@@ -3,8 +3,9 @@
 const std = @import("std");
 const kernel = @import("root");
 
-export fn _start() callconv(.Naked) void {
-    while (true) {}
+comptime {
+    // make sure the entry points are referenced
+    _ = @import("entry.zig");
 }
 
 /// Disable interrupts and put the CPU to sleep.
