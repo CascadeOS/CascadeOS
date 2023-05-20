@@ -105,12 +105,26 @@ const Options = struct {
     /// defaults to 256mb in UEFI mode and 128mb otherwise
     memory: usize,
 
+    kernel_options_module: *std.Build.Module,
+
     pub fn get(b: *std.Build) !Options {
+        const qemu_monitor = b.option(
+            bool,
+            "qemu_monitor",
+            "Enable qemu monitor",
+        ) orelse false;
+
         const qemu_debug = b.option(
             bool,
             "debug",
             "Enable qemu remote debug (also disables kaslr)",
         ) orelse false;
+
+        const no_display = b.option(
+            bool,
+            "no_display",
+            "Disable qemu graphical display (defaults to true)",
+        ) orelse true;
 
         const interrupt_details = b.option(
             bool,
@@ -144,28 +158,25 @@ const Options = struct {
             break :blk interrupt_details;
         };
 
+        const memory: usize = b.option(
+            usize,
+            "memory",
+            "How much memory (in MB) to request from qemu (defaults to 256 for UEFI and 128 otherwise)",
+        ) orelse if (uefi) 256 else 128;
+
+        // Build the kernel options module
+        const kernel_options = b.addOptions();
         return .{
             .optimize = b.standardOptimizeOption(.{}),
-            .qemu_monitor = b.option(
-                bool,
-                "qemu_monitor",
-                "Enable qemu monitor",
-            ) orelse false,
+            .qemu_monitor = qemu_monitor,
             .qemu_debug = qemu_debug,
-            .no_display = b.option(
-                bool,
-                "no_display",
-                "Disable qemu graphical display (defaults to true)",
-            ) orelse true,
+            .no_display = no_display,
             .no_kvm = no_kvm,
             .interrupt_details = interrupt_details,
             .smp = smp,
             .uefi = uefi,
-            .memory = b.option(
-                usize,
-                "memory",
-                "How much memory (in MB) to request from qemu (defaults to 256 for UEFI and 128 otherwise)",
-            ) orelse if (uefi) 256 else 128,
+            .memory = memory,
+            .kernel_options_module = kernel_options.createModule(),
         };
     }
 };
@@ -203,6 +214,8 @@ const Kernel = struct {
                 "linker.ld",
             }),
         });
+
+        kernel_exe.addModule("kernel_options", options.kernel_options_module);
 
         try performTargetSpecificSetup(b, kernel_exe, arch, options);
 
