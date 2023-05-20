@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 const std = @import("std");
 const Step = std.Build.Step;
 const Arch = std.Target.Cpu.Arch;
