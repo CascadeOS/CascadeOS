@@ -578,17 +578,19 @@ const QemuStep = struct {
         }
 
         // UEFI
-        switch (self.arch) {
-            .x86_64 => {
-                if (fileExists("/usr/share/ovmf/x64/OVMF.fd")) {
-                    run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/x64/OVMF.fd" });
-                } else if (fileExists("/usr/share/ovmf/OVMF.fd")) {
-                    run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/OVMF.fd" });
-                } else {
-                    return step.fail("Unable to locate OVMF.fd to enable UEFI booting", .{});
-                }
-            },
-            else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
+        if (self.options.uefi) {
+            switch (self.arch) {
+                .x86_64 => {
+                    if (fileExists("/usr/share/ovmf/x64/OVMF.fd")) {
+                        run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/x64/OVMF.fd" });
+                    } else if (fileExists("/usr/share/ovmf/OVMF.fd")) {
+                        run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/OVMF.fd" });
+                    } else {
+                        return step.fail("Unable to locate OVMF.fd to enable UEFI booting", .{});
+                    }
+                },
+                else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
+            }
         }
 
         try run_qemu.step.make(prog_node);
