@@ -127,7 +127,7 @@ const Kernel = struct {
 
                 return target;
             },
-            else => @panic("Unsupported architecture"),
+            else => @panic("unsupported architecture"),
         }
     }
 
@@ -144,7 +144,7 @@ const Kernel = struct {
                 // TODO: Check if this works
                 kernel_exe.want_lto = false;
             },
-            else => @panic("Unsupported architecture"),
+            else => @panic("unsupported architecture"),
         }
     }
 };
