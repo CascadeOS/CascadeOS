@@ -8,7 +8,3 @@ pub const info = @import("info.zig");
 comptime {
     _ = arch.current;
 }
-
-export fn _start() callconv(.Naked) void {
-    while (true) {}
-}
