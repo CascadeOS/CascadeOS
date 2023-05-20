@@ -5,6 +5,7 @@ const std = @import("std");
 pub const arch = @import("arch/arch.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
+pub const spec = @import("spec/spec.zig");
 
 comptime {
     _ = arch.current;
