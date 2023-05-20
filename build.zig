@@ -70,6 +70,7 @@ pub fn build(b: *std.Build) !void {
 }
 
 const supported_archs: []const Arch = &.{
+    Arch.aarch64,
     Arch.x86_64,
 };
 
@@ -98,7 +99,8 @@ const Options = struct {
     /// number of cores
     smp: usize,
 
-    /// run qemu in UEFI mode
+    /// force qemu to run in UEFI mode, if the architecture supports it
+    /// defaults to false, some architectures always run in UEFI mode
     uefi: bool,
 
     /// how much memory to request from qemu
@@ -143,7 +145,7 @@ const Options = struct {
         const uefi = b.option(
             bool,
             "uefi",
-            "Run qemu in UEFI mode",
+            "Force qemu to run in UEFI mode if the architecture supports it",
         ) orelse false;
 
         const smp = b.option(
@@ -301,6 +303,16 @@ const Kernel = struct {
 
                 return target;
             },
+            .aarch64 => {
+                var target = std.zig.CrossTarget{
+                    .cpu_arch = .aarch64,
+                    .os_tag = .freestanding,
+                    .abi = .none,
+                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 }, // TODO: Make this configurable
+                };
+
+                return target;
+            },
             else => @panic("unsupported architecture"),
         }
     }
@@ -314,6 +326,13 @@ const Kernel = struct {
                 kernel_exe.disable_stack_probing = true;
                 kernel_exe.code_model = .kernel;
                 kernel_exe.red_zone = false;
+                kernel_exe.pie = true;
+                // TODO: Check if this works
+                kernel_exe.want_lto = false;
+            },
+            .aarch64 => {
+                kernel_exe.omit_frame_pointer = false;
+                kernel_exe.disable_stack_probing = true;
                 kernel_exe.pie = true;
                 // TODO: Check if this works
                 kernel_exe.want_lto = false;
@@ -369,12 +388,25 @@ const ImageStep = struct {
     image_file: std.Build.GeneratedFile,
     image_file_source: std.Build.FileSource,
 
+    run_build_image_file: *Step.Run,
+
     pub fn create(owner: *std.Build, arch: Arch, kernel: Kernel) !*ImageStep {
         const step_name = try std.fmt.allocPrint(
             owner.allocator,
             "build {s} image",
             .{@tagName(arch)},
         );
+
+        const build_image_file_name = switch (arch) {
+            .aarch64 => "build_image_aarch64.sh",
+            .x86_64 => "build_image_x86_64.sh",
+            else => @panic("unsupported architecture"),
+        };
+
+        const run_build_image_file = owner.addSystemCommand(&.{build_image_file_name});
+        run_build_image_file.cwd = pathJoinFromRoot(owner, &.{".build"});
+        run_build_image_file.has_side_effects = true;
+        run_build_image_file.stdio = .inherit;
 
         const self = try owner.allocator.create(ImageStep);
         self.* = .{
@@ -387,6 +419,7 @@ const ImageStep = struct {
             .arch = arch,
             .image_file = undefined,
             .image_file_source = undefined,
+            .run_build_image_file = run_build_image_file,
         };
         self.image_file = .{ .step = &self.step };
         self.image_file_source = .{ .generated = &self.image_file };
@@ -451,29 +484,30 @@ const ImageStep = struct {
     }
 
     fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
-        switch (self.arch) {
-            .x86_64 => {
-                const args: []const []const u8 = &.{
-                    pathJoinFromRoot(self.step.owner, &.{ ".build", "build_image_x86_64.sh" }),
-                    image_file_path,
-                };
+        const build_image_file_name = switch (self.arch) {
+            .aarch64 => "build_image_aarch64.sh",
+            .x86_64 => "build_image_x86_64.sh",
+            else => @panic("unsupported architecture"),
+        };
 
-                var child = std.ChildProcess.init(args, self.step.owner.allocator);
-                child.cwd = pathJoinFromRoot(self.step.owner, &.{".build"});
+        const args: []const []const u8 = &.{
+            pathJoinFromRoot(self.step.owner, &.{ ".build", build_image_file_name }),
+            image_file_path,
+        };
 
-                try child.spawn();
-                const term = try child.wait();
+        var child = std.ChildProcess.init(args, self.step.owner.allocator);
+        child.cwd = pathJoinFromRoot(self.step.owner, &.{".build"});
 
-                switch (term) {
-                    .Exited => |code| {
-                        if (code != 0) {
-                            return error.UncleanExit;
-                        }
-                    },
-                    else => return error.UncleanExit,
+        try child.spawn();
+        const term = try child.wait();
+
+        switch (term) {
+            .Exited => |code| {
+                if (code != 0) {
+                    return error.UncleanExit;
                 }
             },
-            else => @panic("unsupported architecture"),
+            else => return error.UncleanExit,
         }
     }
 };
@@ -546,6 +580,7 @@ const QemuStep = struct {
         const self = @fieldParentPtr(QemuStep, "step", step);
 
         const qemu_executable: []const u8 = switch (self.arch) {
+            .aarch64 => "qemu-system-aarch64",
             .x86_64 => "qemu-system-x86_64",
             else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
         };
@@ -608,6 +643,9 @@ const QemuStep = struct {
 
         // set target cpu
         switch (self.arch) {
+            .aarch64 => {
+                run_qemu.addArgs(&.{ "-cpu", "cortex-a57" }); // TODO: Make this configurable
+            },
             .x86_64 => {
                 // we aren't going to support migration so disable it here to get invariant tsc :)
                 run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" });
@@ -617,6 +655,9 @@ const QemuStep = struct {
 
         // set machine
         switch (self.arch) {
+            .aarch64 => {
+                run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }); // TODO: Make this configurable
+            },
             .x86_64 => {
                 if (self.options.no_kvm or !fileExists("/dev/kvm")) {
                     run_qemu.addArgs(&[_][]const u8{ "-machine", "q35,accel=tcg" });
@@ -629,9 +670,17 @@ const QemuStep = struct {
         }
 
         // UEFI
-        if (self.options.uefi) {
-            switch (self.arch) {
-                .x86_64 => {
+        switch (self.arch) {
+            .aarch64 => {
+                // always enable UEFI for aarch64
+                if (fileExists("/usr/share/edk2/aarch64/QEMU_EFI.fd")) {
+                    run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/edk2/aarch64/QEMU_EFI.fd" });
+                } else {
+                    return step.fail("Unable to locate QEMU_EFI.fd to enable UEFI booting", .{});
+                }
+            },
+            .x86_64 => {
+                if (self.options.uefi) {
                     if (fileExists("/usr/share/ovmf/x64/OVMF.fd")) {
                         run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/x64/OVMF.fd" });
                     } else if (fileExists("/usr/share/ovmf/OVMF.fd")) {
@@ -639,9 +688,9 @@ const QemuStep = struct {
                     } else {
                         return step.fail("Unable to locate OVMF.fd to enable UEFI booting", .{});
                     }
-                },
-                else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
-            }
+                }
+            },
+            else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
         }
 
         try run_qemu.step.make(prog_node);
