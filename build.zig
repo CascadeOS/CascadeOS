@@ -105,6 +105,14 @@ const Options = struct {
     /// defaults to 256mb in UEFI mode and 128mb otherwise
     memory: usize,
 
+    // kernel options
+
+    /// force the provided log scopes to be debug (comma seperated list of wildcard scope matchers)
+    scopes_to_force_debug: []const u8,
+
+    /// force the log level of every scope to be debug in the kernel
+    force_debug_log: bool,
+
     kernel_options_module: *std.Build.Module,
 
     pub fn get(b: *std.Build) !Options {
@@ -164,8 +172,23 @@ const Options = struct {
             "How much memory (in MB) to request from qemu (defaults to 256 for UEFI and 128 otherwise)",
         ) orelse if (uefi) 256 else 128;
 
+        const force_debug_log = b.option(
+            bool,
+            "force_debug_log",
+            "Force the log level of every scope to be debug in the kernel",
+        ) orelse false;
+
+        const scopes_to_force_debug = b.option(
+            []const u8,
+            "debug_scope",
+            "Forces the provided log scopes to be debug (comma seperated list of wildcard scope matchers)",
+        ) orelse "";
+
         // Build the kernel options module
         const kernel_options = b.addOptions();
+        kernel_options.addOption(bool, "force_debug_log", force_debug_log);
+        addStringLiteralSlice(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
+
         return .{
             .optimize = b.standardOptimizeOption(.{}),
             .qemu_monitor = qemu_monitor,
@@ -176,8 +199,23 @@ const Options = struct {
             .smp = smp,
             .uefi = uefi,
             .memory = memory,
+            .force_debug_log = force_debug_log,
+            .scopes_to_force_debug = scopes_to_force_debug,
             .kernel_options_module = kernel_options.createModule(),
         };
+    }
+
+    fn addStringLiteralSlice(options: *std.Build.OptionsStep, name: []const u8, buffer: []const u8) void {
+        const out = options.contents.writer();
+
+        out.print("pub const {}: []const []const u8 = &.{{", .{std.zig.fmtId(name)}) catch unreachable;
+
+        var iter = std.mem.split(u8, buffer, ",");
+        while (iter.next()) |value| {
+            if (value.len != 0) out.print("\"{s}\",", .{value}) catch unreachable;
+        }
+
+        out.writeAll("};\n") catch unreachable;
     }
 };
 

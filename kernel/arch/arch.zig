@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
-const kernel = @import("../kernel.zig");
+const kernel = @import("root");
 
 pub const x86_64 = @import("x86_64/x86_64.zig");
 

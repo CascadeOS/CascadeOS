@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const kernel = @import("root");
 
 export fn _start() callconv(.Naked) void {
     while (true) {}
@@ -11,4 +12,17 @@ pub fn disableInterruptsAndHalt() noreturn {
     while (true) {
         asm volatile ("cli; hlt");
     }
+}
+
+pub fn earlyLogFn(
+    comptime scope: @Type(.EnumLiteral),
+    comptime message_level: kernel.log.Level,
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = args;
+    _ = format;
+    _ = message_level;
+    _ = scope;
+    @panic("TODO: implement earlyLogFn");
 }
