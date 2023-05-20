@@ -23,7 +23,7 @@ pub fn setPanicFunction(panic_fn: PanicFunction) void {
 }
 
 /// A function pointer to the current implementation of panic.
-/// This will change from "`noOpPanic` -> setup panic -> normal panic" during system setup.
+/// This will change from "`noOpPanic` -> early boot panic -> normal panic" during system setup.
 var panic_impl: PanicFunction = noOpPanic;
 
 /// A no-op panic used before any infrastructure is ready.

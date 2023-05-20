@@ -39,6 +39,7 @@ fn logFnDispatch(
     comptime format: []const u8,
     args: anytype,
 ) void {
+    // TODO per branch cold: https://github.com/ziglang/zig/issues/5177
     if (initialized) {
         standardLogFn(scope, message_level, format, args);
     } else {
@@ -56,7 +57,8 @@ fn standardLogFn(
     _ = format;
     _ = message_level;
     _ = scope;
-    @panic("TODO: implement standardLogFn");
+
+    @panic("UNIMPLEMENTED"); // TODO: implement standardLogFn
 }
 
 pub const Level = enum {

@@ -14,6 +14,7 @@ pub fn disableInterruptsAndHalt() noreturn {
     }
 }
 
+/// Logging function for early boot only.
 pub fn earlyLogFn(
     comptime scope: @Type(.EnumLiteral),
     comptime message_level: kernel.log.Level,
@@ -24,5 +25,5 @@ pub fn earlyLogFn(
     _ = format;
     _ = message_level;
     _ = scope;
-    @panic("TODO: implement earlyLogFn");
+    @panic("UNIMPLEMENTED"); // TODO: implement earlyLogFn
 }
