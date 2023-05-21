@@ -13,7 +13,7 @@ fn setup() void {
     serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
 
     // print starting message
-    serial_port.writer().writeAll(comptime "starting CircuitOS 0.0.0\n") catch unreachable;
+    serial_port.writer().writeAll(comptime "starting CircuitOS " ++ kernel.info.version ++ "\n") catch unreachable;
 
     const log = kernel.log.scoped(.setup);
 

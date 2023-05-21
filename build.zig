@@ -243,6 +243,8 @@ pub const CircuitTarget = struct {
 const Options = struct {
     optimize: std.builtin.OptimizeMode,
 
+    version: []const u8,
+
     // qemu options
 
     /// enable qemu monitor
@@ -352,8 +354,11 @@ const Options = struct {
             "Forces the provided log scopes to be debug (comma seperated list of wildcard scope matchers)",
         ) orelse "";
 
+        const version = try getVersionString(b, circuit_version);
+
         return .{
             .optimize = b.standardOptimizeOption(.{}),
+            .version = version,
             .qemu_monitor = qemu_monitor,
             .qemu_debug = qemu_debug,
             .no_display = no_display,
@@ -364,7 +369,7 @@ const Options = struct {
             .memory = memory,
             .force_debug_log = force_debug_log,
             .scopes_to_force_debug = scopes_to_force_debug,
-            .kernel_option_modules = try buildKernelOptionModules(b, force_debug_log, scopes_to_force_debug),
+            .kernel_option_modules = try buildKernelOptionModules(b, force_debug_log, scopes_to_force_debug, version),
         };
     }
 
@@ -372,6 +377,7 @@ const Options = struct {
         b: *std.Build,
         force_debug_log: bool,
         scopes_to_force_debug: []const u8,
+        version: []const u8,
     ) !std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) {
         var kernel_option_modules: std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) = .{};
         errdefer kernel_option_modules.deinit(b.allocator);
@@ -380,6 +386,9 @@ const Options = struct {
 
         for (supported_targets) |target| {
             const kernel_options = b.addOptions();
+
+            kernel_options.addOption([]const u8, "version", version);
+
             kernel_options.addOption(bool, "force_debug_log", force_debug_log);
             addStringLiteralSliceOption(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
 
@@ -436,6 +445,64 @@ const Options = struct {
             out.print("pub const board: ?Board = .{s};\n", .{std.zig.fmtId(@tagName(board))}) catch unreachable;
         } else {
             out.writeAll("pub const board: ?Board = null;\n") catch unreachable;
+        }
+    }
+
+    fn getVersionString(b: *std.Build, version: std.builtin.Version) ![]const u8 {
+        const version_string = b.fmt(
+            "{d}.{d}.{d}",
+            .{ version.major, version.minor, version.patch },
+        );
+
+        var code: u8 = undefined;
+        const git_describe_untrimmed = b.execAllowFail(&[_][]const u8{
+            "git", "-C", b.build_root.path.?, "describe", "--match", "*.*.*", "--tags",
+        }, &code, .Ignore) catch {
+            return version_string;
+        };
+        const git_describe = std.mem.trim(u8, git_describe_untrimmed, " \n\r");
+
+        switch (std.mem.count(u8, git_describe, "-")) {
+            0 => {
+                // Tagged release version (e.g. 0.8.0).
+                if (!std.mem.eql(u8, git_describe, version_string)) {
+                    std.debug.print(
+                        "version '{s}' does not match Git tag '{s}'\n",
+                        .{ version_string, git_describe },
+                    );
+                    std.process.exit(1);
+                }
+                return version_string;
+            },
+            2 => {
+                // Untagged development build (e.g. 0.8.0-684-gbbe2cca1a).
+                var it = std.mem.split(u8, git_describe, "-");
+                const tagged_ancestor = it.next() orelse unreachable;
+                const commit_height = it.next() orelse unreachable;
+                const commit_id = it.next() orelse unreachable;
+
+                const ancestor_ver = try std.builtin.Version.parse(tagged_ancestor);
+                if (version.order(ancestor_ver) != .gt) {
+                    std.debug.print(
+                        "version '{}' must be greater than tagged ancestor '{}'\n",
+                        .{ version, ancestor_ver },
+                    );
+                    std.process.exit(1);
+                }
+
+                // Check that the commit hash is prefixed with a 'g' (a Git convention).
+                if (commit_id.len < 1 or commit_id[0] != 'g') {
+                    std.debug.print("unexpected `git describe` output: {s}\n", .{git_describe});
+                    return version_string;
+                }
+
+                // The version is reformatted in accordance with the https://semver.org specification.
+                return b.fmt("{s}-dev.{s}+{s}", .{ version_string, commit_height, commit_id[1..] });
+            },
+            else => {
+                std.debug.print("unexpected `git describe` output: {s}\n", .{git_describe});
+                return version_string;
+            },
         }
     }
 };
