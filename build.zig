@@ -155,6 +155,8 @@ pub const CircuitTarget = struct {
                         .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 },
                     };
 
+                    // TODO: I don't know enough about aarch64 to know how to disable SIMD instructions
+
                     return target;
                 },
             },
