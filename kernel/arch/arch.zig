@@ -22,7 +22,8 @@ pub inline fn disableInterruptsAndHalt() noreturn {
 
 inline fn callCurrent(comptime ReturnType: type, comptime name: []const u8, args: anytype) ReturnType {
     if (!@hasDecl(current, name)) {
-        @compileError(@tagName(kernel.info.arch) ++ " has not implemented `" ++ name ++ "`");
+        // TODO: should this be a compile error?
+        std.debug.panicExtra(null, @returnAddress(), comptime @tagName(kernel.info.arch) ++ " has not implemented `" ++ name ++ "`", .{});
     }
     return @call(.auto, @field(current, name), args);
 }
