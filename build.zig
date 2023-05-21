@@ -3,6 +3,8 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
+const circuit_version = std.builtin.Version{ .major = 0, .minor = 0, .patch = 1 };
+
 pub fn build(b: *std.Build) !void {
     const step_collection = try StepCollection.create(b);
     b.default_step = step_collection.main_test_step;
