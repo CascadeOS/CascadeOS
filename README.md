@@ -1,4 +1,4 @@
-# circuit
+# CircuitOS
 
 Circuit is a general purpose operating system targeting standard desktops and laptops.
 
