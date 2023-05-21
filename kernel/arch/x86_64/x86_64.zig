@@ -30,4 +30,7 @@ pub fn earlyLogFn(
     _ = message_level;
     _ = scope;
     @panic("UNIMPLEMENTED"); // TODO: implement earlyLogFn
+pub inline fn pause() void {
+    asm volatile ("pause");
 }
+
