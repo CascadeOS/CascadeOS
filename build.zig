@@ -2,7 +2,6 @@
 
 const std = @import("std");
 const Step = std.Build.Step;
-const Arch = std.Target.Cpu.Arch;
 
 pub fn build(b: *std.Build) !void {
     const step_collection = try StepCollection.create(b);
@@ -10,58 +9,60 @@ pub fn build(b: *std.Build) !void {
 
     const options = try Options.get(b);
 
-    for (supported_archs) |arch| {
-        const kernel = try Kernel.create(b, arch, options);
+    for (supported_targets) |target| {
+        const target_name = try target.name(b.allocator);
+
+        const kernel = try Kernel.create(b, target, options);
 
         // Setup the build step
         {
             const build_step_name = try std.fmt.allocPrint(
                 b.allocator,
                 "kernel_{s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const build_step_description = try std.fmt.allocPrint(
                 b.allocator,
                 "Build the kernel for {s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const build_step = b.step(build_step_name, build_step_description);
             build_step.dependOn(&kernel.install_step.step);
 
-            step_collection.test_steps.get(arch).?.dependOn(build_step);
+            step_collection.test_steps.get(target).?.dependOn(build_step);
         }
 
-        const image_build = try ImageStep.create(b, arch, kernel);
+        const image_build = try ImageStep.create(b, target, kernel);
 
         // Setup the image step
         {
             const image_step_name = try std.fmt.allocPrint(
                 b.allocator,
                 "image_{s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const image_step_description = try std.fmt.allocPrint(
                 b.allocator,
                 "Build the image for {s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const image_step = b.step(image_step_name, image_step_description);
             image_step.dependOn(&image_build.step);
         }
 
-        const run_in_qemu = try QemuStep.create(b, arch, image_build.image_file_source, options);
+        const run_in_qemu = try QemuStep.create(b, target, image_build.image_file_source, options);
 
         // Setup the qemu step
         {
             const run_in_qemu_step_name = try std.fmt.allocPrint(
                 b.allocator,
                 "run_{s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const run_in_qemu_step_description = try std.fmt.allocPrint(
                 b.allocator,
                 "Run the image for {s} in qemu",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const run_step = b.step(run_in_qemu_step_name, run_in_qemu_step_description);
             run_step.dependOn(&run_in_qemu.step);
@@ -69,9 +70,170 @@ pub fn build(b: *std.Build) !void {
     }
 }
 
-const supported_archs: []const Arch = &.{
-    Arch.aarch64,
-    Arch.x86_64,
+const supported_targets: []const CircuitTarget = &.{
+    .{ .arch = .aarch64, .board = .virt },
+    .{ .arch = .x86_64 },
+};
+
+pub const CircuitTarget = struct {
+    arch: Arch,
+    board: ?Board = null,
+
+    pub const Arch = enum {
+        aarch64,
+        x86_64,
+    };
+
+    pub const Board = enum {
+        virt,
+    };
+
+    pub fn name(self: CircuitTarget, allocator: std.mem.Allocator) ![]const u8 {
+        return if (self.board) |board|
+            try std.fmt.allocPrint(allocator, "{s}_{s}", .{ @tagName(self.arch), @tagName(board) })
+        else
+            try std.fmt.allocPrint(allocator, "{s}", .{@tagName(self.arch)});
+    }
+
+    pub fn isNative(self: CircuitTarget) bool {
+        return switch (@import("builtin").target.cpu.arch) {
+            .aarch64 => self.arch == .aarch64,
+            .x86_64 => self.arch == .x86_64,
+            else => false,
+        };
+    }
+
+    pub fn needsUefi(self: CircuitTarget) bool {
+        return switch (self.arch) {
+            .aarch64 => true,
+            .x86_64 => false,
+        };
+    }
+
+    pub fn getCrossTarget(self: CircuitTarget) std.zig.CrossTarget {
+        switch (self.arch) {
+            .x86_64 => {
+                const features = std.Target.x86.Feature;
+                var target = std.zig.CrossTarget{
+                    .cpu_arch = .x86_64,
+                    .os_tag = .freestanding,
+                    .abi = .none,
+                    .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64 },
+                };
+
+                // Remove all SSE/AVX features
+                target.cpu_features_sub.addFeature(@enumToInt(features.x87));
+                target.cpu_features_sub.addFeature(@enumToInt(features.mmx));
+                target.cpu_features_sub.addFeature(@enumToInt(features.sse));
+                target.cpu_features_sub.addFeature(@enumToInt(features.f16c));
+                target.cpu_features_sub.addFeature(@enumToInt(features.fma));
+                target.cpu_features_sub.addFeature(@enumToInt(features.sse2));
+                target.cpu_features_sub.addFeature(@enumToInt(features.sse3));
+                target.cpu_features_sub.addFeature(@enumToInt(features.sse4_1));
+                target.cpu_features_sub.addFeature(@enumToInt(features.sse4_2));
+                target.cpu_features_sub.addFeature(@enumToInt(features.ssse3));
+                target.cpu_features_sub.addFeature(@enumToInt(features.vzeroupper));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx2));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx512bw));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx512cd));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx512dq));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx512f));
+                target.cpu_features_sub.addFeature(@enumToInt(features.avx512vl));
+
+                // Add soft float
+                target.cpu_features_add.addFeature(@enumToInt(features.soft_float));
+
+                return target;
+            },
+            .aarch64 => switch (self.board.?) {
+                .virt => {
+                    var target = std.zig.CrossTarget{
+                        .cpu_arch = .aarch64,
+                        .os_tag = .freestanding,
+                        .abi = .none,
+                        .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 },
+                    };
+
+                    return target;
+                },
+            },
+        }
+    }
+
+    pub fn linkerScriptPath(self: CircuitTarget, b: *std.Build) []const u8 {
+        return switch (self.arch) {
+            .aarch64 => switch (self.board.?) {
+                .virt => pathJoinFromRoot(b, &.{ ".build", "linker_aarch64_virt.ld" }),
+            },
+            .x86_64 => pathJoinFromRoot(b, &.{ ".build", "linker_x86_64.ld" }),
+        };
+    }
+
+    pub fn buildImagePath(self: CircuitTarget, b: *std.Build) []const u8 {
+        _ = self;
+        return pathJoinFromRoot(b, &.{ ".build", "build_limine_image.sh" });
+    }
+
+    pub fn qemuExecutable(self: CircuitTarget) []const u8 {
+        return switch (self.arch) {
+            .aarch64 => "qemu-system-aarch64",
+            .x86_64 => "qemu-system-x86_64",
+        };
+    }
+
+    pub fn setQemuCpu(self: CircuitTarget, run_qemu: *std.Build.Step.Run) void {
+        switch (self.arch) {
+            .aarch64 => switch (self.board.?) {
+                .virt => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }),
+            },
+            .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }), // `migratable=no` is required to get invariant tsc
+        }
+    }
+
+    pub fn setQemuMachine(self: CircuitTarget, run_qemu: *std.Build.Step.Run) void {
+        switch (self.arch) {
+            .aarch64 => switch (self.board.?) {
+                .virt => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
+            },
+            .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
+        }
+    }
+
+    pub fn uefiFirmwarePath(self: CircuitTarget) ![]const u8 {
+        switch (self.arch) {
+            .aarch64 => {
+                if (fileExists("/usr/share/edk2/aarch64/QEMU_EFI.fd")) return "/usr/share/edk2/aarch64/QEMU_EFI.fd";
+            },
+            .x86_64 => {
+                if (fileExists("/usr/share/ovmf/x64/OVMF.fd")) return "/usr/share/ovmf/x64/OVMF.fd";
+                if (fileExists("/usr/share/ovmf/OVMF.fd")) return "/usr/share/ovmf/OVMF.fd";
+            },
+        }
+
+        return error.UnableToLocateUefiFirmware;
+    }
+
+    pub fn targetSpecificSetup(self: CircuitTarget, kernel_exe: *std.Build.Step.Compile) void {
+        switch (self.arch) {
+            .aarch64 => {
+                kernel_exe.omit_frame_pointer = false;
+                kernel_exe.disable_stack_probing = true;
+                kernel_exe.pie = true;
+                // TODO: Check if this works
+                kernel_exe.want_lto = false;
+            },
+            .x86_64 => {
+                kernel_exe.omit_frame_pointer = false;
+                kernel_exe.disable_stack_probing = true;
+                kernel_exe.code_model = .kernel;
+                kernel_exe.red_zone = false;
+                kernel_exe.pie = true;
+                // TODO: Check if this works
+                kernel_exe.want_lto = false;
+            },
+        }
+    }
 };
 
 const Options = struct {
@@ -115,7 +277,7 @@ const Options = struct {
     /// force the log level of every scope to be debug in the kernel
     force_debug_log: bool,
 
-    kernel_options_module: *std.Build.Module,
+    kernel_option_modules: std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module),
 
     pub fn get(b: *std.Build) !Options {
         const qemu_monitor = b.option(
@@ -186,11 +348,6 @@ const Options = struct {
             "Forces the provided log scopes to be debug (comma seperated list of wildcard scope matchers)",
         ) orelse "";
 
-        // Build the kernel options module
-        const kernel_options = b.addOptions();
-        kernel_options.addOption(bool, "force_debug_log", force_debug_log);
-        addStringLiteralSlice(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
-
         return .{
             .optimize = b.standardOptimizeOption(.{}),
             .qemu_monitor = qemu_monitor,
@@ -203,11 +360,35 @@ const Options = struct {
             .memory = memory,
             .force_debug_log = force_debug_log,
             .scopes_to_force_debug = scopes_to_force_debug,
-            .kernel_options_module = kernel_options.createModule(),
+            .kernel_option_modules = try buildKernelOptionModules(b, force_debug_log, scopes_to_force_debug),
         };
     }
 
-    fn addStringLiteralSlice(options: *std.Build.OptionsStep, name: []const u8, buffer: []const u8) void {
+    fn buildKernelOptionModules(
+        b: *std.Build,
+        force_debug_log: bool,
+        scopes_to_force_debug: []const u8,
+    ) !std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) {
+        var kernel_option_modules: std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) = .{};
+        errdefer kernel_option_modules.deinit(b.allocator);
+
+        try kernel_option_modules.ensureTotalCapacity(b.allocator, supported_targets.len);
+
+        for (supported_targets) |target| {
+            const kernel_options = b.addOptions();
+            kernel_options.addOption(bool, "force_debug_log", force_debug_log);
+            addStringLiteralSliceOption(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
+
+            addArchOption(kernel_options, target.arch);
+            addBoardOption(kernel_options, target.board);
+
+            kernel_option_modules.putAssumeCapacityNoClobber(target, kernel_options.createModule());
+        }
+
+        return kernel_option_modules;
+    }
+
+    fn addStringLiteralSliceOption(options: *std.Build.OptionsStep, name: []const u8, buffer: []const u8) void {
         const out = options.contents.writer();
 
         out.print("pub const {}: []const []const u8 = &.{{", .{std.zig.fmtId(name)}) catch unreachable;
@@ -219,132 +400,88 @@ const Options = struct {
 
         out.writeAll("};\n") catch unreachable;
     }
+
+    // std.Target.Cpu.Arch
+
+    fn addEnumType(options: *std.Build.OptionsStep, name: []const u8, comptime EnumT: type) void {
+        const out = options.contents.writer();
+
+        out.print("pub const {} = enum {{\n", .{std.zig.fmtId(name)}) catch unreachable;
+
+        inline for (std.meta.tags(EnumT)) |tag| {
+            out.print("    {s},\n", .{std.zig.fmtId(@tagName(tag))}) catch unreachable;
+        }
+
+        out.writeAll("};\n") catch unreachable;
+    }
+
+    fn addArchOption(options: *std.Build.OptionsStep, arch: CircuitTarget.Arch) void {
+        addEnumType(options, "Arch", CircuitTarget.Arch);
+
+        const out = options.contents.writer();
+
+        out.print("pub const arch: Arch = .{s};\n", .{std.zig.fmtId(@tagName(arch))}) catch unreachable;
+    }
+
+    fn addBoardOption(options: *std.Build.OptionsStep, optional_board: ?CircuitTarget.Board) void {
+        addEnumType(options, "Board", CircuitTarget.Board);
+
+        const out = options.contents.writer();
+
+        if (optional_board) |board| {
+            out.print("pub const board: ?Board = .{s};\n", .{std.zig.fmtId(@tagName(board))}) catch unreachable;
+        } else {
+            out.writeAll("pub const board: ?Board = null;\n") catch unreachable;
+        }
+    }
 };
 
 const Kernel = struct {
     b: *std.Build,
-    arch: Arch,
+
+    target: CircuitTarget,
     options: Options,
 
     install_step: *Step.InstallArtifact,
 
-    pub fn create(b: *std.Build, arch: Arch, options: Options) !Kernel {
+    pub fn create(b: *std.Build, target: CircuitTarget, options: Options) !Kernel {
         const kernel_exe = b.addExecutable(.{
             .name = "kernel",
             .root_source_file = .{
                 .path = pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }),
             },
-            .target = getTarget(arch),
+            .target = target.getCrossTarget(),
             .optimize = options.optimize,
         });
 
+        const target_name = try target.name(b.allocator);
+
         kernel_exe.override_dest_dir = .{
             .custom = b.pathJoin(&.{
-                @tagName(arch),
+                target_name,
                 "root",
                 "boot",
             }),
         };
 
-        kernel_exe.setLinkerScriptPath(.{
-            .path = pathJoinFromRoot(b, &.{
-                "kernel",
-                "arch",
-                @tagName(arch),
-                "linker.ld",
-            }),
-        });
+        kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
 
-        kernel_exe.addModule("kernel_options", options.kernel_options_module);
+        kernel_exe.addModule("kernel_options", options.kernel_option_modules.get(target).?);
 
-        try performTargetSpecificSetup(b, kernel_exe, arch, options);
+        target.targetSpecificSetup(kernel_exe);
 
         return Kernel{
             .b = b,
-            .arch = arch,
+            .target = target,
             .options = options,
             .install_step = b.addInstallArtifact(kernel_exe),
         };
-    }
-
-    fn getTarget(arch: Arch) std.zig.CrossTarget {
-        switch (arch) {
-            .x86_64 => {
-                const features = std.Target.x86.Feature;
-                var target = std.zig.CrossTarget{
-                    .cpu_arch = .x86_64,
-                    .os_tag = .freestanding,
-                    .abi = .none,
-                    .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64 },
-                };
-
-                // Remove all SSE/AVX features
-                target.cpu_features_sub.addFeature(@enumToInt(features.x87));
-                target.cpu_features_sub.addFeature(@enumToInt(features.mmx));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse));
-                target.cpu_features_sub.addFeature(@enumToInt(features.f16c));
-                target.cpu_features_sub.addFeature(@enumToInt(features.fma));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse2));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse3));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse4_1));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse4_2));
-                target.cpu_features_sub.addFeature(@enumToInt(features.ssse3));
-                target.cpu_features_sub.addFeature(@enumToInt(features.vzeroupper));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx2));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512bw));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512cd));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512dq));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512f));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512vl));
-
-                // Add soft float
-                target.cpu_features_add.addFeature(@enumToInt(features.soft_float));
-
-                return target;
-            },
-            .aarch64 => {
-                var target = std.zig.CrossTarget{
-                    .cpu_arch = .aarch64,
-                    .os_tag = .freestanding,
-                    .abi = .none,
-                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 }, // TODO: Make this configurable
-                };
-
-                return target;
-            },
-            else => @panic("unsupported architecture"),
-        }
-    }
-
-    fn performTargetSpecificSetup(b: *std.Build, kernel_exe: *Step.Compile, arch: Arch, options: Options) !void {
-        _ = b;
-        _ = options;
-        switch (arch) {
-            .x86_64 => {
-                kernel_exe.omit_frame_pointer = false;
-                kernel_exe.disable_stack_probing = true;
-                kernel_exe.code_model = .kernel;
-                kernel_exe.red_zone = false;
-                kernel_exe.pie = true;
-                // TODO: Check if this works
-                kernel_exe.want_lto = false;
-            },
-            .aarch64 => {
-                kernel_exe.omit_frame_pointer = false;
-                kernel_exe.disable_stack_probing = true;
-                kernel_exe.pie = true;
-                // TODO: Check if this works
-                kernel_exe.want_lto = false;
-            },
-            else => @panic("unsupported architecture"),
-        }
     }
 };
 
 const StepCollection = struct {
     main_test_step: *Step,
-    test_steps: std.AutoHashMapUnmanaged(Arch, *Step),
+    test_steps: std.AutoHashMapUnmanaged(CircuitTarget, *Step),
 
     pub fn create(b: *std.Build) !StepCollection {
         const main_test_step = b.step(
@@ -352,23 +489,25 @@ const StepCollection = struct {
             "Run all the tests (also builds all code even if they don't have tests)",
         );
 
-        var test_steps = std.AutoHashMapUnmanaged(Arch, *Step){};
+        var test_steps = std.AutoHashMapUnmanaged(CircuitTarget, *Step){};
         errdefer test_steps.deinit(b.allocator);
 
-        try test_steps.ensureTotalCapacity(b.allocator, supported_archs.len);
-        for (supported_archs) |arch| {
+        try test_steps.ensureTotalCapacity(b.allocator, supported_targets.len);
+        for (supported_targets) |target| {
+            const target_name = try target.name(b.allocator);
+
             const build_step_name = try std.fmt.allocPrint(
                 b.allocator,
                 "test_{s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const build_step_description = try std.fmt.allocPrint(
                 b.allocator,
                 "Run all the tests (also builds all code even if they don't have tests) for {s}",
-                .{@tagName(arch)},
+                .{target_name},
             );
             const build_step = b.step(build_step_name, build_step_description);
-            test_steps.putAssumeCapacityNoClobber(arch, build_step);
+            test_steps.putAssumeCapacityNoClobber(target, build_step);
 
             main_test_step.dependOn(build_step);
         }
@@ -383,30 +522,19 @@ const StepCollection = struct {
 const ImageStep = struct {
     step: Step,
 
-    arch: Arch,
+    target: CircuitTarget,
 
     image_file: std.Build.GeneratedFile,
     image_file_source: std.Build.FileSource,
 
-    run_build_image_file: *Step.Run,
+    pub fn create(owner: *std.Build, target: CircuitTarget, kernel: Kernel) !*ImageStep {
+        const target_name = try target.name(owner.allocator);
 
-    pub fn create(owner: *std.Build, arch: Arch, kernel: Kernel) !*ImageStep {
         const step_name = try std.fmt.allocPrint(
             owner.allocator,
             "build {s} image",
-            .{@tagName(arch)},
+            .{target_name},
         );
-
-        const build_image_file_name = switch (arch) {
-            .aarch64 => "build_image_aarch64.sh",
-            .x86_64 => "build_image_x86_64.sh",
-            else => @panic("unsupported architecture"),
-        };
-
-        const run_build_image_file = owner.addSystemCommand(&.{build_image_file_name});
-        run_build_image_file.cwd = pathJoinFromRoot(owner, &.{".build"});
-        run_build_image_file.has_side_effects = true;
-        run_build_image_file.stdio = .inherit;
 
         const self = try owner.allocator.create(ImageStep);
         self.* = .{
@@ -416,10 +544,9 @@ const ImageStep = struct {
                 .owner = owner,
                 .makeFn = make,
             }),
-            .arch = arch,
+            .target = target,
             .image_file = undefined,
             .image_file_source = undefined,
-            .run_build_image_file = run_build_image_file,
         };
         self.image_file = .{ .step = &self.step };
         self.image_file_source = .{ .generated = &self.image_file };
@@ -438,11 +565,13 @@ const ImageStep = struct {
         var manifest = b.cache.obtain();
         defer manifest.deinit();
 
+        const target_name = try self.target.name(b.allocator);
+
         // Root
         {
             const full_path = pathJoinFromRoot(b, &.{
                 "zig-out",
-                @tagName(self.arch),
+                target_name,
                 "root",
             });
             var dir = try std.fs.cwd().openIterableDir(full_path, .{});
@@ -468,7 +597,7 @@ const ImageStep = struct {
             try std.fmt.allocPrint(
                 b.allocator,
                 "circuit_{s}.hdd",
-                .{@tagName(self.arch)},
+                .{target_name},
             ),
         });
 
@@ -484,15 +613,14 @@ const ImageStep = struct {
     }
 
     fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
-        const build_image_file_name = switch (self.arch) {
-            .aarch64 => "build_image_aarch64.sh",
-            .x86_64 => "build_image_x86_64.sh",
-            else => @panic("unsupported architecture"),
-        };
+        const build_image_path = self.target.buildImagePath(self.step.owner);
+        const target_name = try self.target.name(self.step.owner.allocator);
 
         const args: []const []const u8 = &.{
-            pathJoinFromRoot(self.step.owner, &.{ ".build", build_image_file_name }),
+            build_image_path,
             image_file_path,
+            target_name,
+            @tagName(self.target.arch),
         };
 
         var child = std.ChildProcess.init(args, self.step.owner.allocator);
@@ -545,14 +673,16 @@ const QemuStep = struct {
     step: std.Build.Step,
     image: std.Build.FileSource,
 
-    arch: Arch,
+    target: CircuitTarget,
     options: Options,
 
-    pub fn create(b: *std.Build, arch: Arch, image: std.Build.FileSource, options: Options) !*QemuStep {
+    pub fn create(b: *std.Build, target: CircuitTarget, image: std.Build.FileSource, options: Options) !*QemuStep {
+        const target_name = try target.name(b.allocator);
+
         const step_name = try std.fmt.allocPrint(
             b.allocator,
             "run qemu with {s} image",
-            .{@tagName(arch)},
+            .{target_name},
         );
 
         const self = try b.allocator.create(QemuStep);
@@ -566,7 +696,7 @@ const QemuStep = struct {
                 .makeFn = make,
             }),
             .image = image,
-            .arch = arch,
+            .target = target,
             .options = options,
         };
 
@@ -579,13 +709,7 @@ const QemuStep = struct {
         const b = step.owner;
         const self = @fieldParentPtr(QemuStep, "step", step);
 
-        const qemu_executable: []const u8 = switch (self.arch) {
-            .aarch64 => "qemu-system-aarch64",
-            .x86_64 => "qemu-system-x86_64",
-            else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
-        };
-
-        const run_qemu = b.addSystemCommand(&.{qemu_executable});
+        const run_qemu = b.addSystemCommand(&.{self.target.qemuExecutable()});
 
         run_qemu.has_side_effects = true;
         run_qemu.stdio = .inherit;
@@ -642,55 +766,23 @@ const QemuStep = struct {
         }
 
         // set target cpu
-        switch (self.arch) {
-            .aarch64 => {
-                run_qemu.addArgs(&.{ "-cpu", "cortex-a57" }); // TODO: Make this configurable
-            },
-            .x86_64 => {
-                // we aren't going to support migration so disable it here to get invariant tsc :)
-                run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" });
-            },
-            else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
-        }
+        self.target.setQemuCpu(run_qemu);
 
-        // set machine
-        switch (self.arch) {
-            .aarch64 => {
-                run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }); // TODO: Make this configurable
-            },
-            .x86_64 => {
-                if (self.options.no_kvm or !fileExists("/dev/kvm")) {
-                    run_qemu.addArgs(&[_][]const u8{ "-machine", "q35,accel=tcg" });
-                } else {
-                    run_qemu.addArgs(&[_][]const u8{ "-machine", "q35,accel=kvm" });
-                    run_qemu.addArg("-enable-kvm");
-                }
-            },
-            else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
+        // set target machine
+        self.target.setQemuMachine(run_qemu);
+
+        // KVM
+        const should_use_kvm = !self.options.no_kvm and fileExists("/dev/kvm") and self.target.isNative();
+        if (should_use_kvm) {
+            run_qemu.addArg("-enable-kvm");
         }
 
         // UEFI
-        switch (self.arch) {
-            .aarch64 => {
-                // always enable UEFI for aarch64
-                if (fileExists("/usr/share/edk2/aarch64/QEMU_EFI.fd")) {
-                    run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/edk2/aarch64/QEMU_EFI.fd" });
-                } else {
-                    return step.fail("Unable to locate QEMU_EFI.fd to enable UEFI booting", .{});
-                }
-            },
-            .x86_64 => {
-                if (self.options.uefi) {
-                    if (fileExists("/usr/share/ovmf/x64/OVMF.fd")) {
-                        run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/x64/OVMF.fd" });
-                    } else if (fileExists("/usr/share/ovmf/OVMF.fd")) {
-                        run_qemu.addArgs(&[_][]const u8{ "-bios", "/usr/share/ovmf/OVMF.fd" });
-                    } else {
-                        return step.fail("Unable to locate OVMF.fd to enable UEFI booting", .{});
-                    }
-                }
-            },
-            else => return step.fail("unsupported architecture {s}", .{@tagName(self.arch)}),
+        if (self.options.uefi or self.target.needsUefi()) {
+            const uefi_firmware_path = self.target.uefiFirmwarePath() catch {
+                return step.fail("unable to locate UEFI firmware for target {}", .{self.target});
+            };
+            run_qemu.addArgs(&[_][]const u8{ "-bios", uefi_firmware_path });
         }
 
         try run_qemu.step.make(prog_node);

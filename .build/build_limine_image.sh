@@ -10,17 +10,21 @@ die() {
     exit 1
 }
 
+# Arguments
+IMAGE="$1"
+TARGET_NAME="$2"
+TARGET_ARCH="$3"
+
 # Setup variables
 
 BUILD_DIR=$(pwd -P)
 PROJECT_DIR="$BUILD_DIR/.."
 
 CACHE="$PROJECT_DIR/zig-cache/working-area"
-IMAGE_BOOT="$CACHE/esp_mount_aarch64"
-IMAGE_ROOT="$CACHE/root_mount_aarch64"
+IMAGE_BOOT="$CACHE/esp_mount_$TARGET_NAME"
+IMAGE_ROOT="$CACHE/root_mount_$TARGET_NAME"
 
-OUT_ROOT="$PROJECT_DIR/zig-out/aarch64/root"
-IMAGE="$1"
+OUT_ROOT="$PROJECT_DIR/zig-out/$TARGET_NAME/root"
 
 LIMINE="$CACHE/limine-$LIMINE_BRANCH"
 LIMINE_CONFIG="$BUILD_DIR/limine.cfg"
@@ -115,9 +119,17 @@ sudo mount "${USED_LOOPBACK}p2" "$IMAGE_ROOT" || die "couldn't mount root filesy
 echo "> copying limine files"
 
 sudo mkdir -p "$IMAGE_BOOT"/EFI/BOOT || die "couldn't create EFI/BOOT directory"
-sudo cp "$LIMINE"/limine.sys "$IMAGE_BOOT"/ || die "couldn't copy limine files"
 sudo cp "$LIMINE_CONFIG" "$IMAGE_BOOT"/limine.cfg || die "couldn't copy limine files"
-sudo cp "$LIMINE"/BOOTAA64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
+
+case "$TARGET_ARCH" in
+'x86_64')
+    sudo cp "$LIMINE"/limine.sys "$IMAGE_BOOT"/ || die "couldn't copy limine files"
+    sudo cp "$LIMINE"/BOOTX64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
+    ;;
+'aarch64')
+    sudo cp "$LIMINE"/BOOTAA64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
+    ;;
+esac
 
 # Construct the filesystem
 
