@@ -3,12 +3,14 @@
 const std = @import("std");
 const kernel = @import("root");
 
+const entry = @import("entry.zig");
+
 pub const port = @import("port.zig");
 pub const serial = @import("serial.zig");
 
 comptime {
     // make sure the entry points are referenced
-    _ = @import("entry.zig");
+    _ = entry;
 }
 
 /// Disable interrupts and put the CPU to sleep.
@@ -18,19 +20,8 @@ pub fn disableInterruptsAndHalt() noreturn {
     }
 }
 
-/// Logging function for early boot only.
-pub fn earlyLogFn(
-    comptime scope: @Type(.EnumLiteral),
-    comptime message_level: kernel.log.Level,
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    _ = args;
-    _ = format;
-    _ = message_level;
-    _ = scope;
-    @panic("UNIMPLEMENTED"); // TODO: implement earlyLogFn
 pub inline fn pause() void {
     asm volatile ("pause");
 }
 
+pub const earlyLogFn = entry.earlyLogFn;
