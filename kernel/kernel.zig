@@ -8,7 +8,8 @@ pub const log = @import("log.zig");
 pub const spec = @import("spec/spec.zig");
 
 comptime {
-    _ = arch.current;
+    // ensure any architecture specific code is referenced
+    _ = arch;
 }
 
 /// The signature of a panic implementation function.
@@ -37,7 +38,7 @@ fn noOpPanic(
     _ = stack_trace;
     _ = msg;
     while (true) {
-        arch.current.disableInterruptsAndHalt();
+        arch.disableInterruptsAndHalt();
     }
 }
 

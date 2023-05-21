@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
 
 LIMINE_BRANCH="v4.x-branch-binary"
 PAD_DISK_SIZE=500
