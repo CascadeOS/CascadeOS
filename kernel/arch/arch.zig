@@ -6,7 +6,7 @@ const kernel = @import("root");
 pub const aarch64 = @import("aarch64/aarch64.zig");
 pub const x86_64 = @import("x86_64/x86_64.zig");
 
-const current = switch (kernel.info.arch) {
+const current: type = switch (kernel.info.arch) {
     .aarch64 => aarch64,
     .x86_64 => x86_64,
 };
@@ -16,6 +16,13 @@ comptime {
     _ = current;
 }
 
-pub fn disableInterruptsAndHalt() void {
-    current.disableInterruptsAndHalt();
+pub inline fn disableInterruptsAndHalt() noreturn {
+    callCurrent(noreturn, "disableInterruptsAndHalt", .{});
+}
+
+inline fn callCurrent(comptime ReturnType: type, comptime name: []const u8, args: anytype) ReturnType {
+    if (!@hasDecl(current, name)) {
+        @compileError(@tagName(kernel.info.arch) ++ " has not implemented `" ++ name ++ "`");
+    }
+    return @call(.auto, @field(current, name), args);
 }
