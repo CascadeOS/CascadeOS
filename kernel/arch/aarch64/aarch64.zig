@@ -9,11 +9,6 @@ comptime {
     _ = @import("entry.zig");
 }
 
-/// Disable interrupts and put the CPU to sleep.
-pub fn disableInterruptsAndHalt() noreturn {
-    while (true) {
-        asm volatile ("MSR DAIFSET, #0xF;");
-    }
 }
 
 /// Logging function for early boot only.
@@ -29,3 +24,6 @@ pub fn earlyLogFn(
     _ = scope;
     @panic("UNIMPLEMENTED"); // TODO: implement earlyLogFn
 }
+pub const public = struct {
+    pub const disableInterruptsAndHalt = instructions.disableInterruptsAndHalt;
+};

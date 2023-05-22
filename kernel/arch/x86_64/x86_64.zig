@@ -13,15 +13,9 @@ comptime {
     _ = entry;
 }
 
-/// Disable interrupts and put the CPU to sleep.
-pub fn disableInterruptsAndHalt() noreturn {
-    while (true) {
-        asm volatile ("cli; hlt");
-    }
-}
-
-pub inline fn pause() void {
-    asm volatile ("pause");
 }
 
 pub const earlyLogFn = entry.earlyLogFn;
+pub const public = struct {
+    pub const disableInterruptsAndHalt = instructions.disableInterruptsAndHalt;
+};
