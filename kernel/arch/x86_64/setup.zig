@@ -6,38 +6,21 @@ const x86_64 = @import("x86_64.zig");
 
 const limine = kernel.spec.limine;
 
-var serial_port: x86_64.serial.SerialPort = undefined;
-
-fn setup() void {
-    // we try to get output up and running as soon as possible.
-    serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
-
-    // print starting message
-    serial_port.writer().writeAll(comptime "starting CircuitOS " ++ kernel.info.version ++ "\n") catch unreachable;
-
-    const log = kernel.log.scoped(.setup);
-
-    // now that we have basic output functionality, switch the panic implementation to use it
-    log.info("loading simplified panic handler", .{});
-    kernel.setPanicFunction(simplePanic);
-
-    @panic("UNIMPLEMENTED"); // TODO: implement initial system setup
+/// Entry point.
+export fn _start() callconv(.Naked) noreturn {
+    @call(.never_inline, kernel.setup.setup, .{});
+    @panic("setup returned");
 }
 
-/// Prints the panic message then disables interrupts and halts.
-fn simplePanic(
-    msg: []const u8,
-    stack_trace: ?*const std.builtin.StackTrace,
-    ret_addr: ?usize,
-) noreturn {
-    _ = ret_addr;
-    _ = stack_trace;
+var serial_port: x86_64.serial.SerialPort = undefined;
 
-    serial_port.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+pub fn setupEarlyOutput() void {
+    serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
+    kernel.setPanicFunction(simplePanic);
+}
 
-    while (true) {
-        x86_64.instructions.disableInterruptsAndHalt();
-    }
+pub fn earlyOutputRaw(str: []const u8) void {
+    serial_port.writer().writeAll(str) catch unreachable;
 }
 
 /// Logging function for early boot only.
@@ -56,8 +39,18 @@ pub fn earlyLogFn(
     writer.print(user_fmt, args) catch unreachable;
 }
 
-/// Entry point.
-export fn _start() callconv(.Naked) noreturn {
-    @call(.never_inline, setup, .{});
-    @panic("setup returned");
+/// Prints the panic message then disables interrupts and halts.
+fn simplePanic(
+    msg: []const u8,
+    stack_trace: ?*const std.builtin.StackTrace,
+    ret_addr: ?usize,
+) noreturn {
+    _ = ret_addr;
+    _ = stack_trace;
+
+    serial_port.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+
+    while (true) {
+        x86_64.instructions.disableInterruptsAndHalt();
+    }
 }

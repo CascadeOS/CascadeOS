@@ -6,14 +6,19 @@ const aarch64 = @import("aarch64.zig");
 
 const limine = kernel.spec.limine;
 
-fn setup() void {
-    @panic("UNIMPLEMENTED"); // TODO: implement initial system setup
-}
-
 /// Entry point.
 export fn _start() callconv(.Naked) noreturn {
-    @call(.never_inline, setup, .{});
+    @call(.never_inline, kernel.setup.setup, .{});
     @panic("setup returned");
+}
+
+pub fn earlyOutputRaw(str: []const u8) void {
+    _ = str;
+    @panic("UNIMPLEMENTED"); // TODO: implement earlyOutputRaw
+}
+
+pub fn setupEarlyOutput() void {
+    @panic("UNIMPLEMENTED"); // TODO: implement setupEarlyOutput
 }
 
 /// Logging function for early boot only.

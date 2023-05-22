@@ -12,6 +12,9 @@ comptime {
 }
 
 pub const interface = kernel.arch.ArchInterface{
+    .setupEarlyOutput = setup.setupEarlyOutput,
+
+    .earlyOutputRaw = setup.earlyOutputRaw,
     .earlyLogFn = setup.earlyLogFn,
 
     .disableInterruptsAndHalt = instructions.disableInterruptsAndHalt,
