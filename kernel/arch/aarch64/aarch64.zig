@@ -11,6 +11,8 @@ comptime {
     _ = setup;
 }
 
-pub const public = struct {
-    pub const disableInterruptsAndHalt = instructions.disableInterruptsAndHalt;
+pub const interface = kernel.arch.ArchInterface{
+    .earlyLogFn = setup.earlyLogFn,
+
+    .disableInterruptsAndHalt = instructions.disableInterruptsAndHalt,
 };
