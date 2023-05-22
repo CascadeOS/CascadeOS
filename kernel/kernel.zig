@@ -53,3 +53,11 @@ pub fn panic(
     @setCold(true);
     panic_impl(msg, stack_trace, ret_addr);
 }
+
+pub const std_options = struct {
+    // ensure using `std.log` in the kernel is a compile error
+    pub const log_level = @compileError("use `kernel.log` for logging in the kernel");
+
+    // ensure using `std.log` in the kernel is a compile error
+    pub const logFn = @compileError("use `kernel.log` for logging in the kernel");
+};
