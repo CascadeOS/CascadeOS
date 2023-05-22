@@ -36,7 +36,7 @@ fn simplePanic(
     serial_port.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
 
     while (true) {
-        x86_64.disableInterruptsAndHalt();
+        x86_64.instructions.disableInterruptsAndHalt();
     }
 }
 
