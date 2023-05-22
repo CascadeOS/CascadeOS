@@ -5,7 +5,7 @@ const kernel = @import("root");
 
 const entry = @import("entry.zig");
 
-pub const port = @import("port.zig");
+pub const instructions = @import("instructions.zig");
 pub const serial = @import("serial.zig");
 
 comptime {

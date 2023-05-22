@@ -3,6 +3,7 @@
 const std = @import("std");
 const kernel = @import("root");
 
+pub const instructions = @import("instructions.zig");
 comptime {
     // make sure the entry points are referenced
     _ = @import("entry.zig");

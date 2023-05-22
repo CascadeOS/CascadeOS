@@ -4,8 +4,9 @@ const std = @import("std");
 const kernel = @import("root");
 const x86_64 = @import("x86_64.zig");
 
-const writeU8 = x86_64.port.writeU8;
-const readU8 = x86_64.port.readU8;
+const portReadU8 = x86_64.instructions.portReadU8;
+const portWriteU8 = x86_64.instructions.portWriteU8;
+
 const OUTPUT_READY: u8 = 1 << 5;
 
 // TODO: Make this a proper driver
@@ -20,24 +21,24 @@ pub const SerialPort = struct {
         const data_port_number = com_port.toPort();
 
         // Disable interrupts
-        writeU8(data_port_number + 1, 0x00);
+        portWriteU8(data_port_number + 1, 0x00);
 
         // Set Baudrate
-        writeU8(data_port_number + 3, 0x80);
-        writeU8(data_port_number, baud_rate.toDivisor());
-        writeU8(data_port_number + 1, 0x00);
+        portWriteU8(data_port_number + 3, 0x80);
+        portWriteU8(data_port_number, baud_rate.toDivisor());
+        portWriteU8(data_port_number + 1, 0x00);
 
         // 8 bits, no parity, one stop bit
-        writeU8(data_port_number + 3, 0x03);
+        portWriteU8(data_port_number + 3, 0x03);
 
         // Enable FIFO
-        writeU8(data_port_number + 2, 0xC7);
+        portWriteU8(data_port_number + 2, 0xC7);
 
         // Mark data terminal ready
-        writeU8(data_port_number + 4, 0x0B);
+        portWriteU8(data_port_number + 4, 0x0B);
 
         // Enable interupts
-        writeU8(data_port_number + 1, 0x01);
+        portWriteU8(data_port_number + 1, 0x01);
 
         return .{
             .z_data_port = data_port_number,
@@ -46,8 +47,8 @@ pub const SerialPort = struct {
     }
 
     fn waitForOutputReady(self: SerialPort) void {
-        while (readU8(self.z_line_status_port) & OUTPUT_READY == 0) {
-            x86_64.pause();
+        while (portReadU8(self.z_line_status_port) & OUTPUT_READY == 0) {
+            x86_64.instructions.pause();
         }
     }
 
@@ -61,7 +62,7 @@ pub const SerialPort = struct {
         for (bytes) |char| {
             self.waitForOutputReady();
             // TODO: Should we be checking for `\n` and emitting a `\r` first?
-            writeU8(self.z_data_port, char);
+            portWriteU8(self.z_data_port, char);
         }
         return bytes.len;
     }
