@@ -1,0 +1,39 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "zig build",
+            "type": "process",
+            "command": "zig",
+            "isBuildCommand": true,
+            "args": [
+                "build"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "silent",
+                "showReuseMessage": false,
+                "clear": true,
+                "revealProblems": "onProblem"
+            },
+            "problemMatcher": {
+                "applyTo": "allDocuments",
+                "fileLocation": "autoDetect",
+                "owner": "zig",
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d+):.*?(error):?\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                },
+            }
+        }
+    ]
+}
