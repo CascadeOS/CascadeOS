@@ -29,6 +29,14 @@ pub const setup = struct {
     pub inline fn getEarlyOutputWriter() EarlyOutputWriter {
         return current.setup.getEarlyOutputWriter();
     }
+
+    /// Initialize the architecture specific registers and structures into the state required for early setup.
+    /// One of the requirements of this function is to ensure that any exceptions/faults that occur are correctly handled.
+    ///
+    /// For example, on x86_64 this should setup a GDT, TSS and IDT then install a simple exception handler on every vector.
+    pub inline fn earlyArchInitialization() void {
+        current.setup.earlyArchInitialization();
+    }
 };
 
 /// Disable interrupts and put the CPU to sleep.

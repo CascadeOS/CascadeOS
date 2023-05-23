@@ -17,6 +17,9 @@ pub fn setup() void {
         comptime "starting CircuitOS " ++ kernel.info.version ++ "\n",
     ) catch {};
 
+    log.info("starting architecture specific initialization", .{});
+    kernel.arch.setup.earlyArchInitialization();
+
     log.info("hello world", .{});
 
     @panic("UNIMPLEMENTED"); // TODO: implement initial system setup

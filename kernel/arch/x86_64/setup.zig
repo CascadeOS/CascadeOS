@@ -5,6 +5,7 @@ const kernel = @import("root");
 const x86_64 = @import("x86_64.zig");
 
 const limine = kernel.spec.limine;
+const log = kernel.log.scoped(.setup_x86_64);
 
 /// Entry point.
 export fn _start() callconv(.Naked) noreturn {
@@ -21,4 +22,8 @@ pub fn setupEarlyOutput() void {
 
 pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
     return early_output_serial_port.writer();
+}
+
+pub fn earlyArchInitialization() void {
+    @panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
 }
