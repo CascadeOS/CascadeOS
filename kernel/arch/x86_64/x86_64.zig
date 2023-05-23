@@ -11,6 +11,7 @@ comptime {
 pub const instructions = @import("instructions.zig");
 pub const serial = @import("serial.zig");
 pub const setup = @import("setup.zig");
+pub const Tss = @import("Tss.zig").Tss;
 
 const addr = @import("addr.zig");
 pub const PhysAddr = addr.PhysAddr;
