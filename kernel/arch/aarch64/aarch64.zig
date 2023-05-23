@@ -3,6 +3,8 @@
 const std = @import("std");
 const kernel = @import("root");
 
+pub const exposed = @import("exposed.zig");
+
 pub const instructions = @import("instructions.zig");
 pub const setup = @import("setup.zig");
 pub const UART = @import("UART.zig");
@@ -11,12 +13,3 @@ comptime {
     // make sure the entry points are referenced
     _ = setup;
 }
-
-pub const interface = kernel.arch.ArchInterface{
-    .setupEarlyOutput = setup.setupEarlyOutput,
-
-    .earlyOutputRaw = setup.earlyOutputRaw,
-    .earlyLogFn = setup.earlyLogFn,
-
-    .disableInterruptsAndHalt = instructions.disableInterruptsAndHalt,
-};

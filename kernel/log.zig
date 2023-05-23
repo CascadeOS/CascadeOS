@@ -43,7 +43,7 @@ fn logFnDispatch(
     if (initialized) {
         standardLogFn(scope, message_level, format, args);
     } else {
-        kernel.arch.interface.earlyLogFn(scope, message_level, format, args);
+        kernel.arch.setup.earlyLogFn(scope, message_level, format, args);
     }
 }
 

@@ -40,7 +40,7 @@ fn noOpPanic(
     _ = stack_trace;
     _ = msg;
     while (true) {
-        arch.interface.disableInterruptsAndHalt();
+        arch.disableInterruptsAndHalt();
     }
 }
 
