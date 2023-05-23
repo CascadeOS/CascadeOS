@@ -13,19 +13,19 @@ export fn _start() callconv(.Naked) noreturn {
     @panic("setup returned");
 }
 
-pub const EarlyOutputWriter = aarch64.UART.Writer;
-var early_output_uart: aarch64.UART = undefined;
+pub const EarlyOutputWriter = aarch64.Uart.Writer;
+var early_output_uart: aarch64.Uart = undefined;
 
 pub fn setupEarlyOutput() void {
     // TODO: Use the device tree to find the UART base address.
 
     // TODO: It would be better if the boards could be integrated with the arch, so only valid ones for that arch are possible.
     switch (kernel.info.board.?) {
-        .virt => early_output_uart = aarch64.UART.init(0x09000000),
+        .virt => early_output_uart = aarch64.Uart.init(0x09000000),
     }
 }
 
-pub inline fn getEarlyOutputWriter() aarch64.UART.Writer {
+pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
     return early_output_uart.writer();
 }
 
