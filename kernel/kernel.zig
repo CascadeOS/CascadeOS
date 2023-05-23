@@ -6,6 +6,7 @@ pub const arch = @import("arch/arch.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const setup = @import("setup.zig");
+pub const utils = @import("utils.zig");
 
 pub const spec = @import("spec/spec.zig");
 
