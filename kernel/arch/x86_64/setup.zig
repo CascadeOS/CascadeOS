@@ -12,6 +12,7 @@ export fn _start() callconv(.Naked) noreturn {
     @panic("setup returned");
 }
 
+pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
 var early_output_serial_port: x86_64.serial.SerialPort = undefined;
 
 pub fn setupEarlyOutput() void {

@@ -3,8 +3,6 @@
 const std = @import("std");
 const kernel = @import("root");
 
-pub const exposed = @import("exposed.zig");
-
 pub const instructions = @import("instructions.zig");
 pub const setup = @import("setup.zig");
 pub const UART = @import("UART.zig");

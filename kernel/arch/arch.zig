@@ -19,17 +19,19 @@ comptime {
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
     /// Attempt to set up some form of early output.
-    ///
-    /// Signature compatible with: `fn () void`
-    pub const setupEarlyOutput = current.exposed.setupEarlyOutput;
+    pub inline fn setupEarlyOutput() void {
+        current.setup.setupEarlyOutput();
+    }
+
+    pub const EarlyOutputWriter = current.setup.EarlyOutputWriter;
 
     /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
-    ///
-    /// Signature compatible with: `fn () std.io.Writer`
-    pub const getEarlyOutputWriter = current.exposed.getEarlyOutputWriter;
+    pub inline fn getEarlyOutputWriter() EarlyOutputWriter {
+        return current.setup.getEarlyOutputWriter();
+    }
 };
 
 /// Disable interrupts and put the CPU to sleep.
-///
-/// Signature compatible with: `fn () noreturn`
-pub const disableInterruptsAndHalt = current.exposed.disableInterruptsAndHalt;
+pub inline fn disableInterruptsAndHalt() noreturn {
+    current.instructions.disableInterruptsAndHalt();
+}

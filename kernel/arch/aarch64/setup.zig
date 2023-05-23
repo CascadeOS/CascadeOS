@@ -12,6 +12,7 @@ export fn _start() callconv(.Naked) noreturn {
     @panic("setup returned");
 }
 
+pub const EarlyOutputWriter = aarch64.UART.Writer;
 var early_output_uart: aarch64.UART = undefined;
 
 pub fn setupEarlyOutput() void {
