@@ -6,15 +6,18 @@ const kernel = @import("root");
 pub const aarch64 = @import("aarch64/aarch64.zig");
 pub const x86_64 = @import("x86_64/x86_64.zig");
 
+comptime {
+    // ensure any architecture specific code is referenced
+    _ = current;
+}
+
 const current = switch (kernel.info.arch) {
     .x86_64 => x86_64,
     .aarch64 => aarch64,
 };
 
-comptime {
-    // ensure any architecture specific code is referenced
-    _ = current;
-}
+pub const PhysAddr = current.PhysAddr;
+pub const VirtAddr = current.VirtAddr;
 
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
