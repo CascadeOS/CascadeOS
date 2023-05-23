@@ -20,7 +20,5 @@ pub fn setup() void {
     log.info("starting architecture specific initialization", .{});
     kernel.arch.setup.earlyArchInitialization();
 
-    log.info("hello world", .{});
-
     kernel.utils.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }
