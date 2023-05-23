@@ -31,7 +31,7 @@ pub const Tss = extern struct {
         self.privilege_stack_table[@enumToInt(privilege_level)] = x86_64.VirtAddr.fromInt(@ptrToInt(stack.ptr) + stack.len);
     }
 
-    // pub const format = core.formatStructIgnoreReserved;
+    pub const format = kernel.utils.formatStructIgnoreReserved;
 
     comptime {
         std.debug.assert(@sizeOf(Tss) == 104);
