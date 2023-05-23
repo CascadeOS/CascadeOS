@@ -22,5 +22,5 @@ pub fn setup() void {
 
     log.info("hello world", .{});
 
-    @panic("UNIMPLEMENTED"); // TODO: implement initial system setup
+    kernel.utils.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

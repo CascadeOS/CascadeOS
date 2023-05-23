@@ -42,7 +42,7 @@ pub const panic_implementation = struct {
             return;
         }
 
-        std.debug.panic("cannot switch to {s} panic from {s} panic", .{ @tagName(new_state), @tagName(state) });
+        utils.panicFmt("cannot switch to {s} panic from {s} panic", .{ @tagName(new_state), @tagName(state) });
     }
 
     /// Entry point from the Zig language upon a panic.

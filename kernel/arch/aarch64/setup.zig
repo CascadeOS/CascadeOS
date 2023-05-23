@@ -10,7 +10,7 @@ const log = kernel.log.scoped(.setup_aarch64);
 /// Entry point.
 export fn _start() callconv(.Naked) noreturn {
     @call(.never_inline, kernel.setup.setup, .{});
-    @panic("setup returned");
+    kernel.utils.panic("setup returned");
 }
 
 pub const EarlyOutputWriter = aarch64.Uart.Writer;
@@ -30,5 +30,5 @@ pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
 }
 
 pub fn earlyArchInitialization() void {
-    @panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
+    kernel.utils.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
 }

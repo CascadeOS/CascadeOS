@@ -10,7 +10,7 @@ const log = kernel.log.scoped(.setup_x86_64);
 /// Entry point.
 export fn _start() callconv(.Naked) noreturn {
     @call(.never_inline, kernel.setup.setup, .{});
-    @panic("setup returned");
+    kernel.utils.panic("setup returned");
 }
 
 pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
@@ -25,5 +25,5 @@ pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
 }
 
 pub fn earlyArchInitialization() void {
-    @panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
+    kernel.utils.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
 }

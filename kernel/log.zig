@@ -59,7 +59,7 @@ fn standardLogFn(
     _ = message_level;
     _ = scope;
 
-    @panic("UNIMPLEMENTED `standardLogFn`"); // TODO: implement standardLogFn
+    kernel.utils.panic("UNIMPLEMENTED `standardLogFn`"); // TODO: implement standardLogFn
 }
 
 /// Logging function for early boot only.
