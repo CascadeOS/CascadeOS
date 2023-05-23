@@ -7,8 +7,8 @@ pub const aarch64 = @import("aarch64/aarch64.zig");
 pub const x86_64 = @import("x86_64/x86_64.zig");
 
 const current = switch (kernel.info.arch) {
-    .aarch64 => aarch64,
     .x86_64 => x86_64,
+    .aarch64 => aarch64,
 };
 
 comptime {
@@ -16,7 +16,7 @@ comptime {
     _ = current;
 }
 
-/// Functionality that is only intended to be used during system setup only.
+/// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
     /// Attempt to set up some form of early output.
     ///

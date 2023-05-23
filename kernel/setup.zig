@@ -9,7 +9,7 @@ pub fn setup() void {
     // we try to get output up and running as soon as possible
     kernel.arch.setup.setupEarlyOutput();
 
-    // now that we have early output (hopefully), we can switch to a simple panic handler
+    // now that we have early output, we can switch to a simple panic handler
     kernel.panic_implementation.switchTo(.simple);
 
     // print starting message
