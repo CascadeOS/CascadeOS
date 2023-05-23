@@ -8,6 +8,7 @@ comptime {
     _ = setup;
 }
 
+pub const Gdt = @import("Gdt.zig").Gdt;
 pub const instructions = @import("instructions.zig");
 pub const serial = @import("serial.zig");
 pub const setup = @import("setup.zig");
