@@ -18,22 +18,15 @@ comptime {
 
 /// Functionality that is only intended to be used during system setup only.
 pub const setup = struct {
-    /// Responsible for:
-    /// - Setting up the early output used by `earlyLogFn`
-    /// - Installing a simple panic function
+    /// Attempt to set up some form of early output.
     ///
     /// Signature compatible with: `fn () void`
     pub const setupEarlyOutput = current.exposed.setupEarlyOutput;
 
-    /// Use whatever early output system is available to print a message.
+    /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
     ///
-    /// Signature compatible with: `fn (str: []const u8) void`
-    pub const earlyOutputRaw = current.exposed.earlyOutputRaw;
-
-    /// Use the early output system to print a formatted log message.
-    ///
-    /// Signature compatible with: `fn (scope: @Type(.EnumLiteral), message_level: kernel.log.Level, format: []const u8, args: anytype) void`
-    pub const earlyLogFn = current.exposed.earlyLogFn;
+    /// Signature compatible with: `fn () std.io.Writer`
+    pub const getEarlyOutputWriter = current.exposed.getEarlyOutputWriter;
 };
 
 /// Disable interrupts and put the CPU to sleep.

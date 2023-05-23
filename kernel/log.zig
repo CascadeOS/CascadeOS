@@ -3,7 +3,7 @@
 const std = @import("std");
 const kernel = @import("root");
 
-pub var initialized: bool = false;
+var initialized: bool = false;
 
 pub fn scoped(comptime scope: @Type(.EnumLiteral)) type {
     return struct {
@@ -43,10 +43,11 @@ fn logFnDispatch(
     if (initialized) {
         standardLogFn(scope, message_level, format, args);
     } else {
-        kernel.arch.setup.earlyLogFn(scope, message_level, format, args);
+        earlyLogFn(scope, message_level, format, args);
     }
 }
 
+/// Main logging function used after system setup is finished
 fn standardLogFn(
     comptime scope: @Type(.EnumLiteral),
     comptime message_level: kernel.log.Level,
@@ -59,6 +60,22 @@ fn standardLogFn(
     _ = scope;
 
     @panic("UNIMPLEMENTED"); // TODO: implement standardLogFn
+}
+
+/// Logging function for early boot only.
+fn earlyLogFn(
+    comptime scope: @Type(.EnumLiteral),
+    comptime message_level: kernel.log.Level,
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    const writer = kernel.arch.setup.getEarlyOutputWriter();
+
+    const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
+    writer.writeAll(scopeAndLevelText) catch unreachable;
+
+    const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n') format else format ++ "\n";
+    writer.print(user_fmt, args) catch unreachable;
 }
 
 pub const Level = enum {

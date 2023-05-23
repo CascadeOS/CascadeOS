@@ -10,10 +10,11 @@ pub fn setup() void {
     kernel.arch.setup.setupEarlyOutput();
 
     // print starting message
-    kernel.arch.setup.earlyOutputRaw(comptime "starting CircuitOS " ++ kernel.info.version ++ "\n");
+    kernel.arch.setup.getEarlyOutputWriter().writeAll(
+        comptime "starting CircuitOS " ++ kernel.info.version ++ "\n",
+    ) catch {};
 
     log.info("hello world", .{});
 
     @panic("UNIMPLEMENTED"); // TODO: implement initial system setup
-
 }

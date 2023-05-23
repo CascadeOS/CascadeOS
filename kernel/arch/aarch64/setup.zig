@@ -12,7 +12,7 @@ export fn _start() callconv(.Naked) noreturn {
     @panic("setup returned");
 }
 
-var uart: aarch64.UART = undefined;
+var early_output_uart: aarch64.UART = undefined;
 
 pub fn setupEarlyOutput() void {
     // TODO: Use the device tree to find the UART base address.
@@ -20,29 +20,13 @@ pub fn setupEarlyOutput() void {
     // TODO: It would be better if the boards could be integrated with the arch,
     // so only valid ones for that arch are possible.
     switch (kernel.info.board.?) {
-        .virt => uart = aarch64.UART.init(0x09000000),
+        .virt => early_output_uart = aarch64.UART.init(0x09000000),
     }
     kernel.setPanicFunction(simplePanic);
 }
 
-pub fn earlyOutputRaw(str: []const u8) void {
-    uart.writer().writeAll(str) catch unreachable;
-}
-
-/// Logging function for early boot only.
-pub fn earlyLogFn(
-    comptime scope: @Type(.EnumLiteral),
-    comptime message_level: kernel.log.Level,
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    const writer = uart.writer();
-
-    const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
-    writer.writeAll(scopeAndLevelText) catch unreachable;
-
-    const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n') format else format ++ "\n";
-    writer.print(user_fmt, args) catch unreachable;
+pub inline fn getEarlyOutputWriter() aarch64.UART.Writer {
+    return early_output_uart.writer();
 }
 
 /// Prints the panic message then disables interrupts and halts.
@@ -54,7 +38,7 @@ fn simplePanic(
     _ = ret_addr;
     _ = stack_trace;
 
-    uart.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+    early_output_uart.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
 
     while (true) {
         aarch64.instructions.disableInterruptsAndHalt();

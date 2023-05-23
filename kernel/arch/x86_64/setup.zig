@@ -12,31 +12,15 @@ export fn _start() callconv(.Naked) noreturn {
     @panic("setup returned");
 }
 
-var serial_port: x86_64.serial.SerialPort = undefined;
+var early_output_serial_port: x86_64.serial.SerialPort = undefined;
 
 pub fn setupEarlyOutput() void {
-    serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
+    early_output_serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
     kernel.setPanicFunction(simplePanic);
 }
 
-pub fn earlyOutputRaw(str: []const u8) void {
-    serial_port.writer().writeAll(str) catch unreachable;
-}
-
-/// Logging function for early boot only.
-pub fn earlyLogFn(
-    comptime scope: @Type(.EnumLiteral),
-    comptime message_level: kernel.log.Level,
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    const writer = serial_port.writer();
-
-    const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
-    writer.writeAll(scopeAndLevelText) catch unreachable;
-
-    const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n') format else format ++ "\n";
-    writer.print(user_fmt, args) catch unreachable;
+pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
+    return early_output_serial_port.writer();
 }
 
 /// Prints the panic message then disables interrupts and halts.
@@ -48,7 +32,7 @@ fn simplePanic(
     _ = ret_addr;
     _ = stack_trace;
 
-    serial_port.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+    early_output_serial_port.writer().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
 
     while (true) {
         x86_64.instructions.disableInterruptsAndHalt();
