@@ -73,47 +73,47 @@ pub fn build(b: *std.Build) !void {
 }
 
 const supported_targets: []const CircuitTarget = &.{
-    .{ .arch = .aarch64, .board = .virt },
-    .{ .arch = .x86_64 },
+    .{ .aarch64 = .virt },
+    .x86_64,
 };
 
-pub const CircuitTarget = struct {
-    arch: Arch,
-    board: ?Board = null,
+pub const CircuitTarget = union(Arch) {
+    aarch64: AArch64Board,
+    x86_64,
 
     pub const Arch = enum {
         aarch64,
         x86_64,
     };
 
-    pub const Board = enum {
+    pub const AArch64Board = enum {
         virt,
     };
 
     pub fn name(self: CircuitTarget, allocator: std.mem.Allocator) ![]const u8 {
-        return if (self.board) |board|
-            try std.fmt.allocPrint(allocator, "{s}_{s}", .{ @tagName(self.arch), @tagName(board) })
-        else
-            try std.fmt.allocPrint(allocator, "{s}", .{@tagName(self.arch)});
+        switch (self) {
+            .aarch64 => |board| return try std.fmt.allocPrint(allocator, "{s}_{s}", .{ @tagName(self), @tagName(board) }),
+            .x86_64 => return try std.fmt.allocPrint(allocator, "{s}", .{@tagName(self)}),
+        }
     }
 
     pub fn isNative(self: CircuitTarget) bool {
         return switch (@import("builtin").target.cpu.arch) {
-            .aarch64 => self.arch == .aarch64,
-            .x86_64 => self.arch == .x86_64,
+            .aarch64 => self == .aarch64,
+            .x86_64 => self == .x86_64,
             else => false,
         };
     }
 
     pub fn needsUefi(self: CircuitTarget) bool {
-        return switch (self.arch) {
+        return switch (self) {
             .aarch64 => true,
             .x86_64 => false,
         };
     }
 
     pub fn getCrossTarget(self: CircuitTarget) std.zig.CrossTarget {
-        switch (self.arch) {
+        switch (self) {
             .x86_64 => {
                 const features = std.Target.x86.Feature;
                 var target = std.zig.CrossTarget{
@@ -148,7 +148,7 @@ pub const CircuitTarget = struct {
 
                 return target;
             },
-            .aarch64 => switch (self.board.?) {
+            .aarch64 => |board| switch (board) {
                 .virt => {
                     var target = std.zig.CrossTarget{
                         .cpu_arch = .aarch64,
@@ -166,8 +166,8 @@ pub const CircuitTarget = struct {
     }
 
     pub fn linkerScriptPath(self: CircuitTarget, b: *std.Build) []const u8 {
-        return switch (self.arch) {
-            .aarch64 => switch (self.board.?) {
+        return switch (self) {
+            .aarch64 => |board| switch (board) {
                 .virt => pathJoinFromRoot(b, &.{ ".build", "linker_aarch64_virt.ld" }),
             },
             .x86_64 => pathJoinFromRoot(b, &.{ ".build", "linker_x86_64.ld" }),
@@ -180,15 +180,15 @@ pub const CircuitTarget = struct {
     }
 
     pub fn qemuExecutable(self: CircuitTarget) []const u8 {
-        return switch (self.arch) {
+        return switch (self) {
             .aarch64 => "qemu-system-aarch64",
             .x86_64 => "qemu-system-x86_64",
         };
     }
 
     pub fn setQemuCpu(self: CircuitTarget, run_qemu: *std.Build.Step.Run) void {
-        switch (self.arch) {
-            .aarch64 => switch (self.board.?) {
+        switch (self) {
+            .aarch64 => |board| switch (board) {
                 .virt => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }),
             },
             .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }), // `migratable=no` is required to get invariant tsc
@@ -196,8 +196,8 @@ pub const CircuitTarget = struct {
     }
 
     pub fn setQemuMachine(self: CircuitTarget, run_qemu: *std.Build.Step.Run) void {
-        switch (self.arch) {
-            .aarch64 => switch (self.board.?) {
+        switch (self) {
+            .aarch64 => |board| switch (board) {
                 .virt => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
             },
             .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
@@ -205,7 +205,7 @@ pub const CircuitTarget = struct {
     }
 
     pub fn uefiFirmwarePath(self: CircuitTarget) ![]const u8 {
-        switch (self.arch) {
+        switch (self) {
             .aarch64 => {
                 if (fileExists("/usr/share/edk2/aarch64/QEMU_EFI.fd")) return "/usr/share/edk2/aarch64/QEMU_EFI.fd";
             },
@@ -219,7 +219,7 @@ pub const CircuitTarget = struct {
     }
 
     pub fn targetSpecificSetup(self: CircuitTarget, kernel_exe: *std.Build.Step.Compile) void {
-        switch (self.arch) {
+        switch (self) {
             .aarch64 => {
                 kernel_exe.omit_frame_pointer = false;
                 kernel_exe.disable_stack_probing = true;
@@ -392,8 +392,7 @@ const Options = struct {
             kernel_options.addOption(bool, "force_debug_log", force_debug_log);
             addStringLiteralSliceOption(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
 
-            addArchOption(kernel_options, target.arch);
-            addBoardOption(kernel_options, target.board);
+            addTargetOptions(kernel_options, target);
 
             kernel_option_modules.putAssumeCapacityNoClobber(target, kernel_options.createModule());
         }
@@ -414,8 +413,6 @@ const Options = struct {
         out.writeAll("};\n") catch unreachable;
     }
 
-    // std.Target.Cpu.Arch
-
     fn addEnumType(options: *std.Build.OptionsStep, name: []const u8, comptime EnumT: type) void {
         const out = options.contents.writer();
 
@@ -428,23 +425,19 @@ const Options = struct {
         out.writeAll("};\n") catch unreachable;
     }
 
-    fn addArchOption(options: *std.Build.OptionsStep, arch: CircuitTarget.Arch) void {
+    fn addTargetOptions(options: *std.Build.OptionsStep, target: CircuitTarget) void {
         addEnumType(options, "Arch", CircuitTarget.Arch);
 
         const out = options.contents.writer();
 
-        out.print("pub const arch: Arch = .{s};\n", .{std.zig.fmtId(@tagName(arch))}) catch unreachable;
-    }
+        out.print("pub const arch: Arch = .{s};\n", .{std.zig.fmtId(@tagName(target))}) catch unreachable;
 
-    fn addBoardOption(options: *std.Build.OptionsStep, optional_board: ?CircuitTarget.Board) void {
-        addEnumType(options, "Board", CircuitTarget.Board);
-
-        const out = options.contents.writer();
-
-        if (optional_board) |board| {
-            out.print("pub const board: ?Board = .{s};\n", .{std.zig.fmtId(@tagName(board))}) catch unreachable;
-        } else {
-            out.writeAll("pub const board: ?Board = null;\n") catch unreachable;
+        switch (target) {
+            .x86_64 => {},
+            .aarch64 => |board| {
+                addEnumType(options, "Board", @TypeOf(board));
+                out.print("pub const board: Board = .{s};\n", .{std.zig.fmtId(@tagName(board))}) catch unreachable;
+            },
         }
     }
 
@@ -691,7 +684,7 @@ const ImageStep = struct {
             build_image_path,
             image_file_path,
             target_name,
-            @tagName(self.target.arch),
+            @tagName(self.target),
         };
 
         var child = std.ChildProcess.init(args, self.step.owner.allocator);

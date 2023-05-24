@@ -19,8 +19,7 @@ var early_output_uart: aarch64.Uart = undefined;
 pub fn setupEarlyOutput() void {
     // TODO: Use the device tree to find the UART base address.
 
-    // TODO: It would be better if the boards could be integrated with the arch, so only valid ones for that arch are possible.
-    switch (kernel.info.board.?) {
+    switch (kernel.info.board) {
         .virt => early_output_uart = aarch64.Uart.init(0x09000000),
     }
 }
