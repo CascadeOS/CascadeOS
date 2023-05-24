@@ -12,8 +12,7 @@ pub fn build(b: *std.Build) !void {
     const options = try Options.get(b);
 
     const libraries = try createLibraries(b, step_collection, options.optimize);
-    _ = libraries;
-    const kernels = try createKernels(b, step_collection, options);
+    const kernels = try createKernels(b, libraries, step_collection, options);
     const images = try createImageSteps(b, kernels);
     try createQemuSteps(b, images, options);
 }
@@ -143,7 +142,7 @@ pub const CircuitTarget = union(Arch) {
         };
     }
 
-    pub fn setQemuCpu(self: CircuitTarget, run_qemu: *std.Build.Step.Run) void {
+    pub fn setQemuCpu(self: CircuitTarget, run_qemu: *Step.Run) void {
         switch (self) {
             .aarch64 => |board| switch (board) {
                 .virt => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }),
@@ -152,7 +151,7 @@ pub const CircuitTarget = union(Arch) {
         }
     }
 
-    pub fn setQemuMachine(self: CircuitTarget, run_qemu: *std.Build.Step.Run) void {
+    pub fn setQemuMachine(self: CircuitTarget, run_qemu: *Step.Run) void {
         switch (self) {
             .aarch64 => |board| switch (board) {
                 .virt => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
@@ -175,7 +174,7 @@ pub const CircuitTarget = union(Arch) {
         return error.UnableToLocateUefiFirmware;
     }
 
-    pub fn targetSpecificSetup(self: CircuitTarget, kernel_exe: *std.Build.Step.Compile) void {
+    pub fn targetSpecificSetup(self: CircuitTarget, kernel_exe: *Step.Compile) void {
         switch (self) {
             .aarch64 => {},
             .x86_64 => {
@@ -448,12 +447,12 @@ const Options = struct {
 
 const Kernels = std.AutoHashMapUnmanaged(CircuitTarget, Kernel);
 
-fn createKernels(b: *std.Build, step_collection: StepCollection, options: Options) !Kernels {
+fn createKernels(b: *std.Build, libraries: Libraries, step_collection: StepCollection, options: Options) !Kernels {
     var kernels: Kernels = .{};
     try kernels.ensureTotalCapacity(b.allocator, supported_targets.len);
 
     for (supported_targets) |target| {
-        const kernel = try Kernel.create(b, target, options);
+        const kernel = try Kernel.create(b, target, libraries, options);
 
         const target_name = try target.name(b.allocator);
 
@@ -487,7 +486,7 @@ const Kernel = struct {
 
     install_step: *Step.InstallArtifact,
 
-    pub fn create(b: *std.Build, target: CircuitTarget, options: Options) !Kernel {
+    pub fn create(b: *std.Build, target: CircuitTarget, libraries: Libraries, options: Options) !Kernel {
         const kernel_exe = b.addExecutable(.{
             .name = "kernel",
             .root_source_file = .{
@@ -510,6 +509,12 @@ const Kernel = struct {
         kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
 
         kernel_exe.addModule("kernel_options", options.kernel_option_modules.get(target).?);
+
+        const kernel_dependencies: []const []const u8 = @import("kernel/dependencies.zig").dependencies;
+        for (kernel_dependencies) |dependency| {
+            const library = libraries.get(dependency).?;
+            kernel_exe.addModule(library.name, library.module);
+        }
 
         // TODO: Investigate whether LTO works
         kernel_exe.want_lto = false;
@@ -612,7 +617,7 @@ const ImageStep = struct {
 
         const self = try owner.allocator.create(ImageStep);
         self.* = .{
-            .step = std.Build.Step.init(.{
+            .step = Step.init(.{
                 .id = .custom,
                 .name = step_name,
                 .owner = owner,
@@ -630,7 +635,7 @@ const ImageStep = struct {
         return self;
     }
 
-    fn make(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+    fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         _ = prog_node;
 
         const b = step.owner;
@@ -768,7 +773,7 @@ fn createQemuSteps(b: *std.Build, image_steps: ImageSteps, options: Options) !vo
 }
 
 const QemuStep = struct {
-    step: std.Build.Step,
+    step: Step,
     image: std.Build.FileSource,
 
     target: CircuitTarget,
@@ -787,7 +792,7 @@ const QemuStep = struct {
         errdefer b.allocator.destroy(self);
 
         self.* = .{
-            .step = std.Build.Step.init(.{
+            .step = Step.init(.{
                 .id = .custom,
                 .name = step_name,
                 .owner = b,
@@ -803,7 +808,7 @@ const QemuStep = struct {
         return self;
     }
 
-    fn make(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+    fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         const b = step.owner;
         const self = @fieldParentPtr(QemuStep, "step", step);
 
