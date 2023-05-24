@@ -51,7 +51,7 @@ pub const HHDM = extern struct {
     };
 };
 
-// TODO: Terminal Feature is not implemented as it is not used by Circuit.
+// TODO: Limine's Terminal Feature is not implemented as it is not used by Circuit.
 
 pub const Framebuffer = extern struct {
     id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x9d5827dcd881dd75, 0xa3148604f6fab11b },

@@ -157,7 +157,7 @@ pub const CircuitTarget = union(Arch) {
                         .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 },
                     };
 
-                    // TODO: I don't know enough about aarch64 to know how to disable SIMD instructions
+                    // TODO: Does SIMD (neon) need to be disabled? Like on x86_64?
 
                     return target;
                 },
@@ -220,21 +220,10 @@ pub const CircuitTarget = union(Arch) {
 
     pub fn targetSpecificSetup(self: CircuitTarget, kernel_exe: *std.Build.Step.Compile) void {
         switch (self) {
-            .aarch64 => {
-                kernel_exe.omit_frame_pointer = false;
-                kernel_exe.disable_stack_probing = true;
-                kernel_exe.pie = true;
-                // TODO: Check if this works
-                kernel_exe.want_lto = false;
-            },
+            .aarch64 => {},
             .x86_64 => {
-                kernel_exe.omit_frame_pointer = false;
-                kernel_exe.disable_stack_probing = true;
                 kernel_exe.code_model = .kernel;
                 kernel_exe.red_zone = false;
-                kernel_exe.pie = true;
-                // TODO: Check if this works
-                kernel_exe.want_lto = false;
             },
         }
     }
@@ -254,7 +243,7 @@ const Options = struct {
     qemu_debug: bool,
 
     /// disable qemu graphical display
-    /// TODO: defaults to false currently, this is planned to be true by default
+    /// TODO: Enable display by default when we have a graphical display
     no_display: bool,
 
     /// disable usage of KVM
@@ -531,6 +520,12 @@ const Kernel = struct {
         kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
 
         kernel_exe.addModule("kernel_options", options.kernel_option_modules.get(target).?);
+
+        // TODO: Investigate whether LTO works
+        kernel_exe.want_lto = false;
+        kernel_exe.omit_frame_pointer = false;
+        kernel_exe.disable_stack_probing = true;
+        kernel_exe.pie = true;
 
         target.targetSpecificSetup(kernel_exe);
 

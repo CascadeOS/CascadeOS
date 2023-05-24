@@ -39,7 +39,7 @@ fn logFnDispatch(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    // TODO per branch cold: https://github.com/ziglang/zig/issues/5177
+    // TODO Use per branch cold: https://github.com/ziglang/zig/issues/5177
     if (initialized) {
         standardLogFn(scope, message_level, format, args);
     } else {
@@ -142,7 +142,7 @@ inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
 const level: Level = blk: {
     if (kernel.info.force_debug_log) break :blk .debug;
 
-    // TODO: once the kernel matures remove this
+    // TODO: Once the kernel matures use per mode logging levels
     if (true) break :blk .info;
 
     break :blk switch (kernel.info.mode) {

@@ -9,14 +9,16 @@ const portWriteU8 = x86_64.instructions.portWriteU8;
 
 const OUTPUT_READY: u8 = 1 << 5;
 
-// TODO: Make this a proper driver
+// TODO: Implement a proper serial port driver
+
 pub const SerialPort = struct {
     z_data_port: u16,
     z_line_status_port: u16,
 
     /// Initialize the serial port at `com_port` with the baud rate `baud_rate`
     pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
-        // FIXME: Check if the port exists by writing to then reading the scratch register `data_port_number + 7`
+        // FIXME: Check if the serial port exists before using it.
+        // Writing to then reading the scratch register `data_port_number + 7` should return the same value.
 
         const data_port_number = com_port.toPort();
 
@@ -61,7 +63,7 @@ pub const SerialPort = struct {
     fn writerImpl(self: SerialPort, bytes: []const u8) error{}!usize {
         for (bytes) |char| {
             self.waitForOutputReady();
-            // TODO: Should we be checking for `\n` and emitting a `\r` first?
+            // TODO: Does a serial port need `\r` before `\n`?
             portWriteU8(self.z_data_port, char);
         }
         return bytes.len;
