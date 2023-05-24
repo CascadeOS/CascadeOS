@@ -11,3 +11,5 @@ comptime {
 pub const instructions = @import("instructions.zig");
 pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
+
+pub usingnamespace @import("../arch_helpers.zig").useful_arch_exports;

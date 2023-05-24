@@ -28,11 +28,9 @@ var gdt: x86_64.Gdt = .{};
 var tss: x86_64.Tss = .{};
 
 pub fn earlyArchInitialization() void {
-    // load the gdt
     log.info("loading gdt", .{});
     gdt.load();
 
-    // load the tss
     log.info("loading tss", .{});
     gdt.setTss(&tss);
 }

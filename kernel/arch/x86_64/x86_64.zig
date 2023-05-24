@@ -40,3 +40,5 @@ pub const PrivilegeLevel = enum(u2) {
     /// to perform the accesses.
     ring3 = 3,
 };
+
+pub usingnamespace @import("../arch_helpers.zig").useful_arch_exports;
