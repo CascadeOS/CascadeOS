@@ -471,7 +471,7 @@ fn createKernels(b: *std.Build, step_collection: StepCollection, options: Option
         const build_step = b.step(build_step_name, build_step_description);
         build_step.dependOn(&kernel.install_step.step);
 
-        step_collection.test_steps.get(target).?.dependOn(build_step);
+        step_collection.kernels_test_step.dependOn(build_step);
 
         kernels.putAssumeCapacityNoClobber(target, kernel);
     }
@@ -530,7 +530,7 @@ const Kernel = struct {
 
 const StepCollection = struct {
     main_test_step: *Step,
-    test_steps: std.AutoHashMapUnmanaged(CircuitTarget, *Step),
+    kernels_test_step: *Step,
     libraries_test_step: *Step,
 
     pub fn create(b: *std.Build) !StepCollection {
@@ -545,32 +545,16 @@ const StepCollection = struct {
         );
         main_test_step.dependOn(libraries_test_step);
 
-        var test_steps = std.AutoHashMapUnmanaged(CircuitTarget, *Step){};
-        errdefer test_steps.deinit(b.allocator);
-
-        try test_steps.ensureTotalCapacity(b.allocator, supported_targets.len);
-        for (supported_targets) |target| {
-            const target_name = try target.name(b.allocator);
-
-            const build_step_name = try std.fmt.allocPrint(
-                b.allocator,
-                "test_{s}",
-                .{target_name},
-            );
-            const build_step_description = try std.fmt.allocPrint(
-                b.allocator,
-                "Run all the tests (also builds all code even if they don't have tests) for {s}",
-                .{target_name},
-            );
-            const build_step = b.step(build_step_name, build_step_description);
-            test_steps.putAssumeCapacityNoClobber(target, build_step);
-
-            main_test_step.dependOn(build_step);
-        }
+        // TODO: Figure out a way to run real kernel tests
+        const kernels_test_step = b.step(
+            "test_kernels",
+            "Run all the kernel tests (currently all this does it build the kernels)",
+        );
+        main_test_step.dependOn(kernels_test_step);
 
         return StepCollection{
             .main_test_step = main_test_step,
-            .test_steps = test_steps,
+            .kernels_test_step = kernels_test_step,
             .libraries_test_step = libraries_test_step,
         };
     }
