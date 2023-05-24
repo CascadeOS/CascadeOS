@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core");
 const kernel = @import("root");
 const x86_64 = @import("x86_64.zig");
 
@@ -10,7 +11,7 @@ const log = kernel.log.scoped(.setup_x86_64);
 /// Entry point.
 export fn _start() callconv(.Naked) noreturn {
     @call(.never_inline, kernel.setup.setup, .{});
-    kernel.utils.panic("setup returned");
+    core.panic("setup returned");
 }
 
 pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
@@ -33,4 +34,6 @@ pub fn earlyArchInitialization() void {
 
     log.info("loading tss", .{});
     gdt.setTss(&tss);
+
+    // - implement library system
 }

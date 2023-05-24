@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core");
 const kernel = @import("root");
 
 const log = kernel.log.scoped(.setup);
@@ -20,5 +21,5 @@ pub fn setup() void {
     log.info("starting architecture specific initialization", .{});
     kernel.arch.setup.earlyArchInitialization();
 
-    kernel.utils.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
+    core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

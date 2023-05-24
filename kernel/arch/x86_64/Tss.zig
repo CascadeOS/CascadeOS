@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core");
 const kernel = @import("root");
 const x86_64 = @import("x86_64.zig");
 
@@ -31,7 +32,7 @@ pub const Tss = extern struct {
         self.privilege_stack_table[@enumToInt(privilege_level)] = x86_64.VirtAddr.fromInt(@ptrToInt(stack.ptr) + stack.len);
     }
 
-    pub const format = kernel.utils.formatStructIgnoreReserved;
+    pub const format = core.formatStructIgnoreReserved;
 
     comptime {
         std.debug.assert(@sizeOf(Tss) == 104);

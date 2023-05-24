@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core");
 
 pub const arch = @import("arch/arch.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const setup = @import("setup.zig");
-pub const utils = @import("utils.zig");
 
 pub const spec = @import("spec/spec.zig");
 
@@ -42,7 +42,7 @@ pub const panic_implementation = struct {
             return;
         }
 
-        utils.panicFmt("cannot switch to {s} panic from {s} panic", .{ @tagName(new_state), @tagName(state) });
+        core.panicFmt("cannot switch to {s} panic from {s} panic", .{ @tagName(new_state), @tagName(state) });
     }
 
     /// Entry point from the Zig language upon a panic.

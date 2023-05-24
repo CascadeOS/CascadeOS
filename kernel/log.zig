@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core");
 const kernel = @import("root");
 
 var initialized: bool = false;
@@ -59,7 +60,7 @@ fn standardLogFn(
     _ = message_level;
     _ = scope;
 
-    kernel.utils.panic("UNIMPLEMENTED `standardLogFn`"); // TODO: implement standardLogFn
+    core.panic("UNIMPLEMENTED `standardLogFn`"); // TODO: implement standardLogFn
 }
 
 /// Logging function for early boot only.

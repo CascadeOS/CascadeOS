@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core");
 const kernel = @import("root");
 const aarch64 = @import("aarch64.zig");
 
@@ -10,7 +11,7 @@ const log = kernel.log.scoped(.setup_aarch64);
 /// Entry point.
 export fn _start() callconv(.Naked) noreturn {
     @call(.never_inline, kernel.setup.setup, .{});
-    kernel.utils.panic("setup returned");
+    core.panic("setup returned");
 }
 
 pub const EarlyOutputWriter = aarch64.Uart.Writer;
@@ -29,5 +30,5 @@ pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
 }
 
 pub fn earlyArchInitialization() void {
-    kernel.utils.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
+    core.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
 }
