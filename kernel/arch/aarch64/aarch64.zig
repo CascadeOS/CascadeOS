@@ -11,7 +11,3 @@ comptime {
 pub const instructions = @import("instructions.zig");
 pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
-
-const addr = @import("addr.zig");
-pub const PhysAddr = addr.PhysAddr;
-pub const VirtAddr = addr.VirtAddr;

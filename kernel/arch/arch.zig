@@ -16,8 +16,17 @@ const current = switch (kernel.info.arch) {
     .aarch64 => aarch64,
 };
 
-pub const PhysAddr = current.PhysAddr;
-pub const VirtAddr = current.VirtAddr;
+pub const PhysAddr = extern struct {
+    value: usize,
+
+    pub const zero: PhysAddr = .{ .value = 0 };
+};
+
+pub const VirtAddr = extern struct {
+    value: usize,
+
+    pub const zero: VirtAddr = .{ .value = 0 };
+};
 
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
