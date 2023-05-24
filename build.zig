@@ -11,65 +11,9 @@ pub fn build(b: *std.Build) !void {
 
     const options = try Options.get(b);
 
-    for (supported_targets) |target| {
-        const target_name = try target.name(b.allocator);
-
-        const kernel = try Kernel.create(b, target, options);
-
-        // Setup the build step
-        {
-            const build_step_name = try std.fmt.allocPrint(
-                b.allocator,
-                "kernel_{s}",
-                .{target_name},
-            );
-            const build_step_description = try std.fmt.allocPrint(
-                b.allocator,
-                "Build the kernel for {s}",
-                .{target_name},
-            );
-            const build_step = b.step(build_step_name, build_step_description);
-            build_step.dependOn(&kernel.install_step.step);
-
-            step_collection.test_steps.get(target).?.dependOn(build_step);
-        }
-
-        const image_build = try ImageStep.create(b, target, kernel);
-
-        // Setup the image step
-        {
-            const image_step_name = try std.fmt.allocPrint(
-                b.allocator,
-                "image_{s}",
-                .{target_name},
-            );
-            const image_step_description = try std.fmt.allocPrint(
-                b.allocator,
-                "Build the image for {s}",
-                .{target_name},
-            );
-            const image_step = b.step(image_step_name, image_step_description);
-            image_step.dependOn(&image_build.step);
-        }
-
-        const run_in_qemu = try QemuStep.create(b, target, image_build.image_file_source, options);
-
-        // Setup the qemu step
-        {
-            const run_in_qemu_step_name = try std.fmt.allocPrint(
-                b.allocator,
-                "run_{s}",
-                .{target_name},
-            );
-            const run_in_qemu_step_description = try std.fmt.allocPrint(
-                b.allocator,
-                "Run the image for {s} in qemu",
-                .{target_name},
-            );
-            const run_step = b.step(run_in_qemu_step_name, run_in_qemu_step_description);
-            run_step.dependOn(&run_in_qemu.step);
-        }
-    }
+    const kernels = try createKernels(b, step_collection, options);
+    const images = try createImageSteps(b, kernels);
+    try createQemuSteps(b, images, options);
 }
 
 const supported_targets: []const CircuitTarget = &.{
@@ -489,6 +433,39 @@ const Options = struct {
     }
 };
 
+const Kernels = std.AutoHashMapUnmanaged(CircuitTarget, Kernel);
+
+fn createKernels(b: *std.Build, step_collection: StepCollection, options: Options) !Kernels {
+    var kernels: Kernels = .{};
+    try kernels.ensureTotalCapacity(b.allocator, supported_targets.len);
+
+    for (supported_targets) |target| {
+        const kernel = try Kernel.create(b, target, options);
+
+        const target_name = try target.name(b.allocator);
+
+        const build_step_name = try std.fmt.allocPrint(
+            b.allocator,
+            "kernel_{s}",
+            .{target_name},
+        );
+        const build_step_description = try std.fmt.allocPrint(
+            b.allocator,
+            "Build the kernel for {s}",
+            .{target_name},
+        );
+
+        const build_step = b.step(build_step_name, build_step_description);
+        build_step.dependOn(&kernel.install_step.step);
+
+        step_collection.test_steps.get(target).?.dependOn(build_step);
+
+        kernels.putAssumeCapacityNoClobber(target, kernel);
+    }
+
+    return kernels;
+}
+
 const Kernel = struct {
     b: *std.Build,
 
@@ -577,6 +554,39 @@ const StepCollection = struct {
         };
     }
 };
+
+const ImageSteps = std.AutoHashMapUnmanaged(CircuitTarget, *ImageStep);
+
+fn createImageSteps(b: *std.Build, kernels: Kernels) !ImageSteps {
+    var images: ImageSteps = .{};
+    try images.ensureTotalCapacity(b.allocator, supported_targets.len);
+
+    for (supported_targets) |target| {
+        const kernel = kernels.get(target).?;
+
+        const image_build = try ImageStep.create(b, target, kernel);
+
+        const target_name = try target.name(b.allocator);
+
+        const image_step_name = try std.fmt.allocPrint(
+            b.allocator,
+            "image_{s}",
+            .{target_name},
+        );
+        const image_step_description = try std.fmt.allocPrint(
+            b.allocator,
+            "Build the image for {s}",
+            .{target_name},
+        );
+
+        const image_step = b.step(image_step_name, image_step_description);
+        image_step.dependOn(&image_build.step);
+
+        images.putAssumeCapacityNoClobber(target, image_build);
+    }
+
+    return images;
+}
 
 const ImageStep = struct {
     step: Step,
@@ -728,6 +738,30 @@ fn hashDirectoryRecursive(
     }
 }
 
+fn createQemuSteps(b: *std.Build, image_steps: ImageSteps, options: Options) !void {
+    for (supported_targets) |target| {
+        const image_step = image_steps.get(target).?;
+
+        const qemu_step = try QemuStep.create(b, target, image_step.image_file_source, options);
+
+        const target_name = try target.name(b.allocator);
+
+        const qemu_step_name = try std.fmt.allocPrint(
+            b.allocator,
+            "run_{s}",
+            .{target_name},
+        );
+        const qemu_step_description = try std.fmt.allocPrint(
+            b.allocator,
+            "Run the image for {s} in qemu",
+            .{target_name},
+        );
+
+        const run_step = b.step(qemu_step_name, qemu_step_description);
+        run_step.dependOn(&qemu_step.step);
+    }
+}
+
 const QemuStep = struct {
     step: std.Build.Step,
     image: std.Build.FileSource,
@@ -856,3 +890,13 @@ pub fn fileExists(path: []const u8) bool {
     std.fs.cwd().access(path, .{}) catch return false;
     return true;
 }
+
+pub const LibraryDescription = struct {
+    /// The name of the library:
+    ///   - used as the name of the module provided `@import("{name}");`
+    ///   - used to build the root file path `libraries/{name}/{name}.zig`
+    ///   - used in any build steps created for the library
+    name: []const u8,
+
+    dependencies: []const []const u8 = &.{},
+};
