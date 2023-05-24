@@ -53,8 +53,8 @@ pub const CircuitTarget = union(Arch) {
         }
     }
 
-    pub fn isNative(self: CircuitTarget) bool {
-        return switch (@import("builtin").target.cpu.arch) {
+    pub fn isNative(self: CircuitTarget, b: *std.Build) bool {
+        return switch (b.host.target.cpu.arch) {
             .aarch64 => self == .aarch64,
             .x86_64 => self == .x86_64,
             else => false,
@@ -875,7 +875,7 @@ const QemuStep = struct {
         self.target.setQemuMachine(run_qemu);
 
         // KVM
-        const should_use_kvm = !self.options.no_kvm and fileExists("/dev/kvm") and self.target.isNative();
+        const should_use_kvm = !self.options.no_kvm and fileExists("/dev/kvm") and self.target.isNative(b);
         if (should_use_kvm) {
             run_qemu.addArg("-enable-kvm");
         }
