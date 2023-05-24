@@ -2,16 +2,17 @@
 
 Circuit is a general purpose operating system targeting standard desktops and laptops.
 
+## Short Term Goals
+- Good enough x86-64 support for QEMU
+- Userspace, no gui
+- ext2 on NVMe
+
 ## Planned Features
-- Support x86_64, AArch64 and RISC-V
+- x86_64, AArch64 and RISC-V
 - First class Zig support
 - Userspace with GUI
 - Linux syscall compatibility mode (allowing static linux binaries to run unchanged)
-
-## Long Term Goal
-All functionality implemented in Zig either in repo or as a package.
-
-Allowances might be made for things like [ACPICA](https://acpica.org/).
+- All functionality implemented in Zig either in repo or as a package, allowances might be made for things like [ACPICA](https://acpica.org/).
 
 ## Discord Server
 This project has a [Discord server](https://discord.gg/GZMm2FS3).
