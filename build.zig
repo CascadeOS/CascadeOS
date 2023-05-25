@@ -977,6 +977,8 @@ fn resolveLibrary(
             .source_file = file_source,
         });
 
+        try module.dependencies.put(description.name, module);
+
         for (library_dependencies) |library| {
             try module.dependencies.put(library.name, library.module);
         }
