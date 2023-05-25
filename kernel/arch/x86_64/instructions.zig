@@ -2,7 +2,6 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("root");
 const x86_64 = @import("x86_64.zig");
 
 pub inline fn pause() void {

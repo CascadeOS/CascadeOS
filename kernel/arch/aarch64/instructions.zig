@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("root");
+const kernel = @import("../../kernel.zig");
 const aarch64 = @import("aarch64.zig");
 
 /// Disable interrupts and put the CPU to sleep.

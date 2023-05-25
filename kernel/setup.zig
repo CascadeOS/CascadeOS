@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("root");
+const kernel = @import("kernel.zig");
 
 const log = kernel.log.scoped(.setup);
 
