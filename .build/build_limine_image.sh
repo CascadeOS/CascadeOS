@@ -13,8 +13,7 @@ die() {
 
 # Arguments
 IMAGE="$1"
-TARGET_NAME="$2"
-TARGET_ARCH="$3"
+TARGET_ARCH="$2"
 
 # Setup variables
 
@@ -22,10 +21,10 @@ BUILD_DIR=$(pwd -P)
 PROJECT_DIR="$BUILD_DIR/.."
 
 CACHE="$PROJECT_DIR/zig-cache/working-area"
-IMAGE_BOOT="$CACHE/esp_mount_$TARGET_NAME"
-IMAGE_ROOT="$CACHE/root_mount_$TARGET_NAME"
+IMAGE_BOOT="$CACHE/esp_mount_$TARGET_ARCH"
+IMAGE_ROOT="$CACHE/root_mount_$TARGET_ARCH"
 
-OUT_ROOT="$PROJECT_DIR/zig-out/$TARGET_NAME/root"
+OUT_ROOT="$PROJECT_DIR/zig-out/$TARGET_ARCH/root"
 
 LIMINE="$CACHE/limine-$LIMINE_BRANCH"
 LIMINE_CONFIG="$BUILD_DIR/limine.cfg"

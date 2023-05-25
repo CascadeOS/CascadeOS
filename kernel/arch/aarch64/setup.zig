@@ -19,10 +19,7 @@ var early_output_uart: aarch64.Uart = undefined;
 
 pub fn setupEarlyOutput() void {
     // TODO: Use the device tree to find the UART base address.
-
-    switch (kernel.info.board) {
-        .virt => early_output_uart = aarch64.Uart.init(0x09000000),
-    }
+    early_output_uart = aarch64.Uart.init(0x09000000);
 }
 
 pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {

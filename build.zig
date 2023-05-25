@@ -17,39 +17,20 @@ pub fn build(b: *std.Build) !void {
     try createQemuSteps(b, images, options);
 }
 
-const supported_targets: []const CircuitTarget = &.{
-    .{ .aarch64 = .virt },
-    .x86_64,
-};
+const all_targets: []const CircuitTarget = std.meta.tags(CircuitTarget);
 
-pub const CircuitTarget = union(Arch) {
-    aarch64: AArch64Board,
+pub const CircuitTarget = enum {
+    aarch64,
     x86_64,
 
-    pub const Arch = enum {
-        aarch64,
-        x86_64,
-
-        pub fn getTestCrossTarget(self: Arch) std.zig.CrossTarget {
-            switch (self) {
-                .aarch64 => return std.zig.CrossTarget{
-                    .cpu_arch = .aarch64,
-                },
-                .x86_64 => return std.zig.CrossTarget{
-                    .cpu_arch = .x86_64,
-                },
-            }
-        }
-    };
-
-    pub const AArch64Board = enum {
-        virt,
-    };
-
-    pub fn name(self: CircuitTarget, allocator: std.mem.Allocator) ![]const u8 {
+    pub fn getTestCrossTarget(self: CircuitTarget) std.zig.CrossTarget {
         switch (self) {
-            .aarch64 => |board| return try std.fmt.allocPrint(allocator, "{s}_{s}", .{ @tagName(self), @tagName(board) }),
-            .x86_64 => return try std.fmt.allocPrint(allocator, "{s}", .{@tagName(self)}),
+            .aarch64 => return std.zig.CrossTarget{
+                .cpu_arch = .aarch64,
+            },
+            .x86_64 => return std.zig.CrossTarget{
+                .cpu_arch = .x86_64,
+            },
         }
     }
 
@@ -104,28 +85,24 @@ pub const CircuitTarget = union(Arch) {
 
                 return target;
             },
-            .aarch64 => |board| switch (board) {
-                .virt => {
-                    var target = std.zig.CrossTarget{
-                        .cpu_arch = .aarch64,
-                        .os_tag = .freestanding,
-                        .abi = .none,
-                        .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 },
-                    };
+            .aarch64 => {
+                var target = std.zig.CrossTarget{
+                    .cpu_arch = .aarch64,
+                    .os_tag = .freestanding,
+                    .abi = .none,
+                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 }, // TODO: Add a way to specify this
+                };
 
-                    // TODO: Does SIMD (neon) need to be disabled? Like on x86_64?
+                // TODO: Does SIMD (neon) need to be disabled? Like on x86_64?
 
-                    return target;
-                },
+                return target;
             },
         }
     }
 
     pub fn linkerScriptPath(self: CircuitTarget, b: *std.Build) []const u8 {
         return switch (self) {
-            .aarch64 => |board| switch (board) {
-                .virt => pathJoinFromRoot(b, &.{ ".build", "linker_aarch64_virt.ld" }),
-            },
+            .aarch64 => pathJoinFromRoot(b, &.{ ".build", "linker_aarch64.ld" }),
             .x86_64 => pathJoinFromRoot(b, &.{ ".build", "linker_x86_64.ld" }),
         };
     }
@@ -144,18 +121,14 @@ pub const CircuitTarget = union(Arch) {
 
     pub fn setQemuCpu(self: CircuitTarget, run_qemu: *Step.Run) void {
         switch (self) {
-            .aarch64 => |board| switch (board) {
-                .virt => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }),
-            },
+            .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }), // TODO: Add a way to specify this
             .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }), // `migratable=no` is required to get invariant tsc
         }
     }
 
     pub fn setQemuMachine(self: CircuitTarget, run_qemu: *Step.Run) void {
         switch (self) {
-            .aarch64 => |board| switch (board) {
-                .virt => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
-            },
+            .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
             .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
         }
     }
@@ -327,9 +300,9 @@ const Options = struct {
         var kernel_option_modules: std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) = .{};
         errdefer kernel_option_modules.deinit(b.allocator);
 
-        try kernel_option_modules.ensureTotalCapacity(b.allocator, supported_targets.len);
+        try kernel_option_modules.ensureTotalCapacity(b.allocator, all_targets.len);
 
-        for (supported_targets) |target| {
+        for (all_targets) |target| {
             const kernel_options = b.addOptions();
 
             kernel_options.addOption([]const u8, "version", version);
@@ -371,19 +344,11 @@ const Options = struct {
     }
 
     fn addTargetOptions(options: *std.Build.OptionsStep, target: CircuitTarget) void {
-        addEnumType(options, "Arch", CircuitTarget.Arch);
+        addEnumType(options, "Arch", CircuitTarget);
 
         const out = options.contents.writer();
 
         out.print("pub const arch: Arch = .{s};\n", .{std.zig.fmtId(@tagName(target))}) catch unreachable;
-
-        switch (target) {
-            .x86_64 => {},
-            .aarch64 => |board| {
-                addEnumType(options, "Board", @TypeOf(board));
-                out.print("pub const board: Board = .{s};\n", .{std.zig.fmtId(@tagName(board))}) catch unreachable;
-            },
-        }
     }
 
     fn getVersionString(b: *std.Build, version: std.builtin.Version) ![]const u8 {
@@ -449,22 +414,20 @@ const Kernels = std.AutoHashMapUnmanaged(CircuitTarget, Kernel);
 
 fn createKernels(b: *std.Build, libraries: Libraries, step_collection: StepCollection, options: Options) !Kernels {
     var kernels: Kernels = .{};
-    try kernels.ensureTotalCapacity(b.allocator, supported_targets.len);
+    try kernels.ensureTotalCapacity(b.allocator, all_targets.len);
 
-    for (supported_targets) |target| {
+    for (all_targets) |target| {
         const kernel = try Kernel.create(b, target, libraries, options);
-
-        const target_name = try target.name(b.allocator);
 
         const build_step_name = try std.fmt.allocPrint(
             b.allocator,
             "kernel_{s}",
-            .{target_name},
+            .{@tagName(target)},
         );
         const build_step_description = try std.fmt.allocPrint(
             b.allocator,
             "Build the kernel for {s}",
-            .{target_name},
+            .{@tagName(target)},
         );
 
         const build_step = b.step(build_step_name, build_step_description);
@@ -494,11 +457,9 @@ const Kernel = struct {
             .optimize = options.optimize,
         });
 
-        const target_name = try target.name(b.allocator);
-
         kernel_exe.override_dest_dir = .{
             .custom = b.pathJoin(&.{
-                target_name,
+                @tagName(target),
                 "root",
                 "boot",
             }),
@@ -582,24 +543,22 @@ const ImageSteps = std.AutoHashMapUnmanaged(CircuitTarget, *ImageStep);
 
 fn createImageSteps(b: *std.Build, kernels: Kernels) !ImageSteps {
     var images: ImageSteps = .{};
-    try images.ensureTotalCapacity(b.allocator, supported_targets.len);
+    try images.ensureTotalCapacity(b.allocator, all_targets.len);
 
-    for (supported_targets) |target| {
+    for (all_targets) |target| {
         const kernel = kernels.get(target).?;
 
         const image_build = try ImageStep.create(b, target, kernel);
 
-        const target_name = try target.name(b.allocator);
-
         const image_step_name = try std.fmt.allocPrint(
             b.allocator,
             "image_{s}",
-            .{target_name},
+            .{@tagName(target)},
         );
         const image_step_description = try std.fmt.allocPrint(
             b.allocator,
             "Build the image for {s}",
-            .{target_name},
+            .{@tagName(target)},
         );
 
         const image_step = b.step(image_step_name, image_step_description);
@@ -620,12 +579,10 @@ const ImageStep = struct {
     image_file_source: std.Build.FileSource,
 
     pub fn create(owner: *std.Build, target: CircuitTarget, kernel: Kernel) !*ImageStep {
-        const target_name = try target.name(owner.allocator);
-
         const step_name = try std.fmt.allocPrint(
             owner.allocator,
             "build {s} image",
-            .{target_name},
+            .{@tagName(target)},
         );
 
         const self = try owner.allocator.create(ImageStep);
@@ -657,13 +614,11 @@ const ImageStep = struct {
         var manifest = b.cache.obtain();
         defer manifest.deinit();
 
-        const target_name = try self.target.name(b.allocator);
-
         // Root
         {
             const full_path = pathJoinFromRoot(b, &.{
                 "zig-out",
-                target_name,
+                @tagName(self.target),
                 "root",
             });
             var dir = try std.fs.cwd().openIterableDir(full_path, .{});
@@ -689,7 +644,7 @@ const ImageStep = struct {
             try std.fmt.allocPrint(
                 b.allocator,
                 "circuit_{s}.hdd",
-                .{target_name},
+                .{@tagName(self.target)},
             ),
         });
 
@@ -706,12 +661,10 @@ const ImageStep = struct {
 
     fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
         const build_image_path = self.target.buildImagePath(self.step.owner);
-        const target_name = try self.target.name(self.step.owner.allocator);
 
         const args: []const []const u8 = &.{
             build_image_path,
             image_file_path,
-            target_name,
             @tagName(self.target),
         };
 
@@ -762,22 +715,20 @@ fn hashDirectoryRecursive(
 }
 
 fn createQemuSteps(b: *std.Build, image_steps: ImageSteps, options: Options) !void {
-    for (supported_targets) |target| {
+    for (all_targets) |target| {
         const image_step = image_steps.get(target).?;
 
         const qemu_step = try QemuStep.create(b, target, image_step.image_file_source, options);
 
-        const target_name = try target.name(b.allocator);
-
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
             "run_{s}",
-            .{target_name},
+            .{@tagName(target)},
         );
         const qemu_step_description = try std.fmt.allocPrint(
             b.allocator,
             "Run the image for {s} in qemu",
-            .{target_name},
+            .{@tagName(target)},
         );
 
         const run_step = b.step(qemu_step_name, qemu_step_description);
@@ -793,12 +744,10 @@ const QemuStep = struct {
     options: Options,
 
     pub fn create(b: *std.Build, target: CircuitTarget, image: std.Build.FileSource, options: Options) !*QemuStep {
-        const target_name = try target.name(b.allocator);
-
         const step_name = try std.fmt.allocPrint(
             b.allocator,
             "run qemu with {s} image",
-            .{target_name},
+            .{@tagName(target)},
         );
 
         const self = try b.allocator.create(QemuStep);
@@ -1096,5 +1045,5 @@ pub const LibraryDescription = struct {
 
     /// The list of architectures supported by the library.
     /// `null` means architecture-independent.
-    supported_architectures: ?[]const CircuitTarget.Arch = null,
+    supported_architectures: ?[]const CircuitTarget = null,
 };
