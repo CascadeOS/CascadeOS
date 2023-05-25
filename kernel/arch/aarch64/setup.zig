@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("../../kernel.zig");
+const kernel = @import("kernel");
 const aarch64 = @import("aarch64.zig");
 
 const limine = kernel.spec.limine;

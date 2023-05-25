@@ -489,9 +489,7 @@ const Kernel = struct {
     pub fn create(b: *std.Build, target: CircuitTarget, libraries: Libraries, options: Options) !Kernel {
         const kernel_exe = b.addExecutable(.{
             .name = "kernel",
-            .root_source_file = .{
-                .path = pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }),
-            },
+            .root_source_file = .{ .path = pathJoinFromRoot(b, &.{ "kernel", "root.zig" }) },
             .target = target.getCrossTarget(),
             .optimize = options.optimize,
         });
@@ -508,13 +506,28 @@ const Kernel = struct {
 
         kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
 
-        kernel_exe.addModule("kernel_options", options.kernel_option_modules.get(target).?);
+        const kernel_module = blk: {
+            const kernel_module = b.createModule(.{
+                .source_file = .{ .path = pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
+            });
 
-        const kernel_dependencies: []const []const u8 = @import("kernel/dependencies.zig").dependencies;
-        for (kernel_dependencies) |dependency| {
-            const library = libraries.get(dependency).?;
-            kernel_exe.addModule(library.name, library.module);
-        }
+            // self reference
+            try kernel_module.dependencies.put("kernel", kernel_module);
+
+            // kernel options
+            try kernel_module.dependencies.put("kernel_options", options.kernel_option_modules.get(target).?);
+
+            // dependencies
+            const kernel_dependencies: []const []const u8 = @import("kernel/dependencies.zig").dependencies;
+            for (kernel_dependencies) |dependency| {
+                const library = libraries.get(dependency).?;
+                try kernel_module.dependencies.put(library.name, library.module);
+            }
+
+            break :blk kernel_module;
+        };
+
+        kernel_exe.addModule("kernel", kernel_module);
 
         // TODO: Investigate whether LTO works
         kernel_exe.want_lto = false;
