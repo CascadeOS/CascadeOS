@@ -8,7 +8,7 @@ Circuit is a general purpose operating system targeting standard desktops and la
 - ext2 on NVMe
 
 ## Planned Features
-- x86_64, AArch64 and RISC-V
+- x86_64, AArch64/UEFI and RISC-V/UEFI
 - First class Zig support
 - Linux syscall compatibility mode (allowing static linux binaries to run unchanged)
 - Userspace with GUI (probably using Wayland meaning along with the feature above static linux binaries should work out of the box)
