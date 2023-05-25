@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("../../kernel.zig");
+const kernel = @import("kernel");
 
 comptime {
     // make sure the entry points are referenced

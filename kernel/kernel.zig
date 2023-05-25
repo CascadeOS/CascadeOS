@@ -15,16 +15,6 @@ comptime {
     _ = arch;
 }
 
-pub const std_options = struct {
-    // ensure using `std.log` in the kernel is a compile error
-    pub const log_level = @compileError("use `kernel.log` for logging in the kernel");
-
-    // ensure using `std.log` in the kernel is a compile error
-    pub const logFn = @compileError("use `kernel.log` for logging in the kernel");
-};
-
-pub const panic = panic_implementation.panic;
-
 pub const panic_implementation = struct {
     pub const PanicState = enum(u8) {
         no_op = 0,

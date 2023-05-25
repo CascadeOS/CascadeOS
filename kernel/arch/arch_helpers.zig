@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("../kernel.zig");
+const kernel = @import("kernel");
 
 const arch = @import("arch.zig");
 

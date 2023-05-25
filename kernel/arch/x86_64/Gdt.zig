@@ -2,7 +2,7 @@
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("../../kernel.zig");
+const kernel = @import("kernel");
 const x86_64 = @import("x86_64.zig");
 
 pub const Gdt = extern struct {
