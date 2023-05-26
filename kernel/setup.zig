@@ -24,5 +24,8 @@ pub fn setup() void {
     log.info("capturing system information", .{});
     kernel.arch.setup.captureSystemInformation();
 
+    log.info("configuring system features", .{});
+    kernel.arch.setup.configureSystemFeatures();
+
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

@@ -26,3 +26,7 @@ pub fn earlyArchInitialization() void {
 pub fn captureSystemInformation() void {
     core.panic("UNIMPLEMENTED `captureSystemInformation`"); // TODO: Implement `captureSystemInformation`.
 }
+
+pub fn configureSystemFeatures() void {
+    core.panic("UNIMPLEMENTED `configureSystemFeatures`"); // TODO: Implement `configureSystemFeatures`.
+}

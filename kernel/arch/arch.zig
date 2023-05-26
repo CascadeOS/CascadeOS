@@ -77,6 +77,13 @@ pub const setup = struct {
     pub inline fn captureSystemInformation() void {
         current.setup.captureSystemInformation();
     }
+
+    /// Configure any system features.
+    ///
+    /// For example, on x86_64 this should enable any CPU features that are required.
+    pub inline fn configureSystemFeatures() void {
+        current.setup.configureSystemFeatures();
+    }
 };
 
 /// Disable interrupts and put the CPU to sleep.
