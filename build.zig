@@ -640,7 +640,9 @@ const ImageStep = struct {
             try hashDirectoryRecursive(b.allocator, dir, full_path, &manifest);
         }
 
-        const image_file_path = try b.cache_root.join(b.allocator, &.{
+        const image_file_path = pathJoinFromRoot(b, &.{
+            "zig-out",
+            @tagName(self.target),
             try std.fmt.allocPrint(
                 b.allocator,
                 "circuit_{s}.hdd",
