@@ -5,9 +5,6 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 comptime {
-    // make sure the entry points are referenced
-    _ = setup;
-
     // make sure any interrupt handlers are referenced
     _ = interrupts;
 }

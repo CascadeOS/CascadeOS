@@ -5,14 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const aarch64 = @import("aarch64.zig");
 
-const limine = kernel.spec.limine;
 const log = kernel.log.scoped(.setup_aarch64);
-
-/// Entry point.
-export fn _start() callconv(.Naked) noreturn {
-    @call(.never_inline, kernel.setup.setup, .{});
-    core.panic("setup returned");
-}
 
 pub const EarlyOutputWriter = aarch64.Uart.Writer;
 var early_output_uart: aarch64.Uart = undefined;

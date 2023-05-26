@@ -4,14 +4,16 @@ const std = @import("std");
 const core = @import("core");
 
 pub const arch = @import("arch/arch.zig");
+pub const boot = @import("boot/boot.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const setup = @import("setup.zig");
 
-pub const spec = @import("spec/spec.zig");
-
 comptime {
-    // ensure any architecture specific code is referenced
+    // make sure any bootloader specific code that needs to be referenced is
+    _ = boot;
+
+    // ensure any architecture specific code that needs to be referenced is
     _ = arch;
 }
 
