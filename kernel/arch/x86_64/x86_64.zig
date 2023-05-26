@@ -7,11 +7,15 @@ const kernel = @import("kernel");
 comptime {
     // make sure the entry points are referenced
     _ = setup;
+
+    // make sure any interrupt handlers are referenced
+    _ = interrupts;
 }
 
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const Idt = @import("Idt.zig");
 pub const instructions = @import("instructions.zig");
+pub const interrupts = @import("interrupts.zig");
 pub const registers = @import("registers.zig");
 pub const serial = @import("serial.zig");
 pub const setup = @import("setup.zig");

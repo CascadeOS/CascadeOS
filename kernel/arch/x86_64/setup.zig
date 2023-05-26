@@ -36,23 +36,41 @@ var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 
-const StackSelector = enum(u3) {
-    exception = 0,
-    double_fault = 1,
-    interrupt = 2,
-    non_maskable_interrupt = 3,
-};
-
 pub fn earlyArchInitialization() void {
     log.info("loading gdt", .{});
     gdt.load();
 
     log.info("fill the tss with interrupt/exception handling stacks", .{});
-    tss.setInterruptStack(@enumToInt(StackSelector.exception), &exception_stack);
-    tss.setInterruptStack(@enumToInt(StackSelector.double_fault), &double_fault_stack);
-    tss.setInterruptStack(@enumToInt(StackSelector.interrupt), &interrupt_stack);
-    tss.setInterruptStack(@enumToInt(StackSelector.non_maskable_interrupt), &non_maskable_interrupt_stack);
+    tss.setInterruptStack(.exception, &exception_stack);
+    tss.setInterruptStack(.double_fault, &double_fault_stack);
+    tss.setInterruptStack(.interrupt, &interrupt_stack);
+    tss.setInterruptStack(.non_maskable_interrupt, &non_maskable_interrupt_stack);
 
     log.info("loading tss", .{});
     gdt.setTss(&tss);
+
+    log.info("loading idt", .{});
+    x86_64.interrupts.loadIdt();
+
+    log.debug("mapping idt handlers to correct stacks", .{});
+    for (0..x86_64.Idt.number_of_handlers) |vector_number| {
+        const vector = @intToEnum(x86_64.interrupts.IdtVector, vector_number);
+
+        if (vector == .double_fault) {
+            x86_64.interrupts.setVectorStack(vector, .double_fault);
+            continue;
+        }
+
+        if (vector == .non_maskable_interrupt) {
+            x86_64.interrupts.setVectorStack(vector, .non_maskable_interrupt);
+            continue;
+        }
+
+        if (vector.isException()) {
+            x86_64.interrupts.setVectorStack(vector, .exception);
+            continue;
+        }
+
+        x86_64.interrupts.setVectorStack(vector, .interrupt);
+    }
 }

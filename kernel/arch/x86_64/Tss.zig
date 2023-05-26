@@ -5,6 +5,8 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x86_64 = @import("x86_64.zig");
 
+const InterruptStackSelector = x86_64.interrupts.InterruptStackSelector;
+
 pub const Tss = extern struct {
     reserved_1: u32 align(1) = 0,
 
@@ -23,8 +25,8 @@ pub const Tss = extern struct {
     /// The 16-bit offset to the I/O permission bit map from the 64-bit TSS base.
     iomap_base: u16 align(1) = 0,
 
-    pub fn setInterruptStack(self: *Tss, stack_selector: u3, stack: []align(16) u8) void {
-        self.interrupt_stack_table[stack_selector] = x86_64.VirtAddr.fromInt(@ptrToInt(stack.ptr) + stack.len);
+    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: []align(16) u8) void {
+        self.interrupt_stack_table[@enumToInt(stack_selector)] = x86_64.VirtAddr.fromInt(@ptrToInt(stack.ptr) + stack.len);
     }
 
     pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: []align(16) u8) void {
