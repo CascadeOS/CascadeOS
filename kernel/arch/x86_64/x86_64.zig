@@ -10,6 +10,7 @@ comptime {
 }
 
 pub const Gdt = @import("Gdt.zig").Gdt;
+pub const Idt = @import("Idt.zig");
 pub const instructions = @import("instructions.zig");
 pub const registers = @import("registers.zig");
 pub const serial = @import("serial.zig");
