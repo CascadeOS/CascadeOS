@@ -20,7 +20,7 @@ TARGET_ARCH="$2"
 BUILD_DIR=$(pwd -P)
 PROJECT_DIR="$BUILD_DIR/.."
 
-CACHE="$PROJECT_DIR/zig-cache/working-area"
+CACHE="$PROJECT_DIR/zig-cache"
 IMAGE_BOOT="$CACHE/esp_mount_$TARGET_ARCH"
 IMAGE_ROOT="$CACHE/root_mount_$TARGET_ARCH"
 
