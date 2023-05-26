@@ -2,6 +2,7 @@
 
 //! This module contains the definitions of the Limine protocol.
 //! https://github.com/limine-bootloader/limine/blob/v4.x-branch/PROTOCOL.md
+//! 0c66863d3e041cd6da63cb2474333aa655966fe5
 
 const std = @import("std");
 
