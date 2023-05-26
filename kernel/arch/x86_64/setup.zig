@@ -28,9 +28,30 @@ pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
 var gdt: x86_64.Gdt = .{};
 var tss: x86_64.Tss = .{};
 
+const page_size = core.Size.from(4, .kib);
+const kernel_stack_size = page_size.multiply(4);
+
+var exception_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+
+const StackSelector = enum(u3) {
+    exception = 0,
+    double_fault = 1,
+    interrupt = 2,
+    non_maskable_interrupt = 3,
+};
+
 pub fn earlyArchInitialization() void {
     log.info("loading gdt", .{});
     gdt.load();
+
+    log.info("fill the tss with interrupt/exception handling stacks", .{});
+    tss.setInterruptStack(@enumToInt(StackSelector.exception), &exception_stack);
+    tss.setInterruptStack(@enumToInt(StackSelector.double_fault), &double_fault_stack);
+    tss.setInterruptStack(@enumToInt(StackSelector.interrupt), &interrupt_stack);
+    tss.setInterruptStack(@enumToInt(StackSelector.non_maskable_interrupt), &non_maskable_interrupt_stack);
 
     log.info("loading tss", .{});
     gdt.setTss(&tss);
