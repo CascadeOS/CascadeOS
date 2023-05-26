@@ -21,12 +21,22 @@ pub const PhysAddr = extern struct {
     value: usize,
 
     pub const zero: PhysAddr = .{ .value = 0 };
+
+    comptime {
+        std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
+        std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
+    }
 };
 
 pub const VirtAddr = extern struct {
     value: usize,
 
     pub const zero: VirtAddr = .{ .value = 0 };
+
+    comptime {
+        std.debug.assert(@sizeOf(VirtAddr) == @sizeOf(usize));
+        std.debug.assert(@bitSizeOf(VirtAddr) == @bitSizeOf(usize));
+    }
 };
 
 /// Functionality that is intended to be used during system setup only.
