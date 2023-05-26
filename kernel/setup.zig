@@ -21,5 +21,8 @@ pub fn setup() void {
     log.info("performing early system initialization", .{});
     kernel.arch.setup.earlyArchInitialization();
 
+    log.info("capturing system information", .{});
+    kernel.arch.setup.captureSystemInformation();
+
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

@@ -74,3 +74,7 @@ pub fn earlyArchInitialization() void {
         x86_64.interrupts.setVectorStack(vector, .interrupt);
     }
 }
+
+pub fn captureSystemInformation() void {
+    core.panic("UNIMPLEMENTED `captureSystemInformation`"); // TODO: Implement `captureSystemInformation`.
+}

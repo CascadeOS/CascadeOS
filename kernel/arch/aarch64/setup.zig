@@ -29,3 +29,7 @@ pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
 pub fn earlyArchInitialization() void {
     core.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization`.
 }
+
+pub fn captureSystemInformation() void {
+    core.panic("UNIMPLEMENTED `captureSystemInformation`"); // TODO: Implement `captureSystemInformation`.
+}

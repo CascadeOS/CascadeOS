@@ -70,6 +70,13 @@ pub const setup = struct {
     pub inline fn earlyArchInitialization() void {
         current.setup.earlyArchInitialization();
     }
+
+    /// Capture any system information that is required for the architecture.
+    ///
+    /// For example, on x86_64 this should capture the CPUID information.
+    pub inline fn captureSystemInformation() void {
+        current.setup.captureSystemInformation();
+    }
 };
 
 /// Disable interrupts and put the CPU to sleep.
