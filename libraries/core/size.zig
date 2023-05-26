@@ -6,6 +6,20 @@ const core = @import("core");
 pub const Size = extern struct {
     bytes: usize,
 
+    pub const Unit = enum(usize) {
+        byte = 1,
+        kib = 1024,
+        mib = 1024 * 1024,
+        gib = 1024 * 1024 * 1024,
+        tib = 1024 * 1024 * 1024 * 1024,
+    };
+
+    pub fn from(size: usize, unit: Unit) Size {
+        return .{
+            .bytes = size * @enumToInt(unit),
+        };
+    }
+
     comptime {
         std.debug.assert(@sizeOf(Size) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(Size) == @bitSizeOf(usize));
