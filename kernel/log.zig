@@ -101,7 +101,7 @@ pub const Level = enum {
     }
 };
 
-const maximum_log_scope_length = 15;
+const maximum_log_scope_length = 17;
 
 pub inline fn formatScopeAndLevel(
     comptime message_level: Level,
