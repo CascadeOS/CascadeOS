@@ -40,7 +40,7 @@ pub fn earlyArchInitialization() void {
     log.info("loading gdt", .{});
     gdt.load();
 
-    log.info("fill the tss with interrupt/exception handling stacks", .{});
+    log.info("preparing interrupt and exception stacks", .{});
     tss.setInterruptStack(.exception, &exception_stack);
     tss.setInterruptStack(.double_fault, &double_fault_stack);
     tss.setInterruptStack(.interrupt, &interrupt_stack);
@@ -52,7 +52,7 @@ pub fn earlyArchInitialization() void {
     log.info("loading idt", .{});
     x86_64.interrupts.loadIdt();
 
-    log.debug("mapping idt handlers to correct stacks", .{});
+    log.debug("mapping idt vectors to the prepared stacks", .{});
     for (0..x86_64.Idt.number_of_handlers) |vector_number| {
         const vector = @intToEnum(x86_64.interrupts.IdtVector, vector_number);
 
