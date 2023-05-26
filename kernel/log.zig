@@ -3,6 +3,7 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const kernel_options = @import("kernel_options");
 
 var initialized: bool = false;
 
@@ -134,14 +135,14 @@ inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime messag
 
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
     const scope_name = @tagName(scope);
-    inline for (kernel.info.scopes_to_force_debug) |debug_scope| {
+    inline for (kernel_options.scopes_to_force_debug) |debug_scope| {
         if (std.mem.indexOf(u8, scope_name, debug_scope) != null) return true;
     }
     return false;
 }
 
 const level: Level = blk: {
-    if (kernel.info.force_debug_log) break :blk .debug;
+    if (kernel_options.force_debug_log) break :blk .debug;
 
     // TODO: Once the kernel matures use per mode logging levels
     if (true) break :blk .info;
