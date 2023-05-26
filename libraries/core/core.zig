@@ -2,6 +2,9 @@
 
 const std = @import("std");
 
+const size = @import("size.zig");
+pub const Size = size.Size;
+
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
 pub inline fn panic(comptime msg: []const u8) noreturn {
