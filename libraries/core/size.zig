@@ -20,6 +20,10 @@ pub const Size = extern struct {
         };
     }
 
+    pub fn multiply(self: Size, value: usize) Size {
+        return .{ .bytes = self.bytes * value };
+    }
+
     comptime {
         std.debug.assert(@sizeOf(Size) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(Size) == @bitSizeOf(usize));
