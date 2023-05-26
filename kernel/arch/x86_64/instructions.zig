@@ -8,6 +8,11 @@ pub inline fn pause() void {
     asm volatile ("pause");
 }
 
+/// Disable interrupts.
+pub inline fn disableInterrupts() void {
+    asm volatile ("cli");
+}
+
 /// Disable interrupts and put the CPU to sleep.
 pub fn disableInterruptsAndHalt() noreturn {
     while (true) {
