@@ -157,6 +157,28 @@ pub const PhysRange = struct {
         };
     }
 
+    pub fn moveForward(self: PhysRange, size: core.Size) PhysRange {
+        return .{
+            .addr = self.addr.moveForward(size),
+            .size = self.size,
+        };
+    }
+
+    pub fn moveForwardInPlace(self: *PhysRange, size: core.Size) void {
+        self.addr.moveForwardInPlace(size);
+    }
+
+    pub fn moveBackward(self: PhysRange, size: core.Size) PhysRange {
+        return .{
+            .addr = self.addr.moveBackward(size),
+            .size = self.size,
+        };
+    }
+
+    pub fn moveBackwardInPlace(self: *PhysRange, size: core.Size) void {
+        self.addr.moveBackwardInPlace(size);
+    }
+
     pub fn format(
         value: PhysRange,
         comptime fmt: []const u8,
@@ -179,6 +201,28 @@ pub const VirtRange = struct {
             .addr = addr,
             .size = size,
         };
+    }
+
+    pub fn moveForward(self: VirtRange, size: core.Size) VirtRange {
+        return .{
+            .addr = self.addr.moveForward(size),
+            .size = self.size,
+        };
+    }
+
+    pub fn moveForwardInPlace(self: *VirtRange, size: core.Size) void {
+        self.addr.moveForwardInPlace(size);
+    }
+
+    pub fn moveBackward(self: VirtRange, size: core.Size) VirtRange {
+        return .{
+            .addr = self.addr.moveBackward(size),
+            .size = self.size,
+        };
+    }
+
+    pub fn moveBackwardInPlace(self: *VirtRange, size: core.Size) void {
+        self.addr.moveBackwardInPlace(size);
     }
 
     pub fn format(
