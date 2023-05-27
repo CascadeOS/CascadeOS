@@ -86,6 +86,10 @@ pub const VirtAddr = extern struct {
         return .{ .value = value };
     }
 
+    pub inline fn toPtr(self: VirtAddr, comptime PtrT: type) PtrT {
+        return @intToPtr(PtrT, self.value);
+    }
+
     pub fn isAligned(self: VirtAddr, alignment: core.Size) bool {
         return std.mem.isAligned(self.value, alignment.bytes);
     }
