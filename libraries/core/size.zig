@@ -58,6 +58,26 @@ pub const Size = extern struct {
         self.bytes *= value;
     }
 
+    pub fn lessThan(self: Size, other: Size) bool {
+        return self.bytes < other.bytes;
+    }
+
+    pub fn lessThanOrEqual(self: Size, other: Size) bool {
+        return self.bytes <= other.bytes;
+    }
+
+    pub fn greaterThan(self: Size, other: Size) bool {
+        return self.bytes > other.bytes;
+    }
+
+    pub fn greaterThanOrEqual(self: Size, other: Size) bool {
+        return self.bytes >= other.bytes;
+    }
+
+    pub fn equal(self: Size, other: Size) bool {
+        return self.bytes == other.bytes;
+    }
+
     comptime {
         std.debug.assert(@sizeOf(Size) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(Size) == @bitSizeOf(usize));
