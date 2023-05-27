@@ -58,6 +58,11 @@ pub const Size = extern struct {
         self.bytes *= value;
     }
 
+    /// Caller must ensure `other` is not zero.
+    pub fn divide(self: Size, other: Size) usize {
+        return self.bytes / other.bytes;
+    }
+
     pub fn lessThan(self: Size, other: Size) bool {
         return self.bytes < other.bytes;
     }
