@@ -49,3 +49,5 @@ pub const PrivilegeLevel = enum(u2) {
 
 pub const smallest_page_size = core.Size.from(4, .kib);
 pub const largest_page_size = core.Size.from(1, .gib);
+// TODO: This is incorrect for 5-level paging
+pub const higher_half = kernel.arch.VirtAddr.fromInt(0xffff800000000000);

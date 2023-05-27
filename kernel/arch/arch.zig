@@ -25,6 +25,7 @@ pub const VirtRange = addr.VirtRange;
 
 pub const smallest_page_size: core.Size = current.smallest_page_size;
 pub const largest_page_size: core.Size = current.largest_page_size;
+pub const higher_half: VirtAddr = current.higher_half;
 
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
