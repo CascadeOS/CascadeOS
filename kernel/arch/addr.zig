@@ -16,6 +16,10 @@ pub const PhysAddr = extern struct {
         return .{ .value = value };
     }
 
+    pub fn toKernelVirtual(self: PhysAddr) VirtAddr {
+        return .{ .value = self.value + kernel.info.hhdm.addr.value };
+    }
+
     pub fn isAligned(self: PhysAddr, alignment: core.Size) bool {
         return std.mem.isAligned(self.value, alignment.bytes);
     }
@@ -158,6 +162,13 @@ pub const PhysRange = struct {
         return .{
             .addr = addr,
             .size = size,
+        };
+    }
+
+    pub fn toKernelVirtual(self: PhysRange) VirtRange {
+        return .{
+            .addr = self.addr.toKernelVirtual(),
+            .size = self.size,
         };
     }
 
