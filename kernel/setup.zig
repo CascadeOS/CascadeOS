@@ -30,5 +30,8 @@ pub fn setup() void {
     log.info("configuring system features", .{});
     kernel.arch.setup.configureSystemFeatures();
 
+    log.info("initializing physical memory management", .{});
+    kernel.pmm.init();
+
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

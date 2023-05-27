@@ -7,6 +7,7 @@ pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
+pub const pmm = @import("pmm.zig");
 pub const setup = @import("setup.zig");
 
 comptime {
