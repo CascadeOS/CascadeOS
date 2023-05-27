@@ -56,6 +56,20 @@ pub const PhysAddr = extern struct {
         return self.value == other.value;
     }
 
+    pub fn format(
+        self: PhysAddr,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.writeAll("PhysAddr{ 0x");
+        try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+        try writer.writeAll(" }");
+    }
+
     comptime {
         std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
@@ -110,6 +124,20 @@ pub const VirtAddr = extern struct {
 
     pub fn equal(self: VirtAddr, other: VirtAddr) bool {
         return self.value == other.value;
+    }
+
+    pub fn format(
+        self: VirtAddr,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.writeAll("VirtAddr{ 0x");
+        try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+        try writer.writeAll(" }");
     }
 
     comptime {
