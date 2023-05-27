@@ -14,14 +14,40 @@ pub const Size = extern struct {
         tib = 1024 * 1024 * 1024 * 1024,
     };
 
+    pub const zero: Size = .{ .bytes = 0 };
+
     pub fn from(size: usize, unit: Unit) Size {
         return .{
             .bytes = size * @enumToInt(unit),
         };
     }
 
+    pub fn isAligned(self: Size, alignment: Size) bool {
+        return std.mem.isAligned(self.bytes, alignment.bytes);
+    }
+
+    pub fn add(self: Size, other: Size) Size {
+        return .{ .bytes = self.bytes + other.bytes };
+    }
+
+    pub fn addInPlace(self: *Size, other: Size) void {
+        self.bytes += other.bytes;
+    }
+
+    pub fn subtract(self: Size, other: Size) Size {
+        return .{ .bytes = self.bytes - other.bytes };
+    }
+
+    pub fn subtractInPlace(self: *Size, other: Size) void {
+        self.bytes -= other.bytes;
+    }
+
     pub fn multiply(self: Size, value: usize) Size {
         return .{ .bytes = self.bytes * value };
+    }
+
+    pub fn multiplyInPlace(self: *Size, value: usize) void {
+        self.bytes *= value;
     }
 
     comptime {
