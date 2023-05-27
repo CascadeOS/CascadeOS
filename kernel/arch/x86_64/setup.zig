@@ -30,19 +30,19 @@ var interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 
 pub fn earlyArchInitialization() void {
-    log.info("loading gdt", .{});
+    log.debug("loading gdt", .{});
     gdt.load();
 
-    log.info("preparing interrupt and exception stacks", .{});
+    log.debug("preparing interrupt and exception stacks", .{});
     tss.setInterruptStack(.exception, &exception_stack);
     tss.setInterruptStack(.double_fault, &double_fault_stack);
     tss.setInterruptStack(.interrupt, &interrupt_stack);
     tss.setInterruptStack(.non_maskable_interrupt, &non_maskable_interrupt_stack);
 
-    log.info("loading tss", .{});
+    log.debug("loading tss", .{});
     gdt.setTss(&tss);
 
-    log.info("loading idt", .{});
+    log.debug("loading idt", .{});
     x86_64.interrupts.loadIdt();
 
     log.debug("mapping idt vectors to the prepared stacks", .{});
