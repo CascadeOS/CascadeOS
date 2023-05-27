@@ -26,6 +26,14 @@ pub const Size = extern struct {
         return std.mem.isAligned(self.bytes, alignment.bytes);
     }
 
+    pub fn alignForward(self: Size, alignment: Size) Size {
+        return .{ .bytes = std.mem.alignForward(self.bytes, alignment.bytes) };
+    }
+
+    pub fn alignBackward(self: Size, alignment: Size) Size {
+        return .{ .bytes = std.mem.alignBackward(self.bytes, alignment.bytes) };
+    }
+
     pub fn add(self: Size, other: Size) Size {
         return .{ .bytes = self.bytes + other.bytes };
     }
