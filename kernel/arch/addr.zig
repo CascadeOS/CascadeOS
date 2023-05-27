@@ -37,3 +37,51 @@ pub const VirtAddr = extern struct {
         std.debug.assert(@bitSizeOf(VirtAddr) == @bitSizeOf(usize));
     }
 };
+
+pub const PhysRange = struct {
+    addr: PhysAddr,
+    size: core.Size,
+
+    pub fn fromAddr(addr: PhysAddr, size: core.Size) PhysRange {
+        return .{
+            .addr = addr,
+            .size = size,
+        };
+    }
+
+    pub fn format(
+        value: PhysRange,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("PhysRange{{ {} {} }}", .{ value.addr, value.size });
+    }
+};
+
+pub const VirtRange = struct {
+    addr: VirtAddr,
+    size: core.Size,
+
+    pub fn fromAddr(addr: VirtAddr, size: core.Size) VirtRange {
+        return .{
+            .addr = addr,
+            .size = size,
+        };
+    }
+
+    pub fn format(
+        value: VirtRange,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("VirtRange{{ {} {} }}", .{ value.addr, value.size });
+    }
+};

@@ -15,4 +15,6 @@ const arch = @import("arch.zig");
 pub const useful_arch_exports = struct {
     pub const PhysAddr = arch.PhysAddr;
     pub const VirtAddr = arch.VirtAddr;
+    pub const PhysRange = arch.PhysRange;
+    pub const VirtRange = arch.VirtRange;
 };

@@ -20,6 +20,8 @@ const current = switch (kernel.info.arch) {
 const addr = @import("addr.zig");
 pub const PhysAddr = addr.PhysAddr;
 pub const VirtAddr = addr.VirtAddr;
+pub const PhysRange = addr.PhysRange;
+pub const VirtRange = addr.VirtRange;
 
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
