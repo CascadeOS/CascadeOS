@@ -78,6 +78,87 @@ pub const Size = extern struct {
         return self.bytes == other.bytes;
     }
 
+    pub fn format(
+        size: Size,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.writeAll("Size{ ");
+
+        if (size.bytes == 0) {
+            try writer.writeAll("0 bytes }");
+            return;
+        }
+
+        var value = size.bytes;
+        var emitted_anything = false;
+
+        if (value >= @enumToInt(Unit.tib)) {
+            const tib = value / @enumToInt(Unit.tib);
+
+            if (emitted_anything) try writer.writeAll(", ");
+
+            try std.fmt.formatInt(tib, 10, .lower, .{}, writer);
+            try writer.writeAll(" TiB");
+
+            value -= tib * @enumToInt(Unit.tib);
+            emitted_anything = true;
+        }
+
+        if (value >= @enumToInt(Unit.gib)) {
+            const gib = value / @enumToInt(Unit.gib);
+
+            if (emitted_anything) try writer.writeAll(", ");
+
+            try std.fmt.formatInt(gib, 10, .lower, .{}, writer);
+            try writer.writeAll(" GiB");
+
+            value -= gib * @enumToInt(Unit.gib);
+            emitted_anything = true;
+        }
+
+        if (value >= @enumToInt(Unit.mib)) {
+            const mib = value / @enumToInt(Unit.mib);
+
+            if (emitted_anything) try writer.writeAll(", ");
+
+            try std.fmt.formatInt(mib, 10, .lower, .{}, writer);
+            try writer.writeAll(" MiB");
+
+            value -= mib * @enumToInt(Unit.mib);
+            emitted_anything = true;
+        }
+
+        if (value >= @enumToInt(Unit.kib)) {
+            const kib = value / @enumToInt(Unit.kib);
+
+            if (emitted_anything) try writer.writeAll(", ");
+
+            try std.fmt.formatInt(kib, 10, .lower, .{}, writer);
+            try writer.writeAll(" KiB");
+
+            value -= kib * @enumToInt(Unit.kib);
+            emitted_anything = true;
+        }
+
+        if (value != 0) {
+            if (emitted_anything) try writer.writeAll(", ");
+
+            if (value == 1) {
+                try writer.writeAll("1 byte");
+            } else {
+                try std.fmt.formatInt(value, 10, .lower, .{}, writer);
+                try writer.writeAll(" bytes");
+            }
+        }
+
+        try writer.writeAll(" }");
+    }
+
     comptime {
         std.debug.assert(@sizeOf(Size) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(Size) == @bitSizeOf(usize));
