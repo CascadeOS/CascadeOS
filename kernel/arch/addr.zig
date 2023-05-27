@@ -36,6 +36,26 @@ pub const PhysAddr = extern struct {
         self.value -= size.bytes;
     }
 
+    pub fn lessThan(self: PhysAddr, other: PhysAddr) bool {
+        return self.value < other.value;
+    }
+
+    pub fn lessThanOrEqual(self: PhysAddr, other: PhysAddr) bool {
+        return self.value <= other.value;
+    }
+
+    pub fn greaterThan(self: PhysAddr, other: PhysAddr) bool {
+        return self.value > other.value;
+    }
+
+    pub fn greaterThanOrEqual(self: PhysAddr, other: PhysAddr) bool {
+        return self.value >= other.value;
+    }
+
+    pub fn equal(self: PhysAddr, other: PhysAddr) bool {
+        return self.value == other.value;
+    }
+
     comptime {
         std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
@@ -70,6 +90,26 @@ pub const VirtAddr = extern struct {
 
     pub fn moveBackwardInPlace(self: *VirtAddr, size: core.Size) void {
         self.value -= size.bytes;
+    }
+
+    pub fn lessThan(self: VirtAddr, other: VirtAddr) bool {
+        return self.value < other.value;
+    }
+
+    pub fn lessThanOrEqual(self: VirtAddr, other: VirtAddr) bool {
+        return self.value <= other.value;
+    }
+
+    pub fn greaterThan(self: VirtAddr, other: VirtAddr) bool {
+        return self.value > other.value;
+    }
+
+    pub fn greaterThanOrEqual(self: VirtAddr, other: VirtAddr) bool {
+        return self.value >= other.value;
+    }
+
+    pub fn equal(self: VirtAddr, other: VirtAddr) bool {
+        return self.value == other.value;
     }
 
     comptime {
