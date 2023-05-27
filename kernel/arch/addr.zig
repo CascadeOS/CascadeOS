@@ -20,6 +20,22 @@ pub const PhysAddr = extern struct {
         return std.mem.isAligned(self.value, alignment.bytes);
     }
 
+    pub fn moveForward(self: PhysAddr, size: core.Size) PhysAddr {
+        return .{ .value = self.value + size.bytes };
+    }
+
+    pub fn moveForwardInPlace(self: *PhysAddr, size: core.Size) void {
+        self.value += size.bytes;
+    }
+
+    pub fn moveBackward(self: PhysAddr, size: core.Size) PhysAddr {
+        return .{ .value = self.value - size.bytes };
+    }
+
+    pub fn moveBackwardInPlace(self: *PhysAddr, size: core.Size) void {
+        self.value -= size.bytes;
+    }
+
     comptime {
         std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
@@ -38,6 +54,22 @@ pub const VirtAddr = extern struct {
 
     pub fn isAligned(self: VirtAddr, alignment: core.Size) bool {
         return std.mem.isAligned(self.value, alignment.bytes);
+    }
+
+    pub fn moveForward(self: VirtAddr, size: core.Size) VirtAddr {
+        return .{ .value = self.value + size.bytes };
+    }
+
+    pub fn moveForwardInPlace(self: *VirtAddr, size: core.Size) void {
+        self.value += size.bytes;
+    }
+
+    pub fn moveBackward(self: VirtAddr, size: core.Size) VirtAddr {
+        return .{ .value = self.value - size.bytes };
+    }
+
+    pub fn moveBackwardInPlace(self: *VirtAddr, size: core.Size) void {
+        self.value -= size.bytes;
     }
 
     comptime {
