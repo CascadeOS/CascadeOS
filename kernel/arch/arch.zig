@@ -17,37 +17,9 @@ const current = switch (kernel.info.arch) {
     .aarch64 => aarch64,
 };
 
-pub const PhysAddr = extern struct {
-    value: usize,
-
-    pub const zero: PhysAddr = .{ .value = 0 };
-
-    pub fn fromInt(value: usize) PhysAddr {
-        // TODO: check that the address is valid (cannoical)
-        return .{ .value = value };
-    }
-
-    comptime {
-        std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
-        std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
-    }
-};
-
-pub const VirtAddr = extern struct {
-    value: usize,
-
-    pub const zero: VirtAddr = .{ .value = 0 };
-
-    pub fn fromInt(value: usize) VirtAddr {
-        // TODO: check that the address is valid (cannoical)
-        return .{ .value = value };
-    }
-
-    comptime {
-        std.debug.assert(@sizeOf(VirtAddr) == @sizeOf(usize));
-        std.debug.assert(@bitSizeOf(VirtAddr) == @bitSizeOf(usize));
-    }
-};
+const addr = @import("addr.zig");
+pub const PhysAddr = addr.PhysAddr;
+pub const VirtAddr = addr.VirtAddr;
 
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
