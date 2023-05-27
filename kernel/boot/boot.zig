@@ -123,7 +123,7 @@ pub const MemoryMapEntry = struct {
         try std.fmt.formatBuf(
             @tagName(entry.type),
             .{
-                .alignment = .Left,
+                .alignment = .left,
                 .width = 20,
             },
             writer,

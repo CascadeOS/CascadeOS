@@ -698,7 +698,7 @@ fn hashDirectoryRecursive(
         const new_full_path = try std.fs.path.join(allocator, &.{ directory_full_path, entry.name });
         defer allocator.free(new_full_path);
         switch (entry.kind) {
-            .Directory => {
+            .directory => {
                 var new_dir = try target_dir.dir.openIterableDir(entry.name, .{});
                 defer new_dir.close();
                 try hashDirectoryRecursive(
@@ -708,7 +708,7 @@ fn hashDirectoryRecursive(
                     manifest,
                 );
             },
-            .File => {
+            .file => {
                 _ = try manifest.addFile(new_full_path, null);
             },
             else => {},
