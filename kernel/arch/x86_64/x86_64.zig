@@ -9,6 +9,8 @@ comptime {
     _ = interrupts;
 }
 
+pub usingnamespace @import("../arch_helpers.zig").useful_arch_exports;
+
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const Idt = @import("Idt.zig");
 pub const instructions = @import("instructions.zig");
@@ -45,4 +47,4 @@ pub const PrivilegeLevel = enum(u2) {
     ring3 = 3,
 };
 
-pub usingnamespace @import("../arch_helpers.zig").useful_arch_exports;
+pub const smallest_page_size = core.Size.from(4, .kib);

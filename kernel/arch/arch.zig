@@ -23,6 +23,8 @@ pub const VirtAddr = addr.VirtAddr;
 pub const PhysRange = addr.PhysRange;
 pub const VirtRange = addr.VirtRange;
 
+pub const smallest_page_size: core.Size = current.smallest_page_size;
+
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
     /// Attempt to set up some form of early output.
