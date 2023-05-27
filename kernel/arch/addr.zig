@@ -157,6 +157,10 @@ pub const PhysRange = struct {
         };
     }
 
+    pub fn end(self: PhysRange) PhysAddr {
+        return self.addr.moveForward(self.size);
+    }
+
     pub fn moveForward(self: PhysRange, size: core.Size) PhysRange {
         return .{
             .addr = self.addr.moveForward(size),
@@ -201,6 +205,10 @@ pub const VirtRange = struct {
             .addr = addr,
             .size = size,
         };
+    }
+
+    pub fn end(self: VirtRange) VirtAddr {
+        return self.addr.moveForward(self.size);
     }
 
     pub fn moveForward(self: VirtRange, size: core.Size) VirtRange {
