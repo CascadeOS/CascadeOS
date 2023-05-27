@@ -16,6 +16,10 @@ pub const PhysAddr = extern struct {
         return .{ .value = value };
     }
 
+    pub fn isAligned(self: PhysAddr, alignment: core.Size) bool {
+        return std.mem.isAligned(self.value, alignment.bytes);
+    }
+
     comptime {
         std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
         std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
@@ -30,6 +34,10 @@ pub const VirtAddr = extern struct {
     pub fn fromInt(value: usize) VirtAddr {
         // TODO: check that the address is valid (cannoical)
         return .{ .value = value };
+    }
+
+    pub fn isAligned(self: VirtAddr, alignment: core.Size) bool {
+        return std.mem.isAligned(self.value, alignment.bytes);
     }
 
     comptime {
