@@ -48,3 +48,4 @@ pub const PrivilegeLevel = enum(u2) {
 };
 
 pub const smallest_page_size = core.Size.from(4, .kib);
+pub const largest_page_size = core.Size.from(1, .gib);
