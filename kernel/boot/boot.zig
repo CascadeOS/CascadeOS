@@ -15,6 +15,67 @@ export fn _start() callconv(.Naked) noreturn {
     core.panic("setup returned");
 }
 
+const log = kernel.log.scoped(.boot);
+
+pub fn captureBootloaderInformation() void {
+    if (hhdm.response) |resp| {
+        captureHHDMs(resp.offset);
+    } else {
+        core.panic("bootloader did not provide the start of the HHDM");
+    }
+}
+
+var hhdm: limine.HHDM = .{};
+
+fn captureHHDMs(hhdm_offset: u64) void {
+    const hhdm_start = kernel.arch.VirtAddr.fromInt(hhdm_offset);
+
+    if (!hhdm_start.isAligned(kernel.arch.smallest_page_size)) {
+        core.panic("HHDM is not aligned to the smallest page size");
+    }
+
+    const length_of_hhdm = calculateLengthOfHHDM();
+
+    const hhdm_range = kernel.arch.VirtRange.fromAddr(hhdm_start, length_of_hhdm);
+
+    // Ensure that the non-cached HHDM does not go below the higher half
+    var non_cached_hhdm = hhdm_range;
+    non_cached_hhdm.moveBackwardInPlace(length_of_hhdm);
+    if (non_cached_hhdm.addr.lessThan(kernel.arch.higher_half)) {
+        non_cached_hhdm = hhdm_range.moveForward(length_of_hhdm);
+    }
+
+    kernel.info.hhdm = hhdm_range;
+    log.debug("hhdm: {}", .{hhdm_range});
+
+    kernel.info.non_cached_hhdm = non_cached_hhdm;
+    log.debug("non-cached hhdm: {}", .{non_cached_hhdm});
+}
+
+fn calculateLengthOfHHDM() core.Size {
+    var reverse_memmap_iterator = memoryMapIterator(.backwards);
+
+    while (reverse_memmap_iterator.next()) |entry| {
+        if (entry.type == .reserved_or_unusable) continue;
+
+        var size = core.Size.from(entry.range.end().value, .byte);
+
+        // We choose to align the length of the HHDM to `largest_page_size` to allow large pages to be used for the mapping.
+        size = size.alignForward(kernel.arch.largest_page_size);
+
+        // We ensure the lowest 4GiB are always identity mapped as it is possible that things like the PCI bus are
+        // above the maximum range of the memory map.
+        const four_gib = core.Size.from(4, .gib);
+        if (size.lessThan(four_gib)) {
+            size = four_gib;
+        }
+
+        return size;
+    }
+
+    core.panic("no non-reserved or usable memory regions?");
+}
+
 export var memmap: limine.Memmap = .{};
 
 pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {

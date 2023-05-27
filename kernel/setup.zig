@@ -21,6 +21,9 @@ pub fn setup() void {
     log.info("performing early system initialization", .{});
     kernel.arch.setup.earlyArchInitialization();
 
+    log.info("capturing bootloader information", .{});
+    kernel.boot.captureBootloaderInformation();
+
     log.info("capturing system information", .{});
     kernel.arch.setup.captureSystemInformation();
 
