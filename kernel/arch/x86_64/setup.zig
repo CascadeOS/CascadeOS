@@ -69,7 +69,7 @@ pub fn earlyArchInitialization() void {
 }
 
 pub fn captureSystemInformation() void {
-    core.panic("UNIMPLEMENTED `captureSystemInformation`"); // TODO: Implement `captureSystemInformation`.
+    x86_64.cpuid.capture();
 }
 
 pub fn configureSystemFeatures() void {

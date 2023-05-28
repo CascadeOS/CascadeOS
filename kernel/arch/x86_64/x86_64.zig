@@ -9,7 +9,9 @@ comptime {
     _ = interrupts;
 }
 
+pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
+pub const info = @import("info.zig");
 pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
 pub const paging = @import("paging/paging.zig");
