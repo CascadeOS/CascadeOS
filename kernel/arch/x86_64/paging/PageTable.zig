@@ -210,38 +210,38 @@ pub const PageTable = extern struct {
 
         pub fn getAddress4kib(self: Entry) x86_64.PhysAddr {
             return .{
-                .addr = @as(usize, self.address_4kib_aligned.read()) << offset_of_4kib_aligned_address,
+                .value = @as(usize, self.address_4kib_aligned.read()) << offset_of_4kib_aligned_address,
             };
         }
 
         pub fn setAddress4kib(self: *Entry, addr: x86_64.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.small_page_size));
             self.address_4kib_aligned.write(
-                @truncate(type_of_4kib, addr.addr >> offset_of_4kib_aligned_address),
+                @truncate(type_of_4kib, addr.value >> offset_of_4kib_aligned_address),
             );
         }
 
         pub fn getAddress2mib(self: Entry) x86_64.PhysAddr {
             return .{
-                .addr = @as(usize, self.address_2mib_aligned.read()) << offset_of_2mib_aligned_address,
+                .value = @as(usize, self.address_2mib_aligned.read()) << offset_of_2mib_aligned_address,
             };
         }
 
         pub fn setAddress2mib(self: *Entry, addr: x86_64.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.medium_page_size));
             self.address_2mib_aligned.write(
-                @truncate(type_of_2mib, addr.addr >> offset_of_2mib_aligned_address),
+                @truncate(type_of_2mib, addr.value >> offset_of_2mib_aligned_address),
             );
         }
 
         pub fn getAddress1gib(self: Entry) x86_64.PhysAddr {
-            return .{ .addr = @as(usize, self.address_1gib_aligned.read()) << offset_of_1gib_aligned_address };
+            return .{ .value = @as(usize, self.address_1gib_aligned.read()) << offset_of_1gib_aligned_address };
         }
 
         pub fn setAddress1gib(self: *Entry, addr: x86_64.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.large_page_size));
             self.address_1gib_aligned.write(
-                @truncate(type_of_1gib, addr.addr >> offset_of_1gib_aligned_address),
+                @truncate(type_of_1gib, addr.value >> offset_of_1gib_aligned_address),
             );
         }
 
