@@ -3,15 +3,17 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const x86_64 = @import("x86_64.zig");
+const x86_64 = @import("../x86_64.zig");
 
-const Idt = x86_64.Idt;
+const Idt = @import("Idt.zig");
+
+pub const number_of_handlers = Idt.number_of_handlers;
 
 const log = kernel.log.scoped(.interrupts_x86_64);
 
 var idt: Idt = undefined;
 const raw_handlers = makeRawHandlers();
-var handlers = [_]InterruptHandler{unhandledInterrupt} ** Idt.number_of_handlers;
+var handlers = [_]InterruptHandler{unhandledInterrupt} ** number_of_handlers;
 
 /// This function will load the IDT and fill the entries with raw handlers.
 pub fn loadIdt() void {
@@ -53,11 +55,11 @@ fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
 }
 
 /// Creates an array of raw interrupt handlers, one for each vector.
-fn makeRawHandlers() [Idt.number_of_handlers](*const fn () callconv(.Naked) void) {
-    var raw_handlers_temp: [Idt.number_of_handlers](*const fn () callconv(.Naked) void) = undefined;
+fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
+    var raw_handlers_temp: [number_of_handlers](*const fn () callconv(.Naked) void) = undefined;
 
     comptime var i = 0;
-    inline while (i < Idt.number_of_handlers) : (i += 1) {
+    inline while (i < number_of_handlers) : (i += 1) {
         const vector_number = @intCast(u8, i);
         const idt_vector = @intToEnum(IdtVector, vector_number);
 

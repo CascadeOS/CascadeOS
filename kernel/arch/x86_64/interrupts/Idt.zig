@@ -3,10 +3,11 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const x86_64 = @import("x86_64.zig");
+const x86_64 = @import("../x86_64.zig");
 
 const Idt = @This();
 
+/// The number of interrupt handlers in the IDT.
 pub const number_of_handlers = 256;
 
 handlers: [number_of_handlers]Entry align(16) = std.mem.zeroes([number_of_handlers]Entry),
