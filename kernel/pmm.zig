@@ -83,7 +83,7 @@ pub fn init() void {
     log.debug("|--unusable: {}", .{total_memory.subtract(total_usable_memory)});
 }
 
-pub fn allocateSmallestPage() ?arch.PhysAddr {
+pub fn allocateSmallestPage() ?arch.PhysRange {
     var opt_first_free = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
 
     while (opt_first_free) |first_free| {
@@ -104,14 +104,23 @@ pub fn allocateSmallestPage() ?arch.PhysAddr {
 
         const addr = arch.VirtAddr.fromPtr(first_free).toPhysicalFromKernelVirtual() catch unreachable;
 
-        log.debug("found free page: {}", .{first_free});
+        const range = arch.PhysRange.fromAddr(addr, arch.paging.smallest_page_size);
 
-        return addr;
+        log.debug("found free page: {}", .{range});
+
+        return range;
     } else {
         log.warn("SMALL PAGE ALLOCATION FAILED", .{});
     }
 
     return null;
+}
+
+pub fn deallocateSmallestPage(addr: arch.PhysAddr) void {
+    std.debug.assert(addr.isAligned(arch.paging.smallest_page_size));
+
+    const page_node = addr.toKernelVirtual().toPtr(*PhysPageNode);
+    _ = page_node;
 }
 
 const PhysPageNode = extern struct {
