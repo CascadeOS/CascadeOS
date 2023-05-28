@@ -68,9 +68,9 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
-    pub const smallest_page_size: core.Size = current.smallest_page_size;
-    pub const largest_page_size: core.Size = current.largest_page_size;
-    pub const higher_half: VirtAddr = current.higher_half;
+    pub const smallest_page_size: core.Size = current.paging.smallest_page_size;
+    pub const largest_page_size: core.Size = current.paging.largest_page_size;
+    pub const higher_half: VirtAddr = current.paging.higher_half;
 
-    pub const PageTable = current.PageTable;
+    pub const PageTable = current.paging.PageTable;
 };

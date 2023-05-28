@@ -9,13 +9,11 @@ comptime {
     _ = interrupts;
 }
 
-pub usingnamespace @import("../arch_helpers.zig").useful_arch_exports;
-
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const Idt = @import("Idt.zig");
 pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts.zig");
-pub const PageTable = @import("PageTable.zig").PageTable;
+pub const paging = @import("paging/paging.zig");
 pub const registers = @import("registers.zig");
 pub const serial = @import("serial.zig");
 pub const setup = @import("setup.zig");
@@ -48,7 +46,9 @@ pub const PrivilegeLevel = enum(u2) {
     ring3 = 3,
 };
 
-pub const smallest_page_size = core.Size.from(4, .kib);
-pub const largest_page_size = core.Size.from(1, .gib);
-// TODO: This is incorrect for 5-level paging
-pub const higher_half = kernel.arch.VirtAddr.fromInt(0xffff800000000000);
+// Below here are helpful re-exports from the main arch file
+const arch = @import("../arch.zig");
+pub const PhysAddr = arch.PhysAddr;
+pub const VirtAddr = arch.VirtAddr;
+pub const PhysRange = arch.PhysRange;
+pub const VirtRange = arch.VirtRange;
