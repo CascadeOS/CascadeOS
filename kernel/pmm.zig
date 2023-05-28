@@ -8,6 +8,10 @@ const arch = kernel.arch;
 
 const log = kernel.log.scoped(.pmm);
 
+// TODO: the current implementation is an intrusive linked list using the memory of the free pages themselves
+//       this is simple and works, but it only supports allocation of pages of the smallest size
+//       we should switch to a different data structure to support allocation of larger pages as well
+
 var first_free_physical_page: ?*PhysPageNode = null;
 var total_memory: core.Size = core.Size.zero;
 var total_usable_memory: core.Size = core.Size.zero;
@@ -77,6 +81,37 @@ pub fn init() void {
     log.debug("|  |--free: {}", .{free_memory});
     log.debug("|  |--in use: {}", .{total_usable_memory.subtract(free_memory)});
     log.debug("|--unusable: {}", .{total_memory.subtract(total_usable_memory)});
+}
+
+pub fn allocateSmallestPage() ?arch.PhysAddr {
+    var opt_first_free = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
+
+    while (opt_first_free) |first_free| {
+        if (@cmpxchgWeak(
+            ?*PhysPageNode,
+            &first_free_physical_page,
+            first_free,
+            first_free.next,
+            .AcqRel,
+            .Monotonic,
+        )) |new_first_free| {
+            opt_first_free = new_first_free;
+            continue;
+        }
+
+        // Decrement `free_memory`
+        _ = @atomicRmw(usize, &free_memory.bytes, .Sub, arch.paging.smallest_page_size.bytes, .Monotonic);
+
+        const addr = arch.VirtAddr.fromPtr(first_free).toPhysicalFromKernelVirtual() catch unreachable;
+
+        log.debug("found free page: {}", .{first_free});
+
+        return addr;
+    } else {
+        log.warn("SMALL PAGE ALLOCATION FAILED", .{});
+    }
+
+    return null;
 }
 
 const PhysPageNode = extern struct {
