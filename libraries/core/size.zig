@@ -16,70 +16,74 @@ pub const Size = extern struct {
 
     pub const zero: Size = .{ .bytes = 0 };
 
-    pub fn from(size: usize, unit: Unit) Size {
+    pub inline fn of(comptime T: type) Size {
+        return .{ .bytes = @sizeOf(T) };
+    }
+
+    pub inline fn from(size: usize, unit: Unit) Size {
         return .{
             .bytes = size * @enumToInt(unit),
         };
     }
 
-    pub fn isAligned(self: Size, alignment: Size) bool {
+    pub inline fn isAligned(self: Size, alignment: Size) bool {
         return std.mem.isAligned(self.bytes, alignment.bytes);
     }
 
-    pub fn alignForward(self: Size, alignment: Size) Size {
+    pub inline fn alignForward(self: Size, alignment: Size) Size {
         return .{ .bytes = std.mem.alignForward(self.bytes, alignment.bytes) };
     }
 
-    pub fn alignBackward(self: Size, alignment: Size) Size {
+    pub inline fn alignBackward(self: Size, alignment: Size) Size {
         return .{ .bytes = std.mem.alignBackward(self.bytes, alignment.bytes) };
     }
 
-    pub fn add(self: Size, other: Size) Size {
+    pub inline fn add(self: Size, other: Size) Size {
         return .{ .bytes = self.bytes + other.bytes };
     }
 
-    pub fn addInPlace(self: *Size, other: Size) void {
+    pub inline fn addInPlace(self: *Size, other: Size) void {
         self.bytes += other.bytes;
     }
 
-    pub fn subtract(self: Size, other: Size) Size {
+    pub inline fn subtract(self: Size, other: Size) Size {
         return .{ .bytes = self.bytes - other.bytes };
     }
 
-    pub fn subtractInPlace(self: *Size, other: Size) void {
+    pub inline fn subtractInPlace(self: *Size, other: Size) void {
         self.bytes -= other.bytes;
     }
 
-    pub fn multiply(self: Size, value: usize) Size {
+    pub inline fn multiply(self: Size, value: usize) Size {
         return .{ .bytes = self.bytes * value };
     }
 
-    pub fn multiplyInPlace(self: *Size, value: usize) void {
+    pub inline fn multiplyInPlace(self: *Size, value: usize) void {
         self.bytes *= value;
     }
 
     /// Caller must ensure `other` is not zero.
-    pub fn divide(self: Size, other: Size) usize {
+    pub inline fn divide(self: Size, other: Size) usize {
         return self.bytes / other.bytes;
     }
 
-    pub fn lessThan(self: Size, other: Size) bool {
+    pub inline fn lessThan(self: Size, other: Size) bool {
         return self.bytes < other.bytes;
     }
 
-    pub fn lessThanOrEqual(self: Size, other: Size) bool {
+    pub inline fn lessThanOrEqual(self: Size, other: Size) bool {
         return self.bytes <= other.bytes;
     }
 
-    pub fn greaterThan(self: Size, other: Size) bool {
+    pub inline fn greaterThan(self: Size, other: Size) bool {
         return self.bytes > other.bytes;
     }
 
-    pub fn greaterThanOrEqual(self: Size, other: Size) bool {
+    pub inline fn greaterThanOrEqual(self: Size, other: Size) bool {
         return self.bytes >= other.bytes;
     }
 
-    pub fn equal(self: Size, other: Size) bool {
+    pub inline fn equal(self: Size, other: Size) bool {
         return self.bytes == other.bytes;
     }
 
