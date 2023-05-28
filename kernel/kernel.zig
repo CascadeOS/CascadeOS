@@ -9,6 +9,7 @@ pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
 pub const setup = @import("setup.zig");
+pub const vmm = @import("vmm.zig");
 
 comptime {
     // make sure any bootloader specific code that needs to be referenced is

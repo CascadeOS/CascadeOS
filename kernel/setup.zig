@@ -33,5 +33,8 @@ pub fn setup() void {
     log.info("initializing physical memory management", .{});
     kernel.pmm.init();
 
+    log.info("initializing virtual memory management", .{});
+    kernel.vmm.init();
+
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

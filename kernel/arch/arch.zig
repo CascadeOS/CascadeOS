@@ -70,7 +70,10 @@ pub const interrupts = struct {
 pub const paging = struct {
     pub const smallest_page_size: core.Size = current.paging.smallest_page_size;
     pub const largest_page_size: core.Size = current.paging.largest_page_size;
+
     pub const higher_half: VirtAddr = current.paging.higher_half;
 
     pub const PageTable = current.paging.PageTable;
+
+    pub const mapRegion = current.paging.mapRegion;
 };

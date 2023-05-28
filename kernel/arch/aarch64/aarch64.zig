@@ -17,13 +17,22 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
-    pub const smallest_page_size = core.Size.from(4, .kib);
+    // TODO: I don't know if this is correct for aaarch64
+    pub const small_page_size = core.Size.from(4, .kib);
+    pub const medium_page_size = core.Size.from(2, .mib);
+    pub const large_page_size = core.Size.from(1, .gib);
 
-    // TODO: this depends on the "granule" size
-    pub const largest_page_size = core.Size.from(1, .gib);
+    pub const smallest_page_size = small_page_size;
+    pub const largest_page_size = large_page_size;
+
+    pub const page_sizes_available = [_]bool{
+        true,
+        true,
+        true,
+    };
 
     // TODO: I don't know if this is correct for aaarch64
-    pub const higher_half = kernel.arch.VirtAddr.fromInt(0xffff800000000000);
+    pub const higher_half = VirtAddr.fromInt(0xffff800000000000);
 
     // TODO: implement paging support for aaarch64
     pub const PageTable = struct {
@@ -32,6 +41,19 @@ pub const paging = struct {
             core.panic("UNIMPLEMENTED `zero`"); // TODO: Implement `zero`.
         }
     };
+
+    pub fn mapRegion(
+        page_table: *PageTable,
+        virtual_range: VirtRange,
+        physical_range: PhysRange,
+        map_type: kernel.vmm.MapType,
+    ) !void {
+        _ = map_type;
+        _ = physical_range;
+        _ = virtual_range;
+        _ = page_table;
+        core.panic("UNIMPLEMENTED `mapRegion`"); // TODO: Implement `mapRegion`.
+    }
 };
 
 // Below here are helpful re-exports from the main arch file

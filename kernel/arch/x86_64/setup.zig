@@ -73,5 +73,5 @@ pub fn captureSystemInformation() void {
 }
 
 pub fn configureSystemFeatures() void {
-    core.panic("UNIMPLEMENTED `configureSystemFeatures`"); // TODO: Implement `configureSystemFeatures`.
+    // core.panic("UNIMPLEMENTED `configureSystemFeatures`"); // TODO: Implement `configureSystemFeatures`.
 }
