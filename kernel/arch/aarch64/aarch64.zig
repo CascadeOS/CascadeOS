@@ -4,9 +4,17 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-pub const instructions = @import("instructions.zig");
 pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
+
+pub const interrupts = struct {
+    /// Disable interrupts and put the CPU to sleep.
+    pub fn disableInterruptsAndHalt() noreturn {
+        while (true) {
+            asm volatile ("MSR DAIFSET, #0xF;");
+        }
+    }
+};
 
 pub const paging = struct {
     pub const smallest_page_size = core.Size.from(4, .kib);
@@ -18,7 +26,12 @@ pub const paging = struct {
     pub const higher_half = kernel.arch.VirtAddr.fromInt(0xffff800000000000);
 
     // TODO: implement paging support for aaarch64
-    pub const PageTable = struct {};
+    pub const PageTable = struct {
+        pub fn zero(self: *PageTable) void {
+            _ = self;
+            core.panic("UNIMPLEMENTED `zero`"); // TODO: Implement `zero`.
+        }
+    };
 };
 
 // Below here are helpful re-exports from the main arch file

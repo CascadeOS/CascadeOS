@@ -63,7 +63,7 @@ pub const setup = struct {
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub inline fn disableInterruptsAndHalt() noreturn {
-        current.instructions.disableInterruptsAndHalt();
+        current.interrupts.disableInterruptsAndHalt();
     }
 };
 

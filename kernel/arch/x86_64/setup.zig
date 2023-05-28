@@ -46,7 +46,7 @@ pub fn earlyArchInitialization() void {
     x86_64.interrupts.loadIdt();
 
     log.debug("mapping idt vectors to the prepared stacks", .{});
-    for (0..x86_64.Idt.number_of_handlers) |vector_number| {
+    for (0..x86_64.interrupts.number_of_handlers) |vector_number| {
         const vector = @intToEnum(x86_64.interrupts.IdtVector, vector_number);
 
         if (vector == .double_fault) {

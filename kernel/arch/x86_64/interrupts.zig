@@ -225,7 +225,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
 
     handlers[@intCast(u8, interrupt_frame.padded_vector_number)](interrupt_frame);
 
-    x86_64.instructions.disableInterrupts();
+    x86_64.interrupts.disableInterrupts();
 
     if (interrupt_frame.isUser()) {
         // returning to user code
@@ -428,3 +428,15 @@ pub const IdtVector = enum(u8) {
         };
     }
 };
+
+/// Disable interrupts.
+pub inline fn disableInterrupts() void {
+    asm volatile ("cli");
+}
+
+/// Disable interrupts and put the CPU to sleep.
+pub fn disableInterruptsAndHalt() noreturn {
+    while (true) {
+        asm volatile ("cli; hlt");
+    }
+}

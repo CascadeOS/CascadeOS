@@ -8,18 +8,6 @@ pub inline fn pause() void {
     asm volatile ("pause");
 }
 
-/// Disable interrupts.
-pub inline fn disableInterrupts() void {
-    asm volatile ("cli");
-}
-
-/// Disable interrupts and put the CPU to sleep.
-pub fn disableInterruptsAndHalt() noreturn {
-    while (true) {
-        asm volatile ("cli; hlt");
-    }
-}
-
 pub inline fn portReadU8(port: u16) u8 {
     return asm volatile ("inb %[port],%[ret]"
         : [ret] "={al}" (-> u8),
