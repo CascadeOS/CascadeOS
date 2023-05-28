@@ -30,7 +30,7 @@ var hhdm: limine.HHDM = .{};
 fn captureHHDMs(hhdm_offset: u64) void {
     const hhdm_start = kernel.arch.VirtAddr.fromInt(hhdm_offset);
 
-    if (!hhdm_start.isAligned(kernel.arch.smallest_page_size)) {
+    if (!hhdm_start.isAligned(kernel.arch.paging.smallest_page_size)) {
         core.panic("HHDM is not aligned to the smallest page size");
     }
 
@@ -41,7 +41,7 @@ fn captureHHDMs(hhdm_offset: u64) void {
     // Ensure that the non-cached HHDM does not go below the higher half
     var non_cached_hhdm = hhdm_range;
     non_cached_hhdm.moveBackwardInPlace(length_of_hhdm);
-    if (non_cached_hhdm.addr.lessThan(kernel.arch.higher_half)) {
+    if (non_cached_hhdm.addr.lessThan(kernel.arch.paging.higher_half)) {
         non_cached_hhdm = hhdm_range.moveForward(length_of_hhdm);
     }
 
@@ -61,7 +61,7 @@ fn calculateLengthOfHHDM() core.Size {
         var size = core.Size.from(entry.range.end().value, .byte);
 
         // We choose to align the length of the HHDM to `largest_page_size` to allow large pages to be used for the mapping.
-        size = size.alignForward(kernel.arch.largest_page_size);
+        size = size.alignForward(kernel.arch.paging.largest_page_size);
 
         // We ensure the lowest 4GiB are always identity mapped as it is possible that things like the PCI bus are
         // above the maximum range of the memory map.

@@ -4,6 +4,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+const arch = kernel.arch;
+
 const log = kernel.log.scoped(.pmm);
 
 var first_free_physical_page: ?*PhysPageNode = null;
@@ -26,8 +28,8 @@ pub fn init() void {
                 total_usable_memory.addInPlace(entry.range.size);
                 free_memory.addInPlace(entry.range.size);
 
-                std.debug.assert(entry.range.addr.isAligned(kernel.arch.smallest_page_size));
-                std.debug.assert(entry.range.size.isAligned(kernel.arch.smallest_page_size));
+                std.debug.assert(entry.range.addr.isAligned(arch.paging.smallest_page_size));
+                std.debug.assert(entry.range.size.isAligned(arch.paging.smallest_page_size));
 
                 const range_in_hhdm = entry.range.toKernelVirtual();
 
@@ -35,7 +37,7 @@ pub fn init() void {
                 const virtual_end_addr = range_in_hhdm.end();
 
                 log.debug(indent ** 2 ++ "marking {} pages available from {} to {}", .{
-                    entry.range.size.divide(kernel.arch.smallest_page_size),
+                    entry.range.size.divide(arch.paging.smallest_page_size),
                     current_virtual_addr,
                     virtual_end_addr,
                 });
@@ -44,7 +46,7 @@ pub fn init() void {
                 var opt_previous_page: ?*PhysPageNode = null;
 
                 while (current_virtual_addr.lessThan(virtual_end_addr)) : ({
-                    current_virtual_addr.moveForwardInPlace(kernel.arch.smallest_page_size);
+                    current_virtual_addr.moveForwardInPlace(arch.paging.smallest_page_size);
                 }) {
                     const page = current_virtual_addr.toPtr(*kernel.pmm.PhysPageNode);
                     page.next = null;

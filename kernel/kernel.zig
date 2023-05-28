@@ -46,7 +46,7 @@ pub const panic_implementation = struct {
     ) noreturn {
         @setCold(true);
         switch (state) {
-            .no_op => arch.disableInterruptsAndHalt(),
+            .no_op => arch.interrupts.disableInterruptsAndHalt(),
             .simple => simplePanic(msg, stack_trace, ret_addr),
             .full => panicImpl(msg, stack_trace, ret_addr),
         }
@@ -64,7 +64,7 @@ pub const panic_implementation = struct {
         arch.setup.getEarlyOutputWriter().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
 
         while (true) {
-            arch.disableInterruptsAndHalt();
+            arch.interrupts.disableInterruptsAndHalt();
         }
     }
 
