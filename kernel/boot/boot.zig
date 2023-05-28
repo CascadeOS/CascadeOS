@@ -23,6 +23,17 @@ pub fn captureBootloaderInformation() void {
     } else {
         core.panic("bootloader did not provide the start of the HHDM");
     }
+    if (kernel_address.response) |resp| {
+        const kernel_virtual = resp.virtual_base;
+        const kernel_physical = resp.physical_base;
+        kernel.info.kernel_slide = core.Size.from(kernel_virtual - kernel_physical, .byte);
+        log.debug("kernel virtual: 0x{x:0>16}", .{kernel_virtual});
+        log.debug("kernel physical: 0x{x:0>16}", .{kernel_physical});
+        log.debug("kernel slide: 0x{x:0>16}", .{kernel.info.kernel_slide});
+    } else {
+        // TODO: Maybe we should just allow the slide to be 0 in this case?
+        core.panic("bootloader did not respond with kernel address");
+    }
 }
 
 var hhdm: limine.HHDM = .{};
@@ -75,6 +86,8 @@ fn calculateLengthOfHHDM() core.Size {
 
     core.panic("no non-reserved or usable memory regions?");
 }
+
+export var kernel_address: limine.KernelAddress = .{};
 
 export var memmap: limine.Memmap = .{};
 
