@@ -36,7 +36,7 @@ pub fn captureBootloaderInformation() void {
     }
 }
 
-var hhdm: limine.HHDM = .{};
+export var hhdm: limine.HHDM = .{};
 
 fn captureHHDMs(hhdm_offset: u64) void {
     const hhdm_start = kernel.VirtAddr.fromInt(hhdm_offset);
