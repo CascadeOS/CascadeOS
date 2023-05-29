@@ -121,6 +121,7 @@ pub fn deallocateSmallestPage(addr: kernel.PhysAddr) void {
 
     const page_node = addr.toKernelVirtual().toPtr(*PhysPageNode);
     _ = page_node;
+    core.panic("UNIMPLEMENTED `deallocateSmallestPage`"); // TODO: implement deallocateSmallestPage
 }
 
 const PhysPageNode = extern struct {
