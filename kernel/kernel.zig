@@ -11,6 +11,12 @@ pub const pmm = @import("pmm.zig");
 pub const setup = @import("setup.zig");
 pub const vmm = @import("vmm.zig");
 
+const addr = @import("addr.zig");
+pub const PhysAddr = addr.PhysAddr;
+pub const VirtAddr = addr.VirtAddr;
+pub const PhysRange = addr.PhysRange;
+pub const VirtRange = addr.VirtRange;
+
 comptime {
     // make sure any bootloader specific code that needs to be referenced is
     _ = boot;

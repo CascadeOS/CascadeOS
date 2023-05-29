@@ -17,12 +17,6 @@ const current = switch (kernel.info.arch) {
     .aarch64 => aarch64,
 };
 
-const addr = @import("addr.zig");
-pub const PhysAddr = addr.PhysAddr;
-pub const VirtAddr = addr.VirtAddr;
-pub const PhysRange = addr.PhysRange;
-pub const VirtRange = addr.VirtRange;
-
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
     /// Attempt to set up some form of early output.
@@ -71,7 +65,7 @@ pub const paging = struct {
     pub const smallest_page_size: core.Size = current.paging.smallest_page_size;
     pub const largest_page_size: core.Size = current.paging.largest_page_size;
 
-    pub const higher_half: VirtAddr = current.paging.higher_half;
+    pub const higher_half: kernel.VirtAddr = current.paging.higher_half;
 
     pub const PageTable = current.paging.PageTable;
 

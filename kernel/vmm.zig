@@ -31,7 +31,7 @@ pub fn init() void {
 }
 
 fn identityMaps() !void {
-    const physical_range = arch.PhysRange.fromAddr(arch.PhysAddr.zero, kernel.info.hhdm.size);
+    const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.hhdm.size);
 
     log.debug("identity mapping HHDM", .{});
 
@@ -87,13 +87,13 @@ fn mapKernelSections() !void {
 fn mapSection(start: usize, end: usize, map_type: MapType) !void {
     std.debug.assert(end > start);
 
-    const virtual_range = arch.VirtRange.fromAddr(
-        arch.VirtAddr.fromInt(start),
+    const virtual_range = kernel.VirtRange.fromAddr(
+        kernel.VirtAddr.fromInt(start),
         core.Size.from(end - start, .byte).alignForward(arch.paging.smallest_page_size),
     );
 
-    const physical_range = arch.PhysRange.fromAddr(
-        arch.PhysAddr.fromInt(start).moveBackward(kernel.info.kernel_slide),
+    const physical_range = kernel.PhysRange.fromAddr(
+        kernel.PhysAddr.fromInt(start).moveBackward(kernel.info.kernel_slide),
         virtual_range.size,
     );
 
@@ -151,16 +151,16 @@ pub const PageSize = struct {
 
     mapTo: fn (
         page_table: *PageTable,
-        virtual_addr: arch.VirtAddr,
-        physical_addr: arch.PhysAddr,
+        virtual_addr: kernel.VirtAddr,
+        physical_addr: kernel.PhysAddr,
         map_type: MapType,
     ) MapToError!void,
 };
 
 pub fn mapRegion(
     page_table: *PageTable,
-    virtual_range: arch.VirtRange,
-    physical_range: arch.PhysRange,
+    virtual_range: kernel.VirtRange,
+    physical_range: kernel.PhysRange,
     map_type: MapType,
 ) !void {
     std.debug.assert(virtual_range.addr.isAligned(arch.paging.smallest_page_size));

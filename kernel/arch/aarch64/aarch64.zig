@@ -32,7 +32,7 @@ pub const paging = struct {
     };
 
     // TODO: I don't know if this is correct for aaarch64
-    pub const higher_half = VirtAddr.fromInt(0xffff800000000000);
+    pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
 
     // TODO: implement paging support for aaarch64
     pub const PageTable = struct {
@@ -44,8 +44,8 @@ pub const paging = struct {
 
     pub fn mapRegion(
         page_table: *PageTable,
-        virtual_range: VirtRange,
-        physical_range: PhysRange,
+        virtual_range: kernel.VirtRange,
+        physical_range: kernel.PhysRange,
         map_type: kernel.vmm.MapType,
     ) !void {
         _ = map_type;
@@ -55,10 +55,3 @@ pub const paging = struct {
         core.panic("UNIMPLEMENTED `mapRegion`"); // TODO: Implement `mapRegion`.
     }
 };
-
-// Below here are helpful re-exports from the main arch file
-const arch = @import("../arch.zig");
-pub const PhysAddr = arch.PhysAddr;
-pub const VirtAddr = arch.VirtAddr;
-pub const PhysRange = arch.PhysRange;
-pub const VirtRange = arch.VirtRange;

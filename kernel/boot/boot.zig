@@ -39,7 +39,7 @@ pub fn captureBootloaderInformation() void {
 var hhdm: limine.HHDM = .{};
 
 fn captureHHDMs(hhdm_offset: u64) void {
-    const hhdm_start = kernel.arch.VirtAddr.fromInt(hhdm_offset);
+    const hhdm_start = kernel.VirtAddr.fromInt(hhdm_offset);
 
     if (!hhdm_start.isAligned(kernel.arch.paging.smallest_page_size)) {
         core.panic("HHDM is not aligned to the smallest page size");
@@ -47,7 +47,7 @@ fn captureHHDMs(hhdm_offset: u64) void {
 
     const length_of_hhdm = calculateLengthOfHHDM();
 
-    const hhdm_range = kernel.arch.VirtRange.fromAddr(hhdm_start, length_of_hhdm);
+    const hhdm_range = kernel.VirtRange.fromAddr(hhdm_start, length_of_hhdm);
 
     // Ensure that the non-cached HHDM does not go below the higher half
     var non_cached_hhdm = hhdm_range;
@@ -112,7 +112,7 @@ pub const MemoryMapIterator = union(enum) {
 };
 
 pub const MemoryMapEntry = struct {
-    range: kernel.arch.PhysRange,
+    range: kernel.PhysRange,
     type: Type,
 
     pub const Type = enum {
@@ -169,8 +169,8 @@ const LimineMemoryMapIterator = struct {
         }
 
         return .{
-            .range = kernel.arch.PhysRange.fromAddr(
-                kernel.arch.PhysAddr.fromInt(limine_entry.base),
+            .range = kernel.PhysRange.fromAddr(
+                kernel.PhysAddr.fromInt(limine_entry.base),
                 core.Size.from(limine_entry.length, .byte),
             ),
             .type = switch (limine_entry.memmap_type) {

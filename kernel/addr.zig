@@ -4,8 +4,6 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const arch = @import("arch.zig");
-
 pub const PhysAddr = extern struct {
     value: usize,
 

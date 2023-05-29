@@ -46,10 +46,3 @@ pub const PrivilegeLevel = enum(u2) {
     /// to perform the accesses.
     ring3 = 3,
 };
-
-// Below here are helpful re-exports from the main arch file
-const arch = @import("../arch.zig");
-pub const PhysAddr = arch.PhysAddr;
-pub const VirtAddr = arch.VirtAddr;
-pub const PhysRange = arch.PhysRange;
-pub const VirtRange = arch.VirtRange;
