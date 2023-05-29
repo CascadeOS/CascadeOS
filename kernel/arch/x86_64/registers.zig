@@ -100,3 +100,19 @@ pub const RFlags = packed struct(u64) {
         std.debug.assert(@sizeOf(u64) == @sizeOf(RFlags));
     }
 };
+
+pub const Cr3 = struct {
+    pub inline fn readAddress() kernel.PhysAddr {
+        return kernel.PhysAddr.fromInt(asm ("mov %%cr3, %[value]"
+            : [value] "=r" (-> u64),
+        ) & 0xFFFF_FFFF_FFFF_F000);
+    }
+
+    pub inline fn writeAddress(addr: kernel.PhysAddr) void {
+        asm volatile ("mov %[addr], %%cr3"
+            :
+            : [addr] "r" (addr.value & 0xFFFF_FFFF_FFFF_F000),
+            : "memory"
+        );
+    }
+};
