@@ -4,15 +4,17 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const AddrType = enum {
+pub const PhysAddr = Addr(.phys);
+pub const VirtAddr = Addr(.virt);
+pub const PhysRange = Range(.phys);
+pub const VirtRange = Range(.virt);
+
+const Type = enum {
     phys,
     virt,
 };
 
-pub const PhysAddr = Addr(.phys);
-pub const VirtAddr = Addr(.virt);
-
-fn Addr(comptime addr_type: AddrType) type {
+fn Addr(comptime addr_type: Type) type {
     return extern struct {
         value: usize,
 
@@ -38,6 +40,8 @@ fn Addr(comptime addr_type: AddrType) type {
         }
 
         pub fn toPhysicalFromKernelVirtual(self: VirtAddr) !PhysAddr {
+            if (addr_type == .phys) @compileError("");
+
             if (kernel.info.hhdm.contains(self)) {
                 return .{ .value = self.value - kernel.info.hhdm.addr.value };
             }
@@ -118,117 +122,81 @@ comptime {
     std.debug.assert(@bitSizeOf(VirtAddr) == @bitSizeOf(usize));
 }
 
-pub const PhysRange = struct {
-    addr: PhysAddr,
-    size: core.Size,
+fn Range(comptime addr_type: Type) type {
+    return extern struct {
+        addr: AddrType,
+        size: core.Size,
 
-    pub inline fn fromAddr(addr: PhysAddr, size: core.Size) PhysRange {
-        return .{
-            .addr = addr,
-            .size = size,
+        pub const AddrType: type = switch (addr_type) {
+            .phys => PhysAddr,
+            .virt => VirtAddr,
         };
-    }
 
-    pub inline fn toKernelVirtual(self: PhysRange) VirtRange {
-        return .{
-            .addr = self.addr.toKernelVirtual(),
-            .size = self.size,
-        };
-    }
+        const Self = @This();
 
-    pub inline fn end(self: PhysRange) PhysAddr {
-        return self.addr.moveForward(self.size);
-    }
+        pub inline fn fromAddr(addr: AddrType, size: core.Size) Self {
+            return .{
+                .addr = addr,
+                .size = size,
+            };
+        }
 
-    pub inline fn moveForward(self: PhysRange, size: core.Size) PhysRange {
-        return .{
-            .addr = self.addr.moveForward(size),
-            .size = self.size,
-        };
-    }
+        pub inline fn toKernelVirtual(self: PhysRange) VirtRange {
+            return .{
+                .addr = self.addr.toKernelVirtual(),
+                .size = self.size,
+            };
+        }
 
-    pub inline fn moveForwardInPlace(self: *PhysRange, size: core.Size) void {
-        self.addr.moveForwardInPlace(size);
-    }
+        pub inline fn end(self: Self) AddrType {
+            return self.addr.moveForward(self.size);
+        }
 
-    pub inline fn moveBackward(self: PhysRange, size: core.Size) PhysRange {
-        return .{
-            .addr = self.addr.moveBackward(size),
-            .size = self.size,
-        };
-    }
+        pub inline fn moveForward(self: Self, size: core.Size) Self {
+            return .{
+                .addr = self.addr.moveForward(size),
+                .size = self.size,
+            };
+        }
 
-    pub inline fn moveBackwardInPlace(self: *PhysRange, size: core.Size) void {
-        self.addr.moveBackwardInPlace(size);
-    }
+        pub inline fn moveForwardInPlace(self: *Self, size: core.Size) void {
+            self.addr.moveForwardInPlace(size);
+        }
 
-    pub fn contains(self: PhysRange, addr: PhysAddr) bool {
-        return addr.greaterThanOrEqual(self.addr) and addr.lessThan(self.end());
-    }
+        pub inline fn moveBackward(self: Self, size: core.Size) Self {
+            return .{
+                .addr = self.addr.moveBackward(size),
+                .size = self.size,
+            };
+        }
 
-    pub fn format(
-        value: PhysRange,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
+        pub inline fn moveBackwardInPlace(self: *Self, size: core.Size) void {
+            self.addr.moveBackwardInPlace(size);
+        }
 
-        try writer.print("PhysRange{{ {} {} }}", .{ value.addr, value.size });
-    }
-};
+        pub fn contains(self: Self, addr: AddrType) bool {
+            return addr.greaterThanOrEqual(self.addr) and addr.lessThan(self.end());
+        }
 
-pub const VirtRange = struct {
-    addr: VirtAddr,
-    size: core.Size,
+        pub fn format(
+            value: Self,
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = fmt;
+            _ = options;
 
-    pub inline fn fromAddr(addr: VirtAddr, size: core.Size) VirtRange {
-        return .{
-            .addr = addr,
-            .size = size,
-        };
-    }
+            const name = switch (addr_type) {
+                .phys => "PhysRange",
+                .virt => "VirtRange",
+            };
 
-    pub inline fn end(self: VirtRange) VirtAddr {
-        return self.addr.moveForward(self.size);
-    }
-
-    pub inline fn moveForward(self: VirtRange, size: core.Size) VirtRange {
-        return .{
-            .addr = self.addr.moveForward(size),
-            .size = self.size,
-        };
-    }
-
-    pub inline fn moveForwardInPlace(self: *VirtRange, size: core.Size) void {
-        self.addr.moveForwardInPlace(size);
-    }
-
-    pub inline fn moveBackward(self: VirtRange, size: core.Size) VirtRange {
-        return .{
-            .addr = self.addr.moveBackward(size),
-            .size = self.size,
-        };
-    }
-
-    pub inline fn moveBackwardInPlace(self: *VirtRange, size: core.Size) void {
-        self.addr.moveBackwardInPlace(size);
-    }
-
-    pub fn contains(self: VirtRange, addr: VirtAddr) bool {
-        return addr.greaterThanOrEqual(self.addr) and addr.lessThan(self.end());
-    }
-
-    pub fn format(
-        value: VirtRange,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
-        try writer.print("VirtRange{{ {} {} }}", .{ value.addr, value.size });
-    }
-};
+            try writer.writeAll(comptime name ++ "{ ");
+            try value.addr.format("", .{}, writer);
+            try writer.writeByte(' ');
+            try value.size.format("", .{}, writer);
+            try writer.writeAll(" }");
+        }
+    };
+}
