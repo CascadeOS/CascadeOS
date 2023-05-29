@@ -112,32 +112,44 @@ pub const MapType = struct {
     executable: bool = false,
     no_cache: bool = false,
 
-    // pub fn apply(self: MapType, entry: *PageTable.Entry) void {
-    //     entry.present.write(true);
+    pub fn format(
+        value: MapType,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
 
-    //     if (self.user) {
-    //         entry.user_accessible.write(true);
-    //     }
+        try writer.writeAll("MapType{ ");
 
-    //     if (self.global) {
-    //         entry.global.write(true);
-    //     }
+        var buffer: [5]u8 = undefined;
+        var i: usize = 0;
 
-    //     if (!self.executable and kernel.info.execute_disable) entry.no_execute.write(true);
+        buffer[i] = if (value.user) 'U' else 'K';
+        i += 1;
 
-    //     if (self.writeable) entry.writeable.write(true);
+        buffer[i] = if (value.writeable) 'W' else 'E';
+        i += 1;
 
-    //     if (self.no_cache) {
-    //         entry.no_cache.write(true);
-    //         entry.write_through.write(true);
-    //     }
-    // }
+        if (value.executable) {
+            buffer[i] = 'X';
+            i += 1;
+        }
 
-    // pub fn applyParent(self: MapType, entry: *PageTable.Entry) void {
-    //     entry.present.write(true);
-    //     entry.writeable.write(true);
-    //     if (self.user) entry.user_accessible.write(true);
-    // }
+        if (value.global) {
+            buffer[i] = 'G';
+            i += 1;
+        }
+
+        if (value.no_cache) {
+            buffer[i] = 'C';
+            i += 1;
+        }
+
+        try writer.writeAll(buffer[0..i]);
+        try writer.writeAll(" }");
+    }
 };
 
 pub const MapToError = error{
