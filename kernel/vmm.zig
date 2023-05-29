@@ -23,6 +23,9 @@ pub fn init() void {
     mapKernelSections() catch |err| {
         core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
     };
+
+    log.debug("switching to kernel page table", .{});
+    paging.switchToPageTable(kernel_root_page_table);
 }
 
 fn identityMaps() !void {
