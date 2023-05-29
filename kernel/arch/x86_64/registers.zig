@@ -116,3 +116,52 @@ pub const Cr3 = struct {
         );
     }
 };
+
+pub fn MSR(comptime T: type, comptime register: u32) type {
+    return struct {
+        pub inline fn read() T {
+            switch (T) {
+                u64 => {
+                    var low: u32 = undefined;
+                    var high: u32 = undefined;
+                    asm volatile ("rdmsr"
+                        : [low] "={eax}" (low),
+                          [high] "={edx}" (high),
+                        : [register] "{ecx}" (register),
+                    );
+                    return (@as(u64, high) << 32) | @as(u64, low);
+                },
+                u32 => {
+                    return asm volatile ("rdmsr"
+                        : [low] "={eax}" (-> u32),
+                        : [register] "{ecx}" (register),
+                        : "edx"
+                    );
+                },
+                else => @compileError("read not implemented for " ++ @typeName(T)),
+            }
+        }
+
+        pub inline fn write(value: T) void {
+            switch (T) {
+                u64 => {
+                    asm volatile ("wrmsr"
+                        :
+                        : [reg] "{ecx}" (register),
+                          [low] "{eax}" (@truncate(u32, value)),
+                          [high] "{edx}" (@truncate(u32, value >> 32)),
+                    );
+                },
+                u32 => {
+                    asm volatile ("wrmsr"
+                        :
+                        : [reg] "{ecx}" (register),
+                          [low] "{eax}" (value),
+                          [high] "{edx}" (@as(u32, 0)),
+                    );
+                },
+                else => @compileError("write not implemented for " ++ @typeName(T)),
+            }
+        }
+    };
+}
