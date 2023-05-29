@@ -30,6 +30,12 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     return page_table;
 }
 
+pub fn switchToPageTable(page_table: *const PageTable) void {
+    x86_64.registers.Cr3.writeAddress(
+        kernel.VirtAddr.fromPtr(page_table).unsafeToPhysicalFromKernelVirtual(),
+    );
+}
+
 const MapError = arch.paging.MapError;
 
 pub fn mapRegion(

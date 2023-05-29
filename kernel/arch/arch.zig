@@ -87,4 +87,8 @@ pub const paging = struct {
     ) MapError!void {
         return current.paging.mapRegion(page_table, virtual_range, physical_range, map_type);
     }
+
+    pub inline fn switchToPageTable(page_table: *const PageTable) void {
+        current.paging.switchToPageTable(page_table);
+    }
 };
