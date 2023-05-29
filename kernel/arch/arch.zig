@@ -79,13 +79,22 @@ pub const paging = struct {
         Unexpected,
     };
 
-    pub inline fn mapRegion(
+    pub inline fn mapRegionSmallestPageOnly(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        return current.paging.mapRegion(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapRegionSmallestPageOnly(page_table, virtual_range, physical_range, map_type);
+    }
+
+    pub inline fn mapRegionUseAllPageSizes(
+        page_table: *PageTable,
+        virtual_range: kernel.VirtRange,
+        physical_range: kernel.PhysRange,
+        map_type: kernel.vmm.MapType,
+    ) MapError!void {
+        return current.paging.mapRegionUseAllPageSizes(page_table, virtual_range, physical_range, map_type);
     }
 
     pub inline fn switchToPageTable(page_table: *const PageTable) void {

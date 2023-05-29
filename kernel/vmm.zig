@@ -167,7 +167,7 @@ pub fn mapRegion(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return kernel.arch.paging.mapRegion(
+    return kernel.arch.paging.mapRegionUseAllPageSizes(
         page_table,
         virtual_range,
         physical_range,

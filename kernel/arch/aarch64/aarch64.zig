@@ -45,7 +45,7 @@ pub const paging = struct {
 
     const MapError = arch.paging.MapError;
 
-    pub fn mapRegion(
+    pub fn mapRegionSmallestPageOnly(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
@@ -55,7 +55,20 @@ pub const paging = struct {
         _ = physical_range;
         _ = virtual_range;
         _ = page_table;
-        core.panic("UNIMPLEMENTED `mapRegion`"); // TODO: Implement `mapRegion`.
+        core.panic("UNIMPLEMENTED `mapRegionSmallestPageOnly`"); // TODO: Implement `mapRegionSmallestPageOnly`.
+    }
+
+    pub fn mapRegionUseAllPageSizes(
+        page_table: *PageTable,
+        virtual_range: kernel.VirtRange,
+        physical_range: kernel.PhysRange,
+        map_type: kernel.vmm.MapType,
+    ) MapError!void {
+        _ = map_type;
+        _ = physical_range;
+        _ = virtual_range;
+        _ = page_table;
+        core.panic("UNIMPLEMENTED `mapRegionUseAllPageSizes`"); // TODO: Implement `mapRegionUseAllPageSizes`.
     }
 
     pub fn switchToPageTable(page_table: *const PageTable) void {

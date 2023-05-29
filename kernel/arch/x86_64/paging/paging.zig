@@ -38,7 +38,35 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
 
 const MapError = arch.paging.MapError;
 
-pub fn mapRegion(
+pub fn mapRegionSmallestPageOnly(
+    page_table: *PageTable,
+    virtual_range: kernel.VirtRange,
+    physical_range: kernel.PhysRange,
+    map_type: kernel.vmm.MapType,
+) MapError!void {
+    var current_virtual = virtual_range.addr;
+    const virtual_end = virtual_range.end();
+    var current_physical = physical_range.addr;
+    var size_left = virtual_range.size;
+
+    while (current_virtual.lessThan(virtual_end)) {
+        mapTo4KiB(
+            page_table,
+            current_virtual,
+            current_physical,
+            map_type,
+        ) catch |err| {
+            log.err("failed to map {} to {} 4KiB", .{ current_virtual, current_physical });
+            return err;
+        };
+
+        current_virtual.moveForwardInPlace(small_page_size);
+        current_physical.moveForwardInPlace(small_page_size);
+        size_left.subtractInPlace(small_page_size);
+    }
+}
+
+pub fn mapRegionUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
