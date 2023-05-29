@@ -12,5 +12,5 @@ pub const version = kernel_options.version;
 
 pub var kernel_slide: core.Size = core.Size.zero;
 
-pub var hhdm: kernel.VirtRange = undefined;
-pub var non_cached_hhdm: kernel.VirtRange = undefined;
+pub var hhdm = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.zero);
+pub var non_cached_hhdm = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.zero);
