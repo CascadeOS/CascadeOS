@@ -39,9 +39,16 @@ fn Addr(comptime addr_type: Type) type {
             return @intToPtr(PtrT, self.value);
         }
 
-        pub fn toPhysicalFromKernelVirtual(self: VirtAddr) !PhysAddr {
-            if (addr_type == .phys) @compileError("");
+        /// Returns the physical address of the given virtual address if it is in the HHDM.
+        ///
+        /// ## Safety
+        /// It is the caller's responsibility to ensure that the given virtual address is in the HHDM.
+        pub fn unsafeToPhysicalFromKernelVirtual(self: VirtAddr) PhysAddr {
+            return .{ .value = self.value - kernel.info.hhdm.addr.value };
+        }
 
+        /// Returns the physical address of the given virtual address if it is in one of the HHDMs.
+        pub fn toPhysicalFromKernelVirtual(self: VirtAddr) error{AddressNotInAnyHHDM}!PhysAddr {
             if (kernel.info.hhdm.contains(self)) {
                 return .{ .value = self.value - kernel.info.hhdm.addr.value };
             }
