@@ -31,7 +31,8 @@ pub fn captureBootloaderInformation() void {
         log.debug("kernel physical: 0x{x:0>16}", .{kernel_physical});
         log.debug("kernel slide: 0x{x:0>16}", .{kernel.info.kernel_slide});
     } else {
-        // TODO: Maybe we should just allow the slide to be 0 in this case?
+        // TODO: We should calculate the kernel slide from the the active page table.
+        // By manually performing the virtual to physical translation.
         core.panic("bootloader did not respond with kernel address");
     }
 }
