@@ -101,6 +101,53 @@ pub const RFlags = packed struct(u64) {
     }
 };
 
+pub const Cr0 = packed struct(u64) {
+    protected_mode_enable: bool,
+
+    monitor_coprocessor: bool,
+
+    emulate_coprocessor: bool,
+
+    task_switched: bool,
+
+    extension_type: bool,
+
+    numeric_error: bool,
+
+    _reserved6_15: u10,
+
+    write_protect: bool,
+
+    _reserved17: u1,
+
+    alignment_mask: bool,
+
+    _reserved19_28: u10,
+
+    not_write_through: bool,
+
+    cache_disable: bool,
+
+    paging: bool,
+
+    _reserved32_63: u32,
+
+    pub fn read() Cr0 {
+        return @bitCast(Cr0, asm ("mov %%cr0, %[value]"
+            : [value] "=r" (-> u64),
+        ));
+    }
+
+    pub fn write(self: Cr0) void {
+        asm volatile ("mov %[value], %%cr0"
+            :
+            : [value] "r" (@bitCast(u64, self)),
+        );
+    }
+
+    pub const format = core.formatStructIgnoreReserved;
+};
+
 pub const Cr3 = struct {
     pub inline fn readAddress() kernel.PhysAddr {
         return kernel.PhysAddr.fromInt(asm ("mov %%cr3, %[value]"
