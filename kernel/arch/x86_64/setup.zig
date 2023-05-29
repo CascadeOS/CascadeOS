@@ -69,9 +69,22 @@ pub fn earlyArchInitialization() void {
 }
 
 pub fn captureSystemInformation() void {
+    log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 }
 
 pub fn configureSystemFeatures() void {
-    // core.panic("UNIMPLEMENTED `configureSystemFeatures`"); // TODO: Implement `configureSystemFeatures`.
+    // EFER
+    {
+        var efer = x86_64.registers.EFER.read();
+
+        if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
+
+        if (x86_64.info.syscall) efer.syscall_enable = true;
+        if (x86_64.info.execute_disable) efer.no_execute_enable = true;
+
+        efer.write();
+
+        log.debug("EFER set", .{});
+    }
 }
