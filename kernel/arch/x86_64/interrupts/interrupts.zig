@@ -442,3 +442,16 @@ pub fn disableInterruptsAndHalt() noreturn {
         asm volatile ("cli; hlt");
     }
 }
+
+/// Enable interrupts and put the CPU to sleep.
+pub noinline fn enableInterruptsAndHalt() void {
+    // TODO: The NMI handler will need to check if the IP is equal to __halt_addr and if so, it will need to skip the
+    // hlt instruction.
+    asm volatile (
+        \\sti
+        \\.globl __halt_addr
+        \\__halt_addr:
+        \\hlt
+        \\
+    );
+}
