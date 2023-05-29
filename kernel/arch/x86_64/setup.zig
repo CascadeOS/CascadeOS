@@ -74,6 +74,18 @@ pub fn captureSystemInformation() void {
 }
 
 pub fn configureSystemFeatures() void {
+    // CR0
+    {
+        var cr0 = x86_64.registers.Cr0.read();
+
+        if (!cr0.paging) core.panic("paging not enabled");
+
+        cr0.write_protect = true;
+
+        cr0.write();
+        log.debug("CR0 set", .{});
+    }
+
     // EFER
     {
         var efer = x86_64.registers.EFER.read();
