@@ -57,4 +57,8 @@ pub const paging = struct {
         _ = page_table;
         core.panic("UNIMPLEMENTED `mapRegion`"); // TODO: Implement `mapRegion`.
     }
+
+    pub fn allocatePageTable() *PageTable {
+        core.panic("UNIMPLEMENTED `allocatePageTable`"); // TODO: Implement `allocatePageTable`.
+    }
 };

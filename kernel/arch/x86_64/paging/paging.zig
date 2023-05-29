@@ -20,6 +20,16 @@ pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
+pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
+    const physical_page = kernel.pmm.allocateSmallestPage() orelse return error.PageAllocationFailed;
+    std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
+
+    const page_table = physical_page.toKernelVirtual().addr.toPtr(*PageTable);
+    page_table.zero();
+
+    return page_table;
+}
+
 const MapError = arch.paging.MapError;
 
 pub fn mapRegion(

@@ -67,7 +67,11 @@ pub const paging = struct {
 
     pub const higher_half: kernel.VirtAddr = current.paging.higher_half;
 
-    pub const PageTable = current.paging.PageTable;
+    pub const PageTable: type = current.paging.PageTable;
+
+    pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
+        return current.paging.allocatePageTable();
+    }
 
     pub const MapError = error{
         AlreadyMapped,
