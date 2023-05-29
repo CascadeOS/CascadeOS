@@ -20,14 +20,14 @@ pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
-const MapToError = kernel.vmm.MapToError;
+const MapError = arch.paging.MapError;
 
 pub fn mapRegion(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
     map_type: kernel.vmm.MapType,
-) !void {
+) MapError!void {
     var current_virtual = virtual_range.addr;
     const virtual_end = virtual_range.end();
     var current_physical = physical_range.addr;
@@ -96,7 +96,7 @@ pub fn mapTo4KiB(
     virtual_addr: kernel.VirtAddr,
     physical_addr: kernel.PhysAddr,
     map_type: kernel.vmm.MapType,
-) MapToError!void {
+) MapError!void {
     std.debug.assert(virtual_addr.isAligned(small_page_size));
 
     const p3 = try ensureNextTable(
@@ -127,7 +127,7 @@ pub fn mapTo2MiB(
     virtual_addr: kernel.VirtAddr,
     physical_addr: kernel.PhysAddr,
     map_type: kernel.vmm.MapType,
-) MapToError!void {
+) MapError!void {
     std.debug.assert(virtual_addr.isAligned(medium_page_size));
     std.debug.assert(physical_addr.isAligned(medium_page_size));
 
@@ -155,7 +155,7 @@ pub fn mapTo1GiB(
     virtual_addr: kernel.VirtAddr,
     physical_addr: kernel.PhysAddr,
     map_type: kernel.vmm.MapType,
-) MapToError!void {
+) MapError!void {
     std.debug.assert(x86_64.info.gib_pages); // assert that 1GiB pages are available
     std.debug.assert(virtual_addr.isAligned(large_page_size));
     std.debug.assert(physical_addr.isAligned(large_page_size));

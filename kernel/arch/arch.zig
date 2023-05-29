@@ -69,5 +69,18 @@ pub const paging = struct {
 
     pub const PageTable = current.paging.PageTable;
 
-    pub const mapRegion = current.paging.mapRegion;
+    pub const MapError = error{
+        AlreadyMapped,
+        AllocationFailed,
+        Unexpected,
+    };
+
+    pub inline fn mapRegion(
+        page_table: *PageTable,
+        virtual_range: kernel.VirtRange,
+        physical_range: kernel.PhysRange,
+        map_type: kernel.vmm.MapType,
+    ) MapError!void {
+        return current.paging.mapRegion(page_table, virtual_range, physical_range, map_type);
+    }
 };

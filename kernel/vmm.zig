@@ -152,23 +152,6 @@ pub const MapType = struct {
     }
 };
 
-pub const MapToError = error{
-    AlreadyMapped,
-    AllocationFailed,
-    Unexpected,
-};
-
-pub const PageSize = struct {
-    size: core.Size,
-
-    mapTo: fn (
-        page_table: *PageTable,
-        virtual_addr: kernel.VirtAddr,
-        physical_addr: kernel.PhysAddr,
-        map_type: MapType,
-    ) MapToError!void,
-};
-
 pub fn mapRegion(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,

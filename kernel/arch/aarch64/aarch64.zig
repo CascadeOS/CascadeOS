@@ -3,6 +3,7 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const arch = @import("../arch.zig");
 
 pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
@@ -42,12 +43,14 @@ pub const paging = struct {
         }
     };
 
+    const MapError = arch.paging.MapError;
+
     pub fn mapRegion(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
         map_type: kernel.vmm.MapType,
-    ) !void {
+    ) MapError!void {
         _ = map_type;
         _ = physical_range;
         _ = virtual_range;
