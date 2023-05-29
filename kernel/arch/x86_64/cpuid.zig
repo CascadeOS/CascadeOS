@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-// The specification used is "Intel® 64 and IA-32 Architectures Software Developer's Manual Volume 2A April 2022"
+// The specification used is "Intel® 64 and IA-32 Architectures Software Developer's Manual Volume 2A March 2023"
+// TODO: implement any stuff in the AMD manual that is not in the Intel manual as well
 
 const std = @import("std");
 const core = @import("core");
@@ -21,23 +22,73 @@ pub fn capture() void {
     const largest_extended_function = leaf_extended.eax;
     log.debug("largest extended function: 0x{x}", .{largest_extended_function});
 
-    if (largest_extended_function >= 0x80000001) {
-        handle0x80000001(raw_cpuid(0x80000001, 0));
+    handleSimpleLeafs(largest_standard_function, largest_extended_function);
+}
+
+const simple_leaf_handlers: []const SimpleLeafHandler = &.{
+    .{
+        .leaf = .{ .type = .extended, .value = 0x80000001 },
+        .handlers = &.{
+            .{ .name = "syscall", .register = .edx, .mask_bit = 11, .target = &x86_64.info.syscall },
+            .{ .name = "execute disable", .register = .edx, .mask_bit = 20, .target = &x86_64.info.execute_disable },
+            .{ .name = "1 gib pages", .register = .edx, .mask_bit = 26, .target = &x86_64.info.gib_pages },
+            .{ .name = "rdtscp", .register = .edx, .mask_bit = 27 },
+            .{ .name = "64-bit", .register = .edx, .mask_bit = 29 },
+        },
+    },
+};
+
+fn handleSimpleLeafs(largest_standard_function: u32, largest_extended_function: u32) void {
+    inline for (simple_leaf_handlers) |leaf_handler| {
+        if ((leaf_handler.leaf.type == .standard and leaf_handler.leaf.value <= largest_standard_function) or
+            (leaf_handler.leaf.type == .extended and leaf_handler.leaf.value <= largest_extended_function))
+        {
+            const leaf = raw_cpuid(leaf_handler.leaf.value, 0);
+
+            inline for (leaf_handler.handlers) |handler| {
+                const register = switch (handler.register) {
+                    .eax => leaf.eax,
+                    .ebx => leaf.ebx,
+                    .ecx => leaf.ecx,
+                    .edx => leaf.edx,
+                };
+
+                const result = register & (1 << handler.mask_bit) != 0;
+                if (handler.target) |target| target.* = result;
+                log.debug(comptime handler.name ++ ": {}", .{result});
+            }
+        }
     }
 }
 
-fn handle0x80000001(leaf: Leaf) void {
-    const edx = leaf.edx;
+const SimpleLeafHandler = struct {
+    leaf: LeafSelector,
+    handlers: []const ValueHandler,
 
-    x86_64.info.syscall = (edx & (1 << 11)) != 0;
-    log.debug("syscall: {}", .{x86_64.info.syscall});
+    pub const LeafSelector = struct {
+        type: LeafType,
+        value: u32,
 
-    x86_64.info.execute_disable = (edx & (1 << 20)) != 0;
-    log.debug("execute disable: {}", .{x86_64.info.execute_disable});
+        pub const LeafType = enum {
+            standard,
+            extended,
+        };
+    };
 
-    x86_64.info.gib_pages = (edx & (1 << 26)) != 0;
-    log.debug("gib pages: {}", .{x86_64.info.gib_pages});
-}
+    pub const ValueHandler = struct {
+        name: []const u8,
+        register: Register,
+        mask_bit: u5,
+        target: ?*bool = null,
+
+        pub const Register = enum {
+            eax,
+            ebx,
+            ecx,
+            edx,
+        };
+    };
+};
 
 fn isCPUIDAvailable() bool {
     const orig_rflags = x86_64.registers.RFlags.read();
