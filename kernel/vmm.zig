@@ -13,13 +13,8 @@ const log = kernel.log.scoped(.vmm);
 var kernel_root_page_table: *PageTable = undefined;
 
 pub fn init() void {
-    log.debug("allocating physical page for kernel root page table", .{});
-
-    const physical_page = kernel.pmm.allocateSmallestPage() orelse core.panic("unable to allocate physical page for root page table");
-    std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
-
-    kernel_root_page_table = physical_page.toKernelVirtual().addr.toPtr(*PageTable);
-    kernel_root_page_table.zero();
+    log.debug("allocating kernel root page table", .{});
+    kernel_root_page_table = paging.allocatePageTable() catch core.panic("unable to allocate physical page for root page table");
 
     identityMaps() catch |err| {
         core.panicFmt("failed to map identity maps: {s}", .{@errorName(err)});
