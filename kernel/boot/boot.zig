@@ -93,10 +93,14 @@ export var kernel_address: limine.KernelAddress = .{};
 export var memmap: limine.Memmap = .{};
 
 pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {
+    const memmap_response = memmap.response orelse core.panic("no memory map from the bootloader");
     return .{
         .limine = .{
-            .index = 0,
-            .memmap = memmap.response orelse core.panic("no memory map from the bootloader"),
+            .index = switch (direction) {
+                .forwards => 0,
+                .backwards => memmap_response.entry_count,
+            },
+            .memmap = memmap_response,
             .direction = direction,
         },
     };
@@ -160,13 +164,15 @@ const LimineMemoryMapIterator = struct {
     direction: Direction,
 
     pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
+        if (self.direction == .backwards) {
+            if (self.index == 0) return null;
+            self.index -= 1;
+        }
+
         const limine_entry = self.memmap.getEntry(self.index) orelse return null;
 
-        switch (self.direction) {
-            .forwards => self.index += 1,
-            .backwards => {
-                if (self.index != 0) self.index -= 1;
-            },
+        if (self.direction == .forwards) {
+            self.index += 1;
         }
 
         return .{
