@@ -85,15 +85,17 @@ fn mapKernelSections() !void {
 fn mapSection(start: usize, end: usize, map_type: MapType) !void {
     std.debug.assert(end > start);
 
-    const virtual_range = kernel.VirtRange.fromAddr(
-        kernel.VirtAddr.fromInt(start),
-        core.Size.from(end - start, .byte).alignForward(arch.paging.smallest_page_size),
-    );
+    const virt_addr = kernel.VirtAddr.fromInt(start);
 
-    const physical_range = kernel.PhysRange.fromAddr(
-        kernel.PhysAddr.fromInt(start).moveBackward(kernel.info.kernel_slide),
-        virtual_range.size,
+    const virtual_range = kernel.VirtRange.fromAddr(
+        virt_addr,
+        core.Size.from(end - start, .byte),
     );
+    std.debug.assert(virtual_range.size.isAligned(paging.smallest_page_size));
+
+    const phys_addr = kernel.PhysAddr.fromInt(virt_addr.value - kernel.info.kernel_section_offset.bytes);
+
+    const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
 
     try mapRegion(
         kernel_root_page_table,

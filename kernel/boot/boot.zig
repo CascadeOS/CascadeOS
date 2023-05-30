@@ -26,10 +26,12 @@ pub fn captureBootloaderInformation() void {
     if (kernel_address.response) |resp| {
         const kernel_virtual = resp.virtual_base;
         const kernel_physical = resp.physical_base;
-        kernel.info.kernel_slide = core.Size.from(kernel_virtual - kernel_physical, .byte);
+        kernel.info.kernel_kaslr_offset = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
+        kernel.info.kernel_section_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
         log.debug("kernel virtual: 0x{x:0>16}", .{kernel_virtual});
         log.debug("kernel physical: 0x{x:0>16}", .{kernel_physical});
-        log.debug("kernel slide: 0x{x:0>16}", .{kernel.info.kernel_slide});
+        log.debug("kernel kaslr offset: 0x{x}", .{kernel.info.kernel_kaslr_offset.bytes});
+        log.debug("kernel section offset: 0x{x}", .{kernel.info.kernel_section_offset.bytes});
     } else {
         // TODO: We should calculate the kernel slide from the the active page table.
         // By manually performing the virtual to physical translation.
