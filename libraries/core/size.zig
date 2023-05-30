@@ -62,6 +62,7 @@ pub const Size = extern struct {
         self.bytes *= value;
     }
 
+    /// Division is performed on integers, so the result is rounded down.
     /// Caller must ensure `other` is not zero.
     pub inline fn divide(self: Size, other: Size) usize {
         return self.bytes / other.bytes;
