@@ -35,10 +35,10 @@ pub fn init() void {
                 std.debug.assert(entry.range.addr.isAligned(arch.paging.smallest_page_size));
                 std.debug.assert(entry.range.size.isAligned(arch.paging.smallest_page_size));
 
-                const range_in_hhdm = entry.range.toKernelVirtual();
+                const range_in_direct_map = entry.range.toDirectMap();
 
-                var current_virtual_addr = range_in_hhdm.addr;
-                const virtual_end_addr = range_in_hhdm.end();
+                var current_virtual_addr = range_in_direct_map.addr;
+                const virtual_end_addr = range_in_direct_map.end();
 
                 log.debug(indent ** 2 ++ "marking {} pages available from {} to {}", .{
                     entry.range.size.divide(arch.paging.smallest_page_size),
@@ -102,7 +102,7 @@ pub fn allocateSmallestPage() ?kernel.PhysRange {
         // Decrement `free_memory`
         _ = @atomicRmw(usize, &free_memory.bytes, .Sub, arch.paging.smallest_page_size.bytes, .Monotonic);
 
-        const addr = kernel.VirtAddr.fromPtr(first_free).toPhysicalFromKernelVirtual() catch unreachable;
+        const addr = kernel.VirtAddr.fromPtr(first_free).toPhysicalFromDirectMap() catch unreachable;
 
         const range = kernel.PhysRange.fromAddr(addr, arch.paging.smallest_page_size);
 

@@ -27,8 +27,12 @@ fn Addr(comptime addr_type: Type) type {
             return .{ .value = value };
         }
 
-        pub inline fn toKernelVirtual(self: PhysAddr) VirtAddr {
-            return .{ .value = self.value + kernel.info.hhdm.addr.value };
+        pub inline fn toDirectMap(self: PhysAddr) VirtAddr {
+            return .{ .value = self.value + kernel.info.direct_map.addr.value };
+        }
+
+        pub inline fn toNonCachedDirectMap(self: PhysAddr) VirtAddr {
+            return .{ .value = self.value + kernel.info.non_cached_direct_map.addr.value };
         }
 
         pub inline fn fromPtr(ptr: *const anyopaque) VirtAddr {
@@ -39,23 +43,23 @@ fn Addr(comptime addr_type: Type) type {
             return @intToPtr(PtrT, self.value);
         }
 
-        /// Returns the physical address of the given virtual address if it is in the HHDM.
+        /// Returns the physical address of the given diret map virtual address.
         ///
         /// ## Safety
-        /// It is the caller's responsibility to ensure that the given virtual address is in the HHDM.
-        pub fn unsafeToPhysicalFromKernelVirtual(self: VirtAddr) PhysAddr {
-            return .{ .value = self.value - kernel.info.hhdm.addr.value };
+        /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
+        pub fn unsafeToPhysicalFromDirectMap(self: VirtAddr) PhysAddr {
+            return .{ .value = self.value - kernel.info.direct_map.addr.value };
         }
 
-        /// Returns the physical address of the given virtual address if it is in one of the HHDMs.
-        pub fn toPhysicalFromKernelVirtual(self: VirtAddr) error{AddressNotInAnyHHDM}!PhysAddr {
-            if (kernel.info.hhdm.contains(self)) {
-                return .{ .value = self.value - kernel.info.hhdm.addr.value };
+        /// Returns the physical address of the given virtual address if it is in one of the direct maps.
+        pub fn toPhysicalFromDirectMap(self: VirtAddr) error{AddressNotInAnyDirectMap}!PhysAddr {
+            if (kernel.info.direct_map.contains(self)) {
+                return .{ .value = self.value - kernel.info.direct_map.addr.value };
             }
-            if (kernel.info.non_cached_hhdm.contains(self)) {
-                return .{ .value = self.value - kernel.info.non_cached_hhdm.addr.value };
+            if (kernel.info.non_cached_direct_map.contains(self)) {
+                return .{ .value = self.value - kernel.info.non_cached_direct_map.addr.value };
             }
-            return error.AddressNotInAnyHHDM;
+            return error.AddressNotInAnyDirectMap;
         }
 
         pub inline fn isAligned(self: Self, alignment: core.Size) bool {
@@ -148,9 +152,9 @@ fn Range(comptime addr_type: Type) type {
             };
         }
 
-        pub inline fn toKernelVirtual(self: PhysRange) VirtRange {
+        pub inline fn toDirectMap(self: PhysRange) VirtRange {
             return .{
-                .addr = self.addr.toKernelVirtual(),
+                .addr = self.addr.toDirectMap(),
                 .size = self.size,
             };
         }

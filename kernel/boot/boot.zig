@@ -19,7 +19,7 @@ const log = kernel.log.scoped(.boot);
 
 pub fn captureBootloaderInformation() void {
     if (hhdm.response) |resp| {
-        captureHHDMs(resp.offset);
+        captureHHDM(resp.offset);
     } else {
         core.panic("bootloader did not provide the start of the HHDM");
     }
@@ -41,49 +41,48 @@ pub fn captureBootloaderInformation() void {
 
 export var hhdm: limine.HHDM = .{};
 
-fn captureHHDMs(hhdm_offset: u64) void {
+fn captureHHDM(hhdm_offset: u64) void {
     const hhdm_start = kernel.VirtAddr.fromInt(hhdm_offset);
 
     if (!hhdm_start.isAligned(kernel.arch.paging.smallest_page_size)) {
         core.panic("HHDM is not aligned to the smallest page size");
     }
 
-    const length_of_hhdm = calculateLengthOfHHDM();
+    const size_of_direct_map = calculateLengthOfDirectMap();
 
-    const hhdm_range = kernel.VirtRange.fromAddr(hhdm_start, length_of_hhdm);
+    const direct_map = kernel.VirtRange.fromAddr(hhdm_start, size_of_direct_map);
 
-    // Ensure that the non-cached HHDM does not go below the higher half
-    var non_cached_hhdm = hhdm_range;
-    non_cached_hhdm.moveBackwardInPlace(length_of_hhdm);
-    if (non_cached_hhdm.addr.lessThan(kernel.arch.paging.higher_half)) {
-        non_cached_hhdm = hhdm_range.moveForward(length_of_hhdm);
+    // Ensure that the non-cached direct map does not go below the higher half
+    var non_cached_direct_map = direct_map;
+    non_cached_direct_map.moveBackwardInPlace(size_of_direct_map);
+    if (non_cached_direct_map.addr.lessThan(kernel.arch.paging.higher_half)) {
+        non_cached_direct_map = direct_map.moveForward(size_of_direct_map);
     }
 
-    kernel.info.hhdm = hhdm_range;
-    log.debug("hhdm: {}", .{hhdm_range});
+    kernel.info.direct_map = direct_map;
+    log.debug("direct map: {}", .{direct_map});
 
-    kernel.info.non_cached_hhdm = non_cached_hhdm;
-    log.debug("non-cached hhdm: {}", .{non_cached_hhdm});
+    kernel.info.non_cached_direct_map = non_cached_direct_map;
+    log.debug("non-cached direct map: {}", .{non_cached_direct_map});
 }
 
-fn calculateLengthOfHHDM() core.Size {
+fn calculateLengthOfDirectMap() core.Size {
     var reverse_memmap_iterator = memoryMapIterator(.backwards);
 
     while (reverse_memmap_iterator.next()) |entry| {
+        const estimated_size = core.Size.from(entry.range.end().value, .byte);
 
-        var size = core.Size.from(entry.range.end().value, .byte);
+        log.debug("estimated size of direct map: {}", .{estimated_size});
 
-        // We choose to align the length of the HHDM to `largest_page_size` to allow large pages to be used for the mapping.
-        size = size.alignForward(kernel.arch.paging.largest_page_size);
+        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+        const aligned_size = estimated_size.alignForward(kernel.arch.paging.largest_page_size);
 
-        // We ensure the lowest 4GiB are always identity mapped as it is possible that things like the PCI bus are
-        // above the maximum range of the memory map.
-        const four_gib = core.Size.from(4, .gib);
-        if (size.lessThan(four_gib)) {
-            size = four_gib;
-        }
+        // TODO: Is it possible for things like the PCI bus to be above the maximum range of the memory map?
+        // Maybe we should ensure that the lowest 4GiB are always identity mapped?
 
-        return size;
+        log.debug("aligned size of direct map: {}", .{aligned_size});
+
+        return aligned_size;
     }
 
     core.panic("no non-reserved or usable memory regions?");

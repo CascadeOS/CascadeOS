@@ -248,7 +248,7 @@ pub const PageTable = extern struct {
         pub fn getNextLevel(self: Entry) !*PageTable {
             if (!self.present.read()) return error.NotPresent;
             if (self.huge.read()) return error.HugePage;
-            return self.getAddress4kib().toKernelVirtual().toPtr(*PageTable);
+            return self.getAddress4kib().toDirectMap().toPtr(*PageTable);
         }
 
         pub fn printSmallEntryFlags(self: Entry, writer: anytype) !void {

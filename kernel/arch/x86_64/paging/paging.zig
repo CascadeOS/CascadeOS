@@ -24,7 +24,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     const physical_page = kernel.pmm.allocateSmallestPage() orelse return error.PageAllocationFailed;
     std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
-    const page_table = physical_page.toKernelVirtual().addr.toPtr(*PageTable);
+    const page_table = physical_page.toDirectMap().addr.toPtr(*PageTable);
     page_table.zero();
 
     return page_table;
@@ -32,7 +32,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
 
 pub fn switchToPageTable(page_table: *const PageTable) void {
     x86_64.registers.Cr3.writeAddress(
-        kernel.VirtAddr.fromPtr(page_table).unsafeToPhysicalFromKernelVirtual(),
+        kernel.VirtAddr.fromPtr(page_table).unsafeToPhysicalFromDirectMap(),
     );
 }
 

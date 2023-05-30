@@ -29,22 +29,22 @@ pub fn init() void {
 }
 
 fn identityMaps() !void {
-    const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.hhdm.size);
+    const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
 
-    log.debug("identity mapping HHDM", .{});
+    log.debug("identity mapping the direct map", .{});
 
     try mapRegion(
         kernel_root_page_table,
-        kernel.info.hhdm,
+        kernel.info.direct_map,
         physical_range,
         .{ .writeable = true, .global = true },
     );
 
-    log.debug("identity mapping non-cached HHDM", .{});
+    log.debug("identity mapping the non-cached direct map", .{});
 
     try kernel.vmm.mapRegion(
         kernel_root_page_table,
-        kernel.info.non_cached_hhdm,
+        kernel.info.non_cached_direct_map,
         physical_range,
         .{ .writeable = true, .no_cache = true, .global = true },
     );
