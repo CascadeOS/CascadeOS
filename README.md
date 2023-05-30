@@ -11,7 +11,7 @@ Circuit is a general purpose operating system targeting standard desktops and la
 - x86_64, AArch64/UEFI and RISC-V/UEFI
 - First class Zig support
 - Linux syscall compatibility mode (allowing static linux binaries to run unchanged)
-- Userspace with GUI (probably using Wayland meaning along with the feature above static linux binaries should work out of the box)
+- Userspace with GUI (probably using Wayland meaning along with the feature above static Linux Wayland binaries should work out of the box)
 - All functionality implemented in Zig either in repo or as a package, allowances might be made for things like [ACPICA](https://acpica.org/).
 
 ## Discord Server
