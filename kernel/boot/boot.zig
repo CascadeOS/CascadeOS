@@ -70,7 +70,6 @@ fn calculateLengthOfHHDM() core.Size {
     var reverse_memmap_iterator = memoryMapIterator(.backwards);
 
     while (reverse_memmap_iterator.next()) |entry| {
-        if (entry.type == .reserved_or_unusable) continue;
 
         var size = core.Size.from(entry.range.end().value, .byte);
 
