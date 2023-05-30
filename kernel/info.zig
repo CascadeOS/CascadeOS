@@ -17,8 +17,8 @@ pub const kernel_base_address = kernel.VirtAddr.fromInt(0xffffffff80000000);
 /// This would be zero is not for kaslr.
 pub var kernel_offset_from_base: core.Size = core.Size.zero;
 
-/// This is the offset between the virtual addresses of the kernel's sections and the physical addresses.
-pub var kernel_section_offset: core.Size = core.Size.zero;
+/// This is the offset from the physical address of the kernel to the virtual address of the kernel.
+pub var kernel_offset_from_physical: core.Size = core.Size.zero;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
 pub var direct_map = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.zero);
