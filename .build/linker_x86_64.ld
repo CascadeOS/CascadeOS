@@ -16,6 +16,7 @@ PHDRS
 
 SECTIONS
 {
+    /* This must be kept in sync with `kernel.info.kernel_base_address` */
     . = 0xffffffff80000000;
 
     .text ALIGN(4K) : {
