@@ -4,6 +4,7 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import(".build/CascadeTarget.zig").CascadeTarget;
+const ImageStep = @import(".build/ImageStep.zig");
 const Kernel = @import(".build/Kernel.zig");
 const Library = @import(".build/Library.zig");
 const Options = @import(".build/Options.zig");
@@ -23,196 +24,13 @@ pub fn build(b: *std.Build) !void {
 
     const libraries = try Library.getLibraries(b, step_collection, options.optimize);
     const kernels = try Kernel.getKernels(b, libraries, step_collection, options, all_targets);
-    const images = try createImageSteps(b, kernels);
+    const images = try ImageStep.getImageSteps(b, kernels, all_targets);
     try createQemuSteps(b, images, options);
 }
 
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
-const ImageSteps = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
-
-fn createImageSteps(b: *std.Build, kernels: Kernel.Collection) !ImageSteps {
-    var images: ImageSteps = .{};
-    try images.ensureTotalCapacity(b.allocator, all_targets.len);
-
-    for (all_targets) |target| {
-        const kernel = kernels.get(target).?;
-
-        const image_build = try ImageStep.create(b, target, kernel);
-
-        const image_step_name = try std.fmt.allocPrint(
-            b.allocator,
-            "image_{s}",
-            .{@tagName(target)},
-        );
-        const image_step_description = try std.fmt.allocPrint(
-            b.allocator,
-            "Build the image for {s}",
-            .{@tagName(target)},
-        );
-
-        const image_step = b.step(image_step_name, image_step_description);
-        image_step.dependOn(&image_build.step);
-
-        images.putAssumeCapacityNoClobber(target, image_build);
-    }
-
-    return images;
-}
-
-const ImageStep = struct {
-    step: Step,
-
-    target: CascadeTarget,
-
-    image_file: std.Build.GeneratedFile,
-    image_file_source: std.Build.FileSource,
-
-    pub fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel) !*ImageStep {
-        const step_name = try std.fmt.allocPrint(
-            owner.allocator,
-            "build {s} image",
-            .{@tagName(target)},
-        );
-
-        const self = try owner.allocator.create(ImageStep);
-        self.* = .{
-            .step = Step.init(.{
-                .id = .custom,
-                .name = step_name,
-                .owner = owner,
-                .makeFn = make,
-            }),
-            .target = target,
-            .image_file = undefined,
-            .image_file_source = undefined,
-        };
-        self.image_file = .{ .step = &self.step };
-        self.image_file_source = .{ .generated = &self.image_file };
-
-        self.step.dependOn(&kernel.install_step.step);
-
-        return self;
-    }
-
-    fn make(step: *Step, prog_node: *std.Progress.Node) !void {
-        _ = prog_node;
-
-        const b = step.owner;
-        const self = @fieldParentPtr(ImageStep, "step", step);
-
-        var manifest = b.cache.obtain();
-        defer manifest.deinit();
-
-        // Root
-        {
-            const full_path = helpers.pathJoinFromRoot(b, &.{
-                "zig-out",
-                @tagName(self.target),
-                "root",
-            });
-            var dir = try std.fs.cwd().openIterableDir(full_path, .{});
-            defer dir.close();
-            try hashDirectoryRecursive(b.allocator, dir, full_path, &manifest);
-        }
-
-        // Build file
-        {
-            const full_path = b.pathFromRoot("build.zig");
-            _ = try manifest.addFile(full_path, null);
-        }
-
-        // Build directory
-        {
-            const full_path = b.pathFromRoot(".build");
-            var dir = try std.fs.cwd().openIterableDir(full_path, .{});
-            defer dir.close();
-            try hashDirectoryRecursive(b.allocator, dir, full_path, &manifest);
-        }
-
-        const image_file_path = helpers.pathJoinFromRoot(b, &.{
-            "zig-out",
-            @tagName(self.target),
-            try std.fmt.allocPrint(
-                b.allocator,
-                "cascade_{s}.hdd",
-                .{@tagName(self.target)},
-            ),
-        });
-
-        if (try step.cacheHit(&manifest)) {
-            self.image_file.path = image_file_path;
-            return;
-        }
-
-        try self.generateImage(image_file_path);
-        self.image_file.path = image_file_path;
-
-        try step.writeManifest(&manifest);
-    }
-
-    // TODO: Remove this lock once we have a step to handle fetching and building limine.
-    var image_lock: std.Thread.Mutex = .{};
-
-    fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
-        const build_image_path = self.target.buildImagePath(self.step.owner);
-
-        const args: []const []const u8 = &.{
-            build_image_path,
-            image_file_path,
-            @tagName(self.target),
-        };
-
-        var child = std.ChildProcess.init(args, self.step.owner.allocator);
-        child.cwd = helpers.pathJoinFromRoot(self.step.owner, &.{".build"});
-
-        image_lock.lock();
-        defer image_lock.unlock();
-
-        try child.spawn();
-        const term = try child.wait();
-
-        switch (term) {
-            .Exited => |code| {
-                if (code != 0) {
-                    return error.UncleanExit;
-                }
-            },
-            else => return error.UncleanExit,
-        }
-    }
-};
-
-fn hashDirectoryRecursive(
-    allocator: std.mem.Allocator,
-    target_dir: std.fs.IterableDir,
-    directory_full_path: []const u8,
-    manifest: *std.Build.Cache.Manifest,
-) !void {
-    var iter = target_dir.iterate();
-    while (try iter.next()) |entry| {
-        const new_full_path = try std.fs.path.join(allocator, &.{ directory_full_path, entry.name });
-        defer allocator.free(new_full_path);
-        switch (entry.kind) {
-            .directory => {
-                var new_dir = try target_dir.dir.openIterableDir(entry.name, .{});
-                defer new_dir.close();
-                try hashDirectoryRecursive(
-                    allocator,
-                    new_dir,
-                    new_full_path,
-                    manifest,
-                );
-            },
-            .file => {
-                _ = try manifest.addFile(new_full_path, null);
-            },
-            else => {},
-        }
-    }
-}
-
-fn createQemuSteps(b: *std.Build, image_steps: ImageSteps, options: Options) !void {
+fn createQemuSteps(b: *std.Build, image_steps: ImageStep.Collection, options: Options) !void {
     for (all_targets) |target| {
         const image_step = image_steps.get(target).?;
 
