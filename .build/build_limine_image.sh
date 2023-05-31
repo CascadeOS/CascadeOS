@@ -1,7 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: MIT
 
-LIMINE_BRANCH="v4.x-branch-binary"
 PAD_DISK_SIZE=500
 
 set -e
@@ -14,6 +13,8 @@ die() {
 # Arguments
 IMAGE="$1"
 TARGET_ARCH="$2"
+LIMINE="$3"
+LIMINE_DEPLOY="$4"
 
 # Setup variables
 
@@ -26,21 +27,9 @@ IMAGE_ROOT="$CACHE/root_mount_$TARGET_ARCH"
 
 OUT_ROOT="$PROJECT_DIR/zig-out/$TARGET_ARCH/root"
 
-LIMINE="$CACHE/limine-$LIMINE_BRANCH"
 LIMINE_CONFIG="$BUILD_DIR/limine.cfg"
 
 mkdir -p "$CACHE"
-
-# building limine
-if [ ! -d "${LIMINE}" ]; then
-    echo "> cloning limine"
-    git clone -b "$LIMINE_BRANCH" --depth=1 --single-branch https://github.com/limine-bootloader/limine.git "${LIMINE}" &>/dev/null || die "couldn't clone limine"
-else
-    echo "> check for limine updates"
-    git -C "${LIMINE}" pull &>/dev/null || die "couldn't update limine"
-fi
-echo "> building limine"
-make -C "$LIMINE" &>/dev/null || die "couldn't make limine"
 
 # calculate disk size
 disk_usage() {
@@ -68,7 +57,7 @@ parted -s "$IMAGE" set 1 esp on || die "couldn't set ESP partiton to boot"
 
 echo "> deploying limine"
 
-"$LIMINE"/limine-deploy "$IMAGE" &>/dev/null || die "couldn't deploy limine"
+"$LIMINE_DEPLOY" "$IMAGE" &>/dev/null || die "couldn't deploy limine"
 
 echo "> mounting disk image"
 

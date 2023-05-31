@@ -7,6 +7,7 @@ const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const Kernel = @import("Kernel.zig");
+const LimineStep = @import("LimineStep.zig");
 
 const ImageStep = @This();
 
@@ -15,18 +16,24 @@ pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
 step: Step,
 
 target: CascadeTarget,
+limine_step: *LimineStep,
 
 image_file: std.Build.GeneratedFile,
 image_file_source: std.Build.FileSource,
 
-pub fn getImageSteps(b: *std.Build, kernels: Kernel.Collection, all_targets: []const CascadeTarget) !Collection {
+pub fn getImageSteps(
+    b: *std.Build,
+    kernels: Kernel.Collection,
+    limine_step: *LimineStep,
+    all_targets: []const CascadeTarget,
+) !Collection {
     var images: Collection = .{};
     try images.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
 
     for (all_targets) |target| {
         const kernel = kernels.get(target).?;
 
-        const image_build = try ImageStep.create(b, target, kernel);
+        const image_build = try ImageStep.create(b, target, kernel, limine_step);
 
         const image_step_name = try std.fmt.allocPrint(
             b.allocator,
@@ -48,7 +55,7 @@ pub fn getImageSteps(b: *std.Build, kernels: Kernel.Collection, all_targets: []c
     return images;
 }
 
-fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel) !*ImageStep {
+fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel, limine_step: *LimineStep) !*ImageStep {
     const step_name = try std.fmt.allocPrint(
         owner.allocator,
         "build {s} image",
@@ -64,12 +71,14 @@ fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel) !*ImageStep 
             .makeFn = make,
         }),
         .target = target,
+        .limine_step = limine_step,
         .image_file = undefined,
         .image_file_source = undefined,
     };
     self.image_file = .{ .step = &self.step };
     self.image_file_source = .{ .generated = &self.image_file };
 
+    self.step.dependOn(&limine_step.step);
     self.step.dependOn(&kernel.install_step.step);
 
     return self;
@@ -83,6 +92,14 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     var manifest = b.cache.obtain();
     defer manifest.deinit();
+
+    // Limine cache directory
+    {
+        const limine_directory = self.limine_step.limine_directory.getPath();
+        var dir = try std.fs.cwd().openIterableDir(limine_directory, .{});
+        defer dir.close();
+        try hashDirectoryRecursive(b.allocator, dir, limine_directory, &manifest);
+    }
 
     // Root
     {
@@ -141,6 +158,8 @@ fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
         build_image_path,
         image_file_path,
         @tagName(self.target),
+        self.limine_step.limine_directory.getPath(),
+        self.limine_step.limine_deploy_source.getPath(self.step.owner),
     };
 
     var child = std.ChildProcess.init(args, self.step.owner.allocator);

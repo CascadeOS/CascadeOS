@@ -7,6 +7,7 @@ const CascadeTarget = @import(".build/CascadeTarget.zig").CascadeTarget;
 const ImageStep = @import(".build/ImageStep.zig");
 const Kernel = @import(".build/Kernel.zig");
 const Library = @import(".build/Library.zig");
+const LimineStep = @import(".build/LimineStep.zig");
 const Options = @import(".build/Options.zig");
 const QemuStep = @import(".build/QemuStep.zig");
 const StepCollection = @import(".build/StepCollection.zig");
@@ -22,6 +23,10 @@ pub fn build(b: *std.Build) !void {
 
     const libraries = try Library.getLibraries(b, step_collection, options.optimize);
     const kernels = try Kernel.getKernels(b, libraries, step_collection, options, all_targets);
-    const image_steps = try ImageStep.getImageSteps(b, kernels, all_targets);
+    const limine_step = try LimineStep.create(b);
+    const image_steps = try ImageStep.getImageSteps(b, kernels, limine_step, all_targets);
     _ = try QemuStep.getQemuSteps(b, image_steps, options, all_targets);
+
+    const s = b.step("limine", "run the limine step");
+    s.dependOn(&limine_step.step);
 }
