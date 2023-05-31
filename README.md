@@ -1,10 +1,10 @@
-# CircuitOS
+# CascadeOS
 
-Circuit is a general purpose operating system targeting standard desktops and laptops.
+Cascade is a general purpose operating system targeting standard desktops and laptops.
 
 ## Short Term Goals
 - Good enough x86-64 support for QEMU
-- Userspace, no gui
+- Userspace, no GUI
 - ext2 on NVMe
 
 ## Planned Features

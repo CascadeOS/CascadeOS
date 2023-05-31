@@ -15,7 +15,7 @@ pub fn setup() void {
 
     // print starting message
     kernel.arch.setup.getEarlyOutputWriter().writeAll(
-        comptime "starting CircuitOS " ++ kernel.info.version ++ "\n",
+        comptime "starting CascadeOS " ++ kernel.info.version ++ "\n",
     ) catch {};
 
     log.info("performing early system initialization", .{});

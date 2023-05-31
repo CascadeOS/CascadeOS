@@ -3,7 +3,7 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
-const circuit_version = std.builtin.Version{ .major = 0, .minor = 0, .patch = 1 };
+const cascade_version = std.builtin.Version{ .major = 0, .minor = 0, .patch = 1 };
 
 pub fn build(b: *std.Build) !void {
     const step_collection = try StepCollection.create(b);
@@ -17,13 +17,13 @@ pub fn build(b: *std.Build) !void {
     try createQemuSteps(b, images, options);
 }
 
-const all_targets: []const CircuitTarget = std.meta.tags(CircuitTarget);
+const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
-pub const CircuitTarget = enum {
+pub const CascadeTarget = enum {
     aarch64,
     x86_64,
 
-    pub fn getTestCrossTarget(self: CircuitTarget) std.zig.CrossTarget {
+    pub fn getTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         switch (self) {
             .aarch64 => return std.zig.CrossTarget{
                 .cpu_arch = .aarch64,
@@ -34,7 +34,7 @@ pub const CircuitTarget = enum {
         }
     }
 
-    pub fn isNative(self: CircuitTarget, b: *std.Build) bool {
+    pub fn isNative(self: CascadeTarget, b: *std.Build) bool {
         return switch (b.host.target.cpu.arch) {
             .aarch64 => self == .aarch64,
             .x86_64 => self == .x86_64,
@@ -42,14 +42,14 @@ pub const CircuitTarget = enum {
         };
     }
 
-    pub fn needsUefi(self: CircuitTarget) bool {
+    pub fn needsUefi(self: CascadeTarget) bool {
         return switch (self) {
             .aarch64 => true,
             .x86_64 => false,
         };
     }
 
-    pub fn getCrossTarget(self: CircuitTarget) std.zig.CrossTarget {
+    pub fn getCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         switch (self) {
             .x86_64 => {
                 const features = std.Target.x86.Feature;
@@ -100,40 +100,40 @@ pub const CircuitTarget = enum {
         }
     }
 
-    pub fn linkerScriptPath(self: CircuitTarget, b: *std.Build) []const u8 {
+    pub fn linkerScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
         return switch (self) {
             .aarch64 => pathJoinFromRoot(b, &.{ ".build", "linker_aarch64.ld" }),
             .x86_64 => pathJoinFromRoot(b, &.{ ".build", "linker_x86_64.ld" }),
         };
     }
 
-    pub fn buildImagePath(self: CircuitTarget, b: *std.Build) []const u8 {
+    pub fn buildImagePath(self: CascadeTarget, b: *std.Build) []const u8 {
         _ = self;
         return pathJoinFromRoot(b, &.{ ".build", "build_limine_image.sh" });
     }
 
-    pub fn qemuExecutable(self: CircuitTarget) []const u8 {
+    pub fn qemuExecutable(self: CascadeTarget) []const u8 {
         return switch (self) {
             .aarch64 => "qemu-system-aarch64",
             .x86_64 => "qemu-system-x86_64",
         };
     }
 
-    pub fn setQemuCpu(self: CircuitTarget, run_qemu: *Step.Run) void {
+    pub fn setQemuCpu(self: CascadeTarget, run_qemu: *Step.Run) void {
         switch (self) {
             .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }), // TODO: Add a way to specify this
             .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }), // `migratable=no` is required to get invariant tsc
         }
     }
 
-    pub fn setQemuMachine(self: CircuitTarget, run_qemu: *Step.Run) void {
+    pub fn setQemuMachine(self: CascadeTarget, run_qemu: *Step.Run) void {
         switch (self) {
             .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
             .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
         }
     }
 
-    pub fn uefiFirmwarePath(self: CircuitTarget) ![]const u8 {
+    pub fn uefiFirmwarePath(self: CascadeTarget) ![]const u8 {
         switch (self) {
             .aarch64 => {
                 if (fileExists("/usr/share/edk2/aarch64/QEMU_EFI.fd")) return "/usr/share/edk2/aarch64/QEMU_EFI.fd";
@@ -147,7 +147,7 @@ pub const CircuitTarget = enum {
         return error.UnableToLocateUefiFirmware;
     }
 
-    pub fn targetSpecificSetup(self: CircuitTarget, kernel_exe: *Step.Compile) void {
+    pub fn targetSpecificSetup(self: CascadeTarget, kernel_exe: *Step.Compile) void {
         switch (self) {
             .aarch64 => {},
             .x86_64 => {
@@ -201,7 +201,7 @@ const Options = struct {
     /// force the log level of every scope to be debug in the kernel
     force_debug_log: bool,
 
-    kernel_option_modules: std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module),
+    kernel_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
     pub fn get(b: *std.Build) !Options {
         const qemu_monitor = b.option(
@@ -272,7 +272,7 @@ const Options = struct {
             "Forces the provided log scopes to be debug (comma seperated list of wildcard scope matchers)",
         ) orelse "";
 
-        const version = try getVersionString(b, circuit_version);
+        const version = try getVersionString(b, cascade_version);
 
         return .{
             .optimize = b.standardOptimizeOption(.{}),
@@ -296,8 +296,8 @@ const Options = struct {
         force_debug_log: bool,
         scopes_to_force_debug: []const u8,
         version: []const u8,
-    ) !std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) {
-        var kernel_option_modules: std.AutoHashMapUnmanaged(CircuitTarget, *std.Build.Module) = .{};
+    ) !std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) {
+        var kernel_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
         errdefer kernel_option_modules.deinit(b.allocator);
 
         try kernel_option_modules.ensureTotalCapacity(b.allocator, all_targets.len);
@@ -343,8 +343,8 @@ const Options = struct {
         out.writeAll("};\n") catch unreachable;
     }
 
-    fn addTargetOptions(options: *std.Build.OptionsStep, target: CircuitTarget) void {
-        addEnumType(options, "Arch", CircuitTarget);
+    fn addTargetOptions(options: *std.Build.OptionsStep, target: CascadeTarget) void {
+        addEnumType(options, "Arch", CascadeTarget);
 
         const out = options.contents.writer();
 
@@ -410,7 +410,7 @@ const Options = struct {
     }
 };
 
-const Kernels = std.AutoHashMapUnmanaged(CircuitTarget, Kernel);
+const Kernels = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
 
 fn createKernels(b: *std.Build, libraries: Libraries, step_collection: StepCollection, options: Options) !Kernels {
     var kernels: Kernels = .{};
@@ -444,12 +444,12 @@ fn createKernels(b: *std.Build, libraries: Libraries, step_collection: StepColle
 const Kernel = struct {
     b: *std.Build,
 
-    target: CircuitTarget,
+    target: CascadeTarget,
     options: Options,
 
     install_step: *Step.InstallArtifact,
 
-    pub fn create(b: *std.Build, target: CircuitTarget, libraries: Libraries, options: Options) !Kernel {
+    pub fn create(b: *std.Build, target: CascadeTarget, libraries: Libraries, options: Options) !Kernel {
         const kernel_exe = b.addExecutable(.{
             .name = "kernel",
             .root_source_file = .{ .path = pathJoinFromRoot(b, &.{ "kernel", "root.zig" }) },
@@ -539,7 +539,7 @@ const StepCollection = struct {
     }
 };
 
-const ImageSteps = std.AutoHashMapUnmanaged(CircuitTarget, *ImageStep);
+const ImageSteps = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
 
 fn createImageSteps(b: *std.Build, kernels: Kernels) !ImageSteps {
     var images: ImageSteps = .{};
@@ -573,12 +573,12 @@ fn createImageSteps(b: *std.Build, kernels: Kernels) !ImageSteps {
 const ImageStep = struct {
     step: Step,
 
-    target: CircuitTarget,
+    target: CascadeTarget,
 
     image_file: std.Build.GeneratedFile,
     image_file_source: std.Build.FileSource,
 
-    pub fn create(owner: *std.Build, target: CircuitTarget, kernel: Kernel) !*ImageStep {
+    pub fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel) !*ImageStep {
         const step_name = try std.fmt.allocPrint(
             owner.allocator,
             "build {s} image",
@@ -645,7 +645,7 @@ const ImageStep = struct {
             @tagName(self.target),
             try std.fmt.allocPrint(
                 b.allocator,
-                "circuit_{s}.hdd",
+                "cascade_{s}.hdd",
                 .{@tagName(self.target)},
             ),
         });
@@ -748,10 +748,10 @@ const QemuStep = struct {
     step: Step,
     image: std.Build.FileSource,
 
-    target: CircuitTarget,
+    target: CascadeTarget,
     options: Options,
 
-    pub fn create(b: *std.Build, target: CircuitTarget, image: std.Build.FileSource, options: Options) !*QemuStep {
+    pub fn create(b: *std.Build, target: CascadeTarget, image: std.Build.FileSource, options: Options) !*QemuStep {
         const step_name = try std.fmt.allocPrint(
             b.allocator,
             "run qemu with {s} image",
@@ -1053,5 +1053,5 @@ pub const LibraryDescription = struct {
 
     /// The list of architectures supported by the library.
     /// `null` means architecture-independent.
-    supported_architectures: ?[]const CircuitTarget = null,
+    supported_architectures: ?[]const CascadeTarget = null,
 };
