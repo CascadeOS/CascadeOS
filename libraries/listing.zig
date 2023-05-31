@@ -1,5 +1,4 @@
-const build = @import("../build.zig");
-const LibraryDescription = build.LibraryDescription;
+const LibraryDescription = @import("../.build/LibraryDescription.zig");
 
 pub const libraries: []const LibraryDescription = &.{
     .{ .name = "bitjuggle" },
