@@ -4,6 +4,7 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import(".build/CascadeTarget.zig").CascadeTarget;
+const Kernel = @import(".build/Kernel.zig");
 const Library = @import(".build/Library.zig");
 const Options = @import(".build/Options.zig");
 const StepCollection = @import(".build/StepCollection.zig");
@@ -21,113 +22,16 @@ pub fn build(b: *std.Build) !void {
     const options = try Options.get(b, cascade_version, all_targets);
 
     const libraries = try Library.getLibraries(b, step_collection, options.optimize);
-    const kernels = try createKernels(b, libraries, step_collection, options);
+    const kernels = try Kernel.getKernels(b, libraries, step_collection, options, all_targets);
     const images = try createImageSteps(b, kernels);
     try createQemuSteps(b, images, options);
 }
 
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
-const Kernels = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
-
-fn createKernels(b: *std.Build, libraries: Library.Collection, step_collection: StepCollection, options: Options) !Kernels {
-    var kernels: Kernels = .{};
-    try kernels.ensureTotalCapacity(b.allocator, all_targets.len);
-
-    for (all_targets) |target| {
-        const kernel = try Kernel.create(b, target, libraries, options);
-
-        const build_step_name = try std.fmt.allocPrint(
-            b.allocator,
-            "kernel_{s}",
-            .{@tagName(target)},
-        );
-        const build_step_description = try std.fmt.allocPrint(
-            b.allocator,
-            "Build the kernel for {s}",
-            .{@tagName(target)},
-        );
-
-        const build_step = b.step(build_step_name, build_step_description);
-        build_step.dependOn(&kernel.install_step.step);
-
-        step_collection.kernels_test_step.dependOn(build_step);
-
-        kernels.putAssumeCapacityNoClobber(target, kernel);
-    }
-
-    return kernels;
-}
-
-const Kernel = struct {
-    b: *std.Build,
-
-    target: CascadeTarget,
-    options: Options,
-
-    install_step: *Step.InstallArtifact,
-
-    pub fn create(b: *std.Build, target: CascadeTarget, libraries: Library.Collection, options: Options) !Kernel {
-        const kernel_exe = b.addExecutable(.{
-            .name = "kernel",
-            .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "root.zig" }) },
-            .target = target.getCrossTarget(),
-            .optimize = options.optimize,
-        });
-
-        kernel_exe.override_dest_dir = .{
-            .custom = b.pathJoin(&.{
-                @tagName(target),
-                "root",
-                "boot",
-            }),
-        };
-
-        kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
-
-        const kernel_module = blk: {
-            const kernel_module = b.createModule(.{
-                .source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
-            });
-
-            // self reference
-            try kernel_module.dependencies.put("kernel", kernel_module);
-
-            // kernel options
-            try kernel_module.dependencies.put("kernel_options", options.kernel_option_modules.get(target).?);
-
-            // dependencies
-            const kernel_dependencies: []const []const u8 = @import("kernel/dependencies.zig").dependencies;
-            for (kernel_dependencies) |dependency| {
-                const library = libraries.get(dependency).?;
-                try kernel_module.dependencies.put(library.name, library.module);
-            }
-
-            break :blk kernel_module;
-        };
-
-        kernel_exe.addModule("kernel", kernel_module);
-
-        // TODO: Investigate whether LTO works
-        kernel_exe.want_lto = false;
-        kernel_exe.omit_frame_pointer = false;
-        kernel_exe.disable_stack_probing = true;
-        kernel_exe.pie = true;
-
-        target.targetSpecificSetup(kernel_exe);
-
-        return Kernel{
-            .b = b,
-            .target = target,
-            .options = options,
-            .install_step = b.addInstallArtifact(kernel_exe),
-        };
-    }
-};
-
 const ImageSteps = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
 
-fn createImageSteps(b: *std.Build, kernels: Kernels) !ImageSteps {
+fn createImageSteps(b: *std.Build, kernels: Kernel.Collection) !ImageSteps {
     var images: ImageSteps = .{};
     try images.ensureTotalCapacity(b.allocator, all_targets.len);
 
