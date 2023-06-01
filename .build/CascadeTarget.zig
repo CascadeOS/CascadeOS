@@ -134,18 +134,26 @@ pub const CascadeTarget = enum {
         }
     }
 
-    pub fn uefiFirmwarePath(self: CascadeTarget) ![]const u8 {
+    pub const FirmwareUris = struct {
+        code: std.Uri,
+        vars: std.Uri,
+    };
+
+    pub fn uefiFirmwareUris(self: CascadeTarget) !FirmwareUris {
         switch (self) {
             .aarch64 => {
-                if (helpers.fileExists("/usr/share/edk2/aarch64/QEMU_EFI.fd")) return "/usr/share/edk2/aarch64/QEMU_EFI.fd";
+                return .{
+                    .code = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd"),
+                    .vars = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_VARS.fd"),
+                };
             },
             .x86_64 => {
-                if (helpers.fileExists("/usr/share/ovmf/x64/OVMF.fd")) return "/usr/share/ovmf/x64/OVMF.fd";
-                if (helpers.fileExists("/usr/share/ovmf/OVMF.fd")) return "/usr/share/ovmf/OVMF.fd";
+                return .{
+                    .code = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF_CODE.fd"),
+                    .vars = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF_VARS.fd"),
+                };
             },
         }
-
-        return error.UnableToLocateUefiFirmware;
     }
 
     pub fn targetSpecificSetup(self: CascadeTarget, kernel_exe: *Step.Compile) void {

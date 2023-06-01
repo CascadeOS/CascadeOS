@@ -9,6 +9,7 @@ const ansi = @import("../libraries/ansi/ansi.zig");
 const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const EDK2Step = @import("EDK2Step.zig");
 const ImageStep = @import("ImageStep.zig");
 const Options = @import("Options.zig");
 const StepCollection = @import("StepCollection.zig");
@@ -20,6 +21,11 @@ image: std.Build.FileSource,
 
 target: CascadeTarget,
 options: Options,
+
+uefi: bool,
+
+/// Only non-null if uefi is true
+edk2_step: ?*EDK2Step,
 
 pub fn registerQemuSteps(
     b: *std.Build,
@@ -49,6 +55,10 @@ pub fn registerQemuSteps(
 }
 
 fn create(b: *std.Build, target: CascadeTarget, image: std.Build.FileSource, options: Options) !*QemuStep {
+    const uefi = options.uefi or target.needsUefi();
+
+    const edk2_step: ?*EDK2Step = if (uefi) try EDK2Step.create(b, target) else null;
+
     const step_name = try std.fmt.allocPrint(
         b.allocator,
         "run qemu with {s} image",
@@ -68,7 +78,13 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.FileSource, opt
         .image = image,
         .target = target,
         .options = options,
+        .uefi = uefi,
+        .edk2_step = edk2_step,
     };
+
+    if (uefi) {
+        self.step.dependOn(&edk2_step.?.step);
+    }
 
     image.addStepDependencies(&self.step);
 
@@ -165,11 +181,22 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     run_qemu.addArgs(&[_][]const u8{ "-accel", "tcg" });
 
     // UEFI
-    if (self.options.uefi or self.target.needsUefi()) {
-        const uefi_firmware_path = self.target.uefiFirmwarePath() catch {
-            return step.fail("unable to locate UEFI firmware for target {}", .{self.target});
-        };
-        run_qemu.addArgs(&[_][]const u8{ "-bios", uefi_firmware_path });
+    if (self.uefi) {
+        const code = try std.fmt.allocPrint(
+            b.allocator,
+            "if=pflash,format=raw,unit=0,file={s},readonly=on",
+            .{self.edk2_step.?.code_firmware.getPath()},
+        );
+        const vars = try std.fmt.allocPrint(
+            b.allocator,
+            "if=pflash,format=raw,unit=1,file={s}",
+            .{self.edk2_step.?.vars_firmware.getPath()},
+        );
+
+        run_qemu.addArgs(&[_][]const u8{ "-drive", code });
+        run_qemu.addArgs(&[_][]const u8{ "-drive", vars });
+
+        //run_qemu.addArgs(&[_][]const u8{ "-bios", uefi_firmware_path });
     }
 
     // This is a hack to stop zig's progress output interfering with qemu's output
