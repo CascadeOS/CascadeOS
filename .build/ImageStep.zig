@@ -24,11 +24,12 @@ image_file_source: std.Build.FileSource,
 pub fn getImageSteps(
     b: *std.Build,
     kernels: Kernel.Collection,
-    limine_step: *LimineStep,
     all_targets: []const CascadeTarget,
 ) !Collection {
     var images: Collection = .{};
     try images.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
+
+    const limine_step = try LimineStep.create(b);
 
     for (all_targets) |target| {
         const kernel = kernels.get(target).?;
