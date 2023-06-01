@@ -23,9 +23,9 @@ qemu_debug: bool,
 /// TODO: Enable display by default when we have a graphical display
 no_display: bool,
 
-/// disable usage of KVM
+/// disable usage of any virtualisation accelerators
 /// defaults to false, if qemu interrupt details is requested then this is *forced* to true
-no_kvm: bool,
+no_acceleration: bool,
 
 /// show detailed qemu interrupt details
 interrupt_details: bool,
@@ -33,7 +33,7 @@ interrupt_details: bool,
 /// number of cores
 smp: usize,
 
-/// force qemu to run in UEFI mode, if the architecture supports it
+/// force qemu to run in UEFI mode
 /// defaults to false, some architectures always run in UEFI mode
 uefi: bool,
 
@@ -93,10 +93,10 @@ pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []c
         return error.InvalidNumberOfCoreRequested;
     }
 
-    const no_kvm = blk: {
-        if (b.option(bool, "no_kvm", "Disable usage of KVM")) |value| {
+    const no_acceleration = blk: {
+        if (b.option(bool, "no_acceleration", "Disable usage of QEMU accelerators")) |value| {
             if (value) break :blk true else {
-                if (interrupt_details) std.debug.panic("cannot enable KVM and show qemu interrupt details", .{});
+                if (interrupt_details) std.debug.panic("cannot enable QEMU accelerators and show qemu interrupt details", .{});
             }
         }
         break :blk interrupt_details;
@@ -128,7 +128,7 @@ pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []c
         .qemu_monitor = qemu_monitor,
         .qemu_debug = qemu_debug,
         .no_display = no_display,
-        .no_kvm = no_kvm,
+        .no_acceleration = no_acceleration,
         .interrupt_details = interrupt_details,
         .smp = smp,
         .uefi = uefi,

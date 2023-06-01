@@ -146,11 +146,22 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     // set target machine
     self.target.setQemuMachine(run_qemu);
 
-    // KVM
-    const should_use_kvm = !self.options.no_kvm and helpers.fileExists("/dev/kvm") and self.target.isNative(b);
-    if (should_use_kvm) {
-        run_qemu.addArg("-enable-kvm");
+    // qemu acceleration
+    const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
+    if (should_use_acceleration) {
+        switch (b.host.target.os.tag) {
+            .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
+            .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
+            .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
+            else => {
+                // TODO: support other OSes
+                // TODO: should we add a user visible warning/error here?
+            },
+        }
     }
+
+    // always add tcg as the last accelerator
+    run_qemu.addArgs(&[_][]const u8{ "-accel", "tcg" });
 
     // UEFI
     if (self.options.uefi or self.target.needsUefi()) {
