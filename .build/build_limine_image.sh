@@ -16,8 +16,15 @@ TARGET_ARCH="$2"
 LIMINE="$3"
 LIMINE_DEPLOY="$4"
 
-# Setup variables
+if [ ! -d "$LIMINE" ]; then
+    die "provided limine directory does not exist"
+fi
 
+if [ ! -f "$LIMINE_DEPLOY" ]; then
+    die "provided limine-deploy executable does not exist"
+fi
+
+# Setup variables
 BUILD_DIR=$(pwd -P)
 PROJECT_DIR="$BUILD_DIR/.."
 
@@ -106,6 +113,9 @@ case "$TARGET_ARCH" in
     ;;
 'aarch64')
     sudo cp "$LIMINE"/BOOTAA64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
+    ;;
+*)
+    die "unsupported target arch"
     ;;
 esac
 
