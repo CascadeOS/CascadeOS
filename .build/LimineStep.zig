@@ -66,6 +66,7 @@ const DownloadLimineStep = struct {
     step: Step,
 
     limine_directory: []const u8,
+    timestamp_file_path: []const u8,
 
     pub fn create(b: *std.Build, limine_directory: []const u8) !*DownloadLimineStep {
         const self = try b.allocator.create(DownloadLimineStep);
@@ -78,6 +79,7 @@ const DownloadLimineStep = struct {
                 .makeFn = downloadLimineMake,
             }),
             .limine_directory = limine_directory,
+            .timestamp_file_path = try b.cache_root.join(b.allocator, &.{"limine_timestamp"}),
         };
 
         return self;
@@ -87,8 +89,15 @@ const DownloadLimineStep = struct {
         var node = prog_node.start("downloading limine", 2);
         defer node.end();
 
+        node.activate();
+
         const b = step.owner;
         const self = @fieldParentPtr(DownloadLimineStep, "step", step);
+
+        if (!self.needToDownloadLimine()) {
+            step.result_cached = true;
+            return;
+        }
 
         // attempt to git pull in a pre-existing limine directory
         run(b, &.{
@@ -98,8 +107,9 @@ const DownloadLimineStep = struct {
             "pull",
         }) catch {
             // pull failed, so attempt to clone
-
             node.completeOne();
+
+            try std.fs.cwd().deleteTree(self.limine_directory);
 
             run(b, &.{
                 "git",
@@ -113,7 +123,29 @@ const DownloadLimineStep = struct {
             }) catch {
                 return step.fail("failed to download limine", .{});
             };
+
+            node.completeOne();
         };
+
+        try self.updateTimestampFile();
+    }
+
+    // 6 hours
+    const timeout_ns = std.time.ns_per_hour * 6;
+
+    fn needToDownloadLimine(self: *DownloadLimineStep) bool {
+        std.fs.accessAbsolute(self.limine_directory, .{}) catch return true;
+        const timestamp_file = std.fs.cwd().openFile(self.timestamp_file_path, .{}) catch return true;
+        defer timestamp_file.close();
+        const stat = timestamp_file.stat() catch return true;
+        return std.time.nanoTimestamp() >= stat.mtime + timeout_ns;
+    }
+
+    fn updateTimestampFile(self: *DownloadLimineStep) !void {
+        const timestamp_file = try std.fs.cwd().createFile(self.timestamp_file_path, .{});
+        defer timestamp_file.close();
+        const stat = try timestamp_file.stat();
+        try timestamp_file.updateTimes(stat.atime, std.time.nanoTimestamp());
     }
 
     fn run(b: *std.Build, args: []const []const u8) !void {
