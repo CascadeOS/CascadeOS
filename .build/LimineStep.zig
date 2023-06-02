@@ -95,10 +95,8 @@ const DownloadLimineStep = struct {
     }
 
     fn downloadLimineMake(step: *Step, prog_node: *std.Progress.Node) !void {
-        var node = prog_node.start("downloading limine", 2);
+        var node = prog_node.start(step.name, 0);
         defer node.end();
-
-        node.activate();
 
         const b = step.owner;
         const self = @fieldParentPtr(DownloadLimineStep, "step", step);
@@ -116,8 +114,6 @@ const DownloadLimineStep = struct {
             "pull",
         }) catch {
             // pull failed, so attempt to clone
-            node.completeOne();
-
             try std.fs.cwd().deleteTree(self.limine_directory);
 
             run(b, &.{
@@ -132,8 +128,6 @@ const DownloadLimineStep = struct {
             }) catch {
                 return step.fail("failed to download limine", .{});
             };
-
-            node.completeOne();
         };
 
         try self.updateTimestampFile();
