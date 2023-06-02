@@ -67,7 +67,8 @@ pub fn create(b: *std.Build, target: CascadeTarget) !*EDK2Step {
 }
 
 fn make(step: *Step, prog_node: *std.Progress.Node) !void {
-    _ = prog_node;
+    var node = prog_node.start(step.name, 0);
+    defer node.end();
 
     const b = step.owner;
     const self = @fieldParentPtr(EDK2Step, "step", step);
