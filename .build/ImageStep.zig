@@ -140,6 +140,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     if (try step.cacheHit(&manifest)) {
         self.image_file.path = image_file_path;
+        self.step.result_cached = true;
         return;
     }
 
