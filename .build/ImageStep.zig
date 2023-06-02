@@ -86,15 +86,11 @@ fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel, limine_step:
 }
 
 fn make(step: *Step, prog_node: *std.Progress.Node) !void {
+    var node = prog_node.start(step.name, 0);
+    defer node.end();
+
     const b = step.owner;
     const self = @fieldParentPtr(ImageStep, "step", step);
-
-    var node = prog_node.start(try std.fmt.allocPrint(
-        b.allocator,
-        "build {s} image",
-        .{@tagName(self.target)},
-    ), 0);
-    defer node.end();
 
     var manifest = b.cache.obtain();
     defer manifest.deinit();
