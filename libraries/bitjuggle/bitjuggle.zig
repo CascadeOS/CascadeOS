@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 ///! This package contains various "bit juggling" helpers and functionality:
 ///!
 ///! - `isBitSet` - Check if a bit is set
