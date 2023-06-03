@@ -18,7 +18,7 @@ pub const SerialPort = struct {
 
     /// Initialize the serial port at `com_port` with the baud rate `baud_rate`
     pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
-        // FIXME: Check if the serial port exists before using it.
+        // TODO: Check if the serial port exists before using it. https://github.com/CascadeOS/CascadeOS/issues/37
         // Writing to then reading the scratch register `data_port_number + 7` should return the same value.
 
         const data_port_number = com_port.toPort();

@@ -18,7 +18,7 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
-    // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/22
+    // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/23
     pub const small_page_size = core.Size.from(4, .kib);
     pub const medium_page_size = core.Size.from(2, .mib);
     pub const large_page_size = core.Size.from(1, .gib);
@@ -32,7 +32,7 @@ pub const paging = struct {
         true,
     };
 
-    // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/22
+    // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/23
     pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
 
     // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
