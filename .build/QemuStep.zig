@@ -3,6 +3,9 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
+// TODO: Is there a better way to provide access to the libraries at build time?
+const ansi = @import("../libraries/ansi/ansi.zig");
+
 const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
@@ -171,5 +174,22 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         run_qemu.addArgs(&[_][]const u8{ "-bios", uefi_firmware_path });
     }
 
+    // TODO: This is a hack to stop zig's progress output interfering with qemu's output
+    try ensureCurrentStdoutLineIsEmpty();
+
     try run_qemu.step.make(prog_node);
+}
+
+fn ensureCurrentStdoutLineIsEmpty() !void {
+    const stdout = std.io.getStdOut();
+    const tty_config = std.io.tty.detectConfig(stdout);
+    switch (tty_config) {
+        .no_color, .windows_api => { // TODO: proper support for windows api
+            try stdout.writeAll("\r\n");
+        },
+        .escape_codes => {
+            // clear the current line and return the cursor to the beginning of the line
+            try stdout.writeAll(comptime ansi.clear.line ++ "\r");
+        },
+    }
 }
