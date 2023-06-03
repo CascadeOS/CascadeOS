@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
-const core = @import("core");
 
 pub const Size = extern struct {
     bytes: usize,
@@ -184,7 +183,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         if (!@import("builtin").is_test) return;
 
         inline for (std.meta.declarations(T)) |decl| {
-            if (!decl.is_pub) continue;
+            if (std.mem.eql(u8, decl.name, "std")) continue;
+            if (!@hasDecl(T, decl.name)) continue;
 
             defer _ = @field(T, decl.name);
 
