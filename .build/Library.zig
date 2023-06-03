@@ -95,7 +95,9 @@ fn resolveLibrary(
             .source_file = file_source,
         });
 
-        try module.dependencies.put(description.name, module);
+        // TODO(self-referential module): We would really like to add a self-referential module here
+        // self-referential dependency: @import(description.name) => our own module
+        // try module.dependencies.put(description.name, module);
 
         for (library_dependencies) |library| {
             try module.dependencies.put(library.name, library.module);
@@ -112,6 +114,10 @@ fn resolveLibrary(
                 .optimize = optimize,
                 .target = arch.getTestCrossTarget(),
             });
+
+            // TODO(self-referential module): We would really like to add a self-referential module here
+            // self-referential dependency: @import(description.name) => our own module
+            // test_exe.addModule(description.name, module);
 
             for (library_dependencies) |library| {
                 test_exe.addModule(library.name, library.module);
@@ -143,6 +149,10 @@ fn resolveLibrary(
             .root_source_file = file_source,
             .optimize = optimize,
         });
+
+        // TODO(self-referential module): We would really like to add a self-referential module here
+        // self-referential dependency: @import(description.name) => our own module
+        // test_exe.addModule(description.name, module);
 
         for (library_dependencies) |library| {
             test_exe.addModule(library.name, library.module);
