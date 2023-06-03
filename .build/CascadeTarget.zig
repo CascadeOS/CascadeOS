@@ -72,14 +72,20 @@ pub const CascadeTarget = enum {
                 return target;
             },
             .aarch64 => {
+                const features = std.Target.aarch64.Feature;
                 var target = std.zig.CrossTarget{
                     .cpu_arch = .aarch64,
                     .os_tag = .freestanding,
                     .abi = .none,
-                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a57 }, // TODO: Add a way to specify this
+                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.generic },
                 };
 
-                // TODO: Does SIMD (neon) need to be disabled? Like on x86_64?
+                // TODO: disabling these causes zig to seg fault https://github.com/CascadeOS/CascadeOS/issues/6
+                if (false) {
+                    // Remove neon and fp features
+                    target.cpu_features_sub.addFeature(@enumToInt(features.neon));
+                    target.cpu_features_sub.addFeature(@enumToInt(features.fp_armv8));
+                }
 
                 return target;
             },
