@@ -30,8 +30,8 @@ pub fn init() void {
                 total_usable_memory.addInPlace(entry.range.size);
                 free_memory.addInPlace(entry.range.size);
 
-                std.debug.assert(entry.range.addr.isAligned(arch.paging.smallest_page_size));
-                std.debug.assert(entry.range.size.isAligned(arch.paging.smallest_page_size));
+                std.debug.assert(entry.range.addr.isAligned(arch.paging.standard_page_size));
+                std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
 
                 const range_in_direct_map = entry.range.toDirectMap();
 
@@ -39,7 +39,7 @@ pub fn init() void {
                 const virtual_end_addr = range_in_direct_map.end();
 
                 log.debug(indent ** 2 ++ "marking {} pages available from {} to {}", .{
-                    entry.range.size.divide(arch.paging.smallest_page_size),
+                    entry.range.size.divide(arch.paging.standard_page_size),
                     current_virtual_addr,
                     virtual_end_addr,
                 });
@@ -48,7 +48,7 @@ pub fn init() void {
                 var opt_previous_page: ?*PhysPageNode = null;
 
                 while (current_virtual_addr.lessThan(virtual_end_addr)) : ({
-                    current_virtual_addr.moveForwardInPlace(arch.paging.smallest_page_size);
+                    current_virtual_addr.moveForwardInPlace(arch.paging.standard_page_size);
                 }) {
                     const page = current_virtual_addr.toPtr(*kernel.pmm.PhysPageNode);
                     page.next = null;
@@ -81,7 +81,7 @@ pub fn init() void {
     log.debug("|--unusable: {}", .{total_memory.subtract(total_usable_memory)});
 }
 
-pub fn allocateSmallestPage() ?kernel.PhysRange {
+pub fn allocatePage() ?kernel.PhysRange {
     var opt_first_free = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
 
     while (opt_first_free) |first_free| {
@@ -98,24 +98,24 @@ pub fn allocateSmallestPage() ?kernel.PhysRange {
         }
 
         // Decrement `free_memory`
-        _ = @atomicRmw(usize, &free_memory.bytes, .Sub, arch.paging.smallest_page_size.bytes, .Monotonic);
+        _ = @atomicRmw(usize, &free_memory.bytes, .Sub, arch.paging.standard_page_size.bytes, .Monotonic);
 
         const addr = kernel.VirtAddr.fromPtr(first_free).toPhysicalFromDirectMap() catch unreachable;
 
-        const range = kernel.PhysRange.fromAddr(addr, arch.paging.smallest_page_size);
+        const range = kernel.PhysRange.fromAddr(addr, arch.paging.standard_page_size);
 
         log.debug("found free page: {}", .{range});
 
         return range;
     } else {
-        log.warn("SMALL PAGE ALLOCATION FAILED", .{});
+        log.warn("STANDARD PAGE ALLOCATION FAILED", .{});
     }
 
     return null;
 }
 
-pub fn deallocateSmallestPage(addr: kernel.PhysAddr) void {
-    std.debug.assert(addr.isAligned(arch.paging.smallest_page_size));
+pub fn deallocatePage(addr: kernel.PhysAddr) void {
+    std.debug.assert(addr.isAligned(arch.paging.standard_page_size));
 
     const page_node = addr.toKernelVirtual().toPtr(*PhysPageNode);
     _ = page_node;

@@ -12,7 +12,7 @@ pub const small_page_size = core.Size.from(4, .kib);
 pub const medium_page_size = core.Size.from(2, .mib);
 pub const large_page_size = core.Size.from(1, .gib);
 
-pub const smallest_page_size = small_page_size;
+pub const standard_page_size = small_page_size;
 pub const largest_page_size = large_page_size;
 
 // TODO: This is incorrect for 5-level paging https://github.com/CascadeOS/CascadeOS/issues/34
@@ -21,7 +21,7 @@ pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
 pub const PageTable = @import("PageTable.zig").PageTable;
 
 pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
-    const physical_page = kernel.pmm.allocateSmallestPage() orelse return error.PageAllocationFailed;
+    const physical_page = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
     std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
     const page_table = physical_page.toDirectMap().addr.toPtr(*PageTable);
@@ -38,7 +38,7 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
 
 const MapError = arch.paging.MapError;
 
-pub fn mapRegionSmallestPageOnly(
+pub fn mapRegion(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
@@ -252,7 +252,7 @@ fn ensureNextTable(
     var created = false;
 
     if (!self.present.read()) {
-        const physical_page = kernel.pmm.allocateSmallestPage() orelse return error.AllocationFailed;
+        const physical_page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
         self.setAddress4kib(physical_page.addr);
         created = true;
     }

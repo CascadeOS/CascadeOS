@@ -62,7 +62,7 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
-    pub const smallest_page_size: core.Size = current.paging.smallest_page_size;
+    pub const standard_page_size: core.Size = current.paging.standard_page_size;
     pub const largest_page_size: core.Size = current.paging.largest_page_size;
 
     pub const higher_half: kernel.VirtAddr = current.paging.higher_half;
@@ -79,15 +79,19 @@ pub const paging = struct {
         Unexpected,
     };
 
-    pub inline fn mapRegionSmallestPageOnly(
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    /// This function will only use the architecture's `standard_page_size`.
+    pub inline fn mapRegion(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        return current.paging.mapRegionSmallestPageOnly(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapRegion(page_table, virtual_range, physical_range, map_type);
     }
 
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    /// This function is allowed to use all page sizes available to the architecture.
     pub inline fn mapRegionUseAllPageSizes(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,

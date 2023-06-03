@@ -91,7 +91,7 @@ fn mapSection(start: usize, end: usize, map_type: MapType) !void {
         virt_addr,
         core.Size.from(end - start, .byte),
     );
-    std.debug.assert(virtual_range.size.isAligned(paging.smallest_page_size));
+    std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
     const phys_addr = kernel.PhysAddr.fromInt(virt_addr.value - kernel.info.kernel_offset_from_physical.bytes);
 
@@ -158,10 +158,10 @@ pub fn mapRegion(
     physical_range: kernel.PhysRange,
     map_type: MapType,
 ) !void {
-    std.debug.assert(virtual_range.addr.isAligned(arch.paging.smallest_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.smallest_page_size));
-    std.debug.assert(physical_range.addr.isAligned(arch.paging.smallest_page_size));
-    std.debug.assert(physical_range.size.isAligned(arch.paging.smallest_page_size));
+    std.debug.assert(virtual_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.equal(virtual_range.size));
 
     log.debug(

@@ -23,7 +23,7 @@ pub const paging = struct {
     pub const medium_page_size = core.Size.from(2, .mib);
     pub const large_page_size = core.Size.from(1, .gib);
 
-    pub const smallest_page_size = small_page_size;
+    pub const standard_page_size = small_page_size;
     pub const largest_page_size = large_page_size;
 
     pub const page_sizes_available = [_]bool{
@@ -45,7 +45,7 @@ pub const paging = struct {
 
     const MapError = arch.paging.MapError;
 
-    pub fn mapRegionSmallestPageOnly(
+    pub fn mapRegion(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,

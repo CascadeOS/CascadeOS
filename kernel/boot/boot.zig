@@ -44,8 +44,8 @@ export var hhdm: limine.HHDM = .{};
 fn captureHHDM(hhdm_offset: u64) void {
     const hhdm_start = kernel.VirtAddr.fromInt(hhdm_offset);
 
-    if (!hhdm_start.isAligned(kernel.arch.paging.smallest_page_size)) {
-        core.panic("HHDM is not aligned to the smallest page size");
+    if (!hhdm_start.isAligned(kernel.arch.paging.standard_page_size)) {
+        core.panic("HHDM is not aligned to the standard page size");
     }
 
     const size_of_direct_map = calculateLengthOfDirectMap();
