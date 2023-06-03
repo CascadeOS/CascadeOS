@@ -151,9 +151,6 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     try step.writeManifest(&manifest);
 }
 
-// TODO: Remove this lock once we have a step to handle fetching and building limine.
-var image_lock: std.Thread.Mutex = .{};
-
 fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
     const build_image_path = self.target.buildImagePath(self.step.owner);
 
@@ -167,9 +164,6 @@ fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
 
     var child = std.ChildProcess.init(args, self.step.owner.allocator);
     child.cwd = helpers.pathJoinFromRoot(self.step.owner, &.{".build"});
-
-    image_lock.lock();
-    defer image_lock.unlock();
 
     try child.spawn();
     const term = try child.wait();
