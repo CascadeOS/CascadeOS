@@ -374,10 +374,6 @@ fn BitType(comptime FieldType: type, comptime shift_amount: usize, comptime Valu
                 self.bits.field().* &= ~self_bit;
             }
         }
-
-        comptime {
-            std.testing.refAllDecls(@This());
-        }
     };
 }
 
