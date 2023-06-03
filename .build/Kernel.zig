@@ -97,7 +97,7 @@ fn create(b: *std.Build, target: CascadeTarget, libraries: Library.Collection, o
 
     kernel_exe.addModule("kernel", kernel_module);
 
-    // TODO: Investigate whether LTO works
+    // TODO: LTO cannot be enabled https://github.com/CascadeOS/CascadeOS/issues/8
     kernel_exe.want_lto = false;
     kernel_exe.omit_frame_pointer = false;
     kernel_exe.disable_stack_probing = true;

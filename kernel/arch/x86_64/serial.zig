@@ -10,7 +10,7 @@ const portWriteU8 = x86_64.instructions.portWriteU8;
 
 const OUTPUT_READY: u8 = 1 << 5;
 
-// TODO: Implement a proper serial port driver
+// TODO: Implement a proper serial port driver https://github.com/CascadeOS/CascadeOS/issues/30
 
 pub const SerialPort = struct {
     z_data_port: u16,
@@ -64,7 +64,7 @@ pub const SerialPort = struct {
     fn writerImpl(self: SerialPort, bytes: []const u8) error{}!usize {
         for (bytes) |char| {
             self.waitForOutputReady();
-            // TODO: Does a serial port need `\r` before `\n`?
+            // TODO: Does a serial port need `\r` before `\n`? https://github.com/CascadeOS/CascadeOS/issues/31
             portWriteU8(self.z_data_port, char);
         }
         return bytes.len;

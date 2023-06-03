@@ -8,9 +8,7 @@ const arch = kernel.arch;
 
 const log = kernel.log.scoped(.pmm);
 
-// TODO: the current implementation is an intrusive linked list using the memory of the free pages themselves
-//       this is simple and works, but it only supports allocation of pages of the smallest size
-//       we should switch to a different data structure to support allocation of larger pages as well
+// TODO: better data structure https://github.com/CascadeOS/CascadeOS/issues/20
 
 var first_free_physical_page: ?*PhysPageNode = null;
 var total_memory: core.Size = core.Size.zero;
@@ -121,7 +119,7 @@ pub fn deallocateSmallestPage(addr: kernel.PhysAddr) void {
 
     const page_node = addr.toKernelVirtual().toPtr(*PhysPageNode);
     _ = page_node;
-    core.panic("UNIMPLEMENTED `deallocateSmallestPage`"); // TODO: implement deallocateSmallestPage
+    core.panic("UNIMPLEMENTED `deallocatePage`"); // TODO: implement deallocatePage https://github.com/CascadeOS/CascadeOS/issues/21
 }
 
 const PhysPageNode = extern struct {

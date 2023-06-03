@@ -113,7 +113,7 @@ pub const CascadeTarget = enum {
 
     pub fn setQemuCpu(self: CascadeTarget, run_qemu: *Step.Run) void {
         switch (self) {
-            .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "cortex-a57" }), // TODO: Add a way to specify this
+            .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "max" }),
             .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }), // `migratable=no` is required to get invariant tsc
         }
     }

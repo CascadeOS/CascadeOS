@@ -18,7 +18,7 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
-    // TODO: I don't know if this is correct for aaarch64
+    // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/22
     pub const small_page_size = core.Size.from(4, .kib);
     pub const medium_page_size = core.Size.from(2, .mib);
     pub const large_page_size = core.Size.from(1, .gib);
@@ -32,10 +32,10 @@ pub const paging = struct {
         true,
     };
 
-    // TODO: I don't know if this is correct for aaarch64
+    // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/22
     pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
 
-    // TODO: implement paging support for aaarch64
+    // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     pub const PageTable = struct {
         pub fn zero(self: *PageTable) void {
             _ = self;
@@ -55,7 +55,7 @@ pub const paging = struct {
         _ = physical_range;
         _ = virtual_range;
         _ = page_table;
-        core.panic("UNIMPLEMENTED `mapRegionSmallestPageOnly`"); // TODO: Implement `mapRegionSmallestPageOnly`.
+        core.panic("UNIMPLEMENTED `mapRegion`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
     pub fn mapRegionUseAllPageSizes(
@@ -68,15 +68,15 @@ pub const paging = struct {
         _ = physical_range;
         _ = virtual_range;
         _ = page_table;
-        core.panic("UNIMPLEMENTED `mapRegionUseAllPageSizes`"); // TODO: Implement `mapRegionUseAllPageSizes`.
+        core.panic("UNIMPLEMENTED `mapRegionUseAllPageSizes`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
     pub fn switchToPageTable(page_table: *const PageTable) void {
         _ = page_table;
-        core.panic("UNIMPLEMENTED `switchToPageTable`"); // TODO: Implement `switchToPageTable`.
+        core.panic("UNIMPLEMENTED `switchToPageTable`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
     pub fn allocatePageTable() *PageTable {
-        core.panic("UNIMPLEMENTED `allocatePageTable`"); // TODO: Implement `allocatePageTable`.
+        core.panic("UNIMPLEMENTED `allocatePageTable`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 };

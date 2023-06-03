@@ -21,7 +21,7 @@ pub fn create(b: *std.Build) !StepCollection {
     );
     main_test_step.dependOn(libraries_test_step);
 
-    // TODO: Figure out a way to run real kernel tests
+    // TODO: Figure out a way to run real kernel tests https://github.com/CascadeOS/CascadeOS/issues/14
     const kernels_test_step = b.step(
         "test_kernels",
         "Run all the kernel tests (currently all this does it build the kernels)",

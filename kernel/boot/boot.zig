@@ -6,7 +6,7 @@ const kernel = @import("kernel");
 
 const limine = @import("limine.zig");
 
-// TODO: Support more than just limine.
+// TODO: Support more than just limine. https://github.com/CascadeOS/CascadeOS/issues/35
 //       Multiboot, etc.
 
 /// Entry point.
@@ -34,7 +34,7 @@ pub fn captureBootloaderInformation() void {
         log.debug("kernel offset from physical: 0x{x}", .{kernel.info.kernel_offset_from_physical.bytes});
     } else {
         // TODO: We should calculate the kernel slide from the the active page table.
-        // By manually performing the virtual to physical translation.
+        // https://github.com/CascadeOS/CascadeOS/issues/36
         core.panic("bootloader did not respond with kernel address");
     }
 }
@@ -75,10 +75,11 @@ fn calculateLengthOfDirectMap() core.Size {
         log.debug("estimated size of direct map: {}", .{estimated_size});
 
         // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-        const aligned_size = estimated_size.alignForward(kernel.arch.paging.largest_page_size);
+        var aligned_size = estimated_size.alignForward(kernel.arch.paging.largest_page_size);
 
-        // TODO: Is it possible for things like the PCI bus to be above the maximum range of the memory map?
-        // Maybe we should ensure that the lowest 4GiB are always identity mapped?
+        // We ensure that the lowest 4GiB are always mapped.
+        const @"4gib" = core.Size.from(4, .gib);
+        if (aligned_size.lessThan(@"4gib")) aligned_size = @"4gib";
 
         log.debug("aligned size of direct map: {}", .{aligned_size});
 

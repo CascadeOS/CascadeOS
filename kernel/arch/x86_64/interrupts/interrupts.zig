@@ -46,7 +46,7 @@ pub fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector)
 fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
     const idt_vector = interrupt_frame.getIdtVector();
 
-    // TODO: print specific things for each exception, especially page fault
+    // TODO: print specific things for each exception, especially page fault https://github.com/CascadeOS/CascadeOS/issues/32
     if (idt_vector.isException()) {
         core.panicFmt("exception {s}", .{@tagName(idt_vector)}) catch unreachable;
     }
@@ -236,8 +236,6 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
 }
 
 pub const IdtVector = enum(u8) {
-    // TODO: Check these against the newest Intel and AMD specifications.
-
     /// Occurs when dividing any number by 0 using the DIV or IDIV instruction, or when the division result is too
     /// large to be represented in the destination.
     ///
@@ -446,7 +444,7 @@ pub fn disableInterruptsAndHalt() noreturn {
 /// Enable interrupts and put the CPU to sleep.
 pub noinline fn enableInterruptsAndHalt() void {
     // TODO: The NMI handler will need to check if the IP is equal to __halt_addr and if so, it will need to skip the
-    // hlt instruction.
+    // hlt instruction. https://github.com/CascadeOS/CascadeOS/issues/33
     asm volatile (
         \\sti
         \\.globl __halt_addr

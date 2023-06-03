@@ -7,7 +7,7 @@ const aarch64 = @import("aarch64.zig");
 
 const Uart = @This();
 
-// TODO: Implement a proper UART driver
+// TODO: Implement a proper UART driver https://github.com/CascadeOS/CascadeOS/issues/28
 
 addr: *volatile u8,
 

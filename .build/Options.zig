@@ -20,7 +20,7 @@ qemu_monitor: bool,
 qemu_debug: bool,
 
 /// disable qemu graphical display
-/// TODO: Enable display by default when we have a graphical display
+/// TODO: Enable display by default when we have a graphical display https://github.com/CascadeOS/CascadeOS/issues/11
 no_display: bool,
 
 /// disable usage of any virtualisation accelerators

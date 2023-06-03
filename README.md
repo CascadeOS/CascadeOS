@@ -20,6 +20,4 @@ This project has a [Discord server](https://discord.gg/GZMm2FS3).
 ## Contributing
 There are a few ways to contribute to the project at the stage it is at:
 - Just try to boot the thing and report the many issues you will hit 💩
-- Search the code for 'TODO' (these should probably be made into issues)
-
-TODO: Add better contributing steps, including build instructions
+- Search for issues with the label "contributor friendly"

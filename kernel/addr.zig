@@ -23,7 +23,7 @@ fn Addr(comptime addr_type: Type) type {
         pub const zero: Self = .{ .value = 0 };
 
         pub inline fn fromInt(value: usize) Self {
-            // TODO: check that the address is valid (cannoical)
+            // TODO: check that the address is valid (cannoical) https://github.com/CascadeOS/CascadeOS/issues/15
             return .{ .value = value };
         }
 

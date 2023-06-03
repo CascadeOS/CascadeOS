@@ -11,7 +11,7 @@ const bitjuggle = @import("bitjuggle");
 const Boolean = bitjuggle.Boolean;
 const Bitfield = bitjuggle.Bitfield;
 
-// TODO: Add support for 5-level paging
+// TODO: Add support for 5-level paging https://github.com/CascadeOS/CascadeOS/issues/34
 
 pub const PageTable = extern struct {
     entries: [512]Entry align(paging.small_page_size.bytes),

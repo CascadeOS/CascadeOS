@@ -28,30 +28,30 @@ pub fn getLibraries(b: *std.Build, step_collection: StepCollection, optimize: st
     try libraries.ensureTotalCapacity(b.allocator, library_list.len);
 
     // The library descriptions still left to resolve
-    var libraries_todo = try std.ArrayListUnmanaged(LibraryDescription).initCapacity(b.allocator, library_list.len);
+    var unresolved_libraries = try std.ArrayListUnmanaged(LibraryDescription).initCapacity(b.allocator, library_list.len);
 
-    // Fill the todo list with all the libraries
-    libraries_todo.appendSliceAssumeCapacity(library_list);
+    // Fill the unresolved list with all the libraries
+    unresolved_libraries.appendSliceAssumeCapacity(library_list);
 
-    while (libraries_todo.items.len != 0) {
+    while (unresolved_libraries.items.len != 0) {
         var resolved_any_this_loop = false;
 
         var i: usize = 0;
-        while (i < libraries_todo.items.len) {
-            const description: LibraryDescription = libraries_todo.items[i];
+        while (i < unresolved_libraries.items.len) {
+            const description: LibraryDescription = unresolved_libraries.items[i];
 
             if (try resolveLibrary(b, description, libraries, step_collection, optimize)) |library| {
                 libraries.putAssumeCapacityNoClobber(description.name, library);
 
                 resolved_any_this_loop = true;
-                _ = libraries_todo.swapRemove(i);
+                _ = unresolved_libraries.swapRemove(i);
             } else {
                 i += 1;
             }
         }
 
         if (!resolved_any_this_loop) {
-            @panic("STUCK IN A LOOP"); // TODO: Report this better
+            @panic("STUCK IN A LOOP"); // TODO: Report this better https://github.com/CascadeOS/CascadeOS/issues/9
         }
     }
 
@@ -95,8 +95,7 @@ fn resolveLibrary(
             .source_file = file_source,
         });
 
-        // TODO(self-referential module): We would really like to add a self-referential module here
-        // self-referential dependency: @import(description.name) => our own module
+        // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
         // try module.dependencies.put(description.name, module);
 
         for (library_dependencies) |library| {
@@ -115,8 +114,7 @@ fn resolveLibrary(
                 .target = arch.getTestCrossTarget(),
             });
 
-            // TODO(self-referential module): We would really like to add a self-referential module here
-            // self-referential dependency: @import(description.name) => our own module
+            // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
             // test_exe.addModule(description.name, module);
 
             for (library_dependencies) |library| {
@@ -150,8 +148,7 @@ fn resolveLibrary(
             .optimize = optimize,
         });
 
-        // TODO(self-referential module): We would really like to add a self-referential module here
-        // self-referential dependency: @import(description.name) => our own module
+        // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
         // test_exe.addModule(description.name, module);
 
         for (library_dependencies) |library| {

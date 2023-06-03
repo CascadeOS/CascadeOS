@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 // The specification used is "Intel® 64 and IA-32 Architectures Software Developer's Manual Volume 2A March 2023"
-// TODO: implement any stuff in the AMD manual that is not in the Intel manual as well
+// TODO: implement any stuff in the AMD manual that is not in the Intel manual as well https://github.com/CascadeOS/CascadeOS/issues/29
 
 const std = @import("std");
 const core = @import("core");

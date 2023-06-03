@@ -81,7 +81,7 @@ pub const panic_implementation = struct {
         stack_trace: ?*const std.builtin.StackTrace,
         ret_addr: ?usize,
     ) noreturn {
-        // TODO: Implement `panicImpl`
+        // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
         simplePanic(msg, stack_trace, ret_addr);
     }
 };

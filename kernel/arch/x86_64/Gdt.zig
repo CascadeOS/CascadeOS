@@ -28,7 +28,6 @@ pub const Gdt = extern struct {
     const mask_u24: u64 = std.math.maxInt(u24);
 
     pub fn setTss(self: *Gdt, tss: *x86_64.Tss) void {
-        // TODO: Check the logic for setting the TSS in the GDT is correct
         const low_base: u64 = (@ptrToInt(tss) & mask_u24) << 16;
         const mid_base: u64 = ((@ptrToInt(tss) >> 24) & mask_u8) << 56;
 
