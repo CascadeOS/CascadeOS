@@ -13,6 +13,14 @@ pub const Size = extern struct {
         tib = 1024 * 1024 * 1024 * 1024,
     };
 
+    const unit_table = .{
+        .{ .value = @enumToInt(Unit.tib), .name = "TiB" },
+        .{ .value = @enumToInt(Unit.gib), .name = "GiB" },
+        .{ .value = @enumToInt(Unit.mib), .name = "MiB" },
+        .{ .value = @enumToInt(Unit.kib), .name = "KiB" },
+        .{ .value = @enumToInt(Unit.byte), .name = "B" },
+    };
+
     pub const zero: Size = .{ .bytes = 0 };
 
     pub inline fn of(comptime T: type) Size {
@@ -106,62 +114,17 @@ pub const Size = extern struct {
         var value = size.bytes;
         var emitted_anything = false;
 
-        if (value >= @enumToInt(Unit.tib)) {
-            const tib = value / @enumToInt(Unit.tib);
+        inline for (unit_table) |unit| {
+            if (value >= unit.value) {
+                const part = value / unit.value;
 
-            if (emitted_anything) try writer.writeAll(", ");
+                if (emitted_anything) try writer.writeAll(", ");
 
-            try std.fmt.formatInt(tib, 10, .lower, .{}, writer);
-            try writer.writeAll(" TiB");
+                try std.fmt.formatInt(part, 10, .lower, .{}, writer);
+                try writer.writeAll(comptime " " ++ unit.name);
 
-            value -= tib * @enumToInt(Unit.tib);
-            emitted_anything = true;
-        }
-
-        if (value >= @enumToInt(Unit.gib)) {
-            const gib = value / @enumToInt(Unit.gib);
-
-            if (emitted_anything) try writer.writeAll(", ");
-
-            try std.fmt.formatInt(gib, 10, .lower, .{}, writer);
-            try writer.writeAll(" GiB");
-
-            value -= gib * @enumToInt(Unit.gib);
-            emitted_anything = true;
-        }
-
-        if (value >= @enumToInt(Unit.mib)) {
-            const mib = value / @enumToInt(Unit.mib);
-
-            if (emitted_anything) try writer.writeAll(", ");
-
-            try std.fmt.formatInt(mib, 10, .lower, .{}, writer);
-            try writer.writeAll(" MiB");
-
-            value -= mib * @enumToInt(Unit.mib);
-            emitted_anything = true;
-        }
-
-        if (value >= @enumToInt(Unit.kib)) {
-            const kib = value / @enumToInt(Unit.kib);
-
-            if (emitted_anything) try writer.writeAll(", ");
-
-            try std.fmt.formatInt(kib, 10, .lower, .{}, writer);
-            try writer.writeAll(" KiB");
-
-            value -= kib * @enumToInt(Unit.kib);
-            emitted_anything = true;
-        }
-
-        if (value != 0) {
-            if (emitted_anything) try writer.writeAll(", ");
-
-            if (value == 1) {
-                try writer.writeAll("1 byte");
-            } else {
-                try std.fmt.formatInt(value, 10, .lower, .{}, writer);
-                try writer.writeAll(" bytes");
+                value -= part * unit.value;
+                emitted_anything = true;
             }
         }
 
