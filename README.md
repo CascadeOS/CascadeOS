@@ -15,7 +15,7 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - All functionality implemented in Zig either in repo or as a package, allowances might be made for things like [ACPICA](https://acpica.org/).
 
 ## Discord Server
-This project has a [Discord server](https://discord.gg/GZMm2FS3).
+This project has a [Discord server](https://discord.gg/3hnsQmND3c).
 
 ## Contributing
 There are a few ways to contribute to the project at the stage it is at:
