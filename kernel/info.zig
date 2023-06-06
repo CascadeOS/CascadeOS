@@ -14,7 +14,7 @@ pub const version = kernel_options.version;
 pub const kernel_base_address = kernel.VirtAddr.fromInt(0xffffffff80000000);
 
 /// This is the offset from `kernel_base_address` that the kernel has been loaded at.
-/// This would be zero is not for kaslr.
+/// This would always be zero if not for kaslr.
 pub var kernel_offset_from_base: core.Size = core.Size.zero;
 
 /// This is the offset from the physical address of the kernel to the virtual address of the kernel.
