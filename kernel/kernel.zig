@@ -65,10 +65,13 @@ pub const panic_implementation = struct {
         stack_trace: ?*const std.builtin.StackTrace,
         ret_addr: ?usize,
     ) noreturn {
-        _ = ret_addr;
         _ = stack_trace;
 
-        arch.setup.getEarlyOutputWriter().print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+        const writer = arch.setup.getEarlyOutputWriter();
+
+        writer.print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+
+        printCurrentBackTrace(writer, ret_addr orelse @returnAddress());
 
         while (true) {
             arch.interrupts.disableInterruptsAndHalt();
@@ -85,3 +88,58 @@ pub const panic_implementation = struct {
         simplePanic(msg, stack_trace, ret_addr);
     }
 };
+
+fn printCurrentBackTrace(writer: anytype, return_address: usize) void {
+    var stack_iter = std.debug.StackIterator.init(return_address, @frameAddress());
+
+    while (stack_iter.next()) |address| {
+        printSourceAtAddress(writer, address);
+    }
+}
+
+const indent = "  ";
+
+fn printSourceAtAddress(writer: anytype, address: usize) void {
+    if (address == 0) return;
+
+    if (address < arch.paging.higher_half.value) {
+        writer.writeAll(comptime indent ++ "0x") catch unreachable;
+        std.fmt.formatInt(
+            address,
+            16,
+            .lower,
+            .{},
+            writer,
+        ) catch unreachable;
+        writer.writeAll(" - address is not in the higher half so must be userspace\n") catch unreachable;
+        return;
+    }
+
+    if (address < info.kernel_offset_from_base.bytes) {
+        writer.writeAll(comptime indent ++ "0x") catch unreachable;
+        std.fmt.formatInt(
+            address,
+            16,
+            .lower,
+            .{},
+            writer,
+        ) catch unreachable;
+        writer.writeAll(" - address is smaller than kernel offset from base\n") catch unreachable;
+        return;
+    }
+
+    // we can't use `VirtAddr` here as it is possible this subtract results in a non-canonical address
+    const kernel_source_address = address - info.kernel_offset_from_base.bytes;
+
+    // TODO: Resolve symbols using DWARF or a symbol map https://github.com/CascadeOS/CascadeOS/issues/44
+
+    writer.writeAll(comptime indent ++ "0x") catch unreachable;
+    std.fmt.formatInt(
+        kernel_source_address,
+        16,
+        .lower,
+        .{},
+        writer,
+    ) catch unreachable;
+    writer.writeAll(" - ???\n") catch unreachable;
+}
