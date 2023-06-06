@@ -30,19 +30,23 @@ pub fn panic(
     ret_addr: ?usize,
 ) noreturn {
     @setCold(true);
+    kernel.arch.interrupts.disableInterrupts();
+
     switch (state) {
-        .no_op => kernel.arch.interrupts.disableInterruptsAndHalt(),
+        .no_op => {},
         .simple => simplePanic(msg, stack_trace, ret_addr),
         .full => panicImpl(msg, stack_trace, ret_addr),
     }
+
+    kernel.arch.interrupts.disableInterruptsAndHalt();
 }
 
-/// Prints the panic message then disables interrupts and halts.
+/// Prints the panic message to the early output writer.
 fn simplePanic(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
     ret_addr: ?usize,
-) noreturn {
+) void {
     _ = stack_trace;
 
     const writer = kernel.arch.setup.getEarlyOutputWriter();
@@ -50,18 +54,14 @@ fn simplePanic(
     writer.print("\nPANIC: {s}\n", .{msg}) catch unreachable;
 
     printCurrentBackTrace(writer, ret_addr orelse @returnAddress());
-
-    while (true) {
-        kernel.arch.interrupts.disableInterruptsAndHalt();
-    }
 }
 
-/// Prints the panic message, stack trace, and registers then disables interrupts and halts.
+/// Prints the panic message, stack trace, and registers.
 fn panicImpl(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
     ret_addr: ?usize,
-) noreturn {
+) void {
     // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
     simplePanic(msg, stack_trace, ret_addr);
 }
