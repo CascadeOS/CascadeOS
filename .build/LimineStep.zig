@@ -133,15 +133,15 @@ const DownloadLimineStep = struct {
         try self.updateTimestampFile();
     }
 
-    // 6 hours
-    const timeout_ns = std.time.ns_per_hour * 6;
+    // 24 hours
+    const cache_validity_period = std.time.ns_per_hour * 24;
 
     fn needToDownloadLimine(self: *DownloadLimineStep) bool {
         std.fs.accessAbsolute(self.limine_directory, .{}) catch return true;
         const timestamp_file = std.fs.cwd().openFile(self.timestamp_file_path, .{}) catch return true;
         defer timestamp_file.close();
         const stat = timestamp_file.stat() catch return true;
-        return std.time.nanoTimestamp() >= stat.mtime + timeout_ns;
+        return std.time.nanoTimestamp() >= stat.mtime + cache_validity_period;
     }
 
     fn updateTimestampFile(self: *DownloadLimineStep) !void {
