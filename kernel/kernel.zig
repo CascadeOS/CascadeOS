@@ -115,7 +115,10 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    if (address < info.kernel_offset_from_base.bytes) {
+    // we can't use `VirtAddr` here as it is possible this subtract results in a non-canonical address
+    const kernel_source_address = address - info.kernel_offset_from_base.bytes;
+
+    if (kernel_source_address < info.kernel_base_address.value) {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;
         std.fmt.formatInt(
             address,
@@ -124,12 +127,9 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
             .{},
             writer,
         ) catch unreachable;
-        writer.writeAll(" - address is smaller than kernel offset from base\n") catch unreachable;
+        writer.writeAll(" - address is not a kernel code address\n") catch unreachable;
         return;
     }
-
-    // we can't use `VirtAddr` here as it is possible this subtract results in a non-canonical address
-    const kernel_source_address = address - info.kernel_offset_from_base.bytes;
 
     // TODO: Resolve symbols using DWARF or a symbol map https://github.com/CascadeOS/CascadeOS/issues/44
 
