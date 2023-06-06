@@ -155,7 +155,8 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
         try addFilesRecursive(b, &modules, &file_paths, root_path, std.fs.path.dirname(root_file_path).?);
     }
 
-    // TODO: Should the std lib be embedded too? maybe after compression is implemented?
+    // TODO: compress the embeded files https://github.com/CascadeOS/CascadeOS/issues/48
+    // TODO: embed the std lib (all of it or parts?) https://github.com/CascadeOS/CascadeOS/issues/49
 
     const files_option = b.addOptions();
     files_option.addOption([]const []const u8, "file_paths", file_paths.items);
