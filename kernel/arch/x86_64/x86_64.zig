@@ -46,3 +46,5 @@ pub const PrivilegeLevel = enum(u2) {
     /// to perform the accesses.
     ring3 = 3,
 };
+
+pub const spinLoopHint = instructions.pause;

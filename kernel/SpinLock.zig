@@ -52,7 +52,7 @@ fn internalGrab(self: *SpinLock, interrupts_were_enabled: bool) void {
             kernel.arch.interrupts.enableInterrupts();
             kernel.arch.interrupts.disableInterrupts();
         }
-        kernel.arch.loopHint();
+        kernel.arch.spinLoopHint();
     }
 }
 

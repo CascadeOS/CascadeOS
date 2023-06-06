@@ -17,6 +17,10 @@ const current = switch (kernel.info.arch) {
     .aarch64 => aarch64,
 };
 
+pub inline fn spinLoopHint() void {
+    current.spinLoopHint();
+}
+
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
     /// Attempt to set up some form of early output.

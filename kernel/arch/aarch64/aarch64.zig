@@ -8,6 +8,10 @@ const arch = @import("../arch.zig");
 pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
 
+pub inline fn spinLoopHint() void {
+    asm volatile ("isb" ::: "memory");
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub fn disableInterruptsAndHalt() noreturn {
