@@ -9,6 +9,7 @@ const kernel_options = @import("kernel_options");
 pub const mode: std.builtin.OptimizeMode = builtin.mode;
 pub const arch = kernel_options.arch;
 pub const version = kernel_options.version;
+pub const root_path = kernel_options.root_path;
 
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = kernel.VirtAddr.fromInt(0xffffffff80000000);

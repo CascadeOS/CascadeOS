@@ -157,6 +157,12 @@ fn buildKernelOptionModules(
 
     try kernel_option_modules.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
 
+    const root_path = std.fmt.allocPrint(
+        b.allocator,
+        comptime "{s}" ++ std.fs.path.sep_str,
+        .{b.build_root.path.?},
+    ) catch unreachable;
+
     for (all_targets) |target| {
         const kernel_options = b.addOptions();
 
@@ -164,6 +170,8 @@ fn buildKernelOptionModules(
 
         kernel_options.addOption(bool, "force_debug_log", force_debug_log);
         addStringLiteralSliceOption(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
+
+        kernel_options.addOption([]const u8, "root_path", root_path);
 
         addTargetOptions(kernel_options, target);
 
