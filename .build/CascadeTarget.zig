@@ -139,21 +139,11 @@ pub const CascadeTarget = enum {
         vars: std.Uri,
     };
 
-    pub fn uefiFirmwareUris(self: CascadeTarget) !FirmwareUris {
-        switch (self) {
-            .aarch64 => {
-                return .{
-                    .code = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd"),
-                    .vars = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_VARS.fd"),
-                };
-            },
-            .x86_64 => {
-                return .{
-                    .code = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF_CODE.fd"),
-                    .vars = try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF_VARS.fd"),
-                };
-            },
-        }
+    pub fn uefiFirmwareUri(self: CascadeTarget) !std.Uri {
+        return switch (self) {
+            .aarch64 => try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd"),
+            .x86_64 => try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd"),
+        };
     }
 
     pub fn targetSpecificSetup(self: CascadeTarget, kernel_exe: *Step.Compile) void {
