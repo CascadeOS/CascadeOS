@@ -7,14 +7,14 @@ pub const Size = size.Size;
 
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
-pub inline fn panic(comptime msg: []const u8) noreturn {
+pub fn panic(comptime msg: []const u8) noreturn {
     @setCold(true);
     std.builtin.panic(msg, null, @returnAddress());
 }
 
 /// This function is the same as `std.debug.panicExtra` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
-pub inline fn panicFmt(comptime format: []const u8, args: anytype) noreturn {
+pub fn panicFmt(comptime format: []const u8, args: anytype) noreturn {
     @setCold(true);
     std.debug.panicExtra(null, @returnAddress(), format, args);
 }
