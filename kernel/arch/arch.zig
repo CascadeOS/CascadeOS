@@ -63,6 +63,21 @@ pub const interrupts = struct {
     pub inline fn disableInterruptsAndHalt() noreturn {
         current.interrupts.disableInterruptsAndHalt();
     }
+
+    /// Disable interrupts.
+    pub inline fn disableInterrupts() void {
+        current.interrupts.disableInterrupts();
+    }
+
+    /// Enable interrupts.
+    pub inline fn enableInterrupts() void {
+        current.interrupts.enableInterrupts();
+    }
+
+    /// Are interrupts enabled?
+    pub inline fn interruptsEnabled() bool {
+        return current.interrupts.interruptsEnabled();
+    }
 };
 
 pub const paging = struct {

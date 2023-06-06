@@ -429,6 +429,16 @@ pub const IdtVector = enum(u8) {
     }
 };
 
+/// Are interrupts enabled?
+pub inline fn interruptsEnabled() bool {
+    return x86_64.registers.RFlags.read().interrupt;
+}
+
+/// Enable interrupts.
+pub inline fn enableInterrupts() void {
+    asm volatile ("sti");
+}
+
 /// Disable interrupts.
 pub inline fn disableInterrupts() void {
     asm volatile ("cli");

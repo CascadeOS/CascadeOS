@@ -16,8 +16,24 @@ pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub fn disableInterruptsAndHalt() noreturn {
         while (true) {
-            asm volatile ("MSR DAIFSET, #0xF;");
+            asm volatile ("msr DAIFSet, #0b1111");
+            asm volatile ("wfe");
         }
+    }
+
+    /// Disable interrupts.
+    pub inline fn disableInterrupts() void {
+        asm volatile ("msr DAIFSet, #0b1111");
+    }
+
+    /// Disable interrupts.
+    pub inline fn enableInterrupts() void {
+        asm volatile ("msr DAIFClr, #0b1111;");
+    }
+
+    /// Are interrupts enabled?
+    pub inline fn interruptsEnabled() bool {
+        core.panic("UNIMPLEMENTED `interruptsEnabled`"); // TODO: how do you find out if interrupts are enabled?
     }
 };
 
