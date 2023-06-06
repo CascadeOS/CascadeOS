@@ -12,6 +12,8 @@ pub const pmm = @import("pmm.zig");
 pub const setup = @import("setup.zig");
 pub const vmm = @import("vmm.zig");
 
+pub const SpinLock = @import("SpinLock.zig");
+
 const addr = @import("addr.zig");
 pub const PhysAddr = addr.PhysAddr;
 pub const VirtAddr = addr.VirtAddr;
