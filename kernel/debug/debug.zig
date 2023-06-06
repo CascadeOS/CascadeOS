@@ -145,7 +145,32 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
 
             writer.writeByte('\n') catch unreachable;
 
-            // TODO: include source code in output https://github.com/CascadeOS/CascadeOS/issues/45
+            if (embedded_source_files.get(location.file_name)) |file_contents| embed_blk: {
+                writer.writeAll(comptime indent ** 2) catch unreachable;
+
+                const line = line: {
+                    var line_iter = std.mem.split(u8, file_contents, "\n");
+                    var i: u64 = 1;
+                    while (line_iter.next()) |line| {
+                        if (i == location.line) break :line line;
+                        i += 1;
+                    }
+                    // no matching line found
+                    writer.writeAll("no such line in file?\n") catch unreachable;
+                    break :embed_blk;
+                };
+
+                writer.writeAll(line) catch unreachable;
+
+                if (location.column) |column| {
+                    writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+                    writer.writeByteNTimes(' ', column - 1) catch unreachable;
+
+                    writer.writeAll("^\n") catch unreachable;
+                } else {
+                    writer.writeAll("\n\n") catch unreachable;
+                }
+            }
         } else {
             writer.writeAll(symbol.name) catch unreachable;
             writer.writeAll(" - ???\n") catch unreachable;
@@ -162,3 +187,17 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         writer.writeAll(" - ???\n") catch unreachable;
     }
 }
+
+const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_files: {
+    const embedded_source_files_import = @import("embedded_source_files");
+
+    var array: [embedded_source_files_import.file_paths.len]struct {
+        []const u8,
+        []const u8,
+    } = undefined;
+
+    inline for (embedded_source_files_import.file_paths, 0..) |name, i| {
+        array[i] = .{ name, @embedFile(name) };
+    }
+    break :embedded_source_files array[0..];
+});
