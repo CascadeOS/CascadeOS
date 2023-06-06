@@ -42,7 +42,7 @@ fn identityMaps() !void {
 
     log.debug("identity mapping the non-cached direct map", .{});
 
-    try kernel.vmm.mapRegion(
+    try mapRegion(
         kernel_root_page_table,
         kernel.info.non_cached_direct_map,
         physical_range,
@@ -89,7 +89,7 @@ fn mapSection(start: usize, end: usize, map_type: MapType) !void {
 
     const virtual_range = kernel.VirtRange.fromAddr(
         virt_addr,
-        core.Size.from(end - start, .byte),
+        core.Size.from(end - start, .byte).alignForward(paging.standard_page_size),
     );
     std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
