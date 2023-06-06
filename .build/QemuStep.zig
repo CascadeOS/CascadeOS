@@ -182,21 +182,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     // UEFI
     if (self.uefi) {
-        const code = try std.fmt.allocPrint(
-            b.allocator,
-            "if=pflash,format=raw,unit=0,file={s},readonly=on",
-            .{self.edk2_step.?.code_firmware.getPath()},
-        );
-        const vars = try std.fmt.allocPrint(
-            b.allocator,
-            "if=pflash,format=raw,unit=1,file={s}",
-            .{self.edk2_step.?.vars_firmware.getPath()},
-        );
-
-        run_qemu.addArgs(&[_][]const u8{ "-drive", code });
-        run_qemu.addArgs(&[_][]const u8{ "-drive", vars });
-
-        //run_qemu.addArgs(&[_][]const u8{ "-bios", uefi_firmware_path });
+        run_qemu.addArgs(&[_][]const u8{ "-bios", self.edk2_step.?.firmware.getPath() });
     }
 
     // This is a hack to stop zig's progress output interfering with qemu's output
