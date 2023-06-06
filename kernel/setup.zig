@@ -11,7 +11,7 @@ pub fn setup() void {
     kernel.arch.setup.setupEarlyOutput();
 
     // now that we have early output, we can switch to a simple panic handler
-    kernel.panic_implementation.switchTo(.simple);
+    kernel.debug.switchTo(.simple);
 
     // print starting message
     kernel.arch.setup.getEarlyOutputWriter().writeAll(

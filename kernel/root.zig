@@ -19,4 +19,4 @@ pub const std_options = struct {
     pub const logFn = @compileError("use `kernel.log` for logging in the kernel");
 };
 
-pub const panic = kernel.panic_implementation.panic;
+pub const panic = kernel.debug.panic;
