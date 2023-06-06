@@ -37,7 +37,18 @@ pub fn captureBootloaderInformation() void {
         // https://github.com/CascadeOS/CascadeOS/issues/36
         core.panic("bootloader did not respond with kernel address");
     }
+    if (kernel_file.response) |resp| {
+        kernel.info.kernel_file = resp.kernel_file.getContents();
+        log.debug("kernel file: {} - {}", .{
+            kernel.VirtAddr.fromPtr(resp.kernel_file.address),
+            core.Size.from(resp.kernel_file.size, .byte),
+        });
+    } else {
+        log.warn("bootloader did not provide kernel ELF file location", .{});
+    }
 }
+
+export var kernel_file: limine.KernelFile = .{};
 
 export var hhdm: limine.HHDM = .{};
 

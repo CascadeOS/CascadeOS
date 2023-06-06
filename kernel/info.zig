@@ -26,3 +26,6 @@ pub var direct_map = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.z
 /// This direct map provides an identity mapping between virtual and physical addresses.
 /// The page tables used disable caching for this range.
 pub var non_cached_direct_map = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.zero);
+
+/// This is the kernel's ELF file.
+pub var kernel_file: ?[]const u8 = null;
