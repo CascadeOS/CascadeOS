@@ -5,7 +5,7 @@ const core = @import("core");
 const x86_64 = @import("x86_64.zig");
 
 pub inline fn pause() void {
-    asm volatile ("pause");
+    asm volatile ("pause" ::: "memory");
 }
 
 pub inline fn portReadU8(port: u16) u8 {
