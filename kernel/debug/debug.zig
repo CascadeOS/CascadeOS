@@ -4,6 +4,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+const symbol_map = @import("symbol_map.zig");
+
 pub const PanicState = enum(u8) {
     no_op = 0,
     simple = 1,
@@ -31,6 +33,7 @@ pub fn panic(
 ) noreturn {
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
+    symbol_map.loadSymbols();
 
     switch (state) {
         .no_op => {},
@@ -108,15 +111,54 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    // TODO: Resolve symbols using DWARF or a symbol map https://github.com/CascadeOS/CascadeOS/issues/44
+    if (symbol_map.getSymbol(kernel_source_address)) |symbol| {
+        writer.writeAll(indent) catch unreachable;
 
-    writer.writeAll(comptime indent ++ "0x") catch unreachable;
-    std.fmt.formatInt(
-        kernel_source_address,
-        16,
-        .lower,
-        .{},
-        writer,
-    ) catch unreachable;
-    writer.writeAll(" - ???\n") catch unreachable;
+        if (symbol.location) |location| {
+            writer.writeAll(location.file_name) catch unreachable;
+            writer.writeByte(':') catch unreachable;
+            std.fmt.formatInt(
+                location.line,
+                10,
+                .lower,
+                .{},
+                writer,
+            ) catch unreachable;
+
+            if (location.column) |column| {
+                writer.writeByte(':') catch unreachable;
+                std.fmt.formatInt(
+                    column,
+                    10,
+                    .lower,
+                    .{},
+                    writer,
+                ) catch unreachable;
+            }
+
+            writer.writeAll(" in ") catch unreachable;
+            writer.writeAll(symbol.name) catch unreachable;
+
+            if (!location.is_line_expected_to_be_precise) {
+                writer.writeAll(" (symbols line information is inprecise)") catch unreachable;
+            }
+
+            writer.writeByte('\n') catch unreachable;
+
+            // TODO: include source code in output https://github.com/CascadeOS/CascadeOS/issues/45
+        } else {
+            writer.writeAll(symbol.name) catch unreachable;
+            writer.writeAll(" - ???\n") catch unreachable;
+        }
+    } else {
+        writer.writeAll(comptime indent ++ "0x") catch unreachable;
+        std.fmt.formatInt(
+            kernel_source_address,
+            16,
+            .lower,
+            .{},
+            writer,
+        ) catch unreachable;
+        writer.writeAll(" - ???\n") catch unreachable;
+    }
 }
