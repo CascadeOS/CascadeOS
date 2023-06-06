@@ -33,7 +33,7 @@ pub const interrupts = struct {
 
     /// Are interrupts enabled?
     pub inline fn interruptsEnabled() bool {
-        core.panic("UNIMPLEMENTED `interruptsEnabled`"); // TODO: how do you find out if interrupts are enabled?
+        core.panic("UNIMPLEMENTED `interruptsEnabled`"); // TODO: https://github.com/CascadeOS/CascadeOS/issues/46
     }
 };
 
