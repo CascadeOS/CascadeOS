@@ -28,10 +28,9 @@ pub fn loadSymbols() void {
 }
 
 pub fn getSymbol(address: usize) ?Symbol {
-    // `- 1` is needed in the case where the call to the next function in the stack trace is the very last instruction
-    // of the function (for example `@panic` as the very last statement of a function) in this case using the return
-    // address directly will actually point at the first instruction of the function immediately following the intended
-    // function
+    // We subtract one from the address to better handle the case when the address is the last instruction of the
+    // function (for example `@panic` as the very last statement of a function) as in that case the return
+    // address will actually point at the first instruction _after_ intended function
     const safer_address = address - 1;
 
     if (opt_dwarf_symbol_map) |*dwarf_symbol_map| {
