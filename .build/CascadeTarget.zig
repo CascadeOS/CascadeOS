@@ -80,12 +80,9 @@ pub const CascadeTarget = enum {
                     .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.generic },
                 };
 
-                // TODO: disabling these causes zig to seg fault https://github.com/CascadeOS/CascadeOS/issues/6
-                if (false) {
-                    // Remove neon and fp features
-                    target.cpu_features_sub.addFeature(@enumToInt(features.neon));
-                    target.cpu_features_sub.addFeature(@enumToInt(features.fp_armv8));
-                }
+                // Remove neon and fp features
+                target.cpu_features_sub.addFeature(@enumToInt(features.neon));
+                target.cpu_features_sub.addFeature(@enumToInt(features.fp_armv8));
 
                 return target;
             },
