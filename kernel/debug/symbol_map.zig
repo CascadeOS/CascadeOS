@@ -6,25 +6,19 @@ const kernel = @import("kernel");
 
 const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
 
-var symbol_map_spinlock: kernel.SpinLock = .{};
-var symbol_maps_loaded = false;
-
+var dwarf_symbol_map_spinlock: kernel.SpinLock = .{};
 var opt_dwarf_symbol_map: ?DwarfSymbolMap = null;
 
 pub fn loadSymbols() void {
-    if (symbol_maps_loaded) return;
-    const held = symbol_map_spinlock.lock();
-    defer held.unlock();
-    if (symbol_maps_loaded) return;
-
-    opt_dwarf_symbol_map = dwarf: {
-        if (kernel.info.kernel_file) |kernel_file| {
-            break :dwarf DwarfSymbolMap.init(kernel_file.ptr) catch null;
+    if (opt_dwarf_symbol_map == null) {
+        const held = dwarf_symbol_map_spinlock.lock();
+        defer held.unlock();
+        if (opt_dwarf_symbol_map == null) {
+            if (kernel.info.kernel_file) |kernel_file| {
+                opt_dwarf_symbol_map = DwarfSymbolMap.init(kernel_file.ptr) catch null;
+            }
         }
-        break :dwarf null;
-    };
-
-    symbol_maps_loaded = true;
+    }
 }
 
 pub fn getSymbol(address: usize) ?Symbol {
