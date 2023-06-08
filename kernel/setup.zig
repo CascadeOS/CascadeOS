@@ -13,6 +13,10 @@ pub fn setup() void {
     // now that we have early output, we can switch to a simple panic handler
     kernel.debug.switchTo(.simple);
 
+    // as we need the kernel elf file to output symbols and source locations, we acquire it early
+    kernel.info.kernel_file = kernel.boot.kernelFile() orelse
+        core.panic("bootloader did not provide the kernel file");
+
     // print starting message
     kernel.arch.setup.getEarlyOutputWriter().writeAll(
         comptime "starting CascadeOS " ++ kernel.info.version ++ "\n",
@@ -22,7 +26,7 @@ pub fn setup() void {
     kernel.arch.setup.earlyArchInitialization();
 
     log.info("capturing bootloader information", .{});
-    kernel.boot.captureBootloaderInformation();
+    captureBootloaderInformation();
 
     log.info("capturing system information", .{});
     kernel.arch.setup.captureSystemInformation();
@@ -37,4 +41,82 @@ pub fn setup() void {
     kernel.vmm.init();
 
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
+}
+
+fn captureBootloaderInformation() void {
+    calculateDirectMaps();
+    calculateKernelVirtualAndPhysicalOffsets();
+
+    // the kernel file was captured earlier in the setup process, now we can debug log what was captured
+    log.debug("kernel file: {} - {}", .{
+        kernel.VirtAddr.fromPtr(kernel.info.kernel_file.ptr),
+        core.Size.from(kernel.info.kernel_file.len, .byte),
+    });
+}
+
+fn calculateDirectMaps() void {
+    const direct_map_address = kernel.boot.directMapAddress() orelse
+        core.panic("bootloader did not provide the start of the direct map");
+
+    const direct_map = kernel.VirtAddr.fromInt(direct_map_address);
+
+    if (!direct_map.isAligned(kernel.arch.paging.standard_page_size)) {
+        core.panic("direct map is not aligned to the standard page size");
+    }
+
+    const size_of_direct_map = calculateLengthOfDirectMap();
+
+    const direct_map_range = kernel.VirtRange.fromAddr(direct_map, size_of_direct_map);
+
+    // Ensure that the non-cached direct map does not go below the higher half
+    var non_cached_direct_map_range = direct_map_range;
+    non_cached_direct_map_range.moveBackwardInPlace(size_of_direct_map);
+    if (non_cached_direct_map_range.addr.lessThan(kernel.arch.paging.higher_half)) {
+        non_cached_direct_map_range = direct_map_range.moveForward(size_of_direct_map);
+    }
+
+    kernel.info.direct_map = direct_map_range;
+    log.debug("direct map: {}", .{direct_map});
+
+    kernel.info.non_cached_direct_map = non_cached_direct_map_range;
+    log.debug("non-cached direct map: {}", .{non_cached_direct_map_range});
+}
+
+fn calculateLengthOfDirectMap() core.Size {
+    var reverse_memmap_iterator = kernel.boot.memoryMapIterator(.backwards);
+
+    while (reverse_memmap_iterator.next()) |entry| {
+        const estimated_size = core.Size.from(entry.range.end().value, .byte);
+
+        log.debug("estimated size of direct map: {}", .{estimated_size});
+
+        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+        var aligned_size = estimated_size.alignForward(kernel.arch.paging.largest_page_size);
+
+        // We ensure that the lowest 4GiB are always mapped.
+        const @"4gib" = core.Size.from(4, .gib);
+        if (aligned_size.lessThan(@"4gib")) aligned_size = @"4gib";
+
+        log.debug("aligned size of direct map: {}", .{aligned_size});
+
+        return aligned_size;
+    }
+
+    core.panic("no non-reserved or usable memory regions?");
+}
+
+fn calculateKernelVirtualAndPhysicalOffsets() void {
+    const kernel_address = kernel.boot.kernelAddress() orelse
+        core.panic("bootloader did not provide the kernel address");
+    // TODO: Can we calculate the kernel offsets from the the bootloaders page table?
+    // https://github.com/CascadeOS/CascadeOS/issues/36
+
+    const kernel_virtual = kernel_address.virtual;
+    const kernel_physical = kernel_address.physical;
+    kernel.info.kernel_offset_from_base = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
+    kernel.info.kernel_offset_from_physical = core.Size.from(kernel_virtual - kernel_physical, .byte);
+    log.debug("kernel virtual: 0x{x:0>16}", .{kernel_virtual});
+    log.debug("kernel physical: 0x{x:0>16}", .{kernel_physical});
+    log.debug("kernel offset from base: 0x{x}", .{kernel.info.kernel_offset_from_base.bytes});
+    log.debug("kernel offset from physical: 0x{x}", .{kernel.info.kernel_offset_from_physical.bytes});
 }

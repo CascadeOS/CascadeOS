@@ -16,17 +16,29 @@ pub const kernel_base_address = kernel.VirtAddr.fromInt(0xffffffff80000000);
 
 /// This is the offset from `kernel_base_address` that the kernel has been loaded at.
 /// This would always be zero if not for kaslr.
-pub var kernel_offset_from_base: core.Size = core.Size.zero;
+///
+/// Initialized during `setup`.
+pub var kernel_offset_from_base: core.Size = undefined;
 
 /// This is the offset from the physical address of the kernel to the virtual address of the kernel.
-pub var kernel_offset_from_physical: core.Size = core.Size.zero;
+///
+/// Initialized during `setup`.
+pub var kernel_offset_from_physical: core.Size = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
-pub var direct_map = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.zero);
+///
+/// Initialized during `setup`.
+pub var direct_map: kernel.VirtRange = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
 /// The page tables used disable caching for this range.
-pub var non_cached_direct_map = kernel.VirtRange.fromAddr(kernel.VirtAddr.zero, core.Size.zero);
+///
+/// Initialized during `setup`.
+pub var non_cached_direct_map: kernel.VirtRange = undefined;
 
 /// This is the kernel's ELF file.
-pub var kernel_file: ?[]const u8 = null;
+///
+/// Initialized during `setup`.
+pub var kernel_file: []const u8 = undefined;
+
+const log = kernel.log.scoped(.info);

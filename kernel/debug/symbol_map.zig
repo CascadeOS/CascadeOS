@@ -14,9 +14,7 @@ pub fn loadSymbols() void {
         const held = dwarf_symbol_map_spinlock.lock();
         defer held.unlock();
         if (opt_dwarf_symbol_map == null) {
-            if (kernel.info.kernel_file) |kernel_file| {
-                opt_dwarf_symbol_map = DwarfSymbolMap.init(kernel_file.ptr) catch null;
-            }
+            opt_dwarf_symbol_map = DwarfSymbolMap.init(kernel.info.kernel_file.ptr) catch null;
         }
     }
 }
