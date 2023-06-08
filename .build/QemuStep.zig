@@ -126,7 +126,13 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     // interrupt details
     if (self.options.interrupt_details) {
-        run_qemu.addArgs(&[_][]const u8{ "-d", "int" });
+        if (self.target == .x86_64) {
+            // The "-M smm=off" below disables the SMM generated spam that happens before the kernel starts.
+            run_qemu.addArgs(&[_][]const u8{ "-d", "int", "-M", "smm=off" });
+        } else {
+            // TODO: Is there some way to disable the pre-kernel interrupt spam for other archs? https://github.com/CascadeOS/CascadeOS/issues/50
+            run_qemu.addArgs(&[_][]const u8{ "-d", "int" });
+        }
     }
 
     // qemu monitor
