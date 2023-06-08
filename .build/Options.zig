@@ -54,14 +54,14 @@ kernel_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module
 pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []const CascadeTarget) !Options {
     const qemu_monitor = b.option(
         bool,
-        "qemu_monitor",
+        "monitor",
         "Enable qemu monitor",
     ) orelse false;
 
     const qemu_debug = b.option(
         bool,
         "debug",
-        "Enable qemu remote debug (also disables kaslr)",
+        "Enable qemu remote debug",
     ) orelse false;
 
     const no_display = b.option(
@@ -72,14 +72,14 @@ pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []c
 
     const interrupt_details = b.option(
         bool,
-        "interrupt",
-        "Show detailed qemu interrupt details (disables kvm)",
+        "interrupts",
+        "Show detailed qemu interrupt details (disables acceleration)",
     ) orelse false;
 
     const uefi = b.option(
         bool,
         "uefi",
-        "Force qemu to run in UEFI mode if the architecture supports it",
+        "Force qemu to run in UEFI mode",
     ) orelse false;
 
     const smp = b.option(
