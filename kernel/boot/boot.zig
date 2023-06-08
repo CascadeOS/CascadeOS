@@ -18,12 +18,12 @@ export fn _start() callconv(.Naked) noreturn {
 const log = kernel.log.scoped(.boot);
 
 pub fn captureBootloaderInformation() void {
-    if (hhdm.response) |resp| {
+    if (limine_requests.hhdm.response) |resp| {
         captureHHDM(resp.offset);
     } else {
         core.panic("bootloader did not provide the start of the HHDM");
     }
-    if (kernel_address.response) |resp| {
+    if (limine_requests.kernel_address.response) |resp| {
         const kernel_virtual = resp.virtual_base;
         const kernel_physical = resp.physical_base;
         kernel.info.kernel_offset_from_base = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
@@ -37,7 +37,7 @@ pub fn captureBootloaderInformation() void {
         // https://github.com/CascadeOS/CascadeOS/issues/36
         core.panic("bootloader did not respond with kernel address");
     }
-    if (kernel_file.response) |resp| {
+    if (limine_requests.kernel_file.response) |resp| {
         kernel.info.kernel_file = resp.kernel_file.getContents();
         log.debug("kernel file: {} - {}", .{
             kernel.VirtAddr.fromPtr(resp.kernel_file.address),
@@ -48,9 +48,12 @@ pub fn captureBootloaderInformation() void {
     }
 }
 
-export var kernel_file: limine.KernelFile = .{};
-
-export var hhdm: limine.HHDM = .{};
+const limine_requests = struct {
+    export var kernel_file: limine.KernelFile = .{};
+    export var hhdm: limine.HHDM = .{};
+    export var kernel_address: limine.KernelAddress = .{};
+    export var memmap: limine.Memmap = .{};
+};
 
 fn captureHHDM(hhdm_offset: u64) void {
     const hhdm_start = kernel.VirtAddr.fromInt(hhdm_offset);
@@ -100,12 +103,8 @@ fn calculateLengthOfDirectMap() core.Size {
     core.panic("no non-reserved or usable memory regions?");
 }
 
-export var kernel_address: limine.KernelAddress = .{};
-
-export var memmap: limine.Memmap = .{};
-
 pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {
-    const memmap_response = memmap.response orelse core.panic("no memory map from the bootloader");
+    const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
     return .{
         .limine = .{
             .index = switch (direction) {
