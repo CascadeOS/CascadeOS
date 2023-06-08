@@ -86,6 +86,8 @@ fn calculateLengthOfDirectMap() core.Size {
     var reverse_memmap_iterator = kernel.boot.memoryMapIterator(.backwards);
 
     while (reverse_memmap_iterator.next()) |entry| {
+        if (entry.type == .reserved_or_unusable) continue;
+
         const estimated_size = core.Size.from(entry.range.end().value, .byte);
 
         log.debug("estimated size of direct map: {}", .{estimated_size});
