@@ -95,6 +95,9 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     // no reboot
     run_qemu.addArg("-no-reboot");
 
+    // no shutdown
+    run_qemu.addArg("-no-shutdown");
+
     // RAM
     run_qemu.addArgs(&.{
         "-m",
