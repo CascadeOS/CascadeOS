@@ -50,11 +50,14 @@ fn simplePanic(
     stack_trace: ?*const std.builtin.StackTrace,
     ret_addr: ?usize,
 ) void {
-    _ = stack_trace;
-
     const writer = kernel.arch.setup.getEarlyOutputWriter();
 
-    writer.print("\nPANIC: {s}\n", .{msg}) catch unreachable;
+    writer.print("\nPANIC: {s}\n\n", .{msg}) catch unreachable;
+
+    // error return trace
+    if (stack_trace) |trace| {
+        dumpStackTrace(writer, trace);
+    }
 
     printCurrentBackTrace(writer, ret_addr orelse @returnAddress());
 }
@@ -67,6 +70,22 @@ fn panicImpl(
 ) void {
     // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
     simplePanic(msg, stack_trace, ret_addr);
+}
+
+fn dumpStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) void {
+    var frame_index: usize = 0;
+    var frames_left: usize = std.math.min(stack_trace.index, stack_trace.instruction_addresses.len);
+
+    var opt_first_addr: ?usize = null;
+    while (frames_left != 0) : ({
+        frames_left -= 1;
+        frame_index = (frame_index + 1) % stack_trace.instruction_addresses.len;
+    }) {
+        const return_address = stack_trace.instruction_addresses[frame_index];
+        if (opt_first_addr == null) opt_first_addr = return_address;
+
+        printSourceAtAddress(writer, return_address);
+    }
 }
 
 fn printCurrentBackTrace(writer: anytype, return_address: usize) void {
