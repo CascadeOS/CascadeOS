@@ -36,8 +36,8 @@ SECTIONS
         *(.data .data.*)
     } :data
 
-    .dynamic ALIGN(4K) : {
-        *(.dynamic)
+    .dynamic : {
+        *(.dynamic .dynamic.*)
     } :data :dynamic
 
     .bss : {
