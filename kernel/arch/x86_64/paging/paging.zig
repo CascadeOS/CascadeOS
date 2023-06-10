@@ -44,10 +44,14 @@ pub fn mapRegion(
     physical_range: kernel.PhysRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
+    log.debug("mapRegion - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+
     var current_virtual = virtual_range.addr;
     const virtual_end = virtual_range.end();
     var current_physical = physical_range.addr;
     var size_left = virtual_range.size;
+
+    var kib_mappings: usize = 0;
 
     while (current_virtual.lessThan(virtual_end)) {
         mapTo4KiB(
@@ -60,10 +64,14 @@ pub fn mapRegion(
             return err;
         };
 
+        kib_mappings += 1;
+
         current_virtual.moveForwardInPlace(small_page_size);
         current_physical.moveForwardInPlace(small_page_size);
         size_left.subtractInPlace(small_page_size);
     }
+
+    log.debug("mapRegion - satified using {} 4KiB pages", .{kib_mappings});
 }
 
 pub fn mapRegionUseAllPageSizes(
@@ -72,10 +80,16 @@ pub fn mapRegionUseAllPageSizes(
     physical_range: kernel.PhysRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
+    log.debug("mapRegionUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+
     var current_virtual = virtual_range.addr;
     const virtual_end = virtual_range.end();
     var current_physical = physical_range.addr;
     var size_left = virtual_range.size;
+
+    var gib_mappings: usize = 0;
+    var mib_mappings: usize = 0;
+    var kib_mappings: usize = 0;
 
     while (current_virtual.lessThan(virtual_end)) {
         if (x86_64.info.gib_pages and
@@ -92,6 +106,8 @@ pub fn mapRegionUseAllPageSizes(
                 log.err("failed to map {} to {} 1GiB", .{ current_virtual, current_physical });
                 return err;
             };
+
+            gib_mappings += 1;
 
             current_virtual.moveForwardInPlace(large_page_size);
             current_physical.moveForwardInPlace(large_page_size);
@@ -113,6 +129,8 @@ pub fn mapRegionUseAllPageSizes(
                 return err;
             };
 
+            mib_mappings += 1;
+
             current_virtual.moveForwardInPlace(medium_page_size);
             current_physical.moveForwardInPlace(medium_page_size);
             size_left.subtractInPlace(medium_page_size);
@@ -129,13 +147,20 @@ pub fn mapRegionUseAllPageSizes(
             return err;
         };
 
+        kib_mappings += 1;
+
         current_virtual.moveForwardInPlace(small_page_size);
         current_physical.moveForwardInPlace(small_page_size);
         size_left.subtractInPlace(small_page_size);
     }
+
+    log.debug(
+        "mapRegionUseAllPageSizes - satified using {} 1GiB pages, {} 2MiB pages, {} 4KiB pages",
+        .{ gib_mappings, mib_mappings, kib_mappings },
+    );
 }
 
-pub fn mapTo4KiB(
+fn mapTo4KiB(
     level4_table: *PageTable,
     virtual_addr: kernel.VirtAddr,
     physical_addr: kernel.PhysAddr,
@@ -166,7 +191,7 @@ pub fn mapTo4KiB(
     applyMapType(map_type, entry);
 }
 
-pub fn mapTo2MiB(
+fn mapTo2MiB(
     level4_table: *PageTable,
     virtual_addr: kernel.VirtAddr,
     physical_addr: kernel.PhysAddr,
@@ -194,7 +219,7 @@ pub fn mapTo2MiB(
     applyMapType(map_type, entry);
 }
 
-pub fn mapTo1GiB(
+fn mapTo1GiB(
     level4_table: *PageTable,
     virtual_addr: kernel.VirtAddr,
     physical_addr: kernel.PhysAddr,
