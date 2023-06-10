@@ -38,6 +38,8 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
 
 const MapError = arch.paging.MapError;
 
+/// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+/// This function will only use the architecture's `standard_page_size`.
 pub fn mapRegion(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
@@ -74,6 +76,8 @@ pub fn mapRegion(
     log.debug("mapRegion - satified using {} 4KiB pages", .{kib_mappings});
 }
 
+/// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+/// This function is allowed to use all page sizes available to the architecture.
 pub fn mapRegionUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
