@@ -114,10 +114,11 @@ pub fn allocatePage() ?kernel.PhysRange {
     return null;
 }
 
-pub fn deallocatePage(addr: kernel.PhysAddr) void {
-    std.debug.assert(addr.isAligned(arch.paging.standard_page_size));
+pub fn deallocatePage(range: kernel.PhysRange) void {
+    std.debug.assert(range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(range.size.equal(arch.paging.standard_page_size));
 
-    const page_node = addr.toKernelVirtual().toPtr(*PhysPageNode);
+    const page_node = range.addr.toDirectMap().toPtr(*PhysPageNode);
     _ = page_node;
     core.panic("UNIMPLEMENTED `deallocatePage`"); // TODO: implement deallocatePage https://github.com/CascadeOS/CascadeOS/issues/21
 }
