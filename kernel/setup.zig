@@ -55,28 +55,45 @@ fn captureBootloaderInformation() void {
 }
 
 fn calculateDirectMaps() void {
-    const direct_map_address = kernel.boot.directMapAddress() orelse
-        core.panic("bootloader did not provide the start of the direct map");
-
-    const direct_map = kernel.VirtAddr.fromInt(direct_map_address);
-
-    if (!direct_map.isAligned(kernel.arch.paging.standard_page_size)) {
-        core.panic("direct map is not aligned to the standard page size");
-    }
-
     const size_of_direct_map = calculateLengthOfDirectMap();
 
-    const direct_map_range = kernel.VirtRange.fromAddr(direct_map, size_of_direct_map);
+    const direct_map_range: kernel.VirtRange = blk: {
+        const direct_map_address = kernel.boot.directMapAddress() orelse
+            core.panic("bootloader did not provide the start of the direct map");
 
-    // Ensure that the non-cached direct map does not go below the higher half
-    var non_cached_direct_map_range = direct_map_range;
-    non_cached_direct_map_range.moveBackwardInPlace(size_of_direct_map);
-    if (non_cached_direct_map_range.addr.lessThan(kernel.arch.paging.higher_half)) {
-        non_cached_direct_map_range = direct_map_range.moveForward(size_of_direct_map);
-    }
+        const direct_map = kernel.VirtAddr.fromInt(direct_map_address);
+
+        if (!direct_map.isAligned(kernel.arch.paging.standard_page_size)) {
+            core.panic("direct map is not aligned to the standard page size");
+        }
+
+        break :blk kernel.VirtRange.fromAddr(direct_map, size_of_direct_map);
+    };
+
+    const non_cached_direct_map_range = blk: {
+        // try to place the non-cached direct map directly _before_ the direct map
+        {
+            const range = direct_map_range.moveBackward(size_of_direct_map);
+            // check that we have not gone below the higher half
+            if (range.addr.greaterThanOrEqual(kernel.arch.paging.higher_half)) {
+                break :blk range;
+            }
+        }
+
+        // try to place the non-cached direct map directly _after_ the direct map
+        {
+            const range = direct_map_range.moveForward(size_of_direct_map);
+            // check that we are not overlapping with the kernel
+            if (!range.contains(kernel.info.kernel_virtual_address)) {
+                break :blk range;
+            }
+        }
+
+        core.panic("failed to find region for non-cached direct map");
+    };
 
     kernel.info.direct_map = direct_map_range;
-    log.debug("direct map: {}", .{direct_map});
+    log.debug("direct map: {}", .{direct_map_range});
 
     kernel.info.non_cached_direct_map = non_cached_direct_map_range;
     log.debug("non-cached direct map: {}", .{non_cached_direct_map_range});
