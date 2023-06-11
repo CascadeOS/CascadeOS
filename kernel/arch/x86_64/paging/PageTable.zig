@@ -55,6 +55,17 @@ pub const PageTable = extern struct {
         return @truncate(u9, addr.value >> level_4_shift);
     }
 
+    pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) kernel.VirtAddr {
+        return kernel.VirtAddr.fromInt(
+            signExtendAddress(
+                @as(u64, level_4_index) << level_4_shift |
+                    @as(u64, level_3_index) << level_3_shift |
+                    @as(u64, level_2_index) << level_2_shift |
+                    @as(u64, level_1_index) << level_1_shift,
+            ),
+        );
+    }
+
     pub fn printPageTable(
         self: *const PageTable,
         writer: anytype,
