@@ -43,13 +43,13 @@ const MapError = arch.paging.MapError;
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
 /// This function will only use the architecture's `standard_page_size`.
-pub fn mapRegion(
+pub fn mapRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    log.debug("mapRegion - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+    log.debug("mapRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
     var current_virtual = virtual_range.addr;
     const virtual_end = virtual_range.end();
@@ -76,18 +76,18 @@ pub fn mapRegion(
         size_left.subtractInPlace(small_page_size);
     }
 
-    log.debug("mapRegion - satified using {} 4KiB pages", .{kib_mappings});
+    log.debug("mapRange - satified using {} 4KiB pages", .{kib_mappings});
 }
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
 /// This function is allowed to use all page sizes available to the architecture.
-pub fn mapRegionUseAllPageSizes(
+pub fn mapRangeUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    log.debug("mapRegionUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+    log.debug("mapRangeUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
     var current_virtual = virtual_range.addr;
     const virtual_end = virtual_range.end();
@@ -162,7 +162,7 @@ pub fn mapRegionUseAllPageSizes(
     }
 
     log.debug(
-        "mapRegionUseAllPageSizes - satified using {} 1GiB pages, {} 2MiB pages, {} 4KiB pages",
+        "mapRangeUseAllPageSizes - satified using {} 1GiB pages, {} 2MiB pages, {} 4KiB pages",
         .{ gib_mappings, mib_mappings, kib_mappings },
     );
 }

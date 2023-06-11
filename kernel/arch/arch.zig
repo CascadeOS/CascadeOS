@@ -103,24 +103,24 @@ pub const paging = struct {
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     /// This function will only use the architecture's `standard_page_size`.
-    pub inline fn mapRegion(
+    pub inline fn mapRange(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        return current.paging.mapRegion(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapRange(page_table, virtual_range, physical_range, map_type);
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     /// This function is allowed to use all page sizes available to the architecture.
-    pub inline fn mapRegionUseAllPageSizes(
+    pub inline fn mapRangeUseAllPageSizes(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        return current.paging.mapRegionUseAllPageSizes(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapRangeUseAllPageSizes(page_table, virtual_range, physical_range, map_type);
     }
 
     pub inline fn switchToPageTable(page_table: *const PageTable) void {

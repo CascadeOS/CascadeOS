@@ -75,7 +75,7 @@ pub const MapType = struct {
     }
 };
 
-pub fn mapRegion(
+pub fn mapRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
@@ -92,7 +92,7 @@ pub fn mapRegion(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return kernel.arch.paging.mapRegion(
+    return kernel.arch.paging.mapRange(
         page_table,
         virtual_range,
         physical_range,
@@ -100,7 +100,7 @@ pub fn mapRegion(
     );
 }
 
-pub fn mapRegionUseAllPageSizes(
+pub fn mapRangeUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
@@ -117,7 +117,7 @@ pub fn mapRegionUseAllPageSizes(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return kernel.arch.paging.mapRegionUseAllPageSizes(
+    return kernel.arch.paging.mapRangeUseAllPageSizes(
         page_table,
         virtual_range,
         physical_range,
@@ -130,7 +130,7 @@ fn identityMaps() !void {
 
     log.debug("identity mapping the direct map", .{});
 
-    try mapRegionUseAllPageSizes(
+    try mapRangeUseAllPageSizes(
         kernel_root_page_table,
         kernel.info.direct_map,
         physical_range,
@@ -139,7 +139,7 @@ fn identityMaps() !void {
 
     log.debug("identity mapping the non-cached direct map", .{});
 
-    try mapRegionUseAllPageSizes(
+    try mapRangeUseAllPageSizes(
         kernel_root_page_table,
         kernel.info.non_cached_direct_map,
         physical_range,
@@ -194,7 +194,7 @@ fn mapSection(start: usize, end: usize, map_type: MapType) !void {
 
     const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
 
-    try mapRegionUseAllPageSizes(
+    try mapRangeUseAllPageSizes(
         kernel_root_page_table,
         virtual_range,
         physical_range,

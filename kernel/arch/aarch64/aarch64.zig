@@ -68,7 +68,7 @@ pub const paging = struct {
 
     const MapError = arch.paging.MapError;
 
-    pub fn mapRegion(
+    pub fn mapRange(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
@@ -78,10 +78,10 @@ pub const paging = struct {
         _ = physical_range;
         _ = virtual_range;
         _ = page_table;
-        core.panic("UNIMPLEMENTED `mapRegion`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
+        core.panic("UNIMPLEMENTED `mapRange`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
-    pub fn mapRegionUseAllPageSizes(
+    pub fn mapRangeUseAllPageSizes(
         page_table: *PageTable,
         virtual_range: kernel.VirtRange,
         physical_range: kernel.PhysRange,
@@ -91,7 +91,7 @@ pub const paging = struct {
         _ = physical_range;
         _ = virtual_range;
         _ = page_table;
-        core.panic("UNIMPLEMENTED `mapRegionUseAllPageSizes`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
+        core.panic("UNIMPLEMENTED `mapRangeUseAllPageSizes`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
     pub fn switchToPageTable(page_table: *const PageTable) void {
