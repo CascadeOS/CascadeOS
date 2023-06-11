@@ -58,6 +58,7 @@ pub const PageTable = extern struct {
     pub fn printPageTable(
         self: *const PageTable,
         writer: anytype,
+        comptime print_detailed_level1: bool,
     ) !void {
         for (self.entries, 0..) |level4_entry, level4_i| {
             if (!level4_entry.present.read()) continue;
@@ -108,9 +109,17 @@ pub const PageTable = extern struct {
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
+                    // use only when `print_detailed_level1` is false
+                    var number_of_level1_present_entries: usize = 0;
+
                     const level1 = try level2_entry.getNextLevel();
                     for (level1.entries, 0..) |level1_entry, level1_i| {
                         if (!level1_entry.present.read()) continue;
+
+                        if (!print_detailed_level1) {
+                            number_of_level1_present_entries += 1;
+                            continue;
+                        }
 
                         std.debug.assert(!level1_entry.huge.read());
 
@@ -121,6 +130,10 @@ pub const PageTable = extern struct {
                         try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ virtual, physical, level1_i });
                         try level1_entry.printSmallEntryFlags(writer);
                         try writer.writeByte('\n');
+                    }
+
+                    if (!print_detailed_level1) {
+                        try writer.print("      {} 4KIB mappings\n", .{number_of_level1_present_entries});
                     }
                 }
             }
