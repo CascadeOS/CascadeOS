@@ -16,6 +16,9 @@ pub fn init() void {
     log.debug("allocating kernel root page table", .{});
     kernel_root_page_table = paging.allocatePageTable() catch core.panic("unable to allocate physical page for root page table");
 
+    // the below functions setup the mappings in `kernel_root_page_table` and also register each region in
+    // the kernel memory layout
+
     identityMaps() catch |err| {
         core.panicFmt("failed to map identity maps: {s}", .{@errorName(err)});
     };
@@ -24,8 +27,23 @@ pub fn init() void {
         core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
     };
 
+    // now that the kernel memory layout is populated we sort it from lowest address to highest
+    std.mem.sort(MemoryRegion, kernel_memory_layout[0..kernel_memory_layout_count], {}, struct {
+        fn lessThanFn(context: void, self: MemoryRegion, other: MemoryRegion) bool {
+            _ = context;
+            return self.range.addr.lessThan(other.range.addr);
+        }
+    }.lessThanFn);
+
     log.debug("switching to kernel page table", .{});
     paging.switchToPageTable(kernel_root_page_table);
+
+    if (log.levelEnabled(.debug)) {
+        log.debug("kernel memory regions:", .{});
+        for (kernel_memory_layout[0..kernel_memory_layout_count]) |region| {
+            log.debug("\t{}", .{region});
+        }
+    }
 }
 
 pub const MapType = struct {
@@ -125,6 +143,51 @@ pub fn mapRangeUseAllPageSizes(
     );
 }
 
+pub const MemoryRegion = struct {
+    range: kernel.VirtRange,
+    type: Type,
+
+    pub const Type = enum {
+        kernel_writeable_section,
+        kernel_readonly_section,
+        kernel_executable_section,
+        direct_map,
+        non_cached_direct_map,
+        kernel_heap,
+    };
+
+    pub fn print(region: MemoryRegion, writer: anytype) !void {
+        try writer.writeAll("MemoryRegion{ 0x");
+        try std.fmt.formatInt(region.range.addr.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+        try writer.writeAll(" - 0x");
+        try std.fmt.formatInt(region.range.end().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+
+        try writer.writeAll(" ");
+        try writer.writeAll(@tagName(region.type));
+        try writer.writeAll(" }");
+    }
+
+    pub fn format(
+        region: MemoryRegion,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return print(region, writer);
+    }
+};
+
+// currently the kernel has exactly 6 memory regions: 3 elf sections, 2 direct maps and the heap
+var kernel_memory_layout: [6]MemoryRegion = undefined;
+var kernel_memory_layout_count: usize = 0;
+
+fn registerKernelMemoryRegion(region: MemoryRegion) void {
+    kernel_memory_layout[kernel_memory_layout_count] = region;
+    kernel_memory_layout_count += 1;
+}
+
 fn identityMaps() !void {
     const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
 
@@ -136,6 +199,7 @@ fn identityMaps() !void {
         physical_range,
         .{ .writeable = true, .global = true },
     );
+    registerKernelMemoryRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
 
     log.debug("identity mapping the non-cached direct map", .{});
 
@@ -145,6 +209,7 @@ fn identityMaps() !void {
         physical_range,
         .{ .writeable = true, .no_cache = true, .global = true },
     );
+    registerKernelMemoryRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
 }
 
 const linker_symbols = struct {
@@ -162,6 +227,7 @@ fn mapKernelSections() !void {
         @ptrToInt(&linker_symbols.__text_start),
         @ptrToInt(&linker_symbols.__text_end),
         .{ .executable = true, .global = true },
+        .kernel_executable_section,
     );
 
     log.debug("mapping .rodata section", .{});
@@ -169,6 +235,7 @@ fn mapKernelSections() !void {
         @ptrToInt(&linker_symbols.__rodata_start),
         @ptrToInt(&linker_symbols.__rodata_end),
         .{ .global = true },
+        .kernel_readonly_section,
     );
 
     log.debug("mapping .data section", .{});
@@ -176,10 +243,11 @@ fn mapKernelSections() !void {
         @ptrToInt(&linker_symbols.__data_start),
         @ptrToInt(&linker_symbols.__data_end),
         .{ .writeable = true, .global = true },
+        .kernel_writeable_section,
     );
 }
 
-fn mapSection(start: usize, end: usize, map_type: MapType) !void {
+fn mapSection(start: usize, end: usize, map_type: MapType, region_type: MemoryRegion.Type) !void {
     std.debug.assert(end > start);
 
     const virt_addr = kernel.VirtAddr.fromInt(start);
@@ -200,4 +268,6 @@ fn mapSection(start: usize, end: usize, map_type: MapType) !void {
         physical_range,
         map_type,
     );
+
+    registerKernelMemoryRegion(.{ .range = virtual_range, .type = region_type });
 }
