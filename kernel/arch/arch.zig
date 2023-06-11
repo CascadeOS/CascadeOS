@@ -82,7 +82,10 @@ pub const interrupts = struct {
 
 pub const paging = struct {
     pub const standard_page_size: core.Size = current.paging.standard_page_size;
-    pub const largest_page_size: core.Size = current.paging.largest_page_size;
+
+    pub inline fn largestPageSize() core.Size {
+        return current.paging.largestPageSize();
+    }
 
     pub const higher_half: kernel.VirtAddr = current.paging.higher_half;
 

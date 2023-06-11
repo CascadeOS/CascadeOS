@@ -44,7 +44,10 @@ pub const paging = struct {
     pub const large_page_size = core.Size.from(1, .gib);
 
     pub const standard_page_size = small_page_size;
-    pub const largest_page_size = large_page_size;
+
+    pub inline fn largestPageSize() core.Size {
+        return large_page_size;
+    }
 
     pub const page_sizes_available = [_]bool{
         true,

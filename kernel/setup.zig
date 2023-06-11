@@ -110,7 +110,7 @@ fn calculateLengthOfDirectMap() core.Size {
         log.debug("estimated size of direct map: {}", .{estimated_size});
 
         // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-        var aligned_size = estimated_size.alignForward(kernel.arch.paging.largest_page_size);
+        var aligned_size = estimated_size.alignForward(kernel.arch.paging.largestPageSize());
 
         // We ensure that the lowest 4GiB are always mapped.
         const @"4gib" = core.Size.from(4, .gib);

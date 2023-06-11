@@ -13,7 +13,10 @@ pub const medium_page_size = core.Size.from(2, .mib);
 pub const large_page_size = core.Size.from(1, .gib);
 
 pub const standard_page_size = small_page_size;
-pub const largest_page_size = large_page_size;
+
+pub inline fn largestPageSize() core.Size {
+    return large_page_size;
+}
 
 // TODO: This is incorrect for 5-level paging https://github.com/CascadeOS/CascadeOS/issues/34
 pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
