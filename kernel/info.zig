@@ -14,6 +14,12 @@ pub const root_path = kernel_options.root_path;
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = kernel.VirtAddr.fromInt(0xffffffff80000000);
 
+/// Initialized during `setup`.
+pub var kernel_virtual_address: kernel.VirtAddr = undefined;
+
+/// Initialized during `setup`.
+pub var kernel_physical_address: kernel.PhysAddr = undefined;
+
 /// This is the offset from `kernel_base_address` that the kernel has been loaded at.
 /// This would always be zero if not for kaslr.
 ///

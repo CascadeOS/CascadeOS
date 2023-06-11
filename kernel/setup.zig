@@ -115,10 +115,14 @@ fn calculateKernelVirtualAndPhysicalOffsets() void {
 
     const kernel_virtual = kernel_address.virtual;
     const kernel_physical = kernel_address.physical;
+
+    kernel.info.kernel_virtual_address = kernel.VirtAddr.fromInt(kernel_virtual);
+    kernel.info.kernel_physical_address = kernel.PhysAddr.fromInt(kernel_physical);
+    log.debug("kernel virtual: {}", .{kernel.info.kernel_virtual_address});
+    log.debug("kernel physical: {}", .{kernel.info.kernel_physical_address});
+
     kernel.info.kernel_offset_from_base = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
-    log.debug("kernel virtual: 0x{x:0>16}", .{kernel_virtual});
-    log.debug("kernel physical: 0x{x:0>16}", .{kernel_physical});
     kernel.info.kernel_virtual_offset_from_physical = core.Size.from(kernel_virtual - kernel_physical, .byte);
     log.debug("kernel offset from base: 0x{x}", .{kernel.info.kernel_offset_from_base.bytes});
-    log.debug("kernel offset from physical: 0x{x}", .{kernel.info.kernel_offset_from_physical.bytes});
+    log.debug("kernel offset from physical: 0x{x}", .{kernel.info.kernel_virtual_offset_from_physical.bytes});
 }
