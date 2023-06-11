@@ -28,83 +28,6 @@ pub fn init() void {
     paging.switchToPageTable(kernel_root_page_table);
 }
 
-fn identityMaps() !void {
-    const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
-
-    log.debug("identity mapping the direct map", .{});
-
-    try mapRegionUseAllPageSizes(
-        kernel_root_page_table,
-        kernel.info.direct_map,
-        physical_range,
-        .{ .writeable = true, .global = true },
-    );
-
-    log.debug("identity mapping the non-cached direct map", .{});
-
-    try mapRegionUseAllPageSizes(
-        kernel_root_page_table,
-        kernel.info.non_cached_direct_map,
-        physical_range,
-        .{ .writeable = true, .no_cache = true, .global = true },
-    );
-}
-
-const linker_symbols = struct {
-    extern const __text_start: u8;
-    extern const __text_end: u8;
-    extern const __rodata_start: u8;
-    extern const __rodata_end: u8;
-    extern const __data_start: u8;
-    extern const __data_end: u8;
-};
-
-fn mapKernelSections() !void {
-    log.debug("mapping .text section", .{});
-    try mapSection(
-        @ptrToInt(&linker_symbols.__text_start),
-        @ptrToInt(&linker_symbols.__text_end),
-        .{ .executable = true, .global = true },
-    );
-
-    log.debug("mapping .rodata section", .{});
-    try mapSection(
-        @ptrToInt(&linker_symbols.__rodata_start),
-        @ptrToInt(&linker_symbols.__rodata_end),
-        .{ .global = true },
-    );
-
-    log.debug("mapping .data section", .{});
-    try mapSection(
-        @ptrToInt(&linker_symbols.__data_start),
-        @ptrToInt(&linker_symbols.__data_end),
-        .{ .writeable = true, .global = true },
-    );
-}
-
-fn mapSection(start: usize, end: usize, map_type: MapType) !void {
-    std.debug.assert(end > start);
-
-    const virt_addr = kernel.VirtAddr.fromInt(start);
-
-    const virtual_range = kernel.VirtRange.fromAddr(
-        virt_addr,
-        core.Size.from(end - start, .byte).alignForward(paging.standard_page_size),
-    );
-    std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
-
-    const phys_addr = kernel.PhysAddr.fromInt(virt_addr.value - kernel.info.kernel_virtual_offset_from_physical.bytes);
-
-    const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
-
-    try mapRegionUseAllPageSizes(
-        kernel_root_page_table,
-        virtual_range,
-        physical_range,
-        map_type,
-    );
-}
-
 pub const MapType = struct {
     user: bool = false,
     global: bool = false,
@@ -196,6 +119,83 @@ pub fn mapRegionUseAllPageSizes(
 
     return kernel.arch.paging.mapRegionUseAllPageSizes(
         page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+    );
+}
+
+fn identityMaps() !void {
+    const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
+
+    log.debug("identity mapping the direct map", .{});
+
+    try mapRegionUseAllPageSizes(
+        kernel_root_page_table,
+        kernel.info.direct_map,
+        physical_range,
+        .{ .writeable = true, .global = true },
+    );
+
+    log.debug("identity mapping the non-cached direct map", .{});
+
+    try mapRegionUseAllPageSizes(
+        kernel_root_page_table,
+        kernel.info.non_cached_direct_map,
+        physical_range,
+        .{ .writeable = true, .no_cache = true, .global = true },
+    );
+}
+
+const linker_symbols = struct {
+    extern const __text_start: u8;
+    extern const __text_end: u8;
+    extern const __rodata_start: u8;
+    extern const __rodata_end: u8;
+    extern const __data_start: u8;
+    extern const __data_end: u8;
+};
+
+fn mapKernelSections() !void {
+    log.debug("mapping .text section", .{});
+    try mapSection(
+        @ptrToInt(&linker_symbols.__text_start),
+        @ptrToInt(&linker_symbols.__text_end),
+        .{ .executable = true, .global = true },
+    );
+
+    log.debug("mapping .rodata section", .{});
+    try mapSection(
+        @ptrToInt(&linker_symbols.__rodata_start),
+        @ptrToInt(&linker_symbols.__rodata_end),
+        .{ .global = true },
+    );
+
+    log.debug("mapping .data section", .{});
+    try mapSection(
+        @ptrToInt(&linker_symbols.__data_start),
+        @ptrToInt(&linker_symbols.__data_end),
+        .{ .writeable = true, .global = true },
+    );
+}
+
+fn mapSection(start: usize, end: usize, map_type: MapType) !void {
+    std.debug.assert(end > start);
+
+    const virt_addr = kernel.VirtAddr.fromInt(start);
+
+    const virtual_range = kernel.VirtRange.fromAddr(
+        virt_addr,
+        core.Size.from(end - start, .byte).alignForward(paging.standard_page_size),
+    );
+    std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
+
+    const phys_addr = kernel.PhysAddr.fromInt(virt_addr.value - kernel.info.kernel_virtual_offset_from_physical.bytes);
+
+    const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
+
+    try mapRegionUseAllPageSizes(
+        kernel_root_page_table,
         virtual_range,
         physical_range,
         map_type,
