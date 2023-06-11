@@ -44,9 +44,9 @@ pub fn kernelAddress() ?KernelAddress {
     return null;
 }
 
-pub fn kernelFile() ?[]const u8 {
+pub fn kernelFile() ?kernel.VirtRange {
     if (limine_requests.kernel_file.response) |resp| {
-        return resp.kernel_file.getContents();
+        return kernel.VirtRange.fromSlice(resp.kernel_file.getContents());
     }
     return null;
 }

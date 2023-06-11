@@ -45,6 +45,6 @@ pub var non_cached_direct_map: kernel.VirtRange = undefined;
 /// This is the kernel's ELF file.
 ///
 /// Initialized during `setup`.
-pub var kernel_file: []const u8 = undefined;
+pub var kernel_file: kernel.VirtRange = undefined;
 
 const log = kernel.log.scoped(.info);

@@ -155,6 +155,24 @@ fn Range(comptime addr_type: Type) type {
             };
         }
 
+        pub fn fromSlice(slice: anytype) VirtRange {
+            if (addr_type == .phys) @compileError("`fromSlice` is only implemented for VirtRange");
+            const info: std.builtin.Type = @typeInfo(@TypeOf(slice));
+            if (info != .Pointer) @compileError("");
+            const pointer_info: std.builtin.Type.Pointer = info.Pointer;
+            if (pointer_info.size != .Slice) @compileError("");
+            return .{
+                .addr = AddrType.fromPtr(slice.ptr),
+                .size = core.Size.from(@sizeOf(pointer_info.child) * slice.len, .byte),
+            };
+        }
+
+        pub fn toSlice(self: VirtRange, comptime T: type) ![]T {
+            if (addr_type == .phys) @compileError("`toSlice` is only implemented for VirtRange");
+            const len = try std.math.divExact(usize, self.size.bytes, @sizeOf(T));
+            return self.addr.toPtr([*]T)[0..len];
+        }
+
         pub inline fn toDirectMap(self: PhysRange) VirtRange {
             return .{
                 .addr = self.addr.toDirectMap(),
