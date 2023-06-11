@@ -44,8 +44,8 @@ pub fn setup() void {
 }
 
 fn captureBootloaderInformation() void {
-    calculateDirectMaps();
     calculateKernelVirtualAndPhysicalOffsets();
+    calculateDirectMaps();
 
     // the kernel file was captured earlier in the setup process, now we can debug log what was captured
     log.debug("kernel file: {} - {}", .{
