@@ -95,19 +95,9 @@ pub const Size = extern struct {
         return self.bytes == other.bytes;
     }
 
-    pub fn format(
-        size: Size,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
-        try writer.writeAll("Size{ ");
-
+    pub fn print(size: Size, writer: anytype) !void {
         if (size.bytes == 0) {
-            try writer.writeAll("0 bytes }");
+            try writer.writeAll("0 bytes");
             return;
         }
 
@@ -127,8 +117,17 @@ pub const Size = extern struct {
                 emitted_anything = true;
             }
         }
+    }
 
-        try writer.writeAll(" }");
+    pub fn format(
+        size: Size,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        return print(size, writer);
     }
 
     comptime {

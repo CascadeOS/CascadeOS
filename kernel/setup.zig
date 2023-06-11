@@ -48,9 +48,11 @@ fn captureBootloaderInformation() void {
     calculateDirectMaps();
 
     // the kernel file was captured earlier in the setup process, now we can debug log what was captured
-    log.debug("kernel file: {} - {}", .{
-        kernel.VirtAddr.fromPtr(kernel.info.kernel_file.ptr),
-        core.Size.from(kernel.info.kernel_file.len, .byte),
+    log.debug("kernel file: {}", .{
+        kernel.VirtRange.fromAddr(
+            kernel.VirtAddr.fromPtr(kernel.info.kernel_file.ptr),
+            core.Size.from(kernel.info.kernel_file.len, .byte),
+        ),
     });
 }
 

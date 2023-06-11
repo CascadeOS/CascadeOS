@@ -175,15 +175,10 @@ pub const InterruptFrame = extern struct {
         return self.cs == x86_64.Gdt.user_code_selector;
     }
 
-    pub fn format(
+    pub fn print(
         value: *const InterruptFrame,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
-        _ = options;
-
         const padding = "  ";
 
         try writer.writeAll("InterruptFrame{\n");
@@ -216,6 +211,17 @@ pub const InterruptFrame = extern struct {
         try writer.print(padding ++ "{},\n", .{value.rflags});
 
         try writer.writeAll("}");
+    }
+
+    pub fn format(
+        value: *const InterruptFrame,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        return print(value, writer);
     }
 };
 

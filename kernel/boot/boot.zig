@@ -86,6 +86,32 @@ pub const MemoryMapEntry = struct {
         reclaimable,
     };
 
+    const length_of_longest_tag = blk: {
+        var longest_so_far = 0;
+        inline for (std.meta.tags(Type)) |tag| {
+            const length = @tagName(tag).len;
+            if (length > longest_so_far) longest_so_far = length;
+        }
+        break :blk longest_so_far;
+    };
+
+    pub fn print(entry: MemoryMapEntry, writer: anytype) !void {
+        try writer.writeAll("MemoryMapEntry - ");
+
+        try std.fmt.formatBuf(
+            @tagName(entry.type),
+            .{
+                .alignment = .left,
+                .width = length_of_longest_tag,
+            },
+            writer,
+        );
+
+        try writer.writeAll(" - ");
+
+        try entry.range.print(writer);
+    }
+
     pub fn format(
         entry: MemoryMapEntry,
         comptime fmt: []const u8,
@@ -94,21 +120,7 @@ pub const MemoryMapEntry = struct {
     ) !void {
         _ = options;
         _ = fmt;
-
-        try writer.writeAll("MemoryMapEntry - ");
-
-        try std.fmt.formatBuf(
-            @tagName(entry.type),
-            .{
-                .alignment = .left,
-                .width = 20,
-            },
-            writer,
-        );
-
-        try writer.writeAll(" - ");
-
-        try entry.range.format("", .{}, writer);
+        return print(entry, writer);
     }
 };
 

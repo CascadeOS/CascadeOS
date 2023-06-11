@@ -102,15 +102,7 @@ fn Addr(comptime addr_type: Type) type {
             return self.value == other.value;
         }
 
-        pub fn format(
-            self: Self,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            _ = fmt;
-            _ = options;
-
+        pub fn print(self: Self, writer: anytype) !void {
             const name = switch (addr_type) {
                 .phys => "PhysAddr",
                 .virt => "VirtAddr",
@@ -119,6 +111,17 @@ fn Addr(comptime addr_type: Type) type {
             try writer.writeAll(comptime name ++ "{ 0x");
             try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
             try writer.writeAll(" }");
+        }
+
+        pub fn format(
+            self: Self,
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = fmt;
+            _ = options;
+            return print(self, writer);
         }
     };
 }
@@ -189,6 +192,23 @@ fn Range(comptime addr_type: Type) type {
             return addr.greaterThanOrEqual(self.addr) and addr.lessThan(self.end());
         }
 
+        pub fn print(value: Self, writer: anytype) !void {
+            const name = switch (addr_type) {
+                .phys => "PhysRange",
+                .virt => "VirtRange",
+            };
+
+            try writer.writeAll(comptime name ++ "{ 0x");
+            try std.fmt.formatInt(value.addr.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+
+            try writer.writeAll(" - 0x");
+            try std.fmt.formatInt(value.end().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+            try writer.writeAll(" - ");
+
+            try value.size.print(writer);
+            try writer.writeAll(" }");
+        }
+
         pub fn format(
             value: Self,
             comptime fmt: []const u8,
@@ -197,17 +217,7 @@ fn Range(comptime addr_type: Type) type {
         ) !void {
             _ = fmt;
             _ = options;
-
-            const name = switch (addr_type) {
-                .phys => "PhysRange",
-                .virt => "VirtRange",
-            };
-
-            try writer.writeAll(comptime name ++ "{ ");
-            try value.addr.format("", .{}, writer);
-            try writer.writeByte(' ');
-            try value.size.format("", .{}, writer);
-            try writer.writeAll(" }");
+            return print(value, writer);
         }
     };
 }
