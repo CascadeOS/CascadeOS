@@ -283,11 +283,17 @@ fn ensureNextTable(
 ) error{ AllocationFailed, Unexpected }!*PageTable {
     var created = false;
 
+    var physical_page: ?kernel.PhysRange = null;
+
     if (!self.present.read()) {
-        const physical_page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
-        self.setAddress4kib(physical_page.addr);
+        physical_page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
+        self.setAddress4kib(physical_page.?.addr);
         created = true;
     }
+    errdefer if (physical_page) |page| {
+        self.setAddress4kib(kernel.PhysAddr.zero);
+        kernel.pmm.deallocatePage(page);
+    };
 
     applyParentMapType(map_type, self);
 
