@@ -14,7 +14,9 @@ const Bitfield = bitjuggle.Bitfield;
 // TODO: Add support for 5-level paging https://github.com/CascadeOS/CascadeOS/issues/34
 
 pub const PageTable = extern struct {
-    entries: [512]Entry align(paging.small_page_size.bytes),
+    entries: [number_of_entries]Entry align(paging.small_page_size.bytes),
+
+    pub const number_of_entries = 512;
 
     pub fn zero(self: *PageTable) void {
         const bytes = std.mem.asBytes(self);
@@ -38,19 +40,19 @@ pub const PageTable = extern struct {
     }
 
     pub fn p1Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> 12);
+        return @truncate(u9, addr.value >> level_1_shift);
     }
 
     pub fn p2Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> 21);
+        return @truncate(u9, addr.value >> level_2_shift);
     }
 
     pub fn p3Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> 30);
+        return @truncate(u9, addr.value >> level_3_shift);
     }
 
     pub fn p4Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> 39);
+        return @truncate(u9, addr.value >> level_4_shift);
     }
 
     pub fn printPageTable(
@@ -62,7 +64,7 @@ pub const PageTable = extern struct {
 
             std.debug.assert(!level4_entry.huge.read());
 
-            const sign_extended_level4_part = signExtendAddress(level4_i << 39);
+            const sign_extended_level4_part = signExtendAddress(level4_i << level_4_shift);
 
             try writer.print("level 4 [{}] {}    Flags: ", .{ level4_i, kernel.VirtAddr.fromInt(sign_extended_level4_part) });
             try level4_entry.printDirectoryEntryFlags(writer);
@@ -72,7 +74,7 @@ pub const PageTable = extern struct {
             for (level3.entries, 0..) |level3_entry, level3_i| {
                 if (!level3_entry.present.read()) continue;
 
-                const level3_part = level3_i << 30;
+                const level3_part = level3_i << level_3_shift;
 
                 if (level3_entry.huge.read()) {
                     const virtual = kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part);
@@ -91,7 +93,7 @@ pub const PageTable = extern struct {
                 for (level2.entries, 0..) |level2_entry, level2_i| {
                     if (!level2_entry.present.read()) continue;
 
-                    const level2_part = level2_i << 21;
+                    const level2_part = level2_i << level_2_shift;
 
                     if (level2_entry.huge.read()) {
                         const virtual = kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part | level2_part);
@@ -112,7 +114,7 @@ pub const PageTable = extern struct {
 
                         std.debug.assert(!level1_entry.huge.read());
 
-                        const level1_part = level1_i << 12;
+                        const level1_part = level1_i << level_1_shift;
 
                         const virtual = kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
@@ -187,17 +189,17 @@ pub const PageTable = extern struct {
         /// The page aligned physical address
         ///
         /// Valid for: PML5, PML4, PDPTE, PDE, 4KiB
-        address_4kib_aligned: Bitfield(u64, offset_of_4kib_aligned_address, length_of_4kib_aligned_address),
-
-        /// The 1GiB aligned physical address
-        ///
-        /// Valid for: 1GiB
-        address_1gib_aligned: Bitfield(u64, offset_of_1gib_aligned_address, length_of_1gib_aligned_address),
+        address_4kib_aligned: Bitfield(u64, level_1_shift, length_of_4kib_aligned_address),
 
         /// The 2MiB aligned physical address
         ///
         /// Valid for: 2MiB
-        address_2mib_aligned: Bitfield(u64, offset_of_2mib_aligned_address, length_of_2mib_aligned_address),
+        address_2mib_aligned: Bitfield(u64, level_2_shift, length_of_2mib_aligned_address),
+
+        /// The 1GiB aligned physical address
+        ///
+        /// Valid for: 1GiB
+        address_1gib_aligned: Bitfield(u64, level_3_shift, length_of_1gib_aligned_address),
 
         /// Forbid code execution from the mapped physical pages.
         ///
@@ -210,38 +212,38 @@ pub const PageTable = extern struct {
 
         pub fn getAddress4kib(self: Entry) kernel.PhysAddr {
             return .{
-                .value = @as(usize, self.address_4kib_aligned.read()) << offset_of_4kib_aligned_address,
+                .value = @as(usize, self.address_4kib_aligned.read()) << level_1_shift,
             };
         }
 
         pub fn setAddress4kib(self: *Entry, addr: kernel.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.small_page_size));
             self.address_4kib_aligned.write(
-                @truncate(type_of_4kib, addr.value >> offset_of_4kib_aligned_address),
+                @truncate(type_of_4kib, addr.value >> level_1_shift),
             );
         }
 
         pub fn getAddress2mib(self: Entry) kernel.PhysAddr {
             return .{
-                .value = @as(usize, self.address_2mib_aligned.read()) << offset_of_2mib_aligned_address,
+                .value = @as(usize, self.address_2mib_aligned.read()) << level_2_shift,
             };
         }
 
         pub fn setAddress2mib(self: *Entry, addr: kernel.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.medium_page_size));
             self.address_2mib_aligned.write(
-                @truncate(type_of_2mib, addr.value >> offset_of_2mib_aligned_address),
+                @truncate(type_of_2mib, addr.value >> level_2_shift),
             );
         }
 
         pub fn getAddress1gib(self: Entry) kernel.PhysAddr {
-            return .{ .value = @as(usize, self.address_1gib_aligned.read()) << offset_of_1gib_aligned_address };
+            return .{ .value = @as(usize, self.address_1gib_aligned.read()) << level_3_shift };
         }
 
         pub fn setAddress1gib(self: *Entry, addr: kernel.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.large_page_size));
             self.address_1gib_aligned.write(
-                @truncate(type_of_1gib, addr.value >> offset_of_1gib_aligned_address),
+                @truncate(type_of_1gib, addr.value >> level_3_shift),
             );
         }
 
@@ -377,7 +379,7 @@ pub const PageTable = extern struct {
     };
 
     comptime {
-        std.debug.assert(@sizeOf(PageTable) == @sizeOf([512]Entry));
+        std.debug.assert(@sizeOf(PageTable) == @sizeOf([number_of_entries]Entry));
     }
 };
 
@@ -385,25 +387,26 @@ fn signExtendAddress(addr: u64) u64 {
     return @bitCast(u64, @bitCast(i64, addr << 16) >> 16);
 }
 
+const level_1_shift = 12;
+const level_2_shift = 21;
+const level_3_shift = 30;
+const level_4_shift = 39;
+
 const maximum_physical_address_bit = 39;
 
-const offset_of_4kib_aligned_address = 12;
-const offset_of_2mib_aligned_address = 21;
-const offset_of_1gib_aligned_address = 30;
-
-const length_of_4kib_aligned_address = maximum_physical_address_bit - offset_of_4kib_aligned_address;
-const length_of_2mib_aligned_address = maximum_physical_address_bit - offset_of_2mib_aligned_address;
-const length_of_1gib_aligned_address = maximum_physical_address_bit - offset_of_1gib_aligned_address;
+const length_of_4kib_aligned_address = maximum_physical_address_bit - level_1_shift;
+const length_of_2mib_aligned_address = maximum_physical_address_bit - level_2_shift;
+const length_of_1gib_aligned_address = maximum_physical_address_bit - level_3_shift;
 
 const type_of_4kib = std.meta.Int(
     .unsigned,
-    maximum_physical_address_bit - offset_of_4kib_aligned_address,
+    maximum_physical_address_bit - level_1_shift,
 );
 const type_of_2mib = std.meta.Int(
     .unsigned,
-    maximum_physical_address_bit - offset_of_2mib_aligned_address,
+    maximum_physical_address_bit - level_2_shift,
 );
 const type_of_1gib = std.meta.Int(
     .unsigned,
-    maximum_physical_address_bit - offset_of_1gib_aligned_address,
+    maximum_physical_address_bit - level_3_shift,
 );
