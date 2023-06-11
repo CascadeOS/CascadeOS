@@ -66,6 +66,16 @@ pub const paging = struct {
         }
     };
 
+    /// This function is only called once during system setup, it is required to:
+    ///   1. search the high half of the *top level* of the given page table for a free entry
+    ///   2. allocate a backing frame for it
+    ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
+    ///   4. return the `VirtRange` representing the entire virtual range that entry covers
+    pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtRange {
+        _ = page_table;
+        core.panic("UNIMPLEMENTED `getHeapRangeAndFillFirstLevel`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
+    }
+
     const MapError = arch.paging.MapError;
 
     pub fn mapRange(

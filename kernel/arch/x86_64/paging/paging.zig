@@ -12,9 +12,15 @@ pub const small_page_size = core.Size.from(4, .kib);
 pub const medium_page_size = core.Size.from(2, .mib);
 pub const large_page_size = core.Size.from(1, .gib);
 
+/// This is the total size of the virtual address space that one entry in the top level of the page table covers.
+/// This is only valid for 4-level paging.
+/// TODO: 5-level paging: https://github.com/CascadeOS/CascadeOS/issues/34
+const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
+
 pub const standard_page_size = small_page_size;
 
 pub inline fn largestPageSize() core.Size {
+    // TODO: 5-level paging: https://github.com/CascadeOS/CascadeOS/issues/34
     return large_page_size;
 }
 
@@ -37,6 +43,36 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
     x86_64.registers.Cr3.writeAddress(
         kernel.VirtAddr.fromPtr(page_table).unsafeToPhysicalFromDirectMap(),
     );
+}
+
+/// This function is only called once during system setup, it is required to:
+///   1. search the high half of the *top level* of the given page table for a free entry
+///   2. allocate a backing frame for it
+///   3. map the free entry to the fresh backing frame and ensure it is zeroed
+///   4. return the `VirtRange` representing the entire virtual range that entry covers
+pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtRange {
+    // TODO: 5-level paging: https://github.com/CascadeOS/CascadeOS/issues/34
+    var index: usize = PageTable.p4Index(higher_half);
+    while (index < PageTable.number_of_entries) : (index += 1) {
+        const entry = &page_table.entries[index];
+        if (entry._backing != 0) continue;
+
+        log.debug("found free top level entry for heap at index {}", .{index});
+
+        _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
+
+        return kernel.VirtRange.fromAddr(
+            PageTable.indexToAddr(
+                @truncate(u9, index),
+                0,
+                0,
+                0,
+            ),
+            size_of_top_level_entry,
+        );
+    }
+
+    core.panic("unable to find unused entry in top level of page table");
 }
 
 const MapError = arch.paging.MapError;
@@ -87,6 +123,8 @@ pub fn mapRangeUseAllPageSizes(
     physical_range: kernel.PhysRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
+    // TODO: 5-level paging: https://github.com/CascadeOS/CascadeOS/issues/34
+
     log.debug("mapRangeUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
     var current_virtual = virtual_range.addr;

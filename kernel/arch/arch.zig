@@ -95,6 +95,15 @@ pub const paging = struct {
         return current.paging.allocatePageTable();
     }
 
+    /// This function is only called once during system setup, it is required to:
+    ///   1. search the high half of the *top level* of the given page table for a free entry
+    ///   2. allocate a backing frame for it
+    ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
+    ///   4. return the `VirtRange` representing the entire virtual range that entry covers
+    pub inline fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtRange {
+        return current.paging.getHeapRangeAndFillFirstLevel(page_table);
+    }
+
     pub const MapError = error{
         AlreadyMapped,
         AllocationFailed,

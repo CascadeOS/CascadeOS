@@ -11,6 +11,7 @@ const PageTable = paging.PageTable;
 const log = kernel.log.scoped(.vmm);
 
 var kernel_root_page_table: *PageTable = undefined;
+var heap_range: kernel.VirtRange = undefined;
 
 pub fn init() void {
     log.debug("allocating kernel root page table", .{});
@@ -26,6 +27,13 @@ pub fn init() void {
     mapKernelSections() catch |err| {
         core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
     };
+
+    log.debug("preparing kernel heap", .{});
+    heap_range = kernel.arch.paging.getHeapRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
+        core.panicFmt("failed to find range for the kernel heap: {s}", .{@errorName(err)});
+    };
+    registerKernelMemoryRegion(.{ .range = heap_range, .type = .kernel_heap });
+    log.debug("kernel heap: {}", .{heap_range});
 
     // now that the kernel memory layout is populated we sort it from lowest address to highest
     std.mem.sort(MemoryRegion, kernel_memory_layout[0..kernel_memory_layout_count], {}, struct {
