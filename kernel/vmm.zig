@@ -33,7 +33,7 @@ fn identityMaps() !void {
 
     log.debug("identity mapping the direct map", .{});
 
-    try mapRegion(
+    try mapRegionUseAllPageSizes(
         kernel_root_page_table,
         kernel.info.direct_map,
         physical_range,
@@ -42,7 +42,7 @@ fn identityMaps() !void {
 
     log.debug("identity mapping the non-cached direct map", .{});
 
-    try mapRegion(
+    try mapRegionUseAllPageSizes(
         kernel_root_page_table,
         kernel.info.non_cached_direct_map,
         physical_range,
@@ -97,7 +97,7 @@ fn mapSection(start: usize, end: usize, map_type: MapType) !void {
 
     const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
 
-    try mapRegion(
+    try mapRegionUseAllPageSizes(
         kernel_root_page_table,
         virtual_range,
         physical_range,
@@ -153,6 +153,31 @@ pub const MapType = struct {
 };
 
 pub fn mapRegion(
+    page_table: *PageTable,
+    virtual_range: kernel.VirtRange,
+    physical_range: kernel.PhysRange,
+    map_type: MapType,
+) !void {
+    std.debug.assert(virtual_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.equal(virtual_range.size));
+
+    log.debug(
+        "mapping: {} to {} with type: {}",
+        .{ virtual_range, physical_range, map_type },
+    );
+
+    return kernel.arch.paging.mapRegion(
+        page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+    );
+}
+
+pub fn mapRegionUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
     physical_range: kernel.PhysRange,
