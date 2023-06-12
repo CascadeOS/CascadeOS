@@ -49,7 +49,8 @@ scopes_to_force_debug: []const u8,
 /// force the log level of every scope to be debug in the kernel
 force_debug_log: bool,
 
-kernel_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+kernel_option_module: *std.Build.Module,
+target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
 pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []const CascadeTarget) !Options {
     const qemu_monitor = b.option(
@@ -135,50 +136,58 @@ pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []c
         .memory = memory,
         .force_debug_log = force_debug_log,
         .scopes_to_force_debug = scopes_to_force_debug,
-        .kernel_option_modules = try buildKernelOptionModules(
+        .kernel_option_module = try buildKernelOptionModule(
             b,
             force_debug_log,
             scopes_to_force_debug,
             version,
-            all_targets,
         ),
+        .target_option_modules = try buildTargetOptionModules(b, all_targets),
     };
 }
 
-fn buildKernelOptionModules(
+fn buildTargetOptionModules(
+    b: *std.Build,
+    all_targets: []const CascadeTarget,
+) !std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) {
+    var target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+    errdefer target_option_modules.deinit(b.allocator);
+
+    try target_option_modules.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
+
+    for (all_targets) |target| {
+        const target_options = b.addOptions();
+
+        addTargetOptions(target_options, target);
+
+        target_option_modules.putAssumeCapacityNoClobber(target, target_options.createModule());
+    }
+
+    return target_option_modules;
+}
+
+fn buildKernelOptionModule(
     b: *std.Build,
     force_debug_log: bool,
     scopes_to_force_debug: []const u8,
     version: []const u8,
-    all_targets: []const CascadeTarget,
-) !std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) {
-    var kernel_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
-    errdefer kernel_option_modules.deinit(b.allocator);
-
-    try kernel_option_modules.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
-
+) !*std.Build.Module {
     const root_path = std.fmt.allocPrint(
         b.allocator,
         comptime "{s}" ++ std.fs.path.sep_str,
         .{b.build_root.path.?},
     ) catch unreachable;
 
-    for (all_targets) |target| {
-        const kernel_options = b.addOptions();
+    const kernel_options = b.addOptions();
 
-        kernel_options.addOption([]const u8, "version", version);
+    kernel_options.addOption([]const u8, "version", version);
 
-        kernel_options.addOption(bool, "force_debug_log", force_debug_log);
-        addStringLiteralSliceOption(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
+    kernel_options.addOption(bool, "force_debug_log", force_debug_log);
+    addStringLiteralSliceOption(kernel_options, "scopes_to_force_debug", scopes_to_force_debug);
 
-        kernel_options.addOption([]const u8, "root_path", root_path);
+    kernel_options.addOption([]const u8, "root_path", root_path);
 
-        addTargetOptions(kernel_options, target);
-
-        kernel_option_modules.putAssumeCapacityNoClobber(target, kernel_options.createModule());
-    }
-
-    return kernel_option_modules;
+    return kernel_options.createModule();
 }
 
 fn addStringLiteralSliceOption(options: *Step.Options, name: []const u8, buffer: []const u8) void {

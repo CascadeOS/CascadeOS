@@ -4,10 +4,11 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const builtin = @import("builtin");
+const target_options = @import("cascade_target");
 const kernel_options = @import("kernel_options");
 
 pub const mode: std.builtin.OptimizeMode = builtin.mode;
-pub const arch = kernel_options.arch;
+pub const arch = target_options.arch;
 pub const version = kernel_options.version;
 pub const root_path = kernel_options.root_path;
 

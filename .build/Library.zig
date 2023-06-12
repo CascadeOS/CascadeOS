@@ -7,6 +7,7 @@ const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const LibraryDescription = @import("LibraryDescription.zig");
+const Options = @import("Options.zig");
 const StepCollection = @import("StepCollection.zig");
 
 const Library = @This();
@@ -25,7 +26,7 @@ pub fn getRootFilePath(library: *const Library, b: *std.Build) []const u8 {
 pub fn getLibraries(
     b: *std.Build,
     step_collection: StepCollection,
-    optimize: std.builtin.OptimizeMode,
+    options: Options,
     all_targets: []const CascadeTarget,
 ) !Collection {
     const library_list: []const LibraryDescription = @import("../libraries/listing.zig").libraries;
@@ -46,7 +47,7 @@ pub fn getLibraries(
         while (i < unresolved_libraries.items.len) {
             const description: LibraryDescription = unresolved_libraries.items[i];
 
-            if (try resolveLibrary(b, description, libraries, step_collection, optimize, all_targets)) |library| {
+            if (try resolveLibrary(b, description, libraries, step_collection, options, all_targets)) |library| {
                 libraries.putAssumeCapacityNoClobber(description.name, library);
 
                 resolved_any_this_loop = true;
@@ -69,7 +70,7 @@ fn resolveLibrary(
     description: LibraryDescription,
     libraries: Collection,
     step_collection: StepCollection,
-    optimize: std.builtin.OptimizeMode,
+    options: Options,
     all_targets: []const CascadeTarget,
 ) !?*Library {
     const library_dependencies = blk: {
@@ -108,7 +109,7 @@ fn resolveLibrary(
         const test_exe = b.addTest(.{
             .name = description.name,
             .root_source_file = file_source,
-            .optimize = optimize,
+            .optimize = options.optimize,
             .target = target.getTestCrossTarget(),
         });
 
@@ -130,6 +131,10 @@ fn resolveLibrary(
         // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
         // test_exe.addModule(description.name, module);
         // try module.dependencies.put(description.name, module);
+
+        const target_option_module = options.target_option_modules.get(target).?;
+        test_exe.addModule("cascade_target", target_option_module);
+        try module.dependencies.put("cascade_target", target_option_module);
 
         for (library_dependencies) |library| {
             const library_module = library.modules.get(target) orelse continue;

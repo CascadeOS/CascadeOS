@@ -90,8 +90,11 @@ fn create(
         // self reference
         try kernel_module.dependencies.put("kernel", kernel_module);
 
+        // target options
+        try kernel_module.dependencies.put("cascade_target", options.target_option_modules.get(target).?);
+
         // kernel options
-        try kernel_module.dependencies.put("kernel_options", options.kernel_option_modules.get(target).?);
+        try kernel_module.dependencies.put("kernel_options", options.kernel_option_module);
 
         // dependencies
         const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;

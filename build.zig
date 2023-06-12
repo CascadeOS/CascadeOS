@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) !void {
 
     const options = try Options.get(b, cascade_version, all_targets);
 
-    const libraries = try Library.getLibraries(b, step_collection, options.optimize, all_targets);
+    const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
     const kernels = try Kernel.getKernels(b, libraries, step_collection, options, all_targets);
     const image_steps = try ImageStep.getImageSteps(b, kernels, step_collection, all_targets);
     _ = try QemuStep.getQemuSteps(b, image_steps, options, all_targets);
