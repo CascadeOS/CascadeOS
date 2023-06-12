@@ -123,10 +123,11 @@ esac
 umask 0022
 
 # creating initial filesystem structure
-for dir in boot tmp; do
+for dir in boot test tmp; do
     sudo mkdir -p "$IMAGE_ROOT/$dir" || die "couldn't create $dir directory"
 done
-sudo chmod 700 "$IMAGE_ROOT/boot" || die "couldn't set permission on boot directory"
+sudo chmod 500 "$IMAGE_ROOT/boot" || die "couldn't set permission on boot directory"
+sudo chmod 555 "$IMAGE_ROOT/test" || die "couldn't set permission on boot directory"
 sudo chmod 1777 "$IMAGE_ROOT/tmp" || die "couldn't set permission on tmp directory"
 
 # installing base system
@@ -139,4 +140,5 @@ sudo rsync -aH --inplace "$OUT_ROOT/" "$IMAGE_ROOT/" || die "couldn't copy stagi
 sudo chown -R 0:0 "$IMAGE_ROOT/" || die "couldn't set permission on image root"
 
 sudo chmod -R g+rX,o+rX "$IMAGE_ROOT/" || die "couldn't set permission on image root"
-sudo chmod -R 0400 "$IMAGE_ROOT/boot/" || die "couldn't recursively set 0400 permission on boot folder"
+sudo chmod -R 400 "$IMAGE_ROOT/boot/" || die "couldn't recursively set permissions on boot folder"
+sudo chmod -R 755 "$IMAGE_ROOT/test/" || die "couldn't recursively set permissions on test folder"

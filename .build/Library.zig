@@ -5,6 +5,7 @@ const Step = std.Build.Step;
 
 const helpers = @import("helpers.zig");
 
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const LibraryDescription = @import("LibraryDescription.zig");
 const StepCollection = @import("StepCollection.zig");
 
@@ -15,13 +16,18 @@ pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 name: []const u8,
 root_file: std.Build.FileSource,
 dependencies: []const *Library,
-module: *std.Build.Module,
+modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
 pub fn getRootFilePath(library: *const Library, b: *std.Build) []const u8 {
     return library.root_file.getPath(b);
 }
 
-pub fn getLibraries(b: *std.Build, step_collection: StepCollection, optimize: std.builtin.OptimizeMode) !Collection {
+pub fn getLibraries(
+    b: *std.Build,
+    step_collection: StepCollection,
+    optimize: std.builtin.OptimizeMode,
+    all_targets: []const CascadeTarget,
+) !Collection {
     const library_list: []const LibraryDescription = @import("../libraries/listing.zig").libraries;
 
     var libraries: Collection = .{};
@@ -40,7 +46,7 @@ pub fn getLibraries(b: *std.Build, step_collection: StepCollection, optimize: st
         while (i < unresolved_libraries.items.len) {
             const description: LibraryDescription = unresolved_libraries.items[i];
 
-            if (try resolveLibrary(b, description, libraries, step_collection, optimize)) |library| {
+            if (try resolveLibrary(b, description, libraries, step_collection, optimize, all_targets)) |library| {
                 libraries.putAssumeCapacityNoClobber(description.name, library);
 
                 resolved_any_this_loop = true;
@@ -64,6 +70,7 @@ fn resolveLibrary(
     libraries: Collection,
     step_collection: StepCollection,
     optimize: std.builtin.OptimizeMode,
+    all_targets: []const CascadeTarget,
 ) !?*Library {
     const library_dependencies = blk: {
         var library_dependencies = try std.ArrayList(*Library).initCapacity(b.allocator, description.dependencies.len);
@@ -90,88 +97,47 @@ fn resolveLibrary(
 
     const file_source: std.Build.FileSource = .{ .path = root_path };
 
-    const module = blk: {
+    const supported_targets = if (description.supported_targets) |supported_targets| supported_targets else all_targets;
+
+    var modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+    errdefer modules.deinit(b.allocator);
+
+    try modules.ensureTotalCapacity(b.allocator, @intCast(u32, supported_targets.len));
+
+    for (supported_targets) |target| {
+        const test_exe = b.addTest(.{
+            .name = description.name,
+            .root_source_file = file_source,
+            .optimize = optimize,
+            .target = target.getTestCrossTarget(),
+        });
+
+        test_exe.override_dest_dir = .{
+            .custom = b.pathJoin(&.{
+                @tagName(target),
+                "root",
+                "tests",
+            }),
+        };
+
+        const install_step = b.addInstallArtifact(test_exe);
+        step_collection.libraries_test_build_step_per_target.get(target).?.dependOn(&install_step.step);
+
         const module = b.createModule(.{
             .source_file = file_source,
         });
 
         // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
+        // test_exe.addModule(description.name, module);
         // try module.dependencies.put(description.name, module);
 
         for (library_dependencies) |library| {
-            try module.dependencies.put(library.name, library.module);
+            const library_module = library.modules.get(target) orelse continue;
+            test_exe.addModule(library.name, library_module);
+            try module.dependencies.put(library.name, library_module);
         }
 
-        break :blk module;
-    };
-
-    if (description.supported_architectures) |supported_architectures| {
-        for (supported_architectures) |arch| {
-            const test_exe = b.addTest(.{
-                .name = description.name,
-                .root_source_file = file_source,
-                .optimize = optimize,
-                .target = arch.getTestCrossTarget(),
-            });
-
-            // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
-            // test_exe.addModule(description.name, module);
-
-            for (library_dependencies) |library| {
-                test_exe.addModule(library.name, library.module);
-            }
-
-            const run_test_exe = b.addRunArtifact(test_exe);
-            run_test_exe.skip_foreign_checks = true;
-
-            const run_step_name = try std.fmt.allocPrint(
-                b.allocator,
-                "test_{s}_{s}",
-                .{ description.name, @tagName(arch) },
-            );
-            const run_step_description = try std.fmt.allocPrint(
-                b.allocator,
-                "Run the tests for {s}_{s}",
-                .{ description.name, @tagName(arch) },
-            );
-
-            const run_step = b.step(run_step_name, run_step_description);
-            run_step.dependOn(&run_test_exe.step);
-
-            step_collection.libraries_test_step.dependOn(run_step);
-        }
-    } else {
-        // Don't provide a target so that the tests are built for the host
-        const test_exe = b.addTest(.{
-            .name = description.name,
-            .root_source_file = file_source,
-            .optimize = optimize,
-        });
-
-        // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
-        // test_exe.addModule(description.name, module);
-
-        for (library_dependencies) |library| {
-            test_exe.addModule(library.name, library.module);
-        }
-
-        const run_test_exe = b.addRunArtifact(test_exe);
-
-        const run_step_name = try std.fmt.allocPrint(
-            b.allocator,
-            "test_{s}",
-            .{description.name},
-        );
-        const run_step_description = try std.fmt.allocPrint(
-            b.allocator,
-            "Run the tests for {s}",
-            .{description.name},
-        );
-
-        const run_step = b.step(run_step_name, run_step_description);
-        run_step.dependOn(&run_test_exe.step);
-
-        step_collection.libraries_test_step.dependOn(run_step);
+        modules.putAssumeCapacityNoClobber(target, module);
     }
 
     var library = try b.allocator.create(Library);
@@ -179,7 +145,7 @@ fn resolveLibrary(
     library.* = .{
         .name = description.name,
         .root_file = file_source,
-        .module = module,
+        .modules = modules,
         .dependencies = library_dependencies,
     };
 

@@ -50,7 +50,7 @@ pub fn getKernels(
         const build_step = b.step(build_step_name, build_step_description);
         build_step.dependOn(&kernel.install_step.step);
 
-        step_collection.kernels_test_step.dependOn(build_step);
+        step_collection.kernels_build_step.dependOn(build_step);
 
         kernels.putAssumeCapacityNoClobber(target, kernel);
     }
@@ -97,7 +97,8 @@ fn create(
         const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
         for (kernel_dependencies) |dependency| {
             const library = libraries.get(dependency).?;
-            try kernel_module.dependencies.put(library.name, library.module);
+            const library_module = library.modules.get(target) orelse continue;
+            try kernel_module.dependencies.put(library.name, library_module);
         }
 
         // source file modules

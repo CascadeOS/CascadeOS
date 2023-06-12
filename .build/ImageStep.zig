@@ -10,6 +10,7 @@ const Kernel = @import("Kernel.zig");
 const LimineStep = @import("LimineStep.zig");
 
 const ImageStep = @This();
+const StepCollection = @import("StepCollection.zig");
 
 pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
 
@@ -24,6 +25,7 @@ image_file_source: std.Build.FileSource,
 pub fn getImageSteps(
     b: *std.Build,
     kernels: Kernel.Collection,
+    step_collection: StepCollection,
     all_targets: []const CascadeTarget,
 ) !Collection {
     var images: Collection = .{};
@@ -34,7 +36,7 @@ pub fn getImageSteps(
     for (all_targets) |target| {
         const kernel = kernels.get(target).?;
 
-        const image_build = try ImageStep.create(b, target, kernel, limine_step);
+        const image_build = try ImageStep.create(b, target, kernel, limine_step, step_collection);
 
         const image_step_name = try std.fmt.allocPrint(
             b.allocator,
@@ -56,7 +58,13 @@ pub fn getImageSteps(
     return images;
 }
 
-fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel, limine_step: *LimineStep) !*ImageStep {
+fn create(
+    owner: *std.Build,
+    target: CascadeTarget,
+    kernel: Kernel,
+    limine_step: *LimineStep,
+    step_collection: StepCollection,
+) !*ImageStep {
     const step_name = try std.fmt.allocPrint(
         owner.allocator,
         "build {s} image",
@@ -81,6 +89,7 @@ fn create(owner: *std.Build, target: CascadeTarget, kernel: Kernel, limine_step:
 
     self.step.dependOn(&limine_step.step);
     self.step.dependOn(&kernel.install_step.step);
+    self.step.dependOn(step_collection.libraries_test_build_step_per_target.get(target).?);
 
     return self;
 }

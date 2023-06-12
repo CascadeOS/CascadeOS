@@ -12,6 +12,6 @@ name: []const u8,
 
 dependencies: []const []const u8 = &.{},
 
-/// The list of architectures supported by the library.
-/// `null` means architecture-independent.
-supported_architectures: ?[]const CascadeTarget = null,
+/// The list of targets supported by the library.
+/// `null` means target-independent.
+supported_targets: ?[]const CascadeTarget = null,
