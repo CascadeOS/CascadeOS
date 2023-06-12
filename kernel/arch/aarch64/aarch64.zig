@@ -113,3 +113,9 @@ pub const paging = struct {
         core.panic("UNIMPLEMENTED `allocatePageTable`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 };
+
+comptime {
+    if (kernel.info.arch != .aarch64) {
+        @compileError("aarch64 implementation has been referenced when building " ++ @tagName(kernel.info.arch));
+    }
+}
