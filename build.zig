@@ -16,12 +16,11 @@ const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
 pub fn build(b: *std.Build) !void {
     const step_collection = try StepCollection.create(b, all_targets);
-    b.default_step = step_collection.main_test_step;
 
     const options = try Options.get(b, cascade_version, all_targets);
 
     const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
-    const kernels = try Kernel.getKernels(b, libraries, step_collection, options, all_targets);
-    const image_steps = try ImageStep.getImageSteps(b, kernels, step_collection, all_targets);
-    _ = try QemuStep.getQemuSteps(b, image_steps, options, all_targets);
+    try Kernel.registerKernels(b, step_collection, libraries, options, all_targets);
+    const image_steps = try ImageStep.registerImageSteps(b, step_collection, all_targets);
+    try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
 }

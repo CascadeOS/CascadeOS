@@ -11,10 +11,9 @@ const helpers = @import("helpers.zig");
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const ImageStep = @import("ImageStep.zig");
 const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
 
 const QemuStep = @This();
-
-pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, *QemuStep);
 
 step: Step,
 image: std.Build.FileSource,
@@ -22,15 +21,12 @@ image: std.Build.FileSource,
 target: CascadeTarget,
 options: Options,
 
-pub fn getQemuSteps(
+pub fn registerQemuSteps(
     b: *std.Build,
     image_steps: ImageStep.Collection,
     options: Options,
     all_targets: []const CascadeTarget,
-) !Collection {
-    var qemu_steps: Collection = .{};
-    try qemu_steps.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
-
+) !void {
     for (all_targets) |target| {
         const image_step = image_steps.get(target).?;
 
@@ -49,11 +45,7 @@ pub fn getQemuSteps(
 
         const run_step = b.step(qemu_step_name, qemu_step_description);
         run_step.dependOn(&qemu_step.step);
-
-        qemu_steps.putAssumeCapacityNoClobber(target, qemu_step);
     }
-
-    return qemu_steps;
 }
 
 fn create(b: *std.Build, target: CascadeTarget, image: std.Build.FileSource, options: Options) !*QemuStep {

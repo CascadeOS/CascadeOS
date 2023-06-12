@@ -105,6 +105,19 @@ fn resolveLibrary(
 
     try modules.ensureTotalCapacity(b.allocator, @intCast(u32, supported_targets.len));
 
+    const all_targets_step_name = try std.fmt.allocPrint(
+        b.allocator,
+        "build_{s}",
+        .{description.name},
+    );
+    const all_targets_step_description = try std.fmt.allocPrint(
+        b.allocator,
+        "Build the tests for {s} for every supported target",
+        .{description.name},
+    );
+
+    const all_targets_step = b.step(all_targets_step_name, all_targets_step_description);
+
     for (supported_targets) |target| {
         const test_exe = b.addTest(.{
             .name = description.name,
@@ -121,8 +134,26 @@ fn resolveLibrary(
             }),
         };
 
-        const install_step = b.addInstallArtifact(test_exe);
-        step_collection.libraries_test_build_step_per_target.get(target).?.dependOn(&install_step.step);
+        {
+            const install_step = b.addInstallArtifact(test_exe);
+
+            const step_name = try std.fmt.allocPrint(
+                b.allocator,
+                "build_{s}_{s}",
+                .{ description.name, @tagName(target) },
+            );
+            const step_description = try std.fmt.allocPrint(
+                b.allocator,
+                "Build the tests for {s} on {s}",
+                .{ description.name, @tagName(target) },
+            );
+
+            const step = b.step(step_name, step_description);
+            step.dependOn(&install_step.step);
+            all_targets_step.dependOn(&install_step.step);
+
+            step_collection.registerLibrary(target, &install_step.step);
+        }
 
         const module = b.createModule(.{
             .source_file = file_source,

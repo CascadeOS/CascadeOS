@@ -12,8 +12,6 @@ const StepCollection = @import("StepCollection.zig");
 
 const Kernel = @This();
 
-pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
-
 b: *std.Build,
 
 target: CascadeTarget,
@@ -21,41 +19,19 @@ options: Options,
 
 install_step: *Step.InstallArtifact,
 
-pub fn getKernels(
+pub fn registerKernels(
     b: *std.Build,
-    libraries: Library.Collection,
     step_collection: StepCollection,
+    libraries: Library.Collection,
     options: Options,
     all_targets: []const CascadeTarget,
-) !Collection {
-    var kernels: Collection = .{};
-    try kernels.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
-
+) !void {
     const source_file_modules = try getSourceFileModules(b, libraries);
 
     for (all_targets) |target| {
         const kernel = try Kernel.create(b, target, libraries, options, source_file_modules);
-
-        const build_step_name = try std.fmt.allocPrint(
-            b.allocator,
-            "kernel_{s}",
-            .{@tagName(target)},
-        );
-        const build_step_description = try std.fmt.allocPrint(
-            b.allocator,
-            "Build the kernel for {s}",
-            .{@tagName(target)},
-        );
-
-        const build_step = b.step(build_step_name, build_step_description);
-        build_step.dependOn(&kernel.install_step.step);
-
-        step_collection.kernels_build_step.dependOn(build_step);
-
-        kernels.putAssumeCapacityNoClobber(target, kernel);
+        step_collection.registerKernel(target, &kernel.install_step.step);
     }
-
-    return kernels;
 }
 
 fn create(

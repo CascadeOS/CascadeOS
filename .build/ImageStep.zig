@@ -22,9 +22,8 @@ limine_step: *LimineStep,
 image_file: std.Build.GeneratedFile,
 image_file_source: std.Build.FileSource,
 
-pub fn getImageSteps(
+pub fn registerImageSteps(
     b: *std.Build,
-    kernels: Kernel.Collection,
     step_collection: StepCollection,
     all_targets: []const CascadeTarget,
 ) !Collection {
@@ -34,24 +33,8 @@ pub fn getImageSteps(
     const limine_step = try LimineStep.create(b);
 
     for (all_targets) |target| {
-        const kernel = kernels.get(target).?;
-
-        const image_build = try ImageStep.create(b, target, kernel, limine_step, step_collection);
-
-        const image_step_name = try std.fmt.allocPrint(
-            b.allocator,
-            "image_{s}",
-            .{@tagName(target)},
-        );
-        const image_step_description = try std.fmt.allocPrint(
-            b.allocator,
-            "Build the image for {s}",
-            .{@tagName(target)},
-        );
-
-        const image_step = b.step(image_step_name, image_step_description);
-        image_step.dependOn(&image_build.step);
-
+        const image_build = try ImageStep.create(b, step_collection, target, limine_step);
+        step_collection.registerImage(target, &image_build.step);
         images.putAssumeCapacityNoClobber(target, image_build);
     }
 
@@ -60,10 +43,9 @@ pub fn getImageSteps(
 
 fn create(
     owner: *std.Build,
-    target: CascadeTarget,
-    kernel: Kernel,
-    limine_step: *LimineStep,
     step_collection: StepCollection,
+    target: CascadeTarget,
+    limine_step: *LimineStep,
 ) !*ImageStep {
     const step_name = try std.fmt.allocPrint(
         owner.allocator,
@@ -88,7 +70,7 @@ fn create(
     self.image_file_source = .{ .generated = &self.image_file };
 
     self.step.dependOn(&limine_step.step);
-    self.step.dependOn(&kernel.install_step.step);
+    self.step.dependOn(step_collection.kernels_build_step_per_target.get(target).?);
     self.step.dependOn(step_collection.libraries_test_build_step_per_target.get(target).?);
 
     return self;
