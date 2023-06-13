@@ -1,9 +1,5 @@
 # CascadeOS
 
-![](https://img.shields.io/github/license/CascadeOS/CascadeOS)
-![](https://tokei.rs/b1/github/CascadeOS/CascadeOS)
-[![Discord Chat](https://img.shields.io/discord/1109647597808922725)](https://discordapp.com/channels/1109647597808922725)
-
 Cascade is a general purpose operating system targeting standard desktops and laptops.
 
 ## Short Term Goals
