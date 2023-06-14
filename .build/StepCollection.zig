@@ -4,6 +4,7 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Options = @import("Options.zig");
 
 const StepCollection = @This();
 
@@ -11,7 +12,10 @@ kernels_build_step_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
 images_build_step_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
-libraries_test_build_step_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+cascade_libraries_test_build_step_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+
+non_cascade_libraries_test_build_step_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+non_cascade_libraries_test_run_step_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
 pub fn registerKernel(self: StepCollection, target: CascadeTarget, step: *Step) void {
     self.kernels_build_step_per_target.get(target).?.dependOn(step);
@@ -21,8 +25,13 @@ pub fn registerImage(self: StepCollection, target: CascadeTarget, step: *Step) v
     self.images_build_step_per_target.get(target).?.dependOn(step);
 }
 
-pub fn registerLibrary(self: StepCollection, target: CascadeTarget, step: *Step) void {
-    self.libraries_test_build_step_per_target.get(target).?.dependOn(step);
+pub fn registerCascadeLibrary(self: StepCollection, target: CascadeTarget, install_step: *Step) void {
+    self.cascade_libraries_test_build_step_per_target.get(target).?.dependOn(install_step);
+}
+
+pub fn registerNonCascadeLibrary(self: StepCollection, target: CascadeTarget, install_step: *Step, run_step: *Step) void {
+    self.non_cascade_libraries_test_build_step_per_target.get(target).?.dependOn(install_step);
+    self.non_cascade_libraries_test_run_step_per_target.get(target).?.dependOn(run_step);
 }
 
 pub fn create(b: *std.Build, all_targets: []const CascadeTarget) !StepCollection {
@@ -65,18 +74,46 @@ pub fn create(b: *std.Build, all_targets: []const CascadeTarget) !StepCollection
 
     // Libraries
 
-    const all_test_build_step = b.step(
-        "build_tests",
-        "Build all the tests",
+    const all_library_step = b.step(
+        "libraries",
+        "Build and run all the library tests",
     );
-    all_test_step.dependOn(all_test_build_step);
+    all_test_step.dependOn(all_library_step);
 
-    const libraries_test_build_step_per_target = try buildPerTargetSteps(
+    const all_library_build_step = b.step(
+        "libraries_build",
+        "Build all the library tests",
+    );
+    all_library_step.dependOn(all_library_build_step);
+
+    const cascade_libraries_test_build_step_per_target = try buildPerTargetSteps(
         b,
         all_targets,
-        all_test_build_step,
-        "build_tests_{s}",
-        "Build all the tests for {s}",
+        all_library_build_step,
+        "libraries_cascade_{s}",
+        "Build all the library tests for {s} targeting cascade",
+    );
+
+    const non_cascade_libraries_test_build_step_per_target = try buildPerTargetSteps(
+        b,
+        all_targets,
+        all_library_build_step,
+        "libraries_host_{s}",
+        "Build all the library tests for {s} targeting the host os",
+    );
+
+    const all_library_host_run_step = b.step(
+        "libraries_host_run",
+        "Attempt to run all the library tests targeting the host os",
+    );
+    all_library_step.dependOn(all_library_host_run_step);
+
+    const non_cascade_libraries_test_run_step_per_target = try buildPerTargetSteps(
+        b,
+        all_targets,
+        all_library_host_run_step,
+        "libraries_host_run_{s}",
+        "Attempt to run all the library tests for {s} targeting the host os",
     );
 
     return .{
@@ -84,7 +121,10 @@ pub fn create(b: *std.Build, all_targets: []const CascadeTarget) !StepCollection
 
         .images_build_step_per_target = images_build_step_per_target,
 
-        .libraries_test_build_step_per_target = libraries_test_build_step_per_target,
+        .cascade_libraries_test_build_step_per_target = cascade_libraries_test_build_step_per_target,
+
+        .non_cascade_libraries_test_build_step_per_target = non_cascade_libraries_test_build_step_per_target,
+        .non_cascade_libraries_test_run_step_per_target = non_cascade_libraries_test_run_step_per_target,
     };
 }
 

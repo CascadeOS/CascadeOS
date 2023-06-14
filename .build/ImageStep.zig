@@ -71,7 +71,7 @@ fn create(
 
     self.step.dependOn(&limine_step.step);
     self.step.dependOn(step_collection.kernels_build_step_per_target.get(target).?);
-    self.step.dependOn(step_collection.libraries_test_build_step_per_target.get(target).?);
+    self.step.dependOn(step_collection.cascade_libraries_test_build_step_per_target.get(target).?);
 
     return self;
 }

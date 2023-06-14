@@ -76,7 +76,7 @@ fn create(
         const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
         for (kernel_dependencies) |dependency| {
             const library = libraries.get(dependency).?;
-            const library_module = library.modules.get(target) orelse continue;
+            const library_module = library.cascade_modules.get(target) orelse continue;
             try kernel_module.dependencies.put(library.name, library_module);
         }
 

@@ -17,7 +17,8 @@ pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 name: []const u8,
 root_file: std.Build.FileSource,
 dependencies: []const *Library,
-modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
 pub fn getRootFilePath(library: *const Library, b: *std.Build) []const u8 {
     return library.root_file.getPath(b);
@@ -100,10 +101,11 @@ fn resolveLibrary(
 
     const supported_targets = if (description.supported_targets) |supported_targets| supported_targets else all_targets;
 
-    var modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
-    errdefer modules.deinit(b.allocator);
+    var cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+    errdefer cascade_modules.deinit(b.allocator);
 
-    try modules.ensureTotalCapacity(b.allocator, @intCast(u32, supported_targets.len));
+    var non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+    errdefer non_cascade_modules.deinit(b.allocator);
 
     const all_build_and_run_step_name = try std.fmt.allocPrint(
         b.allocator,
@@ -126,20 +128,98 @@ fn resolveLibrary(
     const all_build_and_run_step = b.step(all_build_and_run_step_name, all_build_and_run_step_description);
 
     for (supported_targets) |target| {
-        const test_exe_install_step = try createTestExe(
-            b,
-            description,
-            file_source,
-            options,
-            target,
-            library_dependencies,
-        );
+        { // cascade test executable and module
+            const cascade_test_exe = try createTestExe(
+                b,
+                description,
+                file_source,
+                options,
+                target,
+                library_dependencies,
+                true,
+            );
 
-        all_build_and_run_step.dependOn(test_exe_install_step);
-        step_collection.registerLibrary(target, test_exe_install_step);
+            cascade_test_exe.override_dest_dir = .{
+                .custom = b.pathJoin(&.{
+                    @tagName(target),
+                    "root",
+                    "tests",
+                }),
+            };
 
-        const module = try createModule(b, file_source, options, target, library_dependencies);
-        modules.putAssumeCapacityNoClobber(target, module);
+            const cascade_install_step = b.addInstallArtifact(cascade_test_exe);
+
+            const cascade_step_name = try std.fmt.allocPrint(
+                b.allocator,
+                "{s}_cascade_{s}",
+                .{ description.name, @tagName(target) },
+            );
+
+            const cascade_step_description = try std.fmt.allocPrint(
+                b.allocator,
+                "Build the tests for {s} on {s} targeting cascade",
+                .{ description.name, @tagName(target) },
+            );
+
+            const cascade_step = b.step(cascade_step_name, cascade_step_description);
+            cascade_step.dependOn(&cascade_install_step.step);
+
+            all_build_and_run_step.dependOn(cascade_step);
+            step_collection.registerCascadeLibrary(target, cascade_step);
+
+            const cascade_module = try createModule(b, file_source, options, target, library_dependencies, true);
+            try cascade_modules.putNoClobber(b.allocator, target, cascade_module);
+        }
+
+        if (!description.cascade_only) { // NON-cascade test executable and module
+            const non_cascade_test_exe = try createTestExe(
+                b,
+                description,
+                file_source,
+                options,
+                target,
+                library_dependencies,
+                false,
+            );
+
+            non_cascade_test_exe.override_dest_dir = .{
+                .custom = b.pathJoin(&.{
+                    @tagName(target),
+                    "non_cascade",
+                    "tests",
+                }),
+            };
+
+            const non_cascade_install_step = b.addInstallArtifact(non_cascade_test_exe);
+
+            const non_cascade_run = b.addRunArtifact(non_cascade_test_exe);
+            non_cascade_run.skip_foreign_checks = true;
+            // TODO: Use https://github.com/ziglang/zig/pull/15852 once master tarballs are updated
+
+            non_cascade_run.step.dependOn(&non_cascade_install_step.step);
+
+            const non_cascade_step_name = try std.fmt.allocPrint(
+                b.allocator,
+                "{s}_host_{s}",
+                .{ description.name, @tagName(target) },
+            );
+
+            const non_cascade_step_description =
+                try std.fmt.allocPrint(
+                b.allocator,
+                "Build and attempt to run the tests for {s} on {s} targeting the host os",
+                .{ description.name, @tagName(target) },
+            );
+
+            const non_cascade_step = b.step(non_cascade_step_name, non_cascade_step_description);
+            non_cascade_step.dependOn(&non_cascade_run.step);
+
+            all_build_and_run_step.dependOn(non_cascade_step);
+            step_collection.registerNonCascadeLibrary(target, &non_cascade_install_step.step, non_cascade_step);
+
+            const non_cascade_module = try createModule(b, file_source, options, target, library_dependencies, false);
+            try non_cascade_modules.putNoClobber(b.allocator, target, non_cascade_module);
+        }
     }
 
     var library = try b.allocator.create(Library);
@@ -147,7 +227,8 @@ fn resolveLibrary(
     library.* = .{
         .name = description.name,
         .root_file = file_source,
-        .modules = modules,
+        .cascade_modules = cascade_modules,
+        .non_cascade_modules = non_cascade_modules,
         .dependencies = library_dependencies,
     };
 
@@ -161,57 +242,34 @@ fn createTestExe(
     options: Options,
     target: CascadeTarget,
     library_dependencies: []const *Library,
-) !*Step {
+    build_for_cascade: bool,
+) !*Step.Compile {
     const cascade_test_exe = b.addTest(.{
         .name = description.name,
         .root_source_file = file_source,
         .optimize = options.optimize,
-        .target = target.getTestCrossTarget(),
+        .target = if (build_for_cascade) target.getCascadeTestCrossTarget() else target.getNonCascadeTestCrossTarget(),
     });
 
     // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
     // test_exe.addModule(description.name, module);
 
-    cascade_test_exe.addModule("cascade_flag", options.cascade_option_module);
+    if (build_for_cascade) {
+        cascade_test_exe.addModule("cascade_flag", options.cascade_option_module);
+    } else {
+        cascade_test_exe.addModule("cascade_flag", options.non_cascade_option_module);
+    }
 
     for (library_dependencies) |library| {
-        const library_module = library.modules.get(target) orelse continue;
+        const library_module = if (build_for_cascade)
+            library.cascade_modules.get(target) orelse continue
+        else
+            library.non_cascade_modules.get(target) orelse continue;
+
         cascade_test_exe.addModule(library.name, library_module);
     }
 
-    cascade_test_exe.override_dest_dir = .{
-        .custom = b.pathJoin(&.{
-            @tagName(target),
-            "root",
-            "tests",
-        }),
-    };
-
-    const cascade_install_step = b.addInstallArtifact(cascade_test_exe);
-
-    const step_name = try std.fmt.allocPrint(
-        b.allocator,
-        "{s}_{s}",
-        .{ description.name, @tagName(target) },
-    );
-
-    const step_description = if (description.cascade_only)
-        try std.fmt.allocPrint(
-            b.allocator,
-            "Build the tests for {s} on {s} targeting cascade",
-            .{ description.name, @tagName(target) },
-        )
-    else
-        try std.fmt.allocPrint(
-            b.allocator,
-            "Build the tests for {s} on {s} and attempt to run it on the host",
-            .{ description.name, @tagName(target) },
-        );
-
-    const step = b.step(step_name, step_description);
-    step.dependOn(&cascade_install_step.step);
-
-    return step;
+    return cascade_test_exe;
 }
 
 fn createModule(
@@ -220,6 +278,7 @@ fn createModule(
     options: Options,
     target: CascadeTarget,
     library_dependencies: []const *Library,
+    build_for_cascade: bool,
 ) !*std.Build.Module {
     const module = b.createModule(.{
         .source_file = file_source,
@@ -228,10 +287,18 @@ fn createModule(
     // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
     // try module.dependencies.put(description.name, module);
 
-    try module.dependencies.put("cascade_flag", options.cascade_option_module);
+    if (build_for_cascade) {
+        try module.dependencies.put("cascade_flag", options.cascade_option_module);
+    } else {
+        try module.dependencies.put("cascade_flag", options.non_cascade_option_module);
+    }
 
     for (library_dependencies) |library| {
-        const library_module = library.modules.get(target) orelse continue;
+        const library_module = if (build_for_cascade)
+            library.cascade_modules.get(target) orelse continue
+        else
+            library.non_cascade_modules.get(target) orelse continue;
+
         try module.dependencies.put(library.name, library_module);
     }
 

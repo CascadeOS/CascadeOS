@@ -9,7 +9,19 @@ pub const CascadeTarget = enum {
     aarch64,
     x86_64,
 
-    pub fn getTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
+    pub fn getNonCascadeTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
+        switch (self) {
+            .aarch64 => return std.zig.CrossTarget{
+                .cpu_arch = .aarch64,
+            },
+            .x86_64 => return std.zig.CrossTarget{
+                .cpu_arch = .x86_64,
+            },
+        }
+    }
+
+    pub fn getCascadeTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
+        // TODO: os_tag should be other
         switch (self) {
             .aarch64 => return std.zig.CrossTarget{
                 .cpu_arch = .aarch64,
