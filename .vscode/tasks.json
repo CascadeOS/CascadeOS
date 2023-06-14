@@ -10,7 +10,7 @@
             "isBuildCommand": true,
             "args": [
                 "build",
-                "test_all"
+                "test"
             ],
             "group": {
                 "kind": "build",

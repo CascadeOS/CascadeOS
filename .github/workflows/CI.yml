@@ -36,4 +36,4 @@ jobs:
         run: zig fmt --check --ast-check **.zig
 
       - name: Test
-        run: zig build test_all -fsummary
+        run: zig build test -fsummary

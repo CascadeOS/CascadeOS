@@ -15,3 +15,7 @@ dependencies: []const []const u8 = &.{},
 /// The list of targets supported by the library.
 /// `null` means target-independent.
 supported_targets: ?[]const CascadeTarget = null,
+
+// TODO: Should this list the non-cascade operating systems supported?
+/// If this is `true` then this library cannot be used or tested outside of Cascade.
+cascade_only: bool = false,
