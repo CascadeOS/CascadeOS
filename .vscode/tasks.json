@@ -4,12 +4,13 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "zig build test_all",
+            "label": "zig build",
             "type": "process",
             "command": "zig",
             "isBuildCommand": true,
             "args": [
-                "build"
+                "build",
+                "test_all"
             ],
             "group": {
                 "kind": "build",

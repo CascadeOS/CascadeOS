@@ -67,7 +67,7 @@ fn create(
         try kernel_module.dependencies.put("kernel", kernel_module);
 
         // target options
-        try kernel_module.dependencies.put("cascade_target", options.target_option_modules.get(target).?);
+        try kernel_module.dependencies.put("cascade_target", options.kernel_target_option_modules.get(target).?);
 
         // kernel options
         try kernel_module.dependencies.put("kernel_options", options.kernel_option_module);

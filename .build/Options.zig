@@ -50,7 +50,10 @@ scopes_to_force_debug: []const u8,
 force_debug_log: bool,
 
 kernel_option_module: *std.Build.Module,
-target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+kernel_target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+
+cascade_option_module: *std.Build.Module,
+non_cascade_option_module: *std.Build.Module,
 
 pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []const CascadeTarget) !Options {
     const qemu_monitor = b.option(
@@ -142,11 +145,19 @@ pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []c
             scopes_to_force_debug,
             version,
         ),
-        .target_option_modules = try buildTargetOptionModules(b, all_targets),
+        .kernel_target_option_modules = try buildKernelTargetOptionModules(b, all_targets),
+        .cascade_option_module = buildCascadeOptionModule(b, true),
+        .non_cascade_option_module = buildCascadeOptionModule(b, false),
     };
 }
 
-fn buildTargetOptionModules(
+fn buildCascadeOptionModule(b: *std.Build, value: bool) *std.Build.Module {
+    const options = b.addOptions();
+    options.addOption(bool, "cascade", value);
+    return options.createModule();
+}
+
+fn buildKernelTargetOptionModules(
     b: *std.Build,
     all_targets: []const CascadeTarget,
 ) !std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) {

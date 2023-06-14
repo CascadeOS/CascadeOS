@@ -163,9 +163,8 @@ fn resolveLibrary(
         // test_exe.addModule(description.name, module);
         // try module.dependencies.put(description.name, module);
 
-        const target_option_module = options.target_option_modules.get(target).?;
-        test_exe.addModule("cascade_target", target_option_module);
-        try module.dependencies.put("cascade_target", target_option_module);
+        test_exe.addModule("cascade_flag", options.cascade_option_module);
+        try module.dependencies.put("cascade_flag", options.cascade_option_module);
 
         for (library_dependencies) |library| {
             const library_module = library.modules.get(target) orelse continue;
