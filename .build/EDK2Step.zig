@@ -4,6 +4,7 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const helpers = @import("helpers.zig");
 
 const EDK2Step = @This();
 
@@ -68,11 +69,9 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         return;
     }
 
-    const firmware_uri = try self.target.uefiFirmwareUri();
-
     try std.fs.cwd().makePath(self.edk2_path);
 
-    try fetch(step, firmware_uri, self.firmware_path);
+    try fetch(step, self.target.uefiFirmwareUrl(), self.firmware_path);
 
     self.firmware.path = self.firmware_path;
 
@@ -97,20 +96,62 @@ fn updateTimestampFile(self: *EDK2Step) !void {
     try timestamp_file.updateTimes(stat.atime, std.time.nanoTimestamp());
 }
 
-fn fetch(step: *Step, uri: std.Uri, destination_path: []const u8) !void {
-    const file = try std.fs.cwd().createFile(destination_path, .{});
-    defer file.close();
+fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
+    var failed = false;
 
-    var buffered_writer = std.io.bufferedWriter(file.writer());
-
-    downloadWithHttpClient(step.owner.allocator, uri, buffered_writer.writer()) catch |err| {
-        return step.fail("failed to fetch '{s}': {s}", .{ uri, @errorName(err) });
+    // try curl
+    helpers.runExternalBinary(
+        step.owner.allocator,
+        &.{
+            "curl",
+            "-s", // silent
+            "-f", // fail fast
+            "-o",
+            destination_path,
+            url,
+        },
+        null,
+    ) catch {
+        failed = true;
     };
 
-    try buffered_writer.flush();
+    if (!failed) return;
+    failed = false;
+
+    // try wget
+    helpers.runExternalBinary(
+        step.owner.allocator,
+        &.{
+            "wget",
+            "-q", // quiet
+            "-O",
+            destination_path,
+            url,
+        },
+        null,
+    ) catch {};
+
+    if (!failed) return;
+    failed = false;
+
+    return step.fail("failed to fetch '{s}' using either curl or wget", .{url});
+
+    // TODO: use the std http client once it stops crashing randomly https://github.com/CascadeOS/CascadeOS/issues/53
+    // const file = try std.fs.cwd().createFile(destination_path, .{});
+    // defer file.close();
+    //
+    // var buffered_writer = std.io.bufferedWriter(file.writer());
+    //
+    // downloadWithHttpClient(step.owner.allocator, url, buffered_writer.writer()) catch |err| {
+    //     return step.fail("failed to fetch '{s}': {s}", .{ url, @errorName(err) });
+    // };
+    //
+    // try buffered_writer.flush();
 }
 
-fn downloadWithHttpClient(allocator: std.mem.Allocator, uri: std.Uri, writer: anytype) !void {
+fn downloadWithHttpClient(allocator: std.mem.Allocator, url: []const u8, writer: anytype) !void {
+    const uri = try std.Uri.parse(url);
+
     var client: std.http.Client = .{ .allocator = allocator };
     defer client.deinit();
 
