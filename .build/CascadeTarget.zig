@@ -108,7 +108,7 @@ pub const CascadeTarget = enum {
         };
     }
 
-    pub fn buildImagePath(self: CascadeTarget, b: *std.Build) []const u8 {
+    pub fn buildImageScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
         _ = self;
         return helpers.pathJoinFromRoot(b, &.{ ".build", "build_limine_image.sh" });
     }
@@ -134,15 +134,10 @@ pub const CascadeTarget = enum {
         }
     }
 
-    pub const FirmwareUris = struct {
-        code: std.Uri,
-        vars: std.Uri,
-    };
-
-    pub fn uefiFirmwareUri(self: CascadeTarget) !std.Uri {
+    pub fn uefiFirmwareUrl(self: CascadeTarget) []const u8 {
         return switch (self) {
-            .aarch64 => try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd"),
-            .x86_64 => try std.Uri.parse("https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd"),
+            .aarch64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd",
+            .x86_64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd",
         };
     }
 
