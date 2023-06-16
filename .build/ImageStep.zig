@@ -143,30 +143,17 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 }
 
 fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
-    const build_image_path = self.target.buildImagePath(self.step.owner);
-
-    const args: []const []const u8 = &.{
-        build_image_path,
-        image_file_path,
-        @tagName(self.target),
-        self.limine_step.limine_directory.getPath(),
-        self.limine_step.limine_deploy_source.getPath(self.step.owner),
-    };
-
-    var child = std.ChildProcess.init(args, self.step.owner.allocator);
-    child.cwd = helpers.pathJoinFromRoot(self.step.owner, &.{".build"});
-
-    try child.spawn();
-    const term = try child.wait();
-
-    switch (term) {
-        .Exited => |code| {
-            if (code != 0) {
-                return error.UncleanExit;
-            }
+    try helpers.runExternalBinary(
+        self.step.owner.allocator,
+        &.{
+            self.target.buildImageScriptPath(self.step.owner),
+            image_file_path,
+            @tagName(self.target),
+            self.limine_step.limine_directory.getPath(),
+            self.limine_step.limine_deploy_source.getPath(self.step.owner),
         },
-        else => return error.UncleanExit,
-    }
+        helpers.pathJoinFromRoot(self.step.owner, &.{".build"}),
+    );
 }
 
 fn hashDirectoryRecursive(
