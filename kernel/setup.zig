@@ -99,26 +99,32 @@ fn calculateDirectMaps() void {
 fn calculateLengthOfDirectMap() core.Size {
     var reverse_memmap_iterator = kernel.boot.memoryMapIterator(.backwards);
 
-    while (reverse_memmap_iterator.next()) |entry| {
-        if (entry.type == .reserved_or_unusable) continue;
+    const last_usable_entry = blk: {
+        // search from the end of the memory map for the first usable region
 
-        const estimated_size = core.Size.from(entry.range.end().value, .byte);
+        while (reverse_memmap_iterator.next()) |entry| {
+            if (entry.type == .reserved_or_unusable) continue;
 
-        log.debug("estimated size of direct map: {}", .{estimated_size});
+            break :blk entry;
+        }
 
-        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-        var aligned_size = estimated_size.alignForward(kernel.arch.paging.largestPageSize());
+        core.panic("no non-reserved or usable memory regions?");
+    };
 
-        // We ensure that the lowest 4GiB are always mapped.
-        const @"4gib" = core.Size.from(4, .gib);
-        if (aligned_size.lessThan(@"4gib")) aligned_size = @"4gib";
+    const estimated_size = core.Size.from(last_usable_entry.range.end().value, .byte);
 
-        log.debug("aligned size of direct map: {}", .{aligned_size});
+    log.debug("estimated size of direct map: {}", .{estimated_size});
 
-        return aligned_size;
-    }
+    // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+    var aligned_size = estimated_size.alignForward(kernel.arch.paging.largestPageSize());
 
-    core.panic("no non-reserved or usable memory regions?");
+    // We ensure that the lowest 4GiB are always mapped.
+    const @"4gib" = core.Size.from(4, .gib);
+    if (aligned_size.lessThan(@"4gib")) aligned_size = @"4gib";
+
+    log.debug("aligned size of direct map: {}", .{aligned_size});
+
+    return aligned_size;
 }
 
 fn calculateKernelVirtualAndPhysicalOffsets() void {

@@ -12,9 +12,10 @@ comptime {
     _ = current;
 }
 
+// TODO: Whatever case is first in the below switch determines zls completions.
 const current = switch (kernel.info.arch) {
-    .aarch64 => aarch64,
     .x86_64 => x86_64,
+    .aarch64 => aarch64,
 };
 
 pub inline fn spinLoopHint() void {
@@ -96,7 +97,7 @@ pub const paging = struct {
     }
 
     /// This function is only called once during system setup, it is required to:
-    ///   1. search the high half of the *top level* of the given page table for a free entry
+    ///   1. search the higher half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
     ///   4. return the `VirtRange` representing the entire virtual range that entry covers

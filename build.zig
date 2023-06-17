@@ -22,7 +22,10 @@ pub fn build(b: *std.Build) !void {
     const options = try Options.get(b, cascade_version, all_targets);
 
     const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
+
     try Kernel.registerKernels(b, step_collection, libraries, options, all_targets);
+
     const image_steps = try ImageStep.registerImageSteps(b, step_collection, all_targets);
+
     try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
 }

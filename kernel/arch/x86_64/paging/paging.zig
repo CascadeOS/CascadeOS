@@ -137,11 +137,12 @@ pub fn mapRangeUseAllPageSizes(
     var kib_mappings: usize = 0;
 
     while (current_virtual.lessThan(virtual_end)) {
-        if (x86_64.info.gib_pages and
+        const map_1gib = x86_64.info.gib_pages and
             size_left.greaterThanOrEqual(large_page_size) and
             current_virtual.isAligned(large_page_size) and
-            current_physical.isAligned(large_page_size))
-        {
+            current_physical.isAligned(large_page_size);
+
+        if (map_1gib) {
             mapTo1GiB(
                 page_table,
                 current_virtual,
@@ -160,10 +161,11 @@ pub fn mapRangeUseAllPageSizes(
             continue;
         }
 
-        if (size_left.greaterThanOrEqual(medium_page_size) and
+        const map_2mib = size_left.greaterThanOrEqual(medium_page_size) and
             current_virtual.isAligned(medium_page_size) and
-            current_physical.isAligned(medium_page_size))
-        {
+            current_physical.isAligned(medium_page_size);
+
+        if (map_2mib) {
             mapTo2MiB(
                 page_table,
                 current_virtual,

@@ -104,18 +104,19 @@ pub const Size = extern struct {
         var value = size.bytes;
         var emitted_anything = false;
 
-        inline for (unit_table) |unit| {
-            if (value >= unit.value) {
-                const part = value / unit.value;
+        // TODO: use `continue` instead of `break :blk` https://github.com/CascadeOS/CascadeOS/issues/55
+        inline for (unit_table) |unit| blk: {
+            if (value < unit.value) break :blk;
 
-                if (emitted_anything) try writer.writeAll(", ");
+            const part = value / unit.value;
 
-                try std.fmt.formatInt(part, 10, .lower, .{}, writer);
-                try writer.writeAll(comptime " " ++ unit.name);
+            if (emitted_anything) try writer.writeAll(", ");
 
-                value -= part * unit.value;
-                emitted_anything = true;
-            }
+            try std.fmt.formatInt(part, 10, .lower, .{}, writer);
+            try writer.writeAll(comptime " " ++ unit.name);
+
+            value -= part * unit.value;
+            emitted_anything = true;
         }
     }
 

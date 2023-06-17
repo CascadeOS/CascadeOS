@@ -39,24 +39,36 @@ const simple_leaf_handlers: []const SimpleLeafHandler = &.{
 };
 
 fn handleSimpleLeafs(largest_standard_function: u32, largest_extended_function: u32) void {
-    inline for (simple_leaf_handlers) |leaf_handler| {
-        if ((leaf_handler.leaf.type == .standard and leaf_handler.leaf.value <= largest_standard_function) or
-            (leaf_handler.leaf.type == .extended and leaf_handler.leaf.value <= largest_extended_function))
-        {
-            const leaf = raw_cpuid(leaf_handler.leaf.value, 0);
+    // TODO: use `continue` instead of `break :blk` https://github.com/CascadeOS/CascadeOS/issues/55
+    // we use a little trick here, the `blk:` below is not on the loop so breaking to that label
+    // does not end the loop but instead starts the next iteration.
+    //
+    // this means `break :blk;` below acts how `continue;` would if it were allowed in this case
 
-            inline for (leaf_handler.handlers) |handler| {
-                const register = switch (handler.register) {
-                    .eax => leaf.eax,
-                    .ebx => leaf.ebx,
-                    .ecx => leaf.ecx,
-                    .edx => leaf.edx,
-                };
+    inline for (simple_leaf_handlers) |leaf_handler| blk: {
+        if (leaf_handler.leaf.type == .standard and leaf_handler.leaf.value > largest_standard_function) {
+            // leaf is out of range of available standard functions
+            break :blk;
+        }
 
-                const result = register & (1 << handler.mask_bit) != 0;
-                if (handler.target) |target| target.* = result;
-                log.debug(comptime handler.name ++ ": {}", .{result});
-            }
+        if (leaf_handler.leaf.type == .extended and leaf_handler.leaf.value > largest_extended_function) {
+            // leaf is out of range of available extended functions
+            break :blk;
+        }
+
+        const leaf = raw_cpuid(leaf_handler.leaf.value, 0);
+
+        inline for (leaf_handler.handlers) |handler| {
+            const register = switch (handler.register) {
+                .eax => leaf.eax,
+                .ebx => leaf.ebx,
+                .ecx => leaf.ecx,
+                .edx => leaf.edx,
+            };
+
+            const result = register & (1 << handler.mask_bit) != 0;
+            if (handler.target) |target| target.* = result;
+            log.debug(comptime handler.name ++ ": {}", .{result});
         }
     }
 }

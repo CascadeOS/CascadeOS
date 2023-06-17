@@ -130,82 +130,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    if (symbol_map.getSymbol(kernel_source_address)) |symbol| {
-        writer.writeAll(indent) catch unreachable;
-
-        if (symbol.location) |location| {
-            writer.writeAll(location.file_name) catch unreachable;
-            writer.writeByte(':') catch unreachable;
-            std.fmt.formatInt(
-                location.line,
-                10,
-                .lower,
-                .{},
-                writer,
-            ) catch unreachable;
-
-            if (location.column) |column| {
-                writer.writeByte(':') catch unreachable;
-                std.fmt.formatInt(
-                    column,
-                    10,
-                    .lower,
-                    .{},
-                    writer,
-                ) catch unreachable;
-            }
-
-            writer.writeAll(" in ") catch unreachable;
-            writer.writeAll(symbol.name) catch unreachable;
-
-            if (!location.is_line_expected_to_be_precise) {
-                writer.writeAll(" (symbols line information is inprecise)") catch unreachable;
-            }
-
-            writer.writeByte('\n') catch unreachable;
-
-            if (embedded_source_files.get(location.file_name)) |file_contents| embed_blk: {
-                writer.writeAll(comptime indent ** 2) catch unreachable;
-
-                var blank_spaces_trimmed_from_line: usize = 0;
-
-                const line = line: {
-                    var line_iter = std.mem.split(u8, file_contents, "\n");
-                    var row: u64 = 1;
-                    while (line_iter.next()) |line| {
-                        if (row == location.line) {
-                            var first_non_empty_column: usize = 0;
-
-                            while (first_non_empty_column < line.len and line[first_non_empty_column] == ' ') {
-                                first_non_empty_column += 1;
-                            }
-
-                            blank_spaces_trimmed_from_line = first_non_empty_column;
-                            break :line line[first_non_empty_column..];
-                        }
-                        row += 1;
-                    }
-                    // no matching line found
-                    writer.writeAll("no such line in file?\n") catch unreachable;
-                    break :embed_blk;
-                };
-
-                writer.writeAll(line) catch unreachable;
-
-                if (location.column) |column| {
-                    writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
-                    writer.writeByteNTimes(' ', column - 1 - blank_spaces_trimmed_from_line) catch unreachable;
-
-                    writer.writeAll("^\n") catch unreachable;
-                } else {
-                    writer.writeAll("\n\n") catch unreachable;
-                }
-            }
-        } else {
-            writer.writeAll(symbol.name) catch unreachable;
-            writer.writeAll(" - ???\n") catch unreachable;
-        }
-    } else {
+    const symbol = symbol_map.getSymbol(kernel_source_address) orelse {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;
         std.fmt.formatInt(
             kernel_source_address,
@@ -214,8 +139,118 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
             .{},
             writer,
         ) catch unreachable;
+
+        return;
+    };
+
+    printSymbol(writer, symbol);
+}
+
+fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
+    writer.writeAll(indent) catch unreachable;
+
+    const location = symbol.location orelse {
+        // setup - ???
+        // ^^^^^
+        writer.writeAll(symbol.name) catch unreachable;
+
+        // setup - ???
+        //      ^^^^^^
         writer.writeAll(" - ???\n") catch unreachable;
+        return;
+    };
+
+    // kernel/setup.zig:43:15 in setup
+    // ^^^^^^^^^^^^^^^^
+    writer.writeAll(location.file_name) catch unreachable;
+
+    // kernel/setup.zig:43:15 in setup
+    //                 ^
+    writer.writeByte(':') catch unreachable;
+
+    // kernel/setup.zig:43:15 in setup
+    //                  ^^
+    std.fmt.formatInt(
+        location.line,
+        10,
+        .lower,
+        .{},
+        writer,
+    ) catch unreachable;
+
+    if (location.column) |column| {
+        // kernel/setup.zig:43:15 in setup
+        //                    ^
+        writer.writeByte(':') catch unreachable;
+
+        // kernel/setup.zig:43:15 in setup
+        //                     ^^
+        std.fmt.formatInt(
+            column,
+            10,
+            .lower,
+            .{},
+            writer,
+        ) catch unreachable;
     }
+
+    // kernel/setup.zig:43:15 in setup
+    //                       ^^^^
+    writer.writeAll(" in ") catch unreachable;
+
+    // kernel/setup.zig:43:15 in setup
+    //                           ^^^^^
+    writer.writeAll(symbol.name) catch unreachable;
+
+    if (!location.is_line_expected_to_be_precise) {
+        // kernel/setup.zig:43:15 in setup (symbols line information is inprecise)
+        //                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        writer.writeAll(" (symbols line information is inprecise)") catch unreachable;
+    }
+
+    const file_contents = embedded_source_files.get(location.file_name) orelse return;
+
+    const line = findTargetLine(file_contents, location.line) orelse {
+        // no matching line found
+        writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+        writer.writeAll("no such line in file?\n") catch unreachable;
+        return;
+    };
+
+    // trim any blank spaces at the beginning of the line that are present in the source file
+    var blank_spaces: usize = 0;
+    while (blank_spaces < line.len and line[blank_spaces] == ' ') {
+        blank_spaces += 1;
+    }
+
+    writer.writeByte('\n') catch unreachable;
+    writer.writeAll(comptime indent ** 2) catch unreachable;
+
+    //     core.panic("some message");
+    //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    writer.writeAll(line[blank_spaces..]) catch unreachable;
+
+    if (location.column) |column| {
+        writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+
+        writer.writeByteNTimes(' ', column - 1 - blank_spaces) catch unreachable;
+
+        writer.writeAll("^\n") catch unreachable;
+    } else {
+        writer.writeAll("\n\n") catch unreachable;
+    }
+}
+
+fn findTargetLine(file_contents: []const u8, target_line_number: usize) ?[]const u8 {
+    var line_iter = std.mem.split(u8, file_contents, "\n");
+    var line_index: u64 = 1;
+
+    while (line_iter.next()) |line| : (line_index += 1) {
+        if (line_index != target_line_number) continue;
+        return line;
+    }
+
+    return null;
 }
 
 const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_files: {

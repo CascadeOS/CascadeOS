@@ -126,24 +126,24 @@ pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
         else => return null,
     };
 
-    if (opt_line_info) |line_info| {
-        return .{
-            .address = address,
-            .name = name,
-            .location = .{
-                .is_line_expected_to_be_precise = true,
-                .file_name = removeRootPrefixFromPath(line_info.file_name),
-                .line = line_info.line,
-                .column = line_info.column,
-            },
-        };
-    } else {
+    const line_info = opt_line_info orelse {
         return .{
             .address = address,
             .name = name,
             .location = null,
         };
-    }
+    };
+
+    return .{
+        .address = address,
+        .name = name,
+        .location = .{
+            .is_line_expected_to_be_precise = true,
+            .file_name = removeRootPrefixFromPath(line_info.file_name),
+            .line = line_info.line,
+            .column = line_info.column,
+        },
+    };
 }
 
 pub fn removeRootPrefixFromPath(path: []const u8) []const u8 {

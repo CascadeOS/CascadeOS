@@ -28,10 +28,14 @@ pub const Gdt = extern struct {
     const mask_u24: u64 = std.math.maxInt(u24);
 
     pub fn setTss(self: *Gdt, tss: *x86_64.Tss) void {
-        const low_base: u64 = (@ptrToInt(tss) & mask_u24) << 16;
-        const mid_base: u64 = ((@ptrToInt(tss) >> 24) & mask_u8) << 56;
+        // TODO: packed struct to represent the below
 
-        const high_base: u64 = @ptrToInt(tss) >> 32;
+        const tss_ptr = @ptrToInt(tss);
+
+        const low_base: u64 = (tss_ptr & mask_u24) << 16;
+        const mid_base: u64 = ((tss_ptr >> 24) & mask_u8) << 56;
+
+        const high_base: u64 = tss_ptr >> 32;
 
         const present: u64 = 1 << 47;
 
