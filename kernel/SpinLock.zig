@@ -55,8 +55,3 @@ fn internalGrab(self: *SpinLock, interrupts_were_enabled: bool) void {
         kernel.arch.spinLoopHint();
     }
 }
-
-/// This function will make it impossible (with correct usage) to acquire this lock
-pub fn panic(self: *SpinLock) void {
-    _ = @atomicRmw(usize, &self.z_serving, .Sub, 1, .Release);
-}
