@@ -194,7 +194,7 @@ fn resolveLibrary(
 
             const non_cascade_run = b.addRunArtifact(non_cascade_test_exe);
             non_cascade_run.skip_foreign_checks = true;
-            // TODO: Use https://github.com/ziglang/zig/pull/15852 once master tarballs are updated
+            non_cascade_run.failing_to_execute_foreign_is_an_error = false;
 
             non_cascade_run.step.dependOn(&non_cascade_install_step.step);
 

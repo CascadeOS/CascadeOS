@@ -15,6 +15,8 @@ const cascade_version = std.builtin.Version{ .major = 0, .minor = 0, .patch = 1 
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
 pub fn build(b: *std.Build) !void {
+    b.enable_qemu = true;
+
     const step_collection = try StepCollection.create(b, all_targets);
 
     const options = try Options.get(b, cascade_version, all_targets);
