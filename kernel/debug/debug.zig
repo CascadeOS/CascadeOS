@@ -74,7 +74,7 @@ fn panicImpl(
 
 fn dumpStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) void {
     var frame_index: usize = 0;
-    var frames_left: usize = std.math.min(stack_trace.index, stack_trace.instruction_addresses.len);
+    var frames_left: usize = @min(stack_trace.index, stack_trace.instruction_addresses.len);
 
     var opt_first_addr: ?usize = null;
     while (frames_left != 0) : ({
