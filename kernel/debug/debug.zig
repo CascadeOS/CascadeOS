@@ -29,16 +29,18 @@ pub fn switchTo(new_state: PanicState) void {
 pub fn panic(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
-    ret_addr: ?usize,
+    opt_return_address: ?usize,
 ) noreturn {
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
     symbol_map.loadSymbols();
 
+    const return_address = opt_return_address orelse @returnAddress();
+
     switch (state) {
         .no_op => {},
-        .simple => simplePanic(msg, stack_trace, ret_addr),
-        .full => panicImpl(msg, stack_trace, ret_addr),
+        .simple => simplePanic(msg, stack_trace, return_address),
+        .full => panicImpl(msg, stack_trace, return_address),
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -48,7 +50,7 @@ pub fn panic(
 fn simplePanic(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
-    ret_addr: ?usize,
+    ret_addr: usize,
 ) void {
     const writer = kernel.arch.setup.getEarlyOutputWriter();
 
@@ -59,14 +61,14 @@ fn simplePanic(
         dumpStackTrace(writer, trace);
     }
 
-    printCurrentBackTrace(writer, ret_addr orelse @returnAddress());
+    printCurrentBackTrace(writer, ret_addr);
 }
 
 /// Prints the panic message, stack trace, and registers.
 fn panicImpl(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
-    ret_addr: ?usize,
+    ret_addr: usize,
 ) void {
     // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
     simplePanic(msg, stack_trace, ret_addr);
