@@ -167,12 +167,23 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
             if (embedded_source_files.get(location.file_name)) |file_contents| embed_blk: {
                 writer.writeAll(comptime indent ** 2) catch unreachable;
 
+                var blank_spaces_trimmed_from_line: usize = 0;
+
                 const line = line: {
                     var line_iter = std.mem.split(u8, file_contents, "\n");
-                    var i: u64 = 1;
+                    var row: u64 = 1;
                     while (line_iter.next()) |line| {
-                        if (i == location.line) break :line line;
-                        i += 1;
+                        if (row == location.line) {
+                            var first_non_empty_column: usize = 0;
+
+                            while (first_non_empty_column < line.len and line[first_non_empty_column] == ' ') {
+                                first_non_empty_column += 1;
+                            }
+
+                            blank_spaces_trimmed_from_line = first_non_empty_column;
+                            break :line line[first_non_empty_column..];
+                        }
+                        row += 1;
                     }
                     // no matching line found
                     writer.writeAll("no such line in file?\n") catch unreachable;
@@ -183,7 +194,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
 
                 if (location.column) |column| {
                     writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
-                    writer.writeByteNTimes(' ', column - 1) catch unreachable;
+                    writer.writeByteNTimes(' ', column - 1 - blank_spaces_trimmed_from_line) catch unreachable;
 
                     writer.writeAll("^\n") catch unreachable;
                 } else {
