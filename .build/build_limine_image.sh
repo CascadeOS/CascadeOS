@@ -107,12 +107,12 @@ sudo mkdir -p "$IMAGE_BOOT"/EFI/BOOT || die "couldn't create EFI/BOOT directory"
 sudo cp "$LIMINE_CONFIG" "$IMAGE_BOOT"/limine.cfg || die "couldn't copy limine files"
 
 case "$TARGET_ARCH" in
+'aarch64')
+    sudo cp "$LIMINE"/BOOTAA64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
+    ;;
 'x86_64')
     sudo cp "$LIMINE"/limine.sys "$IMAGE_BOOT"/ || die "couldn't copy limine files"
     sudo cp "$LIMINE"/BOOTX64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
-    ;;
-'aarch64')
-    sudo cp "$LIMINE"/BOOTAA64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
     ;;
 *)
     die "unsupported target arch"

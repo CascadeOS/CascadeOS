@@ -13,8 +13,8 @@ comptime {
 }
 
 const current = switch (kernel.info.arch) {
-    .x86_64 => x86_64,
     .aarch64 => aarch64,
+    .x86_64 => x86_64,
 };
 
 pub inline fn spinLoopHint() void {

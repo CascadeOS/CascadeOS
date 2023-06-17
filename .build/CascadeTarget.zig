@@ -49,6 +49,22 @@ pub const CascadeTarget = enum {
 
     pub fn getCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         switch (self) {
+            .aarch64 => {
+                const features = std.Target.aarch64.Feature;
+                var target = std.zig.CrossTarget{
+                    .cpu_arch = .aarch64,
+                    .os_tag = .freestanding,
+                    .abi = .none,
+                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.generic },
+                };
+
+                // Remove neon and fp features
+                target.cpu_features_sub.addFeature(@enumToInt(features.neon));
+                target.cpu_features_sub.addFeature(@enumToInt(features.fp_armv8));
+
+                return target;
+            },
+
             .x86_64 => {
                 const features = std.Target.x86.Feature;
                 var target = std.zig.CrossTarget{
@@ -80,21 +96,6 @@ pub const CascadeTarget = enum {
 
                 // Add soft float
                 target.cpu_features_add.addFeature(@enumToInt(features.soft_float));
-
-                return target;
-            },
-            .aarch64 => {
-                const features = std.Target.aarch64.Feature;
-                var target = std.zig.CrossTarget{
-                    .cpu_arch = .aarch64,
-                    .os_tag = .freestanding,
-                    .abi = .none,
-                    .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.generic },
-                };
-
-                // Remove neon and fp features
-                target.cpu_features_sub.addFeature(@enumToInt(features.neon));
-                target.cpu_features_sub.addFeature(@enumToInt(features.fp_armv8));
 
                 return target;
             },
