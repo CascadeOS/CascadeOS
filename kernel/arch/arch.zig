@@ -12,7 +12,7 @@ comptime {
     _ = current;
 }
 
-// TODO: Whatever case is first in the below switch determines zls completions.
+// TODO: whatever case is first in the below switch determines zls completions.
 const current = switch (kernel.info.arch) {
     .x86_64 => x86_64,
     .aarch64 => aarch64,
@@ -102,6 +102,9 @@ pub const paging = struct {
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
     ///   4. return the `VirtRange` representing the entire virtual range that entry covers
     pub inline fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtRange {
+        // TODO: randomize location of the heap https://github.com/CascadeOS/CascadeOS/issues/56
+        // the chance that the heap will occupy the the very first higher half table is very high
+        // especially due to kaslr. to reduce this problem we need to add a bit of random.
         return current.paging.getHeapRangeAndFillFirstLevel(page_table);
     }
 
