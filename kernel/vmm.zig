@@ -232,24 +232,24 @@ const linker_symbols = struct {
 fn mapKernelSections() !void {
     log.debug("mapping .text section", .{});
     try mapSection(
-        @ptrToInt(&linker_symbols.__text_start),
-        @ptrToInt(&linker_symbols.__text_end),
+        @intFromPtr(&linker_symbols.__text_start),
+        @intFromPtr(&linker_symbols.__text_end),
         .{ .executable = true, .global = true },
         .kernel_executable_section,
     );
 
     log.debug("mapping .rodata section", .{});
     try mapSection(
-        @ptrToInt(&linker_symbols.__rodata_start),
-        @ptrToInt(&linker_symbols.__rodata_end),
+        @intFromPtr(&linker_symbols.__rodata_start),
+        @intFromPtr(&linker_symbols.__rodata_end),
         .{ .global = true },
         .kernel_readonly_section,
     );
 
     log.debug("mapping .data section", .{});
     try mapSection(
-        @ptrToInt(&linker_symbols.__data_start),
-        @ptrToInt(&linker_symbols.__data_end),
+        @intFromPtr(&linker_symbols.__data_start),
+        @intFromPtr(&linker_symbols.__data_end),
         .{ .writeable = true, .global = true },
         .kernel_writeable_section,
     );

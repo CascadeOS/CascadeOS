@@ -17,7 +17,7 @@ var state: PanicState = .no_op;
 /// Switches the panic state to the given state.
 /// Panics if the new state is less than the current state.
 pub fn switchTo(new_state: PanicState) void {
-    if (@enumToInt(state) < @enumToInt(new_state)) {
+    if (@intFromEnum(state) < @intFromEnum(new_state)) {
         state = new_state;
         return;
     }

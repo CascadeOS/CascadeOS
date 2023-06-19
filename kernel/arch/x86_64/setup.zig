@@ -47,7 +47,7 @@ pub fn earlyArchInitialization() void {
 
     log.debug("mapping idt vectors to the prepared stacks", .{});
     for (0..x86_64.interrupts.number_of_handlers) |vector_number| {
-        const vector = @intToEnum(x86_64.interrupts.IdtVector, vector_number);
+        const vector = @enumFromInt(x86_64.interrupts.IdtVector, vector_number);
 
         if (vector == .double_fault) {
             x86_64.interrupts.setVectorStack(vector, .double_fault);

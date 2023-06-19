@@ -60,7 +60,7 @@ kernel_target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build
 cascade_option_module: *std.Build.Module,
 non_cascade_option_module: *std.Build.Module,
 
-pub fn get(b: *std.Build, cascade_version: std.builtin.Version, all_targets: []const CascadeTarget) !Options {
+pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_targets: []const CascadeTarget) !Options {
     const build_for_host = b.option(
         bool,
         "build_for_host",
@@ -246,7 +246,7 @@ fn addTargetOptions(options: *Step.Options, target: CascadeTarget) void {
     out.print("pub const arch: Arch = .{s};\n", .{std.zig.fmtId(@tagName(target))}) catch unreachable;
 }
 
-fn getVersionString(b: *std.Build, version: std.builtin.Version) ![]const u8 {
+fn getVersionString(b: *std.Build, version: std.SemanticVersion) ![]const u8 {
     const version_string = b.fmt(
         "{d}.{d}.{d}",
         .{ version.major, version.minor, version.patch },
@@ -279,7 +279,7 @@ fn getVersionString(b: *std.Build, version: std.builtin.Version) ![]const u8 {
             const commit_height = it.next() orelse unreachable;
             const commit_id = it.next() orelse unreachable;
 
-            const ancestor_ver = try std.builtin.Version.parse(tagged_ancestor);
+            const ancestor_ver = try std.SemanticVersion.parse(tagged_ancestor);
             if (version.order(ancestor_ver) != .gt) {
                 std.debug.print(
                     "version '{}' must be greater than tagged ancestor '{}'\n",

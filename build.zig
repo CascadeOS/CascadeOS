@@ -11,7 +11,7 @@ const Options = @import(".build/Options.zig");
 const QemuStep = @import(".build/QemuStep.zig");
 const StepCollection = @import(".build/StepCollection.zig");
 
-const cascade_version = std.builtin.Version{ .major = 0, .minor = 0, .patch = 1 };
+const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 1 };
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
 pub fn build(b: *std.Build) !void {

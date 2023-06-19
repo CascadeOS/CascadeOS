@@ -41,11 +41,11 @@ pub const VirtAddr = extern struct {
     }
 
     pub inline fn fromPtr(ptr: *const anyopaque) VirtAddr {
-        return fromInt(@ptrToInt(ptr));
+        return fromInt(@intFromPtr(ptr));
     }
 
     pub inline fn toPtr(self: VirtAddr, comptime PtrT: type) PtrT {
-        return @intToPtr(PtrT, self.value);
+        return @ptrFromInt(PtrT, self.value);
     }
 
     /// Returns the physical address of the given diret map virtual address.

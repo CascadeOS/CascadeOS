@@ -97,7 +97,7 @@ pub const color = struct {
     };
 
     inline fn makeColor(comptime foreground: bool, comptime c: Color) []const u8 {
-        return comptimeCsiFmt(if (foreground) "38;5;{d}m" else "48;5;{d}m", .{@enumToInt(c)});
+        return comptimeCsiFmt(if (foreground) "38;5;{d}m" else "48;5;{d}m", .{@intFromEnum(c)});
     }
 };
 

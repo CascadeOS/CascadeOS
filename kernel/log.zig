@@ -130,7 +130,7 @@ pub inline fn formatScopeAndLevel(
 
 /// Determine if a specific scope and log level pair is enabled for logging.
 inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime message_level: Level) bool {
-    comptime return isScopeInForcedDebugScopes(scope) or @enumToInt(message_level) <= @enumToInt(level);
+    comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(level);
 }
 
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {

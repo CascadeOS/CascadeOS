@@ -39,7 +39,7 @@ pub const InterruptStackSelector = enum(u3) {
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
 pub fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
-    idt.handlers[@enumToInt(vector)].setStack(@enumToInt(stack_selector));
+    idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
 }
 
 /// Handles all interrupts by printing the vector and then panicking.
@@ -51,7 +51,7 @@ fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
         core.panicFmt("exception {s}", .{@tagName(idt_vector)}) catch unreachable;
     }
 
-    core.panicFmt("interrupt {d}", .{@enumToInt(idt_vector)}) catch unreachable;
+    core.panicFmt("interrupt {d}", .{@intFromEnum(idt_vector)}) catch unreachable;
 }
 
 /// Creates an array of raw interrupt handlers, one for each vector.
@@ -61,7 +61,7 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
     comptime var i = 0;
     inline while (i < number_of_handlers) : (i += 1) {
         const vector_number = @intCast(u8, i);
-        const idt_vector = @intToEnum(IdtVector, vector_number);
+        const idt_vector = @enumFromInt(IdtVector, vector_number);
 
         // if the cpu does not push an error code, we push a dummy error code to ensure the stack
         // is always aligned in the same way for every vector
@@ -164,7 +164,7 @@ pub const InterruptFrame = extern struct {
     ss: u64,
 
     pub fn getIdtVector(self: *const InterruptFrame) IdtVector {
-        return @intToEnum(IdtVector, @intCast(u8, self.padded_vector_number));
+        return @enumFromInt(IdtVector, @intCast(u8, self.padded_vector_number));
     }
 
     pub inline fn isKernel(self: *const InterruptFrame) bool {
@@ -409,14 +409,14 @@ pub const IdtVector = enum(u8) {
     _,
 
     pub fn isException(self: IdtVector) bool {
-        if (@enumToInt(self) <= @enumToInt(IdtVector._reserved8)) {
+        if (@intFromEnum(self) <= @intFromEnum(IdtVector._reserved8)) {
             return self != IdtVector.non_maskable_interrupt;
         }
         return false;
     }
 
     pub fn hasErrorCode(self: IdtVector) bool {
-        return switch (@enumToInt(self)) {
+        return switch (@intFromEnum(self)) {
             // Exceptions
             0x00...0x07 => false,
             0x08 => true,

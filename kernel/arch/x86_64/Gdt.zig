@@ -30,7 +30,7 @@ pub const Gdt = extern struct {
     pub fn setTss(self: *Gdt, tss: *x86_64.Tss) void {
         // TODO: packed struct to represent the below
 
-        const tss_ptr = @ptrToInt(tss);
+        const tss_ptr = @intFromPtr(tss);
 
         const low_base: u64 = (tss_ptr & mask_u24) << 16;
         const mid_base: u64 = ((tss_ptr >> 24) & mask_u8) << 56;
@@ -56,7 +56,7 @@ pub const Gdt = extern struct {
     pub fn load(self: *Gdt) void {
         const gdt_ptr = Gdtr{
             .limit = @sizeOf(Gdt) - 1,
-            .base = @ptrToInt(self),
+            .base = @intFromPtr(self),
         };
 
         // Load the GDT

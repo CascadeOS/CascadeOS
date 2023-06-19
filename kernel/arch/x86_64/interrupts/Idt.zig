@@ -75,7 +75,7 @@ pub const Entry = extern struct {
     }
 
     pub fn setHandler(self: *Entry, handler: *const fn () callconv(.Naked) void) void {
-        const addr = @ptrToInt(handler);
+        const addr = @intFromPtr(handler);
         self.pointer_low = @truncate(u16, addr);
         self.pointer_middle = @truncate(u16, (addr >> 16));
         self.pointer_high = @truncate(u32, (addr >> 32));
@@ -100,7 +100,7 @@ pub fn load(self: *const Idt) void {
     };
 
     const idtr = Idtr{
-        .addr = @ptrToInt(self),
+        .addr = @intFromPtr(self),
         .limit = @sizeOf(Idt) - 1,
     };
 

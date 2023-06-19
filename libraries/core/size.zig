@@ -14,11 +14,11 @@ pub const Size = extern struct {
     };
 
     const unit_table = .{
-        .{ .value = @enumToInt(Unit.tib), .name = "TiB" },
-        .{ .value = @enumToInt(Unit.gib), .name = "GiB" },
-        .{ .value = @enumToInt(Unit.mib), .name = "MiB" },
-        .{ .value = @enumToInt(Unit.kib), .name = "KiB" },
-        .{ .value = @enumToInt(Unit.byte), .name = "B" },
+        .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
+        .{ .value = @intFromEnum(Unit.gib), .name = "GiB" },
+        .{ .value = @intFromEnum(Unit.mib), .name = "MiB" },
+        .{ .value = @intFromEnum(Unit.kib), .name = "KiB" },
+        .{ .value = @intFromEnum(Unit.byte), .name = "B" },
     };
 
     pub const zero: Size = .{ .bytes = 0 };
@@ -29,7 +29,7 @@ pub const Size = extern struct {
 
     pub inline fn from(size: usize, unit: Unit) Size {
         return .{
-            .bytes = size * @enumToInt(unit),
+            .bytes = size * @intFromEnum(unit),
         };
     }
 
@@ -38,11 +38,11 @@ pub const Size = extern struct {
     }
 
     pub inline fn alignForward(self: Size, alignment: Size) Size {
-        return .{ .bytes = std.mem.alignForward(self.bytes, alignment.bytes) };
+        return .{ .bytes = std.mem.alignForward(usize, self.bytes, alignment.bytes) };
     }
 
     pub inline fn alignBackward(self: Size, alignment: Size) Size {
-        return .{ .bytes = std.mem.alignBackward(self.bytes, alignment.bytes) };
+        return .{ .bytes = std.mem.alignBackward(usize, self.bytes, alignment.bytes) };
     }
 
     pub inline fn add(self: Size, other: Size) Size {

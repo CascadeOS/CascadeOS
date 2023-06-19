@@ -93,7 +93,7 @@ test "isBitSet - comptime_int" {
 /// try testing.expect(getBit(a, 1) == 1);
 /// ```
 pub fn getBit(target: anytype, comptime bit: comptime_int) u1 {
-    return @boolToInt(isBitSet(target, bit));
+    return @intFromBool(isBitSet(target, bit));
 }
 
 test "getBit" {

@@ -59,8 +59,8 @@ pub const CascadeTarget = enum {
                 };
 
                 // Remove neon and fp features
-                target.cpu_features_sub.addFeature(@enumToInt(features.neon));
-                target.cpu_features_sub.addFeature(@enumToInt(features.fp_armv8));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.neon));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
 
                 return target;
             },
@@ -75,27 +75,27 @@ pub const CascadeTarget = enum {
                 };
 
                 // Remove all SSE/AVX features
-                target.cpu_features_sub.addFeature(@enumToInt(features.x87));
-                target.cpu_features_sub.addFeature(@enumToInt(features.mmx));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse));
-                target.cpu_features_sub.addFeature(@enumToInt(features.f16c));
-                target.cpu_features_sub.addFeature(@enumToInt(features.fma));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse2));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse3));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse4_1));
-                target.cpu_features_sub.addFeature(@enumToInt(features.sse4_2));
-                target.cpu_features_sub.addFeature(@enumToInt(features.ssse3));
-                target.cpu_features_sub.addFeature(@enumToInt(features.vzeroupper));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx2));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512bw));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512cd));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512dq));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512f));
-                target.cpu_features_sub.addFeature(@enumToInt(features.avx512vl));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.x87));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.mmx));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.sse));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.f16c));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.fma));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.sse2));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.sse3));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.sse4_1));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.sse4_2));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.ssse3));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.vzeroupper));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx2));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512bw));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512cd));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512dq));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512f));
+                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512vl));
 
                 // Add soft float
-                target.cpu_features_add.addFeature(@enumToInt(features.soft_float));
+                target.cpu_features_add.addFeature(@intFromEnum(features.soft_float));
 
                 return target;
             },
