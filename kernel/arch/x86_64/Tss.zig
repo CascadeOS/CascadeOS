@@ -37,7 +37,6 @@ pub const Tss = extern struct {
     pub const format = core.formatStructIgnoreReserved;
 
     comptime {
-        std.debug.assert(@sizeOf(Tss) == 104);
-        std.debug.assert(@bitSizeOf(Tss) == 104 * 8);
+        core.testing.expectSize(@This(), 104);
     }
 };

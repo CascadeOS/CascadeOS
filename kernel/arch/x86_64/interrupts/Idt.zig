@@ -86,8 +86,7 @@ pub const Entry = extern struct {
     }
 
     comptime {
-        std.debug.assert(@sizeOf(Entry) == @sizeOf(u64) * 2);
-        std.debug.assert(@bitSizeOf(Entry) == @bitSizeOf(u64) * 2);
+        core.testing.expectSize(@This(), @sizeOf(u64) * 2);
     }
 
     pub const format = core.formatStructIgnoreReserved;

@@ -96,8 +96,7 @@ pub const RFlags = packed struct(u64) {
     pub const format = core.formatStructIgnoreReserved;
 
     comptime {
-        std.debug.assert(@bitSizeOf(u64) == @bitSizeOf(RFlags));
-        std.debug.assert(@sizeOf(u64) == @sizeOf(RFlags));
+        core.testing.expectSize(@This(), @sizeOf(u64));
     }
 };
 

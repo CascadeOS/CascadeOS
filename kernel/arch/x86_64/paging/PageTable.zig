@@ -403,7 +403,7 @@ pub const PageTable = extern struct {
     };
 
     comptime {
-        std.debug.assert(@sizeOf(PageTable) == @sizeOf([number_of_entries]Entry));
+        core.testing.expectSize(@This(), @sizeOf([number_of_entries]Entry));
     }
 };
 

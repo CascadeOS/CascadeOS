@@ -127,7 +127,6 @@ const PhysPageNode = extern struct {
     next: ?*PhysPageNode = null,
 
     comptime {
-        std.debug.assert(@sizeOf(PhysPageNode) == @sizeOf(usize));
-        std.debug.assert(@bitSizeOf(PhysPageNode) == @bitSizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(usize));
     }
 };

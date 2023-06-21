@@ -25,8 +25,7 @@ pub const PhysAddr = extern struct {
     pub usingnamespace AddrMixin(@This());
 
     comptime {
-        std.debug.assert(@sizeOf(PhysAddr) == @sizeOf(usize));
-        std.debug.assert(@bitSizeOf(PhysAddr) == @bitSizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(usize));
     }
 };
 
@@ -70,8 +69,7 @@ pub const VirtAddr = extern struct {
     pub usingnamespace AddrMixin(@This());
 
     comptime {
-        std.debug.assert(@sizeOf(VirtAddr) == @sizeOf(usize));
-        std.debug.assert(@bitSizeOf(VirtAddr) == @bitSizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(usize));
     }
 };
 

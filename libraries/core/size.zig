@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const core = @import("core.zig");
 
 pub const Size = extern struct {
     bytes: usize,
@@ -132,8 +133,7 @@ pub const Size = extern struct {
     }
 
     comptime {
-        std.debug.assert(@sizeOf(Size) == @sizeOf(usize));
-        std.debug.assert(@bitSizeOf(Size) == @bitSizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(usize));
     }
 };
 
