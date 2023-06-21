@@ -1,12 +1,26 @@
 // SPDX-License-Identifier: MIT
 
 //! This module contains the definitions of the Limine protocol.
-//! https://github.com/limine-bootloader/limine/blob/v4.x-branch/PROTOCOL.md
-//! Document above at commit: 4e1fe0b784647db1c6d8bfcc32ed9a4ecae31f70
+//! https://github.com/limine-bootloader/limine/blob/v5.x-branch/PROTOCOL.md
+//! Document above at commit: 9274ee656e3bbd147a2ee44d4ff8a2f37359f2c9
 
 const std = @import("std");
+const core = @import("core");
 
 const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
+
+const Arch = enum {
+    aarch64,
+    riscv64,
+    x86_64,
+};
+
+const arch: Arch = switch (@import("builtin").cpu.arch) {
+    .aarch64 => .aarch64,
+    .riscv64 => .riscv64,
+    .x86_64 => .x86_64,
+    else => |e| @compileError("unsupported architecture " ++ @tagName(e)),
+};
 
 pub const BootloaderInfo = extern struct {
     id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0xf55038d8e2a1202f, 0x279426fcf5f59740 },
@@ -52,11 +66,11 @@ pub const HHDM = extern struct {
     };
 };
 
-// TODO: Limine's Terminal Feature is not implemented as it is not used by Cascade.
+// NOTE: Limine's Terminal Feature is not implemented as it is deprecated and not used by Cascade.
 
 pub const Framebuffer = extern struct {
     id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x9d5827dcd881dd75, 0xa3148604f6fab11b },
-    revision: u64 = 0,
+    revision: u64 = 1,
     response: ?*const Response = null,
 
     pub const Response = extern struct {
@@ -91,22 +105,18 @@ pub const Framebuffer = extern struct {
         edid_size: u64,
         edid: [*]const u8,
 
-        /// Only present in revision 1
+        /// Only present from revision 1
         mode_count: u64,
-        /// Only present in revision 1
+        /// Only present from revision 1
         video_modes: [*]const *const VideoMode,
 
         pub fn getEdid(self: *const LimineFramebuffer) []const u8 {
             return self.edid[0..self.edid_size];
         }
 
+        /// Only present from revision 1
         pub fn getVideoModes(self: *const LimineFramebuffer) []const *const VideoMode {
             return self.video_modes[0..self.mode_count];
-        }
-
-        comptime {
-            std.debug.assert(10 * @sizeOf(u64) == @sizeOf(LimineFramebuffer));
-            std.debug.assert(10 * @bitSizeOf(u64) == @bitSizeOf(LimineFramebuffer));
         }
     };
 
@@ -129,19 +139,84 @@ pub const Framebuffer = extern struct {
 
     pub const MemoryModel = enum(u8) {
         rgb = 1,
+        _,
     };
 };
 
-/// The presence of this request will prompt the bootloader to turn on x86_64 5-level paging.
-/// It will not be turned on if this request is not present.
-/// If the response pointer is changed to a valid pointer, 5-level paging is engaged.
-pub const Level5Paging = extern struct {
-    id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x94469551da9b3192, 0xebe5e86db7382888 },
+/// The Paging Mode feature allows the kernel to control which paging mode is enabled before control is passed to it.
+/// The response indicates which paging mode was actually enabled by the bootloader.
+/// Kernels must be prepared to handle the case where the requested paging mode is not supported by the hardware.
+pub const PagingMode = extern struct {
+    id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95c1a0edab0944cb, 0xa4e5cb3842f7488a },
     revision: u64 = 0,
     response: ?*const Response = null,
 
+    mode: Mode = default_mode,
+    flags: Flags = .{},
+
     pub const Response = extern struct {
         revision: u64,
+
+        /// Which paging mode was actually enabled by the bootloader.
+        mode: Mode,
+
+        flags: Flags,
+    };
+
+    pub const default_mode: Mode = switch (arch) {
+        .aarch64 => .four_level,
+        .riscv64 => .sv48,
+        .x86_64 => .four_level,
+    };
+
+    pub const Mode = switch (arch) {
+        .aarch64 => Mode_aarch64,
+        .riscv64 => Mode_riscv64,
+        .x86_64 => Mode_x86_64,
+    };
+
+    pub const Mode_aarch64 = enum(u64) {
+        four_level,
+        five_level,
+        _,
+    };
+
+    pub const Mode_riscv64 = enum(u64) {
+        /// three level paging
+        sv39,
+
+        /// four level paging
+        sv48,
+
+        /// five level paging
+        sv57,
+    };
+
+    pub const Mode_x86_64 = enum(u64) {
+        four_level,
+        five_level,
+        _,
+    };
+
+    pub const Flags = switch (arch) {
+        .aarch64 => Flags_aarch64,
+        .riscv64 => Flags_riscv64,
+        .x86_64 => Flags_x86_64,
+    };
+
+    /// No flags are currently defined for aarch64
+    pub const Flags_aarch64 = packed struct(u64) {
+        _reserved: u64 = 0,
+    };
+
+    /// No flags are currently defined for riscv64
+    pub const Flags_riscv64 = packed struct(u64) {
+        _reserved: u64 = 0,
+    };
+
+    /// No flags are currently defined for x86_64
+    pub const Flags_x86_64 = packed struct(u64) {
+        _reserved: u64 = 0,
     };
 };
 
@@ -154,63 +229,16 @@ pub const SMP = extern struct {
 
     flags: Flags = .{},
 
-    pub const Flags = packed struct {
+    pub const Flags = packed struct(u64) {
         /// Use x2APIC if possible (x86_64-only)
         x2apic: u1 = 0,
         _: u63 = 0,
-
-        comptime {
-            std.debug.assert(@sizeOf(u64) == @sizeOf(Flags));
-            std.debug.assert(@bitSizeOf(u64) == @bitSizeOf(Flags));
-        }
     };
 
-    pub const Response = extern union {
-        x86_64: ?*const Response_x86_64,
-    };
-
-    pub const Response_x86_64 = extern struct {
-        revision: u64,
-        flags: ResponseFlags,
-        /// The Local APIC ID of the bootstrap processor.
-        bsp_lapic_id: u32,
-        /// How many CPUs are present. It includes the bootstrap processor.
-        cpu_count: u64,
-        cpus: [*]const *SMPInfo_x86_64,
-
-        pub const ResponseFlags = packed struct {
-            /// X2APIC has been enabled
-            x2apic_enabled: u1 = 0,
-            _: u31 = 0,
-
-            comptime {
-                std.debug.assert(@sizeOf(u32) == @sizeOf(ResponseFlags));
-                std.debug.assert(@bitSizeOf(u32) == @bitSizeOf(ResponseFlags));
-            }
-        };
-
-        pub fn getCpus(self: *const Response) []const *SMPInfo_x86_64 {
-            return self.cpus[0..self.cpu_count];
-        }
-    };
-
-    pub const SMPInfo_x86_64 = extern struct {
-        /// ACPI Processor UID as specified by the MADT
-        processor_id: u32,
-        /// Local APIC ID of the processor as specified by the MADT
-        lapic_id: u32,
-        reserved: u64,
-        /// An atomic write to this field causes the parked CPU to jump to the written address,
-        /// on a 64KiB (or Stack Size Request size) stack.
-        ///
-        /// A pointer to the `SMPInfo` structure of the CPU is passed in RDI.
-        /// Other than that, the CPU state will be the same as described for the bootstrap processor.
-        /// This field is unused for the structure describing the bootstrap processor.
-        /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
-        /// processor.
-        goto_address: ?*const fn (smp_info: *const SMPInfo_x86_64) callconv(.C) noreturn,
-        /// A free for use field
-        extra_argument: u64,
+    pub const Response = switch (arch) {
+        .aarch64 => Response_aarch64,
+        .riscv64 => Response_riscv64,
+        .x86_64 => Response_x86_64,
     };
 
     pub const Response_aarch64 = extern struct {
@@ -221,29 +249,105 @@ pub const SMP = extern struct {
         bsp_mpidr: u64,
         /// How many CPUs are present. It includes the bootstrap processor.
         cpu_count: u64,
-        cpus: [*]const *SMPInfo_aarch64,
+        cpus: [*]*SMPInfo,
 
-        pub fn getCpus(self: *const Response) []const *SMPInfo_aarch64 {
+        pub fn getCpus(self: *const Response) []*SMPInfo {
             return self.cpus[0..self.cpu_count];
         }
+
+        pub const SMPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT
+            processor_id: u32,
+            /// GIC CPU Interface number of the processor as specified by the MADT (possibly always 0)
+            gic_iface_no: u32,
+            /// MPIDR of the processor as specified by the MADT or device tree
+            mpidr: u64,
+
+            _reserved: u64,
+
+            /// An atomic write to this field causes the parked CPU to jump to the written address,
+            /// on a 64KiB (or Stack Size Request size) stack
+            ///
+            /// A pointer to the `SMPInfo` structure of the CPU is passed in X0.
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            /// This field is unused for the structure describing the bootstrap processor.
+            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+
+            /// A free for use field
+            extra_argument: u64,
+        };
     };
 
-    pub const SMPInfo_aarch64 = extern struct {
-        /// ACPI Processor UID as specified by the MADT
-        processor_id: u32,
-        /// GIC CPU Interface number of the processor as specified by the MADT (possibly always 0)
-        gic_iface_no: u32,
-        /// MPIDR of the processor as specified by the MADT or device tree
-        mpidr: u64,
-        /// An atomic write to this field causes the parked CPU to jump to the written address,
-        /// on a 64KiB (or Stack Size Request size) stack
-        ///
-        /// A pointer to the `SMPInfo` structure of the CPU is passed in X0.
-        /// Other than that, the CPU state will be the same as described for the bootstrap processor.
-        /// This field is unused for the structure describing the bootstrap processor.
-        goto_address: ?*const fn (smp_info: *const SMPInfo_aarch64) callconv(.C) noreturn,
-        /// A free for use field
-        extra_argument: u64,
+    pub const Response_riscv64 = extern struct {
+        revision: u64,
+        /// Always zero.
+        flags: u32,
+        /// Hart ID of the bootstrap processor as reported by the UEFI RISC-V Boot Protocol or the SBI.
+        bsp_hartid: u64,
+        /// How many CPUs are present. It includes the bootstrap processor.
+        cpu_count: u64,
+        cpus: [*]*SMPInfo,
+
+        pub fn getCpus(self: *const Response) []*SMPInfo {
+            return self.cpus[0..self.cpu_count];
+        }
+
+        pub const SMPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems).
+            processor_id: u32,
+            /// Hart ID of the processor as specified by the MADT or Device Tree.
+            hartid: u32,
+
+            _reserved: u64,
+            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB
+            /// (or Stack Size Request size) stack.
+            /// A pointer to the `SMPInfo` structure of the CPU is passed in x10(a0).
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            /// This field is unused for the structure describing the bootstrap processor.
+            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+
+            /// A free for use field
+            extra_argument: u64,
+        };
+    };
+
+    pub const Response_x86_64 = extern struct {
+        revision: u64,
+        flags: ResponseFlags,
+        /// The Local APIC ID of the bootstrap processor.
+        bsp_lapic_id: u32,
+        /// How many CPUs are present. It includes the bootstrap processor.
+        cpu_count: u64,
+        cpus: [*]*SMPInfo,
+
+        pub const ResponseFlags = packed struct(u32) {
+            /// X2APIC has been enabled
+            x2apic_enabled: u1 = 0,
+            _: u31 = 0,
+        };
+
+        pub fn getCpus(self: *const Response) []*SMPInfo {
+            return self.cpus[0..self.cpu_count];
+        }
+
+        pub const SMPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT
+            processor_id: u32,
+            /// Local APIC ID of the processor as specified by the MADT
+            lapic_id: u32,
+            reserved: u64,
+            /// An atomic write to this field causes the parked CPU to jump to the written address,
+            /// on a 64KiB (or Stack Size Request size) stack.
+            ///
+            /// A pointer to the `SMPInfo` structure of the CPU is passed in RDI.
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            /// This field is unused for the structure describing the bootstrap processor.
+            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
+            /// processor.
+            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+            /// A free for use field
+            extra_argument: u64,
+        };
     };
 };
 
@@ -290,6 +394,7 @@ pub const Memmap = extern struct {
             bootloader_reclaimable = 5,
             kernel_and_modules = 6,
             framebuffer = 7,
+            _,
         };
     };
 };
@@ -318,8 +423,35 @@ pub const KernelFile = extern struct {
 
 pub const Module = extern struct {
     id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x3e7e279702be32af, 0xca1c4f3bd1280cee },
-    revision: u64 = 0,
+    revision: u64 = 1,
     response: ?*const Response = null,
+
+    /// How many internal modules are passed by the kernel.
+    /// Note: Only supported from revision 1
+    internal_module_count: u64 = 0,
+
+    /// Pointer to an array of `internal_module_count` pointers to `InternalModule` structures.
+    /// Note: Only supported from revision 1
+    internal_modules: ?[*]*const InternalModule = null,
+
+    /// Internal Limine modules are guaranteed to be loaded before user-specified (configuration) modules,
+    /// and thus they are guaranteed to appear before user-specified modules in the modules array in the response.
+    pub const InternalModule = extern struct {
+        /// Path to the module to load.
+        /// This path is relative to the location of the kernel.
+        path: [*:0]const u8,
+        /// Command line for the given module.
+        cmdline: [*:0]const u8,
+        /// Flags changing module loading behaviour
+        flags: Flags,
+
+        pub const Flags = packed struct(u64) {
+            /// If `true` then fail if the requested module is not found.
+            required: bool = false,
+
+            _reserved: u63 = 0,
+        };
+    };
 
     pub const Response = extern struct {
         revision: u64,
@@ -342,7 +474,7 @@ pub const File = extern struct {
     /// The path of the file within the volume, with a leading slash
     path: [*:0]const u8,
     /// A command line associated with the file
-    cmdline: [*:0]const u8,
+    cmdline: ?[*:0]const u8,
 
     media_type: MediaType,
 
@@ -384,6 +516,7 @@ pub const File = extern struct {
         generic = 0,
         optical = 1,
         tftp = 2,
+        _,
     };
 
     pub const LimineUUID = extern struct {

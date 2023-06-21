@@ -156,6 +156,7 @@ const LimineMemoryMapIterator = struct {
                 .kernel_and_modules, .framebuffer => .in_use,
                 .reserved, .bad_memory, .acpi_nvs => .reserved_or_unusable,
                 .acpi_reclaimable, .bootloader_reclaimable => .reclaimable,
+                _ => .reserved_or_unusable,
             },
         };
     }
