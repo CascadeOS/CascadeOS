@@ -7,6 +7,8 @@ const helpers = @import("helpers.zig");
 
 const LimineStep = @This();
 
+const step_version: []const u8 = "1";
+
 step: Step,
 
 limine_directory: std.Build.GeneratedFile,
@@ -88,7 +90,9 @@ const DownloadLimineStep = struct {
                 .makeFn = downloadLimineMake,
             }),
             .limine_directory = limine_directory,
-            .timestamp_file_path = try b.cache_root.join(b.allocator, &.{"limine_timestamp"}),
+            .timestamp_file_path = try b.cache_root.join(b.allocator, &.{
+                "limine_timestamp",
+            }),
         };
 
         return self;
@@ -101,7 +105,7 @@ const DownloadLimineStep = struct {
         const b = step.owner;
         const self = @fieldParentPtr(DownloadLimineStep, "step", step);
 
-        if (!self.needToDownloadLimine()) {
+        if (!try self.needToDownloadLimine()) {
             step.result_cached = true;
             return;
         }
@@ -136,17 +140,26 @@ const DownloadLimineStep = struct {
     // 24 hours
     const cache_validity_period = std.time.ns_per_hour * 24;
 
-    fn needToDownloadLimine(self: *DownloadLimineStep) bool {
+    fn needToDownloadLimine(self: *DownloadLimineStep) !bool {
         std.fs.accessAbsolute(self.limine_directory, .{}) catch return true;
         const timestamp_file = std.fs.cwd().openFile(self.timestamp_file_path, .{}) catch return true;
         defer timestamp_file.close();
         const stat = timestamp_file.stat() catch return true;
-        return std.time.nanoTimestamp() >= stat.mtime + cache_validity_period;
+        if (std.time.nanoTimestamp() >= stat.mtime + cache_validity_period) return true;
+
+        var buffer: [step_version.len]u8 = undefined;
+        const len = try timestamp_file.readAll(&buffer);
+
+        // if the versions don't match we need to download
+        return !std.mem.eql(u8, buffer[0..len], step_version);
     }
 
     fn updateTimestampFile(self: *DownloadLimineStep) !void {
         const timestamp_file = try std.fs.cwd().createFile(self.timestamp_file_path, .{});
         defer timestamp_file.close();
+
+        try timestamp_file.writeAll(step_version);
+
         const stat = try timestamp_file.stat();
         try timestamp_file.updateTimes(stat.atime, std.time.nanoTimestamp());
     }

@@ -8,6 +8,8 @@ const helpers = @import("helpers.zig");
 
 const EDK2Step = @This();
 
+const step_version: []const u8 = "1";
+
 step: Step,
 target: CascadeTarget,
 
@@ -63,7 +65,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     const self = @fieldParentPtr(EDK2Step, "step", step);
 
-    if (!self.needToDownloadFirmware()) {
+    if (!try self.needToDownloadFirmware()) {
         self.firmware.path = self.firmware_path;
         step.result_cached = true;
         return;
@@ -81,17 +83,26 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 // 24 hours
 const cache_validity_period = std.time.ns_per_hour * 24;
 
-fn needToDownloadFirmware(self: *EDK2Step) bool {
+fn needToDownloadFirmware(self: *EDK2Step) !bool {
     std.fs.accessAbsolute(self.firmware_path, .{}) catch return true;
     const timestamp_file = std.fs.cwd().openFile(self.timestamp_file_path, .{}) catch return true;
     defer timestamp_file.close();
     const stat = timestamp_file.stat() catch return true;
-    return std.time.nanoTimestamp() >= stat.mtime + cache_validity_period;
+    if (std.time.nanoTimestamp() >= stat.mtime + cache_validity_period) return true;
+
+    var buffer: [step_version.len]u8 = undefined;
+    const len = try timestamp_file.readAll(&buffer);
+
+    // if the versions don't match we need to download
+    return !std.mem.eql(u8, buffer[0..len], step_version);
 }
 
 fn updateTimestampFile(self: *EDK2Step) !void {
     const timestamp_file = try std.fs.cwd().createFile(self.timestamp_file_path, .{});
     defer timestamp_file.close();
+
+    try timestamp_file.writeAll(step_version);
+
     const stat = try timestamp_file.stat();
     try timestamp_file.updateTimes(stat.atime, std.time.nanoTimestamp());
 }
