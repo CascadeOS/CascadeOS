@@ -14,14 +14,14 @@ die() {
 IMAGE="$1"
 TARGET_ARCH="$2"
 LIMINE="$3"
-LIMINE_DEPLOY="$4"
+LIMINE_EXECUTABLE="$4"
 
 if [ ! -d "$LIMINE" ]; then
     die "provided limine directory does not exist"
 fi
 
-if [ ! -f "$LIMINE_DEPLOY" ]; then
-    die "provided limine-deploy executable does not exist"
+if [ ! -f "$LIMINE_EXECUTABLE" ]; then
+    die "provided limine executable does not exist"
 fi
 
 # Setup variables
@@ -61,7 +61,7 @@ parted -s "$IMAGE" mkpart ROOT ext2 64MiB 100% || die "couldn't create ROOT part
 parted -s "$IMAGE" set 1 esp on || die "couldn't set ESP partiton to boot"
 
 # deploy limine
-"$LIMINE_DEPLOY" "$IMAGE" &>/dev/null || die "couldn't deploy limine"
+"$LIMINE_EXECUTABLE" bios-install "$IMAGE" &>/dev/null || die "couldn't deploy limine"
 
 # creating loopback device
 USED_LOOPBACK=$(sudo losetup -Pf --show "$IMAGE")
@@ -111,7 +111,7 @@ case "$TARGET_ARCH" in
     sudo cp "$LIMINE"/BOOTAA64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
     ;;
 'x86_64')
-    sudo cp "$LIMINE"/limine.sys "$IMAGE_BOOT"/ || die "couldn't copy limine files"
+    sudo cp "$LIMINE"/limine-bios.sys "$IMAGE_BOOT"/ || die "couldn't copy limine files"
     sudo cp "$LIMINE"/BOOTX64.EFI "$IMAGE_BOOT"/EFI/BOOT/ || die "couldn't copy limine files"
     ;;
 *)

@@ -150,7 +150,7 @@ fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
             image_file_path,
             @tagName(self.target),
             self.limine_step.limine_directory.getPath(),
-            self.limine_step.limine_deploy_source.getPath(self.step.owner),
+            self.limine_step.limine_executable_source.getPath(self.step.owner),
         },
         helpers.pathJoinFromRoot(self.step.owner, &.{".build"}),
     );

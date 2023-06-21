@@ -7,31 +7,31 @@ const helpers = @import("helpers.zig");
 
 const LimineStep = @This();
 
-const step_version: []const u8 = "1";
+const step_version: []const u8 = "2";
 
 step: Step,
 
 limine_directory: std.Build.GeneratedFile,
 limine_directory_source: std.Build.FileSource,
 
-limine_deploy_source: std.Build.FileSource,
+limine_executable_source: std.Build.FileSource,
 
 __limine_directory: []const u8,
 __download_limine_step: *DownloadLimineStep,
-__build_limine_deploy: *Step.Compile,
+__build_limine_executable: *Step.Compile,
 
 pub fn create(b: *std.Build) !*LimineStep {
     const limine_directory = try b.cache_root.join(b.allocator, &.{"limine"});
-    const limine_deploy_source = b.pathJoin(&.{ limine_directory, "limine-deploy.c" });
+    const limine_executable_source = b.pathJoin(&.{ limine_directory, "limine.c" });
 
     const download_limine_step = try DownloadLimineStep.create(b, limine_directory);
 
     const build_limine = b.addExecutable(.{
-        .name = "limine-deploy",
+        .name = "limine",
         .link_libc = true,
     });
     build_limine.addIncludePath(limine_directory);
-    build_limine.addCSourceFile(limine_deploy_source, &.{
+    build_limine.addCSourceFile(limine_executable_source, &.{
         "-std=c99",
         "-fno-sanitize=undefined",
     });
@@ -49,8 +49,8 @@ pub fn create(b: *std.Build) !*LimineStep {
         }),
         .__limine_directory = limine_directory,
         .__download_limine_step = download_limine_step,
-        .__build_limine_deploy = build_limine,
-        .limine_deploy_source = build_limine.getOutputSource(),
+        .__build_limine_executable = build_limine,
+        .limine_executable_source = build_limine.getOutputSource(),
         .limine_directory = undefined,
         .limine_directory_source = undefined,
     };
@@ -68,7 +68,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     self.limine_directory.path = self.__limine_directory;
 
     // if both of our child steps are cached, then we are cached
-    if (self.__download_limine_step.step.result_cached and self.__build_limine_deploy.step.result_cached) {
+    if (self.__download_limine_step.step.result_cached and self.__build_limine_executable.step.result_cached) {
         step.result_cached = true;
     }
 }
@@ -124,7 +124,7 @@ const DownloadLimineStep = struct {
                 "git",
                 "clone",
                 "-b",
-                "v4.x-branch-binary",
+                "v5.x-branch-binary",
                 "--depth=1",
                 "--single-branch",
                 "https://github.com/limine-bootloader/limine.git",
