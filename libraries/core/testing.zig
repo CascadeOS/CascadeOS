@@ -3,17 +3,17 @@
 const std = @import("std");
 const core = @import("core.zig");
 
-pub inline fn expectSize(comptime T: type, comptime bytes: comptime_int, comptime bits: comptime_int) void {
+pub inline fn expectSize(comptime T: type, comptime bytes: comptime_int) void {
     if (@sizeOf(T) != bytes) {
         @compileError(std.fmt.comptimePrint(
             "{s} has size {} but is expected to have {}",
             .{ @typeName(T), @sizeOf(T), bytes },
         ));
     }
-    if (@bitSizeOf(T) != bits) {
+    if (@bitSizeOf(T) != 8 * bytes) {
         @compileError(std.fmt.comptimePrint(
             "{s} has bit size {} but is expected to have {}",
-            .{ @typeName(T), @bitSizeOf(T), bits },
+            .{ @typeName(T), @bitSizeOf(T), 8 * bytes },
         ));
     }
 }
