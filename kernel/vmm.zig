@@ -72,31 +72,15 @@ pub const MapType = struct {
 
         try writer.writeAll("MapType{ ");
 
-        var buffer: [5]u8 = undefined;
-        var i: usize = 0;
+        const buffer: []const u8 = &.{
+            if (value.user) 'U' else 'K',
+            if (value.writeable) 'W' else 'R',
+            if (value.executable) 'X' else '-',
+            if (value.global) 'G' else '-',
+            if (value.no_cache) 'C' else '-',
+        };
 
-        buffer[i] = if (value.user) 'U' else 'K';
-        i += 1;
-
-        buffer[i] = if (value.writeable) 'W' else 'E';
-        i += 1;
-
-        if (value.executable) {
-            buffer[i] = 'X';
-            i += 1;
-        }
-
-        if (value.global) {
-            buffer[i] = 'G';
-            i += 1;
-        }
-
-        if (value.no_cache) {
-            buffer[i] = 'C';
-            i += 1;
-        }
-
-        try writer.writeAll(buffer[0..i]);
+        try writer.writeAll(buffer);
         try writer.writeAll(" }");
     }
 };
