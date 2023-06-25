@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: MIT OR 0BSD
-// Implementation from https://github.com/dmgk/zig-uuid (see LICENSE-zig-uuid for upstream license)
+// SPDX-License-Identifier: MIT
+// Various parts of the below implementation are from:
+//  - https://github.com/dmgk/zig-uuid (see LICENSE-zig-uuid for upstream license)
+//  - https://github.com/HelenOS/helenos (see LICENSE-helenos for upstream license)
 
 const std = @import("std");
 const core = @import("core");
@@ -8,9 +10,9 @@ const core = @import("core");
 pub const UUID = extern struct {
     bytes: [16]u8,
 
-    pub const nil: UUID = UUID.from(0);
+    pub const nil: UUID = UUID.parse("00000000-0000-0000-0000-000000000000") catch unreachable;
 
-    pub const omni: UUID = UUID.from(std.math.maxInt(u128));
+    pub const omni: UUID = UUID.parse("ffffffff-ffff-ffff-ffff-ffffffffffff") catch unreachable;
 
     /// Generates a random version 4 UUID.
     ///
@@ -22,7 +24,7 @@ pub const UUID = extern struct {
     ///
     /// Parameters:
     /// - `random`: The random number generator to use.
-    pub fn new(random: std.rand.Random) UUID {
+    pub fn generateV4(random: std.rand.Random) UUID {
         var uuid: UUID = undefined;
 
         random.bytes(&uuid.bytes);
@@ -34,16 +36,6 @@ pub const UUID = extern struct {
         uuid.bytes[8] = (uuid.bytes[8] & 0x3f) | 0x80;
 
         return uuid;
-    }
-
-    /// Creates a UUID from a 128-bit integer value.
-    ///
-    /// Returns: A UUID with the given 128-bit integer value.
-    ///
-    /// Parameters:
-    /// - `value`: The 128-bit integer value to use.
-    pub fn from(value: u128) UUID {
-        return .{ .bytes = @bitCast([16]u8, value) };
     }
 
     pub const ParseError = error{InvalidUUID};
@@ -59,22 +51,41 @@ pub const UUID = extern struct {
     /// Errors:
     /// - `ParseError.InvalidUUID` if the string is not a valid UUID representation.
     pub fn parse(buf: []const u8) ParseError!UUID {
-        var uuid = UUID{ .bytes = undefined };
+        if (buf.len != 36) return ParseError.InvalidUUID;
 
-        if (buf.len != 36 or buf[8] != '-' or buf[13] != '-' or buf[18] != '-' or buf[23] != '-')
-            return ParseError.InvalidUUID;
+        var temporary_layout: InMemoryLayout = undefined;
 
-        inline for (encoded_pos, 0..) |i, j| {
-            const hi = hex_to_nibble[buf[i + 0]];
-            const lo = hex_to_nibble[buf[i + 1]];
-            if (hi == 0xff or lo == 0xff) {
+        inline for (parse_format_sections) |section| {
+            if (section.proceeded_by_hyphen and buf[section.start_index - 1] != '-') {
                 return ParseError.InvalidUUID;
             }
-            uuid.bytes[j] = hi << 4 | lo;
+
+            const T = @TypeOf(@field(temporary_layout, section.field_name));
+
+            // TODO: Don't use `std.fmt`
+
+            @field(temporary_layout, section.field_name) =
+                core.nativeTo(
+                T,
+                std.fmt.parseUnsigned(
+                    T,
+                    buf[section.start_index..][0..section.length],
+                    16,
+                ) catch return ParseError.InvalidUUID,
+                section.endianness,
+            );
         }
 
-        return uuid;
+        return @bitCast(UUID, temporary_layout);
     }
+
+    const InMemoryLayout = packed struct(u128) {
+        time_low: u32,
+        time_mid: u16,
+        time_ver: u16,
+        clock: u16,
+        node: u48,
+    };
 
     pub fn format(
         self: UUID,
@@ -85,63 +96,56 @@ pub const UUID = extern struct {
         _ = fmt;
         _ = options;
 
-        var buf: [36]u8 = undefined;
-        const hex = "0123456789abcdef";
+        const temporary_layout: *const InMemoryLayout = @ptrCast(*const InMemoryLayout, @alignCast(@alignOf(InMemoryLayout), &self));
 
-        buf[8] = '-';
-        buf[13] = '-';
-        buf[18] = '-';
-        buf[23] = '-';
-        inline for (encoded_pos, 0..) |i, j| {
-            buf[i + 0] = hex[self.bytes[j] >> 4];
-            buf[i + 1] = hex[self.bytes[j] & 0x0f];
+        var buf: [36]u8 = [_]u8{0} ** 36;
+
+        inline for (parse_format_sections) |section| {
+            if (section.proceeded_by_hyphen) buf[section.start_index - 1] = '-';
+
+            const T = @TypeOf(@field(temporary_layout, section.field_name));
+
+            // TODO: Don't use `std.fmt`
+            _ = std.fmt.formatIntBuf(
+                buf[section.start_index..][0..section.length],
+                core.toNative(
+                    T,
+                    @field(temporary_layout, section.field_name),
+                    section.endianness,
+                ),
+                16,
+                .lower,
+                .{
+                    .width = section.length,
+                    .fill = '0',
+                },
+            );
         }
 
         try writer.writeAll(&buf);
     }
 
+    const ParseFormatSection = struct {
+        field_name: []const u8,
+        start_index: usize,
+        length: usize,
+        endianness: std.builtin.Endian,
+        proceeded_by_hyphen: bool,
+    };
+
+    // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    // "time low - time mid - time ver - clock - node"
+    const parse_format_sections: []const ParseFormatSection = &.{
+        .{ .field_name = "time_low", .start_index = 0, .length = 8, .proceeded_by_hyphen = false, .endianness = .Little },
+        .{ .field_name = "time_mid", .start_index = 9, .length = 4, .proceeded_by_hyphen = true, .endianness = .Little },
+        .{ .field_name = "time_ver", .start_index = 14, .length = 4, .proceeded_by_hyphen = true, .endianness = .Little },
+        .{ .field_name = "clock", .start_index = 19, .length = 4, .proceeded_by_hyphen = true, .endianness = .Big },
+        .{ .field_name = "node", .start_index = 24, .length = 12, .proceeded_by_hyphen = true, .endianness = .Big },
+    };
+
     comptime {
         core.testing.expectSize(@This(), 16);
     }
-};
-
-// Indices in the UUID string representation for each byte.
-const encoded_pos = [16]u8{ 0, 2, 4, 6, 9, 11, 14, 16, 19, 21, 24, 26, 28, 30, 32, 34 };
-
-// Hex to nibble mapping.
-const hex_to_nibble = [256]u8{
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-    0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
 
 test "parse and format" {
