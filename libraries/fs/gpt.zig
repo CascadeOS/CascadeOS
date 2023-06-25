@@ -18,6 +18,10 @@ pub const minimum_number_of_partition_entries = @intCast(
     minimum_size_of_partition_entry_array.divide(PartitionEntry.size),
 );
 
+/// Almost every tool generates partitions with this alignment.
+/// https://en.wikipedia.org/wiki/Logical_Disk_Manager#Advantages_of_using_a_1-MB_alignment_boundary
+pub const recommended_alignment_of_partitions: core.Size = core.Size.from(1, .mib);
+
 /// Creates a protective MBR partition table with a single partition covering the entire disk.
 ///
 /// This function does the following:
@@ -109,7 +113,7 @@ pub const Header = extern struct {
 
     /// CRC32 checksum for the GPT Header structure.
     /// This value is computed by setting this field to 0, and computing the 32-bit CRC for `header_size` bytes.
-    header_crc_32: u32 align(1),
+    header_crc_32: u32 align(1) = 0,
 
     /// Must be zero.
     _reserved: u32 align(1) = 0,
@@ -235,10 +239,11 @@ pub const PartitionEntry = extern struct {
     ending_lba: u64,
 
     /// Attribute bits
-    attributes: Attribute,
+    attributes: Attribute = .{},
 
     /// Null-terminated string containing a human-readable name of the partition.
-    partition_name: [72]u8,
+    /// UNICODE16-LE encoded.
+    partition_name: [36]u16 = [_]u16{0} ** 36,
 
     pub const Attribute = packed struct(u64) {
         /// If this bit is set, the partition is required for the platform to function.
@@ -249,20 +254,20 @@ pub const PartitionEntry = extern struct {
         /// could potentially stop working if this partition is removed.
         /// Unless OS software or firmware recognizes this partition, it should never be removed or modified as the UEFI
         ///  firmware or platform hardware may become non-functional.
-        required: bool,
+        required: bool = false,
 
         /// If this bit is set, then firmware must not produce an EFI_BLOCK_IO_PROTOCOL device for this partition.
         /// See Partition Discovery for more details.
         /// By not producing an EFI_BLOCK_IO_PROTOCOL partition, file system mappings will not be created for this
         /// partition in UEFI.
-        no_block_io: bool,
+        no_block_io: bool = false,
 
         /// This bit is set aside by this specification to let systems with traditional PC-AT BIOS firmware implementations
         /// inform certain limited, special-purpose software running on these systems that a GPT partition may be bootable.
         /// For systems with firmware implementations conforming to this specification, the UEFI boot manager (see chapter 3)
         /// must ignore this bit when selecting a UEFI-compliant application, e.g., an OS loader (see 2.1.3).
         /// Therefore there is no need for this specification to define the exact meaning of this bit.
-        legacy_bios_bootable: bool,
+        legacy_bios_bootable: bool = false,
 
         /// Undefined and must be zero. Reserved for expansion by future versions of the UEFI specification.
         _undefined: u45 = 0,
@@ -271,7 +276,7 @@ pub const PartitionEntry = extern struct {
         /// The use of these bits will vary depending on the `partition_type_guid`.
         /// Only the owner of the `partition_type_guid` is allowed to modify these bits.
         /// They must be preserved if Bits 0-47 are modified.
-        _reserved: u16,
+        _reserved: u16 = 0,
     };
 
     pub const size: core.Size = core.Size.of(PartitionEntry);
@@ -279,6 +284,34 @@ pub const PartitionEntry = extern struct {
     comptime {
         core.testing.expectSize(@This(), 128);
     }
+};
+
+/// Partition Type GUIDs
+///
+/// List available: https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_type_GUIDs
+pub const partition_types = struct {
+    /// Unused Entry
+    /// Defined by the UEFI specification.
+    pub const unused: UUID = UUID.nil;
+
+    /// EFI System Partition
+    /// Defined by the UEFI specification.
+    pub const efi_system_partition: UUID = UUID.parse("C12A7328-F81F-11D2-BA4B-00A0C93EC93B") catch unreachable;
+
+    /// Partition containing a legacy MBR
+    /// Defined by the UEFI specification.
+    pub const partition_containing_legacy_mbr: UUID = UUID.parse("024DEE41-33E7-11D3-9D69-0008C781F39F") catch unreachable;
+
+    /// Microsoft Basic Data Partition
+    /// https://en.wikipedia.org/wiki/Microsoft_basic_data_partition
+    ///
+    /// According to Microsoft, the basic data partition is the equivalent to master boot record (MBR) partition types
+    /// 0x06 (FAT16B), 0x07 (NTFS or exFAT), and 0x0B (FAT32).
+    /// In practice, it is also equivalent to 0x01 (FAT12), 0x04 (FAT16), 0x0C (FAT32 with logical block addressing),
+    /// and 0x0E (FAT16 with logical block addressing) types as well.
+    pub const microsoft_basic_data_partition: UUID = UUID.parse("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7") catch unreachable;
+
+    pub const linux_filesystem_data: UUID = UUID.parse("0FC63DAF-8483-4772-8E79-3D69D8477DE4") catch unreachable;
 };
 
 comptime {
