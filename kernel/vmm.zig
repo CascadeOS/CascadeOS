@@ -72,7 +72,7 @@ pub const MapType = struct {
 
         try writer.writeAll("MapType{ ");
 
-        const buffer: []const u8 = &.{
+        const buffer: []const u8 = &[_]u8{
             if (value.user) 'U' else 'K',
             if (value.writeable) 'W' else 'R',
             if (value.executable) 'X' else '-',
