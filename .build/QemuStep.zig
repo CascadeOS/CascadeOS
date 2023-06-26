@@ -27,13 +27,16 @@ uefi: bool,
 /// Only non-null if uefi is true
 edk2_step: ?*EDK2Step,
 
+/// Registers QEMU steps for all targets.
+///
+/// For each target, creates a `QemuStep` that runs the image for the target using QEMU.
 pub fn registerQemuSteps(
     b: *std.Build,
     image_steps: ImageStep.Collection,
     options: Options,
-    all_targets: []const CascadeTarget,
+    targets: []const CascadeTarget,
 ) !void {
-    for (all_targets) |target| {
+    for (targets) |target| {
         const image_step = image_steps.get(target).?;
 
         const qemu_step = try QemuStep.create(b, target, image_step.image_file_source, options);
@@ -128,7 +131,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         try std.fmt.allocPrint(
             b.allocator,
             "{d}",
-            .{self.options.smp},
+            .{self.options.number_of_cores},
         ),
     });
 
@@ -150,8 +153,8 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
     }
 
-    // gdb debug
-    if (self.options.qemu_debug) {
+    // gdb remote debug
+    if (self.options.qemu_remote_debug) {
         run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
     }
 

@@ -16,8 +16,8 @@ target: CascadeTarget,
 firmware: std.Build.GeneratedFile,
 firmware_source: std.Build.FileSource,
 
-timestamp_file_path: []const u8,
-edk2_path: []const u8,
+timestamp_path: []const u8,
+edk2_dir: []const u8,
 firmware_path: []const u8,
 
 pub fn create(b: *std.Build, target: CascadeTarget) !*EDK2Step {
@@ -35,7 +35,7 @@ pub fn create(b: *std.Build, target: CascadeTarget) !*EDK2Step {
         .target = target,
         .firmware = undefined,
         .firmware_source = undefined,
-        .timestamp_file_path = try b.cache_root.join(
+        .timestamp_path = try b.cache_root.join(
             b.allocator,
             &.{
                 try std.fmt.allocPrint(
@@ -45,7 +45,7 @@ pub fn create(b: *std.Build, target: CascadeTarget) !*EDK2Step {
                 ),
             },
         ),
-        .edk2_path = try b.cache_root.join(b.allocator, &.{"edk2"}),
+        .edk2_dir = try b.cache_root.join(b.allocator, &.{"edk2"}),
         .firmware_path = try b.cache_root.join(b.allocator, &.{
             "edk2",
             try std.fmt.allocPrint(b.allocator, "OVMF-{s}.fd", .{@tagName(self.target)}),
@@ -57,21 +57,21 @@ pub fn create(b: *std.Build, target: CascadeTarget) !*EDK2Step {
     return self;
 }
 
-fn make(step: *Step, prog_node: *std.Progress.Node) !void {
-    var node = prog_node.start(step.name, 0);
+fn make(step: *Step, progress_node: *std.Progress.Node) !void {
+    var node = progress_node.start(step.name, 0);
     defer node.end();
 
-    node.activate();
+    progress_node.activate();
 
     const self = @fieldParentPtr(EDK2Step, "step", step);
 
-    if (!try self.needToDownloadFirmware()) {
+    if (!try self.firmwareNeedsUpdate()) {
         self.firmware.path = self.firmware_path;
         step.result_cached = true;
         return;
     }
 
-    try std.fs.cwd().makePath(self.edk2_path);
+    try std.fs.cwd().makePath(self.edk2_dir);
 
     try fetch(step, self.target.uefiFirmwareUrl(), self.firmware_path);
 
@@ -83,9 +83,10 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 // 24 hours
 const cache_validity_period = std.time.ns_per_hour * 24;
 
-fn needToDownloadFirmware(self: *EDK2Step) !bool {
+/// Checks if the EDK2 firmware needs to be updated.
+fn firmwareNeedsUpdate(self: *EDK2Step) !bool {
     std.fs.accessAbsolute(self.firmware_path, .{}) catch return true;
-    const timestamp_file = std.fs.cwd().openFile(self.timestamp_file_path, .{}) catch return true;
+    const timestamp_file = std.fs.cwd().openFile(self.timestamp_path, .{}) catch return true;
     defer timestamp_file.close();
     const stat = timestamp_file.stat() catch return true;
     if (std.time.nanoTimestamp() >= stat.mtime + cache_validity_period) return true;
@@ -97,8 +98,9 @@ fn needToDownloadFirmware(self: *EDK2Step) !bool {
     return !std.mem.eql(u8, buffer[0..len], step_version);
 }
 
+/// Update the timestamp file.
 fn updateTimestampFile(self: *EDK2Step) !void {
-    const timestamp_file = try std.fs.cwd().createFile(self.timestamp_file_path, .{});
+    const timestamp_file = try std.fs.cwd().createFile(self.timestamp_path, .{});
     defer timestamp_file.close();
 
     try timestamp_file.writeAll(step_version);
@@ -107,6 +109,7 @@ fn updateTimestampFile(self: *EDK2Step) !void {
     try timestamp_file.updateTimes(stat.atime, std.time.nanoTimestamp());
 }
 
+/// Fetches a file from a URL.
 fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
     var failed = false;
 
@@ -160,28 +163,29 @@ fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
     // try buffered_writer.flush();
 }
 
+/// Downloads a file using the std http client.
 fn downloadWithHttpClient(allocator: std.mem.Allocator, url: []const u8, writer: anytype) !void {
     const uri = try std.Uri.parse(url);
 
-    var client: std.http.Client = .{ .allocator = allocator };
-    defer client.deinit();
+    var http_client: std.http.Client = .{ .allocator = allocator };
+    defer http_client.deinit();
 
-    var headers = std.http.Headers{ .allocator = allocator };
-    defer headers.deinit();
+    var request_headers = std.http.Headers{ .allocator = allocator };
+    defer request_headers.deinit();
 
-    var req = try client.request(.GET, uri, headers, .{});
-    defer req.deinit();
+    var request = try http_client.request(.GET, uri, request_headers, .{});
+    defer request.deinit();
 
-    try req.start();
-    try req.wait();
+    try request.start();
+    try request.wait();
 
-    if (req.response.status != .ok) return error.ResponseNotOk;
+    if (request.response.status != .ok) return error.ResponseNotOk;
 
     var buffer: [4096]u8 = undefined;
 
     while (true) {
-        const number_read = try req.reader().read(&buffer);
-        if (number_read == 0) break;
-        try writer.writeAll(buffer[0..number_read]);
+        const bytes_read = try request.reader().read(&buffer);
+        if (bytes_read == 0) break;
+        try writer.writeAll(buffer[0..bytes_read]);
     }
 }

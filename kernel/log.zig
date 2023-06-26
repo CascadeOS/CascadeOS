@@ -135,7 +135,7 @@ inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime messag
 
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
     const scope_name = @tagName(scope);
-    inline for (kernel_options.scopes_to_force_debug) |debug_scope| {
+    inline for (kernel_options.forced_debug_log_scopes) |debug_scope| {
         if (std.mem.indexOf(u8, scope_name, debug_scope) != null) return true;
     }
     return false;

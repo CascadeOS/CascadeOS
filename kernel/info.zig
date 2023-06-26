@@ -9,7 +9,7 @@ const kernel_options = @import("kernel_options");
 
 pub const mode: std.builtin.OptimizeMode = builtin.mode;
 pub const arch = target_options.arch;
-pub const version = kernel_options.version;
+pub const version = kernel_options.cascade_version;
 pub const root_path = kernel_options.root_path;
 
 // This must be kept in sync with the linker scripts.

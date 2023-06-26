@@ -9,6 +9,7 @@ pub const CascadeTarget = enum {
     aarch64,
     x86_64,
 
+    /// Returns a CrossTarget for building tests targeting the host system.
     pub fn getNonCascadeTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         switch (self) {
             .aarch64 => return std.zig.CrossTarget{
@@ -20,6 +21,7 @@ pub const CascadeTarget = enum {
         }
     }
 
+    /// Returns a CrossTarget for building tests targeting cascade.
     pub fn getCascadeTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         // TODO: os_tag should be other
         switch (self) {
@@ -32,6 +34,7 @@ pub const CascadeTarget = enum {
         }
     }
 
+    /// Returns true if the targets architecture is equal to the host systems.
     pub fn isNative(self: CascadeTarget, b: *std.Build) bool {
         return switch (b.host.target.cpu.arch) {
             .aarch64 => self == .aarch64,
@@ -40,6 +43,7 @@ pub const CascadeTarget = enum {
         };
     }
 
+    /// Returns true if the target needs UEFI to boot.
     pub fn needsUefi(self: CascadeTarget) bool {
         return switch (self) {
             .aarch64 => true,
@@ -47,6 +51,7 @@ pub const CascadeTarget = enum {
         };
     }
 
+    /// Returns a CrossTarget for building the kernel for the given target.
     pub fn getCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         switch (self) {
             .aarch64 => {
@@ -102,6 +107,7 @@ pub const CascadeTarget = enum {
         }
     }
 
+    /// Returns the path to the kernel linker script for the given target.
     pub fn linkerScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
         return switch (self) {
             .aarch64 => helpers.pathJoinFromRoot(b, &.{ ".build", "linker_aarch64.ld" }),
@@ -109,11 +115,13 @@ pub const CascadeTarget = enum {
         };
     }
 
-    pub fn buildImageScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
+    /// Returns the path to the image build script for the given target.
+    pub fn imageScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
         _ = self;
         return helpers.pathJoinFromRoot(b, &.{ ".build", "build_limine_image.sh" });
     }
 
+    /// Returns the name of the QEMU system executable for the given target.
     pub fn qemuExecutable(self: CascadeTarget) []const u8 {
         return switch (self) {
             .aarch64 => "qemu-system-aarch64",
@@ -121,6 +129,7 @@ pub const CascadeTarget = enum {
         };
     }
 
+    /// Appends the correct QEMU CPU arguments for the target to the `run_qemu` step.
     pub fn setQemuCpu(self: CascadeTarget, run_qemu: *Step.Run) void {
         switch (self) {
             .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "max" }),
@@ -128,6 +137,7 @@ pub const CascadeTarget = enum {
         }
     }
 
+    /// Appends the correct QEMU machine arguments for the target to the `run_qemu` step.
     pub fn setQemuMachine(self: CascadeTarget, run_qemu: *Step.Run) void {
         switch (self) {
             .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
@@ -135,6 +145,7 @@ pub const CascadeTarget = enum {
         }
     }
 
+    /// Returns the URL to download the UEFI firmware for the given target.
     pub fn uefiFirmwareUrl(self: CascadeTarget) []const u8 {
         return switch (self) {
             .aarch64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd",
@@ -142,6 +153,7 @@ pub const CascadeTarget = enum {
         };
     }
 
+    /// Applies target-specific configuration to the kernel.
     pub fn targetSpecificSetup(self: CascadeTarget, kernel_exe: *Step.Compile) void {
         switch (self) {
             .aarch64 => {},

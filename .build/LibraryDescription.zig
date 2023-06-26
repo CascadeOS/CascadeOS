@@ -10,12 +10,14 @@ const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 ///   - used in any build steps created for the library
 name: []const u8,
 
+/// The library's dependencies.
+/// Specified as an array of the names of the dependant libraries.
 dependencies: []const []const u8 = &.{},
 
-/// The list of targets supported by the library.
+/// The targets supported by the library.
 /// `null` means target-independent.
 supported_targets: ?[]const CascadeTarget = null,
 
 // TODO: Should this list the non-cascade operating systems supported?
-/// If this is `true` then this library cannot be used or tested outside of Cascade.
-cascade_only: bool = false,
+/// Whether the library can only be used or tested within Cascade.
+is_cascade_only: bool = false,

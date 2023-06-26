@@ -22,43 +22,46 @@ limine_step: *LimineStep,
 image_file: std.Build.GeneratedFile,
 image_file_source: std.Build.FileSource,
 
+/// Registers image build steps.
+///
+/// For each target, creates a `ImageStep` and registers its step with the `StepCollection`.
 pub fn registerImageSteps(
     b: *std.Build,
     step_collection: StepCollection,
-    all_targets: []const CascadeTarget,
+    targets: []const CascadeTarget,
 ) !Collection {
-    var images: Collection = .{};
-    try images.ensureTotalCapacity(b.allocator, @intCast(all_targets.len));
+    var image_steps: Collection = .{};
+    try image_steps.ensureTotalCapacity(b.allocator, @intCast(targets.len));
 
     const limine_step = try LimineStep.create(b);
 
-    for (all_targets) |target| {
-        const image_build = try ImageStep.create(b, step_collection, target, limine_step);
-        step_collection.registerImage(target, &image_build.step);
-        images.putAssumeCapacityNoClobber(target, image_build);
+    for (targets) |target| {
+        const image_build_step = try ImageStep.create(b, step_collection, target, limine_step);
+        step_collection.registerImage(target, &image_build_step.step);
+        image_steps.putAssumeCapacityNoClobber(target, image_build_step);
     }
 
-    return images;
+    return image_steps;
 }
 
 fn create(
-    owner: *std.Build,
+    b: *std.Build,
     step_collection: StepCollection,
     target: CascadeTarget,
     limine_step: *LimineStep,
 ) !*ImageStep {
     const step_name = try std.fmt.allocPrint(
-        owner.allocator,
+        b.allocator,
         "build {s} image",
         .{@tagName(target)},
     );
 
-    const self = try owner.allocator.create(ImageStep);
+    const self = try b.allocator.create(ImageStep);
     self.* = .{
         .step = Step.init(.{
             .id = .custom,
             .name = step_name,
-            .owner = owner,
+            .owner = b,
             .makeFn = make,
         }),
         .target = target,
@@ -70,55 +73,51 @@ fn create(
     self.image_file_source = .{ .generated = &self.image_file };
 
     self.step.dependOn(&limine_step.step);
-    self.step.dependOn(step_collection.kernels_build_step_per_target.get(target).?);
-    self.step.dependOn(step_collection.cascade_libraries_test_build_step_per_target.get(target).?);
+    self.step.dependOn(step_collection.kernel_build_steps_per_target.get(target).?);
+    self.step.dependOn(step_collection.cascade_library_build_steps_per_target.get(target).?);
 
     return self;
 }
 
-fn make(step: *Step, prog_node: *std.Progress.Node) !void {
-    var node = prog_node.start(step.name, 0);
+fn make(step: *Step, progress_node: *std.Progress.Node) !void {
+    var node = progress_node.start(step.name, 0);
     defer node.end();
+
+    progress_node.activate();
 
     const b = step.owner;
     const self = @fieldParentPtr(ImageStep, "step", step);
 
-    var manifest = b.cache.obtain();
-    defer manifest.deinit();
+    var cache_manifest = b.cache.obtain();
+    defer cache_manifest.deinit();
+
+    // Build file
+    _ = try cache_manifest.addFile(b.pathFromRoot("build.zig"), null);
 
     // Limine cache directory
-    {
-        const limine_directory = self.limine_step.limine_directory.getPath();
-        var dir = try std.fs.cwd().openIterableDir(limine_directory, .{});
-        defer dir.close();
-        try hashDirectoryRecursive(b.allocator, dir, limine_directory, &manifest);
-    }
+    try hashDirectoryRecursive(
+        b.allocator,
+        self.limine_step.limine_generated_directory.getPath(),
+        &cache_manifest,
+    );
 
     // Root
-    {
-        const full_path = helpers.pathJoinFromRoot(b, &.{
+    try hashDirectoryRecursive(
+        b.allocator,
+        helpers.pathJoinFromRoot(b, &.{
             "zig-out",
             @tagName(self.target),
             "root",
-        });
-        var dir = try std.fs.cwd().openIterableDir(full_path, .{});
-        defer dir.close();
-        try hashDirectoryRecursive(b.allocator, dir, full_path, &manifest);
-    }
-
-    // Build file
-    {
-        const full_path = b.pathFromRoot("build.zig");
-        _ = try manifest.addFile(full_path, null);
-    }
+        }),
+        &cache_manifest,
+    );
 
     // Build directory
-    {
-        const full_path = b.pathFromRoot(".build");
-        var dir = try std.fs.cwd().openIterableDir(full_path, .{});
-        defer dir.close();
-        try hashDirectoryRecursive(b.allocator, dir, full_path, &manifest);
-    }
+    try hashDirectoryRecursive(
+        b.allocator,
+        b.pathFromRoot(".build"),
+        &cache_manifest,
+    );
 
     const image_file_path = helpers.pathJoinFromRoot(b, &.{
         "zig-out",
@@ -130,7 +129,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         ),
     });
 
-    if (try step.cacheHit(&manifest)) {
+    if (try step.cacheHit(&cache_manifest)) {
         self.image_file.path = image_file_path;
         self.step.result_cached = true;
         return;
@@ -139,46 +138,49 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     try self.generateImage(image_file_path);
     self.image_file.path = image_file_path;
 
-    try step.writeManifest(&manifest);
+    try step.writeManifest(&cache_manifest);
 }
 
-fn generateImage(self: *ImageStep, image_file_path: []const u8) !void {
+/// Generates an image for the target.
+fn generateImage(self: *ImageStep, image_path: []const u8) !void {
     try helpers.runExternalBinary(
         self.step.owner.allocator,
         &.{
-            self.target.buildImageScriptPath(self.step.owner),
-            image_file_path,
+            self.target.imageScriptPath(self.step.owner),
+            image_path,
             @tagName(self.target),
-            self.limine_step.limine_directory.getPath(),
+            self.limine_step.limine_generated_directory.getPath(),
             self.limine_step.limine_executable_source.getPath(self.step.owner),
         },
         helpers.pathJoinFromRoot(self.step.owner, &.{".build"}),
     );
 }
 
+/// Recursively hashes all files in a directory and adds them to the cache_manifest.
 fn hashDirectoryRecursive(
     allocator: std.mem.Allocator,
-    target_dir: std.fs.IterableDir,
-    directory_full_path: []const u8,
-    manifest: *std.Build.Cache.Manifest,
+    path: []const u8,
+    cache_manifest: *std.Build.Cache.Manifest,
 ) !void {
-    var iter = target_dir.iterate();
+    // TODO: Re-write this non-recursively, using a stack.
+
+    var dir = try std.fs.cwd().openIterableDir(path, .{});
+    defer dir.close();
+
+    var iter = dir.iterate();
     while (try iter.next()) |entry| {
-        const new_full_path = try std.fs.path.join(allocator, &.{ directory_full_path, entry.name });
-        defer allocator.free(new_full_path);
+        const child_path = try std.fs.path.join(allocator, &.{ path, entry.name });
+        defer allocator.free(child_path);
         switch (entry.kind) {
             .directory => {
-                var new_dir = try target_dir.dir.openIterableDir(entry.name, .{});
-                defer new_dir.close();
                 try hashDirectoryRecursive(
                     allocator,
-                    new_dir,
-                    new_full_path,
-                    manifest,
+                    child_path,
+                    cache_manifest,
                 );
             },
             .file => {
-                _ = try manifest.addFile(new_full_path, null);
+                _ = try cache_manifest.addFile(child_path, null);
             },
             else => {},
         }

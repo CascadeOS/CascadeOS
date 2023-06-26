@@ -19,16 +19,19 @@ options: Options,
 
 install_step: *Step.InstallArtifact,
 
+/// Registers kernel build steps.
+///
+/// For each target, creates a `Kernel` and registers its install_step with the `StepCollection`.
 pub fn registerKernels(
     b: *std.Build,
     step_collection: StepCollection,
     libraries: Library.Collection,
     options: Options,
-    all_targets: []const CascadeTarget,
+    targets: []const CascadeTarget,
 ) !void {
     const source_file_modules = try getSourceFileModules(b, libraries);
 
-    for (all_targets) |target| {
+    for (targets) |target| {
         const kernel = try Kernel.create(b, target, libraries, options, source_file_modules);
         step_collection.registerKernel(target, &kernel.install_step.step);
     }
@@ -67,7 +70,7 @@ fn create(
         try kernel_module.dependencies.put("kernel", kernel_module);
 
         // target options
-        try kernel_module.dependencies.put("cascade_target", options.kernel_target_option_modules.get(target).?);
+        try kernel_module.dependencies.put("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
 
         // kernel options
         try kernel_module.dependencies.put("kernel_options", options.kernel_option_module);
@@ -106,11 +109,20 @@ fn create(
     };
 }
 
+/// A represents a module created from a source file.
 const SourceFileModule = struct {
+    /// The file name and also the name of the module.
     name: []const u8,
     module: *std.Build.Module,
 };
 
+/// Build the data for a source file map.
+///
+/// Returns a `std.Build.Module` per source file with the name of the file as the module import name,
+/// with a `embedded_source_files` module containing an array of the file names.
+///
+/// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
+/// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
 fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const SourceFileModule {
     var modules = std.ArrayList(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
@@ -145,6 +157,10 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
     return try modules.toOwnedSlice();
 }
 
+/// Adds all files recursively in the given target path to the build.
+///
+/// Creates a `SourceFileModule` for each `.zig` file found, and adds the file path
+/// to the `files` array.
 fn addFilesRecursive(
     b: *std.Build,
     modules: *std.ArrayList(SourceFileModule),
@@ -188,6 +204,7 @@ fn addFilesRecursive(
     }
 }
 
+/// Returns the path without the root prefix, or `null` if the path did not start with the root prefix.
 fn removeRootPrefixFromPath(path: []const u8, root_prefix: []const u8) ?[]const u8 {
     if (std.mem.startsWith(u8, path, root_prefix)) {
         return path[(root_prefix.len)..];
