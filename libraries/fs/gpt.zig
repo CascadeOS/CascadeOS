@@ -13,10 +13,7 @@ pub const Crc32 = std.hash.crc.Crc32IsoHdlc;
 pub const minimum_size_of_partition_entry_array = core.Size.from(16, .kib);
 
 /// The minimum number of partition entries due to the minimum size reserved for the partition array.
-pub const minimum_number_of_partition_entries = @intCast(
-    u32,
-    minimum_size_of_partition_entry_array.divide(PartitionEntry.size),
-);
+pub const minimum_number_of_partition_entries: u32 = @intCast(minimum_size_of_partition_entry_array.divide(PartitionEntry.size));
 
 /// Almost every tool generates partitions with this alignment.
 /// https://en.wikipedia.org/wiki/Logical_Disk_Manager#Advantages_of_using_a_1-MB_alignment_boundary
@@ -45,7 +42,7 @@ pub fn protectiveMBR(mbr: *MBR, number_of_lba: usize) void {
     const size_in_lba_clamped: u32 = if (number_of_lba > 0xFFFFFFFF)
         0xFFFFFFFF
     else
-        @truncate(u32, number_of_lba - 1);
+        @truncate(number_of_lba - 1);
 
     // TODO: calulate this from the `number_of_lba`
     const ending_chs: u24 = 0xFFFFFF;
@@ -158,7 +155,7 @@ pub const Header = extern struct {
     /// Anytime a field in this structure is modified, the CRC should be recomputed.
     /// This includes any changes to the partition entry array as it's checksum is stored in the header as well.
     pub fn updateHash(self: *Header) void {
-        const header_bytes = @ptrCast([*]u8, self)[0..self.header_size];
+        const header_bytes = @as([*]u8, @ptrCast(self))[0..self.header_size];
         self.header_crc_32 = 0;
         self.header_crc_32 = Crc32.hash(header_bytes);
     }

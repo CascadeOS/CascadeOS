@@ -44,7 +44,7 @@ pub const VirtAddr = extern struct {
     }
 
     pub inline fn toPtr(self: VirtAddr, comptime PtrT: type) PtrT {
-        return @ptrFromInt(PtrT, self.value);
+        return @ptrFromInt(self.value);
     }
 
     /// Returns the physical address of the given diret map virtual address.

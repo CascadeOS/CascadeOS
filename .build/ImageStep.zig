@@ -28,7 +28,7 @@ pub fn registerImageSteps(
     all_targets: []const CascadeTarget,
 ) !Collection {
     var images: Collection = .{};
-    try images.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
+    try images.ensureTotalCapacity(b.allocator, @intCast(all_targets.len));
 
     const limine_step = try LimineStep.create(b);
 

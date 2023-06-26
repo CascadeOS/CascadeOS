@@ -13,7 +13,7 @@ addr: *volatile u8,
 
 pub fn init(addr: usize) Uart {
     return .{
-        .addr = @ptrFromInt(*volatile u8, addr),
+        .addr = @ptrFromInt(addr),
     };
 }
 

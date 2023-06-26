@@ -40,19 +40,19 @@ pub const PageTable = extern struct {
     }
 
     pub fn p1Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> level_1_shift);
+        return @truncate(addr.value >> level_1_shift);
     }
 
     pub fn p2Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> level_2_shift);
+        return @truncate(addr.value >> level_2_shift);
     }
 
     pub fn p3Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> level_3_shift);
+        return @truncate(addr.value >> level_3_shift);
     }
 
     pub fn p4Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(u9, addr.value >> level_4_shift);
+        return @truncate(addr.value >> level_4_shift);
     }
 
     pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) kernel.VirtAddr {
@@ -243,7 +243,7 @@ pub const PageTable = extern struct {
         pub fn setAddress4kib(self: *Entry, addr: kernel.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.small_page_size));
             self.address_4kib_aligned.write(
-                @truncate(type_of_4kib, addr.value >> level_1_shift),
+                @as(type_of_4kib, @truncate(addr.value >> level_1_shift)),
             );
         }
 
@@ -255,9 +255,7 @@ pub const PageTable = extern struct {
 
         pub fn setAddress2mib(self: *Entry, addr: kernel.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.medium_page_size));
-            self.address_2mib_aligned.write(
-                @truncate(type_of_2mib, addr.value >> level_2_shift),
-            );
+            self.address_2mib_aligned.write(@truncate(addr.value >> level_2_shift));
         }
 
         pub fn getAddress1gib(self: Entry) kernel.PhysAddr {
@@ -266,9 +264,7 @@ pub const PageTable = extern struct {
 
         pub fn setAddress1gib(self: *Entry, addr: kernel.PhysAddr) void {
             std.debug.assert(addr.isAligned(paging.large_page_size));
-            self.address_1gib_aligned.write(
-                @truncate(type_of_1gib, addr.value >> level_3_shift),
-            );
+            self.address_1gib_aligned.write(@truncate(addr.value >> level_3_shift));
         }
 
         pub fn getNextLevel(self: Entry) !*PageTable {
@@ -408,7 +404,7 @@ pub const PageTable = extern struct {
 };
 
 fn signExtendAddress(addr: u64) u64 {
-    return @bitCast(u64, @bitCast(i64, addr << 16) >> 16);
+    return @bitCast(@as(i64, @bitCast(addr << 16)) >> 16);
 }
 
 const level_1_shift = 12;

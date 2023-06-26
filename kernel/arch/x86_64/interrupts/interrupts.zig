@@ -60,8 +60,8 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
 
     comptime var i = 0;
     inline while (i < number_of_handlers) : (i += 1) {
-        const vector_number = @intCast(u8, i);
-        const idt_vector = @enumFromInt(IdtVector, vector_number);
+        const vector_number: u8 = @intCast(i);
+        const idt_vector: IdtVector = @enumFromInt(vector_number);
 
         // if the cpu does not push an error code, we push a dummy error code to ensure the stack
         // is always aligned in the same way for every vector
@@ -164,7 +164,7 @@ pub const InterruptFrame = extern struct {
     ss: u64,
 
     pub fn getIdtVector(self: *const InterruptFrame) IdtVector {
-        return @enumFromInt(IdtVector, @intCast(u8, self.padded_vector_number));
+        return @enumFromInt(@as(u8, @intCast(self.padded_vector_number)));
     }
 
     pub inline fn isKernel(self: *const InterruptFrame) bool {
@@ -231,7 +231,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
         asm volatile ("swapgs");
     }
 
-    handlers[@intCast(u8, interrupt_frame.padded_vector_number)](interrupt_frame);
+    handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
 
     x86_64.interrupts.disableInterrupts();
 

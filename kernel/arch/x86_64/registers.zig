@@ -78,7 +78,7 @@ pub const RFlags = packed struct(u64) {
 
     /// Returns the current value of the RFLAGS register.
     pub inline fn read() RFlags {
-        return @bitCast(RFlags, asm ("pushfq; popq %[ret]"
+        return @bitCast(asm ("pushfq; popq %[ret]"
             : [ret] "=r" (-> u64),
         ));
     }
@@ -88,7 +88,7 @@ pub const RFlags = packed struct(u64) {
     pub inline fn write(self: RFlags) void {
         asm volatile ("pushq %[val]; popfq"
             :
-            : [val] "r" (@bitCast(u64, self)),
+            : [val] "r" (@as(u64, @bitCast(self))),
             : "flags"
         );
     }
@@ -132,7 +132,7 @@ pub const Cr0 = packed struct(u64) {
     _reserved32_63: u32,
 
     pub fn read() Cr0 {
-        return @bitCast(Cr0, asm ("mov %%cr0, %[value]"
+        return @bitCast(asm ("mov %%cr0, %[value]"
             : [value] "=r" (-> u64),
         ));
     }
@@ -140,7 +140,7 @@ pub const Cr0 = packed struct(u64) {
     pub fn write(self: Cr0) void {
         asm volatile ("mov %[value], %%cr0"
             :
-            : [value] "r" (@bitCast(u64, self)),
+            : [value] "r" (@as(u64, @bitCast(self))),
         );
     }
 
@@ -200,11 +200,11 @@ pub const EFER = packed struct(u64) {
     _reserved22_63: u42,
 
     pub inline fn read() EFER {
-        return @bitCast(EFER, msr.read());
+        return @bitCast(msr.read());
     }
 
     pub inline fn write(self: EFER) void {
-        msr.write(@bitCast(u64, self));
+        msr.write(@as(u64, @bitCast(self)));
     }
 
     const msr = MSR(u64, 0xC0000080);
@@ -243,8 +243,8 @@ pub fn MSR(comptime T: type, comptime register: u32) type {
                     asm volatile ("wrmsr"
                         :
                         : [reg] "{ecx}" (register),
-                          [low] "{eax}" (@truncate(u32, value)),
-                          [high] "{edx}" (@truncate(u32, value >> 32)),
+                          [low] "{eax}" (@as(u32, @truncate(value))),
+                          [high] "{edx}" (@as(u32, @truncate(value >> 32))),
                     );
                 },
                 u32 => {

@@ -19,20 +19,18 @@ var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.bytes]u8 = undef
 var dwarf_debug_allocator = std.heap.FixedBufferAllocator.init(dwarf_debug_allocator_bytes[0..]);
 
 pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
-    const hdr = @ptrCast(*const std.elf.Ehdr, @alignCast(@alignOf(std.elf.Ehdr), &kernel_elf_start[0]));
+    const hdr: *const std.elf.Ehdr = @ptrCast(@alignCast(&kernel_elf_start[0]));
     if (!std.mem.eql(u8, hdr.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
     if (hdr.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
 
     const shoff = hdr.e_shoff;
     const str_section_off = shoff + @as(u64, hdr.e_shentsize) * @as(u64, hdr.e_shstrndx);
-    const str_shdr = @ptrCast(
-        *const std.elf.Shdr,
-        @alignCast(@alignOf(std.elf.Shdr), &kernel_elf_start[std.math.cast(usize, str_section_off) orelse return error.Overflow]),
-    );
+    const str_shdr: *const std.elf.Shdr =
+        @ptrCast(@alignCast(&kernel_elf_start[std.math.cast(usize, str_section_off) orelse return error.Overflow]));
     const header_strings = kernel_elf_start[str_shdr.sh_offset .. str_shdr.sh_offset + str_shdr.sh_size];
-    const shdrs = @ptrCast(
+    const shdrs = @as(
         [*]const std.elf.Shdr,
-        @alignCast(@alignOf(std.elf.Shdr), &kernel_elf_start[shoff]),
+        @ptrCast(@alignCast(&kernel_elf_start[shoff])),
     )[0..hdr.e_shnum];
 
     var opt_debug_info: ?[]const u8 = null;

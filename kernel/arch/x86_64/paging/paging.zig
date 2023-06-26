@@ -63,7 +63,7 @@ pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapErro
 
         return kernel.VirtRange.fromAddr(
             PageTable.indexToAddr(
-                @truncate(u9, index),
+                @truncate(index),
                 0,
                 0,
                 0,

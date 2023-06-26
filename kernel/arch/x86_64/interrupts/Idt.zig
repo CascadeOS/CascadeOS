@@ -76,9 +76,9 @@ pub const Entry = extern struct {
 
     pub fn setHandler(self: *Entry, handler: *const fn () callconv(.Naked) void) void {
         const addr = @intFromPtr(handler);
-        self.pointer_low = @truncate(u16, addr);
-        self.pointer_middle = @truncate(u16, (addr >> 16));
-        self.pointer_high = @truncate(u32, (addr >> 32));
+        self.pointer_low = @truncate(addr);
+        self.pointer_middle = @truncate((addr >> 16));
+        self.pointer_high = @truncate((addr >> 32));
     }
 
     pub fn setStack(self: *Entry, interrupt_stack: u3) void {

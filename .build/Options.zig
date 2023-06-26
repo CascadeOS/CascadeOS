@@ -176,7 +176,7 @@ fn buildKernelTargetOptionModules(
     var target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
     errdefer target_option_modules.deinit(b.allocator);
 
-    try target_option_modules.ensureTotalCapacity(b.allocator, @intCast(u32, all_targets.len));
+    try target_option_modules.ensureTotalCapacity(b.allocator, @intCast(all_targets.len));
 
     for (all_targets) |target| {
         const target_options = b.addOptions();

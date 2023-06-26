@@ -509,7 +509,7 @@ pub const File = extern struct {
     }
 
     pub fn getContents(self: *const File) []const u8 {
-        return @ptrCast([*]const u8, self.address)[0..self.size];
+        return @as([*]const u8, @ptrCast(self.address))[0..self.size];
     }
 
     pub const MediaType = enum(u32) {

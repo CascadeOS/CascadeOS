@@ -76,7 +76,7 @@ pub const UUID = extern struct {
             );
         }
 
-        return @bitCast(UUID, temporary_layout);
+        return @bitCast(temporary_layout);
     }
 
     const InMemoryLayout = packed struct(u128) {
@@ -96,7 +96,7 @@ pub const UUID = extern struct {
         _ = fmt;
         _ = options;
 
-        const temporary_layout: *const InMemoryLayout = @ptrCast(*const InMemoryLayout, @alignCast(@alignOf(InMemoryLayout), &self));
+        const temporary_layout: *const InMemoryLayout = @ptrCast(@alignCast(&self));
 
         var buf: [36]u8 = [_]u8{0} ** 36;
 
