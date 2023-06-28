@@ -6,7 +6,7 @@
 const std = @import("std");
 const core = @import("core");
 
-/// Defines a UUID (Universally Unique IDentifier) version 4 as defined by RFC 4122.
+/// Defines a UUID (Universally Unique IDentifier) as defined by RFC 4122.
 pub const UUID = extern struct {
     bytes: [16]u8,
 
