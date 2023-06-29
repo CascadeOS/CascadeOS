@@ -3,6 +3,7 @@
 const std = @import("std");
 const core = @import("core.zig");
 
+/// Represents a size in bytes.
 pub const Size = extern struct {
     bytes: usize,
 
@@ -15,11 +16,11 @@ pub const Size = extern struct {
     };
 
     const unit_table = .{
-        .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
-        .{ .value = @intFromEnum(Unit.gib), .name = "GiB" },
-        .{ .value = @intFromEnum(Unit.mib), .name = "MiB" },
-        .{ .value = @intFromEnum(Unit.kib), .name = "KiB" },
         .{ .value = @intFromEnum(Unit.byte), .name = "B" },
+        .{ .value = @intFromEnum(Unit.kib), .name = "KiB" },
+        .{ .value = @intFromEnum(Unit.mib), .name = "MiB" },
+        .{ .value = @intFromEnum(Unit.gib), .name = "GiB" },
+        .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
     };
 
     pub const zero: Size = .{ .bytes = 0 };
@@ -28,20 +29,23 @@ pub const Size = extern struct {
         return .{ .bytes = @sizeOf(T) };
     }
 
-    pub inline fn from(size: usize, unit: Unit) Size {
+    pub inline fn from(amount: usize, unit: Unit) Size {
         return .{
-            .bytes = size * @intFromEnum(unit),
+            .bytes = amount * @intFromEnum(unit),
         };
     }
 
+    /// Checks if the `Size` is aligned to the given alignment.
     pub inline fn isAligned(self: Size, alignment: Size) bool {
         return std.mem.isAligned(self.bytes, alignment.bytes);
     }
 
+    /// Aligns the `Size` forward to the given alignment.
     pub inline fn alignForward(self: Size, alignment: Size) Size {
         return .{ .bytes = std.mem.alignForward(usize, self.bytes, alignment.bytes) };
     }
 
+    /// Aligns the `Size` backward to the given alignment.
     pub inline fn alignBackward(self: Size, alignment: Size) Size {
         return .{ .bytes = std.mem.alignBackward(usize, self.bytes, alignment.bytes) };
     }
@@ -74,6 +78,12 @@ pub const Size = extern struct {
     /// Caller must ensure `other` is not zero.
     pub inline fn divide(self: Size, other: Size) usize {
         return self.bytes / other.bytes;
+    }
+
+    /// Division is performed on integers, so the result is rounded down.
+    /// Caller must ensure `other` is not zero.
+    pub inline fn divideInPlace(self: *Size, other: Size) void {
+        self.bytes /= other.bytes;
     }
 
     pub inline fn lessThan(self: Size, other: Size) bool {
