@@ -55,32 +55,36 @@ pub fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
     return (target & mask) != 0;
 }
 
-test "isBitSet" {
-    const a: u8 = 0b00000000;
-    try testing.expect(!isBitSet(a, 0));
-    try testing.expect(!isBitSet(a, 1));
+test isBitSet {
+    // comptime_int
+    {
+        const a: comptime_int = 0b00000000;
+        try testing.expect(!isBitSet(a, 0));
+        try testing.expect(!isBitSet(a, 1));
+    
+        const b: comptime_int = 0b11111111;
+        try testing.expect(isBitSet(b, 0));
+        try testing.expect(isBitSet(b, 1));
+    
+        const c: comptime_int = 0b00000010;
+        try testing.expect(!isBitSet(c, 0));
+        try testing.expect(isBitSet(c, 1));
+    }
 
-    const b: u8 = 0b11111111;
-    try testing.expect(isBitSet(b, 0));
-    try testing.expect(isBitSet(b, 1));
-
-    const c: u8 = 0b00000010;
-    try testing.expect(!isBitSet(c, 0));
-    try testing.expect(isBitSet(c, 1));
-}
-
-test "isBitSet - comptime_int" {
-    const a = 0b00000000;
-    try testing.expect(!isBitSet(a, 0));
-    try testing.expect(!isBitSet(a, 1));
-
-    const b = 0b11111111;
-    try testing.expect(isBitSet(b, 0));
-    try testing.expect(isBitSet(b, 1));
-
-    const c = 0b00000010;
-    try testing.expect(!isBitSet(c, 0));
-    try testing.expect(isBitSet(c, 1));
+    // Runtime
+    {
+        const a: u8 = 0b00000000;
+        try testing.expect(!isBitSet(a, 0));
+        try testing.expect(!isBitSet(a, 1));
+    
+        const b: u8 = 0b11111111;
+        try testing.expect(isBitSet(b, 0));
+        try testing.expect(isBitSet(b, 1));
+    
+        const c: u8 = 0b00000010;
+        try testing.expect(!isBitSet(c, 0));
+        try testing.expect(isBitSet(c, 1));
+    }
 }
 
 /// Get the value of the bit at index `bit`.
@@ -96,32 +100,36 @@ pub fn getBit(target: anytype, comptime bit: comptime_int) u1 {
     return @intFromBool(isBitSet(target, bit));
 }
 
-test "getBit" {
-    const a: u8 = 0b00000000;
-    try testing.expectEqual(@as(u1, 0), getBit(a, 0));
-    try testing.expectEqual(@as(u1, 0), getBit(a, 1));
+test getBit {
+    // comptime_int
+    {
+        const a: comptime_int = 0b00000000;
+        try testing.expectEqual(@as(u1, 0), getBit(a, 0));
+        try testing.expectEqual(@as(u1, 0), getBit(a, 1));
 
-    const b: u8 = 0b11111111;
-    try testing.expectEqual(@as(u1, 1), getBit(b, 0));
-    try testing.expectEqual(@as(u1, 1), getBit(b, 1));
+        const b: comptime_int = 0b11111111;
+        try testing.expectEqual(@as(u1, 1), getBit(b, 0));
+        try testing.expectEqual(@as(u1, 1), getBit(b, 1));
 
-    const c: u8 = 0b00000010;
-    try testing.expectEqual(@as(u1, 0), getBit(c, 0));
-    try testing.expectEqual(@as(u1, 1), getBit(c, 1));
-}
+        const c: comptime_int = 0b00000010;
+        try testing.expectEqual(@as(u1, 0), getBit(c, 0));
+        try testing.expectEqual(@as(u1, 1), getBit(c, 1));
+    }
 
-test "getBit - comptime_int" {
-    const a = 0b00000000;
-    try testing.expectEqual(@as(u1, 0), getBit(a, 0));
-    try testing.expectEqual(@as(u1, 0), getBit(a, 1));
-
-    const b = 0b11111111;
-    try testing.expectEqual(@as(u1, 1), getBit(b, 0));
-    try testing.expectEqual(@as(u1, 1), getBit(b, 1));
-
-    const c = 0b00000010;
-    try testing.expectEqual(@as(u1, 0), getBit(c, 0));
-    try testing.expectEqual(@as(u1, 1), getBit(c, 1));
+    // Runtime
+    {
+        const a: u8 = 0b00000000;
+        try testing.expectEqual(@as(u1, 0), getBit(a, 0));
+        try testing.expectEqual(@as(u1, 0), getBit(a, 1));
+    
+        const b: u8 = 0b11111111;
+        try testing.expectEqual(@as(u1, 1), getBit(b, 0));
+        try testing.expectEqual(@as(u1, 1), getBit(b, 1));
+    
+        const c: u8 = 0b00000010;
+        try testing.expectEqual(@as(u1, 0), getBit(c, 0));
+        try testing.expectEqual(@as(u1, 1), getBit(c, 1));
+    }
 }
 
 /// Obtains the `number_of_bits` bits starting at `start_bit`
@@ -160,16 +168,20 @@ pub fn getBits(target: anytype, comptime start_bit: comptime_int, comptime numbe
     return @truncate(target >> start_bit);
 }
 
-test "getBits" {
-    const a: u8 = 0b01101100;
-    const b = getBits(a, 2, 4);
-    try testing.expectEqual(@as(u4, 0b1011), b);
-}
+test getBits {
+    // comptime_int
+    {
+        const a: comptime_int = 0b01101100;
+        const b = getBits(a, 2, 4);
+        try testing.expectEqual(@as(u4, 0b1011), b);
+    }
 
-test "getBits - comptime_int" {
-    const a = 0b01101100;
-    const b = getBits(a, 2, 4);
-    try testing.expectEqual(@as(u4, 0b1011), b);
+    // Runtime
+    {
+        const a: u8 = 0b01101100;
+        const b = getBits(a, 2, 4);
+        try testing.expectEqual(@as(u4, 0b1011), b);
+    }
 }
 
 /// Sets the bit at the index `bit` to the value `value` (where true means a value of '1' and false means a value of '0')
@@ -218,7 +230,7 @@ pub fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
     }
 }
 
-test "setBit" {
+test setBit {
     var val: u8 = 0b00000000;
     try testing.expect(!isBitSet(val, 0));
     setBit(&val, 0, true);
@@ -286,12 +298,13 @@ pub fn setBits(target: anytype, comptime start_bit: comptime_int, comptime numbe
     target.* = (target.* & bitmask) | (peer_value << start_bit);
 }
 
-test "setBits" {
+test setBits {
     var val: u8 = 0b10000000;
     setBits(&val, 2, 4, 0b00001101);
     try testing.expectEqual(@as(u8, 0b10110100), val);
 }
 
+/// Casts a pointer while preserving const/volatile qualifiers.
 inline fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime NewT: type) type {
     return switch (PtrToT) {
         *T => *NewT,
@@ -302,7 +315,17 @@ inline fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime Ne
     };
 }
 
-pub fn Bitfield(comptime FieldType: type, comptime shift_amount: usize, comptime num_bits: usize) type {
+/// Defines a bitfield.
+pub fn Bitfield(
+    /// The type of the underlying integer containing the bitfield.
+    comptime FieldType: type,
+
+    /// The starting bit index of the bitfield.
+    comptime shift_amount: usize,
+
+    /// The number of bits in the bitfield.
+    comptime num_bits: usize,
+) type {
     if (shift_amount + num_bits > @bitSizeOf(FieldType)) {
         @compileError("bitfield doesn't fit");
     }
@@ -316,7 +339,8 @@ pub fn Bitfield(comptime FieldType: type, comptime shift_amount: usize, comptime
 
         const Self = @This();
 
-        // This function uses `anytype` to support both const and non-const pointers
+        /// A function to access the underlying integer as `FieldType`.
+        /// Uses `anytype` to support both const and non-const access.
         inline fn field(self: anytype) PtrCastPreserveCV(Self, @TypeOf(self), FieldType) {
             return @ptrCast(self);
         }
@@ -333,7 +357,7 @@ pub fn Bitfield(comptime FieldType: type, comptime shift_amount: usize, comptime
     };
 }
 
-test "bitfield" {
+test Bitfield {
     const S = extern union {
         low: Bitfield(u32, 0, 16),
         high: Bitfield(u32, 16, 16),
@@ -354,7 +378,17 @@ test "bitfield" {
     try std.testing.expect(s.val == 0x69691337);
 }
 
-fn BitType(comptime FieldType: type, comptime shift_amount: usize, comptime ValueType: type) type {
+/// Defines a struct representing a single bit.
+fn BitType(
+        /// The type of the underlying integer containing the bit.
+        comptime FieldType: type,
+
+        /// The bit index of the bit.
+        comptime shift_amount: usize,
+
+        /// The type of the bit value, either u1 or bool.
+        comptime ValueType: type,
+) type {
     const self_bit: FieldType = (1 << shift_amount);
 
     return extern struct {
@@ -376,15 +410,18 @@ fn BitType(comptime FieldType: type, comptime shift_amount: usize, comptime Valu
     };
 }
 
-pub fn Bit(comptime FieldType: type, comptime shift_amount: usize) type {
+/// Defines a struct representing a single bit with a u1 value.
+pub fn Bit(
+    /// The type of the underlying integer containing the bit.
+    comptime FieldType: type,
+
+    /// The bit index of the bit.
+    comptime shift_amount: usize,
+) type {
     return BitType(FieldType, shift_amount, u1);
 }
 
-pub fn Boolean(comptime FieldType: type, comptime shift_amount: usize) type {
-    return BitType(FieldType, shift_amount, bool);
-}
-
-test "bit" {
+test Bit {
     const S = extern union {
         low: Bit(u32, 0),
         high: Bit(u32, 1),
@@ -405,7 +442,18 @@ test "bit" {
     try std.testing.expect(s.val == 2);
 }
 
-test "boolean" {
+/// Defines a struct representing a single bit with a boolean value.
+pub fn Boolean(
+    /// The type of the underlying integer containing the bit.
+    comptime FieldType: type,
+
+    /// The bit index of the bit.
+    comptime shift_amount: usize,
+) type {
+    return BitType(FieldType, shift_amount, bool);
+}
+
+test Boolean {
     const S = extern union {
         low: Boolean(u32, 0),
         high: Boolean(u32, 1),
