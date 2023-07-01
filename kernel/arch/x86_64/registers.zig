@@ -210,7 +210,7 @@ pub const EFER = packed struct(u64) {
     }
 
     pub inline fn write(self: EFER) void {
-        msr.write(@as(u64, @bitCast(self)));
+        msr.write(@bitCast(self));
     }
 
     const msr = MSR(u64, 0xC0000080);

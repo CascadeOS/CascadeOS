@@ -49,7 +49,7 @@ pub fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
         const MaskType = std.meta.Int(.unsigned, bit + 1);
         var temp: MaskType = std.math.maxInt(MaskType);
         temp <<= bit;
-        break :blk @as(TargetType, temp);
+        break :blk temp;
     };
 
     return (target & mask) != 0;
@@ -61,11 +61,11 @@ test isBitSet {
         const a: comptime_int = 0b00000000;
         try testing.expect(!isBitSet(a, 0));
         try testing.expect(!isBitSet(a, 1));
-    
+
         const b: comptime_int = 0b11111111;
         try testing.expect(isBitSet(b, 0));
         try testing.expect(isBitSet(b, 1));
-    
+
         const c: comptime_int = 0b00000010;
         try testing.expect(!isBitSet(c, 0));
         try testing.expect(isBitSet(c, 1));
@@ -76,11 +76,11 @@ test isBitSet {
         const a: u8 = 0b00000000;
         try testing.expect(!isBitSet(a, 0));
         try testing.expect(!isBitSet(a, 1));
-    
+
         const b: u8 = 0b11111111;
         try testing.expect(isBitSet(b, 0));
         try testing.expect(isBitSet(b, 1));
-    
+
         const c: u8 = 0b00000010;
         try testing.expect(!isBitSet(c, 0));
         try testing.expect(isBitSet(c, 1));
@@ -121,11 +121,11 @@ test getBit {
         const a: u8 = 0b00000000;
         try testing.expectEqual(@as(u1, 0), getBit(a, 0));
         try testing.expectEqual(@as(u1, 0), getBit(a, 1));
-    
+
         const b: u8 = 0b11111111;
         try testing.expectEqual(@as(u1, 1), getBit(b, 0));
         try testing.expectEqual(@as(u1, 1), getBit(b, 1));
-    
+
         const c: u8 = 0b00000010;
         try testing.expectEqual(@as(u1, 0), getBit(c, 0));
         try testing.expectEqual(@as(u1, 1), getBit(c, 1));
@@ -220,7 +220,7 @@ pub fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
         const MaskType = std.meta.Int(.unsigned, bit + 1);
         var temp: MaskType = std.math.maxInt(MaskType);
         temp <<= bit;
-        break :blk @as(TargetType, temp);
+        break :blk temp;
     };
 
     if (value) {
@@ -280,7 +280,7 @@ pub fn setBits(target: anytype, comptime start_bit: comptime_int, comptime numbe
         }
     }
 
-    const peer_value = @as(TargetType, value);
+    const peer_value: TargetType = value;
 
     if (std.debug.runtime_safety) {
         if (getBits(peer_value, 0, (end_bit - start_bit)) != peer_value) @panic("value exceeds bit range");
@@ -319,10 +319,8 @@ inline fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime Ne
 pub fn Bitfield(
     /// The type of the underlying integer containing the bitfield.
     comptime FieldType: type,
-
     /// The starting bit index of the bitfield.
     comptime shift_amount: usize,
-
     /// The number of bits in the bitfield.
     comptime num_bits: usize,
 ) type {
@@ -380,14 +378,12 @@ test Bitfield {
 
 /// Defines a struct representing a single bit.
 fn BitType(
-        /// The type of the underlying integer containing the bit.
-        comptime FieldType: type,
-
-        /// The bit index of the bit.
-        comptime shift_amount: usize,
-
-        /// The type of the bit value, either u1 or bool.
-        comptime ValueType: type,
+    /// The type of the underlying integer containing the bit.
+    comptime FieldType: type,
+    /// The bit index of the bit.
+    comptime shift_amount: usize,
+    /// The type of the bit value, either u1 or bool.
+    comptime ValueType: type,
 ) type {
     const self_bit: FieldType = (1 << shift_amount);
 
@@ -401,7 +397,7 @@ fn BitType(
         }
 
         pub fn write(self: *Self, val: ValueType) void {
-            if (@as(bool, @bitCast(val))) {
+            if (@bitCast(val)) {
                 self.bits.field().* |= self_bit;
             } else {
                 self.bits.field().* &= ~self_bit;
@@ -414,7 +410,6 @@ fn BitType(
 pub fn Bit(
     /// The type of the underlying integer containing the bit.
     comptime FieldType: type,
-
     /// The bit index of the bit.
     comptime shift_amount: usize,
 ) type {
@@ -446,7 +441,6 @@ test Bit {
 pub fn Boolean(
     /// The type of the underlying integer containing the bit.
     comptime FieldType: type,
-
     /// The bit index of the bit.
     comptime shift_amount: usize,
 ) type {

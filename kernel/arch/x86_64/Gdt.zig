@@ -17,12 +17,12 @@ pub const Gdt = extern struct {
         0,
     },
 
-    pub const null_selector = @as(u16, 0x00);
-    pub const kernel_code_selector = @as(u16, 0x08);
-    pub const kernel_data_selector = @as(u16, 0x10);
-    pub const user_code_selector = @as(u16, 0x18 | 3);
-    pub const user_data_selector = @as(u16, 0x20 | 3);
-    pub const tss_selector = @as(u16, 0x28);
+    pub const null_selector: u16 = 0x00;
+    pub const kernel_code_selector: u16 = 0x08;
+    pub const kernel_data_selector: u16 = 0x10;
+    pub const user_code_selector: u16 = 0x18 | 3;
+    pub const user_data_selector: u16 = 0x20 | 3;
+    pub const tss_selector: u16 = 0x28;
 
     const mask_u8: u64 = std.math.maxInt(u8);
     const mask_u16: u64 = std.math.maxInt(u16);
