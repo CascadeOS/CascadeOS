@@ -19,11 +19,6 @@ pub const UUID = extern struct {
     /// Uses `random` to generate a random 128-bit value.
     /// Then sets the version and variant fields to the appropriate values for a
     /// version 4 UUID as defined in RFC 4122.
-    ///
-    /// Returns: A random version 4 UUID.
-    ///
-    /// Parameters:
-    /// - `random`: The random number generator to use.
     pub fn generateV4(random: std.rand.Random) UUID {
         var uuid: UUID = undefined;
 
@@ -41,16 +36,10 @@ pub const UUID = extern struct {
     pub const ParseError = error{InvalidUUID};
 
     /// Parses a UUID from its string representation.
-    ///
-    /// Returns: The UUID parsed from the string.
-    ///
-    /// Parameters:
-    /// - `buf`: The string representation of the UUID to parse.
-    ///          Must be of the format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-    ///
-    /// Errors:
-    /// - `ParseError.InvalidUUID` if the string is not a valid UUID representation.
-    pub fn parse(buf: []const u8) ParseError!UUID {
+    pub fn parse(
+        /// Must be of the format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+        buf: []const u8,
+    ) ParseError!UUID {
         if (buf.len != 36) return ParseError.InvalidUUID;
 
         var temporary_layout: InMemoryLayout = undefined;
