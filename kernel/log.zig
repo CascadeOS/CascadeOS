@@ -103,6 +103,7 @@ pub const Level = enum {
 
 const maximum_log_scope_length = 17;
 
+/// Helper function to format the scope and level text at the beginning of a log message.
 pub inline fn formatScopeAndLevel(
     comptime message_level: Level,
     comptime scope: @TypeOf(.EnumLiteral),
@@ -133,6 +134,7 @@ inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime messag
     comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(level);
 }
 
+/// Checks if a scope is in the list of scopes forced to log at debug level.
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
     const scope_name = @tagName(scope);
     inline for (kernel_options.forced_debug_log_scopes) |debug_scope| {
