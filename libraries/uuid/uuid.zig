@@ -87,15 +87,7 @@ pub const UUID = extern struct {
         node: u48,
     };
 
-    pub fn format(
-        self: UUID,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
+    pub fn print(self: UUID, writer: anytype) !void {
         const temporary_layout: *const InMemoryLayout = @ptrCast(@alignCast(&self));
 
         var buf: [36]u8 = [_]u8{0} ** 36;
@@ -123,6 +115,17 @@ pub const UUID = extern struct {
         }
 
         try writer.writeAll(&buf);
+    }
+
+    pub inline fn format(
+        self: UUID,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        return print(self, writer);
     }
 
     const ParseFormatSection = struct {

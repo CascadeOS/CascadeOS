@@ -112,7 +112,7 @@ pub const MemoryMapEntry = struct {
         try entry.range.print(writer);
     }
 
-    pub fn format(
+    pub inline fn format(
         entry: MemoryMapEntry,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,

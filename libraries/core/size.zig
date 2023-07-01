@@ -131,7 +131,7 @@ pub const Size = extern struct {
         }
     }
 
-    pub fn format(
+    pub inline fn format(
         size: Size,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,

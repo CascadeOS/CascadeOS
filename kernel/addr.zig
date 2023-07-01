@@ -123,7 +123,7 @@ fn AddrMixin(comptime Self: type) type {
             try writer.writeAll(" }");
         }
 
-        pub fn format(
+        pub inline fn format(
             self: Self,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
@@ -228,7 +228,7 @@ fn RangeMixin(comptime Self: type, comptime AddrType: type) type {
             try writer.writeAll(" }");
         }
 
-        pub fn format(
+        pub inline fn format(
             value: Self,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,

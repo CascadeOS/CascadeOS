@@ -213,7 +213,7 @@ pub const InterruptFrame = extern struct {
         try writer.writeAll("}");
     }
 
-    pub fn format(
+    pub inline fn format(
         value: *const InterruptFrame,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
