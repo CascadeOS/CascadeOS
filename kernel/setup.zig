@@ -52,57 +52,61 @@ fn captureBootloaderInformation() void {
 }
 
 fn calculateDirectMaps() void {
-    const size_of_direct_map = calculateLengthOfDirectMap();
+    const direct_map_size = calculateLengthOfDirectMap();
 
-    const direct_map_range: kernel.VirtRange = blk: {
-        const direct_map_address = kernel.boot.directMapAddress() orelse
-            core.panic("bootloader did not provide the start of the direct map");
+    kernel.info.direct_map = calculateDirectMapRange(direct_map_size);
+    log.debug("direct map: {}", .{kernel.info.direct_map});
 
-        const direct_map = kernel.VirtAddr.fromInt(direct_map_address);
-
-        if (!direct_map.isAligned(kernel.arch.paging.standard_page_size)) {
-            core.panic("direct map is not aligned to the standard page size");
-        }
-
-        break :blk kernel.VirtRange.fromAddr(direct_map, size_of_direct_map);
-    };
-
-    const non_cached_direct_map_range = blk: {
-        // try to place the non-cached direct map directly _before_ the direct map
-        {
-            const range = direct_map_range.moveBackward(size_of_direct_map);
-            // check that we have not gone below the higher half
-            if (range.addr.greaterThanOrEqual(kernel.arch.paging.higher_half)) {
-                break :blk range;
-            }
-        }
-
-        // try to place the non-cached direct map directly _after_ the direct map
-        {
-            const range = direct_map_range.moveForward(size_of_direct_map);
-            // check that we are not overlapping with the kernel
-            if (!range.contains(kernel.info.kernel_virtual_address)) {
-                break :blk range;
-            }
-        }
-
-        core.panic("failed to find region for non-cached direct map");
-    };
-
-    kernel.info.direct_map = direct_map_range;
-    log.debug("direct map: {}", .{direct_map_range});
-
-    kernel.info.non_cached_direct_map = non_cached_direct_map_range;
-    log.debug("non-cached direct map: {}", .{non_cached_direct_map_range});
+    kernel.info.non_cached_direct_map = calculateNonCachedDirectMapRange(direct_map_size, kernel.info.direct_map);
+    log.debug("non-cached direct map: {}", .{kernel.info.non_cached_direct_map});
 }
 
-fn calculateLengthOfDirectMap() core.Size {
-    var reverse_memmap_iterator = kernel.boot.memoryMapIterator(.backwards);
+fn calculateDirectMapRange(direct_map_size: core.Size) kernel.VirtRange {
+    const direct_map_address = kernel.boot.directMapAddress() orelse
+        core.panic("bootloader did not provide the start of the direct map");
 
-    const last_usable_entry = blk: {
+    const direct_map_start_address = kernel.VirtAddr.fromInt(direct_map_address);
+
+    if (!direct_map_start_address.isAligned(kernel.arch.paging.standard_page_size)) {
+        core.panic("direct map is not aligned to the standard page size");
+    }
+
+    return kernel.VirtRange.fromAddr(direct_map_start_address, direct_map_size);
+}
+
+fn calculateNonCachedDirectMapRange(
+    direct_map_size: core.Size,
+    direct_map_range: kernel.VirtRange,
+) kernel.VirtRange {
+    // try to place the non-cached direct map directly _before_ the direct map
+    {
+        const candidate_range = direct_map_range.moveBackward(direct_map_size);
+        // check that we have not gone below the higher half
+        if (candidate_range.addr.greaterThanOrEqual(kernel.arch.paging.higher_half)) {
+            return candidate_range;
+        }
+    }
+
+    // try to place the non-cached direct map directly _after_ the direct map
+    {
+        const candidate_range = direct_map_range.moveForward(direct_map_size);
+        // check that we are not overlapping with the kernel
+        if (!candidate_range.contains(kernel.info.kernel_virtual_address)) {
+            return candidate_range;
+        }
+    }
+
+    core.panic("failed to find region for non-cached direct map");
+}
+
+/// Calculates the length of the direct map.
+fn calculateLengthOfDirectMap() core.Size {
+    var memory_map_iterator = kernel.boot.memoryMapIterator(.backwards);
+
+    const first_usable_entry: kernel.boot.MemoryMapEntry = blk: {
         // search from the end of the memory map for the first usable region
 
-        while (reverse_memmap_iterator.next()) |entry| {
+        while (memory_map_iterator.next()) |entry| {
             if (entry.type == .reserved_or_unusable) continue;
 
             break :blk entry;
@@ -111,18 +115,16 @@ fn calculateLengthOfDirectMap() core.Size {
         core.panic("no non-reserved or usable memory regions?");
     };
 
-    const estimated_size = core.Size.from(last_usable_entry.range.end().value, .byte);
-
-    log.debug("estimated size of direct map: {}", .{estimated_size});
+    const initial_size = core.Size.from(first_usable_entry.range.end().value, .byte);
 
     // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-    var aligned_size = estimated_size.alignForward(kernel.arch.paging.largestPageSize());
+    var aligned_size = initial_size.alignForward(kernel.arch.paging.largestPageSize());
 
     // We ensure that the lowest 4GiB are always mapped.
-    const @"4gib" = core.Size.from(4, .gib);
-    if (aligned_size.lessThan(@"4gib")) aligned_size = @"4gib";
+    const four_gib = core.Size.from(4, .gib);
+    if (aligned_size.lessThan(four_gib)) aligned_size = four_gib;
 
-    log.debug("aligned size of direct map: {}", .{aligned_size});
+    log.debug("size of direct map: {}", .{aligned_size});
 
     return aligned_size;
 }
@@ -130,6 +132,7 @@ fn calculateLengthOfDirectMap() core.Size {
 fn calculateKernelVirtualAndPhysicalOffsets() void {
     const kernel_address = kernel.boot.kernelAddress() orelse
         core.panic("bootloader did not provide the kernel address");
+
     // TODO: Can we calculate the kernel offsets from the the bootloaders page table?
     // https://github.com/CascadeOS/CascadeOS/issues/36
 
