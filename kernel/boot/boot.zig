@@ -22,6 +22,7 @@ const limine_requests = struct {
     export var memmap: limine.Memmap = .{};
 };
 
+/// Returns the direct map address provided by the bootloader, if any.
 pub fn directMapAddress() ?u64 {
     if (limine_requests.hhdm.response) |resp| {
         return resp.offset;
@@ -34,6 +35,7 @@ pub const KernelAddress = struct {
     physical: u64,
 };
 
+/// Returns the kernel virtual and physical addresses provided by the bootloader, if any.
 pub fn kernelAddress() ?KernelAddress {
     if (limine_requests.kernel_address.response) |resp| {
         return .{
@@ -44,6 +46,7 @@ pub fn kernelAddress() ?KernelAddress {
     return null;
 }
 
+/// Returns the kernel file contents as a VirtualRange, if provided by the bootloader.
 pub fn kernelFile() ?kernel.VirtualRange {
     if (limine_requests.kernel_file.response) |resp| {
         return kernel.VirtualRange.fromSlice(resp.kernel_file.getContents());
@@ -51,6 +54,7 @@ pub fn kernelFile() ?kernel.VirtualRange {
     return null;
 }
 
+/// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
     return .{
@@ -65,9 +69,11 @@ pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {
     };
 }
 
+/// An iterator over the memory map entries provided by the bootloader.
 pub const MemoryMapIterator = union(enum) {
     limine: LimineMemoryMapIterator,
 
+    /// Returns the next memory map entry from the iterator, if any remain.
     pub fn next(self: *MemoryMapIterator) ?MemoryMapEntry {
         return switch (self.*) {
             inline else => |*i| i.next(),
@@ -75,6 +81,7 @@ pub const MemoryMapIterator = union(enum) {
     }
 };
 
+/// An entry in the memory map provided by the bootloader.
 pub const MemoryMapEntry = struct {
     range: kernel.PhysicalRange,
     type: Type,
@@ -86,7 +93,8 @@ pub const MemoryMapEntry = struct {
         reclaimable,
     };
 
-    const length_of_longest_tag = blk: {
+    /// The length of the longest tag name in the `MemoryMapEntry.Type` enum.
+    const length_of_longest_tag_name = blk: {
         var longest_so_far = 0;
         inline for (std.meta.tags(Type)) |tag| {
             const length = @tagName(tag).len;
@@ -102,7 +110,7 @@ pub const MemoryMapEntry = struct {
             @tagName(entry.type),
             .{
                 .alignment = .left,
-                .width = length_of_longest_tag,
+                .width = length_of_longest_tag_name,
             },
             writer,
         );
