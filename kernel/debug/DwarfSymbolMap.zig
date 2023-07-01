@@ -19,19 +19,20 @@ var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.bytes]u8 = undef
 var dwarf_debug_allocator = std.heap.FixedBufferAllocator.init(dwarf_debug_allocator_bytes[0..]);
 
 pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
-    const hdr: *const std.elf.Ehdr = @ptrCast(@alignCast(&kernel_elf_start[0]));
-    if (!std.mem.eql(u8, hdr.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
-    if (hdr.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
+    const elf_header: *const std.elf.Ehdr = @ptrCast(@alignCast(&kernel_elf_start[0]));
+    if (!std.mem.eql(u8, elf_header.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
+    if (elf_header.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
 
-    const shoff = hdr.e_shoff;
-    const str_section_off = shoff + @as(u64, hdr.e_shentsize) * @as(u64, hdr.e_shstrndx);
-    const str_shdr: *const std.elf.Shdr =
-        @ptrCast(@alignCast(&kernel_elf_start[std.math.cast(usize, str_section_off) orelse return error.Overflow]));
-    const header_strings = kernel_elf_start[str_shdr.sh_offset .. str_shdr.sh_offset + str_shdr.sh_size];
-    const shdrs = @as(
+    const section_header_offset = elf_header.e_shoff;
+    const string_section_offset =
+        section_header_offset +
+        @as(u64, elf_header.e_shentsize) * @as(u64, elf_header.e_shstrndx);
+    const string_section_header: *const std.elf.Shdr = @ptrCast(@alignCast(&kernel_elf_start[string_section_offset]));
+    const header_strings = kernel_elf_start[string_section_header.sh_offset .. string_section_header.sh_offset + string_section_header.sh_size];
+    const section_headers = @as(
         [*]const std.elf.Shdr,
-        @ptrCast(@alignCast(&kernel_elf_start[shoff])),
-    )[0..hdr.e_shnum];
+        @ptrCast(@alignCast(&kernel_elf_start[section_header_offset])),
+    )[0..elf_header.e_shnum];
 
     var debug_info_opt: ?[]const u8 = null;
     var debug_abbrev_opt: ?[]const u8 = null;
@@ -46,7 +47,7 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
     var debug_names_opt: ?[]const u8 = null;
     var debug_frame_opt: ?[]const u8 = null;
 
-    for (shdrs) |*shdr| {
+    for (section_headers) |*shdr| {
         if (shdr.sh_type == std.elf.SHT_NULL) continue;
 
         const name = std.mem.sliceTo(header_strings[shdr.sh_name..], 0);
@@ -104,12 +105,15 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
     return map;
 }
 
+/// Chops a slice from the given pointer at the given offset and size.
+/// Returns Overflow if the offset or size cannot be represented as a usize.
 fn chopSlice(ptr: [*]const u8, offset: u64, size: u64) error{Overflow}![]const u8 {
     const start = std.math.cast(usize, offset) orelse return error.Overflow;
     const end = start + (std.math.cast(usize, size) orelse return error.Overflow);
     return ptr[start..end];
 }
 
+/// Gets the symbol for the given address. Returns null if no symbol was found.
 pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
     const compile_unit = self.debug_info.findCompileUnit(address) catch return null;
 
@@ -144,6 +148,8 @@ pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
     };
 }
 
+/// Removes the kernel root path prefix from the given path.
+/// Returns the original path if it does not start with the root path.
 pub fn removeRootPrefixFromPath(path: []const u8) []const u8 {
     // things like `memset` and `memcopy` won't be under the ROOT_PATH
     if (std.mem.startsWith(u8, path, kernel.info.root_path)) {

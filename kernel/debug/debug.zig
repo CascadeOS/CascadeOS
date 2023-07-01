@@ -58,7 +58,7 @@ fn simplePanic(
 
     // error return trace
     if (stack_trace) |trace| {
-        dumpStackTrace(writer, trace);
+        printStackTrace(writer, trace);
     }
 
     printCurrentBackTrace(writer, ret_addr);
@@ -74,7 +74,7 @@ fn panicImpl(
     simplePanic(msg, stack_trace, ret_addr);
 }
 
-fn dumpStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) void {
+fn printStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) void {
     var frame_index: usize = 0;
     var frames_left: usize = @min(stack_trace.index, stack_trace.instruction_addresses.len);
 
@@ -100,6 +100,7 @@ fn printCurrentBackTrace(writer: anytype, return_address: usize) void {
 
 const indent = "  ";
 
+/// Prints the source code location for the given address.
 fn printSourceAtAddress(writer: anytype, address: usize) void {
     if (address == 0) return;
 
@@ -148,6 +149,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
     printSymbol(writer, symbol);
 }
 
+/// Prints the symbol information for the given symbol.
 fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
     writer.writeAll(indent) catch unreachable;
 
@@ -243,6 +245,9 @@ fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
     }
 }
 
+/// Finds the target line in the given file contents.
+///
+/// Returns the line contents if found, otherwise returns null.
 fn findTargetLine(file_contents: []const u8, target_line_number: usize) ?[]const u8 {
     var line_iter = std.mem.split(u8, file_contents, "\n");
     var line_index: u64 = 1;

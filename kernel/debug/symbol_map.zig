@@ -19,6 +19,7 @@ pub fn loadSymbols() void {
     }
 }
 
+/// Gets the symbol for the given address.
 pub fn getSymbol(address: usize) ?Symbol {
     // We subtract one from the address to better handle the case when the address is the last instruction of the
     // function (for example `@panic` as the very last statement of a function) as in that case the return
@@ -35,11 +36,13 @@ pub fn getSymbol(address: usize) ?Symbol {
 }
 
 pub const Symbol = struct {
+    /// The address of the symbol.
     address: usize,
     name: []const u8,
     location: ?Location,
 
     pub const Location = struct {
+        /// Whether the line number is expected to precisely correspond to the symbol.
         is_line_expected_to_be_precise: bool,
         file_name: []const u8,
         line: u64,
