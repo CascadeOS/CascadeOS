@@ -7,6 +7,7 @@ const x86_64 = @import("x86_64.zig");
 
 const InterruptStackSelector = x86_64.interrupts.InterruptStackSelector;
 
+/// The x86_64 Task State Segment structure.
 pub const Tss = extern struct {
     reserved_1: u32 align(1) = 0,
 
@@ -25,10 +26,12 @@ pub const Tss = extern struct {
     /// The 16-bit offset to the I/O permission bit map from the 64-bit TSS base.
     iomap_base: u16 align(1) = 0,
 
+    /// Sets the stack for the given stack selector.
     pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: []align(16) u8) void {
         self.interrupt_stack_table[@intFromEnum(stack_selector)] = kernel.VirtualAddress.fromInt(@intFromPtr(stack.ptr) + stack.len);
     }
 
+    /// Sets the stack for the given privilege level.
     pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: []align(16) u8) void {
         std.debug.assert(privilege_level != .ring3);
         self.privilege_stack_table[@intFromEnum(privilege_level)] = kernel.VirtualAddress.fromInt(@intFromPtr(stack.ptr) + stack.len);

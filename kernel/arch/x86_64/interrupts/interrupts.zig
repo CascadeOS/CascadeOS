@@ -38,6 +38,7 @@ pub const InterruptStackSelector = enum(u3) {
 
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
+/// Sets the interrupt stack for the given interrupt vector.
 pub fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
     idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
 }
@@ -163,14 +164,17 @@ pub const InterruptFrame = extern struct {
     rsp: u64,
     ss: u64,
 
+    /// Gets the interrupt vector for this interrupt frame.
     pub fn getIdtVector(self: *const InterruptFrame) IdtVector {
         return @enumFromInt(@as(u8, @intCast(self.padded_vector_number)));
     }
 
+    /// Checks if this interrupt occurred in kernel mode.
     pub inline fn isKernel(self: *const InterruptFrame) bool {
         return self.cs == x86_64.Gdt.kernel_code_selector;
     }
 
+    /// Checks if this interrupt occurred in user mode.
     pub inline fn isUser(self: *const InterruptFrame) bool {
         return self.cs == x86_64.Gdt.user_code_selector;
     }
@@ -225,6 +229,7 @@ pub const InterruptFrame = extern struct {
     }
 };
 
+/// The main interrupt handler for the kernel.
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     if (interrupt_frame.isUser()) {
         // interrupt is from user code
@@ -408,6 +413,7 @@ pub const IdtVector = enum(u8) {
 
     _,
 
+    /// Checks if the given interrupt vector is an exception.
     pub fn isException(self: IdtVector) bool {
         if (@intFromEnum(self) <= @intFromEnum(IdtVector._reserved8)) {
             return self != IdtVector.non_maskable_interrupt;
@@ -415,6 +421,7 @@ pub const IdtVector = enum(u8) {
         return false;
     }
 
+    /// Checks if the given interrupt vector pushes an error code.
     pub fn hasErrorCode(self: IdtVector) bool {
         return switch (@intFromEnum(self)) {
             // Exceptions
@@ -459,12 +466,12 @@ pub fn disableInterruptsAndHalt() noreturn {
 
 /// Enable interrupts and put the CPU to sleep.
 pub noinline fn enableInterruptsAndHalt() void {
-    // TODO: The NMI handler will need to check if the IP is equal to __halt_addr and if so, it will need to skip the
+    // TODO: The NMI handler will need to check if the IP is equal to __halt_address and if so, it will need to skip the
     // hlt instruction. https://github.com/CascadeOS/CascadeOS/issues/33
     asm volatile (
         \\sti
-        \\.globl __halt_addr
-        \\__halt_addr:
+        \\.globl __halt_address
+        \\__halt_address:
         \\hlt
         \\
     );

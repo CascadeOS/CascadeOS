@@ -101,6 +101,8 @@ pub const RFlags = packed struct(u64) {
 };
 
 pub const Cr0 = packed struct(u64) {
+    // TODO: Add field level documentation
+
     protected_mode_enable: bool,
 
     monitor_coprocessor: bool,
@@ -148,12 +150,14 @@ pub const Cr0 = packed struct(u64) {
 };
 
 pub const Cr3 = struct {
+    /// Reads the CR3 register and returns the page table address.
     pub inline fn readAddress() kernel.PhysicalAddress {
         return kernel.PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
             : [value] "=r" (-> u64),
         ) & 0xFFFF_FFFF_FFFF_F000);
     }
 
+    /// Writes the CR3 register with the given page table address.
     pub inline fn writeAddress(address: kernel.PhysicalAddress) void {
         asm volatile ("mov %[address], %%cr3"
             :
@@ -165,6 +169,8 @@ pub const Cr3 = struct {
 
 /// Extended Feature Enable Register (EFER)
 pub const EFER = packed struct(u64) {
+    // TODO: Add field level documentation
+
     syscall_enable: bool,
 
     _reserved1_7: u7,

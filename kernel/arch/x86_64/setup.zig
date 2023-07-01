@@ -46,6 +46,10 @@ pub fn earlyArchInitialization() void {
     x86_64.interrupts.loadIdt();
 
     log.debug("mapping idt vectors to the prepared stacks", .{});
+    mapIdtHandlers();
+}
+
+fn mapIdtHandlers() void {
     for (0..x86_64.interrupts.number_of_handlers) |vector_number| {
         const vector: x86_64.interrupts.IdtVector = @enumFromInt(vector_number);
 
@@ -68,11 +72,13 @@ pub fn earlyArchInitialization() void {
     }
 }
 
+/// Captures x86_64 system information.
 pub fn captureSystemInformation() void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 }
 
+/// Configures x86_64 system features.
 pub fn configureSystemFeatures() void {
     // CR0
     {
@@ -92,8 +98,8 @@ pub fn configureSystemFeatures() void {
 
         if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
 
-        if (x86_64.info.syscall) efer.syscall_enable = true;
-        if (x86_64.info.execute_disable) efer.no_execute_enable = true;
+        if (x86_64.info.has_syscall) efer.syscall_enable = true;
+        if (x86_64.info.has_execute_disable) efer.no_execute_enable = true;
 
         efer.write();
 

@@ -19,7 +19,7 @@ const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
 pub const standard_page_size = small_page_size;
 
 pub inline fn largestPageSize() core.Size {
-    if (x86_64.info.gib_pages) return large_page_size;
+    if (x86_64.info.has_gib_pages) return large_page_size;
     return medium_page_size;
 }
 
@@ -27,6 +27,7 @@ pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
+/// Allocates a new page table.
 pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     const physical_page = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
     std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
@@ -37,6 +38,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     return page_table;
 }
 
+/// Switches to the given page table.
 pub fn switchToPageTable(page_table: *const PageTable) void {
     x86_64.registers.Cr3.writeAddress(
         kernel.VirtualAddress.fromPtr(page_table).unsafeToPhysicalFromDirectMap(),
@@ -49,18 +51,19 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
 ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
 ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
 pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtualRange {
-    var index: usize = PageTable.p4Index(higher_half);
-    while (index < PageTable.number_of_entries) : (index += 1) {
-        const entry = &page_table.entries[index];
+    var table_index: usize = PageTable.p4Index(higher_half);
+
+    while (table_index < PageTable.number_of_entries) : (table_index += 1) {
+        const entry = &page_table.entries[table_index];
         if (entry._backing != 0) continue;
 
-        log.debug("found free top level entry for heap at index {}", .{index});
+        log.debug("found free top level entry for heap at table_index {}", .{table_index});
 
         _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
 
         return kernel.VirtualRange.fromAddr(
             PageTable.indexToAddr(
-                @truncate(index),
+                @truncate(table_index),
                 0,
                 0,
                 0,
@@ -84,32 +87,32 @@ pub fn mapRange(
 ) MapError!void {
     log.debug("mapRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
-    var current_virtual = virtual_range.address;
-    const virtual_end = virtual_range.end();
-    var current_physical = physical_range.address;
-    var size_left = virtual_range.size;
+    var current_virtual_address = virtual_range.address;
+    const end_virtual_address = virtual_range.end();
+    var current_physical_address = physical_range.address;
+    var size_remaining = virtual_range.size;
 
-    var kib_mappings: usize = 0;
+    var kib_page_mappings: usize = 0;
 
-    while (current_virtual.lessThan(virtual_end)) {
+    while (current_virtual_address.lessThan(end_virtual_address)) {
         mapTo4KiB(
             page_table,
-            current_virtual,
-            current_physical,
+            current_virtual_address,
+            current_physical_address,
             map_type,
         ) catch |err| {
-            log.err("failed to map {} to {} 4KiB", .{ current_virtual, current_physical });
+            log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
             return err;
         };
 
-        kib_mappings += 1;
+        kib_page_mappings += 1;
 
-        current_virtual.moveForwardInPlace(small_page_size);
-        current_physical.moveForwardInPlace(small_page_size);
-        size_left.subtractInPlace(small_page_size);
+        current_virtual_address.moveForwardInPlace(small_page_size);
+        current_physical_address.moveForwardInPlace(small_page_size);
+        size_remaining.subtractInPlace(small_page_size);
     }
 
-    log.debug("mapRange - satified using {} 4KiB pages", .{kib_mappings});
+    log.debug("mapRange - satified using {} 4KiB pages", .{kib_page_mappings});
 }
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -122,164 +125,167 @@ pub fn mapRangeUseAllPageSizes(
 ) MapError!void {
     log.debug("mapRangeUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
-    var current_virtual = virtual_range.address;
-    const virtual_end = virtual_range.end();
-    var current_physical = physical_range.address;
-    var size_left = virtual_range.size;
+    var current_virtual_address = virtual_range.address;
+    const end_virtual_address = virtual_range.end();
+    var current_physical_address = physical_range.address;
+    var size_remaining = virtual_range.size;
 
-    var gib_mappings: usize = 0;
-    var mib_mappings: usize = 0;
-    var kib_mappings: usize = 0;
+    var gib_page_mappings: usize = 0;
+    var mib_page_mappings: usize = 0;
+    var kib_page_mappings: usize = 0;
 
-    while (current_virtual.lessThan(virtual_end)) {
-        const map_1gib = x86_64.info.gib_pages and
-            size_left.greaterThanOrEqual(large_page_size) and
-            current_virtual.isAligned(large_page_size) and
-            current_physical.isAligned(large_page_size);
+    while (current_virtual_address.lessThan(end_virtual_address)) {
+        const map_1gib = x86_64.info.has_gib_pages and
+            size_remaining.greaterThanOrEqual(large_page_size) and
+            current_virtual_address.isAligned(large_page_size) and
+            current_physical_address.isAligned(large_page_size);
 
         if (map_1gib) {
             mapTo1GiB(
                 page_table,
-                current_virtual,
-                current_physical,
+                current_virtual_address,
+                current_physical_address,
                 map_type,
             ) catch |err| {
-                log.err("failed to map {} to {} 1GiB", .{ current_virtual, current_physical });
+                log.err("failed to map {} to {} 1GiB", .{ current_virtual_address, current_physical_address });
                 return err;
             };
 
-            gib_mappings += 1;
+            gib_page_mappings += 1;
 
-            current_virtual.moveForwardInPlace(large_page_size);
-            current_physical.moveForwardInPlace(large_page_size);
-            size_left.subtractInPlace(large_page_size);
+            current_virtual_address.moveForwardInPlace(large_page_size);
+            current_physical_address.moveForwardInPlace(large_page_size);
+            size_remaining.subtractInPlace(large_page_size);
             continue;
         }
 
-        const map_2mib = size_left.greaterThanOrEqual(medium_page_size) and
-            current_virtual.isAligned(medium_page_size) and
-            current_physical.isAligned(medium_page_size);
+        const map_2mib = size_remaining.greaterThanOrEqual(medium_page_size) and
+            current_virtual_address.isAligned(medium_page_size) and
+            current_physical_address.isAligned(medium_page_size);
 
         if (map_2mib) {
             mapTo2MiB(
                 page_table,
-                current_virtual,
-                current_physical,
+                current_virtual_address,
+                current_physical_address,
                 map_type,
             ) catch |err| {
-                log.err("failed to map {} to {} 2MiB", .{ current_virtual, current_physical });
+                log.err("failed to map {} to {} 2MiB", .{ current_virtual_address, current_physical_address });
                 return err;
             };
 
-            mib_mappings += 1;
+            mib_page_mappings += 1;
 
-            current_virtual.moveForwardInPlace(medium_page_size);
-            current_physical.moveForwardInPlace(medium_page_size);
-            size_left.subtractInPlace(medium_page_size);
+            current_virtual_address.moveForwardInPlace(medium_page_size);
+            current_physical_address.moveForwardInPlace(medium_page_size);
+            size_remaining.subtractInPlace(medium_page_size);
             continue;
         }
 
         mapTo4KiB(
             page_table,
-            current_virtual,
-            current_physical,
+            current_virtual_address,
+            current_physical_address,
             map_type,
         ) catch |err| {
-            log.err("failed to map {} to {} 4KiB", .{ current_virtual, current_physical });
+            log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
             return err;
         };
 
-        kib_mappings += 1;
+        kib_page_mappings += 1;
 
-        current_virtual.moveForwardInPlace(small_page_size);
-        current_physical.moveForwardInPlace(small_page_size);
-        size_left.subtractInPlace(small_page_size);
+        current_virtual_address.moveForwardInPlace(small_page_size);
+        current_physical_address.moveForwardInPlace(small_page_size);
+        size_remaining.subtractInPlace(small_page_size);
     }
 
     log.debug(
         "mapRangeUseAllPageSizes - satified using {} 1GiB pages, {} 2MiB pages, {} 4KiB pages",
-        .{ gib_mappings, mib_mappings, kib_mappings },
+        .{ gib_page_mappings, mib_page_mappings, kib_page_mappings },
     );
 }
 
+/// Maps a 4 KiB page.
 fn mapTo4KiB(
     level4_table: *PageTable,
-    virtual_addr: kernel.VirtualAddress,
-    physical_addr: kernel.PhysicalAddress,
+    virtual_address: kernel.VirtualAddress,
+    physical_address: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    std.debug.assert(virtual_addr.isAligned(small_page_size));
+    std.debug.assert(virtual_address.isAligned(small_page_size));
 
-    const p3 = try ensureNextTable(
-        level4_table.getEntryLevel4(virtual_addr),
+    const level3_table = try ensureNextTable(
+        level4_table.getEntryLevel4(virtual_address),
         map_type,
     );
 
-    const p2 = try ensureNextTable(
-        p3.getEntryLevel3(virtual_addr),
+    const level2_table = try ensureNextTable(
+        level3_table.getEntryLevel3(virtual_address),
         map_type,
     );
 
-    const p1 = try ensureNextTable(
-        p2.getEntryLevel2(virtual_addr),
+    const level1_table = try ensureNextTable(
+        level2_table.getEntryLevel2(virtual_address),
         map_type,
     );
 
-    const entry = p1.getEntryLevel1(virtual_addr);
+    const entry = level1_table.getEntryLevel1(virtual_address);
     if (entry.present.read()) return error.AlreadyMapped;
 
-    entry.setAddress4kib(physical_addr);
+    entry.setAddress4kib(physical_address);
 
     applyMapType(map_type, entry);
 }
 
+/// Maps a 2 MiB page.
 fn mapTo2MiB(
     level4_table: *PageTable,
-    virtual_addr: kernel.VirtualAddress,
-    physical_addr: kernel.PhysicalAddress,
+    virtual_address: kernel.VirtualAddress,
+    physical_address: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    std.debug.assert(virtual_addr.isAligned(medium_page_size));
-    std.debug.assert(physical_addr.isAligned(medium_page_size));
+    std.debug.assert(virtual_address.isAligned(medium_page_size));
+    std.debug.assert(physical_address.isAligned(medium_page_size));
 
-    const p3 = try ensureNextTable(
-        level4_table.getEntryLevel4(virtual_addr),
+    const level3_table = try ensureNextTable(
+        level4_table.getEntryLevel4(virtual_address),
         map_type,
     );
 
-    const p2 = try ensureNextTable(
-        p3.getEntryLevel3(virtual_addr),
+    const level2_table = try ensureNextTable(
+        level3_table.getEntryLevel3(virtual_address),
         map_type,
     );
 
-    const entry = p2.getEntryLevel2(virtual_addr);
+    const entry = level2_table.getEntryLevel2(virtual_address);
     if (entry.present.read()) return error.AlreadyMapped;
 
-    entry.setAddress2mib(physical_addr);
+    entry.setAddress2mib(physical_address);
 
     entry.huge.write(true);
     applyMapType(map_type, entry);
 }
 
+/// Maps a 1 GiB page.
 fn mapTo1GiB(
     level4_table: *PageTable,
-    virtual_addr: kernel.VirtualAddress,
-    physical_addr: kernel.PhysicalAddress,
+    virtual_address: kernel.VirtualAddress,
+    physical_address: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    std.debug.assert(x86_64.info.gib_pages); // assert that 1GiB pages are available
-    std.debug.assert(virtual_addr.isAligned(large_page_size));
-    std.debug.assert(physical_addr.isAligned(large_page_size));
+    std.debug.assert(x86_64.info.has_gib_pages); // assert that 1GiB pages are available
+    std.debug.assert(virtual_address.isAligned(large_page_size));
+    std.debug.assert(physical_address.isAligned(large_page_size));
 
-    const p3 = try ensureNextTable(
-        level4_table.getEntryLevel4(virtual_addr),
+    const level3_table = try ensureNextTable(
+        level4_table.getEntryLevel4(virtual_address),
         map_type,
     );
 
-    const entry = p3.getEntryLevel3(virtual_addr);
+    const entry = level3_table.getEntryLevel3(virtual_address);
     if (entry.present.read()) return error.AlreadyMapped;
 
-    entry.setAddress1gib(physical_addr);
+    entry.setAddress1gib(physical_address);
 
     entry.huge.write(true);
     applyMapType(map_type, entry);
@@ -296,7 +302,7 @@ fn applyMapType(map_type: kernel.vmm.MapType, entry: *PageTable.Entry) void {
         entry.global.write(true);
     }
 
-    if (!map_type.executable and x86_64.info.execute_disable) entry.no_execute.write(true);
+    if (!map_type.executable and x86_64.info.has_execute_disable) entry.no_execute.write(true);
 
     if (map_type.writeable) entry.writeable.write(true);
 
@@ -312,34 +318,35 @@ fn applyParentMapType(map_type: kernel.vmm.MapType, entry: *PageTable.Entry) voi
     if (map_type.user) entry.user_accessible.write(true);
 }
 
+/// Ensures the next page table level exists.
 fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: kernel.vmm.MapType,
 ) error{ AllocationFailed, Unexpected }!*PageTable {
-    var created = false;
+    var allocated = false;
 
-    var physical_page: ?kernel.PhysicalRange = null;
+    var page: ?kernel.PhysicalRange = null;
 
     if (!self.present.read()) {
-        physical_page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
-        self.setAddress4kib(physical_page.?.address);
-        created = true;
+        page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
+        self.setAddress4kib(page.?.address);
+        allocated = true;
     }
-    errdefer if (physical_page) |page| {
+    errdefer if (page) |allocated_page| {
         self.setAddress4kib(kernel.PhysicalAddress.zero);
-        kernel.pmm.deallocatePage(page);
+        kernel.pmm.deallocatePage(allocated_page);
     };
 
     applyParentMapType(map_type, self);
 
-    const page_table = self.getNextLevel() catch |err| switch (err) {
+    const next_level = self.getNextLevel() catch |err| switch (err) {
         error.HugePage => return error.Unexpected,
         error.NotPresent => unreachable, // we ensure it is present above
     };
 
-    if (created) {
-        page_table.zero();
+    if (allocated) {
+        next_level.zero();
     }
 
-    return page_table;
+    return next_level;
 }

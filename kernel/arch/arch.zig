@@ -18,6 +18,7 @@ const current = switch (kernel.info.arch) {
     .aarch64 => aarch64,
 };
 
+/// Issues an architecture specific hint to the CPU that it we are spinning in a loop.
 pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }
@@ -82,16 +83,21 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
+    /// The standard page size for the architecture.
     pub const standard_page_size: core.Size = current.paging.standard_page_size;
 
+    /// Returns the largest page size supported by the architecture.
     pub inline fn largestPageSize() core.Size {
         return current.paging.largestPageSize();
     }
 
+    /// The virtual address of the higher half.
     pub const higher_half: kernel.VirtualAddress = current.paging.higher_half;
 
+    /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
+    /// Allocates a new page table.
     pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
         return current.paging.allocatePageTable();
     }
@@ -136,6 +142,7 @@ pub const paging = struct {
         return current.paging.mapRangeUseAllPageSizes(page_table, virtual_range, physical_range, map_type);
     }
 
+    /// Switches to the given page table.
     pub inline fn switchToPageTable(page_table: *const PageTable) void {
         current.paging.switchToPageTable(page_table);
     }

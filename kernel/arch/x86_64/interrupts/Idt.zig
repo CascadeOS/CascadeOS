@@ -74,13 +74,15 @@ pub const Entry = extern struct {
         self.setHandler(handler);
     }
 
+    /// Sets the interrupt handler for this interrupt.
     pub fn setHandler(self: *Entry, handler: *const fn () callconv(.Naked) void) void {
         const address = @intFromPtr(handler);
         self.pointer_low = @truncate(address);
-        self.pointer_middle = @truncate((address >> 16));
-        self.pointer_high = @truncate((address >> 32));
+        self.pointer_middle = @truncate(address >> 16);
+        self.pointer_high = @truncate(address >> 32);
     }
 
+    /// Sets the interrupt stack table (IST) index for this interrupt.
     pub fn setStack(self: *Entry, interrupt_stack: u3) void {
         self.options.ist = interrupt_stack +% 1;
     }
@@ -104,8 +106,8 @@ pub fn load(self: *const Idt) void {
     };
 
     asm volatile (
-        \\  lidt (%[idtr_addr])
+        \\  lidt (%[idtr_address])
         :
-        : [idtr_addr] "r" (&idtr),
+        : [idtr_address] "r" (&idtr),
     );
 }

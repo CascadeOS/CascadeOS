@@ -11,8 +11,7 @@ const bitjuggle = @import("bitjuggle");
 const Boolean = bitjuggle.Boolean;
 const Bitfield = bitjuggle.Bitfield;
 
-// Only supports 4-level paging
-
+/// A page table for x86_64.
 pub const PageTable = extern struct {
     entries: [number_of_entries]Entry align(paging.small_page_size.bytes),
 
@@ -23,20 +22,20 @@ pub const PageTable = extern struct {
         @memset(bytes, 0);
     }
 
-    pub fn getEntryLevel4(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
-        return &self.entries[p4Index(virtual_addr)];
+    pub fn getEntryLevel4(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
+        return &self.entries[p4Index(virtual_address)];
     }
 
-    pub fn getEntryLevel3(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
-        return &self.entries[p3Index(virtual_addr)];
+    pub fn getEntryLevel3(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
+        return &self.entries[p3Index(virtual_address)];
     }
 
-    pub fn getEntryLevel2(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
-        return &self.entries[p2Index(virtual_addr)];
+    pub fn getEntryLevel2(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
+        return &self.entries[p2Index(virtual_address)];
     }
 
-    pub fn getEntryLevel1(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
-        return &self.entries[p1Index(virtual_addr)];
+    pub fn getEntryLevel1(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
+        return &self.entries[p1Index(virtual_address)];
     }
 
     pub fn p1Index(address: kernel.VirtualAddress) u9 {
@@ -55,6 +54,7 @@ pub const PageTable = extern struct {
         return @truncate(address.value >> level_4_shift);
     }
 
+    /// Converts page table indices to a virtual address.
     pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) kernel.VirtualAddress {
         return kernel.VirtualAddress.fromInt(
             signExtendAddress(
@@ -71,80 +71,81 @@ pub const PageTable = extern struct {
         writer: anytype,
         comptime print_detailed_level1: bool,
     ) !void {
-        for (self.entries, 0..) |level4_entry, level4_i| {
+        for (self.entries, 0..) |level4_entry, level4_index| {
             if (!level4_entry.present.read()) continue;
 
             std.debug.assert(!level4_entry.huge.read());
 
-            const sign_extended_level4_part = signExtendAddress(level4_i << level_4_shift);
+            // The level 4 part is sign extended to ensure the address is cannonical.
+            const level4_part = signExtendAddress(level4_index << level_4_shift);
 
-            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_i, kernel.VirtualAddress.fromInt(sign_extended_level4_part) });
+            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_index, kernel.VirtualAddress.fromInt(level4_part) });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
-            const level3 = try level4_entry.getNextLevel();
-            for (level3.entries, 0..) |level3_entry, level3_i| {
+            const level3_table = try level4_entry.getNextLevel();
+            for (level3_table.entries, 0..) |level3_entry, level3_index| {
                 if (!level3_entry.present.read()) continue;
 
-                const level3_part = level3_i << level_3_shift;
+                const level3_part = level3_index << level_3_shift;
 
                 if (level3_entry.huge.read()) {
-                    const virtual = kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part);
+                    const virtual = kernel.VirtualAddress.fromInt(level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
-                    try writer.print("  [{}] 1GIB {} -> {}    Flags: ", .{ level3_i, virtual, physical });
+                    try writer.print("  [{}] 1GIB {} -> {}    Flags: ", .{ level3_index, virtual, physical });
                     try level3_entry.printHugeEntryFlags(writer);
                     try writer.writeByte('\n');
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_i, kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part) });
+                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_index, kernel.VirtualAddress.fromInt(level4_part | level3_part) });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
-                const level2 = try level3_entry.getNextLevel();
-                for (level2.entries, 0..) |level2_entry, level2_i| {
+                const level2_table = try level3_entry.getNextLevel();
+                for (level2_table.entries, 0..) |level2_entry, level2_index| {
                     if (!level2_entry.present.read()) continue;
 
-                    const level2_part = level2_i << level_2_shift;
+                    const level2_part = level2_index << level_2_shift;
 
                     if (level2_entry.huge.read()) {
-                        const virtual = kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part | level2_part);
+                        const virtual = kernel.VirtualAddress.fromInt(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
-                        try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ virtual, physical, level2_i });
+                        try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ virtual, physical, level2_index });
                         try level2_entry.printHugeEntryFlags(writer);
                         try writer.writeByte('\n');
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_i, kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part | level2_part) });
+                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_index, kernel.VirtualAddress.fromInt(level4_part | level3_part | level2_part) });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
                     // use only when `print_detailed_level1` is false
-                    var number_of_level1_present_entries: usize = 0;
+                    var level1_present_entries: usize = 0;
 
-                    const level1 = try level2_entry.getNextLevel();
-                    for (level1.entries, 0..) |level1_entry, level1_i| {
+                    const level1_table = try level2_entry.getNextLevel();
+                    for (level1_table.entries, 0..) |level1_entry, level1_index| {
                         if (!level1_entry.present.read()) continue;
 
                         if (!print_detailed_level1) {
-                            number_of_level1_present_entries += 1;
+                            level1_present_entries += 1;
                             continue;
                         }
 
                         std.debug.assert(!level1_entry.huge.read());
 
-                        const level1_part = level1_i << level_1_shift;
+                        const level1_part = level1_index << level_1_shift;
 
-                        const virtual = kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part | level2_part | level1_part);
+                        const virtual = kernel.VirtualAddress.fromInt(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
-                        try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ virtual, physical, level1_i });
+                        try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ virtual, physical, level1_index });
                         try level1_entry.printSmallEntryFlags(writer);
                         try writer.writeByte('\n');
                     }
 
                     if (!print_detailed_level1) {
-                        try writer.print("      {} 4KIB mappings\n", .{number_of_level1_present_entries});
+                        try writer.print("      {} 4KIB mappings\n", .{level1_present_entries});
                     }
                 }
             }
@@ -267,13 +268,20 @@ pub const PageTable = extern struct {
             self.address_1gib_aligned.write(@truncate(address.value >> level_3_shift));
         }
 
+        /// Gets the next page table level.
+        ///
+        /// Returns an error if:
+        /// - The entry is not present.
+        /// - The entry points to a huge page.
+        ///
+        /// Otherwise returns a pointer to the next page table level.
         pub fn getNextLevel(self: Entry) !*PageTable {
             if (!self.present.read()) return error.NotPresent;
             if (self.huge.read()) return error.HugePage;
             return self.getAddress4kib().toDirectMap().toPtr(*PageTable);
         }
 
-        pub fn printSmallEntryFlags(self: Entry, writer: anytype) !void {
+        fn printSmallEntryFlags(self: Entry, writer: anytype) !void {
             std.debug.assert(!self.huge.read());
 
             if (self.present.read()) {
@@ -319,7 +327,7 @@ pub const PageTable = extern struct {
             }
         }
 
-        pub fn printHugeEntryFlags(self: Entry, writer: anytype) !void {
+        fn printHugeEntryFlags(self: Entry, writer: anytype) !void {
             std.debug.assert(self.huge.read());
 
             if (self.present.read()) {
@@ -365,7 +373,7 @@ pub const PageTable = extern struct {
             }
         }
 
-        pub fn printDirectoryEntryFlags(self: Entry, writer: anytype) !void {
+        fn printDirectoryEntryFlags(self: Entry, writer: anytype) !void {
             if (self.present.read()) {
                 try writer.writeAll("Present ");
             } else {

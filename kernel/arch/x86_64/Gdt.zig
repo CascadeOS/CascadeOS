@@ -5,6 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x86_64 = @import("x86_64.zig");
 
+/// The Global Descriptor Table for x86_64.
 pub const Gdt = extern struct {
     descriptors: [7]u64 = [7]u64{
         0x0000000000000000, // Null
