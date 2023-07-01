@@ -11,7 +11,7 @@ const PageTable = paging.PageTable;
 const log = kernel.log.scoped(.vmm);
 
 var kernel_root_page_table: *PageTable = undefined;
-var heap_range: kernel.VirtRange = undefined;
+var heap_range: kernel.VirtualRange = undefined;
 
 pub fn init() void {
     log.debug("allocating kernel root page table", .{});
@@ -82,13 +82,13 @@ pub const MapType = struct {
 /// Maps a virtual address range to a physical address range using the standard page size.
 pub fn mapRange(
     page_table: *PageTable,
-    virtual_range: kernel.VirtRange,
-    physical_range: kernel.PhysRange,
+    virtual_range: kernel.VirtualRange,
+    physical_range: kernel.PhysicalRange,
     map_type: MapType,
 ) !void {
-    std.debug.assert(virtual_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.equal(virtual_range.size));
 
@@ -108,13 +108,13 @@ pub fn mapRange(
 /// Maps a virtual address range to a physical address range using all available page sizes.
 pub fn mapRangeUseAllPageSizes(
     page_table: *PageTable,
-    virtual_range: kernel.VirtRange,
-    physical_range: kernel.PhysRange,
+    virtual_range: kernel.VirtualRange,
+    physical_range: kernel.PhysicalRange,
     map_type: MapType,
 ) !void {
-    std.debug.assert(virtual_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.addr.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.equal(virtual_range.size));
 
@@ -132,7 +132,7 @@ pub fn mapRangeUseAllPageSizes(
 }
 
 pub const MemoryRegion = struct {
-    range: kernel.VirtRange,
+    range: kernel.VirtualRange,
     type: Type,
 
     pub const Type = enum {
@@ -146,7 +146,7 @@ pub const MemoryRegion = struct {
 
     pub fn print(region: MemoryRegion, writer: anytype) !void {
         try writer.writeAll("MemoryRegion{ 0x");
-        try std.fmt.formatInt(region.range.addr.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+        try std.fmt.formatInt(region.range.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
         try writer.writeAll(" - 0x");
         try std.fmt.formatInt(region.range.end().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
 
@@ -182,14 +182,14 @@ fn sortKernelMemoryLayout() void {
     std.mem.sort(MemoryRegion, kernel_memory_layout[0..kernel_memory_layout_count], {}, struct {
         fn lessThanFn(context: void, self: MemoryRegion, other: MemoryRegion) bool {
             _ = context;
-            return self.range.addr.lessThan(other.range.addr);
+            return self.range.address.lessThan(other.range.address);
         }
     }.lessThanFn);
 }
 
 /// Maps the direct maps.
 fn mapDirectMaps() !void {
-    const direct_map_physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
+    const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
 
     log.debug("mapping the direct map", .{});
 
@@ -265,21 +265,21 @@ fn mapSection(
 ) !void {
     std.debug.assert(section_end > section_start);
 
-    const virt_addr = kernel.VirtAddr.fromInt(section_start);
+    const virt_address = kernel.VirtualAddress.fromInt(section_start);
 
-    const virtual_range = kernel.VirtRange.fromAddr(
-        virt_addr,
+    const virtual_range = kernel.VirtualRange.fromAddr(
+        virt_address,
         core.Size
             .from(section_end - section_start, .byte)
             .alignForward(paging.standard_page_size),
     );
     std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
-    const phys_addr = kernel.PhysAddr.fromInt(
-        virt_addr.value - kernel.info.kernel_virtual_offset_from_physical.bytes,
+    const phys_address = kernel.PhysicalAddress.fromInt(
+        virt_address.value - kernel.info.kernel_virtual_offset_from_physical.bytes,
     );
 
-    const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
+    const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
     try mapRangeUseAllPageSizes(
         kernel_root_page_table,

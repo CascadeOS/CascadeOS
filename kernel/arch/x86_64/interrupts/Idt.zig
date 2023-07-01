@@ -75,10 +75,10 @@ pub const Entry = extern struct {
     }
 
     pub fn setHandler(self: *Entry, handler: *const fn () callconv(.Naked) void) void {
-        const addr = @intFromPtr(handler);
-        self.pointer_low = @truncate(addr);
-        self.pointer_middle = @truncate((addr >> 16));
-        self.pointer_high = @truncate((addr >> 32));
+        const address = @intFromPtr(handler);
+        self.pointer_low = @truncate(address);
+        self.pointer_middle = @truncate((address >> 16));
+        self.pointer_high = @truncate((address >> 32));
     }
 
     pub fn setStack(self: *Entry, interrupt_stack: u3) void {
@@ -95,11 +95,11 @@ pub const Entry = extern struct {
 pub fn load(self: *const Idt) void {
     const Idtr = packed struct {
         limit: u16,
-        addr: u64,
+        address: u64,
     };
 
     const idtr = Idtr{
-        .addr = @intFromPtr(self),
+        .address = @intFromPtr(self),
         .limit = @sizeOf(Idt) - 1,
     };
 

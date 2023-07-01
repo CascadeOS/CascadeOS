@@ -148,16 +148,16 @@ pub const Cr0 = packed struct(u64) {
 };
 
 pub const Cr3 = struct {
-    pub inline fn readAddress() kernel.PhysAddr {
-        return kernel.PhysAddr.fromInt(asm ("mov %%cr3, %[value]"
+    pub inline fn readAddress() kernel.PhysicalAddress {
+        return kernel.PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
             : [value] "=r" (-> u64),
         ) & 0xFFFF_FFFF_FFFF_F000);
     }
 
-    pub inline fn writeAddress(addr: kernel.PhysAddr) void {
-        asm volatile ("mov %[addr], %%cr3"
+    pub inline fn writeAddress(address: kernel.PhysicalAddress) void {
+        asm volatile ("mov %[address], %%cr3"
             :
-            : [addr] "r" (addr.value & 0xFFFF_FFFF_FFFF_F000),
+            : [address] "r" (address.value & 0xFFFF_FFFF_FFFF_F000),
             : "memory"
         );
     }

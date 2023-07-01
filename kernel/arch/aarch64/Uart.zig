@@ -9,11 +9,11 @@ const Uart = @This();
 
 // TODO: Implement a proper UART driver https://github.com/CascadeOS/CascadeOS/issues/28
 
-addr: *volatile u8,
+address: *volatile u8,
 
-pub fn init(addr: usize) Uart {
+pub fn init(address: usize) Uart {
     return .{
-        .addr = @ptrFromInt(addr),
+        .address = @ptrFromInt(address),
     };
 }
 
@@ -25,7 +25,7 @@ pub inline fn writer(self: Uart) Writer {
 /// The impl function driving the `std.io.Writer`
 fn writerImpl(self: Uart, bytes: []const u8) error{}!usize {
     for (bytes) |char| {
-        self.addr.* = char;
+        self.address.* = char;
     }
     return bytes.len;
 }

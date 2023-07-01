@@ -29,13 +29,13 @@ pub fn switchTo(new_state: PanicState) void {
 pub fn panic(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
-    opt_return_address: ?usize,
+    return_address_opt: ?usize,
 ) noreturn {
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
     symbol_map.loadSymbols();
 
-    const return_address = opt_return_address orelse @returnAddress();
+    const return_address = return_address_opt orelse @returnAddress();
 
     switch (state) {
         .no_op => {},
@@ -78,13 +78,13 @@ fn dumpStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) v
     var frame_index: usize = 0;
     var frames_left: usize = @min(stack_trace.index, stack_trace.instruction_addresses.len);
 
-    var opt_first_addr: ?usize = null;
+    var first_addr_opt: ?usize = null;
     while (frames_left != 0) : ({
         frames_left -= 1;
         frame_index = (frame_index + 1) % stack_trace.instruction_addresses.len;
     }) {
         const return_address = stack_trace.instruction_addresses[frame_index];
-        if (opt_first_addr == null) opt_first_addr = return_address;
+        if (first_addr_opt == null) first_addr_opt = return_address;
 
         printSourceAtAddress(writer, return_address);
     }
@@ -116,7 +116,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    // we can't use `VirtAddr` here as it is possible this subtract results in a non-canonical address
+    // we can't use `VirtualAddress` here as it is possible this subtract results in a non-canonical address
     const kernel_source_address = address - kernel.info.kernel_offset_from_base.bytes;
 
     if (kernel_source_address < kernel.info.kernel_base_address.value) {

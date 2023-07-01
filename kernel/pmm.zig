@@ -15,61 +15,19 @@ var total_memory: core.Size = core.Size.zero;
 var total_usable_memory: core.Size = core.Size.zero;
 var free_memory: core.Size = core.Size.zero;
 
-pub fn init() void {
-    const indent = "  ";
+const indent = "  ";
 
+pub fn init() void {
     var memory_map_iterator = kernel.boot.memoryMapIterator(.forwards);
 
-    while (memory_map_iterator.next()) |entry| {
-        log.debug(indent ++ "{}", .{entry});
+    while (memory_map_iterator.next()) |memory_map_entry| {
+        log.debug(indent ++ "{}", .{memory_map_entry});
 
-        total_memory.addInPlace(entry.range.size);
+        total_memory.addInPlace(memory_map_entry.range.size);
 
-        switch (entry.type) {
-            .free => {
-                total_usable_memory.addInPlace(entry.range.size);
-                free_memory.addInPlace(entry.range.size);
-
-                std.debug.assert(entry.range.addr.isAligned(arch.paging.standard_page_size));
-                std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
-
-                const range_in_direct_map = entry.range.toDirectMap();
-
-                var current_virtual_addr = range_in_direct_map.addr;
-                const virtual_end_addr = range_in_direct_map.end();
-
-                log.debug(indent ** 2 ++ "marking {} pages available from {} to {}", .{
-                    entry.range.size.divide(arch.paging.standard_page_size),
-                    current_virtual_addr,
-                    virtual_end_addr,
-                });
-
-                var opt_first_page: ?*PhysPageNode = null;
-                var opt_previous_page: ?*PhysPageNode = null;
-
-                while (current_virtual_addr.lessThan(virtual_end_addr)) : ({
-                    current_virtual_addr.moveForwardInPlace(arch.paging.standard_page_size);
-                }) {
-                    const page = current_virtual_addr.toPtr(*kernel.pmm.PhysPageNode);
-                    page.next = null;
-                    if (opt_first_page == null) {
-                        opt_first_page = page;
-                    }
-                    if (opt_previous_page) |previous_page| {
-                        previous_page.next = page;
-                    }
-                    opt_previous_page = page;
-                }
-
-                const first_page = opt_first_page orelse core.panic("no first free page?");
-                const previous_page = opt_previous_page orelse core.panic("no previous page?");
-
-                previous_page.next = first_free_physical_page;
-                first_free_physical_page = first_page;
-            },
-            .in_use, .reclaimable => {
-                total_usable_memory.addInPlace(entry.range.size);
-            },
+        switch (memory_map_entry.type) {
+            .free => processFreeMemoryMapEntry(memory_map_entry),
+            .in_use, .reclaimable => total_usable_memory.addInPlace(memory_map_entry.range.size),
             .reserved_or_unusable => {},
         }
     }
@@ -81,32 +39,85 @@ pub fn init() void {
     log.debug("|--unusable: {}", .{total_memory.subtract(total_usable_memory)});
 }
 
-pub fn allocatePage() ?kernel.PhysRange {
-    var opt_first_free = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
+fn processFreeMemoryMapEntry(memory_map_entry: kernel.boot.MemoryMapEntry) void {
+    total_usable_memory.addInPlace(memory_map_entry.range.size);
+    free_memory.addInPlace(memory_map_entry.range.size);
+    addMemoryMapEntryToAllocator(memory_map_entry);
+}
 
-    while (opt_first_free) |first_free| {
+/// Adds a memory map entry to the physical page allocator.
+fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) void {
+    std.debug.assert(memory_map_entry.range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(memory_map_entry.range.size.isAligned(arch.paging.standard_page_size));
+
+    const virtual_range = memory_map_entry.range.toDirectMap();
+
+    var current_virtual_address = virtual_range.address;
+    const end_virtual_address = virtual_range.end();
+
+    log.debug(indent ** 2 ++ "marking {} pages available from {} to {}", .{
+        memory_map_entry.range.size.divide(arch.paging.standard_page_size),
+        current_virtual_address,
+        end_virtual_address,
+    });
+
+    var first_page_opt: ?*PhysPageNode = null;
+    var previous_page_opt: ?*PhysPageNode = null;
+
+    while (current_virtual_address.lessThan(end_virtual_address)) : ({
+        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+    }) {
+        const page = current_virtual_address.toPtr(*kernel.pmm.PhysPageNode);
+        page.next = null;
+        if (first_page_opt == null) {
+            first_page_opt = page;
+        }
+        if (previous_page_opt) |previous_page| {
+            previous_page.next = page;
+        }
+        previous_page_opt = page;
+    }
+
+    const first_page = first_page_opt orelse core.panic("no first free page?");
+    const previous_page = previous_page_opt orelse core.panic("no previous page?");
+
+    previous_page.next = first_free_physical_page;
+    first_free_physical_page = first_page;
+}
+
+/// Allocates a physical page.
+pub fn allocatePage() ?kernel.PhysicalRange {
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
+
+    while (first_free_page_opt) |first_free_page| {
         if (@cmpxchgWeak(
             ?*PhysPageNode,
             &first_free_physical_page,
-            first_free,
-            first_free.next,
+            first_free_page,
+            first_free_page.next,
             .AcqRel,
             .Monotonic,
-        )) |new_first_free| {
-            opt_first_free = new_first_free;
+        )) |new_first_free_page| {
+            first_free_page_opt = new_first_free_page;
             continue;
         }
 
         // Decrement `free_memory`
-        _ = @atomicRmw(usize, &free_memory.bytes, .Sub, arch.paging.standard_page_size.bytes, .Monotonic);
+        _ = @atomicRmw(
+            usize,
+            &free_memory.bytes,
+            .Sub,
+            arch.paging.standard_page_size.bytes,
+            .Monotonic,
+        );
 
-        const addr = kernel.VirtAddr.fromPtr(first_free).toPhysicalFromDirectMap() catch unreachable;
+        const physical_address = kernel.VirtualAddress.fromPtr(first_free_page).toPhysicalFromDirectMap() catch unreachable;
 
-        const range = kernel.PhysRange.fromAddr(addr, arch.paging.standard_page_size);
+        const allocated_range = kernel.PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
 
-        log.debug("found free page: {}", .{range});
+        log.debug("found free page: {}", .{allocated_range});
 
-        return range;
+        return allocated_range;
     } else {
         log.warn("STANDARD PAGE ALLOCATION FAILED", .{});
     }
@@ -114,12 +125,14 @@ pub fn allocatePage() ?kernel.PhysRange {
     return null;
 }
 
-pub fn deallocatePage(range: kernel.PhysRange) void {
-    std.debug.assert(range.addr.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(range.size.equal(arch.paging.standard_page_size));
+/// Deallocates a physical page.
+pub fn deallocatePage(allocated_range: kernel.PhysicalRange) void {
+    std.debug.assert(allocated_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(allocated_range.size.equal(arch.paging.standard_page_size));
 
-    const page_node = range.addr.toDirectMap().toPtr(*PhysPageNode);
+    const page_node = allocated_range.address.toDirectMap().toPtr(*PhysPageNode);
     _ = page_node;
+
     core.panic("UNIMPLEMENTED `deallocatePage`"); // TODO: implement deallocatePage https://github.com/CascadeOS/CascadeOS/issues/21
 }
 

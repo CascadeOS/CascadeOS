@@ -33,65 +33,65 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
         @ptrCast(@alignCast(&kernel_elf_start[shoff])),
     )[0..hdr.e_shnum];
 
-    var opt_debug_info: ?[]const u8 = null;
-    var opt_debug_abbrev: ?[]const u8 = null;
-    var opt_debug_str: ?[]const u8 = null;
-    var opt_debug_str_offsets: ?[]const u8 = null;
-    var opt_debug_line: ?[]const u8 = null;
-    var opt_debug_line_str: ?[]const u8 = null;
-    var opt_debug_ranges: ?[]const u8 = null;
-    var opt_debug_loclists: ?[]const u8 = null;
-    var opt_debug_rnglists: ?[]const u8 = null;
-    var opt_debug_addr: ?[]const u8 = null;
-    var opt_debug_names: ?[]const u8 = null;
-    var opt_debug_frame: ?[]const u8 = null;
+    var debug_info_opt: ?[]const u8 = null;
+    var debug_abbrev_opt: ?[]const u8 = null;
+    var debug_str_opt: ?[]const u8 = null;
+    var debug_str_offsets_opt: ?[]const u8 = null;
+    var debug_line_opt: ?[]const u8 = null;
+    var debug_line_str_opt: ?[]const u8 = null;
+    var debug_ranges_opt: ?[]const u8 = null;
+    var debug_loclists_opt: ?[]const u8 = null;
+    var debug_rnglists_opt: ?[]const u8 = null;
+    var debug_addr_opt: ?[]const u8 = null;
+    var debug_names_opt: ?[]const u8 = null;
+    var debug_frame_opt: ?[]const u8 = null;
 
     for (shdrs) |*shdr| {
         if (shdr.sh_type == std.elf.SHT_NULL) continue;
 
         const name = std.mem.sliceTo(header_strings[shdr.sh_name..], 0);
         if (std.mem.eql(u8, name, ".debug_info")) {
-            opt_debug_info = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_info_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_abbrev")) {
-            opt_debug_abbrev = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_abbrev_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_str")) {
-            opt_debug_str = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_str_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_str_offsets")) {
-            opt_debug_str_offsets = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_str_offsets_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_line")) {
-            opt_debug_line = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_line_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_line_str")) {
-            opt_debug_line_str = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_line_str_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_ranges")) {
-            opt_debug_ranges = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_ranges_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_loclists")) {
-            opt_debug_loclists = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_loclists_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_rnglists")) {
-            opt_debug_rnglists = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_rnglists_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_addr")) {
-            opt_debug_addr = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_addr_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_names")) {
-            opt_debug_names = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_names_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         } else if (std.mem.eql(u8, name, ".debug_frame")) {
-            opt_debug_frame = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+            debug_frame_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
         }
     }
 
     var map: DwarfSymbolMap = .{
         .debug_info = std.dwarf.DwarfInfo{
             .endian = .Little,
-            .debug_info = opt_debug_info orelse return error.MissingDebugInfo,
-            .debug_abbrev = opt_debug_abbrev orelse return error.MissingDebugInfo,
-            .debug_str = opt_debug_str orelse return error.MissingDebugInfo,
-            .debug_str_offsets = opt_debug_str_offsets,
-            .debug_line = opt_debug_line orelse return error.MissingDebugInfo,
-            .debug_line_str = opt_debug_line_str,
-            .debug_ranges = opt_debug_ranges,
-            .debug_loclists = opt_debug_loclists,
-            .debug_rnglists = opt_debug_rnglists,
-            .debug_addr = opt_debug_addr,
-            .debug_names = opt_debug_names,
-            .debug_frame = opt_debug_frame,
+            .debug_info = debug_info_opt orelse return error.MissingDebugInfo,
+            .debug_abbrev = debug_abbrev_opt orelse return error.MissingDebugInfo,
+            .debug_str = debug_str_opt orelse return error.MissingDebugInfo,
+            .debug_str_offsets = debug_str_offsets_opt,
+            .debug_line = debug_line_opt orelse return error.MissingDebugInfo,
+            .debug_line_str = debug_line_str_opt,
+            .debug_ranges = debug_ranges_opt,
+            .debug_loclists = debug_loclists_opt,
+            .debug_rnglists = debug_rnglists_opt,
+            .debug_addr = debug_addr_opt,
+            .debug_names = debug_names_opt,
+            .debug_frame = debug_frame_opt,
         },
         .allocator = dwarf_debug_allocator.allocator(),
     };
@@ -115,7 +115,7 @@ pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
 
     const name = self.debug_info.getSymbolName(address) orelse return null;
 
-    const opt_line_info: ?std.debug.LineInfo = self.debug_info.getLineNumberInfo(
+    const line_info_opt: ?std.debug.LineInfo = self.debug_info.getLineNumberInfo(
         self.allocator,
         compile_unit.*,
         address,
@@ -124,7 +124,7 @@ pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
         else => return null,
     };
 
-    const line_info = opt_line_info orelse {
+    const line_info = line_info_opt orelse {
         return .{
             .address = address,
             .name = name,

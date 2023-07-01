@@ -56,7 +56,7 @@ pub const paging = struct {
     };
 
     // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/23
-    pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
+    pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
 
     // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     pub const PageTable = struct {
@@ -70,8 +70,8 @@ pub const paging = struct {
     ///   1. search the high half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-    ///   4. return the `VirtRange` representing the entire virtual range that entry covers
-    pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtRange {
+    ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
+    pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtualRange {
         _ = page_table;
         core.panic("UNIMPLEMENTED `getHeapRangeAndFillFirstLevel`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
@@ -80,8 +80,8 @@ pub const paging = struct {
 
     pub fn mapRange(
         page_table: *PageTable,
-        virtual_range: kernel.VirtRange,
-        physical_range: kernel.PhysRange,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
         _ = map_type;
@@ -93,8 +93,8 @@ pub const paging = struct {
 
     pub fn mapRangeUseAllPageSizes(
         page_table: *PageTable,
-        virtual_range: kernel.VirtRange,
-        physical_range: kernel.PhysRange,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
         _ = map_type;

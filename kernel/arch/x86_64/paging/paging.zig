@@ -23,7 +23,7 @@ pub inline fn largestPageSize() core.Size {
     return medium_page_size;
 }
 
-pub const higher_half = kernel.VirtAddr.fromInt(0xffff800000000000);
+pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
@@ -31,7 +31,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     const physical_page = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
     std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
-    const page_table = physical_page.toDirectMap().addr.toPtr(*PageTable);
+    const page_table = physical_page.toDirectMap().address.toPtr(*PageTable);
     page_table.zero();
 
     return page_table;
@@ -39,7 +39,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
 
 pub fn switchToPageTable(page_table: *const PageTable) void {
     x86_64.registers.Cr3.writeAddress(
-        kernel.VirtAddr.fromPtr(page_table).unsafeToPhysicalFromDirectMap(),
+        kernel.VirtualAddress.fromPtr(page_table).unsafeToPhysicalFromDirectMap(),
     );
 }
 
@@ -47,8 +47,8 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
 ///   1. search the high half of the *top level* of the given page table for a free entry
 ///   2. allocate a backing frame for it
 ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-///   4. return the `VirtRange` representing the entire virtual range that entry covers
-pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtRange {
+///   4. return the `VirtualRange` representing the entire virtual range that entry covers
+pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtualRange {
     var index: usize = PageTable.p4Index(higher_half);
     while (index < PageTable.number_of_entries) : (index += 1) {
         const entry = &page_table.entries[index];
@@ -58,7 +58,7 @@ pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapErro
 
         _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
 
-        return kernel.VirtRange.fromAddr(
+        return kernel.VirtualRange.fromAddr(
             PageTable.indexToAddr(
                 @truncate(index),
                 0,
@@ -78,15 +78,15 @@ const MapError = arch.paging.MapError;
 /// This function will only use the architecture's `standard_page_size`.
 pub fn mapRange(
     page_table: *PageTable,
-    virtual_range: kernel.VirtRange,
-    physical_range: kernel.PhysRange,
+    virtual_range: kernel.VirtualRange,
+    physical_range: kernel.PhysicalRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
     log.debug("mapRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
-    var current_virtual = virtual_range.addr;
+    var current_virtual = virtual_range.address;
     const virtual_end = virtual_range.end();
-    var current_physical = physical_range.addr;
+    var current_physical = physical_range.address;
     var size_left = virtual_range.size;
 
     var kib_mappings: usize = 0;
@@ -116,15 +116,15 @@ pub fn mapRange(
 /// This function is allowed to use all page sizes available to the architecture.
 pub fn mapRangeUseAllPageSizes(
     page_table: *PageTable,
-    virtual_range: kernel.VirtRange,
-    physical_range: kernel.PhysRange,
+    virtual_range: kernel.VirtualRange,
+    physical_range: kernel.PhysicalRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
     log.debug("mapRangeUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
-    var current_virtual = virtual_range.addr;
+    var current_virtual = virtual_range.address;
     const virtual_end = virtual_range.end();
-    var current_physical = physical_range.addr;
+    var current_physical = physical_range.address;
     var size_left = virtual_range.size;
 
     var gib_mappings: usize = 0;
@@ -204,8 +204,8 @@ pub fn mapRangeUseAllPageSizes(
 
 fn mapTo4KiB(
     level4_table: *PageTable,
-    virtual_addr: kernel.VirtAddr,
-    physical_addr: kernel.PhysAddr,
+    virtual_addr: kernel.VirtualAddress,
+    physical_addr: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
     std.debug.assert(virtual_addr.isAligned(small_page_size));
@@ -235,8 +235,8 @@ fn mapTo4KiB(
 
 fn mapTo2MiB(
     level4_table: *PageTable,
-    virtual_addr: kernel.VirtAddr,
-    physical_addr: kernel.PhysAddr,
+    virtual_addr: kernel.VirtualAddress,
+    physical_addr: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
     std.debug.assert(virtual_addr.isAligned(medium_page_size));
@@ -263,8 +263,8 @@ fn mapTo2MiB(
 
 fn mapTo1GiB(
     level4_table: *PageTable,
-    virtual_addr: kernel.VirtAddr,
-    physical_addr: kernel.PhysAddr,
+    virtual_addr: kernel.VirtualAddress,
+    physical_addr: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
     std.debug.assert(x86_64.info.gib_pages); // assert that 1GiB pages are available
@@ -318,15 +318,15 @@ fn ensureNextTable(
 ) error{ AllocationFailed, Unexpected }!*PageTable {
     var created = false;
 
-    var physical_page: ?kernel.PhysRange = null;
+    var physical_page: ?kernel.PhysicalRange = null;
 
     if (!self.present.read()) {
         physical_page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
-        self.setAddress4kib(physical_page.?.addr);
+        self.setAddress4kib(physical_page.?.address);
         created = true;
     }
     errdefer if (physical_page) |page| {
-        self.setAddress4kib(kernel.PhysAddr.zero);
+        self.setAddress4kib(kernel.PhysicalAddress.zero);
         kernel.pmm.deallocatePage(page);
     };
 

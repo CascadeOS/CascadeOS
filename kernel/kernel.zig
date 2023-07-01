@@ -14,11 +14,11 @@ pub const vmm = @import("vmm.zig");
 
 pub const SpinLock = @import("SpinLock.zig");
 
-const addr = @import("addr.zig");
-pub const PhysAddr = addr.PhysAddr;
-pub const VirtAddr = addr.VirtAddr;
-pub const PhysRange = addr.PhysRange;
-pub const VirtRange = addr.VirtRange;
+const address = @import("address.zig");
+pub const PhysicalAddress = address.PhysicalAddress;
+pub const VirtualAddress = address.VirtualAddress;
+pub const PhysicalRange = address.PhysicalRange;
+pub const VirtualRange = address.VirtualRange;
 
 comptime {
     // make sure any bootloader specific code that needs to be referenced is

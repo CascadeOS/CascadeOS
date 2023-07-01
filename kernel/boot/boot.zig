@@ -44,9 +44,9 @@ pub fn kernelAddress() ?KernelAddress {
     return null;
 }
 
-pub fn kernelFile() ?kernel.VirtRange {
+pub fn kernelFile() ?kernel.VirtualRange {
     if (limine_requests.kernel_file.response) |resp| {
-        return kernel.VirtRange.fromSlice(resp.kernel_file.getContents());
+        return kernel.VirtualRange.fromSlice(resp.kernel_file.getContents());
     }
     return null;
 }
@@ -76,7 +76,7 @@ pub const MemoryMapIterator = union(enum) {
 };
 
 pub const MemoryMapEntry = struct {
-    range: kernel.PhysRange,
+    range: kernel.PhysicalRange,
     type: Type,
 
     pub const Type = enum {
@@ -147,8 +147,8 @@ const LimineMemoryMapIterator = struct {
         }
 
         return .{
-            .range = kernel.PhysRange.fromAddr(
-                kernel.PhysAddr.fromInt(limine_entry.base),
+            .range = kernel.PhysicalRange.fromAddr(
+                kernel.PhysicalAddress.fromInt(limine_entry.base),
                 core.Size.from(limine_entry.length, .byte),
             ),
             .type = switch (limine_entry.memmap_type) {

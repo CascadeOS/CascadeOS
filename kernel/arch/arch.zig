@@ -88,7 +88,7 @@ pub const paging = struct {
         return current.paging.largestPageSize();
     }
 
-    pub const higher_half: kernel.VirtAddr = current.paging.higher_half;
+    pub const higher_half: kernel.VirtualAddress = current.paging.higher_half;
 
     pub const PageTable: type = current.paging.PageTable;
 
@@ -100,8 +100,8 @@ pub const paging = struct {
     ///   1. search the higher half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-    ///   4. return the `VirtRange` representing the entire virtual range that entry covers
-    pub inline fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtRange {
+    ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
+    pub inline fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
         // TODO: randomize location of the heap https://github.com/CascadeOS/CascadeOS/issues/56
         // the chance that the heap will occupy the the very first higher half table is very high
         // especially due to kaslr. to reduce this problem we need to add a bit of random.
@@ -118,8 +118,8 @@ pub const paging = struct {
     /// This function will only use the architecture's `standard_page_size`.
     pub inline fn mapRange(
         page_table: *PageTable,
-        virtual_range: kernel.VirtRange,
-        physical_range: kernel.PhysRange,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
         return current.paging.mapRange(page_table, virtual_range, physical_range, map_type);
@@ -129,8 +129,8 @@ pub const paging = struct {
     /// This function is allowed to use all page sizes available to the architecture.
     pub inline fn mapRangeUseAllPageSizes(
         page_table: *PageTable,
-        virtual_range: kernel.VirtRange,
-        physical_range: kernel.PhysRange,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
         return current.paging.mapRangeUseAllPageSizes(page_table, virtual_range, physical_range, map_type);

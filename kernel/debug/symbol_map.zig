@@ -7,14 +7,14 @@ const kernel = @import("kernel");
 const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
 
 var dwarf_symbol_map_spinlock: kernel.SpinLock = .{};
-var opt_dwarf_symbol_map: ?DwarfSymbolMap = null;
+var dwarf_symbol_map_opt: ?DwarfSymbolMap = null;
 
 pub fn loadSymbols() void {
-    if (opt_dwarf_symbol_map == null) {
+    if (dwarf_symbol_map_opt == null) {
         const held = dwarf_symbol_map_spinlock.lock();
         defer held.unlock();
-        if (opt_dwarf_symbol_map == null) {
-            opt_dwarf_symbol_map = DwarfSymbolMap.init(kernel.info.kernel_file.addr.toPtr([*]const u8)) catch null;
+        if (dwarf_symbol_map_opt == null) {
+            dwarf_symbol_map_opt = DwarfSymbolMap.init(kernel.info.kernel_file.address.toPtr([*]const u8)) catch null;
         }
     }
 }
@@ -25,7 +25,7 @@ pub fn getSymbol(address: usize) ?Symbol {
     // address will actually point at the first instruction _after_ intended function
     const safer_address = address - 1;
 
-    if (opt_dwarf_symbol_map) |*dwarf_symbol_map| {
+    if (dwarf_symbol_map_opt) |*dwarf_symbol_map| {
         if (dwarf_symbol_map.getSymbol(safer_address)) |symbol| {
             return symbol;
         }

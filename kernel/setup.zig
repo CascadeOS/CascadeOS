@@ -61,28 +61,28 @@ fn calculateDirectMaps() void {
     log.debug("non-cached direct map: {}", .{kernel.info.non_cached_direct_map});
 }
 
-fn calculateDirectMapRange(direct_map_size: core.Size) kernel.VirtRange {
+fn calculateDirectMapRange(direct_map_size: core.Size) kernel.VirtualRange {
     const direct_map_address = kernel.boot.directMapAddress() orelse
         core.panic("bootloader did not provide the start of the direct map");
 
-    const direct_map_start_address = kernel.VirtAddr.fromInt(direct_map_address);
+    const direct_map_start_address = kernel.VirtualAddress.fromInt(direct_map_address);
 
     if (!direct_map_start_address.isAligned(kernel.arch.paging.standard_page_size)) {
         core.panic("direct map is not aligned to the standard page size");
     }
 
-    return kernel.VirtRange.fromAddr(direct_map_start_address, direct_map_size);
+    return kernel.VirtualRange.fromAddr(direct_map_start_address, direct_map_size);
 }
 
 fn calculateNonCachedDirectMapRange(
     direct_map_size: core.Size,
-    direct_map_range: kernel.VirtRange,
-) kernel.VirtRange {
+    direct_map_range: kernel.VirtualRange,
+) kernel.VirtualRange {
     // try to place the non-cached direct map directly _before_ the direct map
     {
         const candidate_range = direct_map_range.moveBackward(direct_map_size);
         // check that we have not gone below the higher half
-        if (candidate_range.addr.greaterThanOrEqual(kernel.arch.paging.higher_half)) {
+        if (candidate_range.address.greaterThanOrEqual(kernel.arch.paging.higher_half)) {
             return candidate_range;
         }
     }
@@ -139,8 +139,8 @@ fn calculateKernelVirtualAndPhysicalOffsets() void {
     const kernel_virtual = kernel_address.virtual;
     const kernel_physical = kernel_address.physical;
 
-    kernel.info.kernel_virtual_address = kernel.VirtAddr.fromInt(kernel_virtual);
-    kernel.info.kernel_physical_address = kernel.PhysAddr.fromInt(kernel_physical);
+    kernel.info.kernel_virtual_address = kernel.VirtualAddress.fromInt(kernel_virtual);
+    kernel.info.kernel_physical_address = kernel.PhysicalAddress.fromInt(kernel_physical);
     log.debug("kernel virtual: {}", .{kernel.info.kernel_virtual_address});
     log.debug("kernel physical: {}", .{kernel.info.kernel_physical_address});
 

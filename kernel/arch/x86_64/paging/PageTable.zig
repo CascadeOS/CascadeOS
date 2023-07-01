@@ -23,40 +23,40 @@ pub const PageTable = extern struct {
         @memset(bytes, 0);
     }
 
-    pub fn getEntryLevel4(self: *PageTable, virtual_addr: kernel.VirtAddr) *Entry {
+    pub fn getEntryLevel4(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
         return &self.entries[p4Index(virtual_addr)];
     }
 
-    pub fn getEntryLevel3(self: *PageTable, virtual_addr: kernel.VirtAddr) *Entry {
+    pub fn getEntryLevel3(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
         return &self.entries[p3Index(virtual_addr)];
     }
 
-    pub fn getEntryLevel2(self: *PageTable, virtual_addr: kernel.VirtAddr) *Entry {
+    pub fn getEntryLevel2(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
         return &self.entries[p2Index(virtual_addr)];
     }
 
-    pub fn getEntryLevel1(self: *PageTable, virtual_addr: kernel.VirtAddr) *Entry {
+    pub fn getEntryLevel1(self: *PageTable, virtual_addr: kernel.VirtualAddress) *Entry {
         return &self.entries[p1Index(virtual_addr)];
     }
 
-    pub fn p1Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(addr.value >> level_1_shift);
+    pub fn p1Index(address: kernel.VirtualAddress) u9 {
+        return @truncate(address.value >> level_1_shift);
     }
 
-    pub fn p2Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(addr.value >> level_2_shift);
+    pub fn p2Index(address: kernel.VirtualAddress) u9 {
+        return @truncate(address.value >> level_2_shift);
     }
 
-    pub fn p3Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(addr.value >> level_3_shift);
+    pub fn p3Index(address: kernel.VirtualAddress) u9 {
+        return @truncate(address.value >> level_3_shift);
     }
 
-    pub fn p4Index(addr: kernel.VirtAddr) u9 {
-        return @truncate(addr.value >> level_4_shift);
+    pub fn p4Index(address: kernel.VirtualAddress) u9 {
+        return @truncate(address.value >> level_4_shift);
     }
 
-    pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) kernel.VirtAddr {
-        return kernel.VirtAddr.fromInt(
+    pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) kernel.VirtualAddress {
+        return kernel.VirtualAddress.fromInt(
             signExtendAddress(
                 @as(u64, level_4_index) << level_4_shift |
                     @as(u64, level_3_index) << level_3_shift |
@@ -78,7 +78,7 @@ pub const PageTable = extern struct {
 
             const sign_extended_level4_part = signExtendAddress(level4_i << level_4_shift);
 
-            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_i, kernel.VirtAddr.fromInt(sign_extended_level4_part) });
+            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_i, kernel.VirtualAddress.fromInt(sign_extended_level4_part) });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
@@ -89,7 +89,7 @@ pub const PageTable = extern struct {
                 const level3_part = level3_i << level_3_shift;
 
                 if (level3_entry.huge.read()) {
-                    const virtual = kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part);
+                    const virtual = kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
                     try writer.print("  [{}] 1GIB {} -> {}    Flags: ", .{ level3_i, virtual, physical });
                     try level3_entry.printHugeEntryFlags(writer);
@@ -97,7 +97,7 @@ pub const PageTable = extern struct {
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_i, kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part) });
+                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_i, kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part) });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
@@ -108,7 +108,7 @@ pub const PageTable = extern struct {
                     const level2_part = level2_i << level_2_shift;
 
                     if (level2_entry.huge.read()) {
-                        const virtual = kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part | level2_part);
+                        const virtual = kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
                         try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ virtual, physical, level2_i });
                         try level2_entry.printHugeEntryFlags(writer);
@@ -116,7 +116,7 @@ pub const PageTable = extern struct {
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_i, kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part | level2_part) });
+                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_i, kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part | level2_part) });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
@@ -136,7 +136,7 @@ pub const PageTable = extern struct {
 
                         const level1_part = level1_i << level_1_shift;
 
-                        const virtual = kernel.VirtAddr.fromInt(sign_extended_level4_part | level3_part | level2_part | level1_part);
+                        const virtual = kernel.VirtualAddress.fromInt(sign_extended_level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
                         try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ virtual, physical, level1_i });
                         try level1_entry.printSmallEntryFlags(writer);
@@ -234,37 +234,37 @@ pub const PageTable = extern struct {
 
         const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
 
-        pub fn getAddress4kib(self: Entry) kernel.PhysAddr {
+        pub fn getAddress4kib(self: Entry) kernel.PhysicalAddress {
             return .{
                 .value = @as(usize, self.address_4kib_aligned.read()) << level_1_shift,
             };
         }
 
-        pub fn setAddress4kib(self: *Entry, addr: kernel.PhysAddr) void {
-            std.debug.assert(addr.isAligned(paging.small_page_size));
+        pub fn setAddress4kib(self: *Entry, address: kernel.PhysicalAddress) void {
+            std.debug.assert(address.isAligned(paging.small_page_size));
             self.address_4kib_aligned.write(
-                @as(type_of_4kib, @truncate(addr.value >> level_1_shift)),
+                @as(type_of_4kib, @truncate(address.value >> level_1_shift)),
             );
         }
 
-        pub fn getAddress2mib(self: Entry) kernel.PhysAddr {
+        pub fn getAddress2mib(self: Entry) kernel.PhysicalAddress {
             return .{
                 .value = @as(usize, self.address_2mib_aligned.read()) << level_2_shift,
             };
         }
 
-        pub fn setAddress2mib(self: *Entry, addr: kernel.PhysAddr) void {
-            std.debug.assert(addr.isAligned(paging.medium_page_size));
-            self.address_2mib_aligned.write(@truncate(addr.value >> level_2_shift));
+        pub fn setAddress2mib(self: *Entry, address: kernel.PhysicalAddress) void {
+            std.debug.assert(address.isAligned(paging.medium_page_size));
+            self.address_2mib_aligned.write(@truncate(address.value >> level_2_shift));
         }
 
-        pub fn getAddress1gib(self: Entry) kernel.PhysAddr {
+        pub fn getAddress1gib(self: Entry) kernel.PhysicalAddress {
             return .{ .value = @as(usize, self.address_1gib_aligned.read()) << level_3_shift };
         }
 
-        pub fn setAddress1gib(self: *Entry, addr: kernel.PhysAddr) void {
-            std.debug.assert(addr.isAligned(paging.large_page_size));
-            self.address_1gib_aligned.write(@truncate(addr.value >> level_3_shift));
+        pub fn setAddress1gib(self: *Entry, address: kernel.PhysicalAddress) void {
+            std.debug.assert(address.isAligned(paging.large_page_size));
+            self.address_1gib_aligned.write(@truncate(address.value >> level_3_shift));
         }
 
         pub fn getNextLevel(self: Entry) !*PageTable {
@@ -403,8 +403,8 @@ pub const PageTable = extern struct {
     }
 };
 
-fn signExtendAddress(addr: u64) u64 {
-    return @bitCast(@as(i64, @bitCast(addr << 16)) >> 16);
+fn signExtendAddress(address: u64) u64 {
+    return @bitCast(@as(i64, @bitCast(address << 16)) >> 16);
 }
 
 const level_1_shift = 12;
