@@ -14,10 +14,12 @@ pub const PhysicalAddress = extern struct {
         return .{ .value = value };
     }
 
+    /// Returns the virtual address corresponding to this physical address in the direct map.
     pub inline fn toDirectMap(self: PhysicalAddress) VirtualAddress {
         return .{ .value = self.value + kernel.info.direct_map.address.value };
     }
 
+    /// Returns the virtual address corresponding to this physical address in the non-cached direct map.
     pub inline fn toNonCachedDirectMap(self: PhysicalAddress) VirtualAddress {
         return .{ .value = self.value + kernel.info.non_cached_direct_map.address.value };
     }
@@ -142,6 +144,7 @@ pub const PhysicalRange = struct {
 
     const name = "PhysicalRange";
 
+    /// Returns a virtual range corresponding to this physical range in the direct map.
     pub inline fn toDirectMap(self: PhysicalRange) VirtualRange {
         return .{
             .address = self.address.toDirectMap(),
@@ -158,17 +161,19 @@ pub const VirtualRange = struct {
 
     const name = "VirtualRange";
 
+    /// Returns a virtual range corresponding to the given slice.
     pub fn fromSlice(slice: anytype) VirtualRange {
         const info: std.builtin.Type = @typeInfo(@TypeOf(slice));
-        if (info != .Pointer) @compileError(""); // TODO: Add error message
+        if (info != .Pointer) @compileError("Type of `slice` is not a pointer: " ++ @typeName(@TypeOf(slice)));
         const pointer_info: std.builtin.Type.Pointer = info.Pointer;
-        if (pointer_info.size != .Slice) @compileError(""); // TODO: Add error message
+        if (pointer_info.size != .Slice) @compileError("`slice` is not a slice: " ++ @typeName(@TypeOf(slice)));
         return .{
             .address = VirtualAddress.fromPtr(slice.ptr),
             .size = core.Size.from(@sizeOf(pointer_info.child) * slice.len, .byte),
         };
     }
 
+    /// Returns a slice of type `T` corresponding to this virtual range.
     pub fn toSlice(self: VirtualRange, comptime T: type) ![]T {
         const len = try std.math.divExact(usize, self.size.bytes, @sizeOf(T));
         return self.address.toPtr([*]T)[0..len];
