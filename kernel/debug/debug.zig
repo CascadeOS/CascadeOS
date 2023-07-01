@@ -117,7 +117,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
     }
 
     // we can't use `VirtualAddress` here as it is possible this subtract results in a non-canonical address
-    const kernel_source_address = address - kernel.info.kernel_offset_from_base.bytes;
+    const kernel_source_address = address - kernel.info.kernel_load_offset.bytes;
 
     if (kernel_source_address < kernel.info.kernel_base_address.value) {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;

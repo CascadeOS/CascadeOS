@@ -25,12 +25,12 @@ pub var kernel_physical_address: kernel.PhysicalAddress = undefined;
 /// This would always be zero if not for kaslr.
 ///
 /// Initialized during `setup`.
-pub var kernel_offset_from_base: core.Size = undefined;
+pub var kernel_load_offset: core.Size = undefined;
 
 /// This is the offset from the physical address of the kernel to the virtual address of the kernel.
 ///
 /// Initialized during `setup`.
-pub var kernel_virtual_offset_from_physical: core.Size = undefined;
+pub var kernel_virtual_offset: core.Size = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
 ///

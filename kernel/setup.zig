@@ -44,7 +44,7 @@ pub fn setup() void {
 }
 
 fn captureBootloaderInformation() void {
-    calculateKernelVirtualAndPhysicalOffsets();
+    calculateKernelOffsets();
     calculateDirectMaps();
 
     // the kernel file was captured earlier in the setup process, now we can debug log what was captured
@@ -129,7 +129,7 @@ fn calculateLengthOfDirectMap() core.Size {
     return aligned_size;
 }
 
-fn calculateKernelVirtualAndPhysicalOffsets() void {
+fn calculateKernelOffsets() void {
     const kernel_address = kernel.boot.kernelAddress() orelse
         core.panic("bootloader did not provide the kernel address");
 
@@ -144,8 +144,8 @@ fn calculateKernelVirtualAndPhysicalOffsets() void {
     log.debug("kernel virtual: {}", .{kernel.info.kernel_virtual_address});
     log.debug("kernel physical: {}", .{kernel.info.kernel_physical_address});
 
-    kernel.info.kernel_offset_from_base = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
-    kernel.info.kernel_virtual_offset_from_physical = core.Size.from(kernel_virtual - kernel_physical, .byte);
-    log.debug("kernel offset from base: 0x{x}", .{kernel.info.kernel_offset_from_base.bytes});
-    log.debug("kernel offset from physical: 0x{x}", .{kernel.info.kernel_virtual_offset_from_physical.bytes});
+    kernel.info.kernel_load_offset = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
+    kernel.info.kernel_virtual_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
+    log.debug("kernel load offset: 0x{x}", .{kernel.info.kernel_load_offset.bytes});
+    log.debug("kernel virtual offset: 0x{x}", .{kernel.info.kernel_virtual_offset.bytes});
 }
