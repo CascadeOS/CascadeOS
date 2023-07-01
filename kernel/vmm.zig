@@ -15,39 +15,33 @@ var heap_range: kernel.VirtRange = undefined;
 
 pub fn init() void {
     log.debug("allocating kernel root page table", .{});
-    kernel_root_page_table = paging.allocatePageTable() catch core.panic("unable to allocate physical page for root page table");
+    kernel_root_page_table = paging.allocatePageTable() catch
+        core.panic("unable to allocate physical page for root page table");
 
     // the below functions setup the mappings in `kernel_root_page_table` and also register each region in
     // the kernel memory layout
 
-    identityMaps() catch |err| {
-        core.panicFmt("failed to map identity maps: {s}", .{@errorName(err)});
+    mapDirectMaps() catch |err| {
+        core.panicFmt("failed to map direct maps: {s}", .{@errorName(err)});
     };
 
     mapKernelSections() catch |err| {
         core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
     };
 
-    log.debug("preparing kernel heap", .{});
-    heap_range = kernel.arch.paging.getHeapRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
-        core.panicFmt("failed to find range for the kernel heap: {s}", .{@errorName(err)});
+    prepareKernelHeap() catch |err| {
+        core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
     };
-    registerKernelMemoryRegion(.{ .range = heap_range, .type = .kernel_heap });
-    log.debug("kernel heap: {}", .{heap_range});
 
-    // now that the kernel memory layout is populated we sort it from lowest address to highest
-    std.mem.sort(MemoryRegion, kernel_memory_layout[0..kernel_memory_layout_count], {}, struct {
-        fn lessThanFn(context: void, self: MemoryRegion, other: MemoryRegion) bool {
-            _ = context;
-            return self.range.addr.lessThan(other.range.addr);
-        }
-    }.lessThanFn);
+    // now that the kernel memory layout is populated we sort it
+    sortKernelMemoryLayout();
 
     log.debug("switching to kernel page table", .{});
     paging.switchToPageTable(kernel_root_page_table);
 
     if (log.levelEnabled(.debug)) {
         log.debug("kernel memory regions:", .{});
+
         for (kernel_memory_layout[0..kernel_memory_layout_count]) |region| {
             log.debug("\t{}", .{region});
         }
@@ -85,6 +79,7 @@ pub const MapType = struct {
     }
 };
 
+/// Maps a virtual address range to a physical address range using the standard page size.
 pub fn mapRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
@@ -110,6 +105,7 @@ pub fn mapRange(
     );
 }
 
+/// Maps a virtual address range to a physical address range using all available page sizes.
 pub fn mapRangeUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtRange,
@@ -159,7 +155,7 @@ pub const MemoryRegion = struct {
         try writer.writeAll(" }");
     }
 
-    pub fn format(
+    pub inline fn format(
         region: MemoryRegion,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
@@ -175,30 +171,42 @@ pub const MemoryRegion = struct {
 var kernel_memory_layout: [6]MemoryRegion = undefined;
 var kernel_memory_layout_count: usize = 0;
 
+/// Registers a kernel memory region.
 fn registerKernelMemoryRegion(region: MemoryRegion) void {
     kernel_memory_layout[kernel_memory_layout_count] = region;
     kernel_memory_layout_count += 1;
 }
 
-fn identityMaps() !void {
-    const physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
+/// Sorts the kernel memory layout from lowest to highest address.
+fn sortKernelMemoryLayout() void {
+    std.mem.sort(MemoryRegion, kernel_memory_layout[0..kernel_memory_layout_count], {}, struct {
+        fn lessThanFn(context: void, self: MemoryRegion, other: MemoryRegion) bool {
+            _ = context;
+            return self.range.addr.lessThan(other.range.addr);
+        }
+    }.lessThanFn);
+}
 
-    log.debug("identity mapping the direct map", .{});
+/// Maps the direct maps.
+fn mapDirectMaps() !void {
+    const direct_map_physical_range = kernel.PhysRange.fromAddr(kernel.PhysAddr.zero, kernel.info.direct_map.size);
+
+    log.debug("mapping the direct map", .{});
 
     try mapRangeUseAllPageSizes(
         kernel_root_page_table,
         kernel.info.direct_map,
-        physical_range,
+        direct_map_physical_range,
         .{ .writeable = true, .global = true },
     );
     registerKernelMemoryRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
 
-    log.debug("identity mapping the non-cached direct map", .{});
+    log.debug("mapping the non-cached direct map", .{});
 
     try mapRangeUseAllPageSizes(
         kernel_root_page_table,
         kernel.info.non_cached_direct_map,
-        physical_range,
+        direct_map_physical_range,
         .{ .writeable = true, .no_cache = true, .global = true },
     );
     registerKernelMemoryRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
@@ -213,6 +221,7 @@ const linker_symbols = struct {
     extern const __data_end: u8;
 };
 
+/// Maps the kernel sections.
 fn mapKernelSections() !void {
     log.debug("mapping .text section", .{});
     try mapSection(
@@ -239,18 +248,36 @@ fn mapKernelSections() !void {
     );
 }
 
-fn mapSection(start: usize, end: usize, map_type: MapType, region_type: MemoryRegion.Type) !void {
-    std.debug.assert(end > start);
+/// Prepares the kernel heap.
+fn prepareKernelHeap() !void {
+    log.debug("preparing kernel heap", .{});
+    heap_range = try kernel.arch.paging.getHeapRangeAndFillFirstLevel(kernel_root_page_table);
+    registerKernelMemoryRegion(.{ .range = heap_range, .type = .kernel_heap });
+    log.debug("kernel heap: {}", .{heap_range});
+}
 
-    const virt_addr = kernel.VirtAddr.fromInt(start);
+/// Maps a section.
+fn mapSection(
+    section_start: usize,
+    section_end: usize,
+    map_type: MapType,
+    region_type: MemoryRegion.Type,
+) !void {
+    std.debug.assert(section_end > section_start);
+
+    const virt_addr = kernel.VirtAddr.fromInt(section_start);
 
     const virtual_range = kernel.VirtRange.fromAddr(
         virt_addr,
-        core.Size.from(end - start, .byte).alignForward(paging.standard_page_size),
+        core.Size
+            .from(section_end - section_start, .byte)
+            .alignForward(paging.standard_page_size),
     );
     std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
-    const phys_addr = kernel.PhysAddr.fromInt(virt_addr.value - kernel.info.kernel_virtual_offset_from_physical.bytes);
+    const phys_addr = kernel.PhysAddr.fromInt(
+        virt_addr.value - kernel.info.kernel_virtual_offset_from_physical.bytes,
+    );
 
     const physical_range = kernel.PhysRange.fromAddr(phys_addr, virtual_range.size);
 
