@@ -15,14 +15,6 @@ pub const Size = extern struct {
         tib = 1024 * 1024 * 1024 * 1024,
     };
 
-    const unit_table = .{
-        .{ .value = @intFromEnum(Unit.byte), .name = "B" },
-        .{ .value = @intFromEnum(Unit.kib), .name = "KiB" },
-        .{ .value = @intFromEnum(Unit.mib), .name = "MiB" },
-        .{ .value = @intFromEnum(Unit.gib), .name = "GiB" },
-        .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
-    };
-
     pub const zero: Size = .{ .bytes = 0 };
 
     pub inline fn of(comptime T: type) Size {
@@ -105,6 +97,15 @@ pub const Size = extern struct {
     pub inline fn equal(self: Size, other: Size) bool {
         return self.bytes == other.bytes;
     }
+
+    // Must be kept in descending size order due to the logic in `print`
+    const unit_table = .{
+        .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
+        .{ .value = @intFromEnum(Unit.gib), .name = "GiB" },
+        .{ .value = @intFromEnum(Unit.mib), .name = "MiB" },
+        .{ .value = @intFromEnum(Unit.kib), .name = "KiB" },
+        .{ .value = @intFromEnum(Unit.byte), .name = "B" },
+    };
 
     pub fn print(size: Size, writer: anytype) !void {
         if (size.bytes == 0) {
