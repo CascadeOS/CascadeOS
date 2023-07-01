@@ -34,11 +34,11 @@ pub const recommended_alignment_of_partitions: core.Size = core.Size.from(1, .mi
 /// - Sets the remaining partition records and fields to 0.
 ///
 /// This MBR partition table is used to protect GPT disks from tools that do not understand GPT partition structures.
-///
-/// Parameters:
-/// - `mbr`: The MBR struct to populate.
-/// - `number_of_lba`: The total number of LBAs on the disk.
-pub fn protectiveMBR(mbr: *MBR, number_of_lba: usize) void {
+pub fn protectiveMBR(
+    mbr: *MBR,
+    /// The total number of LBAs on the disk.
+    number_of_lba: usize,
+) void {
     const size_in_lba_clamped: u32 = if (number_of_lba > 0xFFFFFFFF)
         0xFFFFFFFF
     else
@@ -170,14 +170,10 @@ pub const Header = extern struct {
     /// - Updates the header hash.
     ///
     /// This allows copying a primary GPT header to a backup header and vice versa while keeping all the header values correct.
-    ///
-    /// Parameters:
-    /// - `self`: The source GPT header.
-    /// - `other_header`: The destination GPT header.
-    /// - `partition_array_size_in_lba`: The size of the partition entry array in units of logical blocks.
     pub fn copyToOtherHeader(
         source_header: *const Header,
         destination_header: *Header,
+        /// The size of the partition entry array in units of logical blocks.
         partition_array_size_in_lba: u64,
     ) void {
         // start with an exact copy
