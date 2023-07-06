@@ -72,6 +72,37 @@ pub const Size = extern struct {
         return self.bytes / other.bytes;
     }
 
+    /// Returns the amount of `self` sizes needed to cover `target`.
+    /// Caller must ensure `self` is not zero.
+    pub fn amountToCover(self: Size, target: Size) usize {
+        const one_byte = core.Size{ .bytes = 1 };
+        return target.add(self.subtract(one_byte)).divide(self);
+    }
+
+    test amountToCover {
+        {
+            const size = Size{ .bytes = 10 };
+            const target = Size{ .bytes = 25 };
+            const expected: usize = 3;
+
+            try std.testing.expectEqual(expected, size.amountToCover(target));
+        }
+
+        {
+            const size = Size{ .bytes = 1 };
+            const target = Size{ .bytes = 30 };
+            const expected: usize = 30;
+
+            try std.testing.expectEqual(expected, size.amountToCover(target));
+        }
+
+        {
+            const size = Size{ .bytes = 100 };
+            const target = Size{ .bytes = 100 };
+            const expected: usize = 1;
+
+            try std.testing.expectEqual(expected, size.amountToCover(target));
+        }
     }
 
     pub inline fn lessThan(self: Size, other: Size) bool {
