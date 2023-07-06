@@ -6,14 +6,14 @@ const core = @import("core");
 // TODO: This is currently only used for GPT protective MBR. To add proper MBR support more work is needed here.
 
 pub const MBR = extern struct {
-    boot_code: [440]u8 align(1) = [_]u8{0} ** 440,
-    mbr_disk_signature: u32 align(1) = 0,
-    unknown: u16 align(1) = 0,
-    record1: PartitonRecord align(1) = .{},
-    record2: PartitonRecord align(1) = .{},
-    record3: PartitonRecord align(1) = .{},
-    record4: PartitonRecord align(1) = .{},
-    signature: u16 align(1) = signature,
+    boot_code: [440]u8 align(1),
+    mbr_disk_signature: u32 align(1),
+    unknown: u16 align(1),
+    record1: PartitonRecord align(1),
+    record2: PartitonRecord align(1),
+    record3: PartitonRecord align(1),
+    record4: PartitonRecord align(1),
+    signature: u16 align(1),
 
     pub const signature: u16 = 0xAA55;
 
