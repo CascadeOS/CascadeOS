@@ -103,6 +103,14 @@ pub const Size = extern struct {
 
             try std.testing.expectEqual(expected, size.amountToCover(target));
         }
+
+        {
+            const size = Size{ .bytes = 512 };
+            const target = core.Size.from(64, .mib);
+            const expected: usize = 131072;
+
+            try std.testing.expectEqual(expected, size.amountToCover(target));
+        }
     }
 
     pub inline fn lessThan(self: Size, other: Size) bool {
