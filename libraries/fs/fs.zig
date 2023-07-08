@@ -3,6 +3,9 @@
 const std = @import("std");
 const core = @import("core");
 
+/// File Allocation Table (FAT)
+pub const fat = @import("fat.zig");
+
 /// GUID Partition Table (GPT)
 pub const gpt = @import("gpt.zig");
 
