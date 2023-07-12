@@ -231,6 +231,7 @@ pub const Date = packed struct(u16) {
 
     month: u4,
 
+    /// Number of years after 1980.
     year: u7,
 };
 
