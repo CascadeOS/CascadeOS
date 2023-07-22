@@ -15,10 +15,6 @@ pub const UUID = extern struct {
     pub const omni: UUID = UUID.parse("ffffffff-ffff-ffff-ffff-ffffffffffff") catch unreachable;
 
     /// Generates a random version 4 UUID.
-    ///
-    /// Uses `random` to generate a random 128-bit value.
-    /// Then sets the version and variant fields to the appropriate values for a
-    /// version 4 UUID as defined in RFC 4122.
     pub fn generateV4(random: std.rand.Random) UUID {
         var uuid: UUID = undefined;
 
@@ -36,74 +32,66 @@ pub const UUID = extern struct {
     pub const ParseError = error{InvalidUUID};
 
     /// Parses a UUID from its string representation.
-    pub fn parse(
-        /// Must be of the format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-        buf: []const u8,
-    ) ParseError!UUID {
+    ///
+    /// Expected format is `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+    pub fn parse(buf: []const u8) ParseError!UUID {
         if (buf.len != 36) return ParseError.InvalidUUID;
 
-        var temporary_layout: InMemoryLayout = undefined;
+        var result: UUID = undefined;
 
-        inline for (parse_format_sections) |section| {
-            if (section.proceeded_by_hyphen and buf[section.start_index - 1] != '-') {
-                return ParseError.InvalidUUID;
+        var i: usize = 0;
+
+        inline for (uuid_sections) |section| {
+            if (section.proceeded_by_hyphen) {
+                if (buf[i] != '-') return ParseError.InvalidUUID;
+                i += 1;
             }
 
-            const T = @TypeOf(@field(temporary_layout, section.field_name));
+            const characters_needed = section.charactersNeededToStoreField();
+            const ptr: *align(1) section.field_type = @ptrCast(&result.bytes[section.start_index]);
 
-            // TODO: Don't use `std.fmt`
+            ptr.* = std.fmt.parseUnsigned(
+                section.field_type,
+                buf[i..][0..characters_needed],
+                16,
+            ) catch return ParseError.InvalidUUID;
 
-            @field(temporary_layout, section.field_name) =
-                core.nativeTo(
-                T,
-                std.fmt.parseUnsigned(
-                    T,
-                    buf[section.start_index..][0..section.length],
-                    16,
-                ) catch return ParseError.InvalidUUID,
-                section.endianness,
-            );
+            i += characters_needed;
         }
 
-        return @bitCast(temporary_layout);
+        return result;
     }
 
-    const InMemoryLayout = packed struct(u128) {
-        time_low: u32,
-        time_mid: u16,
-        time_ver: u16,
-        clock: u16,
-        node: u48,
-    };
+    pub const minimum_buffer_length: usize = 36;
 
-    pub fn print(self: UUID, writer: anytype) !void {
-        const temporary_layout: *const InMemoryLayout = @ptrCast(@alignCast(&self));
+    /// `buf` must be atleast `minimum_buffer_length`
+    pub fn bufPrint(self: UUID, buf: []u8) []const u8 {
+        std.debug.assert(buf.len >= minimum_buffer_length);
 
-        var buf: [36]u8 = [_]u8{0} ** 36;
+        var i: usize = 0;
 
-        inline for (parse_format_sections) |section| {
-            if (section.proceeded_by_hyphen) buf[section.start_index - 1] = '-';
+        inline for (uuid_sections) |section| {
+            if (section.proceeded_by_hyphen) {
+                buf[i] = '-';
+                i += 1;
+            }
 
-            const T = @TypeOf(@field(temporary_layout, section.field_name));
+            const characters_needed = section.charactersNeededToStoreField();
+            const ptr: *align(1) const section.field_type = @ptrCast(&self.bytes[section.start_index]);
 
             // TODO: Don't use `std.fmt`
             _ = std.fmt.formatIntBuf(
-                buf[section.start_index..][0..section.length],
-                core.toNative(
-                    T,
-                    @field(temporary_layout, section.field_name),
-                    section.endianness,
-                ),
+                buf[i..][0..characters_needed],
+                ptr.*,
                 16,
                 .lower,
-                .{
-                    .width = section.length,
-                    .fill = '0',
-                },
+                .{ .width = characters_needed, .fill = '0' },
             );
+
+            i += characters_needed;
         }
 
-        try writer.writeAll(&buf);
+        return buf[0..minimum_buffer_length];
     }
 
     pub inline fn format(
@@ -114,25 +102,38 @@ pub const UUID = extern struct {
     ) !void {
         _ = fmt;
         _ = options;
-        return print(self, writer);
+
+        var buf: [minimum_buffer_length]u8 = undefined;
+        try writer.writeAll(self.bufPrint(&buf));
     }
 
-    const ParseFormatSection = struct {
-        field_name: []const u8,
+    const UUIDSection = struct {
+        field_type: type,
         start_index: usize,
-        length: usize,
-        endianness: std.builtin.Endian,
         proceeded_by_hyphen: bool,
+
+        inline fn charactersNeededToStoreField(comptime self: UUIDSection) usize {
+            return comptime switch (self.field_type) {
+                u32 => 8,
+                u16 => 4,
+                u8 => 2,
+                else => @compileError("Unsupported type '" ++ @typeName(self.field_type) ++ "'"),
+            };
+        }
     };
 
-    // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-    // "time low - time mid - time ver - clock - node"
-    const parse_format_sections: []const ParseFormatSection = &.{
-        .{ .field_name = "time_low", .start_index = 0, .length = 8, .proceeded_by_hyphen = false, .endianness = .Little },
-        .{ .field_name = "time_mid", .start_index = 9, .length = 4, .proceeded_by_hyphen = true, .endianness = .Little },
-        .{ .field_name = "time_ver", .start_index = 14, .length = 4, .proceeded_by_hyphen = true, .endianness = .Little },
-        .{ .field_name = "clock", .start_index = 19, .length = 4, .proceeded_by_hyphen = true, .endianness = .Big },
-        .{ .field_name = "node", .start_index = 24, .length = 12, .proceeded_by_hyphen = true, .endianness = .Big },
+    const uuid_sections: []const UUIDSection = &.{
+        .{ .field_type = u32, .start_index = 0, .proceeded_by_hyphen = false }, // time_low
+        .{ .field_type = u16, .start_index = 4, .proceeded_by_hyphen = true }, // time_mid
+        .{ .field_type = u16, .start_index = 6, .proceeded_by_hyphen = true }, // time_hi_and_version
+        .{ .field_type = u8, .start_index = 8, .proceeded_by_hyphen = true }, // clock_seq_hi_and_reserved
+        .{ .field_type = u8, .start_index = 9, .proceeded_by_hyphen = false }, // cloc_seq_low
+        .{ .field_type = u8, .start_index = 10, .proceeded_by_hyphen = true }, // node[0]
+        .{ .field_type = u8, .start_index = 11, .proceeded_by_hyphen = false }, // node[1]
+        .{ .field_type = u8, .start_index = 12, .proceeded_by_hyphen = false }, // node[2]
+        .{ .field_type = u8, .start_index = 13, .proceeded_by_hyphen = false }, // node[3]
+        .{ .field_type = u8, .start_index = 14, .proceeded_by_hyphen = false }, // node[4]
+        .{ .field_type = u8, .start_index = 15, .proceeded_by_hyphen = false }, // node[5]
     };
 
     comptime {
