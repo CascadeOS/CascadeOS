@@ -67,12 +67,14 @@ pub const Size = extern struct {
     }
 
     /// Division is performed on integers, so the result is rounded down.
+    ///
     /// Caller must ensure `other` is not zero.
     pub inline fn divide(self: Size, other: Size) usize {
         return self.bytes / other.bytes;
     }
 
     /// Returns the amount of `self` sizes needed to cover `target`.
+    ///
     /// Caller must ensure `self` is not zero.
     pub fn amountToCover(self: Size, target: Size) usize {
         const one_byte = core.Size{ .bytes = 1 };

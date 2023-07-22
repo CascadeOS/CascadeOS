@@ -42,7 +42,9 @@ pub fn getRootFilePath(library: *const Library, b: *std.Build) []const u8 {
 /// Resolves all libraries and their dependencies.
 ///
 /// Resolves each library in `libraries/listing.zig` and all of their dependencies.
+///
 /// Libraries are resolved recursively until all dependencies have been resolved.
+///
 /// Panics if a loop is detected in the dependency graph.
 pub fn getLibraries(
     b: *std.Build,

@@ -22,6 +22,7 @@ pub var kernel_virtual_address: kernel.VirtualAddress = undefined;
 pub var kernel_physical_address: kernel.PhysicalAddress = undefined;
 
 /// This is the offset from `kernel_base_address` that the kernel has been loaded at.
+///
 /// This would always be zero if not for kaslr.
 ///
 /// Initialized during `setup`.
@@ -38,6 +39,7 @@ pub var kernel_virtual_offset: core.Size = undefined;
 pub var direct_map: kernel.VirtualRange = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
+///
 /// The page tables used disable caching for this range.
 ///
 /// Initialized during `setup`.

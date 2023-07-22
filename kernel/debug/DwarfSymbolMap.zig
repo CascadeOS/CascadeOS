@@ -106,6 +106,7 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
 }
 
 /// Chops a slice from the given pointer at the given offset and size.
+///
 /// Returns Overflow if the offset or size cannot be represented as a usize.
 fn chopSlice(ptr: [*]const u8, offset: u64, size: u64) error{Overflow}![]const u8 {
     const start = std.math.cast(usize, offset) orelse return error.Overflow;
@@ -149,6 +150,7 @@ pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
 }
 
 /// Removes the kernel root path prefix from the given path.
+///
 /// Returns the original path if it does not start with the root path.
 pub fn removeRootPrefixFromPath(path: []const u8) []const u8 {
     // things like `memset` and `memcopy` won't be under the ROOT_PATH

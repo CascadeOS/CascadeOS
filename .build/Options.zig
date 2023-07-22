@@ -26,6 +26,7 @@ qemu_remote_debug: bool,
 no_display: bool,
 
 /// Disable usage of any virtualization accelerators.
+///
 /// Defaults to false, forced to true if interrupt_details is requested.
 no_acceleration: bool,
 
@@ -36,10 +37,12 @@ interrupt_details: bool,
 number_of_cores: usize,
 
 /// Force QEMU to run in UEFI mode.
+///
 /// Defaults to false, some architectures always run in UEFI mode.
 uefi: bool,
 
 /// How much memory (in MB) to request from QEMU.
+///
 /// Defaults to 256 for UEFI and 128 otherwise.
 memory: usize,
 
@@ -165,6 +168,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
 }
 
 /// Creates a option module containing a single `cascade` boolean.
+///
 /// This module can be used to detect if we are running on cascade or not.
 fn buildCascadeOptionModule(b: *std.Build, is_cascade: bool) *std.Build.Module {
     const options = b.addOptions();

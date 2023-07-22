@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: MIT
+//
+// Originally from [Florence](https://github.com/FlorenceOS/Florence/blob/master/lib/util/bitfields.zig) (see LICENSE-FLORENCE for original license)
+//  - `BitField`
+//  - `BitType`
+//  - `Bit`
+//  - `Boolean`
 
-///! This package contains various "bit juggling" helpers and functionality:
-///!
-///! - `isBitSet` - Check if a bit is set
-///! - `getBit` - Get the value of a bit
-///! - `getBits` - Get a range of bits
-///! - `setBit` - Set a specific bit
-///! - `setBits` - Set a range of bits
-///! - `Bitfield` - Used along with `extern union` to represent arbitrary bit fields
-///! - `Bit` - Used along with `extern union` to represent bit fields
-///! - `Boolean` - Used along with `extern union` to represent boolean bit fields
-///!
-///! The `Bitfield`, `Bit` & `Boolean` types are taken pretty much verbatim from [Florence](https://github.com/FlorenceOS/Florence/blob/master/lib/util/bitfields.zig) (see LICENSE-FLORENCE for original license)
 const std = @import("std");
 const assert = std.debug.assert;
 const testing = std.testing;
 
 /// Returns `true` if the the bit at index `bit` is set (equals 1).
+///
 /// Note: that index 0 is the least significant bit, while index `length() - 1` is the most significant bit.
 ///
 /// ```zig
@@ -88,6 +83,7 @@ test isBitSet {
 }
 
 /// Get the value of the bit at index `bit`.
+///
 /// Note: that index 0 is the least significant bit, while index `length() - 1` is the most significant bit.
 ///
 /// ```zig
@@ -132,8 +128,9 @@ test getBit {
     }
 }
 
-/// Obtains the `number_of_bits` bits starting at `start_bit`
-/// Where `start_bit` is the lowest significant bit to fetch
+/// Obtains the `number_of_bits` bits starting at `start_bit`.
+///
+/// Where `start_bit` is the lowest significant bit to fetch.
 ///
 /// ```zig
 /// const a: u8 = 0b01101100;
@@ -184,7 +181,8 @@ test getBits {
     }
 }
 
-/// Sets the bit at the index `bit` to the value `value` (where true means a value of '1' and false means a value of '0')
+/// Sets the bit at the index `bit` to the value `value` (where true means a value of '1' and false means a value of '0').
+///
 /// Note: that index 0 is the least significant bit, while index `length() - 1` is the most significant bit.
 ///
 /// ```zig
@@ -240,8 +238,6 @@ test setBit {
 }
 
 /// Sets the range of bits starting at `start_bit` upto and excluding `start_bit` + `number_of_bits`.
-/// To be specific, if the range is N bits long, the N lower bits of `value` will be used; if any of
-/// the other bits in `value` are set to 1, this function will panic.
 ///
 /// ```zig
 /// var val: u8 = 0b10000000;
@@ -249,7 +245,7 @@ test setBit {
 /// try testing.expectEqual(@as(u8, 0b10110100), val);
 /// ```
 ///
-/// ## Panics
+/// ## Panic
 /// This method will panic if the `value` exceeds the bit range of the type of `target`
 pub fn setBits(target: anytype, comptime start_bit: comptime_int, comptime number_of_bits: comptime_int, value: anytype) void {
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));

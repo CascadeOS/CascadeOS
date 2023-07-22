@@ -159,8 +159,7 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
 
 /// Adds all files recursively in the given target path to the build.
 ///
-/// Creates a `SourceFileModule` for each `.zig` file found, and adds the file path
-/// to the `files` array.
+/// Creates a `SourceFileModule` for each `.zig` file found, and adds the file path to the `files` array.
 fn addFilesRecursive(
     b: *std.Build,
     modules: *std.ArrayList(SourceFileModule),

@@ -97,18 +97,22 @@ pub fn protectiveMBR(
 /// This structure contains metadata about the GPT partition table like the number of entries, entry size, CRCs, etc.
 pub const Header = extern struct {
     /// Identifies EFI-compatible partition table header.
+    ///
     /// This value must contain the ASCII string “EFI PART”, encoded as the 64-bit constant 0x5452415020494645.
     signature: u64 align(1) = 0x5452415020494645,
 
     /// The revision number for this header.
+    ///
     /// This revision value is not related to the UEFI Specification version.
     revision: Revision align(1) = .@"1.0",
 
     /// Size in bytes of the GPT Header.
+    ///
     /// The `header_size` must be greater than or equal to 92 and must be less than or equal to the logical block size.
     header_size: u32 align(1) = @sizeOf(Header),
 
     /// CRC32 checksum for the GPT Header structure.
+    ///
     /// This value is computed by setting this field to 0, and computing the 32-bit CRC for `header_size` bytes.
     header_crc_32: u32 align(1) = 0,
 
@@ -137,11 +141,14 @@ pub const Header = extern struct {
     number_of_partition_entries: u32 align(1),
 
     /// The size, in bytes, of each the GUID Partition Entry structures in the GUID Partition Entry array.
+    ///
     /// This field shall be set to a value of 128 x 2 n where n is an integer greater than or equal to zero (e.g., 128, 256, 512, etc.).
+    ///
     /// NOTE: Previous versions of this specification allowed any multiple of 8.
     size_of_partition_entry: u32 align(1),
 
     /// The CRC32 of the GUID Partition Entry array.
+    ///
     /// Starts at `partition_entry_lba` and is computed over a byte length of `number_of_partition_entries * size_of_partition_entry`.
     partition_entry_array_crc32: u32 align(1),
 
@@ -153,6 +160,7 @@ pub const Header = extern struct {
     /// Updates the `header_crc_32`field with the CRC32 checksum.
     ///
     /// Anytime a field in this structure is modified, the CRC should be recomputed.
+    ///
     /// This includes any changes to the partition entry array as it's checksum is stored in the header as well.
     pub fn updateHash(self: *Header) void {
         const header_bytes = @as([*]u8, @ptrCast(self))[0..self.header_size];
@@ -215,14 +223,12 @@ pub const Header = extern struct {
 ///
 /// This structure contains metadata about a single partition like type, name, starting/ending LBA, attributes, etc.
 pub const PartitionEntry = extern struct {
-    /// Unique ID that defines the purpose and type of this Partition.
+    /// ID that defines the purpose and type of this Partition.
+    ///
     /// A value of zero defines that this partition entry is not being used.
     partition_type_guid: UUID,
 
-    /// GUID that is unique for every partition entry. Every partition ever created will have a unique GUID.
-    /// This GUID must be assigned when the GPT Partition Entry is created.
-    /// The GPT Partition Entry is created whenever the `number_of_partition_entries` in the GPT `Header` is increased
-    /// to include a larger range of addresses.
+    /// GUID of the partition entry.
     unique_partition_guid: UUID,
 
     /// Starting LBA of the partition defined by this entry.
@@ -235,30 +241,36 @@ pub const PartitionEntry = extern struct {
     attributes: Attribute = .{},
 
     /// Null-terminated string containing a human-readable name of the partition.
+    ///
     /// UNICODE16-LE encoded.
     partition_name: [36]u16 = [_]u16{0} ** 36,
 
     pub const Attribute = packed struct(u64) {
         /// If this bit is set, the partition is required for the platform to function.
+        ///
         /// The owner/creator of the partition indicates that deletion or modification of the contents can result in
         /// loss of platform features or failure for the platform to boot or operate.
+        ///
         /// The system cannot function normally if this partition is removed, and it should be considered part of the
         /// hardware of the system. Actions such as running diagnostics, system recovery, or even OS install or boot
         /// could potentially stop working if this partition is removed.
+        ///
         /// Unless OS software or firmware recognizes this partition, it should never be removed or modified as the UEFI
-        ///  firmware or platform hardware may become non-functional.
+        /// firmware or platform hardware may become non-functional.
         required: bool = false,
 
         /// If this bit is set, then firmware must not produce an EFI_BLOCK_IO_PROTOCOL device for this partition.
-        /// See Partition Discovery for more details.
+        ///
         /// By not producing an EFI_BLOCK_IO_PROTOCOL partition, file system mappings will not be created for this
         /// partition in UEFI.
         no_block_io: bool = false,
 
         /// This bit is set aside by this specification to let systems with traditional PC-AT BIOS firmware implementations
         /// inform certain limited, special-purpose software running on these systems that a GPT partition may be bootable.
-        /// For systems with firmware implementations conforming to this specification, the UEFI boot manager (see chapter 3)
-        /// must ignore this bit when selecting a UEFI-compliant application, e.g., an OS loader (see 2.1.3).
+        ///
+        /// For systems with firmware implementations conforming to this specification, the UEFI boot manager must
+        /// ignore this bit when selecting a UEFI-compliant application, e.g. an OS loader.
+        ///
         /// Therefore there is no need for this specification to define the exact meaning of this bit.
         legacy_bios_bootable: bool = false,
 
@@ -266,9 +278,8 @@ pub const PartitionEntry = extern struct {
         _undefined: u45 = 0,
 
         /// Reserved for GUID specific use.
+        ///
         /// The use of these bits will vary depending on the `partition_type_guid`.
-        /// Only the owner of the `partition_type_guid` is allowed to modify these bits.
-        /// They must be preserved if Bits 0-47 are modified.
         _reserved: u16 = 0,
     };
 
@@ -284,22 +295,27 @@ pub const PartitionEntry = extern struct {
 /// List available: https://en.wikipedia.org/wiki/GUID_Partition_Table#Partition_type_GUIDs
 pub const partition_types = struct {
     /// Unused Entry
+    ///
     /// Defined by the UEFI specification.
     pub const unused: UUID = UUID.nil;
 
     /// EFI System Partition
+    ///
     /// Defined by the UEFI specification.
     pub const efi_system_partition: UUID = UUID.parse("C12A7328-F81F-11D2-BA4B-00A0C93EC93B") catch unreachable;
 
     /// Partition containing a legacy MBR
+    ///
     /// Defined by the UEFI specification.
     pub const partition_containing_legacy_mbr: UUID = UUID.parse("024DEE41-33E7-11D3-9D69-0008C781F39F") catch unreachable;
 
     /// Microsoft Basic Data Partition
+    ///
     /// https://en.wikipedia.org/wiki/Microsoft_basic_data_partition
     ///
     /// According to Microsoft, the basic data partition is the equivalent to master boot record (MBR) partition types
     /// 0x06 (FAT16B), 0x07 (NTFS or exFAT), and 0x0B (FAT32).
+    ///
     /// In practice, it is also equivalent to 0x01 (FAT12), 0x04 (FAT16), 0x0C (FAT32 with logical block addressing),
     /// and 0x0E (FAT16 with logical block addressing) types as well.
     pub const microsoft_basic_data_partition: UUID = UUID.parse("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7") catch unreachable;

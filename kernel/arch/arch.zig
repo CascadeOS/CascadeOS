@@ -38,6 +38,7 @@ pub const setup = struct {
     }
 
     /// Initialize the architecture specific registers and structures into the state required for early setup.
+    ///
     /// One of the requirements of this function is to ensure that any exceptions/faults that occur are correctly handled.
     ///
     /// For example, on x86_64 this should setup a GDT, TSS and IDT then install a simple handler on every vector.
@@ -121,6 +122,7 @@ pub const paging = struct {
     };
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
     /// This function will only use the architecture's `standard_page_size`.
     pub inline fn mapRange(
         page_table: *PageTable,
@@ -132,6 +134,7 @@ pub const paging = struct {
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
     /// This function is allowed to use all page sizes available to the architecture.
     pub inline fn mapRangeUseAllPageSizes(
         page_table: *PageTable,

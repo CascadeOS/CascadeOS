@@ -263,6 +263,7 @@ pub const IdtVector = enum(u8) {
     ///
     /// When the exception is a fault, the saved instruction pointer points to the instruction which caused the
     /// exception.
+    ///
     /// When the exception is a trap, the saved instruction pointer points to the instruction after the instruction
     /// which caused the exception.
     debug = 0x01,
@@ -270,22 +271,29 @@ pub const IdtVector = enum(u8) {
     /// Non-Maskable Interrupt
     non_maskable_interrupt = 0x02,
 
-    /// Occurs at the execution of the INT3 instruction
+    /// Occurs at the execution of the INT3 instruction.
+    ///
     /// The saved instruction pointer points to the byte after the INT3 instruction.
     breakpoint = 0x03,
 
     /// Raised when the INTO instruction is executed while the overflow bit in RFLAGS is set to 1.
+    ///
     /// The saved instruction pointer points to the instruction after the INTO instruction.
     overflow = 0x04,
 
     /// Can occur when the BOUND instruction is executed.
+    ///
     /// The BOUND instruction compares an array index with the lower and upper bounds of an array.
+    ///
     /// When the index is out of bounds, the Bound Range Exceeded exception occurs.
+    ///
     /// The saved instruction pointer points to the BOUND instruction which caused the exception.
     bound_range = 0x05,
 
     /// The Invalid Opcode exception occurs when the processor tries to execute an invalid or undefined opcode,
-    /// or an instruction with invalid prefixes. It also occurs in other cases, such as:
+    /// or an instruction with invalid prefixes.
+    ///
+    /// It also occurs in other cases, such as:
     /// - The instruction length exceeds 15 bytes, but this only occurs with redundant prefixes.
     /// - The instruction tries to access a non-existent control register (for example, mov cr6, eax).
     /// - The UD instruction is executed.
@@ -294,11 +302,13 @@ pub const IdtVector = enum(u8) {
     invalid_opcode = 0x06,
 
     /// Occurs when an FPU instruction is attempted but there is no FPU.
+    ///
     /// The saved instruction pointer points to the instruction that caused the exception.
     device_not_available = 0x07,
 
     /// Occurs when an exception is unhandled or when an exception occurs while the CPU is trying to call an exception
     /// handler.
+    ///
     /// The saved instruction pointer is undefined. A double fault cannot be recovered. The faulting process must be
     /// terminated.
     double_fault = 0x08,
@@ -316,6 +326,7 @@ pub const IdtVector = enum(u8) {
     invalid_tss = 0x0A,
 
     /// Occurs when trying to load a segment or gate which has its `Present` bit set to 0.
+    ///
     /// The saved instruction pointer points to the instruction which caused the exception.
     segment_not_present = 0x0B,
 
@@ -330,7 +341,9 @@ pub const IdtVector = enum(u8) {
     /// next instruction of the new task.
     stack = 0x0C,
 
-    /// A General Protection Fault may occur for various reasons. The most common are:
+    /// A General Protection Fault may occur for various reasons.
+    ///
+    /// The most common are:
     /// - Segment error (privilege, type, limit, read/write rights).
     /// - Executing a privileged instruction while CPL != 0.
     /// - Writing a 1 in a reserved register field or writing invalid value combinations (e.g. CR0 with PE=0 and PG=1).
@@ -350,7 +363,7 @@ pub const IdtVector = enum(u8) {
 
     _reserved1 = 0x0F,
 
-    /// occurs when the FWAIT or WAIT instruction, or any waiting floating-point instruction is executed, and the
+    /// Occurs when the FWAIT or WAIT instruction, or any waiting floating-point instruction is executed, and the
     /// following conditions are true:
     /// - CR0.NE is 1;
     /// - an unmasked x87 floating point exception is pending (i.e. the exception bit in the x87 floating point
@@ -358,10 +371,12 @@ pub const IdtVector = enum(u8) {
     ///
     /// The saved instruction pointer points to the instruction which is about to be executed when the exception
     /// occurred.
+    ///
     /// The x87 instruction pointer register contains the address of the last instruction which caused the exception.
     x87_floating_point = 0x10,
 
     /// Occurs when alignment checking is enabled and an unaligned memory data reference is performed.
+    ///
     /// Alignment checking is only performed in CPL 3.
     ///
     /// Alignment checking is disabled by default. To enable it, set the CR0.AM and RFLAGS.AC bits both to 1.
@@ -370,9 +385,10 @@ pub const IdtVector = enum(u8) {
     alignment_check = 0x11,
 
     /// The Machine Check exception is model specific and processor implementations are not required to support it.
+    ///
     /// It uses model-specific registers to provide error information.
-    /// It is disabled by default.
-    /// To enable it, set the CR4.MCE bit to 1.
+    ///
+    /// Ddisabled by default, to enable set CR4.MCE bit to 1.
     ///
     /// Machine check exceptions occur when the processor detects internal errors, such as bad memory, bus errors,
     /// cache errors, etc.
@@ -381,6 +397,7 @@ pub const IdtVector = enum(u8) {
     machine_check = 0x12,
 
     /// Occurs when an unmasked 128-bit media floating-point exception occurs and the CR4.OSXMMEXCPT bit is set to 1.
+    ///
     /// If the OSXMMEXCPT flag is not set, then SIMD floating-point exceptions will cause an Undefined Opcode exception
     /// instead of this.
     ///

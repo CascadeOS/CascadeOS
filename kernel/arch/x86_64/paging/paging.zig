@@ -13,6 +13,7 @@ pub const medium_page_size = core.Size.from(2, .mib);
 pub const large_page_size = core.Size.from(1, .gib);
 
 /// This is the total size of the virtual address space that one entry in the top level of the page table covers.
+///
 /// This is only valid for 4-level paging.
 const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
 
@@ -78,6 +79,7 @@ pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapErro
 const MapError = arch.paging.MapError;
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+///
 /// This function will only use the architecture's `standard_page_size`.
 pub fn mapRange(
     page_table: *PageTable,
@@ -116,6 +118,7 @@ pub fn mapRange(
 }
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+///
 /// This function is allowed to use all page sizes available to the architecture.
 pub fn mapRangeUseAllPageSizes(
     page_table: *PageTable,

@@ -51,7 +51,6 @@ pub const VirtualAddress = extern struct {
 
     /// Returns the physical address of the given diret map virtual address.
     ///
-    /// ## Safety
     /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
     pub fn unsafeToPhysicalFromDirectMap(self: VirtualAddress) PhysicalAddress {
         return .{ .value = self.value - kernel.info.direct_map.address.value };

@@ -11,10 +11,12 @@ const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 name: []const u8,
 
 /// The library's dependencies.
+///
 /// Specified as an array of the names of the dependant libraries.
 dependencies: []const []const u8 = &.{},
 
 /// The targets supported by the library.
+///
 /// `null` means target-independent.
 supported_targets: ?[]const CascadeTarget = null,
 

@@ -13,24 +13,24 @@ pub const number_of_handlers = 256;
 handlers: [number_of_handlers]Entry align(16) = std.mem.zeroes([number_of_handlers]Entry),
 
 pub const Entry = extern struct {
-    /// low 16-bits of ISR address
+    /// Low 16-bits of ISR address
     pointer_low: u16,
 
-    /// the code selector to switch to when the interrupt is recieved.
+    /// The code selector to switch to when the interrupt is recieved.
     code_selector: u16,
 
     options: Options,
 
-    /// middle 16-bits of ISR address
+    /// Middle 16-bits of ISR address
     pointer_middle: u16,
 
-    /// upper 32-bits of ISR address
+    /// Upper 32-bits of ISR address
     pointer_high: u32,
 
     _reserved: u32 = 0,
 
     pub const Options = packed struct(u16) {
-        /// offset into the Interrupt Stack Table, zero means not used.
+        /// Offset into the Interrupt Stack Table, zero means not used.
         ist: u3 = 0,
 
         _reserved1: u5 = 0,
@@ -39,8 +39,9 @@ pub const Entry = extern struct {
 
         _reserved2: u1 = 0,
 
-        /// defines the privilege levels which are allowed to access this interrupt via the INT instruction.
-        /// hardware interrupts ignore this mechanism.
+        /// Defines the privilege levels which are allowed to access this interrupt via the INT instruction.
+        ///
+        /// Hardware interrupts ignore this mechanism.
         privilege_level: x86_64.PrivilegeLevel = .ring0,
 
         present: bool,
@@ -49,7 +50,7 @@ pub const Entry = extern struct {
     };
 
     pub const GateType = enum(u4) {
-        /// interrupts are automatically disabled upon entry and reenabled upon IRET
+        /// Interrupts are automatically disabled upon entry and reenabled upon IRET
         interrupt = 0xE,
 
         trap = 0xF,

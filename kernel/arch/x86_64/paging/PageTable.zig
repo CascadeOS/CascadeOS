@@ -155,80 +155,148 @@ pub const PageTable = extern struct {
     pub const Entry = extern union {
         /// Specifies whether the mapped physical page or page table is loaded in memory.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         present: Boolean(u64, 0),
 
         /// Controls whether writes to the mapped physical pages are allowed.
         ///
         /// If this bit is unset in a level 1 page table entry, the mapped physical page is read-only.
+        ///
         /// If this bit is unset in a higher level page table entry the complete range of mapped pages is read-only.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         writeable: Boolean(u64, 1),
 
         /// Controls whether accesses from userspace (i.e. ring 3) are permitted.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         user_accessible: Boolean(u64, 2),
 
         /// If this bit is set, a "write-through" policy is used for the cache, else a "write-back" policy is used.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         write_through: Boolean(u64, 3),
 
         /// Disables caching for the pointed entry is cacheable.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         no_cache: Boolean(u64, 4),
 
         /// Set by the CPU when the mapped physical page or page table is accessed.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         accessed: Boolean(u64, 5),
 
         /// Set by the CPU on a write to the mapped physical page.
         ///
-        /// Valid for: 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         dirty: Boolean(u64, 6),
 
         /// Specifies that the entry maps a huge physical page instead of a page table.
         ///
-        /// Valid for: 1GiB, 2MiB
+        /// Valid for:
+        ///  - 1GiB
+        ///  - 2MiB
         huge: Boolean(u64, 7),
 
         /// Determines the memory types used
         ///
-        /// Valid for: 4KiB
+        /// Valid for:
+        ///  - 4KiB
         pat: Boolean(u64, 7),
 
         /// Indicates that the mapping is present in all address spaces, so it isn't flushed from the TLB on an address space switch.
         ///
-        /// Valid for: 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         global: Boolean(u64, 8),
 
         /// Determines the memory types used
         ///
-        /// Valid for: 1GiB, 2MiB
+        /// Valid for:
+        ///  - 1GiB
+        ///  - 2MiB
         pat_huge: Boolean(u64, 12),
 
         /// The page aligned physical address
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 4KiB
         address_4kib_aligned: Bitfield(u64, level_1_shift, length_of_4kib_aligned_address),
 
         /// The 2MiB aligned physical address
         ///
-        /// Valid for: 2MiB
+        /// Valid for:
+        ///  - 2MiB
         address_2mib_aligned: Bitfield(u64, level_2_shift, length_of_2mib_aligned_address),
 
         /// The 1GiB aligned physical address
         ///
-        /// Valid for: 1GiB
+        /// Valid for:
+        ///  - 1GiB
         address_1gib_aligned: Bitfield(u64, level_3_shift, length_of_1gib_aligned_address),
 
         /// Forbid code execution from the mapped physical pages.
         ///
-        /// Valid for: PML5, PML4, PDPTE, PDE, 1GiB, 2MiB, 4KiB
+        /// Valid for:
+        ///  - PML5
+        ///  - PML4
+        ///  - PDPTE
+        ///  - PDE
+        ///  - 1GiB
+        ///  - 2MiB
+        ///  - 4KiB
         no_execute: Boolean(u64, 63),
 
         _backing: u64,

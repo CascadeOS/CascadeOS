@@ -144,7 +144,9 @@ pub const Framebuffer = extern struct {
 };
 
 /// The Paging Mode feature allows the kernel to control which paging mode is enabled before control is passed to it.
+///
 /// The response indicates which paging mode was actually enabled by the bootloader.
+///
 /// Kernels must be prepared to handle the case where the requested paging mode is not supported by the hardware.
 pub const PagingMode = extern struct {
     id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95c1a0edab0944cb, 0xa4e5cb3842f7488a },
@@ -182,13 +184,13 @@ pub const PagingMode = extern struct {
     };
 
     pub const Mode_riscv64 = enum(u64) {
-        /// three level paging
+        /// Three level paging
         sv39,
 
-        /// four level paging
+        /// Four level paging
         sv48,
 
-        /// five level paging
+        /// Five level paging
         sv57,
     };
 
@@ -221,6 +223,7 @@ pub const PagingMode = extern struct {
 };
 
 /// The presence of this request will prompt the bootloader to bootstrap the secondary processors.
+///
 /// This will not be done if this request is not present.
 pub const SMP = extern struct {
     id: [4]u64 align(8) = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95a67b819a1b857e, 0xa0b61b723b6a73e0 },
@@ -269,7 +272,9 @@ pub const SMP = extern struct {
             /// on a 64KiB (or Stack Size Request size) stack
             ///
             /// A pointer to the `SMPInfo` structure of the CPU is passed in X0.
+            ///
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
             /// This field is unused for the structure describing the bootstrap processor.
             goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
 
@@ -301,8 +306,11 @@ pub const SMP = extern struct {
             _reserved: u64,
             /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB
             /// (or Stack Size Request size) stack.
+            ///
             /// A pointer to the `SMPInfo` structure of the CPU is passed in x10(a0).
+            ///
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
             /// This field is unused for the structure describing the bootstrap processor.
             goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
 
@@ -316,7 +324,9 @@ pub const SMP = extern struct {
         flags: ResponseFlags,
         /// The Local APIC ID of the bootstrap processor.
         bsp_lapic_id: u32,
-        /// How many CPUs are present. It includes the bootstrap processor.
+        /// How many CPUs are present.
+        ///
+        /// It includes the bootstrap processor.
         cpu_count: u64,
         cpus: [*]*SMPInfo,
 
@@ -340,8 +350,11 @@ pub const SMP = extern struct {
             /// on a 64KiB (or Stack Size Request size) stack.
             ///
             /// A pointer to the `SMPInfo` structure of the CPU is passed in RDI.
+            ///
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
             /// This field is unused for the structure describing the bootstrap processor.
+            ///
             /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
             /// processor.
             goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
@@ -352,10 +365,15 @@ pub const SMP = extern struct {
 };
 
 /// Memory between 0 and 0x1000 is never marked as usable memory.
-/// The kernel and modules loaded are not marked as usable memory. They are marked as Kernel/Modules.
+///
+/// The kernel and modules loaded are not marked as usable memory, they are marked as Kernel/Modules.
+///
 /// The entries are guaranteed to be sorted by base address, lowest to highest.
+///
 /// Usable and bootloader reclaimable entries are guaranteed to be 4096 byte aligned for both base and length.
+///
 /// Usable and bootloader reclaimable entries are guaranteed not to overlap with any other entry.
+///
 /// To the contrary, all non-usable entries (including kernel/modules) are not guaranteed any alignment,
 /// nor is it guaranteed that they do not overlap other entries.
 pub const Memmap = extern struct {
@@ -427,10 +445,12 @@ pub const Module = extern struct {
     response: ?*const Response = null,
 
     /// How many internal modules are passed by the kernel.
+    ///
     /// Note: Only supported from revision 1
     internal_module_count: u64 = 0,
 
     /// Pointer to an array of `internal_module_count` pointers to `InternalModule` structures.
+    ///
     /// Note: Only supported from revision 1
     internal_modules: ?[*]*const InternalModule = null,
 
@@ -438,6 +458,7 @@ pub const Module = extern struct {
     /// and thus they are guaranteed to appear before user-specified modules in the modules array in the response.
     pub const InternalModule = extern struct {
         /// Path to the module to load.
+        ///
         /// This path is relative to the location of the kernel.
         path: [*:0]const u8,
         /// Command line for the given module.
@@ -485,7 +506,9 @@ pub const File = extern struct {
     /// Likewise, but port.
     tftp_port: u32,
 
-    /// 1-based partition index of the volume from which the file was loaded. If 0, it means invalid or unpartitioned.
+    /// 1-based partition index of the volume from which the file was loaded.
+    ///
+    /// If 0, it means invalid or unpartitioned.
     partition_index: u32,
 
     /// If non-0, this is the ID of the disk the file was loaded from as reported in its MBR.
@@ -545,9 +568,13 @@ pub const SMBIOS = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
-        /// Address of the 32-bit SMBIOS entry point. NULL if not present.
+        /// Address of the 32-bit SMBIOS entry point.
+        ///
+        /// NULL if not present.
         entry_32: ?*anyopaque,
-        /// Address of the 64-bit SMBIOS entry point. NULL if not present.
+        /// Address of the 64-bit SMBIOS entry point.
+        ///
+        /// NULL if not present.
         entry_64: ?*anyopaque,
     };
 };

@@ -15,6 +15,7 @@ pub const PanicState = enum(u8) {
 var state: PanicState = .no_op;
 
 /// Switches the panic state to the given state.
+///
 /// Panics if the new state is less than the current state.
 pub fn switchTo(new_state: PanicState) void {
     if (@intFromEnum(state) < @intFromEnum(new_state)) {

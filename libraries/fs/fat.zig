@@ -10,12 +10,11 @@ pub const FAT12Entry = enum(u12) {
     /// Free cluster.
     free = 0,
 
-    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster
-    /// indicator while constructing cluster chains during file allocation
-    /// (only seen on disk if there is a crash or power failure in the middle of this process).
+    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster indicator while constructing cluster
+    /// chains during file allocation (only seen on disk if there is a crash or power failure in the middle of this process).
     ///
-    /// If this value occurs in on-disk cluster chains, file system implementations should treat
-    /// this like an end-of-chain marker.
+    /// If this value occurs in on-disk cluster chains, file system implementations should treat this like an
+    /// end-of-chain marker.
     reserved_temporary_non_free_cluster_indicator = 0x1,
 
     /// Bad sector.
@@ -32,12 +31,11 @@ pub const FAT16Entry = enum(u16) {
     /// Free cluster.
     free = 0,
 
-    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster
-    /// indicator while constructing cluster chains during file allocation
-    /// (only seen on disk if there is a crash or power failure in the middle of this process).
+    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster indicator while constructing cluster
+    /// chains during file allocation (only seen on disk if there is a crash or power failure in the middle of this process).
     ///
-    /// If this value occurs in on-disk cluster chains, file system implementations should treat
-    /// this like an end-of-chain marker.
+    /// If this value occurs in on-disk cluster chains, file system implementations should treat this like an
+    /// end-of-chain marker.
     reserved_temporary_non_free_cluster_indicator = 0x1,
 
     /// Bad sector.
@@ -54,12 +52,11 @@ pub const FAT32Entry = enum(u32) {
     /// Free cluster.
     free = 0,
 
-    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster
-    /// indicator while constructing cluster chains during file allocation
-    /// (only seen on disk if there is a crash or power failure in the middle of this process).
+    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster indicator while constructing cluster
+    /// chains during file allocation (only seen on disk if there is a crash or power failure in the middle of this process).
     ///
-    /// If this value occurs in on-disk cluster chains, file system implementations should treat
-    /// this like an end-of-chain marker.
+    /// If this value occurs in on-disk cluster chains, file system implementations should treat this like an
+    /// end-of-chain marker.
     reserved_temporary_non_free_cluster_indicator = 0x1,
 
     /// Bad sector.
@@ -76,12 +73,11 @@ pub const EXFATEntry = enum(u32) {
     /// Free cluster.
     free = 0,
 
-    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster
-    /// indicator while constructing cluster chains during file allocation
-    /// (only seen on disk if there is a crash or power failure in the middle of this process).
+    /// MS-DOS/PC DOS use this cluster value as a temporary non-free cluster indicator while constructing cluster
+    /// chains during file allocation (only seen on disk if there is a crash or power failure in the middle of this process).
     ///
-    /// If this value occurs in on-disk cluster chains, file system implementations should treat
-    /// this like an end-of-chain marker.
+    /// If this value occurs in on-disk cluster chains, file system implementations should treat this like an
+    /// end-of-chain marker.
     reserved_temporary_non_free_cluster_indicator = 0x1,
 
     /// Bad sector.
@@ -93,7 +89,9 @@ pub const EXFATEntry = enum(u32) {
     _,
 };
 
-/// BIOS Parameter Block. Contains filesystem geometry and layout information.
+/// BIOS Parameter Block.
+///
+/// Contains filesystem geometry and layout information.
 pub const BPB = extern struct {
     /// Jump instruction.
     jump: [3]u8 align(1) = [_]u8{ 0xEB, 0x58, 0x90 },
@@ -108,20 +106,25 @@ pub const BPB = extern struct {
     sectors_per_cluster: u8,
 
     /// Number of reserved sectors.
+    ///
     /// The boot record sectors are included in this value.
     reserved_sectors: u16 align(1),
 
     /// Number of File Allocation Tables (FAT's) on the storage media.
+    ///
     /// Often this value is 2.
     number_of_fats: u8,
 
     /// Number of root directory entries (must be set so that the root directory occupies entire sectors).
+    ///
     /// For FAT32, this field must be 0.
     number_of_root_directory_entries: u16 align(1),
 
     /// The total sectors in the logical volume.
+    ///
     /// If this value is 0, it means there are more than 65535 sectors in the volume, and the actual count is stored
     /// in `large_sector_count`.
+    ///
     /// For FAT32, this field must be 0.
     number_of_sectors: u16 align(1),
 
@@ -129,6 +132,7 @@ pub const BPB = extern struct {
     media_descriptor_type: MediaDescriptor,
 
     /// Number of sectors per FAT.
+    ///
     /// For FAT32, this field must be 0.
     sectors_per_fat: u16 align(1),
 
@@ -142,9 +146,10 @@ pub const BPB = extern struct {
     number_of_hidden_sectors: u32 align(1),
 
     /// Large sector count.
+    ///
     /// For FAT32, this field must be non-zero.
-    /// For FAT12/FAT16, this field contains the sector count if `number_of_sectors` is 0
-    /// (count is greater than or equal to 65535).
+    ///
+    /// For FAT12/FAT16, this field contains the sector count if `number_of_sectors` is 0.
     large_sector_count: u32 align(1),
 
     comptime {
@@ -163,6 +168,7 @@ pub const ExtendedBPB_32 = extern struct {
     version: u16 align(1),
 
     /// The cluster number of the root directory.
+    ///
     /// Often this field is set to 2.
     root_cluster: u32 align(1),
 
@@ -176,6 +182,7 @@ pub const ExtendedBPB_32 = extern struct {
     _reserved2: u32 align(1) = 0,
 
     /// Drive number.
+    ///
     /// 0x00 for a floppy disk and 0x80 for hard disks.
     drive_number: u8 align(1),
 
@@ -187,7 +194,9 @@ pub const ExtendedBPB_32 = extern struct {
     /// Volume ID 'Serial' number.
     volume_id: u32 align(1),
 
-    /// Volume label string. This field is padded with spaces.
+    /// Volume label string.
+    ///
+    /// This field is padded with spaces.
     volume_label: [11]u8,
 
     /// System identifier string. Always "FAT32   ".
@@ -319,9 +328,8 @@ pub const DirectoryEntry = extern union {
             /// Is a subdirectory
             directory: bool = false,
 
-            /// Typically set by the operating system as soon as the file is created or modified
-            /// to mark the file as "dirty", and reset by backup software once the file has been
-            /// backed up to indicate "pure" state.
+            /// Typically set by the operating system as soon as the file is created or modified to mark the file as
+            /// "dirty", and reset by backup software once the file has been backed up to indicate "pure" state.
             archive: bool = false,
 
             _reserved: u2 = 0,
@@ -339,25 +347,26 @@ pub const DirectoryEntry = extern union {
     };
 
     pub const LongFileNameEntry = extern struct {
-        /// Sequence number (1-20) to identify where this entry is in the
-        /// sequence of LFN entries.
+        /// Sequence number (1-20) to identify where this entry is in the sequence of LFN entries.
         ///
         /// Bitwise Or the value with `last_entry` if it is the last part of the LFN.
         ///
-        /// If there are multiple LFN entries required to represent a file name,
-        /// the entry representing the end of the filename comes first.
-        /// The sequence number of that entry has bit 6 (0x40 / `last_entry`) set
-        /// to represent that it is the last logical LFN entry, and it has
-        /// the highest sequence number.
+        /// If there are multiple LFN entries required to represent a file name, the entry representing the end of the
+        /// filename comes first.
+        ///
+        /// The sequence number of that entry has bit 6 (0x40 / `last_entry`) set to represent that it is the last
+        /// logical LFN entry, and it has the highest sequence number.
         sequence_number: u8 align(1),
 
         /// 1st character to 5th character of the name, UCS-2 encoded.
         ///
         /// After the last character of the name, a 0x0000 is added.
+        ///
         /// The remaining unused characters are filled with 0xFFFF.
         first_characters: [5]u16 align(1) = [_]u16{0xFFFF} ** 5,
 
         /// Always equal to 0x0f if this is a long file name entry.
+        ///
         /// Analogous to the `attributes` field of `StandardDirectoryEntry`
         long_file_name_attribute: u8 align(1) = long_file_name_value,
 
@@ -370,6 +379,7 @@ pub const DirectoryEntry = extern union {
         /// 6th character to 11th character of the name, UCS-2 encoded.
         ///
         /// After the last character of the name, a 0x0000 is added.
+        ///
         /// The remaining unused characters are filled with 0xFFFF.
         middle_characters: [6]u16 align(1) = [_]u16{0xFFFF} ** 6,
 
@@ -378,6 +388,7 @@ pub const DirectoryEntry = extern union {
         /// 12th character to 13th character of the name, UCS-2 encoded.
         ///
         /// After the last character of the name, a 0x0000 is added.
+        ///
         /// The remaining unused characters are filled with 0xFFFF.
         final_characters: [2]u16 align(1) = [_]u16{0xFFFF} ** 2,
 
@@ -414,8 +425,8 @@ pub const FSInfo = extern struct {
     ///
     /// Must not be absolutely relied upon to be correct in all scenarios.
     ///
-    /// Before using this value, the operating system should sanity check this
-    /// value to be less than or equal to the volume's count of clusters.
+    /// Before using this value, the operating system should sanity check this value to be less than or equal to the
+    /// volume's count of clusters.
     last_known_number_of_free_clusters: u32 align(1),
 
     /// Number of the most recently known to be allocated data cluster.
@@ -426,8 +437,8 @@ pub const FSInfo = extern struct {
     ///
     /// Must not be absolutely relied upon to be correct in all scenarios.
     ///
-    /// Before using this value, the operating system should sanity check this
-    /// value to be a valid cluster number on the volume.
+    /// Before using this value, the operating system should sanity check this value to be a valid cluster number on
+    /// the volume.
     most_recently_allocated_cluster: u32 align(1),
 
     _reserved2: [12]u8 align(1) = [_]u8{0} ** 12,

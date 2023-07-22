@@ -36,8 +36,8 @@ pub const RFlags = packed struct(u64) {
     /// Determines the order in which strings are processed.
     direction: bool,
 
-    /// Set by hardware to indicate that the sign bit of the result of the last signed integer
-    /// operation differs from the source operands.
+    /// Set by hardware to indicate that the sign bit of the result of the last signed integer operation differs from
+    /// the source operands.
     overflow: bool,
 
     /// Specifies the privilege level required for executing I/O address-space instructions.
@@ -54,19 +54,19 @@ pub const RFlags = packed struct(u64) {
     /// Enable the virtual-8086 mode.
     virtual_8086: bool,
 
-    /// Enable automatic alignment checking if CR0.AM is set. Only works if CPL is 3.
+    /// Enable automatic alignment checking if CR0.AM is set.
+    ///
+    /// Only works if CPL is 3.
     alignment_check: bool,
 
     /// Virtual image of the INTERRUPT_FLAG bit.
     ///
-    /// Used when virtual-8086 mode extensions (CR4.VME) or protected-mode virtual
-    /// interrupts (CR4.PVI) are activated.
+    /// Used when virtual-8086 mode extensions (CR4.VME) or protected-mode virtual interrupts (CR4.PVI) are activated.
     virtual_interrupt: bool,
 
     /// Indicates that an external, maskable interrupt is pending.
     ///
-    /// Used when virtual-8086 mode extensions (CR4.VME) or protected-mode virtual
-    /// interrupts (CR4.PVI) are activated.
+    /// Used when virtual-8086 mode extensions (CR4.VME) or protected-mode virtual interrupts (CR4.PVI) are activated.
     virtual_interrupt_pending: bool,
 
     /// Processor feature identification flag.
@@ -84,6 +84,7 @@ pub const RFlags = packed struct(u64) {
     }
 
     /// Writes the RFLAGS register.
+    ///
     /// Note: does not protect reserved bits, that is left up to the caller
     pub inline fn write(self: RFlags) void {
         asm volatile ("pushq %[val]; popfq"
