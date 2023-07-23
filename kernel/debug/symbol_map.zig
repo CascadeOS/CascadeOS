@@ -38,7 +38,7 @@ pub fn getSymbol(address: usize) ?Symbol {
 pub const Symbol = struct {
     /// The address of the symbol.
     address: usize,
-    name: []const u8,
+    name: ?[]const u8,
     location: ?Location,
 
     pub const Location = struct {

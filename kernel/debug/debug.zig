@@ -155,13 +155,20 @@ fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
     writer.writeAll(indent) catch unreachable;
 
     const location = symbol.location orelse {
-        // setup - ???
-        // ^^^^^
-        writer.writeAll(symbol.name) catch unreachable;
+        if (symbol.name) |name| {
+            // setup - ???
+            // ^^^^^
+            writer.writeAll(name) catch unreachable;
 
-        // setup - ???
-        //      ^^^^^^
-        writer.writeAll(" - ???\n") catch unreachable;
+            // setup - ???
+            //      ^^^^^^
+            writer.writeAll(" - ???\n") catch unreachable;
+        } else {
+            // ??? - ???
+            // ^^^^^^^^^
+            writer.writeAll("??? - ???\n") catch unreachable;
+        }
+
         return;
     };
 
@@ -203,9 +210,15 @@ fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
     //                       ^^^^
     writer.writeAll(" in ") catch unreachable;
 
-    // kernel/setup.zig:43:15 in setup
-    //                           ^^^^^
-    writer.writeAll(symbol.name) catch unreachable;
+    if (symbol.name) |name| {
+        // kernel/setup.zig:43:15 in setup
+        //                           ^^^^^
+        writer.writeAll(name) catch unreachable;
+    } else {
+        // kernel/setup.zig:43:15 in ???
+        //                           ^^^
+        writer.writeAll("???") catch unreachable;
+    }
 
     if (!location.is_line_expected_to_be_precise) {
         // kernel/setup.zig:43:15 in setup (symbols line information is inprecise)

@@ -106,7 +106,7 @@ fn chopSlice(ptr: [*]const u8, offset: u64, size: u64) error{Overflow}![]const u
 pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
     const compile_unit = self.debug_info.findCompileUnit(address) catch return null;
 
-    const name = self.debug_info.getSymbolName(address) orelse return null;
+    const name = self.debug_info.getSymbolName(address) orelse null;
 
     const line_info_opt: ?std.debug.LineInfo = self.debug_info.getLineNumberInfo(
         self.allocator,
