@@ -143,6 +143,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
             .{},
             writer,
         ) catch unreachable;
+        writer.writeAll(" - failed to find address in debug info\n") catch unreachable;
 
         return;
     };
