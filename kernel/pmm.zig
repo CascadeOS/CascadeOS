@@ -85,8 +85,15 @@ fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) vo
     first_free_physical_page = first_page;
 }
 
+pub const PhysicalAllocation = struct {
+    range: kernel.PhysicalRange,
+
+    /// This is only set to true when the kernel itself has zeroed the memory.
+    zeroed: bool = false,
+};
+
 /// Allocates a physical page.
-pub fn allocatePage() ?kernel.PhysicalRange {
+pub fn allocatePage() ?PhysicalAllocation {
     var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
 
     while (first_free_page_opt) |first_free_page| {
@@ -111,13 +118,17 @@ pub fn allocatePage() ?kernel.PhysicalRange {
             .Monotonic,
         );
 
+        const zeroed = first_free_page.zeroed;
         const physical_address = kernel.VirtualAddress.fromPtr(first_free_page).toPhysicalFromDirectMap() catch unreachable;
 
         const allocated_range = kernel.PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
 
-        log.debug("found free page: {}", .{allocated_range});
+        log.debug("found free page: {}{s}", .{ allocated_range, if (zeroed) " (zeroed)" else "" });
 
-        return allocated_range;
+        return PhysicalAllocation{
+            .range = allocated_range,
+            .zeroed = zeroed,
+        };
     } else {
         log.warn("STANDARD PAGE ALLOCATION FAILED", .{});
     }
@@ -126,11 +137,11 @@ pub fn allocatePage() ?kernel.PhysicalRange {
 }
 
 /// Deallocates a physical page.
-pub fn deallocatePage(allocated_range: kernel.PhysicalRange) void {
-    std.debug.assert(allocated_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(allocated_range.size.equal(arch.paging.standard_page_size));
+pub fn deallocatePage(allocation: PhysicalAllocation) void {
+    std.debug.assert(allocation.range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(allocation.range.size.equal(arch.paging.standard_page_size));
 
-    const page_node = allocated_range.address.toDirectMap().toPtr(*PhysPageNode);
+    const page_node = allocation.range.address.toDirectMap().toPtr(*PhysPageNode);
     _ = page_node;
 
     core.panic("UNIMPLEMENTED `deallocatePage`"); // TODO: implement deallocatePage https://github.com/CascadeOS/CascadeOS/issues/21
@@ -139,7 +150,14 @@ pub fn deallocatePage(allocated_range: kernel.PhysicalRange) void {
 const PhysPageNode = extern struct {
     next: ?*PhysPageNode = null,
 
+    /// This is only set to true when the kernel itself has zeroed the memory.
+    ///
+    /// NOTE: Due to the current design of the PMM no pages will be zeroed, as the pages themselves are used to store
+    /// the free page link list.
+    /// This deficency would be removed with https://github.com/CascadeOS/CascadeOS/issues/20
+    zeroed: bool = false,
+
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(usize));
+        std.debug.assert(core.Size.of(PhysPageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
     }
 };

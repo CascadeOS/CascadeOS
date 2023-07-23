@@ -30,11 +30,11 @@ pub const PageTable = @import("PageTable.zig").PageTable;
 
 /// Allocates a new page table.
 pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
-    const physical_page = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
-    std.debug.assert(physical_page.size.greaterThanOrEqual(core.Size.of(PageTable)));
+    const allocation = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
+    std.debug.assert(allocation.range.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
-    const page_table = physical_page.toDirectMap().address.toPtr(*PageTable);
-    page_table.zero();
+    const page_table = allocation.range.toDirectMap().address.toPtr(*PageTable);
+    if (!allocation.zeroed) page_table.zero();
 
     return page_table;
 }
@@ -326,18 +326,15 @@ fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: kernel.vmm.MapType,
 ) error{ AllocationFailed, Unexpected }!*PageTable {
-    var allocated = false;
-
-    var page: ?kernel.PhysicalRange = null;
+    var opt_allocation: ?kernel.pmm.PhysicalAllocation = null;
 
     if (!self.present.read()) {
-        page = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
-        self.setAddress4kib(page.?.address);
-        allocated = true;
+        opt_allocation = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
+        self.setAddress4kib(opt_allocation.?.range.address);
     }
-    errdefer if (page) |allocated_page| {
+    errdefer if (opt_allocation) |allocation| {
         self.setAddress4kib(kernel.PhysicalAddress.zero);
-        kernel.pmm.deallocatePage(allocated_page);
+        kernel.pmm.deallocatePage(allocation);
     };
 
     applyParentMapType(map_type, self);
@@ -347,8 +344,8 @@ fn ensureNextTable(
         error.NotPresent => unreachable, // we ensure it is present above
     };
 
-    if (allocated) {
-        next_level.zero();
+    if (opt_allocation) |allocation| {
+        if (!allocation.zeroed) next_level.zero();
     }
 
     return next_level;
