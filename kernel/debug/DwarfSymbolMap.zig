@@ -4,6 +4,9 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+const elf = std.elf;
+const DW = std.dwarf;
+
 const symbol_map = @import("symbol_map.zig");
 
 const DwarfSymbolMap = @This();
@@ -18,89 +21,74 @@ const size_of_dwarf_debug_allocator = core.Size.from(16, .mib);
 var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.bytes]u8 = undefined;
 var dwarf_debug_allocator = std.heap.FixedBufferAllocator.init(dwarf_debug_allocator_bytes[0..]);
 
+// This function is a re-implementation of `std.debug.readElfDebugInfo`
 pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
-    const elf_header: *const std.elf.Ehdr = @ptrCast(@alignCast(&kernel_elf_start[0]));
-    if (!std.mem.eql(u8, elf_header.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
-    if (elf_header.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
+    const allocator = dwarf_debug_allocator.allocator();
 
-    const section_header_offset = elf_header.e_shoff;
-    const string_section_offset =
-        section_header_offset +
-        @as(u64, elf_header.e_shentsize) * @as(u64, elf_header.e_shstrndx);
-    const string_section_header: *const std.elf.Shdr = @ptrCast(@alignCast(&kernel_elf_start[string_section_offset]));
-    const header_strings = kernel_elf_start[string_section_header.sh_offset .. string_section_header.sh_offset + string_section_header.sh_size];
-    const section_headers = @as(
-        [*]const std.elf.Shdr,
-        @ptrCast(@alignCast(&kernel_elf_start[section_header_offset])),
-    )[0..elf_header.e_shnum];
+    const hdr: *const elf.Ehdr = @ptrCast(@alignCast(kernel_elf_start));
+    if (!std.mem.eql(u8, hdr.e_ident[0..4], elf.MAGIC)) return error.InvalidElfMagic;
+    if (hdr.e_ident[elf.EI_VERSION] != 1) return error.InvalidElfVersion;
 
-    var debug_info_opt: ?[]const u8 = null;
-    var debug_abbrev_opt: ?[]const u8 = null;
-    var debug_str_opt: ?[]const u8 = null;
-    var debug_str_offsets_opt: ?[]const u8 = null;
-    var debug_line_opt: ?[]const u8 = null;
-    var debug_line_str_opt: ?[]const u8 = null;
-    var debug_ranges_opt: ?[]const u8 = null;
-    var debug_loclists_opt: ?[]const u8 = null;
-    var debug_rnglists_opt: ?[]const u8 = null;
-    var debug_addr_opt: ?[]const u8 = null;
-    var debug_names_opt: ?[]const u8 = null;
-    var debug_frame_opt: ?[]const u8 = null;
+    const shoff = hdr.e_shoff;
+    const str_section_off = shoff + @as(u64, hdr.e_shentsize) * @as(u64, hdr.e_shstrndx);
+    const str_shdr: *const elf.Shdr = @ptrCast(@alignCast(&kernel_elf_start[std.math.cast(usize, str_section_off) orelse return error.Overflow]));
+    const header_strings = kernel_elf_start[str_shdr.sh_offset..][0..str_shdr.sh_size];
+    const shdrs = @as(
+        [*]const elf.Shdr,
+        @ptrCast(@alignCast(&kernel_elf_start[shoff])),
+    )[0..hdr.e_shnum];
 
-    for (section_headers) |*shdr| {
-        if (shdr.sh_type == std.elf.SHT_NULL) continue;
+    var sections: DW.DwarfInfo.SectionArray = DW.DwarfInfo.null_section_array;
 
+    for (shdrs) |*shdr| {
+        if (shdr.sh_type == elf.SHT_NULL or shdr.sh_type == elf.SHT_NOBITS) continue;
         const name = std.mem.sliceTo(header_strings[shdr.sh_name..], 0);
-        if (std.mem.eql(u8, name, ".debug_info")) {
-            debug_info_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_abbrev")) {
-            debug_abbrev_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_str")) {
-            debug_str_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_str_offsets")) {
-            debug_str_offsets_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_line")) {
-            debug_line_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_line_str")) {
-            debug_line_str_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_ranges")) {
-            debug_ranges_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_loclists")) {
-            debug_loclists_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_rnglists")) {
-            debug_rnglists_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_addr")) {
-            debug_addr_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_names")) {
-            debug_names_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
-        } else if (std.mem.eql(u8, name, ".debug_frame")) {
-            debug_frame_opt = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+
+        var section_index: ?usize = null;
+        inline for (@typeInfo(DW.DwarfSection).Enum.fields, 0..) |section, i| {
+            if (std.mem.eql(u8, "." ++ section.name, name)) section_index = i;
         }
+        if (section_index == null) continue;
+        if (sections[section_index.?] != null) continue;
+
+        const section_bytes = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+        sections[section_index.?] = if ((shdr.sh_flags & elf.SHF_COMPRESSED) > 0) blk: {
+            var section_stream = std.io.fixedBufferStream(section_bytes);
+            var section_reader = section_stream.reader();
+            const chdr = section_reader.readStruct(elf.Chdr) catch continue;
+            if (chdr.ch_type != .ZLIB) continue;
+
+            var zlib_stream = std.compress.zlib.decompressStream(allocator, section_stream.reader()) catch continue;
+            defer zlib_stream.deinit();
+
+            var decompressed_section = try allocator.alloc(u8, chdr.ch_size);
+            errdefer allocator.free(decompressed_section);
+
+            const read = zlib_stream.reader().readAll(decompressed_section) catch continue;
+            if (read != decompressed_section.len) return error.DecompressionFailed;
+
+            break :blk .{
+                .data = decompressed_section,
+                .virtual_address = shdr.sh_addr,
+                .owned = true,
+            };
+        } else .{
+            .data = section_bytes,
+            .virtual_address = shdr.sh_addr,
+            .owned = false,
+        };
     }
 
     var map: DwarfSymbolMap = .{
-        .debug_info = std.dwarf.DwarfInfo{
+        .debug_info = DW.DwarfInfo{
             .endian = .Little,
-            .debug_info = debug_info_opt orelse return error.MissingDebugInfo,
-            .debug_abbrev = debug_abbrev_opt orelse return error.MissingDebugInfo,
-            .debug_str = debug_str_opt orelse return error.MissingDebugInfo,
-            .debug_str_offsets = debug_str_offsets_opt,
-            .debug_line = debug_line_opt orelse return error.MissingDebugInfo,
-            .debug_line_str = debug_line_str_opt,
-            .debug_ranges = debug_ranges_opt,
-            .debug_loclists = debug_loclists_opt,
-            .debug_rnglists = debug_rnglists_opt,
-            .debug_addr = debug_addr_opt,
-            .debug_names = debug_names_opt,
-            .debug_frame = debug_frame_opt,
+            .sections = sections,
+            .is_macho = false,
         },
         .allocator = dwarf_debug_allocator.allocator(),
     };
 
-    std.dwarf.openDwarfDebugInfo(&map.debug_info, map.allocator) catch |err| switch (err) {
-        error.OutOfMemory => core.panic("dwarf_debug_allocator does not have enough memory for chonky DWARF info"),
-        else => |e| return e,
-    };
+    try DW.openDwarfDebugInfo(&map.debug_info, allocator);
 
     return map;
 }
