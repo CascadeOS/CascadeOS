@@ -34,14 +34,14 @@ pub fn panic(
 ) noreturn {
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
-    symbol_map.loadSymbols();
+    const loaded_symbols = if (symbol_map.loadSymbols()) true else |_| false;
 
     const return_address = return_address_opt orelse @returnAddress();
 
     switch (state) {
         .no_op => {},
-        .simple => simplePanic(msg, stack_trace, return_address),
-        .full => panicImpl(msg, stack_trace, return_address),
+        .simple => simplePanic(msg, stack_trace, return_address, loaded_symbols),
+        .full => panicImpl(msg, stack_trace, return_address, loaded_symbols),
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -52,10 +52,15 @@ fn simplePanic(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
     ret_addr: usize,
+    loaded_symbols: bool,
 ) void {
     const writer = kernel.arch.setup.getEarlyOutputWriter();
 
-    writer.print("\nPANIC: {s}\n\n", .{msg}) catch unreachable;
+    if (loaded_symbols) {
+        writer.print("\nPANIC: {s}\n\n", .{msg}) catch unreachable;
+    } else {
+        writer.print("\nPANIC(no symbols loaded): {s}\n\n", .{msg}) catch unreachable;
+    }
 
     // error return trace
     if (stack_trace) |trace| {
@@ -70,9 +75,10 @@ fn panicImpl(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
     ret_addr: usize,
+    loaded_symbols: bool,
 ) void {
     // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
-    simplePanic(msg, stack_trace, ret_addr);
+    simplePanic(msg, stack_trace, ret_addr, loaded_symbols);
 }
 
 fn printStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) void {

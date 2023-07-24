@@ -6,16 +6,23 @@ const kernel = @import("kernel");
 
 const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
 
+var any_symbolmaps_loaded: bool = false;
+
 var dwarf_symbol_map_spinlock: kernel.SpinLock = .{};
 var dwarf_symbol_map_opt: ?DwarfSymbolMap = null;
 
-pub fn loadSymbols() void {
+pub fn loadSymbols() !void {
     if (dwarf_symbol_map_opt == null) {
         const held = dwarf_symbol_map_spinlock.lock();
         defer held.unlock();
         if (dwarf_symbol_map_opt == null) {
             dwarf_symbol_map_opt = DwarfSymbolMap.init(kernel.info.kernel_file.address.toPtr([*]const u8)) catch null;
+            @atomicStore(bool, &any_symbolmaps_loaded, true, .Release);
         }
+    }
+
+    if (!@atomicLoad(bool, &any_symbolmaps_loaded, .Acquire)) {
+        return error.FailedToLoadSymbols;
     }
 }
 
