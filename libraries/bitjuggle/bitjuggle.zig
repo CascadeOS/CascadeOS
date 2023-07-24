@@ -339,14 +339,25 @@ pub fn Bitfield(
             return @ptrCast(self);
         }
 
-        pub fn write(self: *Self, val: ValueType) void {
+        /// Writes a value to the bitfield without shifting, all bits in `val` not in the bitfield are ignored.
+        pub fn writeNoShiftFullSize(self: *Self, val: FieldType) void {
             self.field().* &= ~self_mask;
-            self.field().* |= @as(FieldType, @intCast(val)) << shift_amount;
+            self.field().* |= (val & self_mask);
+        }
+
+        pub fn write(self: *Self, val: ValueType) void {
+            self.writeNoShiftFullSize(@as(FieldType, @intCast(val)) << shift_amount);
         }
 
         pub fn read(self: Self) ValueType {
-            const val: FieldType = self.field().*;
-            return @intCast((val & self_mask) >> shift_amount);
+            return @intCast(self.readNoShiftFullSize() >> shift_amount);
+        }
+
+        /// Reads the full value of the bitfield without shifting and without truncating the type.
+        ///
+        /// All bits not in the bitfield will be zero.
+        pub inline fn readNoShiftFullSize(self: Self) FieldType {
+            return (self.field().* & self_mask);
         }
     };
 }
