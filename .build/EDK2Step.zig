@@ -111,56 +111,16 @@ fn updateTimestampFile(self: *EDK2Step) !void {
 
 /// Fetches a file from a URL.
 fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
-    var failed = false;
+    const file = try std.fs.cwd().createFile(destination_path, .{});
+    defer file.close();
 
-    // try curl
-    helpers.runExternalBinary(
-        step.owner.allocator,
-        &.{
-            "curl",
-            "-s", // silent
-            "-f", // fail fast
-            "-o",
-            destination_path,
-            url,
-        },
-        null,
-    ) catch {
-        failed = true;
+    var buffered_writer = std.io.bufferedWriter(file.writer());
+
+    downloadWithHttpClient(step.owner.allocator, url, buffered_writer.writer()) catch |err| {
+        return step.fail("failed to fetch '{s}': {s}", .{ url, @errorName(err) });
     };
 
-    if (!failed) return;
-    failed = false;
-
-    // try wget
-    helpers.runExternalBinary(
-        step.owner.allocator,
-        &.{
-            "wget",
-            "-q", // quiet
-            "-O",
-            destination_path,
-            url,
-        },
-        null,
-    ) catch {};
-
-    if (!failed) return;
-    failed = false;
-
-    return step.fail("failed to fetch '{s}' using either curl or wget", .{url});
-
-    // TODO: use the std http client once it stops crashing randomly https://github.com/CascadeOS/CascadeOS/issues/53
-    // const file = try std.fs.cwd().createFile(destination_path, .{});
-    // defer file.close();
-    //
-    // var buffered_writer = std.io.bufferedWriter(file.writer());
-    //
-    // downloadWithHttpClient(step.owner.allocator, url, buffered_writer.writer()) catch |err| {
-    //     return step.fail("failed to fetch '{s}': {s}", .{ url, @errorName(err) });
-    // };
-    //
-    // try buffered_writer.flush();
+    try buffered_writer.flush();
 }
 
 /// Downloads a file using the std http client.
