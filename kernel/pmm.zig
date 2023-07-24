@@ -125,6 +125,10 @@ pub fn allocatePage() ?PhysicalAllocation {
 
         log.debug("found free page: {}{s}", .{ allocated_range, if (zeroed) " (zeroed)" else "" });
 
+        if (zeroed) {
+            first_free_page.* = std.mem.zeroes(PhysPageNode);
+        }
+
         return PhysicalAllocation{
             .range = allocated_range,
             .zeroed = zeroed,
@@ -152,8 +156,8 @@ const PhysPageNode = extern struct {
 
     /// This is only set to true when the kernel itself has zeroed the memory.
     ///
-    /// NOTE: Due to the current design of the PMM no pages will be zeroed, as the pages themselves are used to store
-    /// the free page link list.
+    /// NOTE: Due to the current design of the PMM no pages will actually be zeroed, as the pages themselves are used
+    /// to store the `PhysPageNode` of the free page link list.
     /// This deficency would be removed with https://github.com/CascadeOS/CascadeOS/issues/20
     zeroed: bool = false,
 
