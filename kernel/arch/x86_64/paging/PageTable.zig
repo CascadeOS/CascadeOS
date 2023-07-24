@@ -304,30 +304,30 @@ pub const PageTable = extern struct {
         const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
 
         pub fn getAddress4kib(self: Entry) kernel.PhysicalAddress {
-            return .{ .value = self.address_4kib_aligned.read() << level_1_shift };
+            return .{ .value = self.address_4kib_aligned.readNoShiftFullSize() };
         }
 
         pub fn setAddress4kib(self: *Entry, address: kernel.PhysicalAddress) void {
             std.debug.assert(address.isAligned(paging.small_page_size));
-            self.address_4kib_aligned.write(@truncate(address.value >> level_1_shift));
+            self.address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
         pub fn getAddress2mib(self: Entry) kernel.PhysicalAddress {
-            return .{ .value = self.address_2mib_aligned.read() << level_2_shift };
+            return .{ .value = self.address_2mib_aligned.readNoShiftFullSize() };
         }
 
         pub fn setAddress2mib(self: *Entry, address: kernel.PhysicalAddress) void {
             std.debug.assert(address.isAligned(paging.medium_page_size));
-            self.address_2mib_aligned.write(@truncate(address.value >> level_2_shift));
+            self.address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
         pub fn getAddress1gib(self: Entry) kernel.PhysicalAddress {
-            return .{ .value = self.address_1gib_aligned.read() << level_3_shift };
+            return .{ .value = self.address_1gib_aligned.readNoShiftFullSize() };
         }
 
         pub fn setAddress1gib(self: *Entry, address: kernel.PhysicalAddress) void {
             std.debug.assert(address.isAligned(paging.large_page_size));
-            self.address_1gib_aligned.write(@truncate(address.value >> level_3_shift));
+            self.address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 
         /// Gets the next page table level.
