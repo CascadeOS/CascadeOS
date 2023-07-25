@@ -30,11 +30,11 @@ pub const PageTable = @import("PageTable.zig").PageTable;
 
 /// Allocates a new page table.
 pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
-    const allocation = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
-    std.debug.assert(allocation.range.size.greaterThanOrEqual(core.Size.of(PageTable)));
+    const range = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
+    std.debug.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
-    const page_table = allocation.range.toDirectMap().address.toPtr(*PageTable);
-    if (!allocation.zeroed) page_table.zero();
+    const page_table = range.toDirectMap().address.toPtr(*PageTable);
+    page_table.zero();
 
     return page_table;
 }
@@ -326,15 +326,15 @@ fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: kernel.vmm.MapType,
 ) error{ AllocationFailed, Unexpected }!*PageTable {
-    var opt_allocation: ?kernel.pmm.PhysicalAllocation = null;
+    var opt_range: ?kernel.PhysicalRange = null;
 
     if (!self.present.read()) {
-        opt_allocation = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
-        self.setAddress4kib(opt_allocation.?.range.address);
+        opt_range = kernel.pmm.allocatePage() orelse return error.AllocationFailed;
+        self.setAddress4kib(opt_range.?.address);
     }
-    errdefer if (opt_allocation) |allocation| {
+    errdefer if (opt_range) |range| {
         self.setAddress4kib(kernel.PhysicalAddress.zero);
-        kernel.pmm.deallocatePage(allocation);
+        kernel.pmm.deallocatePage(range);
     };
 
     applyParentMapType(map_type, self);
@@ -344,9 +344,7 @@ fn ensureNextTable(
         error.NotPresent => unreachable, // we ensure it is present above
     };
 
-    if (opt_allocation) |allocation| {
-        if (!allocation.zeroed) next_level.zero();
-    }
+    if (opt_range != null) next_level.zero();
 
     return next_level;
 }
