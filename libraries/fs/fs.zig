@@ -3,6 +3,9 @@
 const std = @import("std");
 const core = @import("core");
 
+/// Ext2/3/4
+pub const ext = @import("ext.zig");
+
 /// File Allocation Table (FAT)
 pub const fat = @import("fat.zig");
 
