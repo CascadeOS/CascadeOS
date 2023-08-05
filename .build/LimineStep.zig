@@ -31,6 +31,8 @@ __build_limine_executable: *Step.Compile,
 
 pub fn create(b: *std.Build) !*LimineStep {
     const limine_dir = try b.cache_root.join(b.allocator, &.{"limine"});
+    const lazy_limine_dir = std.Build.LazyPath{ .path = limine_dir };
+
     const limine_c_source = b.pathJoin(&.{ limine_dir, "limine.c" });
 
     const download_limine = try DownloadLimineStep.create(b, limine_dir);
@@ -39,10 +41,13 @@ pub fn create(b: *std.Build) !*LimineStep {
         .name = "limine",
         .link_libc = true,
     });
-    build_limine_exe.addIncludePath(limine_dir);
-    build_limine_exe.addCSourceFile(limine_c_source, &.{
-        "-std=c99",
-        "-fno-sanitize=undefined",
+    build_limine_exe.addIncludePath(lazy_limine_dir);
+    build_limine_exe.addCSourceFile(.{
+        .file = .{ .path = limine_c_source },
+        .flags = &.{
+            "-std=c99",
+            "-fno-sanitize=undefined",
+        },
     });
 
     build_limine_exe.step.dependOn(&download_limine.step);

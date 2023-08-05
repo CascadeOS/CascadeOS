@@ -12,6 +12,15 @@ pub inline fn spinLoopHint() void {
     asm volatile ("isb" ::: "memory");
 }
 
+/// Entry point.
+pub fn _start() callconv(.Naked) noreturn {
+    asm volatile (
+        \\ b %[setup]
+        :
+        : [setup] "X" (&kernel.setup.setup),
+    );
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub fn disableInterruptsAndHalt() noreturn {

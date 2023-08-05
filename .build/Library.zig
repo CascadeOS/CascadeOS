@@ -214,15 +214,20 @@ fn cascadeTestExecutableAndModule(
         true,
     );
 
-    test_exe.override_dest_dir = .{
-        .custom = b.pathJoin(&.{
-            @tagName(target),
-            "root",
-            "tests",
-        }),
-    };
-
-    const install_step = b.addInstallArtifact(test_exe);
+    const install_step = b.addInstallArtifact(
+        test_exe,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = b.pathJoin(&.{
+                        @tagName(target),
+                        "root",
+                        "tests",
+                    }),
+                },
+            },
+        },
+    );
 
     const build_step_name = try std.fmt.allocPrint(
         b.allocator,
@@ -268,15 +273,20 @@ fn hostTestExecutableAndModule(
         false,
     );
 
-    test_exe.override_dest_dir = .{
-        .custom = b.pathJoin(&.{
-            @tagName(target),
-            "non_cascade",
-            "tests",
-        }),
-    };
-
-    const install_step = b.addInstallArtifact(test_exe);
+    const install_step = b.addInstallArtifact(
+        test_exe,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = b.pathJoin(&.{
+                        @tagName(target),
+                        "non_cascade",
+                        "tests",
+                    }),
+                },
+            },
+        },
+    );
 
     const run_step = b.addRunArtifact(test_exe);
     run_step.skip_foreign_checks = true;

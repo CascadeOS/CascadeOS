@@ -45,7 +45,7 @@ pub const clear = struct {
     /// Clears from the cursor position to the end of the line.
     pub const line_from_cursor = comptimeCsi("0K");
 
-    /// Clears from the beginning of the line to the cursor position. 
+    /// Clears from the beginning of the line to the cursor position.
     pub const line_to_cursor = comptimeCsi("1K");
 
     /// Clears the screen from the cursor position to the end of the screen.
@@ -168,7 +168,7 @@ fn refAllDeclsRecursive(comptime T: type, comptime first: bool) void {
 
         inline for (std.meta.declarations(T)) |decl| {
             // don't analyze if the decl is not pub unless we are the first level of this call chain
-            if (!first and !decl.is_pub) continue;
+            if (!first) continue;
 
             if (std.mem.eql(u8, decl.name, "std")) continue;
 

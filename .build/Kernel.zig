@@ -51,14 +51,6 @@ fn create(
         .optimize = options.optimize,
     });
 
-    kernel_exe.override_dest_dir = .{
-        .custom = b.pathJoin(&.{
-            @tagName(target),
-            "root",
-            "boot",
-        }),
-    };
-
     kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
 
     const kernel_module = blk: {
@@ -101,11 +93,26 @@ fn create(
 
     target.targetSpecificSetup(kernel_exe);
 
+    const install_step = b.addInstallArtifact(
+        kernel_exe,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = b.pathJoin(&.{
+                        @tagName(target),
+                        "root",
+                        "boot",
+                    }),
+                },
+            },
+        },
+    );
+
     return Kernel{
         .b = b,
         .target = target,
         .options = options,
-        .install_step = b.addInstallArtifact(kernel_exe),
+        .install_step = install_step,
     };
 }
 

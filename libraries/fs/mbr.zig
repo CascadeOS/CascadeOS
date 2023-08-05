@@ -41,7 +41,7 @@ fn refAllDeclsRecursive(comptime T: type, comptime first: bool) void {
 
         inline for (std.meta.declarations(T)) |decl| {
             // don't analyze if the decl is not pub unless we are the first level of this call chain
-            if (!first and !decl.is_pub) continue;
+            if (!first) continue;
 
             if (std.mem.eql(u8, decl.name, "std")) continue;
 

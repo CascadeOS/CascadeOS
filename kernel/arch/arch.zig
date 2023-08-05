@@ -10,6 +10,9 @@ pub const x86_64 = @import("x86_64/x86_64.zig");
 comptime {
     // ensure any architecture specific code is referenced
     _ = current;
+
+    // export the architecture specific `_start` function
+    @export(current._start, .{ .name = "_start", .linkage = .Strong });
 }
 
 // TODO: whatever case is first in the below switch determines zls completions.

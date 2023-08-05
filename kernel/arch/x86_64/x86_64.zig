@@ -36,6 +36,16 @@ pub const PrivilegeLevel = enum(u2) {
 
 pub const spinLoopHint = instructions.pause;
 
+/// Entry point.
+pub fn _start() callconv(.Naked) noreturn {
+    asm volatile (
+        \\ push $0
+        \\ jmp %[setup:P]
+        :
+        : [setup] "X" (&kernel.setup.setup),
+    );
+}
+
 comptime {
     if (kernel.info.arch != .x86_64) {
         @compileError("x86_64 implementation has been referenced when building " ++ @tagName(kernel.info.arch));
