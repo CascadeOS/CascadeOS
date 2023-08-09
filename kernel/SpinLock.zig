@@ -30,7 +30,10 @@ pub fn lock(self: *SpinLock) Held {
 
     kernel.arch.interrupts.disableInterrupts();
 
-    self.internalGrab(interrupts_enabled);
+    if (interrupts_enabled)
+        self.internalGrab(true)
+    else
+        self.internalGrab(false);
 
     return .{
         .enable_interrupts_on_unlock = interrupts_enabled,
@@ -38,16 +41,7 @@ pub fn lock(self: *SpinLock) Held {
     };
 }
 
-/// Grab lock without disabling interrupts
-pub fn grab(self: *SpinLock) Held {
-    self.internalGrab(false);
-    return .{
-        .enable_interrupts_on_unlock = false,
-        .spinlock = self,
-    };
-}
-
-fn internalGrab(self: *SpinLock, enable_interrupts_in_the_loop: bool) void {
+fn internalGrab(self: *SpinLock, comptime enable_interrupts_in_the_loop: bool) void {
     const ticket = @atomicRmw(usize, &self.next_available_ticket, .Add, 1, .AcqRel);
     while (true) {
         const current_ticket = @atomicLoad(usize, &self.current_ticket, .Acquire);
