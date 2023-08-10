@@ -186,17 +186,14 @@ pub const Size = extern struct {
 };
 
 comptime {
-    refAllDeclsRecursive(@This(), true);
+    refAllDeclsRecursive(@This());
 }
 
-fn refAllDeclsRecursive(comptime T: type, comptime first: bool) void {
+fn refAllDeclsRecursive(comptime T: type) void {
     comptime {
         if (!@import("builtin").is_test) return;
 
         inline for (std.meta.declarations(T)) |decl| {
-            // don't analyze if the decl is not pub unless we are the first level of this call chain
-            if (!first) continue;
-
             if (std.mem.eql(u8, decl.name, "std")) continue;
 
             if (!@hasDecl(T, decl.name)) continue;
@@ -206,7 +203,7 @@ fn refAllDeclsRecursive(comptime T: type, comptime first: bool) void {
             if (@TypeOf(@field(T, decl.name)) != type) continue;
 
             switch (@typeInfo(@field(T, decl.name))) {
-                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name), false),
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
                 else => {},
             }
         }
