@@ -10,6 +10,7 @@ const Library = @import(".build/Library.zig");
 const Options = @import(".build/Options.zig");
 const QemuStep = @import(".build/QemuStep.zig");
 const StepCollection = @import(".build/StepCollection.zig");
+const Tool = @import(".build/Tool.zig");
 
 const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 1 };
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
@@ -22,6 +23,9 @@ pub fn build(b: *std.Build) !void {
     const options = try Options.get(b, cascade_version, all_targets);
 
     const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
+
+    const tools = try Tool.getTools(b, step_collection, libraries);
+    _ = tools;
 
     try Kernel.registerKernels(b, step_collection, libraries, options, all_targets);
 

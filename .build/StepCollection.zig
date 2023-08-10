@@ -23,6 +23,13 @@ non_cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarg
 /// A map from targets to their non-Cascade library run steps.
 non_cascade_library_run_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
+tool_build_and_test_step: *Step,
+
+pub fn registerTool(self: StepCollection, build_step: *Step, test_step: *Step) void {
+    self.tool_build_and_test_step.dependOn(build_step);
+    self.tool_build_and_test_step.dependOn(test_step);
+}
+
 /// Registers a kernel build step for a target.
 pub fn registerKernel(self: StepCollection, target: CascadeTarget, step: *Step) void {
     self.kernel_build_steps_per_target.get(target).?.dependOn(step);
@@ -52,7 +59,6 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
     b.default_step = all_test_step;
 
     // Kernels
-
     const all_kernels_build_step = b.step(
         "kernels",
         "Build all the kernels",
@@ -124,6 +130,13 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
         "Attempt to run all the library tests for {s} targeting the host os",
     );
 
+    // Tools
+    const all_tools_build_and_test_step = b.step(
+        "tools",
+        "Build all the tools and run all their tests",
+    );
+    all_test_step.dependOn(all_tools_build_and_test_step);
+
     return .{
         .kernel_build_steps_per_target = kernel_build_steps_per_target,
 
@@ -133,6 +146,8 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
 
         .non_cascade_library_build_steps_per_target = non_cascade_library_build_steps_per_target,
         .non_cascade_library_run_steps_per_target = non_cascade_library_run_steps_per_target,
+
+        .tool_build_and_test_step = all_tools_build_and_test_step,
     };
 }
 

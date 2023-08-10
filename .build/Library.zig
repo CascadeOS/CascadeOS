@@ -34,6 +34,9 @@ cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 /// The modules for each supported non-Cascade target.
 non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
+/// If this library supports the hosts architecture the native module from `non_cascade_modules` will be stored here.
+non_cascade_module_for_host: ?*std.Build.Module,
+
 /// Returns the path to the root source file of the library.
 pub fn getRootFilePath(library: *const Library, b: *std.Build) []const u8 {
     return library.root_file.getPath(b);
@@ -150,6 +153,8 @@ fn resolveLibrary(
 
     const all_build_and_run_step = b.step(all_build_and_run_step_name, all_build_and_run_step_description);
 
+    var host_native_module: ?*std.Build.Module = null;
+
     for (supported_targets) |target| {
         try cascadeTestExecutableAndModule(
             b,
@@ -165,7 +170,7 @@ fn resolveLibrary(
 
         // host test executable and module
         if (!library_description.is_cascade_only) {
-            try hostTestExecutableAndModule(
+            if (try hostTestExecutableAndModule(
                 b,
                 library_description,
                 file_source,
@@ -175,7 +180,7 @@ fn resolveLibrary(
                 all_build_and_run_step,
                 step_collection,
                 &non_cascade_modules,
-            );
+            )) |module| host_native_module = module;
         }
     }
 
@@ -187,6 +192,7 @@ fn resolveLibrary(
         .cascade_modules = cascade_modules,
         .non_cascade_modules = non_cascade_modules,
         .dependencies = dependencies,
+        .non_cascade_module_for_host = host_native_module,
     };
 
     return library;
@@ -262,7 +268,7 @@ fn hostTestExecutableAndModule(
     all_build_and_run_step: *std.Build.Step,
     step_collection: StepCollection,
     non_cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
-) !void {
+) !?*std.Build.Module {
     const test_exe = try createTestExe(
         b,
         library_description,
@@ -315,6 +321,9 @@ fn hostTestExecutableAndModule(
 
     const module = try createModule(b, file_source, options, target, dependencies, false);
     try non_cascade_modules.putNoClobber(b.allocator, target, module);
+
+    if (target.isNative(b)) return module;
+    return null;
 }
 
 /// Creates a test executable for a library.
