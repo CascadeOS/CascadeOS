@@ -17,11 +17,8 @@ image_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 /// A map from targets to their Cascade library build steps.
 cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
-/// A map from targets to their non-Cascade library build steps.
-non_cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
-
-/// A map from targets to their non-Cascade library run steps.
-non_cascade_library_run_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+/// A map from targets to their non-Cascade library test steps.
+non_cascade_library_test_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
 tool_build_and_test_step: *Step,
 
@@ -47,8 +44,8 @@ pub fn registerCascadeLibrary(self: StepCollection, target: CascadeTarget, insta
 
 /// Registers non-Cascade library build and run steps for a target.
 pub fn registerNonCascadeLibrary(self: StepCollection, target: CascadeTarget, install_step: *Step, run_step: *Step) void {
-    self.non_cascade_library_build_steps_per_target.get(target).?.dependOn(install_step);
-    self.non_cascade_library_run_steps_per_target.get(target).?.dependOn(run_step);
+    self.non_cascade_library_test_steps_per_target.get(target).?.dependOn(install_step);
+    self.non_cascade_library_test_steps_per_target.get(target).?.dependOn(run_step);
 }
 
 pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
@@ -108,21 +105,13 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
         "Build all the library tests for {s} targeting cascade",
     );
 
-    const non_cascade_library_build_steps_per_target = try buildPerTargetSteps(
-        b,
-        targets,
-        all_library_build_step,
-        "libraries_host_{s}",
-        "Build all the library tests for {s} targeting the host os",
-    );
-
     const all_library_host_run_step = b.step(
         "libraries_host_run",
         "Attempt to run all the library tests targeting the host os",
     );
     all_library_step.dependOn(all_library_host_run_step);
 
-    const non_cascade_library_run_steps_per_target = try buildPerTargetSteps(
+    const non_cascade_library_test_steps_per_target = try buildPerTargetSteps(
         b,
         targets,
         all_library_host_run_step,
@@ -144,8 +133,7 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
 
         .cascade_library_build_steps_per_target = cascade_library_build_steps_per_target,
 
-        .non_cascade_library_build_steps_per_target = non_cascade_library_build_steps_per_target,
-        .non_cascade_library_run_steps_per_target = non_cascade_library_run_steps_per_target,
+        .non_cascade_library_test_steps_per_target = non_cascade_library_test_steps_per_target,
 
         .tool_build_and_test_step = all_tools_build_and_test_step,
     };
