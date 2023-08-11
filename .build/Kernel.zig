@@ -148,10 +148,11 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
 
     // add each dependencies files
     const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
-    for (kernel_dependencies) |dependency| {
-        const library = libraries.get(dependency).?;
-        const root_file_path = library.getRootFilePath(b);
-        try addFilesRecursive(b, &modules, &file_paths, root_path, std.fs.path.dirname(root_file_path).?);
+    var processed_libraries = std.AutoHashMap(*Library, void).init(b.allocator);
+
+    for (kernel_dependencies) |library_name| {
+        const library: *Library = libraries.get(library_name).?;
+        try addFilesFromLibrary(b, &modules, &file_paths, root_path, libraries, library, &processed_libraries);
     }
 
     // TODO: compress the embeded files https://github.com/CascadeOS/CascadeOS/issues/48
@@ -162,6 +163,26 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
     try modules.append(.{ .name = "embedded_source_files", .module = files_option.createModule() });
 
     return try modules.toOwnedSlice();
+}
+
+fn addFilesFromLibrary(
+    b: *std.Build,
+    modules: *std.ArrayList(SourceFileModule),
+    file_paths: *std.ArrayList([]const u8),
+    root_path: []const u8,
+    libraries: Library.Collection,
+    library: *Library,
+    processed_libraries: *std.AutoHashMap(*Library, void),
+) !void {
+    if (processed_libraries.contains(library)) return;
+
+    try addFilesRecursive(b, modules, file_paths, root_path, library.directory_path);
+
+    try processed_libraries.put(library, {});
+
+    for (library.dependencies) |dep| {
+        try addFilesFromLibrary(b, modules, file_paths, root_path, libraries, dep, processed_libraries);
+    }
 }
 
 /// Adds all files recursively in the given target path to the build.

@@ -22,8 +22,8 @@ pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 ///   - In any build steps created for the library
 name: []const u8,
 
-/// The source file for the root file of the library.
-root_file: std.Build.FileSource,
+/// The path to the directory containing this library.
+directory_path: []const u8,
 
 /// The list of library dependencies.
 dependencies: []const *Library,
@@ -36,11 +36,6 @@ non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
 /// If this library supports the hosts architecture the native module from `non_cascade_modules` will be stored here.
 non_cascade_module_for_host: ?*std.Build.Module,
-
-/// Returns the path to the root source file of the library.
-pub fn getRootFilePath(library: *const Library, b: *std.Build) []const u8 {
-    return library.root_file.getPath(b);
-}
 
 /// Resolves all libraries and their dependencies.
 ///
@@ -115,11 +110,15 @@ fn resolveLibrary(
         break :blk try dependencies.toOwnedSlice();
     };
 
+    const directory_path = helpers.pathJoinFromRoot(b, &.{
+        "libraries",
+        library_description.name,
+    });
+
     const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{library_description.name});
 
     const root_file_path = helpers.pathJoinFromRoot(b, &.{
-        "libraries",
-        library_description.name,
+        directory_path,
         root_file_name,
     });
 
@@ -188,7 +187,7 @@ fn resolveLibrary(
 
     library.* = .{
         .name = library_description.name,
-        .root_file = file_source,
+        .directory_path = directory_path,
         .cascade_modules = cascade_modules,
         .non_cascade_modules = non_cascade_modules,
         .dependencies = dependencies,
