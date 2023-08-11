@@ -4,24 +4,12 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-pub const aarch64 = @import("aarch64/aarch64.zig");
-pub const x86_64 = @import("x86_64/x86_64.zig");
-
-comptime {
-    // ensure any architecture specific code is referenced
-    _ = current;
-
-    // export the architecture specific `_start` function
-    @export(current._start, .{ .name = "_start", .linkage = .Strong });
-}
-
-// TODO: whatever case is first in the below switch determines zls completions.
 const current = switch (kernel.info.arch) {
-    .x86_64 => x86_64,
-    .aarch64 => aarch64,
+    .aarch64 => @import("aarch64/aarch64.zig"),
+    .x86_64 => @import("x86_64/x86_64.zig"),
 };
 
-/// Issues an architecture specific hint to the CPU that it we are spinning in a loop.
+/// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }

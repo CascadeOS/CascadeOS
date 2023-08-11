@@ -9,6 +9,14 @@ const limine = @import("limine.zig");
 // TODO: Support more than just limine. https://github.com/CascadeOS/CascadeOS/issues/35
 //       Multiboot, etc.
 
+/// Entry point.
+export fn _start() noreturn {
+    @call(.never_inline, kernel.setup.setup, .{});
+
+    // TODO: This should halt the entire kernel not just this core.
+    core.panic("setup returned");
+}
+
 const limine_requests = struct {
     export var kernel_file: limine.KernelFile = .{};
     export var hhdm: limine.HHDM = .{};
