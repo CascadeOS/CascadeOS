@@ -276,11 +276,33 @@ pub const DirectoryEntry = extern union {
 
     long_file_name: LongFileNameEntry align(1),
 
+    pub fn isLastEntry(self: *const DirectoryEntry) bool {
+        const bytes = std.mem.asBytes(self);
+        return bytes[0] == 0;
+    }
+
+    pub fn setLastEntry(self: *DirectoryEntry) void {
+        const bytes = std.mem.asBytes(self);
+        bytes[0] = 0;
+    }
+
+    pub fn isUnusedEntry(self: *const DirectoryEntry) bool {
+        const bytes = std.mem.asBytes(self);
+        return bytes[0] == unused_value;
+    }
+
+    pub fn setUnused(self: *DirectoryEntry) void {
+        const bytes = std.mem.asBytes(self);
+        bytes[0] = unused_value;
+    }
+
     pub inline fn isLongFileNameEntry(self: DirectoryEntry) bool {
         return self.standard.attributes.isLongFileNameEntry();
     }
 
     const long_file_name_value: u8 = 0x0f;
+
+    const unused_value: u8 = 0xE5;
 
     pub const StandardDirectoryEntry = extern struct {
         /// 8.3 file name.
