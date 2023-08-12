@@ -20,11 +20,13 @@ cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, 
 /// A map from targets to their non-Cascade library test steps.
 non_cascade_library_test_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
-tool_build_and_test_step: *Step,
+tools_build_step: *Step,
+tools_test_step: *Step,
 
+/// Registers a tool.
 pub fn registerTool(self: StepCollection, build_step: *Step, test_step: *Step) void {
-    self.tool_build_and_test_step.dependOn(build_step);
-    self.tool_build_and_test_step.dependOn(test_step);
+    self.tools_build_step.dependOn(build_step);
+    self.tools_test_step.dependOn(test_step);
 }
 
 /// Registers a kernel build step for a target.
@@ -43,8 +45,7 @@ pub fn registerCascadeLibrary(self: StepCollection, target: CascadeTarget, insta
 }
 
 /// Registers non-Cascade library build and run steps for a target.
-pub fn registerNonCascadeLibrary(self: StepCollection, target: CascadeTarget, install_step: *Step, run_step: *Step) void {
-    self.non_cascade_library_test_steps_per_target.get(target).?.dependOn(install_step);
+pub fn registerNonCascadeLibrary(self: StepCollection, target: CascadeTarget, run_step: *Step) void {
     self.non_cascade_library_test_steps_per_target.get(target).?.dependOn(run_step);
 }
 
@@ -53,6 +54,7 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
         "test",
         "Run all the tests (also builds all code even if they don't have tests)",
     );
+    // TODO: Running all tests by default won't be a good idea eventually.
     b.default_step = all_test_step;
 
     // Kernels
@@ -91,40 +93,52 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
     );
     all_test_step.dependOn(all_library_step);
 
-    const all_library_build_step = b.step(
-        "libraries_build",
+    const all_library_cascade_test_step = b.step(
+        "libraries_cascade",
         "Build all the library tests",
     );
-    all_library_step.dependOn(all_library_build_step);
+    all_library_step.dependOn(all_library_cascade_test_step);
 
     const cascade_library_build_steps_per_target = try buildPerTargetSteps(
         b,
         targets,
-        all_library_build_step,
+        all_library_cascade_test_step,
         "libraries_cascade_{s}",
         "Build all the library tests for {s} targeting cascade",
     );
 
-    const all_library_host_run_step = b.step(
-        "libraries_host_run",
+    const all_library_host_test_step = b.step(
+        "libraries_host",
         "Attempt to run all the library tests targeting the host os",
     );
-    all_library_step.dependOn(all_library_host_run_step);
+    all_library_step.dependOn(all_library_host_test_step);
 
     const non_cascade_library_test_steps_per_target = try buildPerTargetSteps(
         b,
         targets,
-        all_library_host_run_step,
-        "libraries_host_run_{s}",
+        all_library_host_test_step,
+        "libraries_host_{s}",
         "Attempt to run all the library tests for {s} targeting the host os",
     );
 
     // Tools
-    const all_tools_build_and_test_step = b.step(
+    const all_tools_step = b.step(
         "tools",
-        "Build all the tools and run all their tests",
+        "Build all the tools and run all of their tests",
     );
-    all_test_step.dependOn(all_tools_build_and_test_step);
+    all_test_step.dependOn(all_tools_step);
+
+    const all_tools_build_step = b.step(
+        "tools_build",
+        "Build all the tools",
+    );
+    all_tools_step.dependOn(all_tools_build_step);
+
+    const all_tools_test_step = b.step(
+        "tools_test",
+        "Run all of the tools tests",
+    );
+    all_tools_step.dependOn(all_tools_test_step);
 
     return .{
         .kernel_build_steps_per_target = kernel_build_steps_per_target,
@@ -135,7 +149,8 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
 
         .non_cascade_library_test_steps_per_target = non_cascade_library_test_steps_per_target,
 
-        .tool_build_and_test_step = all_tools_build_and_test_step,
+        .tools_build_step = all_tools_build_step,
+        .tools_test_step = all_tools_test_step,
     };
 }
 

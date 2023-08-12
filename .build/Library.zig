@@ -316,7 +316,7 @@ fn hostTestExecutableAndModule(
     build_step.dependOn(&run_step.step);
 
     all_build_and_run_step.dependOn(build_step);
-    step_collection.registerNonCascadeLibrary(target, &install_step.step, build_step);
+    step_collection.registerNonCascadeLibrary(target, build_step);
 
     const module = try createModule(b, file_source, options, target, dependencies, false);
     try non_cascade_modules.putNoClobber(b.allocator, target, module);
