@@ -16,10 +16,28 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - Userspace with GUI
 - All functionality implemented in Zig either in repo or as a package, allowances might be made for things like [ACPICA](https://acpica.org/).
 
-## Discord Server
-This project has a [Discord server](https://discord.gg/3hnsQmND3c).
-
 ## Contributing
 Issues with the label "contributor friendly" would be a good place to start after having a look around the code base.
 
-If you have any experience with aarch64 or risc-v then assitance with those architectures would be greatly appreciated.
+If you have any experience with AArch64 or RISC-V then assitance with those architectures would be greatly appreciated.
+
+### Prerequisites:
+- git
+- zig (master)
+- qemu (optional, used for running and testing)
+
+### Build, testing, running
+Run all tests and build all code: 
+```sh
+zig build --summary all
+```
+
+Run the x86_64 kernel in QEMU:
+```sh
+zig build run_x86_64 -Dforce_debug_log
+```
+
+Run `zig build -h` for a listing of the available steps and options.
+
+## Discord Server
+This project has a [Discord server](https://discord.gg/3hnsQmND3c).
