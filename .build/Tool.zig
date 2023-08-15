@@ -11,7 +11,7 @@ const ToolDescription = @import("ToolDescription.zig");
 
 const Tool = @This();
 
-pub const Collection = std.StringArrayHashMapUnmanaged(*Tool);
+pub const Collection = std.StringArrayHashMapUnmanaged(Tool);
 
 name: []const u8,
 
@@ -45,7 +45,7 @@ fn resolveTool(
     step_collection: StepCollection,
     libraries: Library.Collection,
     tool_description: ToolDescription,
-) !*Tool {
+) !Tool {
     const dependencies = blk: {
         var dependencies = try std.ArrayList(*Library).initCapacity(b.allocator, tool_description.dependencies.len);
         defer dependencies.deinit();
@@ -146,16 +146,12 @@ fn resolveTool(
     const run_step = b.step(run_step_name, run_step_description);
     run_step.dependOn(&run.step);
 
-    var tool = try b.allocator.create(Tool);
-
-    tool.* = .{
+    return .{
         .name = tool_description.name,
         .exe = exe,
         .test_exe = test_exe,
         .exe_install_step = &exe_install_step.step,
     };
-
-    return tool;
 }
 
 fn createExe(
