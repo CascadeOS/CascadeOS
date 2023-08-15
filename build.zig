@@ -25,11 +25,10 @@ pub fn build(b: *std.Build) !void {
     const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
 
     const tools = try Tool.getTools(b, step_collection, libraries);
-    _ = tools;
 
-    try Kernel.registerKernels(b, step_collection, libraries, options, all_targets);
+    const kernels = try Kernel.getKernels(b, step_collection, libraries, options, all_targets);
 
-    const image_steps = try ImageStep.registerImageSteps(b, step_collection, all_targets);
+    const image_steps = try ImageStep.registerImageSteps(b, kernels, tools, step_collection, all_targets);
 
     try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
 }
