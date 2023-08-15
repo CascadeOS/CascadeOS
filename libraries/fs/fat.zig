@@ -270,6 +270,9 @@ pub const ShortFileName = extern struct {
         return std.mem.eql(u8, &self.name, &other.name) and std.mem.eql(u8, &self.extension, &other.extension);
     }
 
+    pub const file_name_max_length = 8;
+    pub const extension_max_length = 3;
+
     comptime {
         core.testing.expectSize(@This(), 11);
     }
@@ -419,6 +422,8 @@ pub const DirectoryEntry = extern union {
         final_characters: [2]u16 align(1) = [_]u16{0xFFFF} ** 2,
 
         pub const last_entry: u8 = 0x40;
+        pub const maximum_number_of_characters = 13;
+        pub const maximum_number_of_long_name_entries = 20;
 
         comptime {
             core.testing.expectSize(@This(), 32);
