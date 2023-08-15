@@ -266,6 +266,10 @@ pub const ShortFileName = extern struct {
         return sum;
     }
 
+    pub fn eql(self: ShortFileName, other: ShortFileName) bool {
+        return std.mem.eql(u8, &self.name, &other.name) and std.mem.eql(u8, &self.extension, &other.extension);
+    }
+
     comptime {
         core.testing.expectSize(@This(), 11);
     }
