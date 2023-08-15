@@ -226,8 +226,8 @@ fn cascadeTestExecutableAndModule(
                 .override = .{
                     .custom = b.pathJoin(&.{
                         @tagName(target),
-                        "root",
                         "tests",
+                        "cascade",
                     }),
                 },
             },
@@ -285,8 +285,8 @@ fn hostTestExecutableAndModule(
                 .override = .{
                     .custom = b.pathJoin(&.{
                         @tagName(target),
-                        "non_cascade",
                         "tests",
+                        "non_cascade",
                     }),
                 },
             },

@@ -19,22 +19,27 @@ options: Options,
 
 install_step: *Step.InstallArtifact,
 
-/// Registers kernel build steps.
-///
-/// For each target, creates a `Kernel` and registers its install_step with the `StepCollection`.
-pub fn registerKernels(
+pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
+
+pub fn getKernels(
     b: *std.Build,
     step_collection: StepCollection,
     libraries: Library.Collection,
     options: Options,
     targets: []const CascadeTarget,
-) !void {
+) !Collection {
+    var kernels: Collection = .{};
+    try kernels.ensureTotalCapacity(b.allocator, @intCast(targets.len));
+
     const source_file_modules = try getSourceFileModules(b, libraries);
 
     for (targets) |target| {
         const kernel = try Kernel.create(b, target, libraries, options, source_file_modules);
+        kernels.putAssumeCapacityNoClobber(target, kernel);
         step_collection.registerKernel(target, &kernel.install_step.step);
     }
+
+    return kernels;
 }
 
 fn create(
@@ -95,17 +100,7 @@ fn create(
 
     const install_step = b.addInstallArtifact(
         kernel_exe,
-        .{
-            .dest_dir = .{
-                .override = .{
-                    .custom = b.pathJoin(&.{
-                        @tagName(target),
-                        "root",
-                        "boot",
-                    }),
-                },
-            },
-        },
+        .{ .dest_dir = .{ .override = .{ .custom = b.pathJoin(&.{@tagName(target)}) } } },
     );
 
     return Kernel{
