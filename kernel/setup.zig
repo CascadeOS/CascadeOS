@@ -103,8 +103,8 @@ fn calculateNonCachedDirectMapRange(
 fn calculateLengthOfDirectMap() core.Size {
     var memory_map_iterator = kernel.boot.memoryMapIterator(.backwards);
 
-    const first_usable_entry: kernel.boot.MemoryMapEntry = blk: {
-        // search from the end of the memory map for the first usable region
+    const last_usable_entry: kernel.boot.MemoryMapEntry = blk: {
+        // search from the end of the memory map for the last usable region
 
         while (memory_map_iterator.next()) |entry| {
             if (entry.type == .reserved_or_unusable) continue;
@@ -115,7 +115,7 @@ fn calculateLengthOfDirectMap() core.Size {
         core.panic("no non-reserved or usable memory regions?");
     };
 
-    const initial_size = core.Size.from(first_usable_entry.range.end().value, .byte);
+    const initial_size = core.Size.from(last_usable_entry.range.end().value, .byte);
 
     // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
     var aligned_size = initial_size.alignForward(kernel.arch.paging.largestPageSize());
