@@ -7,13 +7,15 @@ const x86_64 = @import("../x86_64.zig");
 
 const Idt = @import("Idt.zig");
 
+const interrupt_handlers = @import("interrupt_handlers.zig");
+
 pub const number_of_handlers = Idt.number_of_handlers;
 
 const log = kernel.log.scoped(.interrupts);
 
 var idt: Idt = undefined;
 const raw_handlers = makeRawHandlers();
-var handlers = [_]InterruptHandler{unhandledInterrupt} ** number_of_handlers;
+var handlers = [_]InterruptHandler{interrupt_handlers.unhandledInterrupt} ** number_of_handlers;
 
 /// This function will load the IDT and fill the entries with raw handlers.
 pub fn loadIdt() void {
@@ -41,18 +43,6 @@ pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 /// Sets the interrupt stack for the given interrupt vector.
 pub fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
     idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
-}
-
-/// Handles all interrupts by printing the vector and then panicking.
-fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
-    const idt_vector = interrupt_frame.getIdtVector();
-
-    // TODO: print specific things for each exception, especially page fault https://github.com/CascadeOS/CascadeOS/issues/32
-    if (idt_vector.isException()) {
-        core.panicFmt("exception {s}", .{@tagName(idt_vector)}) catch unreachable;
-    }
-
-    core.panicFmt("interrupt {d}", .{@intFromEnum(idt_vector)}) catch unreachable;
 }
 
 /// Creates an array of raw interrupt handlers, one for each vector.
