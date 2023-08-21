@@ -22,20 +22,22 @@ var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.bytes]u8 = undef
 var dwarf_debug_allocator = std.heap.FixedBufferAllocator.init(dwarf_debug_allocator_bytes[0..]);
 
 // This function is a re-implementation of `std.debug.readElfDebugInfo`
-pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
+pub fn init(kernel_elf: []const u8) !DwarfSymbolMap {
     const allocator = dwarf_debug_allocator.allocator();
 
-    const hdr: *const elf.Ehdr = @ptrCast(@alignCast(kernel_elf_start));
+    const mapped_mem = kernel_elf;
+
+    const hdr: *const elf.Ehdr = @ptrCast(@alignCast(&mapped_mem[0]));
     if (!std.mem.eql(u8, hdr.e_ident[0..4], elf.MAGIC)) return error.InvalidElfMagic;
     if (hdr.e_ident[elf.EI_VERSION] != 1) return error.InvalidElfVersion;
 
     const shoff = hdr.e_shoff;
     const str_section_off = shoff + @as(u64, hdr.e_shentsize) * @as(u64, hdr.e_shstrndx);
-    const str_shdr: *const elf.Shdr = @ptrCast(@alignCast(&kernel_elf_start[std.math.cast(usize, str_section_off) orelse return error.Overflow]));
-    const header_strings = kernel_elf_start[str_shdr.sh_offset..][0..str_shdr.sh_size];
+    const str_shdr: *const elf.Shdr = @ptrCast(@alignCast(&mapped_mem[std.math.cast(usize, str_section_off) orelse return error.Overflow]));
+    const header_strings = mapped_mem[str_shdr.sh_offset..][0..str_shdr.sh_size];
     const shdrs = @as(
         [*]const elf.Shdr,
-        @ptrCast(@alignCast(&kernel_elf_start[shoff])),
+        @ptrCast(@alignCast(&mapped_mem[shoff])),
     )[0..hdr.e_shnum];
 
     var sections: DW.DwarfInfo.SectionArray = DW.DwarfInfo.null_section_array;
@@ -44,6 +46,8 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
         if (shdr.sh_type == elf.SHT_NULL or shdr.sh_type == elf.SHT_NOBITS) continue;
         const name = std.mem.sliceTo(header_strings[shdr.sh_name..], 0);
 
+        if (std.mem.eql(u8, name, ".gnu_debuglink")) continue;
+
         var section_index: ?usize = null;
         inline for (@typeInfo(DW.DwarfSection).Enum.fields, 0..) |section, i| {
             if (std.mem.eql(u8, "." ++ section.name, name)) section_index = i;
@@ -51,7 +55,7 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
         if (section_index == null) continue;
         if (sections[section_index.?] != null) continue;
 
-        const section_bytes = try chopSlice(kernel_elf_start, shdr.sh_offset, shdr.sh_size);
+        const section_bytes = try chopSlice(mapped_mem, shdr.sh_offset, shdr.sh_size);
         sections[section_index.?] = if ((shdr.sh_flags & elf.SHF_COMPRESSED) > 0) blk: {
             var section_stream = std.io.fixedBufferStream(section_bytes);
             var section_reader = section_stream.reader();
@@ -65,7 +69,7 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
             errdefer allocator.free(decompressed_section);
 
             const read = zlib_stream.reader().readAll(decompressed_section) catch continue;
-            if (read != decompressed_section.len) return error.DecompressionFailed;
+            std.debug.assert(read == decompressed_section.len);
 
             break :blk .{
                 .data = decompressed_section,
@@ -78,6 +82,14 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
             .owned = false,
         };
     }
+
+    const missing_debug_info =
+        sections[@intFromEnum(DW.DwarfSection.debug_info)] == null or
+        sections[@intFromEnum(DW.DwarfSection.debug_abbrev)] == null or
+        sections[@intFromEnum(DW.DwarfSection.debug_str)] == null or
+        sections[@intFromEnum(DW.DwarfSection.debug_line)] == null;
+
+    if (missing_debug_info) return error.MissingDebugInfo;
 
     var map: DwarfSymbolMap = .{
         .debug_info = DW.DwarfInfo{
@@ -93,10 +105,7 @@ pub fn init(kernel_elf_start: [*]const u8) !DwarfSymbolMap {
     return map;
 }
 
-/// Chops a slice from the given pointer at the given offset and size.
-///
-/// Returns Overflow if the offset or size cannot be represented as a usize.
-fn chopSlice(ptr: [*]const u8, offset: u64, size: u64) error{Overflow}![]const u8 {
+fn chopSlice(ptr: []const u8, offset: u64, size: u64) error{Overflow}![]const u8 {
     const start = std.math.cast(usize, offset) orelse return error.Overflow;
     const end = start + (std.math.cast(usize, size) orelse return error.Overflow);
     return ptr[start..end];
