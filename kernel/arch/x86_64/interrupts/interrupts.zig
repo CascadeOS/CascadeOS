@@ -66,18 +66,9 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
 
         // if the cpu does not push an error code, we push a dummy error code to ensure the stack
         // is always aligned in the same way for every vector
-        const need_to_push_dummy_error_code = comptime !idt_vector.hasErrorCode();
-
-        const error_code_asm = if (need_to_push_dummy_error_code) "push $0\n" else "";
+        const error_code_asm = if (comptime !idt_vector.hasErrorCode()) "push $0\n" else "";
         const vector_number_asm = std.fmt.comptimePrint("push ${d}", .{vector_number});
         const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{x86_64.Gdt.kernel_data_selector});
-
-        // we need to ensure that we have the same stack position upon `iret` as upon entry
-        // as we might push an error code the amount we need to bump the stack pointer by can change.
-        const pop_error_code_and_vector_asm = std.fmt.comptimePrint(
-            "add ${d}, %%rsp",
-            .{if (need_to_push_dummy_error_code) 2 * @sizeOf(usize) else @sizeOf(usize)},
-        );
 
         const rawInterruptHandler = struct {
             fn rawInterruptHandler() callconv(.Naked) void {
@@ -126,7 +117,7 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
                         \\pop %%rcx
                         \\pop %%rbx
                         \\pop %%rax
-                    ++ "\n" ++ pop_error_code_and_vector_asm ++ "\n" ++
+                        \\add $16, %%rsp
                         \\iretq
                 );
             }
