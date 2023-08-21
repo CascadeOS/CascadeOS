@@ -9,7 +9,7 @@ const Idt = @import("Idt.zig");
 
 pub const number_of_handlers = Idt.number_of_handlers;
 
-const log = kernel.log.scoped(.interrupts_x86_64);
+const log = kernel.log.scoped(.interrupts);
 
 var idt: Idt = undefined;
 const raw_handlers = makeRawHandlers();

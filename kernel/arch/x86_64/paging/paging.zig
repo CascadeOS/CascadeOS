@@ -6,7 +6,7 @@ const kernel = @import("kernel");
 const x86_64 = @import("../x86_64.zig");
 const arch = @import("../../arch.zig");
 
-const log = kernel.log.scoped(.paging_x86_64);
+const log = kernel.log.scoped(.paging);
 
 pub const small_page_size = core.Size.from(4, .kib);
 pub const medium_page_size = core.Size.from(2, .mib);
