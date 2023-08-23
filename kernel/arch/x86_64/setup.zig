@@ -22,7 +22,7 @@ var gdt: x86_64.Gdt = .{};
 var tss: x86_64.Tss = .{};
 
 const page_size = core.Size.from(4, .kib);
-const kernel_stack_size = page_size.multiply(4);
+const kernel_stack_size = page_size.multiply(16);
 
 var exception_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
