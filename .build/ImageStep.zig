@@ -180,28 +180,22 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
         .source_path = self.kernel.install_step.emitted_bin.?.getPath(self.b),
     });
 
-    const image_description_path = helpers.pathJoinFromRoot(self.b, &.{
-        "zig-cache",
-        "image_description",
-        @tagName(self.target),
-        try std.fmt.allocPrint(self.b.allocator, "{}", .{std.time.nanoTimestamp()}),
-    });
+    {
+        var image_description_buffer = std.ArrayList(u8).init(self.b.allocator);
+        defer image_description_buffer.deinit();
 
-    var image_description_directory = try std.fs.cwd().makeOpenPath(std.fs.path.dirname(image_description_path).?, .{});
-    defer image_description_directory.close();
+        try builder.serialize(image_description_buffer.writer());
 
-    const image_description = try image_description_directory.createFile(std.fs.path.basename(image_description_path), .{});
-    defer image_description.close();
+        const run_image_builder = self.b.addRunArtifact(self.image_builder_tool.exe);
+        run_image_builder.addArg("-");
+        run_image_builder.has_side_effects = true;
 
-    var buffered_writer = std.io.bufferedWriter(image_description.writer());
-    try builder.serialize(buffered_writer.writer());
-    try buffered_writer.flush();
+        // TODO: This is ugly, but this is the only way to get the below `setStdIn` to work
+        run_image_builder.stdio = .{ .check = std.ArrayList(Step.Run.StdIo.Check).init(self.b.allocator) };
+        run_image_builder.setStdIn(.{ .bytes = image_description_buffer.items });
 
-    const run_image_builder = self.b.addRunArtifact(self.image_builder_tool.exe);
-    run_image_builder.addArg(image_description_path);
-    run_image_builder.has_side_effects = true;
-
-    try run_image_builder.step.make(progress_node);
+        try run_image_builder.step.make(progress_node);
+    }
 
     const run_limine = self.b.addRunArtifact(self.limine_step.__build_limine_executable);
     run_limine.addArg("bios-install");
