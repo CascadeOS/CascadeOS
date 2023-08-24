@@ -20,7 +20,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const parsed = try loadImageDescriptionFromFirstArgument(allocator);
+    const parsed = try getImageDescription(allocator);
     defer parsed.deinit();
 
     var rand = std.rand.DefaultPrng.init(std.crypto.random.int(u64));
@@ -29,7 +29,7 @@ pub fn main() !void {
     try createDiskImage(allocator, parsed.image_description, random);
 }
 
-fn loadImageDescriptionFromFirstArgument(allocator: std.mem.Allocator) !ImageDescription.Parsed {
+fn getImageDescription(allocator: std.mem.Allocator) !ImageDescription.Parsed {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
@@ -37,12 +37,16 @@ fn loadImageDescriptionFromFirstArgument(allocator: std.mem.Allocator) !ImageDes
         core.panic("no image description file given");
     }
 
-    const image_description_path = args[1];
+    const contents = blk: {
+        if (std.mem.eql(u8, args[1], "-")) {
+            break :blk try std.io.getStdIn().readToEndAlloc(allocator, std.math.maxInt(usize));
+        }
 
-    const image_description_file = try std.fs.cwd().openFile(image_description_path, .{});
-    defer image_description_file.close();
+        const image_description_file = try std.fs.cwd().openFile(args[1], .{});
+        defer image_description_file.close();
 
-    const contents = try image_description_file.readToEndAlloc(allocator, std.math.maxInt(usize));
+        break :blk try image_description_file.readToEndAlloc(allocator, std.math.maxInt(usize));
+    };
     defer allocator.free(contents);
 
     return try ImageDescription.parse(allocator, contents);
