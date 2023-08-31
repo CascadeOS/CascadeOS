@@ -92,8 +92,6 @@ fn create(
 
     // TODO: LTO cannot be enabled https://github.com/CascadeOS/CascadeOS/issues/8
     kernel_exe.want_lto = false;
-    kernel_exe.omit_frame_pointer = false;
-    kernel_exe.disable_stack_probing = true;
     kernel_exe.pie = true;
 
     target.targetSpecificSetup(kernel_exe);
