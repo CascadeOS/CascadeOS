@@ -16,22 +16,16 @@ pub const root_path = kernel_options.root_path;
 pub const kernel_base_address = kernel.VirtualAddress.fromInt(0xffffffff80000000);
 
 /// Initialized during `setup`.
-pub var kernel_virtual_address: kernel.VirtualAddress = undefined;
+pub var kernel_virtual_base_address: kernel.VirtualAddress = undefined;
 
 /// Initialized during `setup`.
-pub var kernel_physical_address: kernel.PhysicalAddress = undefined;
+pub var kernel_physical_base_address: kernel.PhysicalAddress = undefined;
 
-/// This is the offset from `kernel_base_address` that the kernel has been loaded at.
-///
-/// This would always be zero if not for kaslr.
-///
 /// Initialized during `setup`.
-pub var kernel_load_offset: core.Size = undefined;
+pub var kernel_virtual_slide: core.Size = undefined;
 
-/// This is the offset from the physical address of the kernel to the virtual address of the kernel.
-///
 /// Initialized during `setup`.
-pub var kernel_virtual_offset: core.Size = undefined;
+pub var kernel_physical_to_virtual_offset: core.Size = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
 ///

@@ -32,13 +32,13 @@ pub fn directMapAddress() ?u64 {
     return null;
 }
 
-pub const KernelAddress = struct {
+pub const KernelBaseAddress = struct {
     virtual: u64,
     physical: u64,
 };
 
-/// Returns the kernel virtual and physical addresses provided by the bootloader, if any.
-pub fn kernelAddress() ?KernelAddress {
+/// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
+pub fn kernelBaseAddress() ?KernelBaseAddress {
     if (limine_requests.kernel_address.response) |resp| {
         return .{
             .virtual = resp.virtual_base,

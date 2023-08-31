@@ -91,7 +91,7 @@ fn calculateNonCachedDirectMapRange(
     {
         const candidate_range = direct_map_range.moveForward(direct_map_size);
         // check that we are not overlapping with the kernel
-        if (!candidate_range.contains(kernel.info.kernel_virtual_address)) {
+        if (!candidate_range.contains(kernel.info.kernel_virtual_base_address)) {
             return candidate_range;
         }
     }
@@ -130,22 +130,22 @@ fn calculateLengthOfDirectMap() core.Size {
 }
 
 fn calculateKernelOffsets() void {
-    const kernel_address = kernel.boot.kernelAddress() orelse
-        core.panic("bootloader did not provide the kernel address");
+    const kernel_base_address = kernel.boot.kernelBaseAddress() orelse
+        core.panic("bootloader did not provide the kernel base address");
 
     // TODO: Can we calculate the kernel offsets from the the bootloaders page table?
     // https://github.com/CascadeOS/CascadeOS/issues/36
 
-    const kernel_virtual = kernel_address.virtual;
-    const kernel_physical = kernel_address.physical;
+    const kernel_virtual = kernel_base_address.virtual;
+    const kernel_physical = kernel_base_address.physical;
 
-    kernel.info.kernel_virtual_address = kernel.VirtualAddress.fromInt(kernel_virtual);
-    kernel.info.kernel_physical_address = kernel.PhysicalAddress.fromInt(kernel_physical);
-    log.debug("kernel virtual: {}", .{kernel.info.kernel_virtual_address});
-    log.debug("kernel physical: {}", .{kernel.info.kernel_physical_address});
+    kernel.info.kernel_virtual_base_address = kernel.VirtualAddress.fromInt(kernel_virtual);
+    kernel.info.kernel_physical_base_address = kernel.PhysicalAddress.fromInt(kernel_physical);
+    log.debug("kernel virtual base address: {}", .{kernel.info.kernel_virtual_base_address});
+    log.debug("kernel physical base address: {}", .{kernel.info.kernel_physical_base_address});
 
-    kernel.info.kernel_load_offset = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
-    kernel.info.kernel_virtual_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
-    log.debug("kernel load offset: 0x{x}", .{kernel.info.kernel_load_offset.bytes});
-    log.debug("kernel virtual offset: 0x{x}", .{kernel.info.kernel_virtual_offset.bytes});
+    kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
+    kernel.info.kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
+    log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.bytes});
+    log.debug("kernel physical to virtual offset: 0x{x}", .{kernel.info.kernel_physical_to_virtual_offset.bytes});
 }
