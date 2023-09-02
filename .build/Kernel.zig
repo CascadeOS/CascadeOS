@@ -94,6 +94,9 @@ fn create(
     kernel_exe.want_lto = false;
     kernel_exe.pie = true;
 
+    // TODO: Implement DWARF based stack unwinding
+    kernel_exe.omit_frame_pointer = false;
+
     target.targetSpecificSetup(kernel_exe);
 
     const install_step = b.addInstallArtifact(
