@@ -26,7 +26,11 @@ pub fn init() void {
         total_memory.addInPlace(memory_map_entry.range.size);
 
         switch (memory_map_entry.type) {
-            .free => processFreeMemoryMapEntry(memory_map_entry),
+            .free => {
+                total_usable_memory.addInPlace(memory_map_entry.range.size);
+                free_memory.addInPlace(memory_map_entry.range.size);
+                addMemoryMapEntryToAllocator(memory_map_entry);
+            },
             .in_use, .reclaimable => total_usable_memory.addInPlace(memory_map_entry.range.size),
             .reserved_or_unusable => {},
         }
@@ -37,12 +41,6 @@ pub fn init() void {
     log.debug("|  |--free: {}", .{free_memory});
     log.debug("|  |--in use: {}", .{total_usable_memory.subtract(free_memory)});
     log.debug("|--unusable: {}", .{total_memory.subtract(total_usable_memory)});
-}
-
-fn processFreeMemoryMapEntry(memory_map_entry: kernel.boot.MemoryMapEntry) void {
-    total_usable_memory.addInPlace(memory_map_entry.range.size);
-    free_memory.addInPlace(memory_map_entry.range.size);
-    addMemoryMapEntryToAllocator(memory_map_entry);
 }
 
 /// Adds a memory map entry to the physical page allocator.
