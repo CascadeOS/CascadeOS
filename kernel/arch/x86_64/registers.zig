@@ -219,6 +219,8 @@ pub const EFER = packed struct(u64) {
     pub const format = core.formatStructIgnoreReserved;
 };
 
+pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);
+
 pub fn MSR(comptime T: type, comptime register: u32) type {
     return struct {
         pub inline fn read() T {
