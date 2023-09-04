@@ -5,6 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const arch = @import("../arch.zig");
 
+pub const registers = @import("registers.zig");
 pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
 
