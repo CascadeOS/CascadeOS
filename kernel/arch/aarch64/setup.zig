@@ -19,6 +19,10 @@ pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
     return early_output_uart.writer();
 }
 
+pub inline fn setCoreData(core_data: *kernel.CoreData) void {
+    aarch64.registers.TPIDR_EL1.write(core_data);
+}
+
 pub fn earlyArchInitialization() void {
     core.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization` https://github.com/CascadeOS/CascadeOS/issues/25
 }

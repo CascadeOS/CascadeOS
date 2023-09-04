@@ -6,7 +6,14 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.setup);
 
+var bootstrap_core_data: kernel.CoreData = .{
+    .core_id = 0,
+};
+
 pub fn setup() void {
+    // setup access to the per core data
+    kernel.arch.setup.setCoreData(&bootstrap_core_data);
+
     // we try to get output up and running as soon as possible
     kernel.arch.setup.setupEarlyOutput();
 

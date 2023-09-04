@@ -14,8 +14,16 @@ pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }
 
+pub inline fn getCoreData() *kernel.CoreData {
+    return current.getCoreData();
+}
+
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
+    pub inline fn setCoreData(core_data: *kernel.CoreData) void {
+        current.setup.setCoreData(core_data);
+    }
+
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
         current.setup.setupEarlyOutput();

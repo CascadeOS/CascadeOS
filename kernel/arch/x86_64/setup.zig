@@ -18,6 +18,10 @@ pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
     return early_output_serial_port.writer();
 }
 
+pub inline fn setCoreData(core_data: *kernel.CoreData) void {
+    x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(core_data));
+}
+
 var gdt: x86_64.Gdt = .{};
 var tss: x86_64.Tss = .{};
 

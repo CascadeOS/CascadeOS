@@ -20,6 +20,10 @@ pub const serial = @import("serial.zig");
 pub const setup = @import("setup.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
+pub inline fn getCoreData() *kernel.CoreData {
+    return @ptrFromInt(registers.KERNEL_GS_BASE.read());
+}
+
 pub const PrivilegeLevel = enum(u2) {
     /// Kernel
     ring0 = 0,

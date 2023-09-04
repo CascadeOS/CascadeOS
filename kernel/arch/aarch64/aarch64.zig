@@ -13,6 +13,10 @@ pub inline fn spinLoopHint() void {
     asm volatile ("isb" ::: "memory");
 }
 
+pub inline fn getCoreData() *kernel.CoreData {
+    return registers.TPIDR_EL1.read();
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub fn disableInterruptsAndHalt() noreturn {
