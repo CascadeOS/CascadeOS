@@ -15,6 +15,11 @@ pub const root_path = kernel_options.root_path;
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = kernel.VirtualAddress.fromInt(0xffffffff80000000);
 
+pub var early_output_initialized: bool = false;
+
+/// Set to true once all kernel setup code is complete.
+pub var kernel_initialized: bool = false; // TODO: Set this to true once the setup code is complete.
+
 /// Initialized during `setup`.
 pub var kernel_virtual_base_address: kernel.VirtualAddress = undefined;
 

@@ -14,11 +14,9 @@ pub fn setup() void {
     // setup access to the per core data
     kernel.arch.setup.setCoreData(&bootstrap_core_data);
 
-    // we try to get output up and running as soon as possible
+    // get output up and running as soon as possible
     kernel.arch.setup.setupEarlyOutput();
-
-    // now that we have early output, we can switch to a simple panic handler
-    kernel.debug.switchTo(.simple);
+    kernel.info.early_output_initialized = true;
 
     // as we need the kernel elf file to output symbols and source locations, we acquire it early
     kernel.info.kernel_file = kernel.boot.kernelFile() orelse

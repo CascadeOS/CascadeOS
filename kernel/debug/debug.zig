@@ -6,26 +6,6 @@ const kernel = @import("kernel");
 
 const symbol_map = @import("symbol_map.zig");
 
-pub const PanicState = enum(u8) {
-    no_op = 0,
-    simple = 1,
-    full = 2,
-};
-
-var state: PanicState = .no_op;
-
-/// Switches the panic state to the given state.
-///
-/// Panics if the new state is less than the current state.
-pub fn switchTo(new_state: PanicState) void {
-    if (@intFromEnum(state) < @intFromEnum(new_state)) {
-        state = new_state;
-        return;
-    }
-
-    core.panicFmt("cannot switch to {s} panic from {s} panic", .{ @tagName(new_state), @tagName(state) });
-}
-
 /// Entry point from the Zig language upon a panic.
 pub fn panic(
     msg: []const u8,
@@ -34,14 +14,20 @@ pub fn panic(
 ) noreturn {
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
+
+    if (!kernel.info.early_output_initialized) {
+        // TODO: can we do anything here or is halting the only reasonable action?
+        kernel.arch.interrupts.disableInterruptsAndHalt();
+    }
+
     const loaded_symbols = if (symbol_map.loadSymbols()) true else |_| false;
 
     const return_address = return_address_opt orelse @returnAddress();
 
-    switch (state) {
-        .no_op => {},
-        .simple => simplePanic(msg, stack_trace, return_address, loaded_symbols),
-        .full => panicImpl(msg, stack_trace, return_address, loaded_symbols),
+    if (kernel.info.kernel_initialized) {
+        panicImpl(msg, stack_trace, return_address, loaded_symbols);
+    } else {
+        simplePanic(msg, stack_trace, return_address, loaded_symbols);
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
