@@ -18,13 +18,6 @@ pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
     return early_output_serial_port.writer();
 }
 
-pub inline fn setCoreData(core_data: *kernel.CoreData) void {
-    x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(core_data));
-}
-
-var gdt: x86_64.Gdt = .{};
-var tss: x86_64.Tss = .{};
-
 const page_size = core.Size.from(4, .kib);
 const kernel_stack_size = page_size.multiply(16);
 
@@ -33,47 +26,37 @@ var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 
-pub fn earlyArchInitialization() void {
-    log.debug("loading gdt", .{});
-    gdt.load();
+pub fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
+    bootstrap_core_data.arch = .{
+        .exception_stack = &exception_stack,
+        .double_fault_stack = &double_fault_stack,
+        .interrupt_stack = &interrupt_stack,
+        .non_maskable_interrupt_stack = &non_maskable_interrupt_stack,
+    };
 
-    log.debug("preparing interrupt and exception stacks", .{});
-    tss.setInterruptStack(.exception, &exception_stack);
-    tss.setInterruptStack(.double_fault, &double_fault_stack);
-    tss.setInterruptStack(.interrupt, &interrupt_stack);
-    tss.setInterruptStack(.non_maskable_interrupt, &non_maskable_interrupt_stack);
-
-    log.debug("loading tss", .{});
-    gdt.setTss(&tss);
-
-    log.debug("loading idt", .{});
-    x86_64.interrupts.loadIdt();
-
-    log.debug("mapping idt vectors to the prepared stacks", .{});
-    mapIdtHandlers();
+    loadCoreData(bootstrap_core_data);
 }
 
-fn mapIdtHandlers() void {
-    for (0..x86_64.interrupts.number_of_handlers) |vector_number| {
-        const vector: x86_64.interrupts.IdtVector = @enumFromInt(vector_number);
+fn loadCoreData(core_data: *kernel.CoreData) void {
+    const arch: *x86_64.ArchCoreData = &core_data.arch;
 
-        if (vector == .double_fault) {
-            x86_64.interrupts.setVectorStack(vector, .double_fault);
-            continue;
-        }
+    arch.gdt.load();
 
-        if (vector == .non_maskable_interrupt) {
-            x86_64.interrupts.setVectorStack(vector, .non_maskable_interrupt);
-            continue;
-        }
+    arch.tss.setInterruptStack(.exception, arch.exception_stack);
+    arch.tss.setInterruptStack(.double_fault, arch.double_fault_stack);
+    arch.tss.setInterruptStack(.interrupt, arch.interrupt_stack);
+    arch.tss.setInterruptStack(.non_maskable_interrupt, arch.non_maskable_interrupt_stack);
 
-        if (vector.isException()) {
-            x86_64.interrupts.setVectorStack(vector, .exception);
-            continue;
-        }
+    arch.gdt.setTss(&arch.tss);
 
-        x86_64.interrupts.setVectorStack(vector, .interrupt);
-    }
+    x86_64.interrupts.loadIdt();
+
+    x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(core_data));
+}
+
+pub fn earlyArchInitialization() void {
+    log.debug("initalizing idt", .{});
+    x86_64.interrupts.initIdt();
 }
 
 /// Captures x86_64 system information.

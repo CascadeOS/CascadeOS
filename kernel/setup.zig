@@ -11,8 +11,8 @@ var bootstrap_core_data: kernel.CoreData = .{
 };
 
 pub fn setup() void {
-    // setup access to the per core data
-    kernel.arch.setup.setCoreData(&bootstrap_core_data);
+    // we need to get the core data loaded early as the panic handler and logging use it
+    kernel.arch.setup.loadBootstrapCoreData(&bootstrap_core_data);
 
     // get output up and running as soon as possible
     kernel.arch.setup.setupEarlyOutput();

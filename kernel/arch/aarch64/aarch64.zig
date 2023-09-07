@@ -13,6 +13,8 @@ pub inline fn spinLoopHint() void {
     asm volatile ("isb" ::: "memory");
 }
 
+pub const ArchCoreData = struct {};
+
 pub inline fn getCoreData() *kernel.CoreData {
     return registers.TPIDR_EL1.read();
 }

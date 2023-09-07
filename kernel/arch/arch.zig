@@ -14,14 +14,17 @@ pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }
 
+pub const ArchCoreData = current.ArchCoreData;
+
 pub inline fn getCoreData() *kernel.CoreData {
     return current.getCoreData();
 }
 
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
-    pub inline fn setCoreData(core_data: *kernel.CoreData) void {
-        current.setup.setCoreData(core_data);
+    /// Performs any actions required to load the provided core data for the bootstrap core.
+    pub inline fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
+        current.setup.loadBootstrapCoreData(bootstrap_core_data);
     }
 
     /// Attempt to set up some form of early output.
@@ -40,7 +43,8 @@ pub const setup = struct {
     ///
     /// One of the requirements of this function is to ensure that any exceptions/faults that occur are correctly handled.
     ///
-    /// For example, on x86_64 this should setup a GDT, TSS and IDT then install a simple handler on every vector.
+    /// For example, on x86_64 after this function has completed a GDT, TSS and an IDT with a simple handler on every vector
+    /// should be in place.
     pub inline fn earlyArchInitialization() void {
         current.setup.earlyArchInitialization();
     }

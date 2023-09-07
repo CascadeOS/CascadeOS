@@ -17,10 +17,13 @@ var idt: Idt = undefined;
 const raw_handlers = makeRawHandlers();
 var handlers = [_]InterruptHandler{interrupt_handlers.unhandledInterrupt} ** number_of_handlers;
 
-/// This function will load the IDT and fill the entries with raw handlers.
+/// Load the IDT on this core.
 pub fn loadIdt() void {
     idt.load();
+}
 
+/// Initalize the IDT with raew handlers and correct stacks.
+pub fn initIdt() void {
     log.debug("mapping idt entries to raw handlers", .{});
     for (raw_handlers, 0..) |raw_handler, i| {
         idt.handlers[i].init(
@@ -28,6 +31,28 @@ pub fn loadIdt() void {
             .interrupt,
             raw_handler,
         );
+    }
+
+    log.debug("applying stack selectors to idt entries", .{});
+    for (0..number_of_handlers) |vector_number| {
+        const vector: IdtVector = @enumFromInt(vector_number);
+
+        if (vector == .double_fault) {
+            setVectorStack(vector, .double_fault);
+            continue;
+        }
+
+        if (vector == .non_maskable_interrupt) {
+            setVectorStack(vector, .non_maskable_interrupt);
+            continue;
+        }
+
+        if (vector.isException()) {
+            setVectorStack(vector, .exception);
+            continue;
+        }
+
+        setVectorStack(vector, .interrupt);
     }
 }
 
@@ -41,7 +66,7 @@ pub const InterruptStackSelector = enum(u3) {
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
 /// Sets the interrupt stack for the given interrupt vector.
-pub fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
+fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
     idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
 }
 

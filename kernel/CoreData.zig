@@ -7,3 +7,5 @@ const kernel = @import("kernel");
 const CoreData = @This();
 
 core_id: usize,
+
+arch: kernel.arch.ArchCoreData = .{},

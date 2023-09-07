@@ -19,8 +19,8 @@ pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
     return early_output_uart.writer();
 }
 
-pub inline fn setCoreData(core_data: *kernel.CoreData) void {
-    aarch64.registers.TPIDR_EL1.write(core_data);
+pub fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
+    aarch64.registers.TPIDR_EL1.write(bootstrap_core_data);
 }
 
 pub fn earlyArchInitialization() void {

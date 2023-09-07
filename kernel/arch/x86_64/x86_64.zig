@@ -9,6 +9,7 @@ comptime {
     _ = interrupts;
 }
 
+pub const ArchCoreData = @import("ArchCoreData.zig");
 pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const info = @import("info.zig");
