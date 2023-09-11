@@ -22,6 +22,41 @@ pub const VirtualAddress = address.VirtualAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const VirtualRange = address.VirtualRange;
 
+var kernel_state: State = .initial;
+
+pub inline fn state() State {
+    return kernel_state;
+}
+
+pub fn setState(new_state: State) void {
+    std.debug.assert(@intFromEnum(new_state) > @intFromEnum(kernel_state));
+    kernel_state = new_state;
+}
+
+pub const State = enum(u8) {
+    /// Control has been passed to the kernel from the bootloader.
+    initial,
+
+    /// The bootstrap core data has been loaded.
+    bootstrap_core_data_loaded,
+
+    /// Early output has been initialized.
+    early_output_initialized,
+
+    /// Bootloader information has been captured.
+    bootloader_information_captured,
+
+    /// System information has been captured.
+    system_information_captured,
+
+    /// The virtual memory manager has been initialized.
+    vmm_initialized,
+
+    pub inline fn atleast(self: State, required_state: State) bool {
+        return @intFromEnum(required_state) <= @intFromEnum(self);
+    }
+};
+
 comptime {
     // make sure any bootloader specific code that needs to be referenced is
     _ = boot;

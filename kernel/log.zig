@@ -71,7 +71,7 @@ fn earlyLogFn(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (!kernel.info.early_output_initialized) return;
+    if (!kernel.state().atleast(.early_output_initialized)) return;
 
     const writer = kernel.arch.setup.getEarlyOutputWriter();
 

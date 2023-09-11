@@ -15,7 +15,7 @@ pub fn panic(
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
 
-    if (!kernel.info.early_output_initialized) {
+    if (!kernel.state().atleast(.early_output_initialized)) {
         // TODO: can we do anything here or is halting the only reasonable action?
         kernel.arch.interrupts.disableInterruptsAndHalt();
     }
@@ -24,11 +24,8 @@ pub fn panic(
 
     const return_address = return_address_opt orelse @returnAddress();
 
-    if (kernel.info.kernel_initialized) {
-        panicImpl(msg, stack_trace, return_address, loaded_symbols);
-    } else {
-        simplePanic(msg, stack_trace, return_address, loaded_symbols);
-    }
+    // TODO: call `panicImpl` if the kernel is ready
+    simplePanic(msg, stack_trace, return_address, loaded_symbols);
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
 }
