@@ -13,11 +13,9 @@ var bootstrap_core_data: kernel.CoreData = .{
 pub fn setup() void {
     // we need to get the core data loaded early as the panic handler and logging use it
     kernel.arch.setup.loadBootstrapCoreData(&bootstrap_core_data);
-    kernel.setState(.bootstrap_core_data_loaded);
 
     // get output up and running as soon as possible
     kernel.arch.setup.setupEarlyOutput();
-    kernel.setState(.early_output_initialized);
 
     // as we need the kernel elf file to output symbols and source locations, we acquire it early
     kernel.info.kernel_file = kernel.boot.kernelFile() orelse
@@ -33,11 +31,9 @@ pub fn setup() void {
 
     log.info("capturing bootloader information", .{});
     captureBootloaderInformation();
-    kernel.setState(.bootloader_information_captured);
 
     log.info("capturing system information", .{});
     kernel.arch.setup.captureSystemInformation();
-    kernel.setState(.system_information_captured);
 
     log.info("configuring system features", .{});
     kernel.arch.setup.configureSystemFeatures();
@@ -47,7 +43,6 @@ pub fn setup() void {
 
     log.info("initializing virtual memory", .{});
     kernel.vmm.init();
-    kernel.setState(.vmm_initialized);
 
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }

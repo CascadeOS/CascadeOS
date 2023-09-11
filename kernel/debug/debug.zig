@@ -15,11 +15,6 @@ pub fn panic(
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
 
-    if (!kernel.state().atleast(.early_output_initialized)) {
-        // TODO: can we do anything here or is halting the only reasonable action?
-        kernel.arch.interrupts.disableInterruptsAndHalt();
-    }
-
     const loaded_symbols = if (symbol_map.loadSymbols()) true else |_| false;
 
     const return_address = return_address_opt orelse @returnAddress();

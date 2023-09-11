@@ -71,8 +71,6 @@ fn earlyLogFn(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    if (!kernel.state().atleast(.early_output_initialized)) return;
-
     const writer = kernel.arch.setup.getEarlyOutputWriter() orelse return;
 
     const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
