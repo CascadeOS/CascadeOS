@@ -41,7 +41,7 @@ pub const setup = struct {
     pub const EarlyOutputWriter = current.setup.EarlyOutputWriter;
 
     /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
-    pub inline fn getEarlyOutputWriter() EarlyOutputWriter {
+    pub inline fn getEarlyOutputWriter() ?EarlyOutputWriter {
         return current.setup.getEarlyOutputWriter();
     }
 

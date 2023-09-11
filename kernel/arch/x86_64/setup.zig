@@ -8,14 +8,14 @@ const x86_64 = @import("x86_64.zig");
 const log = kernel.log.scoped(.setup);
 
 pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
-var early_output_serial_port: x86_64.serial.SerialPort = undefined;
+var early_output_serial_port: ?x86_64.serial.SerialPort = null;
 
 pub fn setupEarlyOutput() void {
     early_output_serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
 }
 
-pub inline fn getEarlyOutputWriter() x86_64.serial.SerialPort.Writer {
-    return early_output_serial_port.writer();
+pub fn getEarlyOutputWriter() ?x86_64.serial.SerialPort.Writer {
+    return if (early_output_serial_port) |output| output.writer() else null;
 }
 
 const page_size = core.Size.from(4, .kib);

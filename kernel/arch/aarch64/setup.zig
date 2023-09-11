@@ -8,15 +8,15 @@ const aarch64 = @import("aarch64.zig");
 const log = kernel.log.scoped(.setup);
 
 pub const EarlyOutputWriter = aarch64.Uart.Writer;
-var early_output_uart: aarch64.Uart = undefined;
+var early_output_uart: ?aarch64.Uart = null;
 
 pub fn setupEarlyOutput() void {
     // TODO: Use the device tree to find the UART base address https://github.com/CascadeOS/CascadeOS/issues/24
     early_output_uart = aarch64.Uart.init(0x09000000);
 }
 
-pub inline fn getEarlyOutputWriter() aarch64.Uart.Writer {
-    return early_output_uart.writer();
+pub fn getEarlyOutputWriter() ?aarch64.Uart.Writer {
+    return if (early_output_uart) |output| output.writer() else null;
 }
 
 pub fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {

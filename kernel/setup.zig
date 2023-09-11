@@ -24,7 +24,7 @@ pub fn setup() void {
         core.panic("bootloader did not provide the kernel file");
 
     // print starting message
-    kernel.arch.setup.getEarlyOutputWriter().writeAll(
+    kernel.arch.setup.getEarlyOutputWriter().?.writeAll(
         comptime "starting CascadeOS " ++ kernel.info.version ++ "\n",
     ) catch {};
 

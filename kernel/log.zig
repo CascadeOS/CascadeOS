@@ -73,7 +73,7 @@ fn earlyLogFn(
 ) void {
     if (!kernel.state().atleast(.early_output_initialized)) return;
 
-    const writer = kernel.arch.setup.getEarlyOutputWriter();
+    const writer = kernel.arch.setup.getEarlyOutputWriter() orelse return;
 
     const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
     writer.writeAll(scopeAndLevelText) catch unreachable;

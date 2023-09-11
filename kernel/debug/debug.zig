@@ -37,7 +37,7 @@ fn simplePanic(
     ret_addr: usize,
     loaded_symbols: bool,
 ) void {
-    const writer = kernel.arch.setup.getEarlyOutputWriter();
+    const writer = kernel.arch.setup.getEarlyOutputWriter() orelse return;
 
     if (loaded_symbols) {
         writer.print("\nPANIC: {s}\n\n", .{msg}) catch unreachable;
