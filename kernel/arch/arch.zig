@@ -90,6 +90,24 @@ pub const interrupts = struct {
     pub inline fn interruptsEnabled() bool {
         return current.interrupts.interruptsEnabled();
     }
+
+    pub const InterruptGuard = struct {
+        enable_interrupts: bool,
+
+        pub inline fn release(self: InterruptGuard) void {
+            if (self.enable_interrupts) enableInterrupts();
+        }
+    };
+
+    pub fn interruptGuard() InterruptGuard {
+        const interrupts_enabled = interruptsEnabled();
+
+        disableInterrupts();
+
+        return .{
+            .enable_interrupts = interrupts_enabled,
+        };
+    }
 };
 
 pub const paging = struct {
