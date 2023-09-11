@@ -4,7 +4,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const symbol_map = @import("symbol_map.zig");
+const symbols = @import("symbols.zig");
 
 /// Entry point from the Zig language upon a panic.
 pub fn panic(
@@ -15,51 +15,86 @@ pub fn panic(
     @setCold(true);
     kernel.arch.interrupts.disableInterrupts();
 
-    const loaded_symbols = if (symbol_map.loadSymbols()) true else |_| false;
-
     const return_address = return_address_opt orelse @returnAddress();
 
-    // TODO: call `panicImpl` if the kernel is ready
-    simplePanic(msg, stack_trace, return_address, loaded_symbols);
+    if (kernel.info.kernel_initialized) {
+        panicImpl(msg, stack_trace, return_address);
+    } else {
+        earlyPanicImpl(msg, stack_trace, return_address);
+    }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
 }
 
-/// Prints the panic message to the early output writer.
-fn simplePanic(
+/// Panic implementation used before the kernel is fully initialized and running.
+fn earlyPanicImpl(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
-    ret_addr: usize,
-    loaded_symbols: bool,
+    return_address: usize,
 ) void {
     const writer = kernel.arch.setup.getEarlyOutputWriter() orelse return;
 
-    if (loaded_symbols) {
-        writer.print("\nPANIC: {s}\n\n", .{msg}) catch unreachable;
-    } else {
-        writer.print("\nPANIC(no symbols loaded): {s}\n\n", .{msg}) catch unreachable;
+    // panic message
+    {
+        const core_data = kernel.arch.safeGetCoreData() orelse return;
+
+        if (core_data.panicked) {
+            // TODO: Can we do something better when we panic in a panic?
+            writer.writeAll("\nPANIC IN PANIC\n") catch unreachable;
+
+            return;
+        }
+        core_data.panicked = true;
+
+        writer.writeAll("\nPANIC on core ") catch unreachable;
+
+        std.fmt.formatInt(
+            core_data.core_id,
+            10,
+            .lower,
+            .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
+            writer,
+        ) catch unreachable;
+
+        if (msg.len != 0) {
+            writer.writeAll(" - ") catch unreachable;
+
+            writer.writeAll(msg) catch unreachable;
+
+            if (msg[msg.len - 1] != '\n') {
+                writer.writeByte('\n') catch unreachable;
+            }
+        } else {
+            writer.writeByte('\n') catch unreachable;
+        }
     }
+
+    symbols.loadSymbols();
 
     // error return trace
     if (stack_trace) |trace| {
-        printStackTrace(writer, trace);
+        if (trace.index != 0) {
+            printStackTrace(writer, trace);
+        }
     }
 
-    printCurrentBackTrace(writer, ret_addr);
+    printCurrentBackTrace(writer, return_address);
 }
 
-/// Prints the panic message, stack trace, and registers.
+/// Panic implementation used when the kernel is fully initialized and running.
 fn panicImpl(
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
-    ret_addr: usize,
-    loaded_symbols: bool,
+    return_address: usize,
 ) void {
     // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
-    simplePanic(msg, stack_trace, ret_addr, loaded_symbols);
+    earlyPanicImpl(msg, stack_trace, return_address);
 }
 
-fn printStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) void {
+fn printStackTrace(
+    writer: anytype,
+    stack_trace: *const std.builtin.StackTrace,
+) void {
     var frame_index: usize = 0;
     var frames_left: usize = @min(stack_trace.index, stack_trace.instruction_addresses.len);
 
@@ -75,7 +110,12 @@ fn printStackTrace(writer: anytype, stack_trace: *const std.builtin.StackTrace) 
     }
 }
 
-fn printCurrentBackTrace(writer: anytype, return_address: usize) void {
+fn printCurrentBackTrace(
+    writer: anytype,
+    return_address: usize,
+) void {
+    // TODO: Use DWARF frame unwinding - https://github.com/CascadeOS/CascadeOS/issues/62
+
     var stack_iter = std.debug.StackIterator.init(return_address, @frameAddress());
 
     while (stack_iter.next()) |address| {
@@ -85,7 +125,6 @@ fn printCurrentBackTrace(writer: anytype, return_address: usize) void {
 
 const indent = "  ";
 
-/// Prints the source code location for the given address.
 fn printSourceAtAddress(writer: anytype, address: usize) void {
     if (address == 0) return;
 
@@ -102,9 +141,13 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    // we can't use `VirtualAddress` here as it is possible this subtract results in a non-canonical address
-    const kernel_source_address = address - kernel.info.kernel_virtual_slide.bytes;
+    // TODO: Inform the user if this is null.
+    const kernel_virtual_slide = if (kernel.info.kernel_virtual_slide) |slide| slide.bytes else 0;
 
+    // we can't use `VirtualAddress` here as it is possible this subtract results in a non-canonical address
+    const kernel_source_address = address - kernel_virtual_slide;
+
+    // TODO: This is not a sufficent check for this situation, `vmm.kernel_memory_layout` should be used if possible
     if (kernel_source_address < kernel.info.kernel_base_address.value) {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;
         std.fmt.formatInt(
@@ -118,7 +161,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    const symbol = symbol_map.getSymbol(kernel_source_address) orelse {
+    const symbol = symbols.getSymbol(kernel_source_address) orelse {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;
         std.fmt.formatInt(
             kernel_source_address,
@@ -127,16 +170,14 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
             .{},
             writer,
         ) catch unreachable;
-        writer.writeAll(" - failed to find address in debug info\n") catch unreachable;
-
+        writer.writeAll(" - ???\n") catch unreachable;
         return;
     };
 
     printSymbol(writer, symbol);
 }
 
-/// Prints the symbol information for the given symbol.
-fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
+fn printSymbol(writer: anytype, symbol: symbols.Symbol) void {
     writer.writeAll(indent) catch unreachable;
 
     const location = symbol.location orelse {
@@ -248,7 +289,7 @@ fn printSymbol(writer: anytype, symbol: symbol_map.Symbol) void {
 ///
 /// Returns the line contents if found, otherwise returns null.
 fn findTargetLine(file_contents: []const u8, target_line_number: usize) ?[]const u8 {
-    var line_iter = std.mem.split(u8, file_contents, "\n");
+    var line_iter = std.mem.splitScalar(u8, file_contents, '\n');
     var line_index: u64 = 1;
 
     while (line_iter.next()) |line| : (line_index += 1) {

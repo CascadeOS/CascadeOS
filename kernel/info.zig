@@ -12,6 +12,9 @@ pub const arch = target_options.arch;
 pub const version = kernel_options.cascade_version;
 pub const root_path = kernel_options.root_path;
 
+/// Indicates whether the kernel has finished initialization and is running
+pub var kernel_initialized: bool = false;
+
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = kernel.VirtualAddress.fromInt(0xffffffff80000000);
 
@@ -22,7 +25,7 @@ pub var kernel_virtual_base_address: kernel.VirtualAddress = undefined;
 pub var kernel_physical_base_address: kernel.PhysicalAddress = undefined;
 
 /// Initialized during `setup`.
-pub var kernel_virtual_slide: core.Size = undefined;
+pub var kernel_virtual_slide: ?core.Size = null;
 
 /// Initialized during `setup`.
 pub var kernel_physical_to_virtual_offset: core.Size = undefined;
@@ -42,6 +45,6 @@ pub var non_cached_direct_map: kernel.VirtualRange = undefined;
 /// This is the kernel's ELF file.
 ///
 /// Initialized during `setup`.
-pub var kernel_file: kernel.VirtualRange = undefined;
+pub var kernel_file: ?kernel.VirtualRange = null;
 
 const log = kernel.log.scoped(.info);

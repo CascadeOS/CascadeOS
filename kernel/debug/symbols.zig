@@ -6,31 +6,43 @@ const kernel = @import("kernel");
 
 const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
 
-var any_symbolmaps_loaded: bool = false;
+var symbols_loaded: bool = false;
+var symbol_loading_failed: bool = false;
 
-var dwarf_symbol_map_spinlock: kernel.SpinLock = .{};
+var symbol_loading_spinlock: kernel.SpinLock = .{};
+
 var dwarf_symbol_map_opt: ?DwarfSymbolMap = null;
 
-pub fn loadSymbols() !void {
-    if (dwarf_symbol_map_opt == null) dwarf_blk: {
-        const held = dwarf_symbol_map_spinlock.lock();
-        defer held.unlock();
-        if (dwarf_symbol_map_opt == null) {
-            const kernel_file = kernel.info.kernel_file.toSlice(u8) catch break :dwarf_blk;
-            if (DwarfSymbolMap.init(kernel_file)) |dwarf_symbol_map| {
-                dwarf_symbol_map_opt = dwarf_symbol_map;
-                @atomicStore(bool, &any_symbolmaps_loaded, true, .Release);
-            } else |_| {}
-        }
+pub fn loadSymbols() void {
+    if (@atomicLoad(bool, &symbols_loaded, .Monotonic)) return;
+    if (@atomicLoad(bool, &symbol_loading_failed, .Monotonic)) return;
+
+    const held = symbol_loading_spinlock.lock();
+    defer held.unlock();
+
+    if (@atomicLoad(bool, &symbols_loaded, .Monotonic)) return;
+    if (@atomicLoad(bool, &symbol_loading_failed, .Monotonic)) return;
+
+    // DWARF
+    dwarf: {
+        const kernel_file = kernel.info.kernel_file orelse break :dwarf;
+        const kernel_file_slice = kernel_file.toSlice(u8) catch break :dwarf;
+
+        if (DwarfSymbolMap.init(kernel_file_slice)) |dwarf_symbol_map| {
+            dwarf_symbol_map_opt = dwarf_symbol_map;
+            @atomicStore(bool, &symbols_loaded, true, .Release);
+            return;
+        } else |_| {}
     }
 
-    if (!@atomicLoad(bool, &any_symbolmaps_loaded, .Acquire)) {
-        return error.FailedToLoadSymbols;
-    }
+    // TODO: Embed a simple symbol map to use when DWARF fails us.
+
+    @atomicStore(bool, &symbol_loading_failed, true, .Release);
 }
 
-/// Gets the symbol for the given address.
 pub fn getSymbol(address: usize) ?Symbol {
+    if (!symbols_loaded) return null;
+
     // We subtract one from the address to better handle the case when the address is the last instruction of the
     // function (for example `@panic` as the very last statement of a function) as in that case the return
     // address will actually point at the first instruction _after_ intended function
@@ -46,7 +58,6 @@ pub fn getSymbol(address: usize) ?Symbol {
 }
 
 pub const Symbol = struct {
-    /// The address of the symbol.
     address: usize,
     name: ?[]const u8,
     location: ?Location,

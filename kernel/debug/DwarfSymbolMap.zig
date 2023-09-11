@@ -7,7 +7,7 @@ const kernel = @import("kernel");
 const elf = std.elf;
 const DW = std.dwarf;
 
-const symbol_map = @import("symbol_map.zig");
+const symbols = @import("symbols.zig");
 
 const DwarfSymbolMap = @This();
 
@@ -112,7 +112,7 @@ fn chopSlice(ptr: []const u8, offset: u64, size: u64) error{Overflow}![]const u8
 }
 
 /// Gets the symbol for the given address. Returns null if no symbol was found.
-pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbol_map.Symbol {
+pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbols.Symbol {
     const compile_unit = self.debug_info.findCompileUnit(address) catch return null;
 
     const name = self.debug_info.getSymbolName(address) orelse null;

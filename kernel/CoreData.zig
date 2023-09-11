@@ -8,4 +8,6 @@ const CoreData = @This();
 
 core_id: usize,
 
+panicked: bool = false,
+
 arch: kernel.arch.ArchCoreData = .{},

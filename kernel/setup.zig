@@ -45,6 +45,8 @@ pub fn setup() void {
     kernel.vmm.init();
 
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
+
+    // TODO: kernel.info.kernel_initialized = true;
 }
 
 fn captureBootloaderInformation() void {
@@ -52,7 +54,7 @@ fn captureBootloaderInformation() void {
     calculateDirectMaps();
 
     // the kernel file was captured earlier in the setup process, now we can debug log what was captured
-    log.debug("kernel file: {}", .{kernel.info.kernel_file});
+    log.debug("kernel file: {}", .{kernel.info.kernel_file.?});
 }
 
 fn calculateDirectMaps() void {
@@ -150,6 +152,6 @@ fn calculateKernelOffsets() void {
 
     kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
     kernel.info.kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
-    log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.bytes});
+    log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.?.bytes});
     log.debug("kernel physical to virtual offset: 0x{x}", .{kernel.info.kernel_physical_to_virtual_offset.bytes});
 }
