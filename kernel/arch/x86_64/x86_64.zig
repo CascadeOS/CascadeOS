@@ -25,6 +25,12 @@ pub inline fn getCoreData() *kernel.CoreData {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
+/// Unlike `getCoreData`, this allows the pointer to be null, which allows detecting if the core data
+/// has not yet been initialized.
+pub inline fn safeGetCoreData() ?*kernel.CoreData {
+    return @ptrFromInt(registers.KERNEL_GS_BASE.read());
+}
+
 pub const PrivilegeLevel = enum(u2) {
     /// Kernel
     ring0 = 0,

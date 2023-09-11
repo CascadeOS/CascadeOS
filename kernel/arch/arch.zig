@@ -20,6 +20,12 @@ pub inline fn getCoreData() *kernel.CoreData {
     return current.getCoreData();
 }
 
+/// Unlike `getCoreData`, this allows the pointer to be null, which allows detecting if the core data
+/// has not yet been initialized.
+pub inline fn safeGetCoreData() ?*kernel.CoreData {
+    return current.safeGetCoreData();
+}
+
 /// Functionality that is intended to be used during system setup only.
 pub const setup = struct {
     /// Performs any actions required to load the provided core data for the bootstrap core.
