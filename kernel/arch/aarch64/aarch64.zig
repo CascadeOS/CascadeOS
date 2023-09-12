@@ -16,13 +16,13 @@ pub inline fn spinLoopHint() void {
 pub const ArchCoreData = struct {};
 
 pub inline fn getCoreData() *kernel.CoreData {
-    return registers.TPIDR_EL1_CoreData.read();
+    return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
 /// Unlike `getCoreData`, this allows the pointer to be null, which allows detecting if the core data
 /// has not yet been initialized.
 pub inline fn safeGetCoreData() ?*kernel.CoreData {
-    return registers.TPIDR_EL1_SafeCoreData.read();
+    return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
 pub const interrupts = struct {

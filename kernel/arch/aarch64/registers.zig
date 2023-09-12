@@ -5,8 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const aarch64 = @import("aarch64.zig");
 
-pub const TPIDR_EL1_CoreData = MSR(*kernel.CoreData, "TPIDR_EL1");
-pub const TPIDR_EL1_SafeCoreData = MSR(?*kernel.CoreData, "TPIDR_EL1");
+pub const TPIDR_EL1 = MSR(u64, "TPIDR_EL1");
 
 pub fn MSR(comptime T: type, comptime name: []const u8) type {
     return struct {
