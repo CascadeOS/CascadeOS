@@ -21,20 +21,19 @@ pub fn getEarlyOutputWriter() ?x86_64.serial.SerialPort.Writer {
 const page_size = core.Size.from(4, .kib);
 const kernel_stack_size = page_size.multiply(16);
 
-var exception_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
-var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
-var interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
-var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var kernel_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
+var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 
 pub fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
     bootstrap_core_data.arch = .{
-        .exception_stack = &exception_stack,
         .double_fault_stack = &double_fault_stack,
-        .interrupt_stack = &interrupt_stack,
         .non_maskable_interrupt_stack = &non_maskable_interrupt_stack,
     };
 
     loadCoreData(bootstrap_core_data);
+
+    bootstrap_core_data.arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
 }
 
 fn loadCoreData(core_data: *kernel.CoreData) void {
@@ -42,9 +41,7 @@ fn loadCoreData(core_data: *kernel.CoreData) void {
 
     arch.gdt.load();
 
-    arch.tss.setInterruptStack(.exception, arch.exception_stack);
     arch.tss.setInterruptStack(.double_fault, arch.double_fault_stack);
-    arch.tss.setInterruptStack(.interrupt, arch.interrupt_stack);
     arch.tss.setInterruptStack(.non_maskable_interrupt, arch.non_maskable_interrupt_stack);
 
     arch.gdt.setTss(&arch.tss);

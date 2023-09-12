@@ -16,7 +16,7 @@ pub fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
 
     // TODO: print specific things for each exception, especially page fault https://github.com/CascadeOS/CascadeOS/issues/32
     if (idt_vector.isException()) {
-        core.panicFmt("exception {s}", .{@tagName(idt_vector)}) catch unreachable;
+        core.panicFmt("exception: {s}", .{@tagName(idt_vector)}) catch unreachable;
     }
 
     core.panicFmt("interrupt {d}", .{@intFromEnum(idt_vector)}) catch unreachable;
