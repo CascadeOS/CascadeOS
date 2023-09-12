@@ -235,21 +235,11 @@ pub const InterruptFrame = extern struct {
     }
 };
 
-/// The main interrupt handler for the kernel.
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    if (interrupt_frame.isUser()) {
-        // interrupt is from user code
-        asm volatile ("swapgs");
-    }
-
     handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
 
+    // ensure interrupts are disabled when restoring the state before iret
     x86_64.interrupts.disableInterrupts();
-
-    if (interrupt_frame.isUser()) {
-        // returning to user code
-        asm volatile ("swapgs");
-    }
 }
 
 pub const IdtVector = enum(u8) {
