@@ -172,32 +172,32 @@ pub const InterruptFrame = extern struct {
 
         try writer.writeAll("InterruptFrame{\n");
 
-        try writer.print(padding ++ "Error Code: {},\n", .{value.error_code});
-        try writer.print(padding ++ "Vector Number: {},\n", .{value.vector_number});
+        try writer.print(comptime padding ++ "Error Code: {},\n", .{value.error_code});
+        try writer.print(comptime padding ++ "Vector Number: {},\n", .{value.vector_number});
 
-        try writer.print(padding ++ "cs: {},\n", .{value.cs});
-        try writer.print(padding ++ "ss: {},\n", .{value.ss});
-        try writer.print(padding ++ "ds: {},\n", .{value.ds});
-        try writer.print(padding ++ "es: {},\n", .{value.es});
-        try writer.print(padding ++ "rsp: 0x{x},\n", .{value.rsp});
-        try writer.print(padding ++ "rip: 0x{x},\n", .{value.rip});
-        try writer.print(padding ++ "rax: 0x{x},\n", .{value.rax});
-        try writer.print(padding ++ "rbx: 0x{x},\n", .{value.rbx});
-        try writer.print(padding ++ "rcx: 0x{x},\n", .{value.rcx});
-        try writer.print(padding ++ "rdx: 0x{x},\n", .{value.rdx});
-        try writer.print(padding ++ "rbp: 0x{x},\n", .{value.rbp});
-        try writer.print(padding ++ "rsi: 0x{x},\n", .{value.rsi});
-        try writer.print(padding ++ "rdi: 0x{x},\n", .{value.rdi});
-        try writer.print(padding ++ "r8: 0x{x},\n", .{value.r8});
-        try writer.print(padding ++ "r9: 0x{x},\n", .{value.r9});
-        try writer.print(padding ++ "r10: 0x{x},\n", .{value.r10});
-        try writer.print(padding ++ "r11: 0x{x},\n", .{value.r11});
-        try writer.print(padding ++ "r12: 0x{x},\n", .{value.r12});
-        try writer.print(padding ++ "r13: 0x{x},\n", .{value.r13});
-        try writer.print(padding ++ "r14: 0x{x},\n", .{value.r14});
-        try writer.print(padding ++ "r15: 0x{x},\n", .{value.r15});
+        try writer.print(comptime padding ++ "cs: {},\n", .{value.cs});
+        try writer.print(comptime padding ++ "ss: {},\n", .{value.ss});
+        try writer.print(comptime padding ++ "ds: {},\n", .{value.ds});
+        try writer.print(comptime padding ++ "es: {},\n", .{value.es});
+        try writer.print(comptime padding ++ "rsp: 0x{x},\n", .{value.rsp});
+        try writer.print(comptime padding ++ "rip: 0x{x},\n", .{value.rip});
+        try writer.print(comptime padding ++ "rax: 0x{x},\n", .{value.rax});
+        try writer.print(comptime padding ++ "rbx: 0x{x},\n", .{value.rbx});
+        try writer.print(comptime padding ++ "rcx: 0x{x},\n", .{value.rcx});
+        try writer.print(comptime padding ++ "rdx: 0x{x},\n", .{value.rdx});
+        try writer.print(comptime padding ++ "rbp: 0x{x},\n", .{value.rbp});
+        try writer.print(comptime padding ++ "rsi: 0x{x},\n", .{value.rsi});
+        try writer.print(comptime padding ++ "rdi: 0x{x},\n", .{value.rdi});
+        try writer.print(comptime padding ++ "r8: 0x{x},\n", .{value.r8});
+        try writer.print(comptime padding ++ "r9: 0x{x},\n", .{value.r9});
+        try writer.print(comptime padding ++ "r10: 0x{x},\n", .{value.r10});
+        try writer.print(comptime padding ++ "r11: 0x{x},\n", .{value.r11});
+        try writer.print(comptime padding ++ "r12: 0x{x},\n", .{value.r12});
+        try writer.print(comptime padding ++ "r13: 0x{x},\n", .{value.r13});
+        try writer.print(comptime padding ++ "r14: 0x{x},\n", .{value.r14});
+        try writer.print(comptime padding ++ "r15: 0x{x},\n", .{value.r15});
 
-        try writer.print(padding ++ "{},\n", .{value.rflags});
+        try writer.print(comptime padding ++ "{},\n", .{value.rflags});
 
         try writer.writeAll("}");
     }

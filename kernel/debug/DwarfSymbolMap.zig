@@ -50,7 +50,7 @@ pub fn init(kernel_elf: []const u8) !DwarfSymbolMap {
 
         var section_index: ?usize = null;
         inline for (@typeInfo(DW.DwarfSection).Enum.fields, 0..) |section, i| {
-            if (std.mem.eql(u8, "." ++ section.name, name)) section_index = i;
+            if (std.mem.eql(u8, comptime "." ++ section.name, name)) section_index = i;
         }
         if (section_index == null) continue;
         if (sections[section_index.?] != null) continue;

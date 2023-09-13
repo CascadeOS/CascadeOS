@@ -142,7 +142,7 @@ const csi = "\x1b[";
 
 /// Concatenates the CSI escape code prefix with the given string at compile-time.
 inline fn comptimeCsi(comptime fmt: []const u8) []const u8 {
-    return csi ++ fmt;
+    comptime return csi ++ fmt;
 }
 
 test comptimeCsi {
@@ -151,7 +151,7 @@ test comptimeCsi {
 
 /// Concatenates the CSI escape code prefix with the given format string and format arguments at compile-time.
 inline fn comptimeCsiFmt(comptime fmt: []const u8, args: anytype) []const u8 {
-    return comptime std.fmt.comptimePrint(csi ++ fmt, args);
+    comptime return std.fmt.comptimePrint(csi ++ fmt, args);
 }
 
 test comptimeCsiFmt {

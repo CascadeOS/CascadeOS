@@ -221,7 +221,7 @@ fn RangeMixin(comptime Self: type, comptime AddrType: type) type {
         }
 
         pub fn print(value: Self, writer: anytype) !void {
-            try writer.writeAll(Self.name ++ "{ 0x");
+            try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
 
             try writer.writeAll(" - 0x");

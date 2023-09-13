@@ -21,7 +21,7 @@ pub fn init() void {
     var memory_map_iterator = kernel.boot.memoryMapIterator(.forwards);
 
     while (memory_map_iterator.next()) |memory_map_entry| {
-        log.debug(indent ++ "{}", .{memory_map_entry});
+        log.debug(comptime indent ++ "{}", .{memory_map_entry});
 
         total_memory.addInPlace(memory_map_entry.range.size);
 
@@ -53,7 +53,7 @@ fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) vo
     var current_virtual_address = virtual_range.address;
     const end_virtual_address = virtual_range.end();
 
-    log.debug(indent ** 2 ++ "marking {} pages available from {} to {}", .{
+    log.debug(comptime indent ** 2 ++ "marking {} pages available from {} to {}", .{
         memory_map_entry.range.size.divide(arch.paging.standard_page_size),
         current_virtual_address,
         end_virtual_address,
