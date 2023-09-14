@@ -140,7 +140,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
     try efi_partition.addFile(.{
         .destination_path = "/limine.cfg",
         .source_path = helpers.pathJoinFromRoot(self.b, &.{
-            ".build",
+            "build",
             "limine.cfg",
         }),
     });

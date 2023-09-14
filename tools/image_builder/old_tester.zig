@@ -497,7 +497,7 @@ fn addFilesAndDirectoriesToEfi(context: *EFIContext) !void {
         };
         try context.copyFile(
             &root_directory[root_directory_index].standard,
-            "/home/lee/src/CascadeOS/.build/limine.cfg",
+            "/home/lee/src/CascadeOS/build/limine.cfg",
         );
         root_directory_index += 1;
     }

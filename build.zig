@@ -3,14 +3,14 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
-const CascadeTarget = @import(".build/CascadeTarget.zig").CascadeTarget;
-const ImageStep = @import(".build/ImageStep.zig");
-const Kernel = @import(".build/Kernel.zig");
-const Library = @import(".build/Library.zig");
-const Options = @import(".build/Options.zig");
-const QemuStep = @import(".build/QemuStep.zig");
-const StepCollection = @import(".build/StepCollection.zig");
-const Tool = @import(".build/Tool.zig");
+const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
+const ImageStep = @import("build/ImageStep.zig");
+const Kernel = @import("build/Kernel.zig");
+const Library = @import("build/Library.zig");
+const Options = @import("build/Options.zig");
+const QemuStep = @import("build/QemuStep.zig");
+const StepCollection = @import("build/StepCollection.zig");
+const Tool = @import("build/Tool.zig");
 
 const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 1 };
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);

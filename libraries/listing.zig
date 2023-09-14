@@ -1,4 +1,4 @@
-const LibraryDescription = @import("../.build/LibraryDescription.zig");
+const LibraryDescription = @import("../build/LibraryDescription.zig");
 
 pub const libraries: []const LibraryDescription = &.{
     .{ .name = "ansi" },
