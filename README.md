@@ -22,14 +22,19 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - git (optional; used for fetching the limine bootloader when building a disk image)
 - qemu (optional; used for running and host testing)
 
+Run the x86_64 kernel in QEMU:
+```sh
+zig build run_x86_64
+```
+
+List all available build targets:
+```sh
+zig build -l
+```
+
 Run all tests and build all code: 
 ```sh
 zig build --summary all
-```
-
-Run the x86_64 kernel in QEMU:
-```sh
-zig build run_x86_64 -Dforce_debug_log
 ```
 
 Run `zig build -h` for a listing of the available steps and options.
