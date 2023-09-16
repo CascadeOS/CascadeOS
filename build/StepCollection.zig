@@ -95,7 +95,7 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
 
     const all_library_cascade_test_step = b.step(
         "libraries_cascade",
-        "Build all the library tests",
+        "Build all the library tests targeting cascade",
     );
     all_library_step.dependOn(all_library_cascade_test_step);
 
