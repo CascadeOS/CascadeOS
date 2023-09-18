@@ -13,7 +13,7 @@ pub const number_of_handlers = Idt.number_of_handlers;
 
 const log = kernel.log.scoped(.interrupts);
 
-var idt: Idt = undefined;
+var idt: Idt = .{};
 const raw_handlers = makeRawHandlers();
 var handlers = [_]InterruptHandler{interrupt_handlers.unhandledInterrupt} ** number_of_handlers;
 
