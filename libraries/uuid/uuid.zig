@@ -35,11 +35,11 @@ pub const UUID = extern struct {
     ///
     /// Expected format is `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
     pub fn parse(buf: []const u8) ParseError!UUID {
-        if (buf.len != 36) return ParseError.InvalidUUID;
+        if (buf.len != uuid_buffer_length) return ParseError.InvalidUUID;
 
         var result: UUID = undefined;
 
-        var i: usize = 0;
+        comptime var i: usize = 0;
 
         inline for (uuid_sections) |section| {
             if (section.proceeded_by_hyphen) {
@@ -47,7 +47,7 @@ pub const UUID = extern struct {
                 i += 1;
             }
 
-            const characters_needed = section.charactersNeededToStoreField();
+            const characters_needed = comptime section.charactersNeededToStoreField();
             const ptr: *align(1) section.field_type = @ptrCast(&result.bytes[section.start_index]);
 
             ptr.* = std.fmt.parseUnsigned(
@@ -62,11 +62,11 @@ pub const UUID = extern struct {
         return result;
     }
 
-    pub const minimum_buffer_length: usize = 36;
+    pub const uuid_buffer_length: usize = 36;
 
-    /// `buf` must be atleast `minimum_buffer_length`
+    /// `buf` must be atleast `uuid_buffer_length`
     pub fn bufPrint(self: UUID, buf: []u8) []const u8 {
-        std.debug.assert(buf.len >= minimum_buffer_length);
+        std.debug.assert(buf.len >= uuid_buffer_length);
 
         var i: usize = 0;
 
@@ -91,7 +91,7 @@ pub const UUID = extern struct {
             i += characters_needed;
         }
 
-        return buf[0..minimum_buffer_length];
+        return buf[0..uuid_buffer_length];
     }
 
     pub inline fn format(
@@ -103,7 +103,7 @@ pub const UUID = extern struct {
         _ = fmt;
         _ = options;
 
-        var buf: [minimum_buffer_length]u8 = undefined;
+        var buf: [uuid_buffer_length]u8 = undefined;
         try writer.writeAll(self.bufPrint(&buf));
     }
 
