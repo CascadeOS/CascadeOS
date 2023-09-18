@@ -870,23 +870,26 @@ fn getFATDateAndTime() FATDateTime {
     const month_day = year_day.calculateMonthDay();
     const day_seconds = epoch_seconds.getDaySeconds();
 
-    var result: FATDateTime = undefined;
+    return .{
+        .date = .{
+            .year = @intCast(year_day.year - 1980), // -10 to account for unix epoch vs dos epoch
+            .month = @intCast(@intFromEnum(month_day.month)),
+            .day = @intCast(month_day.day_index),
+        },
 
-    result.date = fat.Date{
-        .year = @intCast(year_day.year - 1980), // -10 to account for unix epoch vs dos epoch
-        .month = @intCast(@intFromEnum(month_day.month)),
-        .day = @intCast(month_day.day_index),
+        .time = .{
+            .hour = @intCast(day_seconds.getHoursIntoDay()),
+            .minute = @intCast(day_seconds.getMinutesIntoHour()),
+            .second_2s = @intCast(day_seconds.getSecondsIntoMinute() / 2),
+        },
+
+        .subsecond = @intCast(
+            @divFloor(
+                @mod(unix_timestamp_ms, std.time.ms_per_s),
+                10,
+            ),
+        ),
     };
-
-    result.time = fat.Time{
-        .hour = @intCast(day_seconds.getHoursIntoDay()),
-        .minute = @intCast(day_seconds.getMinutesIntoHour()),
-        .second_2s = @intCast(day_seconds.getSecondsIntoMinute() / 2),
-    };
-
-    result.subsecond = @intCast(@divFloor(@mod(unix_timestamp_ms, std.time.ms_per_s), 10));
-
-    return result;
 }
 
 const ebpb_boot_code = [_]u8{
