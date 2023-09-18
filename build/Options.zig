@@ -267,7 +267,7 @@ fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion) !
     const raw_git_describe_output = b.execAllowFail(&[_][]const u8{
         "git", "-C", b.build_root.path.?, "describe", "--match", "*.*.*", "--tags",
     }, &exit_code, .Ignore) catch {
-        return version_string;
+        return b.fmt("{s}-unknown", .{version_string});
     };
     const git_describe_output = std.mem.trim(u8, raw_git_describe_output, " \n\r");
 
