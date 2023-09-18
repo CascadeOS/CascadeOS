@@ -42,7 +42,7 @@ pub fn init() void {
     if (log.levelEnabled(.debug)) {
         log.debug("kernel memory regions:", .{});
 
-        for (kernel_memory_layout[0..kernel_memory_layout_count]) |region| {
+        for (kernel_memory_layout.slice()) |region| {
             log.debug("\t{}", .{region});
         }
     }
@@ -168,18 +168,16 @@ pub const MemoryRegion = struct {
 };
 
 // currently the kernel has exactly 6 memory regions: 3 elf sections, 2 direct maps and the heap
-var kernel_memory_layout: [6]MemoryRegion = undefined;
-var kernel_memory_layout_count: usize = 0;
+var kernel_memory_layout: std.BoundedArray(MemoryRegion, 6) = .{};
 
 /// Registers a kernel memory region.
 fn registerKernelMemoryRegion(region: MemoryRegion) void {
-    kernel_memory_layout[kernel_memory_layout_count] = region;
-    kernel_memory_layout_count += 1;
+    kernel_memory_layout.append(region) catch unreachable;
 }
 
 /// Sorts the kernel memory layout from lowest to highest address.
 fn sortKernelMemoryLayout() void {
-    std.mem.sort(MemoryRegion, kernel_memory_layout[0..kernel_memory_layout_count], {}, struct {
+    std.mem.sort(MemoryRegion, kernel_memory_layout.slice(), {}, struct {
         fn lessThanFn(context: void, self: MemoryRegion, other: MemoryRegion) bool {
             _ = context;
             return self.range.address.lessThan(other.range.address);
