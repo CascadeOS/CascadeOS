@@ -151,7 +151,7 @@ pub const PhysicalRange = struct {
         };
     }
 
-    pub usingnamespace RangeMixin(@This(), PhysicalAddress);
+    pub usingnamespace RangeMixin(@This());
 };
 
 pub const VirtualRange = struct {
@@ -178,12 +178,14 @@ pub const VirtualRange = struct {
         return self.address.toPtr([*]T)[0..len];
     }
 
-    pub usingnamespace RangeMixin(@This(), VirtualAddress);
+    pub usingnamespace RangeMixin(@This());
 };
 
-fn RangeMixin(comptime Self: type, comptime AddrType: type) type {
+fn RangeMixin(comptime Self: type) type {
     return struct {
-        pub inline fn fromAddr(address: AddrType, size: core.Size) Self {
+        pub const AddrType = std.meta.fieldInfo(Self, .address).type;
+
+        pub inline fn fromAddr(address: anytype, size: core.Size) Self {
             return .{
                 .address = address,
                 .size = size,
@@ -216,7 +218,7 @@ fn RangeMixin(comptime Self: type, comptime AddrType: type) type {
             self.address.moveBackwardInPlace(size);
         }
 
-        pub fn contains(self: Self, address: AddrType) bool {
+        pub fn contains(self: Self, address: anytype) bool {
             return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
         }
 
