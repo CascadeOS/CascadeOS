@@ -54,8 +54,6 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
         "test",
         "Run all the tests (also builds all code even if they don't have tests)",
     );
-    // TODO: Running all tests by default won't be a good idea eventually.
-    b.default_step = all_test_step;
 
     // Kernels
     const all_kernels_build_step = b.step(

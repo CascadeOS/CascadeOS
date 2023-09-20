@@ -34,7 +34,7 @@ zig build -l
 
 Run all tests and build all code: 
 ```sh
-zig build --summary all
+zig build test --summary all
 ```
 
 Run `zig build -h` for a listing of the available steps and options.
