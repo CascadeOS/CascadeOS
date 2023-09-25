@@ -1,0 +1,11 @@
+.{
+    .name = "CascadeOS",
+    .version = "0.0.1",
+
+    .dependencies = .{
+        .limine = .{ // v5.20230924.0
+            .url = "https://github.com/limine-bootloader/limine/archive/f9980cf7cba0c4cebb56ebbbfde3219f6f438f35.tar.gz",
+            .hash = "1220877e79437a255859109fe7cd0826e802eaf78bf6d118d01665baa711b5248f9d",
+        },
+    },
+}

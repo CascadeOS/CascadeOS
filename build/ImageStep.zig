@@ -7,7 +7,6 @@ const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const Kernel = @import("Kernel.zig");
-const LimineStep = @import("LimineStep.zig");
 const Tool = @import("Tool.zig");
 
 const ImageStep = @This();
@@ -20,7 +19,8 @@ b: *std.Build,
 step: Step,
 
 target: CascadeTarget,
-limine_step: *LimineStep,
+limine_dep: *std.Build.Dependency,
+limine_exe: *std.Build.Step.Compile,
 
 image_builder_tool: Tool,
 
@@ -39,15 +39,37 @@ pub fn registerImageSteps(
     step_collection: StepCollection,
     targets: []const CascadeTarget,
 ) !Collection {
+    const limine_dep = b.dependency("limine", .{});
+
+    const limine_exe = b.addExecutable(.{
+        .name = "limine",
+        .link_libc = true,
+    });
+    limine_exe.addIncludePath(limine_dep.path(""));
+    limine_exe.addCSourceFile(.{
+        .file = limine_dep.path("limine.c"),
+        .flags = &.{
+            "-std=c99",
+            "-fno-sanitize=undefined",
+        },
+    });
+
     var image_steps: Collection = .{};
     try image_steps.ensureTotalCapacity(b.allocator, @intCast(targets.len));
 
     const image_builder_tool = tools.get("image_builder").?;
-    const limine_step = try LimineStep.create(b);
 
     for (targets) |target| {
         const kernel = kernels.get(target).?;
-        const image_build_step = try ImageStep.create(b, kernel, image_builder_tool, step_collection, target, limine_step);
+        const image_build_step = try ImageStep.create(
+            b,
+            kernel,
+            image_builder_tool,
+            step_collection,
+            target,
+            limine_dep,
+            limine_exe,
+        );
         step_collection.registerImage(target, &image_build_step.step);
         image_steps.putAssumeCapacityNoClobber(target, image_build_step);
     }
@@ -61,7 +83,8 @@ fn create(
     image_builder_tool: Tool,
     step_collection: StepCollection,
     target: CascadeTarget,
-    limine_step: *LimineStep,
+    limine_dep: *std.Build.Dependency,
+    limine_exe: *std.Build.Step.Compile,
 ) !*ImageStep {
     const step_name = try std.fmt.allocPrint(
         b.allocator,
@@ -80,7 +103,8 @@ fn create(
             .makeFn = make,
         }),
         .target = target,
-        .limine_step = limine_step,
+        .limine_dep = limine_dep,
+        .limine_exe = limine_exe,
         .image_file = undefined,
         .image_file_source = undefined,
         .image_builder_tool = image_builder_tool,
@@ -88,7 +112,11 @@ fn create(
     self.image_file = .{ .step = &self.step };
     self.image_file_source = .{ .generated = &self.image_file };
 
-    self.step.dependOn(&limine_step.step);
+    // TODO: Why do we need to depend on the emitted bin instead of just depending on the compile step?
+    // If this line is changed to `self.step.dependOn(&limine_exe.step);` then the `Run` step fails to execute the binary.
+    const bin_file = limine_exe.getEmittedBin();
+    bin_file.addStepDependencies(&self.step);
+
     self.step.dependOn(&image_builder_tool.exe.step);
     self.step.dependOn(step_collection.kernel_build_steps_per_target.get(target).?);
 
@@ -145,32 +173,21 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
         }),
     });
 
-    const limine_directory = self.limine_step.limine_generated_directory.getPath();
-
     switch (self.target) {
         .aarch64 => {
             try efi_partition.addFile(.{
                 .destination_path = "/EFI/BOOT/BOOTAA64.EFI",
-                .source_path = helpers.pathJoinFromRoot(self.b, &.{
-                    limine_directory,
-                    "BOOTAA64.EFI",
-                }),
+                .source_path = self.limine_dep.path("BOOTAA64.EFI").getPath2(self.b, &self.step),
             });
         },
         .x86_64 => {
             try efi_partition.addFile(.{
                 .destination_path = "/limine-bios.sys",
-                .source_path = helpers.pathJoinFromRoot(self.b, &.{
-                    limine_directory,
-                    "limine-bios.sys",
-                }),
+                .source_path = self.limine_dep.path("limine-bios.sys").getPath2(self.b, &self.step),
             });
             try efi_partition.addFile(.{
                 .destination_path = "/EFI/BOOT/BOOTX64.EFI",
-                .source_path = helpers.pathJoinFromRoot(self.b, &.{
-                    limine_directory,
-                    "BOOTX64.EFI",
-                }),
+                .source_path = self.limine_dep.path("BOOTX64.EFI").getPath2(self.b, &self.step),
             });
         },
     }
@@ -197,7 +214,8 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
         try run_image_builder.step.make(progress_node);
     }
 
-    const run_limine = self.b.addRunArtifact(self.limine_step.__build_limine_executable);
+    const run_limine = self.b.addRunArtifact(self.limine_exe);
+
     run_limine.addArg("bios-install");
     run_limine.addArg(image_path);
 
