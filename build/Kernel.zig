@@ -122,7 +122,6 @@ fn create(
 
             const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
             kernel_exe.addAssemblyFile(.{ .path = file_path });
-            std.debug.print("\nasm: {s}\n", .{file_path});
         }
     }
 
