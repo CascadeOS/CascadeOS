@@ -109,16 +109,7 @@ pub const CascadeTarget = enum {
 
     /// Returns the path to the kernel linker script for the given target.
     pub fn linkerScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
-        return switch (self) {
-            .aarch64 => helpers.pathJoinFromRoot(b, &.{ "build", "linker_aarch64.ld" }),
-            .x86_64 => helpers.pathJoinFromRoot(b, &.{ "build", "linker_x86_64.ld" }),
-        };
-    }
-
-    /// Returns the path to the image build script for the given target.
-    pub fn imageScriptPath(self: CascadeTarget, b: *std.Build) []const u8 {
-        _ = self;
-        return helpers.pathJoinFromRoot(b, &.{ "build", "build_limine_image.sh" });
+        return helpers.pathJoinFromRoot(b, &.{ "kernel", "arch", @tagName(self), "linker.ld" });
     }
 
     /// Returns the name of the QEMU system executable for the given target.
