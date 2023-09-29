@@ -136,7 +136,7 @@ fn downloadWithHttpClient(allocator: std.mem.Allocator, url: []const u8, writer:
     var request = try http_client.request(.GET, uri, request_headers, .{});
     defer request.deinit();
 
-    try request.start();
+    try request.start(.{});
     try request.wait();
 
     if (request.response.status != .ok) return error.ResponseNotOk;
