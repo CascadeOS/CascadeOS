@@ -99,6 +99,33 @@ fn create(
 
     target.targetSpecificSetup(kernel_exe);
 
+    // Add assembly files
+    assembly_files_blk: {
+        const assembly_files_dir_path = helpers.pathJoinFromRoot(b, &.{
+            "kernel",
+            "arch",
+            @tagName(target),
+            "asm",
+        });
+
+        var assembly_files_dir = std.fs.cwd().openIterableDir(assembly_files_dir_path, .{}) catch break :assembly_files_blk;
+        defer assembly_files_dir.close();
+
+        var iter = assembly_files_dir.iterateAssumeFirstIteration();
+        while (try iter.next()) |entry| {
+            if (entry.kind != .file) {
+                std.debug.panic(
+                    "found entry '{s}' with unexpected type '{s}' in assembly directory '{s}'\n",
+                    .{ entry.name, @tagName(entry.kind), assembly_files_dir_path },
+                );
+            }
+
+            const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
+            kernel_exe.addAssemblyFile(.{ .path = file_path });
+            std.debug.print("\nasm: {s}\n", .{file_path});
+        }
+    }
+
     const install_step = b.addInstallArtifact(
         kernel_exe,
         .{ .dest_dir = .{ .override = .{ .custom = b.pathJoin(&.{@tagName(target)}) } } },
