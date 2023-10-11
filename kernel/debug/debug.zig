@@ -252,7 +252,12 @@ fn printSymbol(writer: anytype, symbol: symbols.Symbol) void {
         writer.writeAll(" (symbols line information is inprecise)") catch unreachable;
     }
 
-    const file_contents = embedded_source_files.get(location.file_name) orelse return;
+    const file_contents = embedded_source_files.get(location.file_name) orelse {
+        // no matching file found
+        writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+        writer.writeAll("no such file in embedded source files\n") catch unreachable;
+        return;
+    };
 
     const line = findTargetLine(file_contents, location.line) orelse {
         // no matching line found
