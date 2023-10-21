@@ -138,7 +138,7 @@ fn create(
     };
 }
 
-/// A represents a module created from a source file.
+/// Module created from a source file.
 const SourceFileModule = struct {
     /// The file name and also the name of the module.
     name: []const u8,
