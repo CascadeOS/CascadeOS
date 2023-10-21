@@ -11,7 +11,6 @@ const log = kernel.log.scoped(.pmm);
 // TODO: better data structure https://github.com/CascadeOS/CascadeOS/issues/20
 
 var first_free_physical_page: ?*PhysPageNode = null;
-var total_memory: core.Size = core.Size.zero;
 var total_usable_memory: core.Size = core.Size.zero;
 var free_memory: core.Size = core.Size.zero;
 
@@ -22,8 +21,6 @@ pub fn init() void {
 
     while (memory_map_iterator.next()) |memory_map_entry| {
         log.debug(comptime indent ++ "{}", .{memory_map_entry});
-
-        total_memory.addInPlace(memory_map_entry.range.size);
 
         switch (memory_map_entry.type) {
             .free => {
@@ -36,11 +33,10 @@ pub fn init() void {
         }
     }
 
-    log.debug("pmm total memory: {}", .{total_memory});
-    log.debug("|--usable: {}", .{total_usable_memory});
-    log.debug("|  |--free: {}", .{free_memory});
-    log.debug("|  |--in use: {}", .{total_usable_memory.subtract(free_memory)});
-    log.debug("|--unusable: {}", .{total_memory.subtract(total_usable_memory)});
+    log.debug(
+        "total usable memory: {} - free: {} - in use: {}",
+        .{ total_usable_memory, free_memory, total_usable_memory.subtract(free_memory) },
+    );
 }
 
 /// Adds a memory map entry to the physical page allocator.
