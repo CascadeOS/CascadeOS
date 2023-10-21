@@ -49,20 +49,20 @@ pub const VirtualAddress = extern struct {
         return @ptrFromInt(self.value);
     }
 
-    /// Returns the physical address of the given diret map virtual address.
+    /// Returns the physical address of the given direct map virtual address.
     ///
     /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
     pub fn unsafeToPhysicalFromDirectMap(self: VirtualAddress) PhysicalAddress {
-        return .{ .value = self.value - kernel.info.direct_map.address.value };
+        return .{ .value = self.value -% kernel.info.direct_map.address.value };
     }
 
     /// Returns the physical address of the given virtual address if it is in one of the direct maps.
     pub fn toPhysicalFromDirectMap(self: VirtualAddress) error{AddressNotInAnyDirectMap}!PhysicalAddress {
         if (kernel.info.direct_map.contains(self)) {
-            return .{ .value = self.value - kernel.info.direct_map.address.value };
+            return .{ .value = self.value -% kernel.info.direct_map.address.value };
         }
         if (kernel.info.non_cached_direct_map.contains(self)) {
-            return .{ .value = self.value - kernel.info.non_cached_direct_map.address.value };
+            return .{ .value = self.value -% kernel.info.non_cached_direct_map.address.value };
         }
         return error.AddressNotInAnyDirectMap;
     }
