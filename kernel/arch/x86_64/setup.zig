@@ -26,18 +26,18 @@ var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO:
 var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 
 pub fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
-    bootstrap_core_data.arch = .{
+    bootstrap_core_data._arch = .{
         .double_fault_stack = &double_fault_stack,
         .non_maskable_interrupt_stack = &non_maskable_interrupt_stack,
     };
 
     loadCoreData(bootstrap_core_data);
 
-    bootstrap_core_data.arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
+    bootstrap_core_data._arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
 }
 
 fn loadCoreData(core_data: *kernel.CoreData) void {
-    const arch: *x86_64.ArchCoreData = &core_data.arch;
+    const arch: *x86_64.ArchCoreData = core_data.arch();
 
     arch.gdt.load();
 

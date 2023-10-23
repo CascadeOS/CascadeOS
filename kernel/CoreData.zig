@@ -10,4 +10,8 @@ core_id: usize,
 
 panicked: bool = false,
 
-arch: kernel.arch.ArchCoreData = .{},
+_arch: kernel.arch.ArchCoreData = .{},
+
+pub inline fn arch(self: *CoreData) *kernel.arch.ArchCoreData {
+    return &self._arch;
+}
