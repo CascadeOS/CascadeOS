@@ -191,7 +191,11 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     // This is a hack to stop zig's progress output interfering with qemu's output
     try ensureCurrentStdoutLineIsEmpty();
 
+    var timer = try std.time.Timer.start();
+
     try run_qemu.step.make(prog_node);
+
+    step.result_duration_ns = timer.read();
 }
 
 fn ensureCurrentStdoutLineIsEmpty() !void {

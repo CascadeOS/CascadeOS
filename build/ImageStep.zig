@@ -133,6 +133,8 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     // TODO: using caching somehow.
 
+    var timer = try std.time.Timer.start();
+
     const image_file_path = helpers.pathJoinFromRoot(self.b, &.{
         "zig-out",
         @tagName(self.target),
@@ -145,6 +147,8 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     try self.generateImage(image_file_path, progress_node);
     self.image_file.path = image_file_path;
+
+    step.result_duration_ns = timer.read();
 }
 
 const ImageDescription = @import("../tools/image_builder/ImageDescription.zig");

@@ -71,6 +71,8 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
         return;
     }
 
+    var timer = try std.time.Timer.start();
+
     try std.fs.cwd().makePath(self.edk2_dir);
 
     try fetch(step, self.target.uefiFirmwareUrl(), self.firmware_path);
@@ -78,6 +80,8 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
     self.firmware.path = self.firmware_path;
 
     try self.updateTimestampFile();
+
+    step.result_duration_ns = timer.read();
 }
 
 // 24 hours
