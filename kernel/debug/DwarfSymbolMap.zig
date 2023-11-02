@@ -93,7 +93,7 @@ pub fn init(kernel_elf: []const u8) !DwarfSymbolMap {
 
     var map: DwarfSymbolMap = .{
         .debug_info = DW.DwarfInfo{
-            .endian = .Little,
+            .endian = .little,
             .sections = sections,
             .is_macho = false,
         },
