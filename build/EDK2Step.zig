@@ -111,20 +111,8 @@ fn updateTimestampFile(self: *EDK2Step) !void {
 
 /// Fetches a file from a URL.
 fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
-    const file = try std.fs.cwd().createFile(destination_path, .{});
-    defer file.close();
+    const allocator = step.owner.allocator;
 
-    var buffered_writer = std.io.bufferedWriter(file.writer());
-
-    downloadWithHttpClient(step.owner.allocator, url, buffered_writer.writer()) catch |err| {
-        return step.fail("failed to fetch '{s}': {s}", .{ url, @errorName(err) });
-    };
-
-    try buffered_writer.flush();
-}
-
-/// Downloads a file using the std http client.
-fn downloadWithHttpClient(allocator: std.mem.Allocator, url: []const u8, writer: anytype) !void {
     const uri = try std.Uri.parse(url);
 
     var http_client: std.http.Client = .{ .allocator = allocator };
@@ -141,11 +129,37 @@ fn downloadWithHttpClient(allocator: std.mem.Allocator, url: []const u8, writer:
 
     if (request.response.status != .ok) return error.ResponseNotOk;
 
-    var buffer: [4096]u8 = undefined;
+    const file = try std.fs.cwd().createFile(destination_path, .{ .read = true });
+    defer file.close();
 
-    while (true) {
-        const bytes_read = try request.reader().read(&buffer);
-        if (bytes_read == 0) break;
-        try writer.writeAll(buffer[0..bytes_read]);
+    if (request.response.content_length) |content_length| {
+        // Content length is known, so we can ensure the file is the correct length then mmap it.
+
+        try file.setEndPos(content_length);
+
+        const file_contents = try std.os.mmap(
+            null,
+            content_length,
+            std.os.PROT.WRITE,
+            std.os.MAP.SHARED,
+            file.handle,
+            0,
+        );
+        defer std.os.munmap(file_contents);
+
+        const read = try request.readAll(file_contents);
+        std.debug.assert(read == content_length);
+    } else {
+        // Unkown content length, so we have to use an intermediate buffer.
+
+        var buffer: [std.mem.page_size]u8 = undefined;
+
+        const reader = request.reader();
+
+        while (true) {
+            const bytes_read = try reader.read(&buffer);
+            if (bytes_read == 0) break;
+            try file.writeAll(buffer[0..bytes_read]);
+        }
     }
 }
