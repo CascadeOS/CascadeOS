@@ -75,7 +75,8 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
         "images",
         "Build all the images",
     );
-    all_test_step.dependOn(all_images_build_step);
+    // FIXME: This causes the CI to hang and timeout
+    // all_test_step.dependOn(all_images_build_step);
 
     const image_build_steps_per_target = try buildPerTargetSteps(
         b,
