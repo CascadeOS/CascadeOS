@@ -69,7 +69,7 @@ pub fn init(kernel_elf: []const u8) !DwarfSymbolMap {
             errdefer allocator.free(decompressed_section);
 
             const read = zlib_stream.reader().readAll(decompressed_section) catch continue;
-            std.debug.assert(read == decompressed_section.len);
+            core.debugAssert(read == decompressed_section.len);
 
             break :blk .{
                 .data = decompressed_section,

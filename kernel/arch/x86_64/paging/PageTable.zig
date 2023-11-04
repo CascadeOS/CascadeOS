@@ -74,7 +74,7 @@ pub const PageTable = extern struct {
         for (self.entries, 0..) |level4_entry, level4_index| {
             if (!level4_entry.present.read()) continue;
 
-            std.debug.assert(!level4_entry.huge.read());
+            core.debugAssert(!level4_entry.huge.read());
 
             // The level 4 part is sign extended to ensure the address is cannonical.
             const level4_part = signExtendAddress(level4_index << level_4_shift);
@@ -133,7 +133,7 @@ pub const PageTable = extern struct {
                             continue;
                         }
 
-                        std.debug.assert(!level1_entry.huge.read());
+                        core.debugAssert(!level1_entry.huge.read());
 
                         const level1_part = level1_index << level_1_shift;
 
@@ -308,7 +308,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress4kib(self: *Entry, address: kernel.PhysicalAddress) void {
-            std.debug.assert(address.isAligned(paging.small_page_size));
+            core.debugAssert(address.isAligned(paging.small_page_size));
             self.address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -317,7 +317,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress2mib(self: *Entry, address: kernel.PhysicalAddress) void {
-            std.debug.assert(address.isAligned(paging.medium_page_size));
+            core.debugAssert(address.isAligned(paging.medium_page_size));
             self.address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -326,7 +326,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress1gib(self: *Entry, address: kernel.PhysicalAddress) void {
-            std.debug.assert(address.isAligned(paging.large_page_size));
+            core.debugAssert(address.isAligned(paging.large_page_size));
             self.address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -344,7 +344,7 @@ pub const PageTable = extern struct {
         }
 
         fn printSmallEntryFlags(self: Entry, writer: anytype) !void {
-            std.debug.assert(!self.huge.read());
+            core.debugAssert(!self.huge.read());
 
             if (self.present.read()) {
                 try writer.writeAll("Present ");
@@ -390,7 +390,7 @@ pub const PageTable = extern struct {
         }
 
         fn printHugeEntryFlags(self: Entry, writer: anytype) !void {
-            std.debug.assert(self.huge.read());
+            core.debugAssert(self.huge.read());
 
             if (self.present.read()) {
                 try writer.writeAll("Present ");

@@ -31,7 +31,7 @@ pub const PageTable = @import("PageTable.zig").PageTable;
 /// Allocates a new page table.
 pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     const range = kernel.pmm.allocatePage() orelse return error.PageAllocationFailed;
-    std.debug.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
+    core.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
     const page_table = range.toDirectMap().address.toPtr(*PageTable);
     page_table.zero();
@@ -215,7 +215,7 @@ fn mapTo4KiB(
     physical_address: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    std.debug.assert(virtual_address.isAligned(small_page_size));
+    core.debugAssert(virtual_address.isAligned(small_page_size));
 
     const level3_table = try ensureNextTable(
         level4_table.getEntryLevel4(virtual_address),
@@ -247,8 +247,8 @@ fn mapTo2MiB(
     physical_address: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    std.debug.assert(virtual_address.isAligned(medium_page_size));
-    std.debug.assert(physical_address.isAligned(medium_page_size));
+    core.debugAssert(virtual_address.isAligned(medium_page_size));
+    core.debugAssert(physical_address.isAligned(medium_page_size));
 
     const level3_table = try ensureNextTable(
         level4_table.getEntryLevel4(virtual_address),
@@ -276,9 +276,9 @@ fn mapTo1GiB(
     physical_address: kernel.PhysicalAddress,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    std.debug.assert(x86_64.info.has_gib_pages); // assert that 1GiB pages are available
-    std.debug.assert(virtual_address.isAligned(large_page_size));
-    std.debug.assert(physical_address.isAligned(large_page_size));
+    core.debugAssert(x86_64.info.has_gib_pages); // assert that 1GiB pages are available
+    core.debugAssert(virtual_address.isAligned(large_page_size));
+    core.debugAssert(physical_address.isAligned(large_page_size));
 
     const level3_table = try ensureNextTable(
         level4_table.getEntryLevel4(virtual_address),

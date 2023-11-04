@@ -7,7 +7,6 @@
 //  - `Boolean`
 
 const std = @import("std");
-const assert = std.debug.assert;
 const testing = std.testing;
 
 /// Returns `true` if the the bit at index `bit` is set (equals 1).

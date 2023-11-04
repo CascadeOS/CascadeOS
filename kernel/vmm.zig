@@ -86,11 +86,11 @@ pub fn mapRange(
     physical_range: kernel.PhysicalRange,
     map_type: MapType,
 ) !void {
-    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.equal(virtual_range.size));
+    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(physical_range.size.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.equal(virtual_range.size));
 
     log.debug(
         "mapping: {} to {} with type: {}",
@@ -112,11 +112,11 @@ pub fn mapRangeUseAllPageSizes(
     physical_range: kernel.PhysicalRange,
     map_type: MapType,
 ) !void {
-    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.equal(virtual_range.size));
+    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(physical_range.size.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.equal(virtual_range.size));
 
     log.debug(
         "mapping: {} to {} with type: {}",
@@ -261,7 +261,7 @@ fn mapSection(
     map_type: MapType,
     region_type: MemoryRegion.Type,
 ) !void {
-    std.debug.assert(section_end > section_start);
+    core.assert(section_end > section_start);
 
     const virt_address = kernel.VirtualAddress.fromInt(section_start);
 
@@ -271,7 +271,7 @@ fn mapSection(
             .from(section_end - section_start, .byte)
             .alignForward(paging.standard_page_size),
     );
-    std.debug.assert(virtual_range.size.isAligned(paging.standard_page_size));
+    core.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
     const phys_address = kernel.PhysicalAddress.fromInt(
         virt_address.value - kernel.info.kernel_physical_to_virtual_offset.bytes,

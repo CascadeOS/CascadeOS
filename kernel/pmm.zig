@@ -41,8 +41,12 @@ pub fn init() void {
 
 /// Adds a memory map entry to the physical page allocator.
 fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) void {
-    std.debug.assert(memory_map_entry.range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(memory_map_entry.range.size.isAligned(arch.paging.standard_page_size));
+    if (!memory_map_entry.range.address.isAligned(arch.paging.standard_page_size)) {
+        core.panicFmt("memory map entry address is not aligned to page size: {}", .{memory_map_entry});
+    }
+    if (!memory_map_entry.range.size.isAligned(arch.paging.standard_page_size)) {
+        core.panicFmt("memory map entry size is not aligned to page size: {}", .{memory_map_entry});
+    }
 
     const virtual_range = memory_map_entry.range.toDirectMap();
 
@@ -120,8 +124,8 @@ pub fn allocatePage() ?kernel.PhysicalRange {
 
 /// Deallocates a physical page.
 pub fn deallocatePage(range: kernel.PhysicalRange) void {
-    std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(range.size.equal(arch.paging.standard_page_size));
+    core.debugAssert(range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(range.size.equal(arch.paging.standard_page_size));
 
     const page_node = range.address.toDirectMap().toPtr(*PhysPageNode);
     _ = page_node;
@@ -133,6 +137,6 @@ const PhysPageNode = extern struct {
     next: ?*PhysPageNode = null,
 
     comptime {
-        std.debug.assert(core.Size.of(PhysPageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
+        core.assert(core.Size.of(PhysPageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
     }
 };

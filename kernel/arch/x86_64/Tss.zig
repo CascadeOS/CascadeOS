@@ -33,7 +33,7 @@ pub const Tss = extern struct {
 
     /// Sets the stack for the given privilege level.
     pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: []align(16) u8) void {
-        std.debug.assert(privilege_level != .ring3);
+        core.assert(privilege_level != .ring3);
         self.privilege_stack_table[@intFromEnum(privilege_level)] = kernel.VirtualAddress.fromInt(@intFromPtr(stack.ptr) + stack.len);
     }
 

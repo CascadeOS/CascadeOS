@@ -4,10 +4,22 @@ const std = @import("std");
 const builtin = @import("builtin");
 const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();
 
+const safety = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
+
 const size = @import("size.zig");
 pub const Size = size.Size;
 
 pub const testing = @import("testing.zig");
+
+pub fn assert(ok: bool) void {
+    if (comptime @inComptime() or safety)
+        if (!ok) panic("assertion failure");
+}
+
+pub fn debugAssert(ok: bool) void {
+    if (comptime @inComptime() or builtin.mode == .Debug)
+        if (!ok) panic("assertion failure");
+}
 
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
