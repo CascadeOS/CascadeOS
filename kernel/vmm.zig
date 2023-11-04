@@ -13,6 +13,8 @@ const log = kernel.log.scoped(.vmm);
 var kernel_root_page_table: *PageTable = undefined;
 var heap_range: kernel.VirtualRange = undefined;
 
+var initalized = false;
+
 pub fn init() void {
     log.debug("allocating kernel root page table", .{});
     kernel_root_page_table = paging.allocatePageTable() catch
@@ -39,13 +41,13 @@ pub fn init() void {
     log.debug("switching to kernel page table", .{});
     paging.switchToPageTable(kernel_root_page_table);
 
-    if (log.levelEnabled(.debug)) {
-        log.debug("kernel memory regions:", .{});
+    log.debug("kernel memory regions:", .{});
 
-        for (kernel_memory_layout.slice()) |region| {
-            log.debug("\t{}", .{region});
-        }
+    for (kernel_memory_layout.slice()) |region| {
+        log.debug("\t{}", .{region});
     }
+
+    initalized = true;
 }
 
 pub const MapType = struct {
@@ -80,7 +82,7 @@ pub const MapType = struct {
 };
 
 /// Maps a virtual address range to a physical address range using the standard page size.
-pub fn mapRange(
+fn mapRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
@@ -106,7 +108,7 @@ pub fn mapRange(
 }
 
 /// Maps a virtual address range to a physical address range using all available page sizes.
-pub fn mapRangeUseAllPageSizes(
+fn mapRangeUseAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
