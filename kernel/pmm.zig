@@ -16,6 +16,8 @@ var free_memory: core.Size = core.Size.zero;
 
 const indent = "  ";
 
+var initalized: bool = false;
+
 pub fn init() void {
     var memory_map_iterator = kernel.boot.memoryMapIterator(.forwards);
 
@@ -37,6 +39,8 @@ pub fn init() void {
         "total usable memory: {} - free: {} - in use: {}",
         .{ total_usable_memory, free_memory, total_usable_memory.subtract(free_memory) },
     );
+
+    initalized = true;
 }
 
 /// Adds a memory map entry to the physical page allocator.
@@ -85,6 +89,8 @@ fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) vo
 
 /// Allocates a physical page.
 pub fn allocatePage() ?kernel.PhysicalRange {
+    core.debugAssert(initalized);
+
     var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
 
     while (first_free_page_opt) |first_free_page| {
@@ -124,6 +130,7 @@ pub fn allocatePage() ?kernel.PhysicalRange {
 
 /// Deallocates a physical page.
 pub fn deallocatePage(range: kernel.PhysicalRange) void {
+    core.debugAssert(initalized);
     core.debugAssert(range.address.isAligned(arch.paging.standard_page_size));
     core.debugAssert(range.size.equal(arch.paging.standard_page_size));
 
