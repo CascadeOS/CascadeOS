@@ -137,7 +137,7 @@ fn AddrMixin(comptime Self: type) type {
     };
 }
 
-pub const PhysicalRange = struct {
+pub const PhysicalRange = extern struct {
     address: PhysicalAddress,
     size: core.Size,
 
@@ -154,7 +154,7 @@ pub const PhysicalRange = struct {
     pub usingnamespace RangeMixin(@This());
 };
 
-pub const VirtualRange = struct {
+pub const VirtualRange = extern struct {
     address: VirtualAddress,
     size: core.Size,
 
