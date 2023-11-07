@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: MIT
-//
-// Originally from [Florence](https://github.com/FlorenceOS/Florence/blob/master/lib/util/bitfields.zig) (see LICENSE-FLORENCE for original license)
-//  - `BitField`
-//  - `BitType`
-//  - `Bit`
-//  - `Boolean`
 
 const std = @import("std");
-const testing = std.testing;
+const builtin = @import("builtin");
 
 /// Returns `true` if the the bit at index `bit` is set (equals 1).
 ///
@@ -16,10 +10,10 @@ const testing = std.testing;
 /// ```zig
 /// const a: u8 = 0b00000010;
 ///
-/// try testing.expect(!isBitSet(a, 0));
-/// try testing.expect(isBitSet(a, 1));
+/// try std.testing.expect(!isBitSet(a, 0));
+/// try std.testing.expect(isBitSet(a, 1));
 /// ```
-pub fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
+pub inline fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
     const TargetType = @TypeOf(target);
 
     comptime {
@@ -53,31 +47,31 @@ test isBitSet {
     // comptime_int
     {
         const a: comptime_int = 0b00000000;
-        try testing.expect(!isBitSet(a, 0));
-        try testing.expect(!isBitSet(a, 1));
+        try std.testing.expect(!isBitSet(a, 0));
+        try std.testing.expect(!isBitSet(a, 1));
 
         const b: comptime_int = 0b11111111;
-        try testing.expect(isBitSet(b, 0));
-        try testing.expect(isBitSet(b, 1));
+        try std.testing.expect(isBitSet(b, 0));
+        try std.testing.expect(isBitSet(b, 1));
 
         const c: comptime_int = 0b00000010;
-        try testing.expect(!isBitSet(c, 0));
-        try testing.expect(isBitSet(c, 1));
+        try std.testing.expect(!isBitSet(c, 0));
+        try std.testing.expect(isBitSet(c, 1));
     }
 
     // Runtime
     {
         const a: u8 = 0b00000000;
-        try testing.expect(!isBitSet(a, 0));
-        try testing.expect(!isBitSet(a, 1));
+        try std.testing.expect(!isBitSet(a, 0));
+        try std.testing.expect(!isBitSet(a, 1));
 
         const b: u8 = 0b11111111;
-        try testing.expect(isBitSet(b, 0));
-        try testing.expect(isBitSet(b, 1));
+        try std.testing.expect(isBitSet(b, 0));
+        try std.testing.expect(isBitSet(b, 1));
 
         const c: u8 = 0b00000010;
-        try testing.expect(!isBitSet(c, 0));
-        try testing.expect(isBitSet(c, 1));
+        try std.testing.expect(!isBitSet(c, 0));
+        try std.testing.expect(isBitSet(c, 1));
     }
 }
 
@@ -88,10 +82,10 @@ test isBitSet {
 /// ```zig
 /// const a: u8 = 0b00000010;
 ///
-/// try testing.expect(getBit(a, 0) == 0);
-/// try testing.expect(getBit(a, 1) == 1);
+/// try std.testing.expect(getBit(a, 0) == 0);
+/// try std.testing.expect(getBit(a, 1) == 1);
 /// ```
-pub fn getBit(target: anytype, comptime bit: comptime_int) u1 {
+pub inline fn getBit(target: anytype, comptime bit: comptime_int) u1 {
     return @intFromBool(isBitSet(target, bit));
 }
 
@@ -99,31 +93,31 @@ test getBit {
     // comptime_int
     {
         const a: comptime_int = 0b00000000;
-        try testing.expectEqual(@as(u1, 0), getBit(a, 0));
-        try testing.expectEqual(@as(u1, 0), getBit(a, 1));
+        try std.testing.expectEqual(@as(u1, 0), getBit(a, 0));
+        try std.testing.expectEqual(@as(u1, 0), getBit(a, 1));
 
         const b: comptime_int = 0b11111111;
-        try testing.expectEqual(@as(u1, 1), getBit(b, 0));
-        try testing.expectEqual(@as(u1, 1), getBit(b, 1));
+        try std.testing.expectEqual(@as(u1, 1), getBit(b, 0));
+        try std.testing.expectEqual(@as(u1, 1), getBit(b, 1));
 
         const c: comptime_int = 0b00000010;
-        try testing.expectEqual(@as(u1, 0), getBit(c, 0));
-        try testing.expectEqual(@as(u1, 1), getBit(c, 1));
+        try std.testing.expectEqual(@as(u1, 0), getBit(c, 0));
+        try std.testing.expectEqual(@as(u1, 1), getBit(c, 1));
     }
 
     // Runtime
     {
         const a: u8 = 0b00000000;
-        try testing.expectEqual(@as(u1, 0), getBit(a, 0));
-        try testing.expectEqual(@as(u1, 0), getBit(a, 1));
+        try std.testing.expectEqual(@as(u1, 0), getBit(a, 0));
+        try std.testing.expectEqual(@as(u1, 0), getBit(a, 1));
 
         const b: u8 = 0b11111111;
-        try testing.expectEqual(@as(u1, 1), getBit(b, 0));
-        try testing.expectEqual(@as(u1, 1), getBit(b, 1));
+        try std.testing.expectEqual(@as(u1, 1), getBit(b, 0));
+        try std.testing.expectEqual(@as(u1, 1), getBit(b, 1));
 
         const c: u8 = 0b00000010;
-        try testing.expectEqual(@as(u1, 0), getBit(c, 0));
-        try testing.expectEqual(@as(u1, 1), getBit(c, 1));
+        try std.testing.expectEqual(@as(u1, 0), getBit(c, 0));
+        try std.testing.expectEqual(@as(u1, 1), getBit(c, 1));
     }
 }
 
@@ -134,9 +128,13 @@ test getBit {
 /// ```zig
 /// const a: u8 = 0b01101100;
 /// const b = getBits(a, 2, 4);
-/// try testing.expectEqual(@as(u4,0b1011), b);
+/// try std.testing.expectEqual(@as(u4,0b1011), b);
 /// ```
-pub fn getBits(target: anytype, comptime start_bit: comptime_int, comptime number_of_bits: comptime_int) std.meta.Int(.unsigned, number_of_bits) {
+pub inline fn getBits(
+    target: anytype,
+    comptime start_bit: comptime_int,
+    comptime number_of_bits: comptime_int,
+) std.meta.Int(.unsigned, number_of_bits) {
     const TargetType = @TypeOf(target);
 
     comptime {
@@ -169,14 +167,14 @@ test getBits {
     {
         const a: comptime_int = 0b01101100;
         const b = getBits(a, 2, 4);
-        try testing.expectEqual(@as(u4, 0b1011), b);
+        try std.testing.expectEqual(@as(u4, 0b1011), b);
     }
 
     // Runtime
     {
         const a: u8 = 0b01101100;
         const b = getBits(a, 2, 4);
-        try testing.expectEqual(@as(u4, 0b1011), b);
+        try std.testing.expectEqual(@as(u4, 0b1011), b);
     }
 }
 
@@ -186,9 +184,9 @@ test getBits {
 ///
 /// ```zig
 /// var val: u8 = 0b00000000;
-/// try testing.expect(!getBit(val, 0));
+/// try std.testing.expect(!getBit(val, 0));
 /// setBit( &val, 0, true);
-/// try testing.expect(getBit(val, 0));
+/// try std.testing.expect(getBit(val, 0));
 /// ```
 pub fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
@@ -229,11 +227,11 @@ pub fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
 
 test setBit {
     var val: u8 = 0b00000000;
-    try testing.expect(!isBitSet(val, 0));
+    try std.testing.expect(!isBitSet(val, 0));
     setBit(&val, 0, true);
-    try testing.expect(isBitSet(val, 0));
+    try std.testing.expect(isBitSet(val, 0));
     setBit(&val, 0, false);
-    try testing.expect(!isBitSet(val, 0));
+    try std.testing.expect(!isBitSet(val, 0));
 }
 
 /// Sets the range of bits starting at `start_bit` upto and excluding `start_bit` + `number_of_bits`.
@@ -241,12 +239,17 @@ test setBit {
 /// ```zig
 /// var val: u8 = 0b10000000;
 /// setBits(&val, 2, 4, 0b00001101);
-/// try testing.expectEqual(@as(u8, 0b10110100), val);
+/// try std.testing.expectEqual(@as(u8, 0b10110100), val);
 /// ```
 ///
 /// ## Panic
 /// This method will panic if the `value` exceeds the bit range of the type of `target`
-pub fn setBits(target: anytype, comptime start_bit: comptime_int, comptime number_of_bits: comptime_int, value: anytype) void {
+pub fn setBits(
+    target: anytype,
+    comptime start_bit: comptime_int,
+    comptime number_of_bits: comptime_int,
+    value: anytype,
+) void {
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
         if (ptr_type_info != .Pointer) @compileError("not a pointer");
@@ -278,7 +281,9 @@ pub fn setBits(target: anytype, comptime start_bit: comptime_int, comptime numbe
     const peer_value: TargetType = value;
 
     if (std.debug.runtime_safety) {
-        if (getBits(peer_value, 0, (end_bit - start_bit)) != peer_value) @panic("value exceeds bit range");
+        if (getBits(peer_value, 0, (end_bit - start_bit)) != peer_value) {
+            @panic("value exceeds bit range");
+        }
     }
 
     const bitmask: TargetType = comptime blk: {
@@ -296,7 +301,7 @@ pub fn setBits(target: anytype, comptime start_bit: comptime_int, comptime numbe
 test setBits {
     var val: u8 = 0b10000000;
     setBits(&val, 2, 4, 0b00001101);
-    try testing.expectEqual(@as(u8, 0b10110100), val);
+    try std.testing.expectEqual(@as(u8, 0b10110100), val);
 }
 
 /// Casts a pointer while preserving const/volatile qualifiers.
@@ -472,6 +477,10 @@ test Boolean {
     s.high.write(false);
 
     try std.testing.expect(s.val == 1);
+}
+
+comptime {
+    if (builtin.cpu.arch.endian() != .little) @compileError("'bitjuggle' assumes little endian");
 }
 
 comptime {
