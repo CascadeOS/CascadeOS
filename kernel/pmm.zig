@@ -91,7 +91,7 @@ fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) vo
 pub fn allocatePage() ?kernel.PhysicalRange {
     core.debugAssert(initalized);
 
-    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Monotonic);
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Acquire);
 
     while (first_free_page_opt) |first_free_page| {
         if (@cmpxchgWeak(
@@ -100,31 +100,30 @@ pub fn allocatePage() ?kernel.PhysicalRange {
             first_free_page,
             first_free_page.next,
             .AcqRel,
-            .Monotonic,
+            .Acquire,
         )) |new_first_free_page| {
             first_free_page_opt = new_first_free_page;
             continue;
         }
 
-        // Decrement `free_memory`
+        // decrement `free_memory`
         _ = @atomicRmw(
             usize,
             &free_memory.bytes,
             .Sub,
             arch.paging.standard_page_size.bytes,
-            .Monotonic,
+            .AcqRel,
         );
 
         const physical_address = kernel.VirtualAddress.fromPtr(first_free_page).toPhysicalFromDirectMap() catch unreachable;
         const allocated_range = kernel.PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
 
-        log.debug("found free page: {}", .{allocated_range});
+        log.debug("allocated page: {}", .{allocated_range});
 
         return allocated_range;
-    } else {
-        log.warn("STANDARD PAGE ALLOCATION FAILED", .{});
     }
 
+    log.warn("STANDARD PAGE ALLOCATION FAILED", .{});
     return null;
 }
 
@@ -135,9 +134,37 @@ pub fn deallocatePage(range: kernel.PhysicalRange) void {
     core.debugAssert(range.size.equal(arch.paging.standard_page_size));
 
     const page_node = range.address.toDirectMap().toPtr(*PhysPageNode);
-    _ = page_node;
 
-    core.panic("UNIMPLEMENTED `deallocatePage`"); // TODO: implement deallocatePage https://github.com/CascadeOS/CascadeOS/issues/21
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Acquire);
+
+    while (true) {
+        page_node.next = first_free_page_opt;
+
+        if (@cmpxchgWeak(
+            ?*PhysPageNode,
+            &first_free_physical_page,
+            first_free_page_opt,
+            page_node,
+            .AcqRel,
+            .Acquire,
+        )) |new_first_free_page| {
+            first_free_page_opt = new_first_free_page;
+            continue;
+        }
+
+        break;
+    }
+
+    // increment `free_memory`
+    _ = @atomicRmw(
+        usize,
+        &free_memory.bytes,
+        .Add,
+        arch.paging.standard_page_size.bytes,
+        .AcqRel,
+    );
+
+    log.debug("freed page: {}", .{range});
 }
 
 const PhysPageNode = extern struct {
