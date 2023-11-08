@@ -21,6 +21,9 @@ test_exe: *Step.Compile,
 
 exe_install_step: *Step,
 
+/// only used for generating a dependency graph
+dependencies: []const *const Library,
+
 /// Resolves all tools and their dependencies.
 pub fn getTools(
     b: *std.Build,
@@ -151,6 +154,8 @@ fn resolveTool(
         .exe = exe,
         .test_exe = test_exe,
         .exe_install_step = &exe_install_step.step,
+
+        .dependencies = dependencies,
     };
 }
 

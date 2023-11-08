@@ -19,6 +19,9 @@ options: Options,
 
 install_step: *Step.InstallArtifact,
 
+/// only used for generating a dependency graph
+dependencies: []const *const Library,
+
 pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
 
 pub fn getKernels(
@@ -58,6 +61,10 @@ fn create(
 
     kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
 
+    const declared_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
+    var dependencies = try std.ArrayListUnmanaged(*const Library).initCapacity(b.allocator, declared_dependencies.len);
+    defer dependencies.deinit(b.allocator);
+
     const kernel_module = blk: {
         const kernel_module = b.createModule(.{
             .source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
@@ -73,11 +80,12 @@ fn create(
         try kernel_module.dependencies.put("kernel_options", options.kernel_option_module);
 
         // dependencies
-        const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
-        for (kernel_dependencies) |dependency| {
+
+        for (declared_dependencies) |dependency| {
             const library = libraries.get(dependency).?;
             const library_module = library.cascade_modules.get(target) orelse continue;
             try kernel_module.dependencies.put(library.name, library_module);
+            dependencies.appendAssumeCapacity(library);
         }
 
         // source file modules
@@ -135,6 +143,8 @@ fn create(
         .target = target,
         .options = options,
         .install_step = install_step,
+
+        .dependencies = try dependencies.toOwnedSlice(b.allocator),
     };
 }
 
