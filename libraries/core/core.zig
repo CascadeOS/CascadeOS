@@ -35,6 +35,12 @@ pub fn panicFmt(comptime format: []const u8, args: anytype) noreturn {
     std.debug.panicExtra(null, @returnAddress(), format, args);
 }
 
+pub const OrderedComparison = enum {
+    less,
+    match,
+    more,
+};
+
 /// This function formats structs but skips fields containing "reserved" in their name.
 pub fn formatStructIgnoreReserved(
     self: anytype,
