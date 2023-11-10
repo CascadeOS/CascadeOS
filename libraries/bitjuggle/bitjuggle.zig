@@ -197,7 +197,7 @@ test getBits {
 /// setBit( &val, 0, true);
 /// try std.testing.expect(getBit(val, 0));
 /// ```
-pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
+pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) void {
     // SAFETY: comptime checks ensure function is always safe
     @setRuntimeSafety(false);
 
@@ -224,7 +224,7 @@ pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: bool) v
     }
 
     const mask = ~(@as(TargetType, 1) << bit);
-    const peer_value: TargetType = @intFromBool(value);
+    const peer_value: TargetType = value;
 
     target.* = (target.* & mask) | (peer_value << bit);
 }
@@ -232,9 +232,9 @@ pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: bool) v
 test setBit {
     var val: u8 = 0b00000000;
     try std.testing.expect(!isBitSet(val, 0));
-    setBit(&val, 0, true);
+    setBit(&val, 0, 1);
     try std.testing.expect(isBitSet(val, 0));
-    setBit(&val, 0, false);
+    setBit(&val, 0, 0);
     try std.testing.expect(!isBitSet(val, 0));
 }
 
