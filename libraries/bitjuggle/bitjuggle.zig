@@ -14,6 +14,9 @@ const builtin = @import("builtin");
 /// try std.testing.expect(isBitSet(a, 1));
 /// ```
 pub inline fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
+    // SAFETY: comptime checks ensure function is always safe
+    @setRuntimeSafety(false);
+
     const TargetType = @TypeOf(target);
 
     comptime {
@@ -86,6 +89,9 @@ test isBitSet {
 /// try std.testing.expect(getBit(a, 1) == 1);
 /// ```
 pub inline fn getBit(target: anytype, comptime bit: comptime_int) u1 {
+    // SAFETY: function is always safe
+    @setRuntimeSafety(false);
+
     return @intFromBool(isBitSet(target, bit));
 }
 
@@ -135,6 +141,9 @@ pub inline fn getBits(
     comptime start_bit: comptime_int,
     comptime number_of_bits: comptime_int,
 ) std.meta.Int(.unsigned, number_of_bits) {
+    // SAFETY: comptime checks ensure function is always safe
+    @setRuntimeSafety(false);
+
     const TargetType = @TypeOf(target);
 
     comptime {
@@ -188,7 +197,10 @@ test getBits {
 /// setBit( &val, 0, true);
 /// try std.testing.expect(getBit(val, 0));
 /// ```
-pub fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
+pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
+    // SAFETY: comptime checks ensure function is always safe
+    @setRuntimeSafety(false);
+
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
         if (ptr_type_info != .Pointer) @compileError("not a pointer");
@@ -211,18 +223,10 @@ pub fn setBit(target: anytype, comptime bit: comptime_int, value: bool) void {
         }
     }
 
-    const mask: TargetType = comptime blk: {
-        const MaskType = std.meta.Int(.unsigned, bit + 1);
-        var temp: MaskType = std.math.maxInt(MaskType);
-        temp <<= bit;
-        break :blk temp;
-    };
+    const mask = ~(@as(TargetType, 1) << bit);
+    const peer_value: TargetType = @intFromBool(value);
 
-    if (value) {
-        target.* |= mask;
-    } else {
-        target.* &= comptime ~(mask);
-    }
+    target.* = (target.* & mask) | (peer_value << bit);
 }
 
 test setBit {
@@ -250,6 +254,9 @@ pub fn setBits(
     comptime number_of_bits: comptime_int,
     value: anytype,
 ) void {
+    // SAFETY: comptime checks and explicit runtime safety check
+    @setRuntimeSafety(false);
+
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
         if (ptr_type_info != .Pointer) @compileError("not a pointer");
@@ -345,15 +352,24 @@ pub fn Bitfield(
 
         /// Writes a value to the bitfield without shifting, all bits in `val` not in the bitfield are ignored.
         pub fn writeNoShiftFullSize(self: *Self, val: FieldType) void {
+            // SAFETY: function is always safe
+            @setRuntimeSafety(false);
+
             self.field().* &= ~self_mask;
             self.field().* |= (val & self_mask);
         }
 
         pub fn write(self: *Self, val: ValueType) void {
+            // SAFETY: function is always safe
+            @setRuntimeSafety(false);
+
             self.writeNoShiftFullSize(@as(FieldType, @intCast(val)) << shift_amount);
         }
 
         pub fn read(self: Self) ValueType {
+            // SAFETY: function is always safe
+            @setRuntimeSafety(false);
+
             return @intCast(self.readNoShiftFullSize() >> shift_amount);
         }
 
@@ -361,6 +377,9 @@ pub fn Bitfield(
         ///
         /// All bits not in the bitfield will be zero.
         pub inline fn readNoShiftFullSize(self: Self) FieldType {
+            // SAFETY: function is always safe
+            @setRuntimeSafety(false);
+
             return (self.field().* & self_mask);
         }
     };
@@ -396,23 +415,23 @@ fn BitType(
     /// The type of the bit value, either u1 or bool.
     comptime ValueType: type,
 ) type {
-    const self_bit: FieldType = (1 << shift_amount);
-
     return extern struct {
         bits: Bitfield(FieldType, shift_amount, 1),
 
         const Self = @This();
 
         pub fn read(self: Self) ValueType {
-            return @bitCast(@as(u1, @truncate(self.bits.field().* >> shift_amount)));
+            // SAFETY: function is always safe
+            @setRuntimeSafety(false);
+
+            return @bitCast(getBit(self.bits.field().*, shift_amount));
         }
 
         pub fn write(self: *Self, val: ValueType) void {
-            if (@bitCast(val)) {
-                self.bits.field().* |= self_bit;
-            } else {
-                self.bits.field().* &= ~self_bit;
-            }
+            // SAFETY: function is always safe
+            @setRuntimeSafety(false);
+
+            setBit(self.bits.field(), shift_amount, @bitCast(val));
         }
     };
 }
