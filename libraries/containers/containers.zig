@@ -9,6 +9,7 @@ pub const RedBlack = struct {
     pub const Tree = red_black_tree.Tree;
     pub const Node = red_black_tree.Node;
     pub const Iterator = red_black_tree.Iterator;
+    pub const ComparisonAndMatch = red_black_tree.ComparisonAndMatch;
 };
 
 comptime {

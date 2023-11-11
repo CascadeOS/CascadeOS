@@ -602,11 +602,52 @@ pub fn Tree(
             return null;
         }
 
+        /// Returns the last node encountered for which `whereFn` returns a `ComparisonAndMatch` where
+        /// `counts_as_a_match` is true, if `comparison` is `.match` then that node is returned.
+        ///
+        /// If no node is found, returns null.
+        ///
+        /// NOTE:
+        ///   - The `whereFn` *must* return the same `comparison` value as the `compareFn` would when comparing
+        ///     the `other_node` to the target node.
+        pub fn findLastMatch(
+            self: *const Self,
+            context: anytype,
+            comptime whereFn: fn (context: @TypeOf(context), other_node: *const Node) ComparisonAndMatch,
+        ) ?*Node {
+            const root = self.root orelse return null;
+
+            var opt_current_node: ?*Node = root;
+
+            var last_matching_node: ?*Node = null;
+
+            while (opt_current_node) |current_node| {
+                const comparison = whereFn(context, current_node);
+
+                const direction: Direction = switch (comparison.comparison) {
+                    .match => return current_node,
+                    .less => .left,
+                    .greater => .right,
+                };
+
+                if (comparison.counts_as_a_match) last_matching_node = current_node;
+
+                opt_current_node = current_node.children[direction.toValue()];
+            }
+
+            return last_matching_node;
+        }
+
         pub fn iterator(self: *const Self) Iterator {
             return Iterator.init(self.root);
         }
     };
 }
+
+pub const ComparisonAndMatch = struct {
+    comparison: core.OrderedComparison,
+    counts_as_a_match: bool,
+};
 
 pub const Iterator = struct {
     next_node: ?*Node,
@@ -725,7 +766,7 @@ test Tree {
     {
         var less_than_node = tree.findFirstMatch(
             @as(usize, 15),
-            Item.findLessThanNode,
+            Item.findFirstLessThanEqualNode,
         );
         try std.testing.expect(less_than_node != null);
         var less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
@@ -735,11 +776,32 @@ test Tree {
 
         less_than_node = tree.findFirstMatch(
             @as(usize, 15),
-            Item.findLessThanNode,
+            Item.findFirstLessThanEqualNode,
         );
         try std.testing.expect(less_than_node != null);
         less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
         try std.testing.expectEqual(@as(usize, 0), less_than_item.value);
+    }
+
+    // find - last less than
+    {
+        var less_than_node = tree.findLastMatch(
+            @as(usize, 40),
+            Item.findLastLessThanEqualNode,
+        );
+        try std.testing.expect(less_than_node != null);
+        var less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
+        try std.testing.expectEqual(@as(usize, 0), less_than_item.value);
+
+        tree.remove(less_than_node.?);
+
+        less_than_node = tree.findLastMatch(
+            @as(usize, 40),
+            Item.findLastLessThanEqualNode,
+        );
+        try std.testing.expect(less_than_node != null);
+        less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
+        try std.testing.expectEqual(@as(usize, 17), less_than_item.value);
     }
 }
 
@@ -770,7 +832,7 @@ const Item = struct {
             core.OrderedComparison.match;
     }
 
-    fn findLessThanNode(context: usize, other_node: *const Node) core.OrderedComparison {
+    fn findFirstLessThanEqualNode(context: usize, other_node: *const Node) core.OrderedComparison {
         const other_item = @fieldParentPtr(Item, "node", other_node);
 
         if (other_item.value <= context) return .match;
@@ -778,16 +840,27 @@ const Item = struct {
         return .less;
     }
 
+    fn findLastLessThanEqualNode(context: usize, other_node: *const Node) ComparisonAndMatch {
+        const other_item = @fieldParentPtr(Item, "node", other_node);
+
+        const less_than_or_equal = other_item.value <= context;
+
+        return .{
+            .comparison = if (less_than_or_equal) .less else .greater,
+            .counts_as_a_match = less_than_or_equal,
+        };
+    }
+
     fn compareNodes(node: *const Node, other_node: *const Node) core.OrderedComparison {
         const item = @fieldParentPtr(Item, "node", node);
         const other = @fieldParentPtr(Item, "node", other_node);
 
         return if (item.value < other.value)
-            core.OrderedComparison.less
+            .less
         else if (item.value > other.value)
-            core.OrderedComparison.greater
+            .greater
         else
-            core.OrderedComparison.match;
+            .match;
     }
 
     fn lessThan(_: void, lhs: Item, rhs: Item) bool {
