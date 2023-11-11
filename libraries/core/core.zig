@@ -38,7 +38,7 @@ pub fn panicFmt(comptime format: []const u8, args: anytype) noreturn {
 pub const OrderedComparison = enum {
     less,
     match,
-    more,
+    greater,
 };
 
 /// This function formats structs but skips fields containing "reserved" in their name.

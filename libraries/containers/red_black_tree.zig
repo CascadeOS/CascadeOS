@@ -161,7 +161,7 @@ pub fn Tree(
                     direction = switch (compareFn(node, current_node)) {
                         .match => return error.AlreadyPresent,
                         .less => .left,
-                        .more => .right,
+                        .greater => .right,
                     };
                     parent_node = current_node;
                     opt_current_node = current_node.children[direction.toValue()];
@@ -594,7 +594,7 @@ pub fn Tree(
                 const direction: Direction = switch (whereFn(context, current_node)) {
                     .match => return current_node,
                     .less => .left,
-                    .more => .right,
+                    .greater => .right,
                 };
                 opt_current_node = current_node.children[direction.toValue()];
             }
@@ -765,7 +765,7 @@ const Item = struct {
         return if (context < other_item.value)
             core.OrderedComparison.less
         else if (context > other_item.value)
-            core.OrderedComparison.more
+            core.OrderedComparison.greater
         else
             core.OrderedComparison.match;
     }
@@ -785,7 +785,7 @@ const Item = struct {
         return if (item.value < other.value)
             core.OrderedComparison.less
         else if (item.value > other.value)
-            core.OrderedComparison.more
+            core.OrderedComparison.greater
         else
             core.OrderedComparison.match;
     }
