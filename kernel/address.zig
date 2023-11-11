@@ -118,6 +118,12 @@ fn AddrMixin(comptime Self: type) type {
             return self.value >= other.value;
         }
 
+        pub fn compare(self: Self, other: Self) core.OrderedComparison {
+            if (self.lessThan(other)) return .less;
+            if (self.greaterThan(other)) return .greater;
+            return .match;
+        }
+
         pub fn print(self: Self, writer: anytype) !void {
             try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
