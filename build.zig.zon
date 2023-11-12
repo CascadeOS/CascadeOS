@@ -3,9 +3,9 @@
     .version = "0.0.1",
 
     .dependencies = .{
-        .limine = .{ // v5.20231006.0
-            .url = "https://github.com/limine-bootloader/limine/archive/ee753845b2241ec75bfc67e8cce48f1860c365a2.tar.gz",
-            .hash = "122012d48b314549ce30978fc59cfebff3b895707d956a6d80d2ffa5eafad7054e36",
+        .limine = .{ // tag: v5.20231103.0-binary
+            .url = "https://github.com/limine-bootloader/limine/archive/1976e465744d68c26e2e0b2675e57771b235ee3d.tar.gz",
+            .hash = "1220eb87ab4a60d05cd07fd887cc96a744bfa003f0539d4cd58d8f5c4cd60a6f03a8",
         },
     },
 
