@@ -4,7 +4,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const limine = @import("limine.zig");
+const limine = @import("limine");
 
 // TODO: Support more than just limine. https://github.com/CascadeOS/CascadeOS/issues/35
 //       Multiboot, etc.

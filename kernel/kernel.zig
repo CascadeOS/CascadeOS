@@ -4,7 +4,7 @@ const std = @import("std");
 const core = @import("core");
 
 pub const arch = @import("arch/arch.zig");
-pub const boot = @import("boot/boot.zig");
+pub const boot = @import("boot.zig");
 pub const CoreData = @import("CoreData.zig");
 pub const debug = @import("debug/debug.zig");
 pub const info = @import("info.zig");
