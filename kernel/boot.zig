@@ -18,6 +18,8 @@ export fn _start() noreturn {
 }
 
 const limine_requests = struct {
+    // TODO: setting this to 1 causes aarch64 to hang at "limine: Loading kernel `boot:///kernel`..."
+    export var limine_revison: limine.BaseRevison = .{ .revison = 0 };
     export var kernel_file: limine.KernelFile = .{};
     export var hhdm: limine.HHDM = .{};
     export var kernel_address: limine.KernelAddress = .{};
@@ -59,13 +61,14 @@ pub fn kernelFile() ?kernel.VirtualRange {
 /// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
+    const entries = memmap_response.entries();
     return .{
         .limine = .{
             .index = switch (direction) {
                 .forwards => 0,
-                .backwards => memmap_response.entry_count,
+                .backwards => entries.len,
             },
-            .memmap = memmap_response,
+            .entries = entries,
             .direction = direction,
         },
     };
@@ -141,27 +144,30 @@ pub const Direction = enum {
 
 const LimineMemoryMapIterator = struct {
     index: usize,
-    memmap: *const limine.Memmap.Response,
+    entries: []const *const limine.Memmap.Entry,
     direction: Direction,
 
     pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
-        if (self.direction == .backwards) {
-            if (self.index == 0) return null;
-            self.index -= 1;
-        }
-
-        const limine_entry = self.memmap.getEntry(self.index) orelse return null;
-
-        if (self.direction == .forwards) {
-            self.index += 1;
-        }
+        const limine_entry = switch (self.direction) {
+            .backwards => blk: {
+                if (self.index == 0) return null;
+                self.index -= 1;
+                break :blk self.entries[self.index];
+            },
+            .forwards => blk: {
+                if (self.index >= self.entries.len) return null;
+                const entry = self.entries[self.index];
+                self.index += 1;
+                break :blk entry;
+            },
+        };
 
         return .{
             .range = kernel.PhysicalRange.fromAddr(
                 kernel.PhysicalAddress.fromInt(limine_entry.base),
                 core.Size.from(limine_entry.length, .byte),
             ),
-            .type = switch (limine_entry.memmap_type) {
+            .type = switch (limine_entry.type) {
                 .usable => .free,
                 .kernel_and_modules, .framebuffer => .in_use,
                 .reserved, .bad_memory, .acpi_nvs => .reserved_or_unusable,
