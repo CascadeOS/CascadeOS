@@ -4,6 +4,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+pub const AddressSpace = @import("AddressSpace.zig");
 pub const MapType = @import("MapType.zig");
 pub const MemoryRegion = @import("MemoryRegion.zig");
 
