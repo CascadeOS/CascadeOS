@@ -8,7 +8,7 @@ const arch = kernel.arch;
 const paging = kernel.arch.paging;
 const PageTable = paging.PageTable;
 
-const log = kernel.log.scoped(.vmm);
+const log = kernel.log.scoped(.virt_mm);
 
 var kernel_root_page_table: *PageTable = undefined;
 var heap_range: kernel.VirtualRange = undefined;
