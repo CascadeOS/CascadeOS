@@ -474,7 +474,7 @@ const FATContext = struct {
                     continue; // TODO: long names
                 }
 
-                if (entry.standard.short_file_name.eql(name.short_name)) return entry;
+                if (entry.standard.short_file_name.equal(name.short_name)) return entry;
             }
 
             return null;
