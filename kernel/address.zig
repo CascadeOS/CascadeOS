@@ -202,6 +202,10 @@ fn RangeMixin(comptime Self: type) type {
             return self.address.moveForward(self.size);
         }
 
+        pub fn equal(self: Self, other: Self) bool {
+            return self.address.equal(other.address) and self.size.equal(other.size);
+        }
+
         pub inline fn moveForward(self: Self, size: core.Size) Self {
             return .{
                 .address = self.address.moveForward(size),
