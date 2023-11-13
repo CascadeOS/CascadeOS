@@ -135,6 +135,12 @@ pub const Size = extern struct {
         return self.bytes == other.bytes;
     }
 
+    pub fn compare(self: Size, other: Size) core.OrderedComparison {
+        if (self.lessThan(other)) return .less;
+        if (self.greaterThan(other)) return .greater;
+        return .match;
+    }
+
     // Must be kept in descending size order due to the logic in `print`
     const unit_table = .{
         .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
