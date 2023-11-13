@@ -6,7 +6,7 @@ const kernel = @import("kernel");
 
 const arch = kernel.arch;
 
-const log = kernel.log.scoped(.pmm);
+const log = kernel.log.scoped(.phys_mm);
 
 // TODO: better data structure https://github.com/CascadeOS/CascadeOS/issues/20
 
