@@ -11,8 +11,8 @@ pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
 pub const setup = @import("setup.zig");
-pub const SpinLock = @import("SpinLock.zig");
 pub const vmm = @import("vmm.zig");
+pub const sync = @import("sync/sync.zig");
 
 const address = @import("address.zig");
 pub const PhysicalAddress = address.PhysicalAddress;

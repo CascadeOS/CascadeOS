@@ -9,7 +9,7 @@ const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
 var symbols_loaded: bool = false;
 var symbol_loading_failed: bool = false;
 
-var symbol_loading_spinlock: kernel.SpinLock = .{};
+var symbol_loading_spinlock: kernel.sync.SpinLock = .{};
 
 var dwarf_symbol_map_opt: ?DwarfSymbolMap = null;
 
