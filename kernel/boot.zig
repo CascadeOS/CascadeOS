@@ -11,10 +11,10 @@ const limine = @import("limine");
 
 /// Entry point.
 export fn _start() noreturn {
-    @call(.never_inline, kernel.setup.setup, .{});
+    @call(.never_inline, kernel.init.kernelInit, .{});
 
     // TODO: This should halt the entire kernel not just this core.
-    core.panic("setup returned");
+    core.panic("kernelInit returned");
 }
 
 const limine_requests = struct {

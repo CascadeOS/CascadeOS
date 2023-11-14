@@ -5,7 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const aarch64 = @import("aarch64.zig");
 
-const log = kernel.log.scoped(.setup);
+const log = kernel.log.scoped(.init);
 
 pub const EarlyOutputWriter = aarch64.Uart.Writer;
 var early_output_uart: ?aarch64.Uart = null;

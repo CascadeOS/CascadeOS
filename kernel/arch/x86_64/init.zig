@@ -5,7 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x86_64 = @import("x86_64.zig");
 
-const log = kernel.log.scoped(.setup);
+const log = kernel.log.scoped(.init);
 
 pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
 var early_output_serial_port: ?x86_64.serial.SerialPort = null;

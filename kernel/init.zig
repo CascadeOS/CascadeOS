@@ -4,39 +4,40 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const log = kernel.log.scoped(.setup);
+const log = kernel.log.scoped(.init);
 
 var bootstrap_core_data: kernel.CoreData = .{
     .core_id = 0,
 };
 
-pub fn setup() void {
+/// Entry point from the bootloader specific code.
+pub fn kernelInit() void {
     // we need to get the core data loaded early as the panic handler and logging use it
-    kernel.arch.setup.loadBootstrapCoreData(&bootstrap_core_data);
+    kernel.arch.init.loadBootstrapCoreData(&bootstrap_core_data);
 
     // get output up and running as soon as possible
-    kernel.arch.setup.setupEarlyOutput();
+    kernel.arch.init.setupEarlyOutput();
 
     // as we need the kernel elf file to output symbols and source locations, we acquire it early
     kernel.info.kernel_file = kernel.boot.kernelFile() orelse
         core.panic("bootloader did not provide the kernel file");
 
     // print starting message
-    if (kernel.arch.setup.getEarlyOutputWriter()) |writer| {
+    if (kernel.arch.init.getEarlyOutputWriter()) |writer| {
         writer.writeAll(comptime "starting CascadeOS " ++ kernel.info.version ++ "\n") catch {};
     }
 
     log.info("performing early system initialization", .{});
-    kernel.arch.setup.earlyArchInitialization();
+    kernel.arch.init.earlyArchInitialization();
 
     log.info("capturing bootloader information", .{});
     captureBootloaderInformation();
 
     log.info("capturing system information", .{});
-    kernel.arch.setup.captureSystemInformation();
+    kernel.arch.init.captureSystemInformation();
 
     log.info("configuring system features", .{});
-    kernel.arch.setup.configureSystemFeatures();
+    kernel.arch.init.configureSystemFeatures();
 
     log.info("initializing physical memory", .{});
     kernel.pmm.init();
@@ -53,7 +54,7 @@ fn captureBootloaderInformation() void {
     calculateKernelOffsets();
     calculateDirectMaps();
 
-    // the kernel file was captured earlier in the setup process, now we can debug log what was captured
+    // the kernel file was captured earlier in the init process, now we can debug log what was captured
     log.debug("kernel file: {}", .{kernel.info.kernel_file.?});
 }
 

@@ -26,47 +26,47 @@ pub inline fn safeGetCoreData() ?*kernel.CoreData {
     return current.safeGetCoreData();
 }
 
-/// Functionality that is intended to be used during system setup only.
-pub const setup = struct {
+/// Functionality that is intended to be used during kernel init only.
+pub const init = struct {
     /// Performs any actions required to load the provided core data for the bootstrap core.
     pub inline fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
-        current.setup.loadBootstrapCoreData(bootstrap_core_data);
+        current.init.loadBootstrapCoreData(bootstrap_core_data);
     }
 
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
-        current.setup.setupEarlyOutput();
+        current.init.setupEarlyOutput();
     }
 
-    pub const EarlyOutputWriter = current.setup.EarlyOutputWriter;
+    pub const EarlyOutputWriter = current.init.EarlyOutputWriter;
 
     /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
     pub inline fn getEarlyOutputWriter() ?EarlyOutputWriter {
-        return current.setup.getEarlyOutputWriter();
+        return current.init.getEarlyOutputWriter();
     }
 
-    /// Initialize the architecture specific registers and structures into the state required for early setup.
+    /// Initialize the architecture specific registers and structures into the state required for early kernel init.
     ///
     /// One of the requirements of this function is to ensure that any exceptions/faults that occur are correctly handled.
     ///
     /// For example, on x86_64 after this function has completed a GDT, TSS and an IDT with a simple handler on every vector
     /// should be in place.
     pub inline fn earlyArchInitialization() void {
-        current.setup.earlyArchInitialization();
+        current.init.earlyArchInitialization();
     }
 
     /// Capture any system information that is required for the architecture.
     ///
     /// For example, on x86_64 this should capture the CPUID information.
     pub inline fn captureSystemInformation() void {
-        current.setup.captureSystemInformation();
+        current.init.captureSystemInformation();
     }
 
     /// Configure any system features.
     ///
     /// For example, on x86_64 this should enable any CPU features that are required.
     pub inline fn configureSystemFeatures() void {
-        current.setup.configureSystemFeatures();
+        current.init.configureSystemFeatures();
     }
 };
 
@@ -130,7 +130,7 @@ pub const paging = struct {
         return current.paging.allocatePageTable();
     }
 
-    /// This function is only called once during system setup, it is required to:
+    /// This function is only called once during kernel init, it is required to:
     ///   1. search the higher half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed

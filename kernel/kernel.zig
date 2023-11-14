@@ -8,9 +8,9 @@ pub const boot = @import("boot.zig");
 pub const CoreData = @import("CoreData.zig");
 pub const debug = @import("debug/debug.zig");
 pub const info = @import("info.zig");
+pub const init = @import("init.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
-pub const setup = @import("setup.zig");
 pub const vmm = @import("vmm.zig");
 pub const sync = @import("sync/sync.zig");
 

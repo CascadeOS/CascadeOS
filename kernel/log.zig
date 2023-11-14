@@ -49,7 +49,7 @@ fn logFnDispatch(
     }
 }
 
-/// Main logging function used after system setup is finished
+/// Main logging function used after kernel init is finished
 fn standardLogFn(
     comptime scope: @Type(.EnumLiteral),
     comptime message_level: kernel.log.Level,
@@ -71,7 +71,7 @@ fn earlyLogFn(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    const writer = kernel.arch.setup.getEarlyOutputWriter() orelse return;
+    const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
     const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
     writer.writeAll(scopeAndLevelText) catch unreachable;

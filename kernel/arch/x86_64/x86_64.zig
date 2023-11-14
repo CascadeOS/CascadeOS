@@ -13,12 +13,12 @@ pub const ArchCoreData = @import("ArchCoreData.zig");
 pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const info = @import("info.zig");
+pub const init = @import("init.zig");
 pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
 pub const paging = @import("paging/paging.zig");
 pub const registers = @import("registers.zig");
 pub const serial = @import("serial.zig");
-pub const setup = @import("setup.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
 pub inline fn getCoreData() *kernel.CoreData {

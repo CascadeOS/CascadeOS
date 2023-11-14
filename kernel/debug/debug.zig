@@ -32,7 +32,7 @@ fn earlyPanicImpl(
     stack_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
 ) void {
-    const writer = kernel.arch.setup.getEarlyOutputWriter() orelse return;
+    const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
     // panic message
     {

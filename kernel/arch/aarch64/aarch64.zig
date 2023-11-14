@@ -5,8 +5,8 @@ const core = @import("core");
 const kernel = @import("kernel");
 const arch = @import("../arch.zig");
 
+pub const init = @import("init.zig");
 pub const registers = @import("registers.zig");
-pub const setup = @import("setup.zig");
 pub const Uart = @import("Uart.zig");
 
 pub inline fn spinLoopHint() void {
@@ -79,7 +79,7 @@ pub const paging = struct {
         }
     };
 
-    /// This function is only called once during system setup, it is required to:
+    /// This function is only called once during kernel init, it is required to:
     ///   1. search the high half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed

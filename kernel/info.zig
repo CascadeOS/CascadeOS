@@ -18,33 +18,33 @@ pub var kernel_initialized: bool = false;
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = kernel.VirtualAddress.fromInt(0xffffffff80000000);
 
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var kernel_virtual_base_address: kernel.VirtualAddress = undefined;
 
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var kernel_physical_base_address: kernel.PhysicalAddress = undefined;
 
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var kernel_virtual_slide: ?core.Size = null;
 
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var kernel_physical_to_virtual_offset: core.Size = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
 ///
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var direct_map: kernel.VirtualRange = undefined;
 
 /// This direct map provides an identity mapping between virtual and physical addresses.
 ///
 /// The page tables used disable caching for this range.
 ///
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var non_cached_direct_map: kernel.VirtualRange = undefined;
 
 /// This is the kernel's ELF file.
 ///
-/// Initialized during `setup`.
+/// Initialized during `initKernel`.
 pub var kernel_file: ?kernel.VirtualRange = null;
 
 const log = kernel.log.scoped(.info);
