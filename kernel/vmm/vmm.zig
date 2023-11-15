@@ -121,6 +121,25 @@ const KernelMemoryRegion = struct {
         non_cached_direct_map,
         kernel_heap,
     };
+
+    pub fn print(region: KernelMemoryRegion, writer: anytype) !void {
+        try writer.writeAll("KernelMemoryRegion{ ");
+        try region.range.print(writer);
+        try writer.writeAll(" - ");
+        try writer.writeAll(@tagName(region.region_type));
+        try writer.writeAll(" }");
+    }
+
+    pub inline fn format(
+        region: KernelMemoryRegion,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return print(region, writer);
+    }
 };
 
 /// Registers a kernel memory region.
