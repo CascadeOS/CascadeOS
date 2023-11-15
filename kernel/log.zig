@@ -101,7 +101,7 @@ pub const Level = enum {
     }
 };
 
-const maximum_log_scope_length = 12;
+const maximum_log_scope_length = 18;
 
 /// Helper function to format the scope and level text at the beginning of a log message.
 pub inline fn formatScopeAndLevel(
