@@ -5,6 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 pub const AddressSpace = @import("AddressSpace.zig");
+pub const KernelMemoryLayout = @import("KernelMemoryLayout.zig");
 pub const MapType = @import("MapType.zig");
 pub const MemoryRegion = @import("MemoryRegion.zig");
 
@@ -16,6 +17,7 @@ const log = kernel.log.scoped(.virt_mm);
 
 var kernel_root_page_table: *PageTable = undefined;
 var heap_range: kernel.VirtualRange = undefined;
+var kernel_memory_layout: KernelMemoryLayout = .{};
 
 var initalized = false;
 
@@ -39,15 +41,12 @@ pub fn init() void {
         core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
     };
 
-    // now that the kernel memory layout is populated we sort it
-    sortKernelMemoryLayout();
-
     log.debug("switching to kernel page table", .{});
     paging.switchToPageTable(kernel_root_page_table);
 
     log.debug("kernel memory regions:", .{});
 
-    for (kernel_memory_layout.slice()) |region| {
+    for (kernel_memory_layout.layout.slice()) |region| {
         log.debug("\t{}", .{region});
     }
 
@@ -106,57 +105,6 @@ fn mapRangeUseAllPageSizes(
     );
 }
 
-// currently the kernel has exactly 6 memory regions: 3 elf sections, 2 direct maps and the heap
-var kernel_memory_layout: std.BoundedArray(KernelMemoryRegion, 6) = .{};
-
-const KernelMemoryRegion = struct {
-    range: kernel.VirtualRange,
-    region_type: RegionType,
-
-    pub const RegionType = enum {
-        kernel_writeable_section,
-        kernel_readonly_section,
-        kernel_executable_section,
-        direct_map,
-        non_cached_direct_map,
-        kernel_heap,
-    };
-
-    pub fn print(region: KernelMemoryRegion, writer: anytype) !void {
-        try writer.writeAll("KernelMemoryRegion{ ");
-        try region.range.print(writer);
-        try writer.writeAll(" - ");
-        try writer.writeAll(@tagName(region.region_type));
-        try writer.writeAll(" }");
-    }
-
-    pub inline fn format(
-        region: KernelMemoryRegion,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return print(region, writer);
-    }
-};
-
-/// Registers a kernel memory region.
-fn registerKernelMemoryRegion(region: KernelMemoryRegion) void {
-    kernel_memory_layout.append(region) catch unreachable;
-}
-
-/// Sorts the kernel memory layout from lowest to highest address.
-fn sortKernelMemoryLayout() void {
-    std.mem.sort(KernelMemoryRegion, kernel_memory_layout.slice(), {}, struct {
-        fn lessThanFn(context: void, self: KernelMemoryRegion, other: KernelMemoryRegion) bool {
-            _ = context;
-            return self.range.address.lessThan(other.range.address);
-        }
-    }.lessThanFn);
-}
-
 /// Maps the direct maps.
 fn mapDirectMaps() !void {
     const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
@@ -169,7 +117,7 @@ fn mapDirectMaps() !void {
         direct_map_physical_range,
         .{ .writeable = true, .global = true },
     );
-    registerKernelMemoryRegion(.{ .range = kernel.info.direct_map, .region_type = .direct_map });
+    kernel_memory_layout.registerRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
 
     log.debug("mapping the non-cached direct map", .{});
 
@@ -179,7 +127,7 @@ fn mapDirectMaps() !void {
         direct_map_physical_range,
         .{ .writeable = true, .no_cache = true, .global = true },
     );
-    registerKernelMemoryRegion(.{ .range = kernel.info.non_cached_direct_map, .region_type = .non_cached_direct_map });
+    kernel_memory_layout.registerRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
 }
 
 const linker_symbols = struct {
@@ -198,7 +146,7 @@ fn mapKernelSections() !void {
         @intFromPtr(&linker_symbols.__text_start),
         @intFromPtr(&linker_symbols.__text_end),
         .{ .executable = true, .global = true },
-        .kernel_executable_section,
+        .executable_section,
     );
 
     log.debug("mapping .rodata section", .{});
@@ -206,7 +154,7 @@ fn mapKernelSections() !void {
         @intFromPtr(&linker_symbols.__rodata_start),
         @intFromPtr(&linker_symbols.__rodata_end),
         .{ .global = true },
-        .kernel_readonly_section,
+        .readonly_section,
     );
 
     log.debug("mapping .data section", .{});
@@ -214,7 +162,7 @@ fn mapKernelSections() !void {
         @intFromPtr(&linker_symbols.__data_start),
         @intFromPtr(&linker_symbols.__data_end),
         .{ .writeable = true, .global = true },
-        .kernel_writeable_section,
+        .writeable_section,
     );
 }
 
@@ -222,7 +170,7 @@ fn mapKernelSections() !void {
 fn prepareKernelHeap() !void {
     log.debug("preparing kernel heap", .{});
     heap_range = try kernel.arch.paging.getHeapRangeAndFillFirstLevel(kernel_root_page_table);
-    registerKernelMemoryRegion(.{ .range = heap_range, .region_type = .kernel_heap });
+    kernel_memory_layout.registerRegion(.{ .range = heap_range, .type = .heap });
     log.debug("kernel heap: {}", .{heap_range});
 }
 
@@ -231,7 +179,7 @@ fn mapSection(
     section_start: usize,
     section_end: usize,
     map_type: MapType,
-    region_type: KernelMemoryRegion.RegionType,
+    region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
 ) !void {
     core.assert(section_end > section_start);
 
@@ -258,5 +206,5 @@ fn mapSection(
         map_type,
     );
 
-    registerKernelMemoryRegion(.{ .range = virtual_range, .region_type = region_type });
+    kernel_memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
 }
