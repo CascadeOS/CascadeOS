@@ -35,6 +35,7 @@ pub const KernelMemoryRegion = struct {
         direct_map,
         non_cached_direct_map,
         heap,
+        stacks,
     };
 
     pub fn print(region: KernelMemoryRegion, writer: anytype) !void {

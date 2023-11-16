@@ -130,16 +130,16 @@ pub const paging = struct {
         return current.paging.allocatePageTable();
     }
 
-    /// This function is only called once during kernel init, it is required to:
+    /// This function is only called during kernel init, it is required to:
     ///   1. search the higher half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
     ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
-    pub inline fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
-        // TODO: randomize location of the heap https://github.com/CascadeOS/CascadeOS/issues/56
+    pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
+        // TODO: randomize location of the heap/stacks https://github.com/CascadeOS/CascadeOS/issues/56
         // the chance that the heap will occupy the the very first higher half table is very high
         // especially due to kaslr. to reduce this problem we need to add a bit of random.
-        return current.paging.getHeapRangeAndFillFirstLevel(page_table);
+        return current.paging.getTopLevelRangeAndFillFirstLevel(page_table);
     }
 
     pub const MapError = error{

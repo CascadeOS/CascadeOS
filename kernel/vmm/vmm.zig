@@ -17,6 +17,7 @@ const log = kernel.log.scoped(.virt_mm);
 
 var kernel_root_page_table: *PageTable = undefined;
 var heap_range: kernel.VirtualRange = undefined;
+var kernel_stacks_range: kernel.VirtualRange = undefined;
 var kernel_memory_layout: KernelMemoryLayout = .{};
 
 var initalized = false;
@@ -37,9 +38,23 @@ pub fn init() void {
         core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
     };
 
-    prepareKernelHeap() catch |err| {
-        core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
-    };
+    {
+        log.debug("preparing kernel heap", .{});
+        heap_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
+            core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
+        };
+        kernel_memory_layout.registerRegion(.{ .range = heap_range, .type = .heap });
+        log.debug("kernel heap: {}", .{heap_range});
+    }
+
+    {
+        log.debug("preparing kernel stack range", .{});
+        kernel_stacks_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
+            core.panicFmt("failed to prepare kernel stack range: {s}", .{@errorName(err)});
+        };
+        kernel_memory_layout.registerRegion(.{ .range = heap_range, .type = .stacks });
+        log.debug("kernel stack range: {}", .{heap_range});
+    }
 
     log.debug("switching to kernel page table", .{});
     paging.switchToPageTable(kernel_root_page_table);
@@ -164,14 +179,6 @@ fn mapKernelSections() !void {
         .{ .writeable = true, .global = true },
         .writeable_section,
     );
-}
-
-/// Prepares the kernel heap.
-fn prepareKernelHeap() !void {
-    log.debug("preparing kernel heap", .{});
-    heap_range = try kernel.arch.paging.getHeapRangeAndFillFirstLevel(kernel_root_page_table);
-    kernel_memory_layout.registerRegion(.{ .range = heap_range, .type = .heap });
-    log.debug("kernel heap: {}", .{heap_range});
 }
 
 /// Maps a section.
