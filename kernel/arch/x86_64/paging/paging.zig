@@ -46,19 +46,19 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
     );
 }
 
-/// This function is only called once during kernel init, it is required to:
+/// This function is only called during kernel init, it is required to:
 ///   1. search the high half of the *top level* of the given page table for a free entry
 ///   2. allocate a backing frame for it
 ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
 ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
-pub fn getHeapRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtualRange {
+pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtualRange {
     var table_index: usize = PageTable.p4Index(higher_half);
 
     while (table_index < PageTable.number_of_entries) : (table_index += 1) {
         const entry = &page_table.entries[table_index];
         if (entry._backing != 0) continue;
 
-        log.debug("found free top level entry for heap at table_index {}", .{table_index});
+        log.debug("found free top level entry for at table_index {}", .{table_index});
 
         _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
 
