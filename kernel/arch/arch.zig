@@ -167,7 +167,7 @@ pub const paging = struct {
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
     ) void {
-        current.paging.unmapRange(page_table, virtual_range);
+        current.paging.unmapStandardRange(page_table, virtual_range);
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.

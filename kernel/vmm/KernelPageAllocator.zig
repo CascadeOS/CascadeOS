@@ -63,7 +63,7 @@ inline fn allocImpl(len: usize) !?[*]u8 {
     var current_virtual_range = kernel.VirtualRange.fromAddr(allocated_range.address, kernel.arch.paging.standard_page_size);
     errdefer {
         while (current_virtual_range.address.greaterThanOrEqual(allocated_range.address)) {
-            vmm.unmapRange(vmm.kernel_root_page_table, current_virtual_range);
+            vmm.unmapStandardRange(vmm.kernel_root_page_table, current_virtual_range);
             current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
         }
     }
@@ -71,7 +71,7 @@ inline fn allocImpl(len: usize) !?[*]u8 {
     while (!current_virtual_range.address.equal(allocated_range_end)) {
         const physical_range = kernel.pmm.allocatePage() orelse return error.OutOfMemory;
 
-        try vmm.mapRange(
+        try vmm.mapStandardRange(
             vmm.kernel_root_page_table,
             current_virtual_range,
             physical_range,
@@ -106,7 +106,7 @@ fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
     const held = vmm.kernel_heap_address_space_lock.lock();
     defer held.unlock();
     vmm.kernel_heap_address_space.deallocate(unallocated_range);
-    vmm.unmapRange(vmm.kernel_root_page_table, unallocated_range);
+    vmm.unmapStandardRange(vmm.kernel_root_page_table, unallocated_range);
 
     // TODO: Cache needs to be flushed on this core and others.
 
@@ -122,7 +122,7 @@ fn free(_: *anyopaque, buf: []u8, _: u8, _: usize) void {
     const held = vmm.kernel_heap_address_space_lock.lock();
     defer held.unlock();
     vmm.kernel_heap_address_space.deallocate(unallocated_range);
-    vmm.unmapRange(vmm.kernel_root_page_table, unallocated_range);
+    vmm.unmapStandardRange(vmm.kernel_root_page_table, unallocated_range);
 
     // TODO: Cache needs to be flushed on this core and others.
 }
