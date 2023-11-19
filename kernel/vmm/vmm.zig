@@ -85,7 +85,7 @@ fn prepareKernelStacks() !void {
 }
 
 /// Maps a virtual address range to a physical address range using the standard page size.
-pub fn mapRange(
+pub fn mapStandardRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
@@ -115,7 +115,7 @@ pub fn mapRange(
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `kernel.arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
-pub fn unmapRange(
+pub fn unmapStandardRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
 ) void {
@@ -124,7 +124,7 @@ pub fn unmapRange(
 
     log.debug("unmapping: {}", .{virtual_range});
 
-    return kernel.arch.paging.unmapRange(page_table, virtual_range);
+    return kernel.arch.paging.unmapStandardRange(page_table, virtual_range);
 }
 
 /// Maps a virtual address range to a physical address range using all available page sizes.
