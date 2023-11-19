@@ -303,6 +303,10 @@ pub const PageTable = extern struct {
 
         const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
 
+        pub fn zero(self: *Entry) void {
+            self._backing = 0;
+        }
+
         pub fn getAddress4kib(self: Entry) kernel.PhysicalAddress {
             return .{ .value = self.address_4kib_aligned.readNoShiftFullSize() };
         }
