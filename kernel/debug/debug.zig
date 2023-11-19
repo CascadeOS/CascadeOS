@@ -255,7 +255,7 @@ fn printSymbol(writer: anytype, symbol: symbols.Symbol) void {
     const file_contents = embedded_source_files.get(location.file_name) orelse {
         // no matching file found
         writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
-        writer.writeAll("no such file in embedded source files\n") catch unreachable;
+        writer.writeAll("no such file in embedded source files\n\n") catch unreachable;
         return;
     };
 
