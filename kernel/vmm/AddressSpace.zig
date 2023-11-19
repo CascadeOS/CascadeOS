@@ -59,13 +59,13 @@ pub const AllocateError = error{
 /// Allocate a memory region.
 ///
 /// **REQUIREMENTS**:
-/// - `number_of_pages` must be non-zero
-pub fn allocate(self: *AddressSpace, number_of_pages: usize, map_type: kernel.vmm.MapType) AllocateError!kernel.VirtualRange {
-    core.assert(number_of_pages != 0);
+/// - `size` must be non-zero
+/// - `size` must be aligned to `kernel.arch.paging.standard_page_size`
+pub fn allocate(self: *AddressSpace, size: core.Size, map_type: kernel.vmm.MapType) AllocateError!kernel.VirtualRange {
+    core.assert(size.bytes != 0);
+    core.assert(size.isAligned(kernel.arch.paging.standard_page_size));
 
-    const virtual_range = try self.allocateVirtualRange(
-        kernel.arch.paging.standard_page_size.multiply(number_of_pages),
-    );
+    const virtual_range = try self.allocateVirtualRange(size);
     errdefer self.deallocateVirtualRange(virtual_range) catch {
         // FIXME: we have no way to recover from this
         core.panic("deallocateVirtualRange failed, this AddressSpace may now be in an invalid state");
