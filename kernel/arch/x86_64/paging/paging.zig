@@ -115,6 +115,24 @@ pub fn mapStandardRange(
     log.debug("mapStandardRange - satified using {} 4KiB pages", .{kib_page_mappings});
 }
 
+/// Unmaps the `virtual_range`.
+///
+/// This function assumes only the architecture's `standard_page_size` is used for the mapping.
+pub fn unmapStandardRange(
+    page_table: *PageTable,
+    virtual_range: kernel.VirtualRange,
+) void {
+    _ = page_table;
+    log.debug("unmapRange - {}", .{virtual_range});
+
+    var current_virtual_address = virtual_range.address;
+    const end_virtual_address = virtual_range.end();
+
+    while (current_virtual_address.lessThan(end_virtual_address)) {
+        current_virtual_address.moveForwardInPlace(small_page_size);
+    }
+}
+
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
 ///
 /// This function is allowed to use all page sizes available to the architecture.
@@ -290,6 +308,33 @@ fn mapTo1GiB(
 
     entry.huge.write(true);
     applyMapType(map_type, entry);
+}
+
+/// Unmaps a 4 KiB page.
+fn unmap4KiB(
+    level4_table: *PageTable,
+    virtual_address: kernel.VirtualAddress,
+) void {
+    core.debugAssert(virtual_address.isAligned(small_page_size));
+
+    const level4_entry = level4_table.getEntryLevel4(virtual_address);
+    if (!level4_entry.present.read() or level4_entry.huge.read()) return;
+
+    const level3_table = level4_entry.getNextLevel() catch unreachable; // checked above
+    const level3_entry = level3_table.getEntryLevel3(virtual_address);
+    if (!level3_entry.present.read() or level3_entry.huge.read()) return;
+
+    const level2_table = level3_entry.getNextLevel() catch unreachable; // checked above
+    const level2_entry = level2_table.getEntryLevel2(virtual_address);
+    if (!level2_entry.present.read() or level2_entry.huge.read()) return;
+
+    const level1_table = level2_entry.getNextLevel() catch unreachable; // checked above
+    const level1_entry = level1_table.getEntryLevel1(virtual_address);
+    if (!level2_entry.present.read()) return;
+
+    kernel.pmm.deallocatePage(level1_entry.getAddress4kib());
+
+    level1_entry.zero();
 }
 
 fn applyMapType(map_type: kernel.vmm.MapType, entry: *PageTable.Entry) void {

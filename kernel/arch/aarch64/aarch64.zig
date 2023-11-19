@@ -104,6 +104,18 @@ pub const paging = struct {
         core.panic("UNIMPLEMENTED `mapStandardRange`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
+    /// Unmaps the `virtual_range`.
+    ///
+    /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
+    pub fn unmapStandardRange(
+        page_table: *PageTable,
+        virtual_range: kernel.VirtualRange,
+    ) void {
+        _ = page_table;
+        _ = virtual_range;
+        core.panic("UNIMPLEMENTED `unmapRange`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
+    }
+
     pub fn mapRangeUseAllPageSizes(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,

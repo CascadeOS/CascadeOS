@@ -160,6 +160,16 @@ pub const paging = struct {
         return current.paging.mapStandardRange(page_table, virtual_range, physical_range, map_type);
     }
 
+    /// Unmaps the `virtual_range`.
+    ///
+    /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
+    pub fn unmapStandardRange(
+        page_table: *PageTable,
+        virtual_range: kernel.VirtualRange,
+    ) void {
+        current.paging.unmapRange(page_table, virtual_range);
+    }
+
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// This function is allowed to use all page sizes available to the architecture.
