@@ -15,9 +15,13 @@ const PageTable = paging.PageTable;
 
 const log = kernel.log.scoped(.virt_mm);
 
-var kernel_root_page_table: *PageTable = undefined;
-var heap_range: kernel.VirtualRange = undefined;
-var kernel_stacks_range: kernel.VirtualRange = undefined;
+pub const kernel_page_allocator = @import("KernelPageAllocator.zig").kernel_page_allocator;
+
+pub var kernel_root_page_table: *PageTable = undefined;
+
+pub var kernel_heap_address_space_lock: kernel.sync.SpinLock = .{};
+pub var kernel_heap_address_space: AddressSpace = undefined;
+
 var kernel_memory_layout: KernelMemoryLayout = .{};
 
 var initalized = false;
@@ -38,23 +42,13 @@ pub fn init() void {
         core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
     };
 
-    {
-        log.debug("preparing kernel heap", .{});
-        heap_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
-            core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
-        };
-        kernel_memory_layout.registerRegion(.{ .range = heap_range, .type = .heap });
-        log.debug("kernel heap: {}", .{heap_range});
-    }
+    prepareKernelHeap() catch |err| {
+        core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
+    };
 
-    {
-        log.debug("preparing kernel stack range", .{});
-        kernel_stacks_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
-            core.panicFmt("failed to prepare kernel stack range: {s}", .{@errorName(err)});
-        };
-        kernel_memory_layout.registerRegion(.{ .range = heap_range, .type = .stacks });
-        log.debug("kernel stack range: {}", .{heap_range});
-    }
+    prepareKernelStacks() catch |err| {
+        core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
+    };
 
     log.debug("switching to kernel page table", .{});
     paging.switchToPageTable(kernel_root_page_table);
@@ -68,8 +62,30 @@ pub fn init() void {
     initalized = true;
 }
 
+fn prepareKernelHeap() !void {
+    log.debug("preparing kernel heap", .{});
+
+    const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table);
+
+    kernel_heap_address_space = try AddressSpace.init(kernel_heap_range);
+    kernel_memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
+
+    log.debug("kernel heap: {}", .{kernel_heap_range});
+}
+
+fn prepareKernelStacks() !void {
+    log.debug("preparing kernel stacks", .{});
+
+    const kernel_stacks_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
+        core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
+    };
+    kernel_memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
+
+    log.debug("kernel stacks: {}", .{kernel_stacks_range});
+}
+
 /// Maps a virtual address range to a physical address range using the standard page size.
-fn mapRange(
+pub fn mapRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
@@ -92,6 +108,23 @@ fn mapRange(
         physical_range,
         map_type,
     );
+}
+
+/// Unmaps a virtual address range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
+pub fn unmapRange(
+    page_table: *PageTable,
+    virtual_range: kernel.VirtualRange,
+) void {
+    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+
+    log.debug("unmapping: {}", .{virtual_range});
+
+    return kernel.arch.paging.unmapRange(page_table, virtual_range);
 }
 
 /// Maps a virtual address range to a physical address range using all available page sizes.
