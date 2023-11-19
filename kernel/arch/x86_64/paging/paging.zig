@@ -81,18 +81,17 @@ const MapError = arch.paging.MapError;
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
 ///
 /// This function will only use the architecture's `standard_page_size`.
-pub fn mapRange(
+pub fn mapStandardRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
     map_type: kernel.vmm.MapType,
 ) MapError!void {
-    log.debug("mapRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+    log.debug("mapStandardRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
     var current_virtual_address = virtual_range.address;
     const end_virtual_address = virtual_range.end();
     var current_physical_address = physical_range.address;
-    var size_remaining = virtual_range.size;
 
     var kib_page_mappings: usize = 0;
 
@@ -111,10 +110,9 @@ pub fn mapRange(
 
         current_virtual_address.moveForwardInPlace(small_page_size);
         current_physical_address.moveForwardInPlace(small_page_size);
-        size_remaining.subtractInPlace(small_page_size);
     }
 
-    log.debug("mapRange - satified using {} 4KiB pages", .{kib_page_mappings});
+    log.debug("mapStandardRange - satified using {} 4KiB pages", .{kib_page_mappings});
 }
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.

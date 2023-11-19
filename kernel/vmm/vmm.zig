@@ -86,7 +86,7 @@ fn mapRange(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return kernel.arch.paging.mapRange(
+    return kernel.arch.paging.mapStandardRange(
         page_table,
         virtual_range,
         physical_range,

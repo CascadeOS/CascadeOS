@@ -91,7 +91,7 @@ pub const paging = struct {
 
     const MapError = arch.paging.MapError;
 
-    pub fn mapRange(
+    pub fn mapStandardRange(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
@@ -101,7 +101,7 @@ pub const paging = struct {
         _ = physical_range;
         _ = virtual_range;
         _ = page_table;
-        core.panic("UNIMPLEMENTED `mapRange`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
+        core.panic("UNIMPLEMENTED `mapStandardRange`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
     pub fn mapRangeUseAllPageSizes(

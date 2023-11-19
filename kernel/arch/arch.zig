@@ -151,13 +151,13 @@ pub const paging = struct {
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// This function will only use the architecture's `standard_page_size`.
-    pub inline fn mapRange(
+    pub inline fn mapStandardRange(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        return current.paging.mapRange(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapStandardRange(page_table, virtual_range, physical_range, map_type);
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
