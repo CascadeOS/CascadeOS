@@ -6,8 +6,6 @@ const kernel = @import("kernel");
 
 const vmm = @import("vmm.zig");
 
-const log = kernel.log.scoped(.kernel_heap);
-
 const KernelPageAllocator = @This();
 
 pub const kernel_page_allocator = std.mem.Allocator{
@@ -25,23 +23,16 @@ pub const kernel_page_allocator = std.mem.Allocator{
 /// allocation call stack. If the value is `0` it means no return address
 /// has been provided.
 fn alloc(_: *anyopaque, len: usize, _: u8, _: usize) ?[*]u8 {
-    log.debug("alloc - len: {}", .{len});
-
     core.debugAssert(len != 0);
-    const result = allocImpl(len) catch |err| {
-        log.err("{s}", .{@errorName(err)});
-        return null;
-    };
-
-    log.debug("result: {any}", .{result});
-
-    return result;
+    return allocImpl(len) catch return null;
 }
 
 const heap_map_type: vmm.MapType = .{ .global = true, .writeable = true };
 
+// A seperate function is used to allow for the usage of `errdefer`.
 inline fn allocImpl(len: usize) !?[*]u8 {
-    const aligned_size = core.Size.from(len, .byte).alignForward(kernel.arch.paging.standard_page_size);
+    const aligned_size = core.Size.from(len, .byte)
+        .alignForward(kernel.arch.paging.standard_page_size);
 
     const allocated_range = blk: {
         const held = vmm.kernel_heap_address_space_lock.lock();
@@ -59,15 +50,17 @@ inline fn allocImpl(len: usize) !?[*]u8 {
     }
 
     const allocated_range_end = allocated_range.end();
-
     var current_virtual_range = kernel.VirtualRange.fromAddr(allocated_range.address, kernel.arch.paging.standard_page_size);
+
     errdefer {
+        // Unmap all pages that have been mapped.
         while (current_virtual_range.address.greaterThanOrEqual(allocated_range.address)) {
             vmm.unmapStandardRange(vmm.kernel_root_page_table, current_virtual_range);
             current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
         }
     }
 
+    // Map all pages that were allocated.
     while (!current_virtual_range.address.equal(allocated_range_end)) {
         const physical_range = kernel.pmm.allocatePage() orelse return error.OutOfMemory;
 
@@ -85,21 +78,27 @@ inline fn allocImpl(len: usize) !?[*]u8 {
 }
 
 fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
-    log.debug("resize - old buf: {*} - new len: {}", .{ buf, new_len });
+    const old_aligned_size = core.Size.from(buf.len, .byte)
+        .alignForward(kernel.arch.paging.standard_page_size);
 
-    const old_aligned_size = core.Size.from(buf.len, .byte).alignForward(kernel.arch.paging.standard_page_size);
+    const new_aligned_size = core.Size.from(new_len, .byte)
+        .alignForward(kernel.arch.paging.standard_page_size);
 
-    const new_aligned_size = core.Size.from(new_len, .byte).alignForward(kernel.arch.paging.standard_page_size);
-
+    // If the new size is the same as the old size after alignment, then we can just return.
     if (new_aligned_size.equal(old_aligned_size)) return true;
 
+    // If the new size is larger than the old size after alignment then a resize in place is not possible.
     if (new_aligned_size.greaterThan(old_aligned_size)) return false;
 
-    const unallocated_size = new_aligned_size.subtract(old_aligned_size);
+    // If the new size is smaller than the old size after alignment then we need to unmap the extra pages.
+
+    const unallocated_size = old_aligned_size.subtract(new_aligned_size);
     core.debugAssert(unallocated_size.isAligned(kernel.arch.paging.standard_page_size));
 
     const unallocated_range = kernel.VirtualRange.fromAddr(
-        kernel.VirtualRange.fromSlice(buf).end().moveBackward(unallocated_size),
+        kernel.VirtualAddress.fromPtr(buf.ptr)
+            .moveForward(old_aligned_size)
+            .moveBackward(unallocated_size),
         unallocated_size,
     );
 
@@ -114,8 +113,6 @@ fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
 }
 
 fn free(_: *anyopaque, buf: []u8, _: u8, _: usize) void {
-    log.debug("free - buf: {*}", .{buf});
-
     var unallocated_range = kernel.VirtualRange.fromSlice(buf);
     unallocated_range.size = unallocated_range.size.alignForward(kernel.arch.paging.standard_page_size);
 
