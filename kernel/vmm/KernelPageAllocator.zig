@@ -8,6 +8,8 @@ const vmm = @import("vmm.zig");
 
 const KernelPageAllocator = @This();
 
+const heap_map_type: vmm.MapType = .{ .global = true, .writeable = true };
+
 pub const kernel_page_allocator = std.mem.Allocator{
     .ptr = undefined,
     .vtable = &.{
@@ -17,17 +19,10 @@ pub const kernel_page_allocator = std.mem.Allocator{
     },
 };
 
-/// Attempt to allocate exactly `len` bytes aligned to `1 << ptr_align`.
-///
-/// `ret_addr` is optionally provided as the first return address of the
-/// allocation call stack. If the value is `0` it means no return address
-/// has been provided.
 fn alloc(_: *anyopaque, len: usize, _: u8, _: usize) ?[*]u8 {
     core.debugAssert(len != 0);
     return allocImpl(len) catch return null;
 }
-
-const heap_map_type: vmm.MapType = .{ .global = true, .writeable = true };
 
 // A seperate function is used to allow for the usage of `errdefer`.
 inline fn allocImpl(len: usize) !?[*]u8 {
@@ -91,7 +86,6 @@ fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
     if (new_aligned_size.greaterThan(old_aligned_size)) return false;
 
     // If the new size is smaller than the old size after alignment then we need to unmap the extra pages.
-
     const unallocated_size = old_aligned_size.subtract(new_aligned_size);
     core.debugAssert(unallocated_size.isAligned(kernel.arch.paging.standard_page_size));
 
@@ -102,12 +96,7 @@ fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
         unallocated_size,
     );
 
-    const held = vmm.kernel_heap_address_space_lock.lock();
-    defer held.unlock();
-    vmm.kernel_heap_address_space.deallocate(unallocated_range);
-    vmm.unmapStandardRange(vmm.kernel_root_page_table, unallocated_range);
-
-    // TODO: Cache needs to be flushed on this core and others.
+    freeImpl(unallocated_range);
 
     return true;
 }
@@ -116,10 +105,25 @@ fn free(_: *anyopaque, buf: []u8, _: u8, _: usize) void {
     var unallocated_range = kernel.VirtualRange.fromSlice(buf);
     unallocated_range.size = unallocated_range.size.alignForward(kernel.arch.paging.standard_page_size);
 
-    const held = vmm.kernel_heap_address_space_lock.lock();
-    defer held.unlock();
-    vmm.kernel_heap_address_space.deallocate(unallocated_range);
-    vmm.unmapStandardRange(vmm.kernel_root_page_table, unallocated_range);
+    freeImpl(unallocated_range);
+}
+
+fn freeImpl(range: kernel.VirtualRange) void {
+    const range_end = range.end();
+    var current_virtual_range = kernel.VirtualRange.fromAddr(range.address, kernel.arch.paging.standard_page_size);
+
+    {
+        const held = vmm.kernel_heap_address_space_lock.lock();
+        defer held.unlock();
+
+        vmm.kernel_heap_address_space.deallocate(range);
+    }
+
+    while (!current_virtual_range.address.equal(range_end)) {
+        vmm.unmapStandardRange(vmm.kernel_root_page_table, range);
+
+        current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
 
     // TODO: Cache needs to be flushed on this core and others.
 }
