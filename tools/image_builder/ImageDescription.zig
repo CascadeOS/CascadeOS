@@ -129,7 +129,7 @@ pub const Builder = struct {
         const new_used_size = self.used_size + size;
         if (new_used_size > self.size) return error.ImageSizeExceeded;
 
-        var partition_builder = try self.allocator.create(PartitionBuilder);
+        const partition_builder = try self.allocator.create(PartitionBuilder);
         errdefer self.allocator.destroy(partition_builder);
 
         partition_builder.* = .{

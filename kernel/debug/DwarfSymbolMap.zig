@@ -65,7 +65,7 @@ pub fn init(kernel_elf: []const u8) !DwarfSymbolMap {
             var zlib_stream = std.compress.zlib.decompressStream(allocator, section_stream.reader()) catch continue;
             defer zlib_stream.deinit();
 
-            var decompressed_section = try allocator.alloc(u8, chdr.ch_size);
+            const decompressed_section = try allocator.alloc(u8, chdr.ch_size);
             errdefer allocator.free(decompressed_section);
 
             const read = zlib_stream.reader().readAll(decompressed_section) catch continue;

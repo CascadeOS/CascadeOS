@@ -70,7 +70,7 @@ fn createDiskImage(allocator: std.mem.Allocator, image_description: ImageDescrip
     const disk_image = try createAndMapDiskImage(disk_image_path, disk_size);
     defer std.os.munmap(disk_image);
 
-    var gpt_partitions = try allocator.alloc(GptPartition, image_description.partitions.len);
+    const gpt_partitions = try allocator.alloc(GptPartition, image_description.partitions.len);
     defer allocator.free(gpt_partitions);
 
     try createGpt(allocator, image_description, disk_image, random, gpt_partitions);

@@ -303,7 +303,7 @@ pub fn Tree(
             const opt_node_parent = node.getParent();
 
             // get node's only child if any
-            var opt_node_child: ?*Node =
+            const opt_node_child: ?*Node =
                 node.children[Direction.left.toValue()] orelse
                 node.children[Direction.right.toValue()];
 

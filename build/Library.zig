@@ -183,7 +183,7 @@ fn resolveLibrary(
         }
     }
 
-    var library = try b.allocator.create(Library);
+    const library = try b.allocator.create(Library);
 
     library.* = .{
         .name = library_description.name,
