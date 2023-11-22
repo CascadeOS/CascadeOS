@@ -22,15 +22,3 @@ pub fn getEarlyOutputWriter() ?aarch64.Uart.Writer {
 pub fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     aarch64.registers.TPIDR_EL1.write(@intFromPtr(bootstrap_processor));
 }
-
-pub fn earlyArchInitialization() void {
-    core.panic("UNIMPLEMENTED `earlyArchInitialization`"); // TODO: Implement `earlyArchInitialization` https://github.com/CascadeOS/CascadeOS/issues/25
-}
-
-pub fn captureSystemInformation() void {
-    core.panic("UNIMPLEMENTED `captureSystemInformation`"); // TODO: Implement `captureSystemInformation` https://github.com/CascadeOS/CascadeOS/issues/26
-}
-
-pub fn configureSystemFeatures() void {
-    core.panic("UNIMPLEMENTED `configureSystemFeatures`"); // TODO: Implement `configureSystemFeatures` https://github.com/CascadeOS/CascadeOS/issues/27
-}
