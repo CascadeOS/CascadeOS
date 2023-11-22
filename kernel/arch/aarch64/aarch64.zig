@@ -13,15 +13,14 @@ pub inline fn spinLoopHint() void {
     asm volatile ("isb" ::: "memory");
 }
 
-pub const ArchCoreData = struct {};
+pub const ArchProcessor = struct {};
 
-pub inline fn getCoreData() *kernel.CoreData {
+pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
-/// Unlike `getCoreData`, this allows the pointer to be null, which allows detecting if the core data
-/// has not yet been initialized.
-pub inline fn safeGetCoreData() ?*kernel.CoreData {
+/// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
+pub inline fn safeGetProcessor() ?*kernel.Processor {
     return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 

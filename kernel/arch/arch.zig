@@ -14,23 +14,23 @@ pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }
 
-pub const ArchCoreData = current.ArchCoreData;
+/// Architecture specific processor information.
+pub const ArchProcessor = current.ArchProcessor;
 
-pub inline fn getCoreData() *kernel.CoreData {
-    return current.getCoreData();
+pub inline fn getProcessor() *kernel.Processor {
+    return current.getProcessor();
 }
 
-/// Unlike `getCoreData`, this allows the pointer to be null, which allows detecting if the core data
-/// has not yet been initialized.
-pub inline fn safeGetCoreData() ?*kernel.CoreData {
-    return current.safeGetCoreData();
+/// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
+pub inline fn safeGetProcessor() ?*kernel.Processor {
+    return current.safeGetProcessor();
 }
 
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
-    /// Performs any actions required to load the provided core data for the bootstrap core.
-    pub inline fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
-        current.init.loadBootstrapCoreData(bootstrap_core_data);
+    /// Performs any actions required to load the provided Processor for the bootstrap processor.
+    pub inline fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+        current.init.loadBootstrapProcessor(bootstrap_processor);
     }
 
     /// Attempt to set up some form of early output.
