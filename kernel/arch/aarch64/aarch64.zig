@@ -133,7 +133,7 @@ pub const paging = struct {
         core.panic("UNIMPLEMENTED `switchToPageTable`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 
-    pub fn allocatePageTable() *PageTable {
+    pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
         core.panic("UNIMPLEMENTED `allocatePageTable`"); // TODO: implement paging https://github.com/CascadeOS/CascadeOS/issues/23
     }
 };
