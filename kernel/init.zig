@@ -6,14 +6,14 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.init);
 
-var bootstrap_core_data: kernel.CoreData = .{
-    .core_id = 0,
+var bootstrap_processor: kernel.Processor = .{
+    .id = 0,
 };
 
 /// Entry point from the bootloader specific code.
 pub fn kernelInit() void {
-    // we need to get the core data loaded early as the panic handler and logging use it
-    kernel.arch.init.loadBootstrapCoreData(&bootstrap_core_data);
+    // we need to get the Cpu data loaded early as the panic handler and logging use it
+    kernel.arch.init.loadBootstrapProcessor(&bootstrap_processor);
 
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();

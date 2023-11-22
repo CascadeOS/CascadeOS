@@ -36,20 +36,20 @@ fn earlyPanicImpl(
 
     // panic message
     {
-        const core_data = kernel.arch.safeGetCoreData() orelse return;
+        const processor = kernel.arch.safeGetProcessor() orelse return;
 
-        if (core_data.panicked) {
+        if (processor.panicked) {
             // TODO: Can we do something better when we panic in a panic?
             writer.writeAll("\nPANIC IN PANIC\n") catch unreachable;
 
             return;
         }
-        core_data.panicked = true;
+        processor.panicked = true;
 
-        writer.writeAll("\nPANIC on core ") catch unreachable;
+        writer.writeAll("\nPANIC on processor ") catch unreachable;
 
         std.fmt.formatInt(
-            core_data.core_id,
+            processor.id,
             10,
             .lower,
             .{ .width = 2, .fill = '0' }, // TODO: What should the width be?

@@ -9,7 +9,7 @@ comptime {
     _ = interrupts;
 }
 
-pub const ArchCoreData = @import("ArchCoreData.zig");
+pub const ArchProcessor = @import("ArchProcessor.zig");
 pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const info = @import("info.zig");
@@ -21,13 +21,12 @@ pub const registers = @import("registers.zig");
 pub const serial = @import("serial.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
-pub inline fn getCoreData() *kernel.CoreData {
+pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
-/// Unlike `getCoreData`, this allows the pointer to be null, which allows detecting if the core data
-/// has not yet been initialized.
-pub inline fn safeGetCoreData() ?*kernel.CoreData {
+/// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
+pub inline fn safeGetProcessor() ?*kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 

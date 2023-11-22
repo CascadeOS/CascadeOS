@@ -25,19 +25,19 @@ var kernel_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 
-pub fn loadBootstrapCoreData(bootstrap_core_data: *kernel.CoreData) void {
-    bootstrap_core_data._arch = .{
+pub fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+    bootstrap_processor._arch = .{
         .double_fault_stack = &double_fault_stack,
         .non_maskable_interrupt_stack = &non_maskable_interrupt_stack,
     };
 
-    loadCoreData(bootstrap_core_data);
+    loadProcessor(bootstrap_processor);
 
-    bootstrap_core_data._arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
+    bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
 }
 
-fn loadCoreData(core_data: *kernel.CoreData) void {
-    const arch: *x86_64.ArchCoreData = core_data.arch();
+fn loadProcessor(processor: *kernel.Processor) void {
+    const arch: *x86_64.ArchProcessor = processor.arch();
 
     arch.gdt.load();
 
@@ -48,7 +48,7 @@ fn loadCoreData(core_data: *kernel.CoreData) void {
 
     x86_64.interrupts.loadIdt();
 
-    x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(core_data));
+    x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(processor));
 }
 
 pub fn earlyArchInitialization() void {
