@@ -11,6 +11,8 @@ const current = switch (kernel.info.arch) {
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
+    checkSupport(current, "spinLoopHint", fn () void);
+
     current.spinLoopHint();
 }
 
@@ -18,11 +20,15 @@ pub inline fn spinLoopHint() void {
 pub const ArchProcessor = current.ArchProcessor;
 
 pub inline fn getProcessor() *kernel.Processor {
+    checkSupport(current, "getProcessor", fn () *kernel.Processor);
+
     return current.getProcessor();
 }
 
 /// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
 pub inline fn safeGetProcessor() ?*kernel.Processor {
+    checkSupport(current, "safeGetProcessor", fn () ?*kernel.Processor);
+
     return current.safeGetProcessor();
 }
 
@@ -30,11 +36,15 @@ pub inline fn safeGetProcessor() ?*kernel.Processor {
 pub const init = struct {
     /// Performs any actions required to load the provided Processor for the bootstrap processor.
     pub inline fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+        checkSupport(current.init, "loadBootstrapProcessor", fn (*kernel.Processor) void);
+
         current.init.loadBootstrapProcessor(bootstrap_processor);
     }
 
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
+        checkSupport(current.init, "setupEarlyOutput", fn () void);
+
         current.init.setupEarlyOutput();
     }
 
@@ -42,6 +52,8 @@ pub const init = struct {
 
     /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
     pub inline fn getEarlyOutputWriter() ?EarlyOutputWriter {
+        checkSupport(current.init, "getEarlyOutputWriter", fn () ?EarlyOutputWriter);
+
         return current.init.getEarlyOutputWriter();
     }
 
@@ -52,6 +64,8 @@ pub const init = struct {
     /// For example, on x86_64 after this function has completed a GDT, TSS and an IDT with a simple handler on every vector
     /// should be in place.
     pub inline fn earlyArchInitialization() void {
+        checkSupport(current.init, "earlyArchInitialization", fn () void);
+
         current.init.earlyArchInitialization();
     }
 
@@ -59,6 +73,8 @@ pub const init = struct {
     ///
     /// For example, on x86_64 this should capture the CPUID information.
     pub inline fn captureSystemInformation() void {
+        checkSupport(current.init, "captureSystemInformation", fn () void);
+
         current.init.captureSystemInformation();
     }
 
@@ -66,6 +82,8 @@ pub const init = struct {
     ///
     /// For example, on x86_64 this should enable any CPU features that are required.
     pub inline fn configureSystemFeatures() void {
+        checkSupport(current.init, "configureSystemFeatures", fn () void);
+
         current.init.configureSystemFeatures();
     }
 };
@@ -73,21 +91,29 @@ pub const init = struct {
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub inline fn disableInterruptsAndHalt() noreturn {
+        checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);
+
         current.interrupts.disableInterruptsAndHalt();
     }
 
     /// Disable interrupts.
     pub inline fn disableInterrupts() void {
+        checkSupport(current.interrupts, "disableInterrupts", fn () void);
+
         current.interrupts.disableInterrupts();
     }
 
     /// Enable interrupts.
     pub inline fn enableInterrupts() void {
+        checkSupport(current.interrupts, "enableInterrupts", fn () void);
+
         current.interrupts.enableInterrupts();
     }
 
     /// Are interrupts enabled?
     pub inline fn interruptsEnabled() bool {
+        checkSupport(current.interrupts, "interruptsEnabled", fn () bool);
+
         return current.interrupts.interruptsEnabled();
     }
 
@@ -116,6 +142,8 @@ pub const paging = struct {
 
     /// Returns the largest page size supported by the architecture.
     pub inline fn largestPageSize() core.Size {
+        checkSupport(current.paging, "largestPageSize", fn () core.Size);
+
         return current.paging.largestPageSize();
     }
 
@@ -127,6 +155,8 @@ pub const paging = struct {
 
     /// Allocates a new page table.
     pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
+        checkSupport(current.paging, "allocatePageTable", fn () error{PageAllocationFailed}!*PageTable);
+
         return current.paging.allocatePageTable();
     }
 
@@ -136,6 +166,8 @@ pub const paging = struct {
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
     ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
     pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
+        checkSupport(current.paging, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!kernel.VirtualRange);
+
         // TODO: randomize location of the heap/stacks https://github.com/CascadeOS/CascadeOS/issues/56
         // the chance that the heap will occupy the the very first higher half table is very high
         // especially due to kaslr. to reduce this problem we need to add a bit of random.
@@ -157,6 +189,13 @@ pub const paging = struct {
         physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
+        checkSupport(current.paging, "mapStandardRange", fn (
+            *PageTable,
+            kernel.VirtualRange,
+            kernel.PhysicalRange,
+            kernel.vmm.MapType,
+        ) MapError!void);
+
         return current.paging.mapStandardRange(page_table, virtual_range, physical_range, map_type);
     }
 
@@ -167,6 +206,8 @@ pub const paging = struct {
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
     ) void {
+        checkSupport(current.paging, "unmapStandardRange", fn (*PageTable, kernel.VirtualRange) void);
+
         current.paging.unmapStandardRange(page_table, virtual_range);
     }
 
@@ -179,11 +220,50 @@ pub const paging = struct {
         physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
+        checkSupport(current.paging, "mapRangeUseAllPageSizes", fn (
+            *PageTable,
+            kernel.VirtualRange,
+            kernel.PhysicalRange,
+            kernel.vmm.MapType,
+        ) MapError!void);
+
         return current.paging.mapRangeUseAllPageSizes(page_table, virtual_range, physical_range, map_type);
     }
 
     /// Switches to the given page table.
     pub inline fn switchToPageTable(page_table: *const PageTable) void {
+        checkSupport(current.paging, "switchToPageTable", fn (*const PageTable) void);
+
         current.paging.switchToPageTable(page_table);
     }
 };
+
+/// Checks if the current architecture implements the given function.
+///
+/// If it is unimplemented, this function will panic at runtime.
+///
+/// If it is implemented, this function will validate it's signature at compile time and do nothing at runtime.
+inline fn checkSupport(comptime Container: type, comptime name: []const u8, comptime TargetT: type) void {
+    if (comptime name.len == 0) @compileError("zero-length name");
+
+    if (!@hasDecl(Container, name)) {
+        core.panic("`" ++ @tagName(kernel.info.arch) ++ "` does not implement `" ++ name ++ "`");
+    }
+
+    const DeclT = @TypeOf(@field(Container, name));
+
+    const mismatch_type_msg =
+        comptime "Expected `" ++ name ++ "` to be compatible with `" ++ @typeName(TargetT) ++
+        "`, but it is `" ++ @typeName(DeclT) ++ "`";
+
+    const decl_type_info = @typeInfo(DeclT).Fn;
+    const target_type_info = @typeInfo(TargetT).Fn;
+
+    if (decl_type_info.return_type != target_type_info.return_type) @compileError(mismatch_type_msg);
+
+    if (decl_type_info.params.len != target_type_info.params.len) @compileError(mismatch_type_msg);
+
+    inline for (decl_type_info.params, target_type_info.params) |decl_param, target_param| {
+        if (decl_param.type != target_param.type) @compileError(mismatch_type_msg);
+    }
+}
