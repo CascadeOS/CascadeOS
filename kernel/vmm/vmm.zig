@@ -4,7 +4,6 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-pub const AddressSpace = @import("AddressSpace.zig");
 pub const KernelMemoryLayout = @import("KernelMemoryLayout.zig");
 pub const MapType = @import("MapType.zig");
 pub const MemoryRegion = @import("MemoryRegion.zig");
@@ -15,15 +14,9 @@ const PageTable = paging.PageTable;
 
 const log = kernel.log.scoped(.virt_mm);
 
-pub var kernel_root_page_table: *PageTable = undefined;
-
-var kernel_memory_layout: KernelMemoryLayout = .{};
-
-var initialized = false;
-
 pub fn init() void {
     log.debug("allocating kernel root page table", .{});
-    kernel_root_page_table = paging.allocatePageTable() catch
+    kernel.root_page_table = paging.allocatePageTable() catch
         core.panic("unable to allocate physical page for root page table");
 
     // the below functions setup the mappings in `kernel_root_page_table` and also register each region in
@@ -46,24 +39,22 @@ pub fn init() void {
     };
 
     log.debug("switching to kernel page table", .{});
-    paging.switchToPageTable(kernel_root_page_table);
+    paging.switchToPageTable(kernel.root_page_table);
 
     log.debug("kernel memory regions:", .{});
 
-    for (kernel_memory_layout.layout.slice()) |region| {
+    for (kernel.memory_layout.layout.slice()) |region| {
         log.debug("\t{}", .{region});
     }
-
-    initialized = true;
 }
 
 fn prepareKernelHeap() !void {
     log.debug("preparing kernel heap", .{});
 
-    const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table);
+    const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel.root_page_table);
 
-    kernel.heap.address_space = try AddressSpace.init(kernel_heap_range);
-    kernel_memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
+    kernel.heap.address_space = try kernel.AddressSpace.init(kernel_heap_range);
+    kernel.memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
 
     log.debug("kernel heap: {}", .{kernel_heap_range});
 }
@@ -71,10 +62,10 @@ fn prepareKernelHeap() !void {
 fn prepareKernelStacks() !void {
     log.debug("preparing kernel stacks", .{});
 
-    const kernel_stacks_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table) catch |err| {
+    const kernel_stacks_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel.root_page_table) catch |err| {
         core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
     };
-    kernel_memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
+    kernel.memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
 
     log.debug("kernel stacks: {}", .{kernel_stacks_range});
 }
@@ -155,22 +146,22 @@ fn mapDirectMaps() !void {
     log.debug("mapping the direct map", .{});
 
     try mapRangeUseAllPageSizes(
-        kernel_root_page_table,
+        kernel.root_page_table,
         kernel.info.direct_map,
         direct_map_physical_range,
         .{ .writeable = true, .global = true },
     );
-    kernel_memory_layout.registerRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
+    kernel.memory_layout.registerRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
 
     log.debug("mapping the non-cached direct map", .{});
 
     try mapRangeUseAllPageSizes(
-        kernel_root_page_table,
+        kernel.root_page_table,
         kernel.info.non_cached_direct_map,
         direct_map_physical_range,
         .{ .writeable = true, .no_cache = true, .global = true },
     );
-    kernel_memory_layout.registerRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
+    kernel.memory_layout.registerRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
 }
 
 const linker_symbols = struct {
@@ -235,11 +226,11 @@ fn mapSection(
     const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
     try mapRangeUseAllPageSizes(
-        kernel_root_page_table,
+        kernel.root_page_table,
         virtual_range,
         physical_range,
         map_type,
     );
 
-    kernel_memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+    kernel.memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
 }

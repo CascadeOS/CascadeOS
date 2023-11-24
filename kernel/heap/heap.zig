@@ -7,7 +7,7 @@ const kernel = @import("kernel");
 const vmm = kernel.vmm;
 
 // Initialized by `vmm.init`
-pub var address_space: vmm.AddressSpace = undefined;
+pub var address_space: kernel.AddressSpace = undefined;
 var address_space_lock: kernel.sync.SpinLock = .{};
 
 pub const page_allocator = std.mem.Allocator{
@@ -53,7 +53,7 @@ const PageAllocator = struct {
         errdefer {
             // Unmap all pages that have been mapped.
             while (current_virtual_range.address.greaterThanOrEqual(allocated_range.address)) {
-                vmm.unmapStandardRange(vmm.kernel_root_page_table, current_virtual_range);
+                vmm.unmapStandardRange(kernel.root_page_table, current_virtual_range);
                 current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
             }
         }
@@ -63,7 +63,7 @@ const PageAllocator = struct {
             const physical_range = kernel.pmm.allocatePage() orelse return error.OutOfMemory;
 
             try vmm.mapStandardRange(
-                vmm.kernel_root_page_table,
+                kernel.root_page_table,
                 current_virtual_range,
                 physical_range,
                 heap_map_type,
@@ -123,7 +123,7 @@ const PageAllocator = struct {
         }
 
         while (!current_virtual_range.address.equal(range_end)) {
-            vmm.unmapStandardRange(vmm.kernel_root_page_table, range);
+            vmm.unmapStandardRange(kernel.root_page_table, range);
 
             current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
         }

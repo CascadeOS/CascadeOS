@@ -24,6 +24,7 @@ const limine_requests = struct {
     export var hhdm: limine.HHDM = .{};
     export var kernel_address: limine.KernelAddress = .{};
     export var memmap: limine.Memmap = .{};
+    export var smp: limine.SMP = .{};
 };
 
 /// Returns the direct map address provided by the bootloader, if any.
@@ -57,6 +58,66 @@ pub fn kernelFile() ?kernel.VirtualRange {
     }
     return null;
 }
+
+pub fn processorDescriptors() ProcessorDescriptorIterator {
+    const smp_response = limine_requests.smp.response orelse core.panic("no processor descriptors from the bootloader");
+    const entries = smp_response.cpus();
+    return .{
+        .limine = .{
+            .index = 0,
+            .entries = entries,
+        },
+    };
+}
+
+pub const ProcessorDescriptor = struct {
+    _raw: Raw,
+
+    pub const Raw = union(enum) {
+        limine: *limine.SMP.Response.SMPInfo,
+    };
+
+    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
+};
+
+/// An iterator over the processor descriptors provided by the bootloader.
+pub const ProcessorDescriptorIterator = union(enum) {
+    limine: LimineProcessorDescriptorIterator,
+
+    pub fn count(self: ProcessorDescriptorIterator) usize {
+        return switch (self) {
+            inline else => |i| i.count(),
+        };
+    }
+
+    /// Returns the next processor descriptor from the iterator, if any remain.
+    pub fn next(self: *ProcessorDescriptorIterator) ?ProcessorDescriptor {
+        return switch (self.*) {
+            inline else => |*i| i.next(),
+        };
+    }
+};
+
+const LimineProcessorDescriptorIterator = struct {
+    index: usize,
+    entries: []*limine.SMP.Response.SMPInfo,
+
+    pub fn count(self: LimineProcessorDescriptorIterator) usize {
+        return self.entries.len;
+    }
+
+    pub fn next(self: *LimineProcessorDescriptorIterator) ?ProcessorDescriptor {
+        if (self.index >= self.entries.len) return null;
+
+        const smp_info = self.entries[self.index];
+
+        self.index += 1;
+
+        return .{
+            ._raw = .{ .limine = smp_info },
+        };
+    }
+};
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMap(direction: Direction) MemoryMapIterator {
