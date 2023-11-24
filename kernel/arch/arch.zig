@@ -42,6 +42,8 @@ pub const init = struct {
     }
 
     /// Prepares the provided Processor for use.
+    ///
+    /// **WARNING**: This function will panic if the processor cannot be prepared.
     pub inline fn prepareProcessor(processor: *kernel.Processor) void {
         checkSupport(current.init, "prepareProcessor", fn (*kernel.Processor) void);
 

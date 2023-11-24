@@ -18,23 +18,19 @@ pub fn getEarlyOutputWriter() ?x86_64.serial.SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
-const page_size = core.Size.from(4, .kib);
-const kernel_stack_size = page_size.multiply(16);
-
-// TODO: These could be smaller
-var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
-var bootstrap_double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
-var bootstrap_non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_double_fault_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     bootstrap_processor._arch = .{
-        .interrupt_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
+        .interrupt_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_interrupt_stack),
         )),
-        .double_fault_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
+        .double_fault_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_double_fault_stack),
         )),
-        .non_maskable_interrupt_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
+        .non_maskable_interrupt_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_non_maskable_interrupt_stack),
         )),
     };
@@ -42,10 +38,17 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, bootstrap_processor._arch.interrupt_stack);
 }
 
+/// Prepares the provided Processor for use.
+///
+/// **WARNING**: This function will panic if the processor cannot be prepared.
 pub fn prepareProcessor(processor: *kernel.Processor) void {
-    _ = processor;
+    processor._arch = .{
+        .interrupt_stack = kernel.Stack.create() catch core.panic("unable to create interrupt stack"),
+        .double_fault_stack = kernel.Stack.create() catch core.panic("unable to create double fault stack"),
+        .non_maskable_interrupt_stack = kernel.Stack.create() catch core.panic("unable to create non-mackable interrupt stack"),
+    };
 
-    core.panic("NOT IMPLEMENTED"); // TODO
+    processor._arch.tss.setPrivilegeStack(.ring0, processor._arch.interrupt_stack);
 }
 
 pub fn loadProcessor(processor: *kernel.Processor) void {

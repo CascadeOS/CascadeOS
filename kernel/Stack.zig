@@ -32,3 +32,43 @@ pub fn fromRange(range: kernel.VirtualRange) Stack {
         .stack_top = range.end(),
     };
 }
+
+pub fn create() !Stack {
+    const virtual_range = blk: {
+        const held = stacks_range_allocator_lock.lock();
+        defer held.unlock();
+
+        break :blk try stacks_range_allocator.allocateRange(stack_size_with_guard_page);
+    };
+    errdefer {
+        const held = stacks_range_allocator_lock.lock();
+        defer held.unlock();
+
+        stacks_range_allocator.deallocateRange(virtual_range) catch {
+            // FIXME: we have no way to recover from this
+            core.panic("deallocateRange failed");
+        };
+    }
+
+    // Don't map the guard page.
+    var range_to_map = virtual_range.moveForward(kernel.arch.paging.standard_page_size);
+    range_to_map.size.subtractInPlace(kernel.arch.paging.standard_page_size);
+
+    try kernel.vmm.mapRange(kernel.root_page_table, range_to_map, .{ .global = true, .writeable = true });
+
+    return fromRange(virtual_range);
+}
+
+/// Destroys a stack.
+///
+/// **REQUIREMENTS**:
+/// - `stack` must have been created with `create`.
+pub fn destroy(stack: Stack) void {
+    // The guard page was not mapped.
+    var range_to_unmap = stack.range.moveForward(kernel.arch.paging.standard_page_size);
+    range_to_unmap.size.subtractInPlace(kernel.arch.paging.standard_page_size);
+
+    kernel.vmm.unmap(kernel.root_page_table, range_to_unmap);
+
+    // TODO: Cache needs to be flushed on this core and others.
+}

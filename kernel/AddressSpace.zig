@@ -53,7 +53,7 @@ pub fn allocate(self: *AddressSpace, size: core.Size, map_type: kernel.vmm.MapTy
     const virtual_range = self.range_allocator.allocateRange(size) catch return error.AddressSpaceExhausted;
     errdefer self.range_allocator.deallocateRange(virtual_range) catch {
         // FIXME: we have no way to recover from this
-        core.panic("deallocateVirtualRange failed, this AddressSpace may now be in an invalid state");
+        core.panic("deallocateRange failed, this AddressSpace may now be in an invalid state");
     };
 
     try self.allocateMemoryRegion(.{ .range = virtual_range, .map_type = map_type });
