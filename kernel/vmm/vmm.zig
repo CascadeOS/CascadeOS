@@ -15,12 +15,7 @@ const PageTable = paging.PageTable;
 
 const log = kernel.log.scoped(.virt_mm);
 
-pub const kernel_page_allocator = @import("KernelPageAllocator.zig").kernel_page_allocator;
-
 pub var kernel_root_page_table: *PageTable = undefined;
-
-pub var kernel_heap_address_space_lock: kernel.sync.SpinLock = .{};
-pub var kernel_heap_address_space: AddressSpace = undefined;
 
 var kernel_memory_layout: KernelMemoryLayout = .{};
 
@@ -67,7 +62,7 @@ fn prepareKernelHeap() !void {
 
     const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_root_page_table);
 
-    kernel_heap_address_space = try AddressSpace.init(kernel_heap_range);
+    kernel.heap.address_space = try AddressSpace.init(kernel_heap_range);
     kernel_memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
 
     log.debug("kernel heap: {}", .{kernel_heap_range});
