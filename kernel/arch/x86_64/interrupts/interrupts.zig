@@ -24,7 +24,7 @@ pub fn loadIdt() void {
     idt.load();
 }
 
-/// Initalize the IDT with raw handlers and correct stacks.
+/// initialize the IDT with raw handlers and correct stacks.
 pub fn initIdt() void {
     log.debug("mapping idt entries to raw handlers", .{});
     for (raw_handlers, 0..) |raw_handler, i| {

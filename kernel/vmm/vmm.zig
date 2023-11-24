@@ -24,7 +24,7 @@ pub var kernel_heap_address_space: AddressSpace = undefined;
 
 var kernel_memory_layout: KernelMemoryLayout = .{};
 
-var initalized = false;
+var initialized = false;
 
 pub fn init() void {
     log.debug("allocating kernel root page table", .{});
@@ -59,7 +59,7 @@ pub fn init() void {
         log.debug("\t{}", .{region});
     }
 
-    initalized = true;
+    initialized = true;
 }
 
 fn prepareKernelHeap() !void {

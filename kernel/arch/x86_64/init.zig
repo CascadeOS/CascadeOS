@@ -58,7 +58,7 @@ pub fn loadProcessor(processor: *kernel.Processor) void {
 }
 
 pub fn earlyArchInitialization() void {
-    log.debug("initalizing idt", .{});
+    log.debug("initializing idt", .{});
     x86_64.interrupts.initIdt();
 }
 
