@@ -197,51 +197,51 @@ pub const paging = struct {
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// This function will only use the architecture's `standard_page_size`.
-    pub inline fn mapStandardRange(
+    pub inline fn mapToPhysicalRange(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        checkSupport(current.paging, "mapStandardRange", fn (
+        checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
             kernel.VirtualRange,
             kernel.PhysicalRange,
             kernel.vmm.MapType,
         ) MapError!void);
 
-        return current.paging.mapStandardRange(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
     }
 
     /// Unmaps the `virtual_range`.
     ///
     /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
-    pub fn unmapStandardRange(
+    pub fn unmap(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
     ) void {
-        checkSupport(current.paging, "unmapStandardRange", fn (*PageTable, kernel.VirtualRange) void);
+        checkSupport(current.paging, "unmap", fn (*PageTable, kernel.VirtualRange) void);
 
-        current.paging.unmapStandardRange(page_table, virtual_range);
+        current.paging.unmap(page_table, virtual_range);
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// This function is allowed to use all page sizes available to the architecture.
-    pub inline fn mapRangeUseAllPageSizes(
+    pub inline fn mapToPhysicalRangeAllPageSizes(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
         map_type: kernel.vmm.MapType,
     ) MapError!void {
-        checkSupport(current.paging, "mapRangeUseAllPageSizes", fn (
+        checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
             *PageTable,
             kernel.VirtualRange,
             kernel.PhysicalRange,
             kernel.vmm.MapType,
         ) MapError!void);
 
-        return current.paging.mapRangeUseAllPageSizes(page_table, virtual_range, physical_range, map_type);
+        return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
     }
 
     /// Switches to the given page table.

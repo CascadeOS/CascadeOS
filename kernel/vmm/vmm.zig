@@ -62,16 +62,49 @@ fn prepareKernelHeap() !void {
 fn prepareKernelStacks() !void {
     log.debug("preparing kernel stacks", .{});
 
-    const kernel_stacks_range = kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel.root_page_table) catch |err| {
-        core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
-    };
+    const kernel_stacks_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel.root_page_table);
+
+    kernel.Stack.stacks_range_allocator = try kernel.RangeAllocator.init(kernel_stacks_range);
     kernel.memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
 
     log.debug("kernel stacks: {}", .{kernel_stacks_range});
 }
 
-/// Maps a virtual address range to a physical address range using the standard page size.
-pub fn mapStandardRange(
+/// Maps a virtual range using the standard page size.
+///
+/// Physical pages are allocated for each page in the virtual range.
+pub fn mapRange(page_table: *PageTable, virtual_range: kernel.VirtualRange, map_type: MapType) !void {
+    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+
+    const virtual_range_end = virtual_range.end();
+    var current_virtual_range = kernel.VirtualRange.fromAddr(virtual_range.address, kernel.arch.paging.standard_page_size);
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
+            kernel.vmm.unmap(page_table, current_virtual_range);
+            current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
+        }
+    }
+
+    // Map all pages that were allocated.
+    while (!current_virtual_range.address.equal(virtual_range_end)) {
+        const physical_range = kernel.pmm.allocatePage() orelse return error.OutOfMemory;
+
+        try kernel.vmm.mapToPhysicalRange(
+            page_table,
+            current_virtual_range,
+            physical_range,
+            map_type,
+        );
+
+        current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+}
+
+/// Maps a virtual address range to a physical range using the standard page size.
+pub fn mapToPhysicalRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
@@ -88,7 +121,7 @@ pub fn mapStandardRange(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return kernel.arch.paging.mapStandardRange(
+    return kernel.arch.paging.mapToPhysicalRange(
         page_table,
         virtual_range,
         physical_range,
@@ -96,12 +129,12 @@ pub fn mapStandardRange(
     );
 }
 
-/// Unmaps a virtual address range.
+/// Unmaps a virtual range.
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `kernel.arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
-pub fn unmapStandardRange(
+pub fn unmap(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
 ) void {
@@ -110,11 +143,11 @@ pub fn unmapStandardRange(
 
     log.debug("unmapping: {}", .{virtual_range});
 
-    return kernel.arch.paging.unmapStandardRange(page_table, virtual_range);
+    return kernel.arch.paging.unmap(page_table, virtual_range);
 }
 
 /// Maps a virtual address range to a physical address range using all available page sizes.
-fn mapRangeUseAllPageSizes(
+fn mapToPhysicalRangeAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
@@ -131,7 +164,7 @@ fn mapRangeUseAllPageSizes(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return kernel.arch.paging.mapRangeUseAllPageSizes(
+    return kernel.arch.paging.mapToPhysicalRangeAllPageSizes(
         page_table,
         virtual_range,
         physical_range,
@@ -145,7 +178,7 @@ fn mapDirectMaps() !void {
 
     log.debug("mapping the direct map", .{});
 
-    try mapRangeUseAllPageSizes(
+    try mapToPhysicalRangeAllPageSizes(
         kernel.root_page_table,
         kernel.info.direct_map,
         direct_map_physical_range,
@@ -155,7 +188,7 @@ fn mapDirectMaps() !void {
 
     log.debug("mapping the non-cached direct map", .{});
 
-    try mapRangeUseAllPageSizes(
+    try mapToPhysicalRangeAllPageSizes(
         kernel.root_page_table,
         kernel.info.non_cached_direct_map,
         direct_map_physical_range,
@@ -225,7 +258,7 @@ fn mapSection(
 
     const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
-    try mapRangeUseAllPageSizes(
+    try mapToPhysicalRangeAllPageSizes(
         kernel.root_page_table,
         virtual_range,
         physical_range,

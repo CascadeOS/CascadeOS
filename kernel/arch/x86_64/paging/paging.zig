@@ -81,7 +81,7 @@ const MapError = arch.paging.MapError;
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
 ///
 /// This function will only use the architecture's `standard_page_size`.
-pub fn mapStandardRange(
+pub fn mapToPhysicalRange(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,
@@ -118,7 +118,7 @@ pub fn mapStandardRange(
 /// Unmaps the `virtual_range`.
 ///
 /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
-pub fn unmapStandardRange(
+pub fn unmap(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
 ) void {
@@ -136,7 +136,7 @@ pub fn unmapStandardRange(
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
 ///
 /// This function is allowed to use all page sizes available to the architecture.
-pub fn mapRangeUseAllPageSizes(
+pub fn mapToPhysicalRangeAllPageSizes(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
     physical_range: kernel.PhysicalRange,

@@ -47,30 +47,7 @@ const PageAllocator = struct {
             address_space.deallocate(allocated_range);
         }
 
-        const allocated_range_end = allocated_range.end();
-        var current_virtual_range = kernel.VirtualRange.fromAddr(allocated_range.address, kernel.arch.paging.standard_page_size);
-
-        errdefer {
-            // Unmap all pages that have been mapped.
-            while (current_virtual_range.address.greaterThanOrEqual(allocated_range.address)) {
-                vmm.unmapStandardRange(kernel.root_page_table, current_virtual_range);
-                current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
-            }
-        }
-
-        // Map all pages that were allocated.
-        while (!current_virtual_range.address.equal(allocated_range_end)) {
-            const physical_range = kernel.pmm.allocatePage() orelse return error.OutOfMemory;
-
-            try vmm.mapStandardRange(
-                kernel.root_page_table,
-                current_virtual_range,
-                physical_range,
-                heap_map_type,
-            );
-
-            current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
-        }
+        try kernel.vmm.mapRange(kernel.root_page_table, allocated_range, heap_map_type);
 
         return allocated_range.address.toPtr([*]u8);
     }
@@ -112,9 +89,6 @@ const PageAllocator = struct {
     }
 
     fn freeImpl(range: kernel.VirtualRange) void {
-        const range_end = range.end();
-        var current_virtual_range = kernel.VirtualRange.fromAddr(range.address, kernel.arch.paging.standard_page_size);
-
         {
             const held = address_space_lock.lock();
             defer held.unlock();
@@ -122,11 +96,7 @@ const PageAllocator = struct {
             address_space.deallocate(range);
         }
 
-        while (!current_virtual_range.address.equal(range_end)) {
-            vmm.unmapStandardRange(kernel.root_page_table, range);
-
-            current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
-        }
+        vmm.unmap(kernel.root_page_table, range);
 
         // TODO: Cache needs to be flushed on this core and others.
     }
