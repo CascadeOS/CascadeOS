@@ -14,7 +14,7 @@ id: usize,
 
 panicked: bool = false,
 
-_arch: kernel.arch.ArchProcessor = .{},
+_arch: kernel.arch.ArchProcessor,
 
 pub inline fn arch(self: *Processor) *kernel.arch.ArchProcessor {
     return &self._arch;

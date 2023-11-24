@@ -19,6 +19,14 @@ pub fn getEarlyOutputWriter() ?aarch64.Uart.Writer {
     return if (early_output_uart) |output| output.writer() else null;
 }
 
-pub fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
-    aarch64.registers.TPIDR_EL1.write(@intFromPtr(bootstrap_processor));
+pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+    _ = bootstrap_processor;
+}
+
+pub fn prepareProcessor(processor: *kernel.Processor) void {
+    _ = processor;
+}
+
+pub fn loadProcessor(processor: *kernel.Processor) void {
+    aarch64.registers.TPIDR_EL1.write(@intFromPtr(processor));
 }

@@ -34,11 +34,25 @@ pub inline fn safeGetProcessor() ?*kernel.Processor {
 
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
-    /// Performs any actions required to load the provided Processor for the bootstrap processor.
-    pub inline fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
-        checkSupport(current.init, "loadBootstrapProcessor", fn (*kernel.Processor) void);
+    /// Prepares the provided Processor for the bootstrap processor.
+    pub inline fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+        checkSupport(current.init, "prepareBootstrapProcessor", fn (*kernel.Processor) void);
 
-        current.init.loadBootstrapProcessor(bootstrap_processor);
+        current.init.prepareBootstrapProcessor(bootstrap_processor);
+    }
+
+    /// Prepares the provided Processor for use.
+    pub inline fn prepareProcessor(processor: *kernel.Processor) void {
+        checkSupport(current.init, "prepareProcessor", fn (*kernel.Processor) void);
+
+        current.init.prepareProcessor(processor);
+    }
+
+    /// Performs any actions required to load the provided Processor for the current execution context.
+    pub inline fn loadProcessor(processor: *kernel.Processor) void {
+        checkSupport(current.init, "loadProcessor", fn (*kernel.Processor) void);
+
+        current.init.loadProcessor(processor);
     }
 
     /// Attempt to set up some form of early output.

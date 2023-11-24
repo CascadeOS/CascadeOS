@@ -8,12 +8,14 @@ const log = kernel.log.scoped(.init);
 
 var bootstrap_processor: kernel.Processor = .{
     .id = 0,
+    ._arch = undefined, // initialized by `prepareBootstrapProcessor`
 };
 
 /// Entry point from the bootloader specific code.
 pub fn kernelInit() void {
-    // we need to get the Cpu data loaded early as the panic handler and logging use it
-    kernel.arch.init.loadBootstrapProcessor(&bootstrap_processor);
+    // we need to get the processor data loaded early as the panic handler and logging use it
+    kernel.arch.init.prepareBootstrapProcessor(&bootstrap_processor);
+    kernel.arch.init.loadProcessor(&bootstrap_processor);
 
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();

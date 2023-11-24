@@ -25,18 +25,24 @@ var kernel_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
 var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 
-pub fn loadBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     bootstrap_processor._arch = .{
         .double_fault_stack = &double_fault_stack,
         .non_maskable_interrupt_stack = &non_maskable_interrupt_stack,
     };
 
-    loadProcessor(bootstrap_processor);
-
     bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
+
+    loadProcessor(bootstrap_processor);
 }
 
-fn loadProcessor(processor: *kernel.Processor) void {
+pub fn prepareProcessor(processor: *kernel.Processor) void {
+    _ = processor;
+
+    core.panic("NOT IMPLEMENTED"); // TODO
+}
+
+pub fn loadProcessor(processor: *kernel.Processor) void {
     const arch: *x86_64.ArchProcessor = processor.arch();
 
     arch.gdt.load();
