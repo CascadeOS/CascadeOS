@@ -19,7 +19,7 @@ const indent = "  ";
 var initalized: bool = false;
 
 pub fn init() void {
-    var memory_map_iterator = kernel.boot.memoryMapIterator(.forwards);
+    var memory_map_iterator = kernel.boot.memoryMap(.forwards);
 
     while (memory_map_iterator.next()) |memory_map_entry| {
         log.debug(comptime indent ++ "{}", .{memory_map_entry});

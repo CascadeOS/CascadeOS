@@ -108,7 +108,7 @@ fn calculateNonCachedDirectMapRange(
 
 /// Calculates the length of the direct map.
 fn calculateLengthOfDirectMap() core.Size {
-    var memory_map_iterator = kernel.boot.memoryMapIterator(.backwards);
+    var memory_map_iterator = kernel.boot.memoryMap(.backwards);
 
     const last_usable_entry: kernel.boot.MemoryMapEntry = blk: {
         // search from the end of the memory map for the last usable region

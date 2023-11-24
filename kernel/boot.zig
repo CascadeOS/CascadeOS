@@ -59,7 +59,7 @@ pub fn kernelFile() ?kernel.VirtualRange {
 }
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMapIterator(direction: Direction) MemoryMapIterator {
+pub fn memoryMap(direction: Direction) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
     const entries = memmap_response.entries();
     return .{
