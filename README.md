@@ -10,15 +10,14 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - ext2 on NVMe
 
 ## Planned Features
-- x86_64, AArch64/UEFI and RISC-V/UEFI
+- x86_64, AArch64 and RISC-V
 - First class Zig support
-- Linux compatibility mode (allowing static linux binaries to run unchanged)
 - Userspace with GUI
 - All functionality implemented in Zig either in repo or as a package, allowances might be made for things like [ACPICA](https://acpica.org/).
 
 ## Build, testing, running
 ### Prerequisites:
-- zig master
+- zig master (0.12.0-dev.1717+54f4abae2)
 - qemu (optional; used for running and host testing)
 
 Run the x86_64 kernel in QEMU:

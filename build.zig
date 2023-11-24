@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+const builtin = @import("builtin");
 const std = @import("std");
 const Step = std.Build.Step;
 
@@ -13,7 +14,23 @@ const QemuStep = @import("build/QemuStep.zig");
 const StepCollection = @import("build/StepCollection.zig");
 const Tool = @import("build/Tool.zig");
 
+// Ensure this is kept in sync with `build.zig.zon` and `README.md`
+const min_zig_version = "0.12.0-dev.1717+54f4abae2";
+
+comptime {
+    const current_zig = builtin.zig_version;
+    const min_zig = std.SemanticVersion.parse(min_zig_version) catch unreachable;
+    if (current_zig.order(min_zig) == .lt) {
+        @compileError(std.fmt.comptimePrint(
+            "Your Zig version {} does not meet the minimum build requirement of {}",
+            .{ current_zig, min_zig },
+        ));
+    }
+}
+
+// Ensure this is kept in sync with `build.zig.zon`
 const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 1 };
+
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
 pub fn build(b: *std.Build) !void {

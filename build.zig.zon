@@ -1,6 +1,11 @@
 .{
     .name = "CascadeOS",
+
+    // Ensure this is kept in sync with `build.zig`
     .version = "0.0.1",
+
+    // Endure this is kept in sync with `build.zig` and `README.md`
+    .minimum_zig_version = "0.12.0-dev.1717+54f4abae2",
 
     .dependencies = .{
         .limine = .{ // tag: v5.20231103.0-binary
