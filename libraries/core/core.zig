@@ -41,8 +41,10 @@ pub const OrderedComparison = enum {
     greater,
 };
 
-/// This function formats structs but skips fields containing "reserved" in their name.
-pub fn formatStructIgnoreReserved(
+/// This function formats structs but skips:
+///  - fields containing "reserved" in their name
+///  - fields starting with '_'
+pub fn formatStructIgnoreReservedAndHiddenFields(
     self: anytype,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
@@ -67,6 +69,7 @@ pub fn formatStructIgnoreReserved(
     comptime var first: bool = true;
 
     inline for (struct_info.fields) |field| {
+        if (comptime field.name[0] == '_') continue;
         if (comptime std.mem.indexOf(u8, field.name, "reserved") != null) continue;
 
         try writer.writeAll(comptime (if (first) "" else ",") ++ " ." ++ field.name ++ " = ");

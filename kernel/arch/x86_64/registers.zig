@@ -94,7 +94,7 @@ pub const RFlags = packed struct(u64) {
         );
     }
 
-    pub const format = core.formatStructIgnoreReserved;
+    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
@@ -147,7 +147,7 @@ pub const Cr0 = packed struct(u64) {
         );
     }
 
-    pub const format = core.formatStructIgnoreReserved;
+    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 pub const Cr3 = struct {
@@ -216,7 +216,7 @@ pub const EFER = packed struct(u64) {
 
     const msr = MSR(u64, 0xC0000080);
 
-    pub const format = core.formatStructIgnoreReserved;
+    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);

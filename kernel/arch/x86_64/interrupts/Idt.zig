@@ -46,7 +46,7 @@ pub const Entry = extern struct {
 
         present: bool,
 
-        pub const format = core.formatStructIgnoreReserved;
+        pub const format = core.formatStructIgnoreReservedAndHiddenFields;
     };
 
     pub const GateType = enum(u4) {
@@ -92,7 +92,7 @@ pub const Entry = extern struct {
         core.testing.expectSize(@This(), @sizeOf(u64) * 2);
     }
 
-    pub const format = core.formatStructIgnoreReserved;
+    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 pub fn load(self: *const Idt) void {

@@ -37,7 +37,7 @@ pub const Tss = extern struct {
         self.privilege_stack_table[@intFromEnum(privilege_level)] = kernel.VirtualAddress.fromInt(@intFromPtr(stack.ptr) + stack.len);
     }
 
-    pub const format = core.formatStructIgnoreReserved;
+    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 
     comptime {
         core.testing.expectSize(@This(), 104);
