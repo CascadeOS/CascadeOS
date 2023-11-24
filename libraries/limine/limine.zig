@@ -276,144 +276,140 @@ pub const SMP = extern struct {
         _: u63 = 0,
     };
 
-    pub const Response = extern struct {
+    pub const Response = switch (arch) {
+        .aarch64 => aarch64,
+        .riscv64 => riscv64,
+        .x86_64 => x86_64,
+    };
+
+    pub const aarch64 = extern struct {
         revision: u64,
 
-        arch: switch (arch) {
-            .aarch64 => aarch64,
-            .riscv64 => riscv64,
-            .x86_64 => x86_64,
-        },
+        /// Always zero.
+        flags: u32,
 
-        pub const aarch64 = extern struct {
-            revision: u64,
+        /// MPIDR of the bootstrap processor (as read from MPIDR_EL1, with Res1 masked off).
+        bsp_mpidr: u64,
 
-            /// Always zero.
-            flags: u32,
+        _cpu_count: u64,
+        _cpus: [*]*SMPInfo,
 
-            /// MPIDR of the bootstrap processor (as read from MPIDR_EL1, with Res1 masked off).
-            bsp_mpidr: u64,
+        pub fn cpus(self: *const aarch64) []*SMPInfo {
+            return self._cpus[0..self._cpu_count];
+        }
 
-            _cpu_count: u64,
-            _cpus: [*]*SMPInfo,
+        pub const SMPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT
+            processor_id: u32,
 
-            pub fn cpus(self: *const Response) []*SMPInfo {
-                return self._cpus[0..self._cpu_count];
-            }
+            /// GIC CPU Interface number of the processor as specified by the MADT (possibly always 0)
+            gic_iface_no: u32,
 
-            pub const SMPInfo = extern struct {
-                /// ACPI Processor UID as specified by the MADT
-                processor_id: u32,
+            /// MPIDR of the processor as specified by the MADT or device tree
+            mpidr: u64,
 
-                /// GIC CPU Interface number of the processor as specified by the MADT (possibly always 0)
-                gic_iface_no: u32,
+            _reserved: u64,
 
-                /// MPIDR of the processor as specified by the MADT or device tree
-                mpidr: u64,
+            /// An atomic write to this field causes the parked CPU to jump to the written address,
+            /// on a 64KiB (or Stack Size Request size) stack
+            ///
+            /// A pointer to the `SMPInfo` structure of the CPU is passed in X0.
+            ///
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
+            /// This field is unused for the structure describing the bootstrap processor.
+            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
 
-                _reserved: u64,
+            /// A free for use field
+            extra_argument: u64,
+        };
+    };
 
-                /// An atomic write to this field causes the parked CPU to jump to the written address,
-                /// on a 64KiB (or Stack Size Request size) stack
-                ///
-                /// A pointer to the `SMPInfo` structure of the CPU is passed in X0.
-                ///
-                /// Other than that, the CPU state will be the same as described for the bootstrap processor.
-                ///
-                /// This field is unused for the structure describing the bootstrap processor.
-                goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+    pub const riscv64 = extern struct {
+        revision: u64,
 
-                /// A free for use field
-                extra_argument: u64,
-            };
+        /// Always zero.
+        flags: u32,
+
+        /// Hart ID of the bootstrap processor as reported by the UEFI RISC-V Boot Protocol or the SBI.
+        bsp_hartid: u64,
+
+        _cpu_count: u64,
+        _cpus: [*]*SMPInfo,
+
+        pub fn cpus(self: *const riscv64) []*SMPInfo {
+            return self._cpus[0..self._cpu_count];
+        }
+
+        pub const SMPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems).
+            processor_id: u32,
+
+            /// Hart ID of the processor as specified by the MADT or Device Tree.
+            hartid: u32,
+
+            _reserved: u64,
+
+            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB
+            /// (or Stack Size Request size) stack.
+            ///
+            /// A pointer to the `SMPInfo` structure of the CPU is passed in x10(a0).
+            ///
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
+            /// This field is unused for the structure describing the bootstrap processor.
+            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+
+            /// A free for use field
+            extra_argument: u64,
+        };
+    };
+
+    pub const x86_64 = extern struct {
+        revision: u64,
+
+        flags: ResponseFlags,
+
+        /// The Local APIC ID of the bootstrap processor.
+        bsp_lapic_id: u32,
+
+        _cpu_count: u64,
+        _cpus: [*]*SMPInfo,
+
+        pub const ResponseFlags = packed struct(u32) {
+            /// X2APIC has been enabled
+            x2apic_enabled: u1 = 0,
+            _: u31 = 0,
         };
 
-        pub const riscv64 = extern struct {
-            revision: u64,
+        pub fn cpus(self: *const x86_64) []*SMPInfo {
+            return self._cpus[0..self._cpu_count];
+        }
 
-            /// Always zero.
-            flags: u32,
+        pub const SMPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT
+            processor_id: u32,
 
-            /// Hart ID of the bootstrap processor as reported by the UEFI RISC-V Boot Protocol or the SBI.
-            bsp_hartid: u64,
+            /// Local APIC ID of the processor as specified by the MADT
+            lapic_id: u32,
 
-            _cpu_count: u64,
-            _cpus: [*]*SMPInfo,
+            _reserved: u64,
 
-            pub fn cpus(self: *const Response) []*SMPInfo {
-                return self._cpus[0..self._cpu_count];
-            }
+            /// An atomic write to this field causes the parked CPU to jump to the written address,
+            /// on a 64KiB (or Stack Size Request size) stack.
+            ///
+            /// A pointer to the `SMPInfo` structure of the CPU is passed in RDI.
+            ///
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
+            /// This field is unused for the structure describing the bootstrap processor.
+            ///
+            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
+            /// processor.
+            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
 
-            pub const SMPInfo = extern struct {
-                /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems).
-                processor_id: u32,
-
-                /// Hart ID of the processor as specified by the MADT or Device Tree.
-                hartid: u32,
-
-                _reserved: u64,
-
-                /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB
-                /// (or Stack Size Request size) stack.
-                ///
-                /// A pointer to the `SMPInfo` structure of the CPU is passed in x10(a0).
-                ///
-                /// Other than that, the CPU state will be the same as described for the bootstrap processor.
-                ///
-                /// This field is unused for the structure describing the bootstrap processor.
-                goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
-
-                /// A free for use field
-                extra_argument: u64,
-            };
-        };
-
-        pub const x86_64 = extern struct {
-            revision: u64,
-
-            flags: ResponseFlags,
-
-            /// The Local APIC ID of the bootstrap processor.
-            bsp_lapic_id: u32,
-
-            _cpu_count: u64,
-            _cpus: [*]*SMPInfo,
-
-            pub const ResponseFlags = packed struct(u32) {
-                /// X2APIC has been enabled
-                x2apic_enabled: u1 = 0,
-                _: u31 = 0,
-            };
-
-            pub fn cpus(self: *const Response) []*SMPInfo {
-                return self._cpus[0..self._cpu_count];
-            }
-
-            pub const SMPInfo = extern struct {
-                /// ACPI Processor UID as specified by the MADT
-                processor_id: u32,
-
-                /// Local APIC ID of the processor as specified by the MADT
-                lapic_id: u32,
-
-                reserved: u64,
-
-                /// An atomic write to this field causes the parked CPU to jump to the written address,
-                /// on a 64KiB (or Stack Size Request size) stack.
-                ///
-                /// A pointer to the `SMPInfo` structure of the CPU is passed in RDI.
-                ///
-                /// Other than that, the CPU state will be the same as described for the bootstrap processor.
-                ///
-                /// This field is unused for the structure describing the bootstrap processor.
-                ///
-                /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
-                /// processor.
-                goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
-
-                /// A free for use field
-                extra_argument: u64,
-            };
+            /// A free for use field
+            extra_argument: u64,
         };
     };
 };
