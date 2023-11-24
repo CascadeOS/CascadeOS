@@ -10,9 +10,11 @@ pub const info = @import("info.zig");
 pub const init = @import("init.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
-pub const Processor = @import("Processor.zig");
 pub const vmm = @import("vmm/vmm.zig");
 pub const sync = @import("sync/sync.zig");
+
+pub const Processor = @import("Processor.zig");
+pub const Stack = @import("Stack.zig");
 
 const address = @import("address.zig");
 pub const PhysicalAddress = address.PhysicalAddress;

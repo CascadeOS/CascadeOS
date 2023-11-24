@@ -27,14 +27,14 @@ pub const Tss = extern struct {
     iomap_base: u16 align(1) = 0,
 
     /// Sets the stack for the given stack selector.
-    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: []align(16) u8) void {
-        self.interrupt_stack_table[@intFromEnum(stack_selector)] = kernel.VirtualAddress.fromInt(@intFromPtr(stack.ptr) + stack.len);
+    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: kernel.Stack) void {
+        self.interrupt_stack_table[@intFromEnum(stack_selector)] = stack.stack_top;
     }
 
     /// Sets the stack for the given privilege level.
-    pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: []align(16) u8) void {
+    pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: kernel.Stack) void {
         core.assert(privilege_level != .ring3);
-        self.privilege_stack_table[@intFromEnum(privilege_level)] = kernel.VirtualAddress.fromInt(@intFromPtr(stack.ptr) + stack.len);
+        self.privilege_stack_table[@intFromEnum(privilege_level)] = stack.stack_top;
     }
 
     pub const format = core.formatStructIgnoreReservedAndHiddenFields;
