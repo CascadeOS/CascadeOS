@@ -21,19 +21,18 @@ pub fn getEarlyOutputWriter() ?x86_64.serial.SerialPort.Writer {
 const page_size = core.Size.from(4, .kib);
 const kernel_stack_size = page_size.multiply(16);
 
-var kernel_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
-var double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
-var non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
+var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes;
+var bootstrap_double_fault_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
+var bootstrap_non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel_stack_size.bytes; // TODO: This could be smaller
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     bootstrap_processor._arch = .{
-        .double_fault_stack = &double_fault_stack,
-        .non_maskable_interrupt_stack = &non_maskable_interrupt_stack,
+        .interrupt_stack = &bootstrap_interrupt_stack,
+        .double_fault_stack = &bootstrap_double_fault_stack,
+        .non_maskable_interrupt_stack = &bootstrap_non_maskable_interrupt_stack,
     };
 
-    bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, &kernel_interrupt_stack);
-
-    loadProcessor(bootstrap_processor);
+    bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, bootstrap_processor._arch.interrupt_stack);
 }
 
 pub fn prepareProcessor(processor: *kernel.Processor) void {
