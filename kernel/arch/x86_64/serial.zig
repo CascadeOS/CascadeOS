@@ -13,8 +13,8 @@ const OUTPUT_READY: u8 = 1 << 5;
 // TODO: Implement a proper serial port driver https://github.com/CascadeOS/CascadeOS/issues/30
 
 pub const SerialPort = struct {
-    z_data_port: u16,
-    z_line_status_port: u16,
+    _data_port: u16,
+    _line_status_port: u16,
 
     /// Initialize the serial port at `com_port` with the baud rate `baud_rate`
     pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
@@ -44,13 +44,13 @@ pub const SerialPort = struct {
         portWriteU8(data_port_number + 1, 0x01);
 
         return .{
-            .z_data_port = data_port_number,
-            .z_line_status_port = data_port_number + 5,
+            ._data_port = data_port_number,
+            ._line_status_port = data_port_number + 5,
         };
     }
 
     fn waitForOutputReady(self: SerialPort) void {
-        while (portReadU8(self.z_line_status_port) & OUTPUT_READY == 0) {
+        while (portReadU8(self._line_status_port) & OUTPUT_READY == 0) {
             x86_64.instructions.pause();
         }
     }
@@ -65,7 +65,7 @@ pub const SerialPort = struct {
         for (bytes) |char| {
             self.waitForOutputReady();
             // TODO: Does a serial port need `\r` before `\n`? https://github.com/CascadeOS/CascadeOS/issues/31
-            portWriteU8(self.z_data_port, char);
+            portWriteU8(self._data_port, char);
         }
         return bytes.len;
     }

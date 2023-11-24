@@ -9,19 +9,19 @@ const InterruptStackSelector = x86_64.interrupts.InterruptStackSelector;
 
 /// The x86_64 Task State Segment structure.
 pub const Tss = extern struct {
-    reserved_1: u32 align(1) = 0,
+    _reserved_1: u32 align(1) = 0,
 
     /// Stack pointers (RSP) for privilege levels 0-2.
     privilege_stack_table: [3]kernel.VirtualAddress align(1) = [_]kernel.VirtualAddress{kernel.VirtualAddress.zero} ** 3,
 
-    reserved_2: u64 align(1) = 0,
+    _reserved_2: u64 align(1) = 0,
 
     /// Interrupt stack table (IST) pointers.
     interrupt_stack_table: [7]kernel.VirtualAddress align(1) = [_]kernel.VirtualAddress{kernel.VirtualAddress.zero} ** 7,
 
-    reserved_3: u64 align(1) = 0,
+    _reserved_3: u64 align(1) = 0,
 
-    reserved_4: u16 align(1) = 0,
+    _reserved_4: u16 align(1) = 0,
 
     /// The 16-bit offset to the I/O permission bit map from the 64-bit TSS base.
     iomap_base: u16 align(1) = 0,
