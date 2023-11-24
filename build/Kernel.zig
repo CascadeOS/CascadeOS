@@ -116,7 +116,7 @@ fn create(
             "asm",
         });
 
-        var assembly_files_dir = std.fs.cwd().openIterableDir(assembly_files_dir_path, .{}) catch break :assembly_files_blk;
+        var assembly_files_dir = std.fs.cwd().openDir(assembly_files_dir_path, .{ .iterate = true }) catch break :assembly_files_blk;
         defer assembly_files_dir.close();
 
         var iter = assembly_files_dir.iterateAssumeFirstIteration();
@@ -227,7 +227,7 @@ fn addFilesRecursive(
     root_path: []const u8,
     target_path: []const u8,
 ) !void {
-    var dir = try std.fs.cwd().openIterableDir(target_path, .{});
+    var dir = try std.fs.cwd().openDir(target_path, .{ .iterate = true });
     defer dir.close();
 
     var it = dir.iterate();
