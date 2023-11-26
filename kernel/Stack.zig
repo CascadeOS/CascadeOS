@@ -16,8 +16,7 @@ pub const usable_stack_size = kernel.arch.paging.standard_page_size.multiply(16)
 /// The guard page for the next stack in memory is immediately after our stack top so acts as our guard page to catch underflows.
 const stack_size_with_guard_page = usable_stack_size.add(kernel.arch.paging.standard_page_size);
 
-// Initialized by `vmm.init`
-pub var stacks_range_allocator: kernel.RangeAllocator = undefined;
+var stacks_range_allocator: kernel.RangeAllocator = undefined;
 var stacks_range_allocator_lock: kernel.sync.SpinLock = .{};
 
 /// The entire virtual range including the guard page.
@@ -76,3 +75,9 @@ pub fn destroy(stack: Stack) void {
 
     // TODO: Cache needs to be flushed on this core and others.
 }
+
+pub const init = struct {
+    pub fn initStacks(kernel_stacks_range: kernel.VirtualRange) !void {
+        stacks_range_allocator = try kernel.RangeAllocator.init(kernel_stacks_range);
+    }
+};
