@@ -6,8 +6,7 @@ const kernel = @import("kernel");
 
 const vmm = kernel.vmm;
 
-// Initialized by `vmm.init`
-pub var address_space: kernel.AddressSpace = undefined;
+var address_space: kernel.AddressSpace = undefined;
 var address_space_lock: kernel.sync.SpinLock = .{};
 
 pub const page_allocator = std.mem.Allocator{
@@ -103,5 +102,11 @@ const PageAllocator = struct {
         vmm.unmap(kernel.vmm.kernel_page_table, range);
 
         // TODO: Cache needs to be flushed on this core and others.
+    }
+};
+
+pub const init = struct {
+    pub fn initHeap(kernel_heap_range: kernel.VirtualRange) !void {
+        address_space = try kernel.AddressSpace.init(kernel_heap_range);
     }
 };
