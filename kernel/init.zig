@@ -42,7 +42,7 @@ pub fn kernelInit() void {
     kernel.arch.init.configureSystemFeatures();
 
     log.info("initializing physical memory", .{});
-    kernel.pmm.init();
+    kernel.pmm.init.initPmm();
 
     log.info("initializing virtual memory", .{});
     kernel.vmm.init.initVmm();
