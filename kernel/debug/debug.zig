@@ -6,6 +6,8 @@ const kernel = @import("kernel");
 
 const symbols = @import("symbols.zig");
 
+var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
+
 /// Entry point from the Zig language upon a panic.
 pub fn panic(
     msg: []const u8,
@@ -17,68 +19,9 @@ pub fn panic(
 
     const return_address = return_address_opt orelse @returnAddress();
 
-    if (kernel.info.kernel_initialized) {
-        panicImpl(msg, stack_trace, return_address);
-    } else {
-        earlyPanicImpl(msg, stack_trace, return_address);
-    }
+    panic_impl(msg, stack_trace, return_address);
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
-}
-
-/// Panic implementation used before the kernel is fully initialized and running.
-fn earlyPanicImpl(
-    msg: []const u8,
-    stack_trace: ?*const std.builtin.StackTrace,
-    return_address: usize,
-) void {
-    const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
-
-    // panic message
-    {
-        const processor = kernel.arch.safeGetProcessor() orelse return;
-
-        if (processor.panicked) {
-            // TODO: Can we do something better when we panic in a panic?
-            writer.writeAll("\nPANIC IN PANIC\n") catch unreachable;
-
-            return;
-        }
-        processor.panicked = true;
-
-        writer.writeAll("\nPANIC on processor ") catch unreachable;
-
-        std.fmt.formatInt(
-            processor.id,
-            10,
-            .lower,
-            .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
-            writer,
-        ) catch unreachable;
-
-        if (msg.len != 0) {
-            writer.writeAll(" - ") catch unreachable;
-
-            writer.writeAll(msg) catch unreachable;
-
-            if (msg[msg.len - 1] != '\n') {
-                writer.writeByte('\n') catch unreachable;
-            }
-        } else {
-            writer.writeByte('\n') catch unreachable;
-        }
-    }
-
-    symbols.loadSymbols();
-
-    // error return trace
-    if (stack_trace) |trace| {
-        if (trace.index != 0) {
-            printStackTrace(writer, trace);
-        }
-    }
-
-    printCurrentBackTrace(writer, return_address);
 }
 
 /// Panic implementation used when the kernel is fully initialized and running.
@@ -88,7 +31,7 @@ fn panicImpl(
     return_address: usize,
 ) void {
     // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
-    earlyPanicImpl(msg, stack_trace, return_address);
+    init.earlyPanicImpl(msg, stack_trace, return_address);
 }
 
 fn printStackTrace(
@@ -318,3 +261,62 @@ const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_
     }
     break :embedded_source_files array[0..];
 });
+
+pub const init = struct {
+    /// Panic implementation used before the kernel is fully initialized and running.
+    fn earlyPanicImpl(
+        msg: []const u8,
+        stack_trace: ?*const std.builtin.StackTrace,
+        return_address: usize,
+    ) void {
+        const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
+
+        // panic message
+        {
+            if (kernel.arch.safeGetProcessor()) |processor| {
+                if (processor.panicked) {
+                    // TODO: Can we do something better when we panic in a panic?
+                    writer.writeAll("\nPANIC IN PANIC\n") catch unreachable;
+
+                    return;
+                }
+                processor.panicked = true;
+
+                writer.writeAll("\nPANIC on processor ") catch unreachable;
+
+                std.fmt.formatInt(
+                    processor.id,
+                    10,
+                    .lower,
+                    .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
+                    writer,
+                ) catch unreachable;
+            } else {
+                writer.writeAll("\nPANIC with no initalized processor") catch unreachable;
+            }
+
+            if (msg.len != 0) {
+                writer.writeAll(" - ") catch unreachable;
+
+                writer.writeAll(msg) catch unreachable;
+
+                if (msg[msg.len - 1] != '\n') {
+                    writer.writeByte('\n') catch unreachable;
+                }
+            } else {
+                writer.writeByte('\n') catch unreachable;
+            }
+        }
+
+        symbols.loadSymbols();
+
+        // error return trace
+        if (stack_trace) |trace| {
+            if (trace.index != 0) {
+                printStackTrace(writer, trace);
+            }
+        }
+
+        printCurrentBackTrace(writer, return_address);
+    }
+};
