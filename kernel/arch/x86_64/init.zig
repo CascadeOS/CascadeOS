@@ -24,9 +24,6 @@ var bootstrap_non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     bootstrap_processor._arch = .{
-        .interrupt_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
-            @as([]u8, &bootstrap_interrupt_stack),
-        )),
         .double_fault_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_double_fault_stack),
         )),
@@ -35,7 +32,7 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
         )),
     };
 
-    bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, bootstrap_processor._arch.interrupt_stack);
+    bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, bootstrap_processor.idle_and_interrupt_stack);
 }
 
 /// Prepares the provided Processor for use.
@@ -43,12 +40,11 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
 /// **WARNING**: This function will panic if the processor cannot be prepared.
 pub fn prepareProcessor(processor: *kernel.Processor) void {
     processor._arch = .{
-        .interrupt_stack = kernel.Stack.create() catch core.panic("unable to create interrupt stack"),
         .double_fault_stack = kernel.Stack.create() catch core.panic("unable to create double fault stack"),
         .non_maskable_interrupt_stack = kernel.Stack.create() catch core.panic("unable to create non-mackable interrupt stack"),
     };
 
-    processor._arch.tss.setPrivilegeStack(.ring0, processor._arch.interrupt_stack);
+    processor._arch.tss.setPrivilegeStack(.ring0, processor.idle_and_interrupt_stack);
 }
 
 pub fn loadProcessor(processor: *kernel.Processor) void {
