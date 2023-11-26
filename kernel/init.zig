@@ -45,7 +45,7 @@ pub fn kernelInit() void {
     kernel.pmm.init();
 
     log.info("initializing virtual memory", .{});
-    kernel.vmm.init();
+    kernel.vmm.init.initVmm();
 
     core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 

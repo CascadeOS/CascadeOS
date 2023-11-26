@@ -47,7 +47,11 @@ const PageAllocator = struct {
             address_space.deallocate(allocated_range);
         }
 
-        try kernel.vmm.mapRange(kernel.root_page_table, allocated_range, heap_map_type);
+        try kernel.vmm.mapRange(
+            kernel.vmm.kernel_page_table,
+            allocated_range,
+            heap_map_type,
+        );
 
         return allocated_range.address.toPtr([*]u8);
     }
@@ -96,7 +100,7 @@ const PageAllocator = struct {
             address_space.deallocate(range);
         }
 
-        vmm.unmap(kernel.root_page_table, range);
+        vmm.unmap(kernel.vmm.kernel_page_table, range);
 
         // TODO: Cache needs to be flushed on this core and others.
     }

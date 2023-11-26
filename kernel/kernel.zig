@@ -26,15 +26,6 @@ pub const VirtualAddress = address.VirtualAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const VirtualRange = address.VirtualRange;
 
-/// The root page table for the kernel.
-///
-/// Initialized during `vmm.init`.
-pub var root_page_table: *arch.paging.PageTable = undefined;
-
-/// The memory layout of the kernel.
-///
-/// Populated during `vmm.init`.
-pub var memory_layout: vmm.KernelMemoryLayout = .{};
 
 comptime {
     // make sure any bootloader specific code that needs to be referenced is

@@ -54,7 +54,11 @@ pub fn create() !Stack {
     var range_to_map = virtual_range.moveForward(kernel.arch.paging.standard_page_size);
     range_to_map.size.subtractInPlace(kernel.arch.paging.standard_page_size);
 
-    try kernel.vmm.mapRange(kernel.root_page_table, range_to_map, .{ .global = true, .writeable = true });
+    try kernel.vmm.mapRange(
+        kernel.vmm.kernel_page_table,
+        range_to_map,
+        .{ .global = true, .writeable = true },
+    );
 
     return fromRange(virtual_range);
 }

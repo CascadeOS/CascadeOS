@@ -14,61 +14,8 @@ const PageTable = paging.PageTable;
 
 const log = kernel.log.scoped(.virt_mm);
 
-pub fn init() void {
-    log.debug("allocating kernel root page table", .{});
-    kernel.root_page_table = paging.allocatePageTable() catch
-        core.panic("unable to allocate physical page for root page table");
-
-    // the below functions setup the mappings in `kernel_root_page_table` and also register each region in
-    // the kernel memory layout
-
-    mapDirectMaps() catch |err| {
-        core.panicFmt("failed to map direct maps: {s}", .{@errorName(err)});
-    };
-
-    mapKernelSections() catch |err| {
-        core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
-    };
-
-    prepareKernelHeap() catch |err| {
-        core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
-    };
-
-    prepareKernelStacks() catch |err| {
-        core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
-    };
-
-    log.debug("switching to kernel page table", .{});
-    paging.switchToPageTable(kernel.root_page_table);
-
-    log.debug("kernel memory regions:", .{});
-
-    for (kernel.memory_layout.layout.slice()) |region| {
-        log.debug("\t{}", .{region});
-    }
-}
-
-fn prepareKernelHeap() !void {
-    log.debug("preparing kernel heap", .{});
-
-    const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel.root_page_table);
-
-    kernel.heap.address_space = try kernel.AddressSpace.init(kernel_heap_range);
-    kernel.memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
-
-    log.debug("kernel heap: {}", .{kernel_heap_range});
-}
-
-fn prepareKernelStacks() !void {
-    log.debug("preparing kernel stacks", .{});
-
-    const kernel_stacks_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel.root_page_table);
-
-    kernel.Stack.stacks_range_allocator = try kernel.RangeAllocator.init(kernel_stacks_range);
-    kernel.memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
-
-    log.debug("kernel stacks: {}", .{kernel_stacks_range});
-}
+pub var kernel_page_table: *arch.paging.PageTable = undefined;
+pub var memory_layout: KernelMemoryLayout = .{};
 
 /// Maps a virtual range using the standard page size.
 ///
@@ -146,124 +93,184 @@ pub fn unmap(
     return kernel.arch.paging.unmap(page_table, virtual_range);
 }
 
-/// Maps a virtual address range to a physical address range using all available page sizes.
-fn mapToPhysicalRangeAllPageSizes(
-    page_table: *PageTable,
-    virtual_range: kernel.VirtualRange,
-    physical_range: kernel.PhysicalRange,
-    map_type: MapType,
-) !void {
-    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(physical_range.size.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.equal(virtual_range.size));
+pub const init = struct {
+    pub fn initVmm() void {
+        log.debug("allocating kernel root page table", .{});
+        kernel_page_table = paging.allocatePageTable() catch
+            core.panic("unable to allocate physical page for root page table");
 
-    log.debug(
-        "mapping: {} to {} with type: {}",
-        .{ virtual_range, physical_range, map_type },
-    );
+        // the below functions setup the mappings in `kernel_root_page_table` and also register each region in
+        // the kernel memory layout
 
-    return kernel.arch.paging.mapToPhysicalRangeAllPageSizes(
-        page_table,
-        virtual_range,
-        physical_range,
-        map_type,
-    );
-}
+        mapDirectMaps() catch |err| {
+            core.panicFmt("failed to map direct maps: {s}", .{@errorName(err)});
+        };
 
-/// Maps the direct maps.
-fn mapDirectMaps() !void {
-    const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
+        mapKernelSections() catch |err| {
+            core.panicFmt("failed to map kernel sections: {s}", .{@errorName(err)});
+        };
 
-    log.debug("mapping the direct map", .{});
+        prepareKernelHeap() catch |err| {
+            core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
+        };
 
-    try mapToPhysicalRangeAllPageSizes(
-        kernel.root_page_table,
-        kernel.info.direct_map,
-        direct_map_physical_range,
-        .{ .writeable = true, .global = true },
-    );
-    kernel.memory_layout.registerRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
+        prepareKernelStacks() catch |err| {
+            core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
+        };
 
-    log.debug("mapping the non-cached direct map", .{});
+        log.debug("switching to kernel page table", .{});
+        paging.switchToPageTable(kernel_page_table);
 
-    try mapToPhysicalRangeAllPageSizes(
-        kernel.root_page_table,
-        kernel.info.non_cached_direct_map,
-        direct_map_physical_range,
-        .{ .writeable = true, .no_cache = true, .global = true },
-    );
-    kernel.memory_layout.registerRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
-}
+        log.debug("kernel memory regions:", .{});
 
-const linker_symbols = struct {
-    extern const __text_start: u8;
-    extern const __text_end: u8;
-    extern const __rodata_start: u8;
-    extern const __rodata_end: u8;
-    extern const __data_start: u8;
-    extern const __data_end: u8;
+        for (memory_layout.layout.slice()) |region| {
+            log.debug("\t{}", .{region});
+        }
+    }
+
+    fn prepareKernelHeap() !void {
+        log.debug("preparing kernel heap", .{});
+
+        const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_page_table);
+
+        try kernel.heap.init.initHeap(kernel_heap_range);
+
+        memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
+
+        log.debug("kernel heap: {}", .{kernel_heap_range});
+    }
+
+    fn prepareKernelStacks() !void {
+        log.debug("preparing kernel stacks", .{});
+
+        const kernel_stacks_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_page_table);
+
+        try kernel.Stack.init.initStacks(kernel_stacks_range);
+
+        memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
+
+        log.debug("kernel stacks: {}", .{kernel_stacks_range});
+    }
+
+    /// Maps a virtual address range to a physical address range using all available page sizes.
+    fn mapToPhysicalRangeAllPageSizes(
+        page_table: *PageTable,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
+        map_type: MapType,
+    ) !void {
+        core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+        core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+        core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
+        core.debugAssert(physical_range.size.isAligned(arch.paging.standard_page_size));
+        core.debugAssert(virtual_range.size.equal(virtual_range.size));
+
+        log.debug(
+            "mapping: {} to {} with type: {}",
+            .{ virtual_range, physical_range, map_type },
+        );
+
+        return kernel.arch.paging.mapToPhysicalRangeAllPageSizes(
+            page_table,
+            virtual_range,
+            physical_range,
+            map_type,
+        );
+    }
+
+    /// Maps the direct maps.
+    fn mapDirectMaps() !void {
+        const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
+
+        log.debug("mapping the direct map", .{});
+
+        try mapToPhysicalRangeAllPageSizes(
+            kernel_page_table,
+            kernel.info.direct_map,
+            direct_map_physical_range,
+            .{ .writeable = true, .global = true },
+        );
+        memory_layout.registerRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
+
+        log.debug("mapping the non-cached direct map", .{});
+
+        try mapToPhysicalRangeAllPageSizes(
+            kernel_page_table,
+            kernel.info.non_cached_direct_map,
+            direct_map_physical_range,
+            .{ .writeable = true, .no_cache = true, .global = true },
+        );
+        memory_layout.registerRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
+    }
+
+    const linker_symbols = struct {
+        extern const __text_start: u8;
+        extern const __text_end: u8;
+        extern const __rodata_start: u8;
+        extern const __rodata_end: u8;
+        extern const __data_start: u8;
+        extern const __data_end: u8;
+    };
+
+    /// Maps the kernel sections.
+    fn mapKernelSections() !void {
+        log.debug("mapping .text section", .{});
+        try mapSection(
+            @intFromPtr(&linker_symbols.__text_start),
+            @intFromPtr(&linker_symbols.__text_end),
+            .{ .executable = true, .global = true },
+            .executable_section,
+        );
+
+        log.debug("mapping .rodata section", .{});
+        try mapSection(
+            @intFromPtr(&linker_symbols.__rodata_start),
+            @intFromPtr(&linker_symbols.__rodata_end),
+            .{ .global = true },
+            .readonly_section,
+        );
+
+        log.debug("mapping .data section", .{});
+        try mapSection(
+            @intFromPtr(&linker_symbols.__data_start),
+            @intFromPtr(&linker_symbols.__data_end),
+            .{ .writeable = true, .global = true },
+            .writeable_section,
+        );
+    }
+
+    /// Maps a section.
+    fn mapSection(
+        section_start: usize,
+        section_end: usize,
+        map_type: MapType,
+        region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
+    ) !void {
+        core.assert(section_end > section_start);
+
+        const virt_address = kernel.VirtualAddress.fromInt(section_start);
+
+        const virtual_range = kernel.VirtualRange.fromAddr(
+            virt_address,
+            core.Size
+                .from(section_end - section_start, .byte)
+                .alignForward(paging.standard_page_size),
+        );
+        core.assert(virtual_range.size.isAligned(paging.standard_page_size));
+
+        const phys_address = kernel.PhysicalAddress.fromInt(
+            virt_address.value - kernel.info.kernel_physical_to_virtual_offset.bytes,
+        );
+
+        const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
+
+        try mapToPhysicalRangeAllPageSizes(
+            kernel_page_table,
+            virtual_range,
+            physical_range,
+            map_type,
+        );
+
+        memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+    }
 };
-
-/// Maps the kernel sections.
-fn mapKernelSections() !void {
-    log.debug("mapping .text section", .{});
-    try mapSection(
-        @intFromPtr(&linker_symbols.__text_start),
-        @intFromPtr(&linker_symbols.__text_end),
-        .{ .executable = true, .global = true },
-        .executable_section,
-    );
-
-    log.debug("mapping .rodata section", .{});
-    try mapSection(
-        @intFromPtr(&linker_symbols.__rodata_start),
-        @intFromPtr(&linker_symbols.__rodata_end),
-        .{ .global = true },
-        .readonly_section,
-    );
-
-    log.debug("mapping .data section", .{});
-    try mapSection(
-        @intFromPtr(&linker_symbols.__data_start),
-        @intFromPtr(&linker_symbols.__data_end),
-        .{ .writeable = true, .global = true },
-        .writeable_section,
-    );
-}
-
-/// Maps a section.
-fn mapSection(
-    section_start: usize,
-    section_end: usize,
-    map_type: MapType,
-    region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
-) !void {
-    core.assert(section_end > section_start);
-
-    const virt_address = kernel.VirtualAddress.fromInt(section_start);
-
-    const virtual_range = kernel.VirtualRange.fromAddr(
-        virt_address,
-        core.Size
-            .from(section_end - section_start, .byte)
-            .alignForward(paging.standard_page_size),
-    );
-    core.assert(virtual_range.size.isAligned(paging.standard_page_size));
-
-    const phys_address = kernel.PhysicalAddress.fromInt(
-        virt_address.value - kernel.info.kernel_physical_to_virtual_offset.bytes,
-    );
-
-    const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
-
-    try mapToPhysicalRangeAllPageSizes(
-        kernel.root_page_table,
-        virtual_range,
-        physical_range,
-        map_type,
-    );
-
-    kernel.memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
-}
