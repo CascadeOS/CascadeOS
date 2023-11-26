@@ -12,9 +12,6 @@ pub const arch = target_options.arch;
 pub const version = kernel_options.cascade_version;
 pub const root_path = kernel_options.root_path;
 
-/// Indicates whether the kernel has finished initialization and is running
-pub var kernel_initialized: bool = false;
-
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = kernel.VirtualAddress.fromInt(0xffffffff80000000);
 

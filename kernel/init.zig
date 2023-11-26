@@ -47,9 +47,8 @@ pub fn kernelInit() void {
     log.info("initializing virtual memory", .{});
     kernel.vmm.init.initVmm();
 
-    core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 
-    // TODO: kernel.info.kernel_initialized = true;
+    core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
 }
 
 fn captureBootloaderInformation() void {
