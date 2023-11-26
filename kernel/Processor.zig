@@ -24,5 +24,3 @@ _arch: kernel.arch.ArchProcessor,
 pub inline fn arch(self: *Processor) *kernel.arch.ArchProcessor {
     return &self._arch;
 }
-
-pub const format = core.formatStructIgnoreReservedAndHiddenFields;

@@ -37,8 +37,6 @@ pub const Tss = extern struct {
         self.privilege_stack_table[@intFromEnum(privilege_level)] = stack.stack_top;
     }
 
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
-
     comptime {
         core.testing.expectSize(@This(), 104);
     }

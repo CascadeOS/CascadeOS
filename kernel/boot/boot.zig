@@ -76,8 +76,6 @@ pub const ProcessorDescriptor = struct {
     pub const Raw = union(enum) {
         limine: *limine.SMP.Response.SMPInfo,
     };
-
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 /// An iterator over the processor descriptors provided by the bootloader.
