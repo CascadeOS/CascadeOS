@@ -14,10 +14,10 @@ id: usize,
 
 panicked: bool = false,
 
-/// The stack used for interrupts and idle.
+/// The stack used for idle.
 ///
-/// Also used for the time between moving away from the bootloader provided stack until we start scheduling.
-idle_and_interrupt_stack: kernel.Stack,
+/// Also used during the move from the bootloader provided stack until we start scheduling.
+idle_stack: kernel.Stack,
 
 _arch: kernel.arch.ArchProcessor,
 

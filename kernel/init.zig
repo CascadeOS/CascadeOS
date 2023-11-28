@@ -10,14 +10,14 @@ var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_
 
 var bootstrap_processor: kernel.Processor = .{
     .id = 0,
-    .idle_and_interrupt_stack = undefined, // initialized at the beginning of `kernelInit`
+    .idle_stack = undefined, // initialized at the beginning of `kernelInit`
     ._arch = undefined, // initialized by `prepareBootstrapProcessor`
 };
 
 /// Entry point from the bootloader specific code.
 pub fn kernelInit() void {
     // we need to get the processor data loaded early as the panic handler and logging use it
-    bootstrap_processor.idle_and_interrupt_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
+    bootstrap_processor.idle_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
         @as([]u8, &bootstrap_interrupt_stack),
     ));
     kernel.arch.init.prepareBootstrapProcessor(&bootstrap_processor);
