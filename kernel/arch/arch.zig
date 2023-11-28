@@ -137,7 +137,7 @@ pub const interrupts = struct {
     pub fn interruptGuard() InterruptGuard {
         const interrupts_enabled = interruptsEnabled();
 
-        disableInterrupts();
+        if (interrupts_enabled) disableInterrupts();
 
         return .{
             .enable_interrupts = interrupts_enabled,
