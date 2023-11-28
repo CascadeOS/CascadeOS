@@ -28,13 +28,13 @@ pub const Tss = extern struct {
 
     /// Sets the stack for the given stack selector.
     pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: kernel.Stack) void {
-        self.interrupt_stack_table[@intFromEnum(stack_selector)] = stack.stack_top;
+        self.interrupt_stack_table[@intFromEnum(stack_selector)] = stack.stack_pointer;
     }
 
     /// Sets the stack for the given privilege level.
     pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: kernel.Stack) void {
         core.assert(privilege_level != .ring3);
-        self.privilege_stack_table[@intFromEnum(privilege_level)] = stack.stack_top;
+        self.privilege_stack_table[@intFromEnum(privilege_level)] = stack.stack_pointer;
     }
 
     comptime {

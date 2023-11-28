@@ -22,13 +22,12 @@ var stacks_range_allocator_lock: kernel.sync.SpinLock = .{};
 /// The entire virtual range including the guard page.
 range: kernel.VirtualRange,
 
-/// The top of the stack.
-stack_top: kernel.VirtualAddress,
+stack_pointer: kernel.VirtualAddress,
 
 pub fn fromRange(range: kernel.VirtualRange) Stack {
     return Stack{
         .range = range,
-        .stack_top = range.end(),
+        .stack_pointer = range.end(),
     };
 }
 
