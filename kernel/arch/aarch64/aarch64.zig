@@ -19,11 +19,6 @@ pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
-/// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
-pub inline fn safeGetProcessor() ?*kernel.Processor {
-    return @ptrFromInt(registers.TPIDR_EL1.read());
-}
-
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub fn disableInterruptsAndHalt() noreturn {

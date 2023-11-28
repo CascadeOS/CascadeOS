@@ -25,13 +25,6 @@ pub inline fn getProcessor() *kernel.Processor {
     return current.getProcessor();
 }
 
-/// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
-pub inline fn safeGetProcessor() ?*kernel.Processor {
-    checkSupport(current, "safeGetProcessor", fn () ?*kernel.Processor);
-
-    return current.safeGetProcessor();
-}
-
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
     /// Prepares the provided Processor for the bootstrap processor.

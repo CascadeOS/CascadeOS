@@ -25,11 +25,6 @@ pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
-/// Unlike `getProcessor`, this allows the pointer to be null, which allows detecting if the Processor has not yet been initialized.
-pub inline fn safeGetProcessor() ?*kernel.Processor {
-    return @ptrFromInt(registers.KERNEL_GS_BASE.read());
-}
-
 pub const PrivilegeLevel = enum(u2) {
     /// Kernel
     ring0 = 0,
