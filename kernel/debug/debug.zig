@@ -263,6 +263,8 @@ const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_
 });
 
 pub const init = struct {
+    var panic_lock: kernel.sync.SpinLock = .{};
+
     /// Panic implementation used before the kernel is fully initialized and running.
     fn earlyPanicImpl(
         msg: []const u8,
@@ -271,29 +273,49 @@ pub const init = struct {
     ) void {
         const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
+        const processor = kernel.arch.getProcessor();
+
+        if (processor.panicked) {
+            const lock_held = panic_lock._processor_plus_one == processor.id + 1;
+            if (!lock_held) _ = panic_lock.lock();
+
+            // TODO: Can we do something better when we panic in a panic?
+            writer.writeAll("\nPANIC IN PANIC on processor ") catch unreachable;
+
+            std.fmt.formatInt(
+                processor.id,
+                10,
+                .lower,
+                .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
+                writer,
+            ) catch unreachable;
+
+            writer.writeByte('\n') catch unreachable;
+
+            if (lock_held) {
+                // we need to unlock the panic lock or other panicking processors will be deadlocked
+                panic_lock.unsafeUnlock();
+            }
+
+            return;
+        }
+
+        processor.panicked = true;
+
+        const held = panic_lock.lock();
+        defer held.unlock();
+
         // panic message
         {
-            if (kernel.arch.safeGetProcessor()) |processor| {
-                if (processor.panicked) {
-                    // TODO: Can we do something better when we panic in a panic?
-                    writer.writeAll("\nPANIC IN PANIC\n") catch unreachable;
+            writer.writeAll("\nPANIC on processor ") catch unreachable;
 
-                    return;
-                }
-                processor.panicked = true;
-
-                writer.writeAll("\nPANIC on processor ") catch unreachable;
-
-                std.fmt.formatInt(
-                    processor.id,
-                    10,
-                    .lower,
-                    .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
-                    writer,
-                ) catch unreachable;
-            } else {
-                writer.writeAll("\nPANIC with no initalized processor") catch unreachable;
-            }
+            std.fmt.formatInt(
+                processor.id,
+                10,
+                .lower,
+                .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
+                writer,
+            ) catch unreachable;
 
             if (msg.len != 0) {
                 writer.writeAll(" - ") catch unreachable;
