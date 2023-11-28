@@ -1,43 +1,63 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
+const builtin = @import("builtin");
 const core = @import("core");
 const kernel = @import("kernel");
 
+const is_debug = builtin.mode == .Debug;
+
 const SpinLock = @This();
 
-/// The ticket whose turn it is to acquire the lock.
-current_ticket: usize = 1,
-
-/// The ticket to hand out next.
-next_available_ticket: usize = 1,
+/// The id of the processor that currently holds the lock + 1.
+///
+/// If the lock is currently unlocked, this is 0.
+_processor_plus_one: usize = 0,
 
 pub const Held = struct {
-    interrupt_guard: kernel.arch.interrupts.InterruptGuard,
+    interrupts_enabled: bool,
     spinlock: *SpinLock,
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
-        _ = @atomicRmw(usize, &self.spinlock.current_ticket, .Add, 1, .Release);
-        self.interrupt_guard.release();
+        core.debugAssert(kernel.arch.getProcessor().id + 1 == self.spinlock._processor_plus_one);
+
+        @atomicStore(usize, &self.spinlock._processor_plus_one, 0, .Release);
+        if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
     }
 };
 
-/// Grabs lock and disables interrupts atomically.
+pub fn unsafeUnlock(self: *SpinLock) void {
+    @atomicStore(usize, &self._processor_plus_one, 0, .Release);
+}
+
 pub fn lock(self: *SpinLock) Held {
-    const interrupt_guard = kernel.arch.interrupts.interruptGuard();
+    const interrupts_enabled = kernel.arch.interrupts.interruptsEnabled();
+    if (interrupts_enabled) kernel.arch.interrupts.disableInterrupts();
 
-    const ticket = @atomicRmw(usize, &self.next_available_ticket, .Add, 1, .AcqRel);
+    const processor = kernel.arch.getProcessor();
+
+    const processor_id_plus_one = processor.id + 1;
+
     while (true) {
-        const current_ticket = @atomicLoad(usize, &self.current_ticket, .Acquire);
+        if (@cmpxchgWeak(
+            usize,
+            &self._processor_plus_one,
+            0,
+            processor_id_plus_one,
+            .AcqRel,
+            .Acquire,
+        )) |current| {
+            core.debugAssert(current != processor_id_plus_one);
 
-        if (current_ticket == ticket) break; // we have the lock
+            kernel.arch.spinLoopHint();
 
-        kernel.arch.spinLoopHint();
+            continue;
+        }
+
+        return .{
+            .interrupts_enabled = interrupts_enabled,
+            .spinlock = self,
+        };
     }
-
-    return .{
-        .interrupt_guard = interrupt_guard,
-        .spinlock = self,
-    };
 }
