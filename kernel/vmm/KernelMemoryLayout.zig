@@ -29,6 +29,9 @@ pub const KernelMemoryRegion = struct {
     type: Type,
 
     pub const Type = enum {
+        init_executable_section,
+        init_writeable_section,
+
         writeable_section,
         readonly_section,
         executable_section,

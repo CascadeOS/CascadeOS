@@ -204,6 +204,11 @@ pub const init = struct {
     }
 
     const linker_symbols = struct {
+        extern const __init_text_start: u8;
+        extern const __init_text_end: u8;
+        extern const __init_data_start: u8;
+        extern const __init_data_end: u8;
+
         extern const __text_start: u8;
         extern const __text_end: u8;
         extern const __rodata_start: u8;
@@ -214,6 +219,22 @@ pub const init = struct {
 
     /// Maps the kernel sections.
     fn mapKernelSections() !void {
+        log.debug("mapping .init_text section", .{});
+        try mapSection(
+            @intFromPtr(&linker_symbols.__init_text_start),
+            @intFromPtr(&linker_symbols.__init_text_end),
+            .{ .executable = true },
+            .init_executable_section,
+        );
+
+        log.debug("mapping .init_data section", .{});
+        try mapSection(
+            @intFromPtr(&linker_symbols.__init_data_start),
+            @intFromPtr(&linker_symbols.__init_data_end),
+            .{ .writeable = true },
+            .init_writeable_section,
+        );
+
         log.debug("mapping .text section", .{});
         try mapSection(
             @intFromPtr(&linker_symbols.__text_start),
@@ -246,6 +267,8 @@ pub const init = struct {
         map_type: MapType,
         region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
     ) !void {
+        if (section_start == section_end) return;
+
         core.assert(section_end > section_start);
 
         const virt_address = kernel.VirtualAddress.fromInt(section_start);
