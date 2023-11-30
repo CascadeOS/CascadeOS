@@ -14,14 +14,14 @@ var symbol_loading_spinlock: kernel.SpinLock = .{};
 var dwarf_symbol_map_opt: ?DwarfSymbolMap = null;
 
 pub fn loadSymbols() void {
-    if (@atomicLoad(bool, &symbols_loaded, .Monotonic)) return;
-    if (@atomicLoad(bool, &symbol_loading_failed, .Monotonic)) return;
+    if (@atomicLoad(bool, &symbols_loaded, .Acquire)) return;
+    if (@atomicLoad(bool, &symbol_loading_failed, .Acquire)) return;
 
     const held = symbol_loading_spinlock.lock();
     defer held.unlock();
 
-    if (@atomicLoad(bool, &symbols_loaded, .Monotonic)) return;
-    if (@atomicLoad(bool, &symbol_loading_failed, .Monotonic)) return;
+    if (@atomicLoad(bool, &symbols_loaded, .Acquire)) return;
+    if (@atomicLoad(bool, &symbol_loading_failed, .Acquire)) return;
 
     // DWARF
     dwarf: {

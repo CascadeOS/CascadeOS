@@ -70,7 +70,7 @@ fn earlyLogFn(
     comptime message_level: kernel.log.Level,
     comptime format: []const u8,
     args: anytype,
-) void {
+) linksection(kernel.info.init_code) void {
     const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
     const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);

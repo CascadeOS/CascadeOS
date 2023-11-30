@@ -10,7 +10,7 @@ pub const RangeAllocator = @import("heap/RangeAllocator.zig");
 
 const vmm = kernel.vmm;
 
-var address_space: AddressSpace = undefined;
+var address_space: AddressSpace = undefined; // Initialised in `initHeap`
 var address_space_lock: kernel.SpinLock = .{};
 
 pub const page_allocator = std.mem.Allocator{

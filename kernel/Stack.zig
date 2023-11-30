@@ -76,7 +76,7 @@ pub fn destroy(stack: Stack) void {
 }
 
 pub const init = struct {
-    pub fn initStacks(kernel_stacks_range: kernel.VirtualRange) !void {
+    pub fn initStacks(kernel_stacks_range: kernel.VirtualRange) linksection(kernel.info.init_code) !void {
         stacks_range_allocator = try kernel.heap.RangeAllocator.init(kernel_stacks_range);
     }
 };

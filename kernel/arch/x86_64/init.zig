@@ -8,21 +8,21 @@ const x86_64 = @import("x86_64.zig");
 const log = kernel.log.scoped(.init);
 
 pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
-var early_output_serial_port: ?x86_64.serial.SerialPort = null;
+var early_output_serial_port: ?x86_64.serial.SerialPort linksection(kernel.info.init_data) = null;
 
-pub fn setupEarlyOutput() void {
+pub fn setupEarlyOutput() linksection(kernel.info.init_code) void {
     early_output_serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
 }
 
-pub fn getEarlyOutputWriter() ?x86_64.serial.SerialPort.Writer {
+pub fn getEarlyOutputWriter() linksection(kernel.info.init_code) ?x86_64.serial.SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
-var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
-var bootstrap_double_fault_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
-var bootstrap_non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_double_fault_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_non_maskable_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
 
-pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksection(kernel.info.init_code) void {
     bootstrap_processor._arch = .{
         .double_fault_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_double_fault_stack),
@@ -38,7 +38,7 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
 /// Prepares the provided Processor for use.
 ///
 /// **WARNING**: This function will panic if the processor cannot be prepared.
-pub fn prepareProcessor(processor: *kernel.Processor) void {
+pub fn prepareProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
     processor._arch = .{
         .double_fault_stack = kernel.Stack.create() catch core.panic("unable to create double fault stack"),
         .non_maskable_interrupt_stack = kernel.Stack.create() catch core.panic("unable to create non-mackable interrupt stack"),
@@ -47,7 +47,7 @@ pub fn prepareProcessor(processor: *kernel.Processor) void {
     processor._arch.tss.setPrivilegeStack(.ring0, processor.idle_stack);
 }
 
-pub fn loadProcessor(processor: *kernel.Processor) void {
+pub fn loadProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
     const arch: *x86_64.ArchProcessor = processor.arch();
 
     arch.gdt.load();
@@ -62,19 +62,19 @@ pub fn loadProcessor(processor: *kernel.Processor) void {
     x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(processor));
 }
 
-pub fn earlyArchInitialization() void {
+pub fn earlyArchInitialization() linksection(kernel.info.init_code) void {
     log.debug("initializing idt", .{});
     x86_64.interrupts.initIdt();
 }
 
 /// Captures x86_64 system information.
-pub fn captureSystemInformation() void {
+pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 }
 
 /// Configures x86_64 system features.
-pub fn configureSystemFeatures() void {
+pub fn configureSystemFeatures() linksection(kernel.info.init_code) void {
     // CR0
     {
         var cr0 = x86_64.registers.Cr0.read();

@@ -102,7 +102,7 @@ const PhysPageNode = extern struct {
 pub const init = struct {
     const indent = "  ";
 
-    pub fn initPmm() void {
+    pub fn initPmm() linksection(kernel.info.init_code) void {
         var memory_map_iterator = kernel.boot.memoryMap(.forwards);
 
         while (memory_map_iterator.next()) |memory_map_entry| {
@@ -126,7 +126,7 @@ pub const init = struct {
     }
 
     /// Adds a memory map entry to the physical page allocator.
-    fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) void {
+    fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) linksection(kernel.info.init_code) void {
         if (!memory_map_entry.range.address.isAligned(arch.paging.standard_page_size)) {
             core.panicFmt("memory map entry address is not aligned to page size: {}", .{memory_map_entry});
         }

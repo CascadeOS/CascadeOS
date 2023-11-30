@@ -6,9 +6,9 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.init);
 
-var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
 
-var bootstrap_processor: kernel.Processor = .{
+var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .{
     .id = 0,
     .idle_stack = undefined, // initialized at the beginning of `kernelInit`
     ._arch = undefined, // initialized by `prepareBootstrapProcessor`
@@ -17,7 +17,7 @@ var bootstrap_processor: kernel.Processor = .{
 /// Entry point from the bootloader specific code.
 ///
 /// Only the bootstrap processor executes this function.
-pub fn kernelInitStage1() void {
+pub fn kernelInitStage1() linksection(kernel.info.init_code) void {
     // we need to get the processor data loaded early as the panic handler and logging use it
     bootstrap_processor.idle_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
         @as([]u8, &bootstrap_interrupt_stack),
@@ -64,7 +64,7 @@ pub fn kernelInitStage1() void {
 /// Stage 2 of the kernel initialization.
 ///
 /// This function is executed by all processors, including the bootstrap processor.
-fn kernelInitStage2(processor: *kernel.Processor) noreturn {
+fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_code) noreturn {
     kernel.arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
     kernel.arch.init.loadProcessor(processor);
 
@@ -74,7 +74,7 @@ fn kernelInitStage2(processor: *kernel.Processor) noreturn {
 /// Initialize the per processor data structures for all processors including the bootstrap processor.
 ///
 /// Also wakes the non-bootstrap processors and jumps them to `kernelInitStage2`.
-fn initProcessors() void {
+fn initProcessors() linksection(kernel.info.init_code) void {
     var processor_descriptors = kernel.boot.processorDescriptors();
 
     const processors = kernel.heap.page_allocator.alloc(
@@ -107,7 +107,7 @@ fn initProcessors() void {
     kernel.Processor.all = processors;
 }
 
-fn captureBootloaderInformation() void {
+fn captureBootloaderInformation() linksection(kernel.info.init_code) void {
     calculateKernelOffsets();
     calculateDirectMaps();
 
@@ -115,7 +115,7 @@ fn captureBootloaderInformation() void {
     log.debug("kernel file: {}", .{kernel.info.kernel_file.?});
 }
 
-fn calculateDirectMaps() void {
+fn calculateDirectMaps() linksection(kernel.info.init_code) void {
     const direct_map_size = calculateLengthOfDirectMap();
 
     kernel.info.direct_map = calculateDirectMapRange(direct_map_size);
@@ -125,7 +125,7 @@ fn calculateDirectMaps() void {
     log.debug("non-cached direct map: {}", .{kernel.info.non_cached_direct_map});
 }
 
-fn calculateDirectMapRange(direct_map_size: core.Size) kernel.VirtualRange {
+fn calculateDirectMapRange(direct_map_size: core.Size) linksection(kernel.info.init_code) kernel.VirtualRange {
     const direct_map_address = kernel.boot.directMapAddress() orelse
         core.panic("bootloader did not provide the start of the direct map");
 
@@ -141,7 +141,7 @@ fn calculateDirectMapRange(direct_map_size: core.Size) kernel.VirtualRange {
 fn calculateNonCachedDirectMapRange(
     direct_map_size: core.Size,
     direct_map_range: kernel.VirtualRange,
-) kernel.VirtualRange {
+) linksection(kernel.info.init_code) kernel.VirtualRange {
     // try to place the non-cached direct map directly _before_ the direct map
     {
         const candidate_range = direct_map_range.moveBackward(direct_map_size);
@@ -164,7 +164,7 @@ fn calculateNonCachedDirectMapRange(
 }
 
 /// Calculates the length of the direct map.
-fn calculateLengthOfDirectMap() core.Size {
+fn calculateLengthOfDirectMap() linksection(kernel.info.init_code) core.Size {
     var memory_map_iterator = kernel.boot.memoryMap(.backwards);
 
     const last_usable_entry: kernel.boot.MemoryMapEntry = blk: {
@@ -193,7 +193,7 @@ fn calculateLengthOfDirectMap() core.Size {
     return aligned_size;
 }
 
-fn calculateKernelOffsets() void {
+fn calculateKernelOffsets() linksection(kernel.info.init_code) void {
     const kernel_base_address = kernel.boot.kernelBaseAddress() orelse
         core.panic("bootloader did not provide the kernel base address");
 

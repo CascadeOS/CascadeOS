@@ -10,7 +10,7 @@ const limine = @import("limine");
 //       Multiboot, etc.
 
 /// Entry point.
-export fn _start() noreturn {
+export fn _start() linksection(kernel.info.init_code) noreturn {
     @call(.never_inline, kernel.init.kernelInitStage1, .{});
 
     // TODO: This should halt the entire kernel not just this cpu.
@@ -19,16 +19,16 @@ export fn _start() noreturn {
 
 const limine_requests = struct {
     // TODO: setting this to 1 causes aarch64 to hang at "limine: Loading kernel `boot:///kernel`..."
-    export var limine_revison: limine.BaseRevison = .{ .revison = 0 };
-    export var kernel_file: limine.KernelFile = .{};
-    export var hhdm: limine.HHDM = .{};
-    export var kernel_address: limine.KernelAddress = .{};
-    export var memmap: limine.Memmap = .{};
-    export var smp: limine.SMP = .{};
+    export var limine_revison: limine.BaseRevison linksection(kernel.info.init_data) = .{ .revison = 0 };
+    export var kernel_file: limine.KernelFile linksection(kernel.info.init_data) = .{};
+    export var hhdm: limine.HHDM linksection(kernel.info.init_data) = .{};
+    export var kernel_address: limine.KernelAddress linksection(kernel.info.init_data) = .{};
+    export var memmap: limine.Memmap linksection(kernel.info.init_data) = .{};
+    export var smp: limine.SMP linksection(kernel.info.init_data) = .{};
 };
 
 /// Returns the direct map address provided by the bootloader, if any.
-pub fn directMapAddress() ?u64 {
+pub fn directMapAddress() linksection(kernel.info.init_code) ?u64 {
     if (limine_requests.hhdm.response) |resp| {
         return resp.offset;
     }
@@ -41,7 +41,7 @@ pub const KernelBaseAddress = struct {
 };
 
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
-pub fn kernelBaseAddress() ?KernelBaseAddress {
+pub fn kernelBaseAddress() linksection(kernel.info.init_code) ?KernelBaseAddress {
     if (limine_requests.kernel_address.response) |resp| {
         return .{
             .virtual = resp.virtual_base,
@@ -52,14 +52,14 @@ pub fn kernelBaseAddress() ?KernelBaseAddress {
 }
 
 /// Returns the kernel file contents as a VirtualRange, if provided by the bootloader.
-pub fn kernelFile() ?kernel.VirtualRange {
+pub fn kernelFile() linksection(kernel.info.init_code) ?kernel.VirtualRange {
     if (limine_requests.kernel_file.response) |resp| {
         return kernel.VirtualRange.fromSlice(resp.kernel_file.getContents());
     }
     return null;
 }
 
-pub fn processorDescriptors() ProcessorDescriptorIterator {
+pub fn processorDescriptors() linksection(kernel.info.init_code) ProcessorDescriptorIterator {
     const smp_response = limine_requests.smp.response orelse core.panic("no processor descriptors from the bootloader");
     const entries = smp_response.cpus();
     return .{
@@ -77,7 +77,7 @@ pub const ProcessorDescriptor = struct {
         self: ProcessorDescriptor,
         processor: *kernel.Processor,
         comptime targetFn: fn (processor: *kernel.Processor) noreturn,
-    ) void {
+    ) linksection(kernel.info.init_code) void {
         switch (self._raw) {
             .limine => |limine_info| {
                 const trampolineFn = struct {
@@ -112,14 +112,14 @@ pub const ProcessorDescriptor = struct {
 pub const ProcessorDescriptorIterator = union(enum) {
     limine: LimineProcessorDescriptorIterator,
 
-    pub fn count(self: ProcessorDescriptorIterator) usize {
+    pub fn count(self: ProcessorDescriptorIterator) linksection(kernel.info.init_code) usize {
         return switch (self) {
             inline else => |i| i.count(),
         };
     }
 
     /// Returns the next processor descriptor from the iterator, if any remain.
-    pub fn next(self: *ProcessorDescriptorIterator) ?ProcessorDescriptor {
+    pub fn next(self: *ProcessorDescriptorIterator) linksection(kernel.info.init_code) ?ProcessorDescriptor {
         return switch (self.*) {
             inline else => |*i| i.next(),
         };
@@ -130,11 +130,11 @@ const LimineProcessorDescriptorIterator = struct {
     index: usize,
     entries: []*limine.SMP.Response.SMPInfo,
 
-    pub fn count(self: LimineProcessorDescriptorIterator) usize {
+    pub fn count(self: LimineProcessorDescriptorIterator) linksection(kernel.info.init_code) usize {
         return self.entries.len;
     }
 
-    pub fn next(self: *LimineProcessorDescriptorIterator) ?ProcessorDescriptor {
+    pub fn next(self: *LimineProcessorDescriptorIterator) linksection(kernel.info.init_code) ?ProcessorDescriptor {
         if (self.index >= self.entries.len) return null;
 
         const smp_info = self.entries[self.index];
@@ -148,7 +148,7 @@ const LimineProcessorDescriptorIterator = struct {
 };
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMap(direction: Direction) MemoryMapIterator {
+pub fn memoryMap(direction: Direction) linksection(kernel.info.init_code) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
     const entries = memmap_response.entries();
     return .{
@@ -168,7 +168,7 @@ pub const MemoryMapIterator = union(enum) {
     limine: LimineMemoryMapIterator,
 
     /// Returns the next memory map entry from the iterator, if any remain.
-    pub fn next(self: *MemoryMapIterator) ?MemoryMapEntry {
+    pub fn next(self: *MemoryMapIterator) linksection(kernel.info.init_code) ?MemoryMapEntry {
         return switch (self.*) {
             inline else => |*i| i.next(),
         };
@@ -197,7 +197,7 @@ pub const MemoryMapEntry = struct {
         break :blk longest_so_far;
     };
 
-    pub fn print(entry: MemoryMapEntry, writer: anytype) !void {
+    pub fn print(entry: MemoryMapEntry, writer: anytype) linksection(kernel.info.init_code) !void {
         try writer.writeAll("MemoryMapEntry - ");
 
         try std.fmt.formatBuf(
@@ -236,7 +236,7 @@ const LimineMemoryMapIterator = struct {
     entries: []const *const limine.Memmap.Entry,
     direction: Direction,
 
-    pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
+    pub fn next(self: *LimineMemoryMapIterator) linksection(kernel.info.init_code) ?MemoryMapEntry {
         const limine_entry = switch (self.direction) {
             .backwards => blk: {
                 if (self.index == 0) return null;

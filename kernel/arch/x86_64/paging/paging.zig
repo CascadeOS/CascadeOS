@@ -51,7 +51,7 @@ pub fn switchToPageTable(page_table: *const PageTable) void {
 ///   2. allocate a backing frame for it
 ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
 ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
-pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) arch.paging.MapError!kernel.VirtualRange {
+pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) linksection(kernel.info.init_code) arch.paging.MapError!kernel.VirtualRange {
     var table_index: usize = PageTable.p4Index(higher_half);
 
     while (table_index < PageTable.number_of_entries) : (table_index += 1) {

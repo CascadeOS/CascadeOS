@@ -10,7 +10,7 @@ const x86_64 = @import("x86_64.zig");
 
 const log = kernel.log.scoped(.cpuid);
 
-pub fn capture() void {
+pub fn capture() linksection(kernel.info.init_code) void {
     if (!isCPUIDAvailable()) core.panic("cpuid is not supported");
 
     const cpuid_leaf_0 = raw_cpuid(0x0, 0);
@@ -25,7 +25,7 @@ pub fn capture() void {
     handleSimpleLeafs(max_standard_leaf, max_extended_leaf);
 }
 
-const simple_leaf_handlers: []const SimpleLeafHandler = &.{
+const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.init_data) = &.{
     .{
         .leaf = .{ .type = .extended, .value = 0x80000001 },
         .handlers = &.{
@@ -41,7 +41,7 @@ const simple_leaf_handlers: []const SimpleLeafHandler = &.{
 /// Handles simple CPUID leaves.
 ///
 /// Loops through the `simple_leaf_handlers` performing the declared actions for each handler.
-fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) void {
+fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection(kernel.info.init_code) void {
     // TODO: use `continue` instead of `break :blk` https://github.com/CascadeOS/CascadeOS/issues/55
     // we use a little trick here, the `blk:` below is not on the loop so breaking to that label
     // does not end the loop but instead starts the next iteration.
@@ -116,7 +116,7 @@ const SimpleLeafHandler = struct {
     };
 };
 
-fn isCPUIDAvailable() bool {
+fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
     const orig_rflags = x86_64.registers.RFlags.read();
     var modified_rflags = orig_rflags;
 

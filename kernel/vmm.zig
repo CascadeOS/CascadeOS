@@ -94,7 +94,7 @@ pub fn unmap(
 }
 
 pub const init = struct {
-    pub fn initVmm() void {
+    pub fn initVmm() linksection(kernel.info.init_code) void {
         log.debug("allocating kernel root page table", .{});
         kernel_page_table = paging.allocatePageTable() catch
             core.panic("unable to allocate physical page for root page table");
@@ -128,7 +128,7 @@ pub const init = struct {
         }
     }
 
-    fn prepareKernelHeap() !void {
+    fn prepareKernelHeap() linksection(kernel.info.init_code) !void {
         log.debug("preparing kernel heap", .{});
 
         const kernel_heap_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_page_table);
@@ -140,7 +140,7 @@ pub const init = struct {
         log.debug("kernel heap: {}", .{kernel_heap_range});
     }
 
-    fn prepareKernelStacks() !void {
+    fn prepareKernelStacks() linksection(kernel.info.init_code) !void {
         log.debug("preparing kernel stacks", .{});
 
         const kernel_stacks_range = try kernel.arch.paging.getTopLevelRangeAndFillFirstLevel(kernel_page_table);
@@ -158,7 +158,7 @@ pub const init = struct {
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
         map_type: MapType,
-    ) !void {
+    ) linksection(kernel.info.init_code) !void {
         core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
         core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
         core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
@@ -179,7 +179,7 @@ pub const init = struct {
     }
 
     /// Maps the direct maps.
-    fn mapDirectMaps() !void {
+    fn mapDirectMaps() linksection(kernel.info.init_code) !void {
         const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
 
         log.debug("mapping the direct map", .{});
@@ -218,7 +218,7 @@ pub const init = struct {
     };
 
     /// Maps the kernel sections.
-    fn mapKernelSections() !void {
+    fn mapKernelSections() linksection(kernel.info.init_code) !void {
         log.debug("mapping .init_text section", .{});
         try mapSection(
             @intFromPtr(&linker_symbols.__init_text_start),
@@ -266,7 +266,7 @@ pub const init = struct {
         section_end: usize,
         map_type: MapType,
         region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
-    ) !void {
+    ) linksection(kernel.info.init_code) !void {
         if (section_start == section_end) return;
 
         core.assert(section_end > section_start);

@@ -263,14 +263,14 @@ const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_
 });
 
 pub const init = struct {
-    var panic_lock: kernel.SpinLock = .{};
+    var panic_lock: kernel.SpinLock linksection(kernel.info.init_data) = .{};
 
     /// Panic implementation used before the kernel is fully initialized and running.
     fn earlyPanicImpl(
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
-    ) void {
+    ) linksection(kernel.info.init_code) void {
         const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
         const processor = kernel.arch.getProcessor();
