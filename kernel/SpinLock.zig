@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
-const builtin = @import("builtin");
 const core = @import("core");
 const kernel = @import("kernel");
-
-const is_debug = builtin.mode == .Debug;
 
 const SpinLock = @This();
 
