@@ -4,10 +4,14 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+pub const AddressSpace = @import("heap/AddressSpace.zig");
+pub const DirectObjectPool = @import("heap/DirectObjectPool.zig").DirectObjectPool;
+pub const RangeAllocator = @import("heap/RangeAllocator.zig");
+
 const vmm = kernel.vmm;
 
-var address_space: kernel.AddressSpace = undefined;
-var address_space_lock: kernel.sync.SpinLock = .{};
+var address_space: AddressSpace = undefined;
+var address_space_lock: kernel.SpinLock = .{};
 
 pub const page_allocator = std.mem.Allocator{
     .ptr = undefined,
@@ -107,6 +111,6 @@ const PageAllocator = struct {
 
 pub const init = struct {
     pub fn initHeap(kernel_heap_range: kernel.VirtualRange) !void {
-        address_space = try kernel.AddressSpace.init(kernel_heap_range);
+        address_space = try kernel.heap.AddressSpace.init(kernel_heap_range);
     }
 };

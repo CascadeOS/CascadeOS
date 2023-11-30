@@ -4,7 +4,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const x86_64 = @import("../x86_64.zig");
-const arch = @import("../../arch.zig");
+const arch = kernel.arch;
 
 const log = kernel.log.scoped(.paging);
 

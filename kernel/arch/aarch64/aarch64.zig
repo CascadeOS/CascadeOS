@@ -3,7 +3,7 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const arch = @import("../arch.zig");
+const arch = kernel.arch;
 
 pub const init = @import("init.zig");
 pub const registers = @import("registers.zig");

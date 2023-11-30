@@ -4,7 +4,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const symbols = @import("symbols.zig");
+const symbols = @import("debug/symbols.zig");
 
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
 
@@ -263,7 +263,7 @@ const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_
 });
 
 pub const init = struct {
-    var panic_lock: kernel.sync.SpinLock = .{};
+    var panic_lock: kernel.SpinLock = .{};
 
     /// Panic implementation used before the kernel is fully initialized and running.
     fn earlyPanicImpl(

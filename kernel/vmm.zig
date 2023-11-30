@@ -4,9 +4,9 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-pub const KernelMemoryLayout = @import("KernelMemoryLayout.zig");
-pub const MapType = @import("MapType.zig");
-pub const MemoryRegion = @import("MemoryRegion.zig");
+pub const KernelMemoryLayout = @import("vmm/KernelMemoryLayout.zig");
+pub const MapType = @import("vmm/MapType.zig");
+pub const MemoryRegion = @import("vmm/MemoryRegion.zig");
 
 const arch = kernel.arch;
 const paging = kernel.arch.paging;

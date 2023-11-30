@@ -10,11 +10,11 @@ const MemoryRegion = kernel.vmm.MemoryRegion;
 const RedBlack = containers.RedBlack;
 const MemoryRegionRedBlackTree = RedBlack.Tree(memoryRegionAddressCompare);
 
-var memory_region_pool: kernel.DirectObjectPool(MemoryRegionWithNode, .memory_region_pool) = .{};
+var memory_region_pool: kernel.heap.DirectObjectPool(MemoryRegionWithNode, .memory_region_pool) = .{};
 
 const AddressSpace = @This();
 
-range_allocator: kernel.RangeAllocator = .{},
+range_allocator: kernel.heap.RangeAllocator = .{},
 memory_region_tree: MemoryRegionRedBlackTree = .{},
 
 /// Initialize an address space.
@@ -29,7 +29,7 @@ pub fn init(total_range: kernel.VirtualRange) error{OutOfMemory}!AddressSpace {
     core.assert(total_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     return .{
-        .range_allocator = try kernel.RangeAllocator.init(total_range),
+        .range_allocator = try kernel.heap.RangeAllocator.init(total_range),
     };
 }
 

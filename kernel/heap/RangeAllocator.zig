@@ -9,7 +9,7 @@ const RedBlack = containers.RedBlack;
 const RegionAddressRedBlackTree = RedBlack.Tree(rangeAddressCompare);
 const RegionSizeRedBlackTree = RedBlack.Tree(rangeSizeCompare);
 
-var range_pool: kernel.DirectObjectPool(RangeWithNodes, .range_pool) = .{};
+var range_pool: kernel.heap.DirectObjectPool(RangeWithNodes, .range_pool) = .{};
 
 const RangeAllocator = @This();
 
