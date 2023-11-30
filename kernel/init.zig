@@ -55,8 +55,56 @@ pub fn kernelInitStage1() void {
     log.info("initializing virtual memory", .{});
     kernel.vmm.init.initVmm();
 
+    log.info("initializing processors", .{});
+    initProcessors();
 
-    core.panic("UNIMPLEMENTED"); // TODO: implement initial system setup
+    kernelInitStage2(&kernel.Processor.all[0]);
+}
+
+/// Stage 2 of the kernel initialization.
+///
+/// This function is executed by all processors, including the bootstrap processor.
+fn kernelInitStage2(processor: *kernel.Processor) noreturn {
+    kernel.arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
+    kernel.arch.init.loadProcessor(processor);
+
+    core.panic("UNIMPLEMENTED"); // TODO: implement intialization stage 2
+}
+
+/// Initialize the per processor data structures for all processors including the bootstrap processor.
+///
+/// Also wakes the non-bootstrap processors and jumps them to `kernelInitStage2`.
+fn initProcessors() void {
+    var processor_descriptors = kernel.boot.processorDescriptors();
+
+    const processors = kernel.heap.page_allocator.alloc(
+        kernel.Processor,
+        processor_descriptors.count(),
+    ) catch core.panic("failed to allocate processors");
+
+    var i: usize = 0;
+
+    while (processor_descriptors.next()) |processor_descriptor| : (i += 1) {
+        log.debug("initializing processor {}", .{i});
+
+        const processor = &processors[i];
+
+        const idle_stack = kernel.Stack.create() catch core.panic("failed to allocate idle and interrupt stack");
+
+        processor.* = .{
+            .id = i,
+            .idle_stack = idle_stack,
+            ._arch = undefined, // initialized by `prepareProcessor`
+        };
+
+        kernel.arch.init.prepareProcessor(processor);
+
+        if (processor.id != 0) {
+            processor_descriptor.boot(processor, kernelInitStage2);
+        }
+    }
+
+    kernel.Processor.all = processors;
 }
 
 fn captureBootloaderInformation() void {

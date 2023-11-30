@@ -8,6 +8,11 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+/// The list of processors in the system.
+///
+/// Initialized during `init.initKernelStage1`.
+pub var all: []Processor = undefined;
+
 const Processor = @This();
 
 id: usize,

@@ -73,6 +73,36 @@ pub fn processorDescriptors() ProcessorDescriptorIterator {
 pub const ProcessorDescriptor = struct {
     _raw: Raw,
 
+    pub fn boot(
+        self: ProcessorDescriptor,
+        processor: *kernel.Processor,
+        comptime targetFn: fn (processor: *kernel.Processor) noreturn,
+    ) void {
+        switch (self._raw) {
+            .limine => |limine_info| {
+                const trampolineFn = struct {
+                    fn trampolineFn(smp_info: *const limine.SMP.Response.SMPInfo) callconv(.C) noreturn {
+                        targetFn(@ptrFromInt(smp_info.extra_argument));
+                    }
+                }.trampolineFn;
+
+                @atomicStore(
+                    usize,
+                    &limine_info.extra_argument,
+                    @intFromPtr(processor),
+                    .Release,
+                );
+
+                @atomicStore(
+                    ?*const fn (*const limine.SMP.Response.SMPInfo) callconv(.C) noreturn,
+                    &limine_info.goto_address,
+                    &trampolineFn,
+                    .Release,
+                );
+            },
+        }
+    }
+
     pub const Raw = union(enum) {
         limine: *limine.SMP.Response.SMPInfo,
     };
