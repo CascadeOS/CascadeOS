@@ -15,7 +15,9 @@ var bootstrap_processor: kernel.Processor = .{
 };
 
 /// Entry point from the bootloader specific code.
-pub fn kernelInit() void {
+///
+/// Only the bootstrap processor executes this function.
+pub fn kernelInitStage1() void {
     // we need to get the processor data loaded early as the panic handler and logging use it
     bootstrap_processor.idle_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
         @as([]u8, &bootstrap_interrupt_stack),

@@ -11,7 +11,7 @@ const limine = @import("limine");
 
 /// Entry point.
 export fn _start() noreturn {
-    @call(.never_inline, kernel.init.kernelInit, .{});
+    @call(.never_inline, kernel.init.kernelInitStage1, .{});
 
     // TODO: This should halt the entire kernel not just this cpu.
     core.panic("kernelInit returned");
