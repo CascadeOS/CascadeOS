@@ -41,6 +41,8 @@ pub const PrivilegeLevel = enum(u2) {
 
 pub const spinLoopHint = instructions.pause;
 
+pub const switchToStack = instructions.switchToStack;
+
 comptime {
     if (kernel.info.arch != .x86_64) {
         @compileError("x86_64 implementation has been referenced when building " ++ @tagName(kernel.info.arch));

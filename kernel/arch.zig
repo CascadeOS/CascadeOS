@@ -25,6 +25,13 @@ pub inline fn getProcessor() *kernel.Processor {
     return current.getProcessor();
 }
 
+/// Switch to the provided stack.
+pub inline fn switchToStack(stack: kernel.Stack) void {
+    checkSupport(current, "switchToStack", fn (kernel.Stack) void);
+
+    current.switchToStack(stack);
+}
+
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
     /// Prepares the provided Processor for the bootstrap processor.
