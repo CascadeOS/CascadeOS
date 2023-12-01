@@ -273,7 +273,15 @@ pub const init = struct {
     ) void { // TODO: Put in init_code section
         const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
-        const processor = kernel.Processor.get();
+        const processor = kernel.arch.earlyGetProcessor() orelse {
+            // TODO: Somehow we have panicked before we have loaded a processor.
+
+            // We might clobber another processors output but we don't have a choice.
+
+            writer.writeAll("\nPANIC - before processor loaded\n") catch unreachable;
+
+            return;
+        };
 
         if (processor.panicked) {
             const lock_held = panic_lock._processor_plus_one == processor.id + 1;
