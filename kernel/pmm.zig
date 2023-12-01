@@ -170,7 +170,7 @@ pub const init = struct {
     }
 
     pub fn reclaimBootloaderReclaimableMemory() void {
-        const memory_map_iterator = kernel.boot.memoryMap(.forwards);
+        var memory_map_iterator = kernel.boot.memoryMap(.forwards);
         while (memory_map_iterator.next()) |memory_map_entry| {
             if (memory_map_entry.type != .reclaimable) continue;
 
