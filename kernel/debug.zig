@@ -273,7 +273,7 @@ pub const init = struct {
     ) void { // TODO: Put in init_code section
         const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
-        const processor = kernel.arch.getProcessor();
+        const processor = kernel.Processor.get();
 
         if (processor.panicked) {
             const lock_held = panic_lock._processor_plus_one == processor.id + 1;

@@ -26,6 +26,10 @@ idle_stack: kernel.Stack,
 
 _arch: kernel.arch.ArchProcessor,
 
+pub inline fn get() *Processor {
+    return kernel.arch.getProcessor();
+}
+
 pub inline fn arch(self: *Processor) *kernel.arch.ArchProcessor {
     return &self._arch;
 }
