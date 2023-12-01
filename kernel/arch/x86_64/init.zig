@@ -8,13 +8,13 @@ const x86_64 = @import("x86_64.zig");
 const log = kernel.log.scoped(.init);
 
 pub const EarlyOutputWriter = x86_64.serial.SerialPort.Writer;
-var early_output_serial_port: ?x86_64.serial.SerialPort linksection(kernel.info.init_data) = null;
+var early_output_serial_port: ?x86_64.serial.SerialPort = null; // TODO: Put in init_data section
 
 pub fn setupEarlyOutput() linksection(kernel.info.init_code) void {
     early_output_serial_port = x86_64.serial.SerialPort.init(.COM1, .Baud115200);
 }
 
-pub fn getEarlyOutputWriter() linksection(kernel.info.init_code) ?x86_64.serial.SerialPort.Writer {
+pub fn getEarlyOutputWriter() ?x86_64.serial.SerialPort.Writer { // TODO: Put in init_code section
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
