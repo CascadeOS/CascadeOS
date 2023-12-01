@@ -19,6 +19,10 @@ pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
+pub inline fn earlyGetProcessor() ?*kernel.Processor {
+    return @ptrFromInt(registers.TPIDR_EL1.read());
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub fn disableInterruptsAndHalt() noreturn {

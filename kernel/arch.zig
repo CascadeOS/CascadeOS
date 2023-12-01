@@ -19,10 +19,26 @@ pub inline fn spinLoopHint() void {
 /// Architecture specific processor information.
 pub const ArchProcessor = current.ArchProcessor;
 
+/// Get the current processor.
+///
+/// Panics if interrupts are enabled.
 pub inline fn getProcessor() *kernel.Processor {
     checkSupport(current, "getProcessor", fn () *kernel.Processor);
 
+    core.debugAssert(!interrupts.interruptsEnabled());
+
     return current.getProcessor();
+}
+
+/// Get the current processor, supports returning null for early boot before the processor is set.
+///
+/// Panics if interrupts are enabled.
+pub inline fn earlyGetProcessor() ?*kernel.Processor {
+    checkSupport(current, "earlyGetProcessor", fn () ?*kernel.Processor);
+
+    core.debugAssert(!interrupts.interruptsEnabled());
+
+    return current.earlyGetProcessor();
 }
 
 /// Switch to the provided stack.
