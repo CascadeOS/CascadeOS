@@ -52,23 +52,69 @@ pub fn allocatePage() ?kernel.PhysicalRange {
     return null;
 }
 
+/// Deallocates a physical range.
+///
+/// **REQUIREMENTS**:
+/// - `range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `range.size` must be aligned to `kernel.arch.paging.standard_page_size`
+pub fn deallocateRange(range: kernel.PhysicalRange) void {
+    core.debugAssert(range.address.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(range.size.isAligned(arch.paging.standard_page_size));
+
+    const first_page_node = range.address.toDirectMap().toPtr(*PhysPageNode);
+
+    if (range.size.equal(arch.paging.standard_page_size)) {
+        deallocateImpl(first_page_node, first_page_node, arch.paging.standard_page_size);
+        return;
+    }
+
+    // build up linked list
+    const last_page_node = blk: {
+        var current_virtual_address = range.address.toDirectMap();
+        const end_virtual_address: kernel.VirtualAddress = range.end().toDirectMap();
+
+        var previous: *PhysPageNode = first_page_node;
+
+        while (current_virtual_address.lessThan(end_virtual_address)) {
+            const page_node = current_virtual_address.toPtr(*PhysPageNode);
+
+            previous.next = page_node;
+            previous = page_node;
+
+            current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+        }
+
+        break :blk previous;
+    };
+
+    deallocateImpl(first_page_node, last_page_node, range.size);
+}
+
 /// Deallocates a physical page.
+///
+/// **REQUIREMENTS**:
+/// - `range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `range.size` must be *equal* to `kernel.arch.paging.standard_page_size`
 pub fn deallocatePage(range: kernel.PhysicalRange) void {
     core.debugAssert(range.address.isAligned(arch.paging.standard_page_size));
     core.debugAssert(range.size.equal(arch.paging.standard_page_size));
 
     const page_node = range.address.toDirectMap().toPtr(*PhysPageNode);
 
+    deallocateImpl(page_node, page_node, arch.paging.standard_page_size);
+}
+
+fn deallocateImpl(first_page_node: *PhysPageNode, last_page_node: *PhysPageNode, size: core.Size) void {
     var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Acquire);
 
     while (true) {
-        page_node.next = first_free_page_opt;
+        last_page_node.next = first_free_page_opt;
 
         if (@cmpxchgWeak(
             ?*PhysPageNode,
             &first_free_physical_page,
             first_free_page_opt,
-            page_node,
+            first_page_node,
             .AcqRel,
             .Acquire,
         )) |new_first_free_page| {
@@ -84,11 +130,9 @@ pub fn deallocatePage(range: kernel.PhysicalRange) void {
         usize,
         &free_memory.bytes,
         .Add,
-        arch.paging.standard_page_size.bytes,
+        size.bytes,
         .AcqRel,
     );
-
-    log.debug("freed page: {}", .{range});
 }
 
 const PhysPageNode = extern struct {
