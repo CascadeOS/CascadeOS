@@ -14,6 +14,8 @@ var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .
     ._arch = undefined, // initialized by `prepareBootstrapProcessor`
 };
 
+/// Stage 1 of kernel initialization.
+///
 /// Entry point from the bootloader specific code.
 ///
 /// Only the bootstrap processor executes this function.
@@ -61,14 +63,58 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) void {
     kernelInitStage2(&kernel.Processor.all[0]);
 }
 
-/// Stage 2 of the kernel initialization.
+/// Stage 2 of kernel initialization.
 ///
 /// This function is executed by all processors, including the bootstrap processor.
+///
+/// All processors are using the bootloader provided stack.
 fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_code) noreturn {
     kernel.arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
     kernel.arch.init.loadProcessor(processor);
 
-    core.panic("UNIMPLEMENTED"); // TODO: implement intialization stage 2
+    // Switch to the `idle_stack` of the processor.
+    // !Warning: As we are switching stack no variables above this point can be used anymore.
+    {
+        // TODO: Use an assembly trampoline to do this when calling `kernelInitStage3`.
+        kernel.arch.switchToStack(processor.idle_stack);
+    }
+
+    kernelInitStage3();
+}
+
+var processors_in_stage3 = std.atomic.Value(usize).init(0);
+var reload_page_table_gate = std.atomic.Value(bool).init(false);
+
+/// Stage 3 of kernel initialization.
+noinline fn kernelInitStage3() noreturn {
+    _ = processors_in_stage3.fetchAdd(1, .AcqRel);
+
+    const processor = kernel.Processor.get();
+
+    if (processor.id == 0) {
+        // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
+        // the init only mappings.
+        const processor_count = kernel.Processor.all.len;
+        while (processors_in_stage3.load(.Acquire) != processor_count) {
+            kernel.arch.spinLoopHint();
+        }
+
+        kernel.vmm.init.unmapInitOnlyKernelSections();
+
+        reload_page_table_gate.store(true, .Release);
+    } else {
+        // We are not the bootstrap processor, we need to wait for the bootstrap processor to
+        // unmap the init only mappings before we can continue.
+
+        while (!reload_page_table_gate.load(.Acquire)) {
+            kernel.arch.spinLoopHint();
+        }
+    }
+
+    // now that the init only mappings are gone we reload the page table
+    kernel.arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
+
+    core.panic("UNIMPLEMENTED"); // TODO: implement intialization stage 3
 }
 
 /// Initialize the per processor data structures for all processors including the bootstrap processor.

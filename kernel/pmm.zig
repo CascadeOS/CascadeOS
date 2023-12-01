@@ -169,6 +169,15 @@ pub const init = struct {
         );
     }
 
+    pub fn reclaimBootloaderReclaimableMemory() void {
+        const memory_map_iterator = kernel.boot.memoryMap(.forwards);
+        while (memory_map_iterator.next()) |memory_map_entry| {
+            if (memory_map_entry.type != .reclaimable) continue;
+
+            deallocateRange(memory_map_entry.range);
+        }
+    }
+
     /// Adds a memory map entry to the physical page allocator.
     fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) linksection(kernel.info.init_code) void {
         if (!memory_map_entry.range.address.isAligned(arch.paging.standard_page_size)) {

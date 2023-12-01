@@ -260,6 +260,15 @@ pub const init = struct {
         );
     }
 
+    /// Unmaps the init only kernel sections.
+    pub fn unmapInitOnlyKernelSections() void {
+        log.debug("unmapping .init_text section", .{});
+        unmapSectionType(.init_executable_section);
+
+        log.debug("unmapping .init_data section", .{});
+        unmapSectionType(.init_writeable_section);
+    }
+
     /// Maps a section.
     fn mapSection(
         section_start: usize,
@@ -295,5 +304,26 @@ pub const init = struct {
         );
 
         memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+    }
+
+    /// Unmaps all kernel sections of the given type.
+    ///
+    /// Also removes the region from the memory layout.
+    fn unmapSectionType(
+        region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
+    ) void {
+        var i: usize = 0;
+
+        while (i < memory_layout.layout.len) {
+            const region = memory_layout.layout.get(i);
+            if (region.type != region_type) {
+                i += 1;
+                continue;
+            }
+
+            unmap(kernel_page_table, region.range);
+
+            _ = memory_layout.layout.swapRemove(i);
+        }
     }
 };
