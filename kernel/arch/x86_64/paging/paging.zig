@@ -122,13 +122,14 @@ pub fn unmap(
     page_table: *PageTable,
     virtual_range: kernel.VirtualRange,
 ) void {
-    _ = page_table;
     log.debug("unmapRange - {}", .{virtual_range});
 
     var current_virtual_address = virtual_range.address;
     const end_virtual_address = virtual_range.end();
 
     while (current_virtual_address.lessThan(end_virtual_address)) {
+        unmap4KiB(page_table, current_virtual_address);
+
         current_virtual_address.moveForwardInPlace(small_page_size);
     }
 }
@@ -332,7 +333,7 @@ fn unmap4KiB(
     const level1_entry = level1_table.getEntryLevel1(virtual_address);
     if (!level2_entry.present.read()) return;
 
-    kernel.pmm.deallocatePage(level1_entry.getAddress4kib());
+    kernel.pmm.deallocatePage(kernel.PhysicalRange.fromAddr(level1_entry.getAddress4kib(), kernel.arch.paging.standard_page_size));
 
     level1_entry.zero();
 }
