@@ -228,6 +228,13 @@ fn RangeMixin(comptime Self: type) type {
             self.address.moveBackwardInPlace(size);
         }
 
+        pub fn containsRange(self: Self, other: Self) bool {
+            if (!self.address.lessThanOrEqual(other.address)) return false;
+            if (!self.end().greaterThanOrEqual(other.end())) return false;
+
+            return true;
+        }
+
         pub fn contains(self: Self, address: anytype) bool {
             return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
         }
