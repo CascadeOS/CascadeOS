@@ -90,3 +90,15 @@ pub const init = struct {
         stacks_range_allocator = try kernel.heap.RangeAllocator.init(kernel_stacks_range);
     }
 };
+
+pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
+    const T = @TypeOf(value);
+
+    const new_stack_pointer: kernel.VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
+    if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
+
+    stack.stack_pointer = new_stack_pointer;
+
+    const ptr: *T = new_stack_pointer.toPtr(*T);
+    ptr.* = value;
+}
