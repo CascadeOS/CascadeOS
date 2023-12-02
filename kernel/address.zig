@@ -82,6 +82,20 @@ fn AddrMixin(comptime Self: type) type {
             return std.mem.isAligned(self.value, alignment.bytes);
         }
 
+        /// Returns the address rounded up to the nearest multiple of the given alignment.
+        ///
+        /// `alignment` must be a power of two.
+        pub fn alignForward(self: Self, alignment: core.Size) Self {
+            return .{ .value = std.mem.alignForward(usize, self.value, alignment.bytes) };
+        }
+
+        /// Returns the address rounded down to the nearest multiple of the given alignment.
+        ///
+        /// `alignment` must be a power of two.
+        pub fn alignBackward(self: Self, alignment: core.Size) Self {
+            return .{ .value = std.mem.alignBackward(usize, self.value, alignment.bytes) };
+        }
+
         pub inline fn moveForward(self: Self, size: core.Size) Self {
             return .{ .value = self.value + size.bytes };
         }
