@@ -24,10 +24,10 @@ var bootstrap_non_maskable_interrupt_stack align(16) linksection(kernel.info.ini
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksection(kernel.info.init_code) void {
     bootstrap_processor._arch = .{
-        .double_fault_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
+        .double_fault_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_double_fault_stack),
         )),
-        .non_maskable_interrupt_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
+        .non_maskable_interrupt_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
             @as([]u8, &bootstrap_non_maskable_interrupt_stack),
         )),
     };

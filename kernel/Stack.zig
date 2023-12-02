@@ -22,12 +22,26 @@ var stacks_range_allocator_lock: kernel.SpinLock = .{};
 /// The entire virtual range including the guard page.
 range: kernel.VirtualRange,
 
+/// The usable range excluding the guard page.
+usable_range: kernel.VirtualRange,
+
 stack_pointer: kernel.VirtualAddress,
 
-pub fn fromRange(range: kernel.VirtualRange) Stack {
+pub fn fromRangeNoGuard(range: kernel.VirtualRange) Stack {
     return Stack{
         .range = range,
+        .usable_range = range,
         .stack_pointer = range.end(),
+    };
+}
+
+pub fn fromRangeWithGuard(range: kernel.VirtualRange, usable_range: kernel.VirtualRange) Stack {
+    core.debugAssert(range.containsRange(usable_range));
+
+    return Stack{
+        .range = range,
+        .usable_range = usable_range,
+        .stack_pointer = usable_range.end(),
     };
 }
 
@@ -49,16 +63,16 @@ pub fn create() !Stack {
     }
 
     // Don't map the guard page.
-    var range_to_map = virtual_range.moveForward(kernel.arch.paging.standard_page_size);
-    range_to_map.size.subtractInPlace(kernel.arch.paging.standard_page_size);
+    var usable_range = virtual_range.moveForward(kernel.arch.paging.standard_page_size);
+    usable_range.size.subtractInPlace(kernel.arch.paging.standard_page_size);
 
     try kernel.vmm.mapRange(
         kernel.vmm.kernel_page_table,
-        range_to_map,
+        usable_range,
         .{ .global = true, .writeable = true },
     );
 
-    return fromRange(virtual_range);
+    return fromRangeWithGuard(virtual_range, usable_range);
 }
 
 /// Destroys a stack.
@@ -66,11 +80,7 @@ pub fn create() !Stack {
 /// **REQUIREMENTS**:
 /// - `stack` must have been created with `create`.
 pub fn destroy(stack: Stack) void {
-    // The guard page was not mapped.
-    var range_to_unmap = stack.range.moveForward(kernel.arch.paging.standard_page_size);
-    range_to_unmap.size.subtractInPlace(kernel.arch.paging.standard_page_size);
-
-    kernel.vmm.unmap(kernel.root_page_table, range_to_unmap);
+    kernel.vmm.unmap(kernel.root_page_table, stack.usable_range);
 
     // TODO: Cache needs to be flushed on this core and others.
 }

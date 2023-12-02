@@ -21,7 +21,7 @@ var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .
 /// Only the bootstrap processor executes this function.
 pub fn kernelInitStage1() linksection(kernel.info.init_code) void {
     // we need to get the processor data loaded early as the panic handler and logging use it
-    bootstrap_processor.idle_stack = kernel.Stack.fromRange(kernel.VirtualRange.fromSlice(
+    bootstrap_processor.idle_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
         @as([]u8, &bootstrap_interrupt_stack),
     ));
     kernel.arch.init.prepareBootstrapProcessor(&bootstrap_processor);
