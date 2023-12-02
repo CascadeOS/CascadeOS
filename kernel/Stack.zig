@@ -45,7 +45,7 @@ pub fn fromRangeWithGuard(range: kernel.VirtualRange, usable_range: kernel.Virtu
     };
 }
 
-pub fn create() !Stack {
+pub fn create(push_null_return_value: bool) !Stack {
     const virtual_range = blk: {
         const held = stacks_range_allocator_lock.lock();
         defer held.unlock();
@@ -71,8 +71,15 @@ pub fn create() !Stack {
         usable_range,
         .{ .global = true, .writeable = true },
     );
+    errdefer kernel.vmm.unmap(kernel.vmm.kernel_page_table, usable_range);
 
-    return fromRangeWithGuard(virtual_range, usable_range);
+    var stack = fromRangeWithGuard(virtual_range, usable_range);
+
+    if (push_null_return_value) {
+        try stack.pushReturnAddress(kernel.VirtualAddress.zero);
+    }
+
+    return stack;
 }
 
 /// Destroys a stack.

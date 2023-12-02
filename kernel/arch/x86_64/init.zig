@@ -40,8 +40,8 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksec
 /// **WARNING**: This function will panic if the processor cannot be prepared.
 pub fn prepareProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
     processor._arch = .{
-        .double_fault_stack = kernel.Stack.create() catch core.panic("unable to create double fault stack"),
-        .non_maskable_interrupt_stack = kernel.Stack.create() catch core.panic("unable to create non-mackable interrupt stack"),
+        .double_fault_stack = kernel.Stack.create(true) catch core.panic("unable to create double fault stack"),
+        .non_maskable_interrupt_stack = kernel.Stack.create(true) catch core.panic("unable to create non-mackable interrupt stack"),
     };
 
     processor._arch.tss.setPrivilegeStack(.ring0, processor.idle_stack);

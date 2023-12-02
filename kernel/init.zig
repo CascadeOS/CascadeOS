@@ -138,7 +138,9 @@ fn initProcessors() linksection(kernel.info.init_code) void {
 
         const processor = &processors[i];
 
-        const idle_stack = kernel.Stack.create() catch core.panic("failed to allocate idle and interrupt stack");
+        const idle_stack = kernel.Stack.create(true) catch {
+            core.panic("failed to allocate idle stack");
+        };
 
         processor.* = .{
             .id = i,
