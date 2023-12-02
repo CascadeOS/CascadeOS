@@ -278,7 +278,7 @@ pub const paging = struct {
 inline fn checkSupport(comptime Container: type, comptime name: []const u8, comptime TargetT: type) void {
     if (comptime name.len == 0) @compileError("zero-length name");
 
-    if (!@hasDecl(Container, name)) {
+    if (comptime !@hasDecl(Container, name)) {
         core.panic("`" ++ @tagName(kernel.info.arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
