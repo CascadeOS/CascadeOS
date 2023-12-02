@@ -44,11 +44,8 @@ pub fn lock(self: *SpinLock) Held {
             processor_id_plus_one,
             .AcqRel,
             .Acquire,
-        )) |current| {
-            core.debugAssert(current != processor_id_plus_one);
-
+        )) |_| {
             kernel.arch.spinLoopHint();
-
             continue;
         }
 
