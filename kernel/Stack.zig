@@ -102,3 +102,11 @@ pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
     const ptr: *T = new_stack_pointer.toPtr(*T);
     ptr.* = value;
 }
+
+pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
+    const new_stack_pointer: kernel.VirtualAddress = stack.stack_pointer.alignBackward(alignment);
+
+    if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
+
+    stack.stack_pointer = new_stack_pointer;
+}
