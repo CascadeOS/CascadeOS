@@ -41,11 +41,13 @@ pub inline fn earlyGetProcessor() ?*kernel.Processor {
     return current.earlyGetProcessor();
 }
 
-/// Switch to the provided stack.
-pub inline fn switchToStack(stack: kernel.Stack) void {
-    checkSupport(current, "switchToStack", fn (kernel.Stack) void);
+/// Begins executing the provided function on the provided stack.
+///
+/// It is the callers responsibility to push a dummy return address if it is requried.
+pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noreturn) error{StackOverflow}!noreturn {
+    checkSupport(current, "jumpTo", fn (*kernel.Stack, *const fn () noreturn) error{StackOverflow}!noreturn);
 
-    current.switchToStack(stack);
+    try current.jumpTo(stack, target_function);
 }
 
 /// Functionality that is intended to be used during kernel init only.

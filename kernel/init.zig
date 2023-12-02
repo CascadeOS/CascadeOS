@@ -72,21 +72,14 @@ fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_c
     kernel.arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
     kernel.arch.init.loadProcessor(processor);
 
-    // Switch to the `idle_stack` of the processor.
-    // !Warning: As we are switching stack no variables above this point can be used anymore.
-    {
-        // TODO: Use an assembly trampoline to do this when calling `kernelInitStage3`.
-        kernel.arch.switchToStack(processor.idle_stack);
-    }
-
-    kernelInitStage3();
+    kernel.arch.jumpTo(&processor.idle_stack, kernelInitStage3) catch core.panic("failed to jump to kernelInitStage3");
 }
 
 var processors_in_stage3 = std.atomic.Value(usize).init(0);
 var reload_page_table_gate = std.atomic.Value(bool).init(false);
 
 /// Stage 3 of kernel initialization.
-noinline fn kernelInitStage3() noreturn {
+fn kernelInitStage3() noreturn {
     _ = processors_in_stage3.fetchAdd(1, .AcqRel);
 
     const processor = kernel.Processor.get();

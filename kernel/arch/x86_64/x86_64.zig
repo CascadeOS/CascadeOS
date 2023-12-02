@@ -45,7 +45,20 @@ pub const PrivilegeLevel = enum(u2) {
 
 pub const spinLoopHint = instructions.pause;
 
-pub const switchToStack = instructions.switchToStack;
+/// Begins executing the provided function on the provided stack.
+///
+/// It is the callers responsibility to push a dummy return address if it is requried.
+pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noreturn) error{StackOverflow}!noreturn {
+    try stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(target_function));
+    asm volatile (
+        \\  mov %[stack], %%rsp
+        \\  ret
+        :
+        : [stack] "rm" (stack.stack_pointer.value),
+        : "memory"
+    );
+    unreachable;
+}
 
 comptime {
     if (kernel.info.arch != .x86_64) {
