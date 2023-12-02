@@ -25,7 +25,7 @@ pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
-pub fn earlyGetProcessor() ?*kernel.Processor {
+pub inline fn earlyGetProcessor() ?*kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
