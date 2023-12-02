@@ -110,3 +110,14 @@ pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
 
     stack.stack_pointer = new_stack_pointer;
 }
+
+const RETURN_ADDRESS_ALIGNMENT = core.Size.from(16, .byte);
+
+pub fn pushReturnAddress(stack: *Stack, return_address: kernel.VirtualAddress) error{StackOverflow}!void {
+    const old_stack_pointer = stack.stack_pointer;
+
+    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?
+    errdefer stack.stack_pointer = old_stack_pointer;
+
+    try stack.push(return_address.value);
+}
