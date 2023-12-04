@@ -283,7 +283,7 @@ pub const init = struct {
             return;
         };
 
-        if (processor.panicked) {
+        if (processor.state == .panic) {
             const lock_held = panic_lock._processor_plus_one == processor.id + 1;
             if (!lock_held) _ = panic_lock.lock();
 
@@ -308,7 +308,7 @@ pub const init = struct {
             return;
         }
 
-        processor.panicked = true;
+        processor.state = .panic;
 
         const held = panic_lock.lock();
         defer held.unlock();

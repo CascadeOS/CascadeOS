@@ -17,7 +17,7 @@ const Processor = @This();
 
 id: usize,
 
-panicked: bool = false,
+state: State,
 
 /// The stack used for idle.
 ///
@@ -33,3 +33,17 @@ pub inline fn get() *Processor {
 pub inline fn arch(self: *Processor) *kernel.arch.ArchProcessor {
     return &self._arch;
 }
+
+pub const State = enum {
+    /// The processor is idle.
+    idle,
+
+    /// The processor is running in user-space.
+    user,
+
+    /// The processor is running in kernel-space.
+    kernel,
+
+    /// The processor has panicked.
+    panic,
+};
