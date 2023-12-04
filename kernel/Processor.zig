@@ -15,7 +15,7 @@ pub var all: []Processor = undefined;
 
 const Processor = @This();
 
-id: usize,
+id: Id,
 
 state: State,
 
@@ -46,4 +46,31 @@ pub const State = enum {
 
     /// The processor has panicked.
     panic,
+};
+
+pub const Id = enum(usize) {
+    bootstrap_core = 0,
+
+    _,
+
+    pub fn print(self: Id, writer: anytype) !void {
+        std.fmt.formatInt(
+            @intFromEnum(self),
+            10,
+            .lower,
+            .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
+            writer,
+        ) catch unreachable;
+    }
+
+    pub inline fn format(
+        self: Id,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        return print(self, writer);
+    }
 };

@@ -17,7 +17,7 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
-        core.debugAssert(kernel.Processor.get().id + 1 == self.spinlock._processor_plus_one);
+        core.debugAssert(@intFromEnum(kernel.Processor.get().id) + 1 == self.spinlock._processor_plus_one);
 
         @atomicStore(usize, &self.spinlock._processor_plus_one, 0, .Release);
         if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
@@ -34,7 +34,7 @@ pub fn lock(self: *SpinLock) Held {
 
     const processor = kernel.Processor.get();
 
-    const processor_id_plus_one = processor.id + 1;
+    const processor_id_plus_one = @intFromEnum(processor.id) + 1;
 
     while (true) {
         if (@cmpxchgWeak(

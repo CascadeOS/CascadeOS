@@ -284,19 +284,13 @@ pub const init = struct {
         };
 
         if (processor.state == .panic) {
-            const lock_held = panic_lock._processor_plus_one == processor.id + 1;
+            const lock_held = panic_lock._processor_plus_one == @intFromEnum(processor.id) + 1;
             if (!lock_held) _ = panic_lock.lock();
 
             // TODO: Can we do something better when we panic in a panic?
             writer.writeAll("\nPANIC IN PANIC on processor ") catch unreachable;
 
-            std.fmt.formatInt(
-                processor.id,
-                10,
-                .lower,
-                .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
-                writer,
-            ) catch unreachable;
+            processor.id.print(writer) catch unreachable;
 
             writer.writeByte('\n') catch unreachable;
 
@@ -317,13 +311,7 @@ pub const init = struct {
         {
             writer.writeAll("\nPANIC on processor ") catch unreachable;
 
-            std.fmt.formatInt(
-                processor.id,
-                10,
-                .lower,
-                .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
-                writer,
-            ) catch unreachable;
+            processor.id.print(writer) catch unreachable;
 
             if (msg.len != 0) {
                 writer.writeAll(" - ") catch unreachable;
