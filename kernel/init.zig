@@ -10,7 +10,6 @@ var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]
 
 var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .{
     .id = .bootstrap,
-    .state = .kernel,
     .idle_stack = undefined, // initialized at the beginning of `kernelInit`
     ._arch = undefined, // initialized by `prepareBootstrapProcessor`
 };
@@ -138,7 +137,6 @@ fn initProcessors() linksection(kernel.info.init_code) void {
 
         processor.* = .{
             .id = @enumFromInt(i),
-            .state = .kernel,
             .idle_stack = idle_stack,
             ._arch = undefined, // initialized by `prepareProcessor`
         };
