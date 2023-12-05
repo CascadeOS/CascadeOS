@@ -9,7 +9,7 @@ const log = kernel.log.scoped(.init);
 var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
 
 var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .{
-    .id = kernel.Processor.Id.bootstrap_core,
+    .id = .bootstrap,
     .state = .kernel,
     .idle_stack = undefined, // initialized at the beginning of `kernelInit`
     ._arch = undefined, // initialized by `prepareBootstrapProcessor`
@@ -85,7 +85,7 @@ fn kernelInitStage3() noreturn {
 
     const processor = kernel.Processor.get();
 
-    if (processor.id == kernel.Processor.Id.bootstrap_core) {
+    if (processor.id == .bootstrap) {
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
         // the init only mappings.
         const processor_count = kernel.Processor.all.len;
@@ -145,7 +145,7 @@ fn initProcessors() linksection(kernel.info.init_code) void {
 
         kernel.arch.init.prepareProcessor(processor);
 
-        if (processor.id != kernel.Processor.Id.bootstrap_core) {
+        if (processor.id != .bootstrap) {
             processor_descriptor.boot(processor, kernelInitStage2);
         }
     }

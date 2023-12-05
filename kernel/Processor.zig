@@ -49,7 +49,7 @@ pub const State = enum {
 };
 
 pub const Id = enum(usize) {
-    bootstrap_core = 0,
+    bootstrap = 0,
 
     _,
 
