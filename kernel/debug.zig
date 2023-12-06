@@ -84,25 +84,14 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
         return;
     }
 
-    // TODO: Inform the user if this is null.
-    const kernel_virtual_slide = if (kernel.info.kernel_virtual_slide) |slide| slide.bytes else 0;
+    var kernel_virtual_slide_is_null: bool = false;
+    const kernel_virtual_slide = if (kernel.info.kernel_virtual_slide) |slide| slide.bytes else blk: {
+        kernel_virtual_slide_is_null = true;
+        break :blk 0;
+    };
 
     // we can't use `VirtualAddress` here as it is possible this subtract results in a non-canonical address
     const kernel_source_address = address - kernel_virtual_slide;
-
-    // TODO: This is not a sufficent check for this situation, `vmm.kernel_memory_layout` should be used if possible
-    if (kernel_source_address < kernel.info.kernel_base_address.value) {
-        writer.writeAll(comptime indent ++ "0x") catch unreachable;
-        std.fmt.formatInt(
-            address,
-            16,
-            .lower,
-            .{},
-            writer,
-        ) catch unreachable;
-        writer.writeAll(" - address is not a kernel code address\n") catch unreachable;
-        return;
-    }
 
     const symbol = symbols.getSymbol(kernel_source_address) orelse {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;
@@ -113,14 +102,20 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
             .{},
             writer,
         ) catch unreachable;
-        writer.writeAll(" - ???\n") catch unreachable;
+
+        if (kernel_virtual_slide_is_null) {
+            writer.writeAll(" - ??? (address may be incorrect)\n") catch unreachable;
+        } else {
+            writer.writeAll(" - ???\n") catch unreachable;
+        }
+
         return;
     };
 
-    printSymbol(writer, symbol);
+    printSymbol(writer, symbol, kernel_virtual_slide_is_null);
 }
 
-fn printSymbol(writer: anytype, symbol: symbols.Symbol) void {
+fn printSymbol(writer: anytype, symbol: symbols.Symbol, kernel_virtual_slide_is_null: bool) void {
     writer.writeAll(indent) catch unreachable;
 
     const location = symbol.location orelse {
@@ -131,11 +126,21 @@ fn printSymbol(writer: anytype, symbol: symbols.Symbol) void {
 
             // setup - ???
             //      ^^^^^^
-            writer.writeAll(" - ???\n") catch unreachable;
+            if (kernel_virtual_slide_is_null) {
+                writer.writeAll(" - ??? (address and symbol may be incorrect)\n") catch unreachable;
+            } else {
+                writer.writeAll(" - ???\n") catch unreachable;
+            }
         } else {
             // ??? - ???
             // ^^^^^^^^^
             writer.writeAll("??? - ???\n") catch unreachable;
+
+            if (kernel_virtual_slide_is_null) {
+                writer.writeAll("??? - ??? (address may be incorrect)\n") catch unreachable;
+            } else {
+                writer.writeAll("??? - ???\n") catch unreachable;
+            }
         }
 
         return;
@@ -193,6 +198,10 @@ fn printSymbol(writer: anytype, symbol: symbols.Symbol) void {
         // kernel/setup.zig:43:15 in setup (symbols line information is inprecise)
         //                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         writer.writeAll(" (symbols line information is inprecise)") catch unreachable;
+    }
+
+    if (kernel_virtual_slide_is_null) {
+        writer.writeAll(" (address and symbol may be incorrect)") catch unreachable;
     }
 
     const file_contents = embedded_source_files.get(location.file_name) orelse {
