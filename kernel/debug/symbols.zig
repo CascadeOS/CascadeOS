@@ -17,6 +17,9 @@ pub fn loadSymbols() void {
     if (@atomicLoad(bool, &symbols_loaded, .Acquire)) return;
     if (@atomicLoad(bool, &symbol_loading_failed, .Acquire)) return;
 
+    // If the processor has not yet been initialized, we can't acquire the spinlock.
+    if (kernel.arch.earlyGetProcessor() == null) return;
+
     const held = symbol_loading_spinlock.lock();
     defer held.unlock();
 
