@@ -271,6 +271,33 @@ const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_
     break :embedded_source_files array[0..];
 });
 
+fn printUserPanicMessage(writer: anytype, msg: []const u8) void {
+    if (msg.len != 0) {
+        writer.writeAll(" - ") catch unreachable;
+
+        writer.writeAll(msg) catch unreachable;
+
+        if (msg[msg.len - 1] != '\n') {
+            writer.writeByte('\n') catch unreachable;
+        }
+    } else {
+        writer.writeByte('\n') catch unreachable;
+    }
+}
+
+fn printErrorAndCurrentStackTrace(writer: anytype, stack_trace: ?*const std.builtin.StackTrace, return_address: usize) void {
+    symbols.loadSymbols();
+
+    // error return trace
+    if (stack_trace) |trace| {
+        if (trace.index != 0) {
+            printStackTrace(writer, trace);
+        }
+    }
+
+    printCurrentBackTrace(writer, return_address);
+}
+
 pub const init = struct {
     var panic_lock: kernel.SpinLock = .{}; // TODO: Put in init_data section
 
@@ -283,25 +310,31 @@ pub const init = struct {
         const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
 
         const processor = kernel.arch.earlyGetProcessor() orelse {
-            // TODO: Somehow we have panicked before we have loaded a processor.
+            // Somehow we have panicked before we have loaded a processor.
+            // As we have not acquired the panic lock we might clobber another processors output but we don't have a choice.
 
-            // We might clobber another processors output but we don't have a choice.
+            writer.writeAll("\nPANIC - before processor loaded") catch unreachable;
 
-            writer.writeAll("\nPANIC - before processor loaded\n") catch unreachable;
+            printUserPanicMessage(writer, msg);
+
+            printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
 
             return;
         };
 
         if (processor.panicked) {
+            // We have already panicked on this processor.
+
             const lock_held = panic_lock._processor_plus_one == @intFromEnum(processor.id) + 1;
             if (!lock_held) _ = panic_lock.lock();
 
-            // TODO: Can we do something better when we panic in a panic?
             writer.writeAll("\nPANIC IN PANIC on processor ") catch unreachable;
 
             processor.id.print(writer) catch unreachable;
 
-            writer.writeByte('\n') catch unreachable;
+            printUserPanicMessage(writer, msg);
+
+            printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
 
             if (lock_held) {
                 // we need to unlock the panic lock or other panicking processors will be deadlocked
@@ -316,34 +349,12 @@ pub const init = struct {
         const held = panic_lock.lock();
         defer held.unlock();
 
-        // panic message
-        {
-            writer.writeAll("\nPANIC on processor ") catch unreachable;
+        writer.writeAll("\nPANIC on processor ") catch unreachable;
 
-            processor.id.print(writer) catch unreachable;
+        processor.id.print(writer) catch unreachable;
 
-            if (msg.len != 0) {
-                writer.writeAll(" - ") catch unreachable;
+        printUserPanicMessage(writer, msg);
 
-                writer.writeAll(msg) catch unreachable;
-
-                if (msg[msg.len - 1] != '\n') {
-                    writer.writeByte('\n') catch unreachable;
-                }
-            } else {
-                writer.writeByte('\n') catch unreachable;
-            }
-        }
-
-        symbols.loadSymbols();
-
-        // error return trace
-        if (stack_trace) |trace| {
-            if (trace.index != 0) {
-                printStackTrace(writer, trace);
-            }
-        }
-
-        printCurrentBackTrace(writer, return_address);
+        printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
     }
 };
