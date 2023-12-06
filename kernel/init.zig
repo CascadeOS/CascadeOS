@@ -20,15 +20,15 @@ var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .
 ///
 /// Only the bootstrap processor executes this function.
 pub fn kernelInitStage1() linksection(kernel.info.init_code) void {
+    // get output up and running as soon as possible
+    kernel.arch.init.setupEarlyOutput();
+
     // we need to get the processor data loaded early as the panic handler and logging use it
     bootstrap_processor.idle_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
         @as([]u8, &bootstrap_interrupt_stack),
     ));
     kernel.arch.init.prepareBootstrapProcessor(&bootstrap_processor);
     kernel.arch.init.loadProcessor(&bootstrap_processor);
-
-    // get output up and running as soon as possible
-    kernel.arch.init.setupEarlyOutput();
 
     // as we need the kernel elf file to output symbols and source locations, we acquire it early
     kernel.info.kernel_file = kernel.boot.kernelFile() orelse
