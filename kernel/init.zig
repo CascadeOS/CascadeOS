@@ -119,7 +119,7 @@ fn kernelInitStage3() noreturn {
 fn initProcessors() linksection(kernel.info.init_code) void {
     var processor_descriptors = kernel.boot.processorDescriptors();
 
-    const processors = kernel.heap.page_allocator.alloc(
+    kernel.Processor.all = kernel.heap.page_allocator.alloc(
         kernel.Processor,
         processor_descriptors.count(),
     ) catch core.panic("failed to allocate processors");
@@ -129,7 +129,7 @@ fn initProcessors() linksection(kernel.info.init_code) void {
     while (processor_descriptors.next()) |processor_descriptor| : (i += 1) {
         log.debug("initializing processor {}", .{i});
 
-        const processor = &processors[i];
+        const processor = &kernel.Processor.all[i];
 
         const idle_stack = kernel.Stack.create(true) catch {
             core.panic("failed to allocate idle stack");
@@ -147,8 +147,6 @@ fn initProcessors() linksection(kernel.info.init_code) void {
             processor_descriptor.boot(processor, kernelInitStage2);
         }
     }
-
-    kernel.Processor.all = processors;
 }
 
 fn captureBootloaderInformation() linksection(kernel.info.init_code) void {
