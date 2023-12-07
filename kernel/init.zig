@@ -95,8 +95,7 @@ fn kernelInitStage3() noreturn {
             kernel.arch.spinLoopHint();
         }
 
-        // TODO: We need to copy the kernel file as it is in bootloader reclaimable memory
-        // kernel.pmm.init.reclaimBootloaderReclaimableMemory();
+        kernel.pmm.init.reclaimBootloaderReclaimableMemory();
 
         kernel.vmm.init.unmapInitOnlyKernelSections();
 
