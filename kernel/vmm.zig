@@ -119,6 +119,7 @@ pub const init = struct {
         };
 
         log.debug("switching to kernel page table", .{});
+        kernel.kernel_task.page_table = kernel_page_table;
         paging.switchToPageTable(kernel_page_table);
 
         log.debug("kernel memory regions:", .{});

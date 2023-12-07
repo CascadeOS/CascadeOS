@@ -7,6 +7,9 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const Stack = kernel.Stack;
+const std = @import("std");
+const Thread = kernel.Task.Thread;
 
 /// The list of processors in the system.
 ///
@@ -23,6 +26,11 @@ panicked: bool = false,
 ///
 /// Also used during the move from the bootloader provided stack until we start scheduling.
 idle_stack: kernel.Stack,
+
+/// The currently running thread.
+///
+/// This is set to `null` when the processor is idle and also before we start scheduling.
+current_thread: ?*Thread = null,
 
 _arch: kernel.arch.ArchProcessor,
 

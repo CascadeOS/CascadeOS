@@ -17,12 +17,19 @@ pub const SpinLock = @import("SpinLock.zig");
 
 pub const Processor = @import("Processor.zig");
 pub const Stack = @import("Stack.zig");
+pub const Task = @import("Task.zig");
 
 const address = @import("address.zig");
 pub const PhysicalAddress = address.PhysicalAddress;
 pub const VirtualAddress = address.VirtualAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const VirtualRange = address.VirtualRange;
+
+pub var kernel_task: Task = .{
+    .id = .kernel,
+    ._name = Task.Name.fromSlice("kernel") catch unreachable,
+    .page_table = undefined, // initialized in `initVmm`
+};
 
 comptime {
     // make sure any bootloader specific code that needs to be referenced is
