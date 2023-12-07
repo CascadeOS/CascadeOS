@@ -198,6 +198,10 @@ pub const VirtualRange = extern struct {
         return self.address.toPtr([*]T)[0..len];
     }
 
+    pub fn toByteSlice(self: VirtualRange) []u8 {
+        return self.address.toPtr([*]u8)[0..self.size.bytes];
+    }
+
     pub usingnamespace RangeMixin(@This());
 };
 
