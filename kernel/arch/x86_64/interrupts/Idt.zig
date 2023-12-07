@@ -42,7 +42,7 @@ pub const Entry = extern struct {
         /// Defines the privilege levels which are allowed to access this interrupt via the INT instruction.
         ///
         /// Hardware interrupts ignore this mechanism.
-        privilege_level: x86_64.PrivilegeLevel = .ring0,
+        privilege_level: x86_64.PrivilegeLevel = .kernel,
 
         present: bool,
 

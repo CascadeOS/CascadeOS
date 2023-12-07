@@ -32,7 +32,7 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksec
         )),
     };
 
-    bootstrap_processor._arch.tss.setPrivilegeStack(.ring0, bootstrap_processor.idle_stack);
+    bootstrap_processor._arch.tss.setPrivilegeStack(.kernel, bootstrap_processor.idle_stack);
 }
 
 /// Prepares the provided Processor for use.
@@ -44,7 +44,7 @@ pub fn prepareProcessor(processor: *kernel.Processor) linksection(kernel.info.in
         .non_maskable_interrupt_stack = kernel.Stack.create(true) catch core.panic("unable to create non-mackable interrupt stack"),
     };
 
-    processor._arch.tss.setPrivilegeStack(.ring0, processor.idle_stack);
+    processor._arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);
 }
 
 pub fn loadProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {

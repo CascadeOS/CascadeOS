@@ -31,16 +31,16 @@ pub inline fn earlyGetProcessor() ?*kernel.Processor {
 
 pub const PrivilegeLevel = enum(u2) {
     /// Kernel
-    ring0 = 0,
+    kernel = 0,
 
     /// Unused
-    ring1 = 1,
+    _unused1 = 1,
 
     /// Unused
-    ring2 = 2,
+    _unused2 = 2,
 
     /// Userspace
-    ring3 = 3,
+    user = 3,
 };
 
 pub const spinLoopHint = instructions.pause;
