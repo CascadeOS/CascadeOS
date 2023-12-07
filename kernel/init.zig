@@ -57,6 +57,9 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) void {
     log.info("initializing virtual memory", .{});
     kernel.vmm.init.initVmm();
 
+    log.debug("copying kernel file from bootloader memory", .{});
+    copyKernelFileFromBootloaderMemory();
+
     log.info("initializing processors", .{});
     initProcessors();
 
@@ -111,6 +114,25 @@ fn kernelInitStage3() noreturn {
     kernel.arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
 
     core.panic("UNIMPLEMENTED"); // TODO: implement intialization stage 3
+}
+
+/// Copy the kernel file from the bootloader provided memory to the kernel heap.
+pub fn copyKernelFileFromBootloaderMemory() void {
+    const bootloader_provided_kernel_file = kernel.info.kernel_file.?;
+
+    const kernel_file_buffer = kernel.heap.page_allocator.alloc(
+        u8,
+        bootloader_provided_kernel_file.size.bytes,
+    ) catch {
+        core.panic("Failed to allocate memory for kernel file buffer");
+    };
+
+    @memcpy(
+        kernel_file_buffer[0..bootloader_provided_kernel_file.size.bytes],
+        bootloader_provided_kernel_file.toByteSlice(),
+    );
+
+    kernel.info.kernel_file.?.address = kernel.VirtualAddress.fromPtr(kernel_file_buffer.ptr);
 }
 
 /// Initialize the per processor data structures for all processors including the bootstrap processor.
