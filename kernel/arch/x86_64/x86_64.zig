@@ -55,7 +55,7 @@ pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noretur
         \\  ret
         :
         : [stack] "rm" (stack.stack_pointer.value),
-        : "memory"
+        : "memory", "stack"
     );
     unreachable;
 }
