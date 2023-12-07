@@ -58,6 +58,8 @@ pub const paging = struct {
 
     // TODO: Is this correct for aarch64? https://github.com/CascadeOS/CascadeOS/issues/23
     pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
+
+    pub const PageTable = struct {};
 };
 
 comptime {
