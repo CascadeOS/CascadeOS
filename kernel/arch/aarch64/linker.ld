@@ -8,8 +8,6 @@ ENTRY(_start)
 PHDRS
 {
     null         PT_NULL    FLAGS(0) ;                   /* Null segment */
-    init_text    PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
-    init_data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
     text         PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
     rodata       PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
     data         PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
@@ -26,14 +24,7 @@ SECTIONS
         __init_text_start = .;
         *(.init_text .init_text.*)
         __init_text_end = .;
-    } :init_text
-
-    /* This must be kept in sync with `kernel.info.init_data` */
-    .init_data ALIGN(4K) : {
-        __init_data_start = .;
-        *(.init_data .init_data.*)
-        __init_data_end = .;
-    } :init_data
+    } :text
 
     .text ALIGN(4K) : {
         __text_start = .;
@@ -46,6 +37,13 @@ SECTIONS
         *(.rodata .rodata.*)
         __rodata_end = .;
     } :rodata
+
+    /* This must be kept in sync with `kernel.info.init_data` */
+    .init_data ALIGN(4K) : {
+        __init_data_start = .;
+        *(.init_data .init_data.*)
+        __init_data_end = .;
+    } :data
 
     .data ALIGN(4K) : {
         __data_start = .;
