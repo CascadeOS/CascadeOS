@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
-const kernel = @import("kernel");
-const x86_64 = @import("../x86_64.zig");
-
+const Gdt = x86_64.Gdt;
 const Idt = @import("Idt.zig");
-
 const interrupt_handlers = @import("interrupt_handlers.zig");
+const interrupts = x86_64.interrupts;
+const kernel = @import("kernel");
+const registers = x86_64.registers;
+const std = @import("std");
+const x86_64 = @import("../x86_64.zig");
 
 pub const number_of_handlers = Idt.number_of_handlers;
 
@@ -29,7 +30,7 @@ pub fn initIdt() void {
     log.debug("mapping idt entries to raw handlers", .{});
     for (raw_handlers, 0..) |raw_handler, i| {
         idt.handlers[i].init(
-            x86_64.Gdt.kernel_code_selector,
+            Gdt.kernel_code_selector,
             .interrupt,
             raw_handler,
         );
@@ -62,7 +63,7 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
         // is always aligned in the same way for every vector
         const error_code_asm = if (comptime !idt_vector.hasErrorCode()) "push $0\n" else "";
         const vector_number_asm = std.fmt.comptimePrint("push ${d}", .{vector_number});
-        const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{x86_64.Gdt.kernel_data_selector});
+        const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{Gdt.kernel_data_selector});
 
         const rawInterruptHandler = struct {
             fn rawInterruptHandler() callconv(.Naked) void {
@@ -145,7 +146,7 @@ pub const InterruptFrame = extern struct {
     error_code: u64,
     rip: u64,
     cs: u64,
-    rflags: x86_64.registers.RFlags,
+    rflags: registers.RFlags,
     rsp: u64,
     ss: u64,
 
@@ -156,12 +157,12 @@ pub const InterruptFrame = extern struct {
 
     /// Checks if this interrupt occurred in kernel mode.
     pub inline fn isKernel(self: *const InterruptFrame) bool {
-        return self.cs == x86_64.Gdt.kernel_code_selector;
+        return self.cs == Gdt.kernel_code_selector;
     }
 
     /// Checks if this interrupt occurred in user mode.
     pub inline fn isUser(self: *const InterruptFrame) bool {
-        return self.cs == x86_64.Gdt.user_code_selector;
+        return self.cs == Gdt.user_code_selector;
     }
 
     pub fn print(
@@ -218,7 +219,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
-    x86_64.interrupts.disableInterrupts();
+    interrupts.disableInterrupts();
 }
 
 pub const IdtVector = enum(u8) {
@@ -436,7 +437,7 @@ pub const IdtVector = enum(u8) {
 
 /// Are interrupts enabled?
 pub inline fn interruptsEnabled() bool {
-    return x86_64.registers.RFlags.read().interrupt;
+    return registers.RFlags.read().interrupt;
 }
 
 /// Enable interrupts.

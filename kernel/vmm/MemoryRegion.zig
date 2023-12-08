@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-
-const MapType = kernel.vmm.MapType;
+const std = @import("std");
+const VirtualRange = kernel.VirtualRange;
+const vmm = kernel.vmm;
 
 const MemoryRegion = @This();
 
 /// The virtual range of this region.
-range: kernel.VirtualRange,
+range: VirtualRange,
 
 /// The type of mapping.
-map_type: MapType,
+map_type: vmm.MapType,
 
 pub fn print(region: MemoryRegion, writer: anytype) !void {
     try writer.writeAll("MemoryRegion{ 0x");

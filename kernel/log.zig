@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
+const info = kernel.info;
 const kernel = @import("kernel");
 const kernel_options = @import("kernel_options");
+const std = @import("std");
 
 var initialized: bool = false;
 
@@ -29,7 +31,7 @@ pub fn scoped(comptime scope: @Type(.EnumLiteral)) type {
             logFnDispatch(scope, .debug, format, args);
         }
 
-        pub inline fn levelEnabled(comptime message_level: kernel.log.Level) bool {
+        pub inline fn levelEnabled(comptime message_level: Level) bool {
             comptime return loggingEnabledFor(scope, message_level);
         }
     };
@@ -37,7 +39,7 @@ pub fn scoped(comptime scope: @Type(.EnumLiteral)) type {
 
 fn logFnDispatch(
     comptime scope: @Type(.EnumLiteral),
-    comptime message_level: kernel.log.Level,
+    comptime message_level: Level,
     comptime format: []const u8,
     args: anytype,
 ) void {
@@ -52,7 +54,7 @@ fn logFnDispatch(
 /// Main logging function used after kernel init is finished
 fn standardLogFn(
     comptime scope: @Type(.EnumLiteral),
-    comptime message_level: kernel.log.Level,
+    comptime message_level: Level,
     comptime format: []const u8,
     args: anytype,
 ) void {
@@ -67,13 +69,13 @@ fn standardLogFn(
 /// Logging function for early boot only.
 fn earlyLogFn(
     comptime scope: @Type(.EnumLiteral),
-    comptime message_level: kernel.log.Level,
+    comptime message_level: Level,
     comptime format: []const u8,
     args: anytype,
-) linksection(kernel.info.init_code) void {
-    const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
+) linksection(info.init_code) void {
+    const writer = arch.init.getEarlyOutputWriter() orelse return;
 
-    const scopeAndLevelText = comptime kernel.log.formatScopeAndLevel(message_level, scope);
+    const scopeAndLevelText = comptime formatScopeAndLevel(message_level, scope);
     writer.writeAll(scopeAndLevelText) catch unreachable;
 
     const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n') format else format ++ "\n";
@@ -149,7 +151,7 @@ const level: Level = blk: {
     // TODO: Once the kernel matures use per mode logging levels https://github.com/CascadeOS/CascadeOS/issues/19
     if (true) break :blk .info;
 
-    break :blk switch (kernel.info.mode) {
+    break :blk switch (info.mode) {
         .Debug => .info,
         .ReleaseSafe => .warn,
         .ReleaseFast, .ReleaseSmall => .err,

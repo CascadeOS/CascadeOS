@@ -3,14 +3,17 @@
 // The specification used is "Intel® 64 and IA-32 Architectures Software Developer's Manual Volume 2A March 2023"
 // TODO: implement any stuff in the AMD manual that is not in the Intel manual as well https://github.com/CascadeOS/CascadeOS/issues/29
 
-const std = @import("std");
+const arch_info = x86_64.arch_info;
 const core = @import("core");
+const info = kernel.info;
 const kernel = @import("kernel");
+const registers = x86_64.registers;
+const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
 const log = kernel.log.scoped(.cpuid);
 
-pub fn capture() linksection(kernel.info.init_code) void {
+pub fn capture() linksection(info.init_code) void {
     if (!isCPUIDAvailable()) core.panic("cpuid is not supported");
 
     const cpuid_leaf_0 = raw_cpuid(0x0, 0);
@@ -25,13 +28,13 @@ pub fn capture() linksection(kernel.info.init_code) void {
     handleSimpleLeafs(max_standard_leaf, max_extended_leaf);
 }
 
-const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.init_data) = &.{
+const simple_leaf_handlers: []const SimpleLeafHandler linksection(info.init_data) = &.{
     .{
         .leaf = .{ .type = .extended, .value = 0x80000001 },
         .handlers = &.{
-            .{ .name = "syscall", .register = .edx, .mask_bit = 11, .target = &x86_64.info.has_syscall },
-            .{ .name = "execute disable", .register = .edx, .mask_bit = 20, .target = &x86_64.info.has_execute_disable },
-            .{ .name = "1 GiB large pages", .register = .edx, .mask_bit = 26, .target = &x86_64.info.has_gib_pages },
+            .{ .name = "syscall", .register = .edx, .mask_bit = 11, .target = &arch_info.has_syscall },
+            .{ .name = "execute disable", .register = .edx, .mask_bit = 20, .target = &arch_info.has_execute_disable },
+            .{ .name = "1 GiB large pages", .register = .edx, .mask_bit = 26, .target = &arch_info.has_gib_pages },
             .{ .name = "rdtscp", .register = .edx, .mask_bit = 27 },
             .{ .name = "64-bit", .register = .edx, .mask_bit = 29 },
         },
@@ -41,7 +44,7 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
 /// Handles simple CPUID leaves.
 ///
 /// Loops through the `simple_leaf_handlers` performing the declared actions for each handler.
-fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection(kernel.info.init_code) void {
+fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection(info.init_code) void {
     // TODO: use `continue` instead of `break :blk` https://github.com/CascadeOS/CascadeOS/issues/55
     // we use a little trick here, the `blk:` below is not on the loop so breaking to that label
     // does not end the loop but instead starts the next iteration.
@@ -116,14 +119,14 @@ const SimpleLeafHandler = struct {
     };
 };
 
-fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
-    const orig_rflags = x86_64.registers.RFlags.read();
+fn isCPUIDAvailable() linksection(info.init_code) bool {
+    const orig_rflags = registers.RFlags.read();
     var modified_rflags = orig_rflags;
 
     modified_rflags.id = !modified_rflags.id;
     modified_rflags.write();
 
-    const new_rflags = x86_64.registers.RFlags.read();
+    const new_rflags = registers.RFlags.read();
 
     return orig_rflags.id != new_rflags.id;
 }

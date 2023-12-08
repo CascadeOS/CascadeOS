@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const info = kernel.info;
 const kernel = @import("kernel");
+const std = @import("std");
+const Tss = x86_64.Tss;
 const x86_64 = @import("x86_64.zig");
 
 /// The Global Descriptor Table for x86_64.
@@ -28,7 +30,7 @@ pub const Gdt = extern struct {
     const mask_u16: u64 = std.math.maxInt(u16);
     const mask_u24: u64 = std.math.maxInt(u24);
 
-    pub fn setTss(self: *Gdt, tss: *x86_64.Tss) linksection(kernel.info.init_code) void {
+    pub fn setTss(self: *Gdt, tss: *Tss) linksection(info.init_code) void {
         // TODO: packed struct to represent the below
 
         const tss_ptr = @intFromPtr(tss);
@@ -42,7 +44,7 @@ pub const Gdt = extern struct {
 
         const available_64_bit_tss: u64 = 0b1001 << 40;
 
-        const limit: u64 = (@sizeOf(x86_64.Tss) - 1) & mask_u16;
+        const limit: u64 = (@sizeOf(Tss) - 1) & mask_u16;
 
         self.descriptors[5] = low_base | mid_base | limit | present | available_64_bit_tss;
         self.descriptors[6] = high_base;
@@ -54,7 +56,7 @@ pub const Gdt = extern struct {
         );
     }
 
-    pub fn load(self: *Gdt) linksection(kernel.info.init_code) void {
+    pub fn load(self: *Gdt) linksection(info.init_code) void {
         const gdt_ptr = Gdtr{
             .limit = @sizeOf(Gdt) - 1,
             .base = @intFromPtr(self),

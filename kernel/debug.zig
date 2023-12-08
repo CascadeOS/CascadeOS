@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
+const info = kernel.info;
 const kernel = @import("kernel");
-
+const SpinLock = kernel.SpinLock;
+const std = @import("std");
 const symbols = @import("debug/symbols.zig");
 
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
@@ -15,13 +17,13 @@ pub fn panic(
     return_address_opt: ?usize,
 ) noreturn {
     @setCold(true);
-    kernel.arch.interrupts.disableInterrupts();
+    arch.interrupts.disableInterrupts();
 
     const return_address = return_address_opt orelse @returnAddress();
 
     panic_impl(msg, stack_trace, return_address);
 
-    kernel.arch.interrupts.disableInterruptsAndHalt();
+    arch.interrupts.disableInterruptsAndHalt();
 }
 
 /// Panic implementation used when the kernel is fully initialized and running.
@@ -71,7 +73,7 @@ const indent = "  ";
 fn printSourceAtAddress(writer: anytype, address: usize) void {
     if (address == 0) return;
 
-    if (address < kernel.arch.paging.higher_half.value) {
+    if (address < arch.paging.higher_half.value) {
         writer.writeAll(comptime indent ++ "0x") catch unreachable;
         std.fmt.formatInt(
             address,
@@ -85,7 +87,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
     }
 
     var kernel_virtual_slide_is_null: bool = false;
-    const kernel_virtual_slide = if (kernel.info.kernel_virtual_slide) |slide| slide.bytes else blk: {
+    const kernel_virtual_slide = if (info.kernel_virtual_slide) |slide| slide.bytes else blk: {
         kernel_virtual_slide_is_null = true;
         break :blk 0;
     };
@@ -299,7 +301,7 @@ fn printErrorAndCurrentStackTrace(writer: anytype, stack_trace: ?*const std.buil
 }
 
 pub const init = struct {
-    var panic_lock: kernel.SpinLock = .{}; // TODO: Put in init_data section
+    var panic_lock: SpinLock = .{}; // TODO: Put in init_data section
 
     /// Panic implementation used before the kernel is fully initialized and running.
     fn earlyPanicImpl(
@@ -307,9 +309,9 @@ pub const init = struct {
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void { // TODO: Put in init_code section
-        const writer = kernel.arch.init.getEarlyOutputWriter() orelse return;
+        const writer = arch.init.getEarlyOutputWriter() orelse return;
 
-        const processor = kernel.arch.earlyGetProcessor() orelse {
+        const processor = arch.earlyGetProcessor() orelse {
             // Somehow we have panicked before we have loaded a processor.
             // As we have not acquired the panic lock we might clobber another processors output but we don't have a choice.
 

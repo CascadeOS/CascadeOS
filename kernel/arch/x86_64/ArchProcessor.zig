@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const Gdt = x86_64.Gdt;
 const kernel = @import("kernel");
+const Stack = kernel.Stack;
+const std = @import("std");
+const Tss = x86_64.Tss;
 const x86_64 = @import("x86_64.zig");
 
-gdt: x86_64.Gdt = .{},
-tss: x86_64.Tss = .{},
+gdt: Gdt = .{},
+tss: Tss = .{},
 
-double_fault_stack: kernel.Stack,
-non_maskable_interrupt_stack: kernel.Stack,
+double_fault_stack: Stack,
+non_maskable_interrupt_stack: Stack,

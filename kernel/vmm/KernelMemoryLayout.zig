@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const std = @import("std");
+const VirtualRange = kernel.VirtualRange;
 
 const KernelMemoryLayout = @This();
 
@@ -25,7 +26,7 @@ fn sortKernelMemoryLayout(self: *KernelMemoryLayout) void {
 }
 
 pub const KernelMemoryRegion = struct {
-    range: kernel.VirtualRange,
+    range: VirtualRange,
     type: Type,
 
     pub const Type = enum {

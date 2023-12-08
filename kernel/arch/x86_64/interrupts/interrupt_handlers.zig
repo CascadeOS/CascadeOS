@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
-const kernel = @import("kernel");
-const x86_64 = @import("../x86_64.zig");
-
-const interrupts = @import("interrupts.zig");
 const InterruptFrame = interrupts.InterruptFrame;
+const interrupts = @import("interrupts.zig");
+const kernel = @import("kernel");
+const std = @import("std");
+const x86_64 = @import("../x86_64.zig");
 
 const log = kernel.log.scoped(.interrupts);
 

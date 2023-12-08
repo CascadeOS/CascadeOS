@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const PrivilegeLevel = x86_64.PrivilegeLevel;
+const std = @import("std");
 const x86_64 = @import("../x86_64.zig");
 
 const Idt = @This();
@@ -42,7 +43,7 @@ pub const Entry = extern struct {
         /// Defines the privilege levels which are allowed to access this interrupt via the INT instruction.
         ///
         /// Hardware interrupts ignore this mechanism.
-        privilege_level: x86_64.PrivilegeLevel = .kernel,
+        privilege_level: PrivilegeLevel = .kernel,
 
         present: bool,
 

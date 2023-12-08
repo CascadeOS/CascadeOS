@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
-const kernel = @import("kernel");
-
 const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
+const info = kernel.info;
+const kernel = @import("kernel");
+const SpinLock = kernel.SpinLock;
+const std = @import("std");
 
 var symbols_loaded: bool = false;
 var symbol_loading_failed: bool = false;
 
-var symbol_loading_spinlock: kernel.SpinLock = .{};
+var symbol_loading_spinlock: SpinLock = .{};
 
 var dwarf_symbol_map_opt: ?DwarfSymbolMap = null;
 
@@ -18,7 +20,7 @@ pub fn loadSymbols() void {
     if (@atomicLoad(bool, &symbol_loading_failed, .Acquire)) return;
 
     // If the processor has not yet been initialized, we can't acquire the spinlock.
-    if (kernel.arch.earlyGetProcessor() == null) return;
+    if (arch.earlyGetProcessor() == null) return;
 
     const held = symbol_loading_spinlock.lock();
     defer held.unlock();
@@ -28,7 +30,7 @@ pub fn loadSymbols() void {
 
     // DWARF
     dwarf: {
-        const kernel_file = kernel.info.kernel_file orelse break :dwarf;
+        const kernel_file = info.kernel_file orelse break :dwarf;
         const kernel_file_slice = kernel_file.toSlice(u8) catch break :dwarf;
 
         if (DwarfSymbolMap.init(kernel_file_slice)) |dwarf_symbol_map| {

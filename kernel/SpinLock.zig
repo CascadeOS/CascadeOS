@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
+const Processor = kernel.Processor;
+const std = @import("std");
 
 const SpinLock = @This();
 
@@ -17,10 +19,10 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
-        core.debugAssert(@intFromEnum(kernel.Processor.get().id) + 1 == self.spinlock._processor_plus_one);
+        core.debugAssert(@intFromEnum(Processor.get().id) + 1 == self.spinlock._processor_plus_one);
 
         @atomicStore(usize, &self.spinlock._processor_plus_one, 0, .Release);
-        if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
+        if (self.interrupts_enabled) arch.interrupts.enableInterrupts();
     }
 };
 
@@ -29,10 +31,10 @@ pub fn unsafeUnlock(self: *SpinLock) void {
 }
 
 pub fn lock(self: *SpinLock) Held {
-    const interrupts_enabled = kernel.arch.interrupts.interruptsEnabled();
-    if (interrupts_enabled) kernel.arch.interrupts.disableInterrupts();
+    const interrupts_enabled = arch.interrupts.interruptsEnabled();
+    if (interrupts_enabled) arch.interrupts.disableInterrupts();
 
-    const processor = kernel.Processor.get();
+    const processor = Processor.get();
 
     const processor_id_plus_one = @intFromEnum(processor.id) + 1;
 
@@ -45,7 +47,7 @@ pub fn lock(self: *SpinLock) Held {
             .AcqRel,
             .Acquire,
         )) |_| {
-            kernel.arch.spinLoopHint();
+            arch.spinLoopHint();
             continue;
         }
 

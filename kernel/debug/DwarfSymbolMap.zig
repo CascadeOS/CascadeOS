@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
-const kernel = @import("kernel");
-
-const elf = std.elf;
 const DW = std.dwarf;
-
+const elf = std.elf;
+const info = kernel.info;
+const kernel = @import("kernel");
+const std = @import("std");
 const symbols = @import("symbols.zig");
 
 const DwarfSymbolMap = @This();
@@ -151,8 +150,8 @@ pub fn getSymbol(self: *DwarfSymbolMap, address: usize) ?symbols.Symbol {
 /// Returns the original path if it does not start with the root path.
 pub fn removeRootPrefixFromPath(path: []const u8) []const u8 {
     // things like `memset` and `memcopy` won't be under the ROOT_PATH
-    if (std.mem.startsWith(u8, path, kernel.info.root_path)) {
-        return path[(kernel.info.root_path.len)..];
+    if (std.mem.startsWith(u8, path, info.root_path)) {
+        return path[(info.root_path.len)..];
     }
 
     return path;

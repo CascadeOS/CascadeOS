@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const PhysicalAddress = kernel.PhysicalAddress;
+const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
 pub const RFlags = packed struct(u64) {
@@ -152,14 +153,14 @@ pub const Cr0 = packed struct(u64) {
 
 pub const Cr3 = struct {
     /// Reads the CR3 register and returns the page table address.
-    pub inline fn readAddress() kernel.PhysicalAddress {
-        return kernel.PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
+    pub inline fn readAddress() PhysicalAddress {
+        return PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
             : [value] "=r" (-> u64),
         ) & 0xFFFF_FFFF_FFFF_F000);
     }
 
     /// Writes the CR3 register with the given page table address.
-    pub inline fn writeAddress(address: kernel.PhysicalAddress) void {
+    pub inline fn writeAddress(address: PhysicalAddress) void {
         asm volatile ("mov %[address], %%cr3"
             :
             : [address] "r" (address.value & 0xFFFF_FFFF_FFFF_F000),

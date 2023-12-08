@@ -2,32 +2,39 @@
 
 //! Represents a kernel stack.
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
+const heap = kernel.heap;
+const info = kernel.info;
 const kernel = @import("kernel");
+const SpinLock = kernel.SpinLock;
+const std = @import("std");
+const VirtualAddress = kernel.VirtualAddress;
+const VirtualRange = kernel.VirtualRange;
+const vmm = kernel.vmm;
 
 const Stack = @This();
 
-pub const usable_stack_size = kernel.arch.paging.standard_page_size.multiply(16);
+pub const usable_stack_size = arch.paging.standard_page_size.multiply(16);
 
 /// The size of the stack including the guard page.
 ///
 /// Only one guard page is used and it is placed at the bottom of the stack to catch overflows.
 /// The guard page for the next stack in memory is immediately after our stack top so acts as our guard page to catch underflows.
-const stack_size_with_guard_page = usable_stack_size.add(kernel.arch.paging.standard_page_size);
+const stack_size_with_guard_page = usable_stack_size.add(arch.paging.standard_page_size);
 
-var stacks_range_allocator: kernel.heap.RangeAllocator = undefined;
-var stacks_range_allocator_lock: kernel.SpinLock = .{};
+var stacks_range_allocator: heap.RangeAllocator = undefined;
+var stacks_range_allocator_lock: SpinLock = .{};
 
 /// The entire virtual range including the guard page.
-range: kernel.VirtualRange,
+range: VirtualRange,
 
 /// The usable range excluding the guard page.
-usable_range: kernel.VirtualRange,
+usable_range: VirtualRange,
 
-stack_pointer: kernel.VirtualAddress,
+stack_pointer: VirtualAddress,
 
-pub fn fromRangeNoGuard(range: kernel.VirtualRange) Stack {
+pub fn fromRangeNoGuard(range: VirtualRange) Stack {
     return Stack{
         .range = range,
         .usable_range = range,
@@ -35,7 +42,7 @@ pub fn fromRangeNoGuard(range: kernel.VirtualRange) Stack {
     };
 }
 
-pub fn fromRangeWithGuard(range: kernel.VirtualRange, usable_range: kernel.VirtualRange) Stack {
+pub fn fromRangeWithGuard(range: VirtualRange, usable_range: VirtualRange) Stack {
     core.debugAssert(range.containsRange(usable_range));
 
     return Stack{
@@ -63,20 +70,20 @@ pub fn create(push_null_return_value: bool) !Stack {
     }
 
     // Don't map the guard page.
-    var usable_range = virtual_range.moveForward(kernel.arch.paging.standard_page_size);
-    usable_range.size.subtractInPlace(kernel.arch.paging.standard_page_size);
+    var usable_range = virtual_range.moveForward(arch.paging.standard_page_size);
+    usable_range.size.subtractInPlace(arch.paging.standard_page_size);
 
-    try kernel.vmm.mapRange(
-        kernel.vmm.kernel_page_table,
+    try vmm.mapRange(
+        vmm.kernel_page_table,
         usable_range,
         .{ .global = true, .writeable = true },
     );
-    errdefer kernel.vmm.unmap(kernel.vmm.kernel_page_table, usable_range);
+    errdefer vmm.unmap(vmm.kernel_page_table, usable_range);
 
     var stack = fromRangeWithGuard(virtual_range, usable_range);
 
     if (push_null_return_value) {
-        try stack.pushReturnAddress(kernel.VirtualAddress.zero);
+        try stack.pushReturnAddress(VirtualAddress.zero);
     }
 
     return stack;
@@ -87,21 +94,21 @@ pub fn create(push_null_return_value: bool) !Stack {
 /// **REQUIREMENTS**:
 /// - `stack` must have been created with `create`.
 pub fn destroy(stack: Stack) void {
-    kernel.vmm.unmap(kernel.root_page_table, stack.usable_range);
+    vmm.unmap(kernel.root_page_table, stack.usable_range);
 
     // TODO: Cache needs to be flushed on this core and others.
 }
 
 pub const init = struct {
-    pub fn initStacks(kernel_stacks_range: kernel.VirtualRange) linksection(kernel.info.init_code) !void {
-        stacks_range_allocator = try kernel.heap.RangeAllocator.init(kernel_stacks_range);
+    pub fn initStacks(kernel_stacks_range: VirtualRange) linksection(info.init_code) !void {
+        stacks_range_allocator = try heap.RangeAllocator.init(kernel_stacks_range);
     }
 };
 
 pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
     const T = @TypeOf(value);
 
-    const new_stack_pointer: kernel.VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
+    const new_stack_pointer: VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
     stack.stack_pointer = new_stack_pointer;
@@ -111,7 +118,7 @@ pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
 }
 
 pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
-    const new_stack_pointer: kernel.VirtualAddress = stack.stack_pointer.alignBackward(alignment);
+    const new_stack_pointer: VirtualAddress = stack.stack_pointer.alignBackward(alignment);
 
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
@@ -120,7 +127,7 @@ pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
 
 const RETURN_ADDRESS_ALIGNMENT = core.Size.from(16, .byte);
 
-pub fn pushReturnAddress(stack: *Stack, return_address: kernel.VirtualAddress) error{StackOverflow}!void {
+pub fn pushReturnAddress(stack: *Stack, return_address: VirtualAddress) error{StackOverflow}!void {
     const old_stack_pointer = stack.stack_pointer;
 
     try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?

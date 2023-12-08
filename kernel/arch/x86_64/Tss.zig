@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const interrupts = x86_64.interrupts;
+const InterruptStackSelector = interrupts.InterruptStackSelector;
 const kernel = @import("kernel");
+const PrivilegeLevel = x86_64.PrivilegeLevel;
+const Stack = kernel.Stack;
+const std = @import("std");
+const VirtualAddress = kernel.VirtualAddress;
 const x86_64 = @import("x86_64.zig");
-
-const InterruptStackSelector = x86_64.interrupts.InterruptStackSelector;
 
 /// The x86_64 Task State Segment structure.
 pub const Tss = extern struct {
     _reserved_1: u32 align(1) = 0,
 
     /// Stack pointers (RSP) for privilege levels 0-2.
-    privilege_stack_table: [3]kernel.VirtualAddress align(1) = [_]kernel.VirtualAddress{kernel.VirtualAddress.zero} ** 3,
+    privilege_stack_table: [3]VirtualAddress align(1) = [_]VirtualAddress{VirtualAddress.zero} ** 3,
 
     _reserved_2: u64 align(1) = 0,
 
     /// Interrupt stack table (IST) pointers.
-    interrupt_stack_table: [7]kernel.VirtualAddress align(1) = [_]kernel.VirtualAddress{kernel.VirtualAddress.zero} ** 7,
+    interrupt_stack_table: [7]VirtualAddress align(1) = [_]VirtualAddress{VirtualAddress.zero} ** 7,
 
     _reserved_3: u64 align(1) = 0,
 
@@ -27,12 +30,12 @@ pub const Tss = extern struct {
     iomap_base: u16 align(1) = 0,
 
     /// Sets the stack for the given stack selector.
-    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: kernel.Stack) void {
+    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: Stack) void {
         self.interrupt_stack_table[@intFromEnum(stack_selector)] = stack.stack_pointer;
     }
 
     /// Sets the stack for the given privilege level.
-    pub fn setPrivilegeStack(self: *Tss, privilege_level: x86_64.PrivilegeLevel, stack: kernel.Stack) void {
+    pub fn setPrivilegeStack(self: *Tss, privilege_level: PrivilegeLevel, stack: Stack) void {
         core.assert(privilege_level != .user);
         self.privilege_stack_table[@intFromEnum(privilege_level)] = stack.stack_pointer;
     }

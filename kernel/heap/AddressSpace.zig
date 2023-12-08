@@ -1,35 +1,37 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const arch = kernel.arch;
 const containers = @import("containers");
 const core = @import("core");
+const heap = kernel.heap;
 const kernel = @import("kernel");
-
-const MemoryRegion = kernel.vmm.MemoryRegion;
-
-const RedBlack = containers.RedBlack;
+const MemoryRegion = vmm.MemoryRegion;
 const MemoryRegionRedBlackTree = RedBlack.Tree(memoryRegionAddressCompare);
+const RedBlack = containers.RedBlack;
+const std = @import("std");
+const VirtualRange = kernel.VirtualRange;
+const vmm = kernel.vmm;
 
-var memory_region_pool: kernel.heap.DirectObjectPool(MemoryRegionWithNode, .memory_region_pool) = .{};
+var memory_region_pool: heap.DirectObjectPool(MemoryRegionWithNode, .memory_region_pool) = .{};
 
 const AddressSpace = @This();
 
-range_allocator: kernel.heap.RangeAllocator = .{},
+range_allocator: heap.RangeAllocator = .{},
 memory_region_tree: MemoryRegionRedBlackTree = .{},
 
 /// Initialize an address space.
 ///
 /// **REQUIREMENTS**:
 /// - size of `total_range` must be non-zero
-/// - address of `total_range` must be aligned to `kernel.arch.paging.standard_page_size`
-/// - size of `total_range` must be aligned to `kernel.arch.paging.standard_page_size`
-pub fn init(total_range: kernel.VirtualRange) error{OutOfMemory}!AddressSpace {
+/// - address of `total_range` must be aligned to `arch.paging.standard_page_size`
+/// - size of `total_range` must be aligned to `arch.paging.standard_page_size`
+pub fn init(total_range: VirtualRange) error{OutOfMemory}!AddressSpace {
     core.assert(total_range.size.bytes != 0);
-    core.assert(total_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.assert(total_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.assert(total_range.address.isAligned(arch.paging.standard_page_size));
+    core.assert(total_range.size.isAligned(arch.paging.standard_page_size));
 
     return .{
-        .range_allocator = try kernel.heap.RangeAllocator.init(total_range),
+        .range_allocator = try heap.RangeAllocator.init(total_range),
     };
 }
 
@@ -45,10 +47,10 @@ pub const AllocateError = error{
 ///
 /// **REQUIREMENTS**:
 /// - `size` must be non-zero
-/// - `size` must be aligned to `kernel.arch.paging.standard_page_size`
-pub fn allocate(self: *AddressSpace, size: core.Size, map_type: kernel.vmm.MapType) AllocateError!kernel.VirtualRange {
+/// - `size` must be aligned to `arch.paging.standard_page_size`
+pub fn allocate(self: *AddressSpace, size: core.Size, map_type: vmm.MapType) AllocateError!VirtualRange {
     core.assert(size.bytes != 0);
-    core.assert(size.isAligned(kernel.arch.paging.standard_page_size));
+    core.assert(size.isAligned(arch.paging.standard_page_size));
 
     const virtual_range = self.range_allocator.allocateRange(size) catch return error.AddressSpaceExhausted;
     errdefer self.range_allocator.deallocateRange(virtual_range) catch {
@@ -66,12 +68,12 @@ pub fn allocate(self: *AddressSpace, size: core.Size, map_type: kernel.vmm.MapTy
 /// **REQUIREMENTS**:
 /// - `range` must have been previously allocated by this address space, it can be a sub-range of a previously allocated range
 /// - size of `range` must be non-zero
-/// - address of `range` must be aligned to `kernel.arch.paging.standard_page_size`
-/// - size of `range` must be aligned to `kernel.arch.paging.standard_page_size`
-pub fn deallocate(self: *AddressSpace, range: kernel.VirtualRange) void {
+/// - address of `range` must be aligned to `arch.paging.standard_page_size`
+/// - size of `range` must be aligned to `arch.paging.standard_page_size`
+pub fn deallocate(self: *AddressSpace, range: VirtualRange) void {
     core.assert(range.size.bytes != 0);
-    core.assert(range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.assert(range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.assert(range.address.isAligned(arch.paging.standard_page_size));
+    core.assert(range.size.isAligned(arch.paging.standard_page_size));
 
     // TODO: support failure below, we need to have a way to rollback the changes from `allocateVirtualRange`
 
@@ -156,7 +158,7 @@ fn allocateMemoryRegion(
 }
 
 /// !WARNING: this function will panic if the range is not contained in any memory region
-fn deallocateMemoryRegion(self: *AddressSpace, range: kernel.VirtualRange) error{OutOfMemory}!void {
+fn deallocateMemoryRegion(self: *AddressSpace, range: VirtualRange) error{OutOfMemory}!void {
     // find a memory region that contains the range
     const matching_region_node = self.memory_region_tree.findFirstMatch(range, memoryRegionContainsRangeCompare) orelse {
         core.panic("no matching memory region found");
@@ -201,7 +203,7 @@ fn deallocateMemoryRegion(self: *AddressSpace, range: kernel.VirtualRange) error
 
     proceeding_region_with_node.* = .{
         .memory_region = .{
-            .range = kernel.VirtualRange.fromAddr(
+            .range = VirtualRange.fromAddr(
                 range.end(),
                 core.Size.from(matching_region.memory_region.range.end().value - range.end().value, .byte),
             ),
@@ -262,7 +264,7 @@ fn memoryRegionAddressCompare(node: *const RedBlack.Node, other_node: *const Red
     return memory_region.range.address.compare(other_memory_region.range.address);
 }
 
-fn memoryRegionContainsRangeCompare(range: kernel.VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
+fn memoryRegionContainsRangeCompare(range: VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_range = MemoryRegionWithNode.fromNodeConst(other_node).memory_region.range;
 
     if (range.address.lessThan(other_range.address)) return .less;

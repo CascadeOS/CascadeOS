@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const aarch64 = @import("aarch64.zig");
 const core = @import("core");
 const kernel = @import("kernel");
-const aarch64 = @import("aarch64.zig");
+const std = @import("std");
 
 const Uart = @This();
 

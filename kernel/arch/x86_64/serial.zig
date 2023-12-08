@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const instructions = x86_64.instructions;
 const kernel = @import("kernel");
+const portReadU8 = instructions.portReadU8;
+const portWriteU8 = instructions.portWriteU8;
+const std = @import("std");
 const x86_64 = @import("x86_64.zig");
-
-const portReadU8 = x86_64.instructions.portReadU8;
-const portWriteU8 = x86_64.instructions.portWriteU8;
 
 const OUTPUT_READY: u8 = 1 << 5;
 
@@ -51,7 +51,7 @@ pub const SerialPort = struct {
 
     fn waitForOutputReady(self: SerialPort) void {
         while (portReadU8(self._line_status_port) & OUTPUT_READY == 0) {
-            x86_64.instructions.pause();
+            instructions.pause();
         }
     }
 

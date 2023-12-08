@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const info = kernel.info;
 const kernel = @import("kernel");
+const PhysicalRange = kernel.PhysicalRange;
+const Processor = kernel.Processor;
+const Stack = kernel.Stack;
+const std = @import("std");
+const VirtualAddress = kernel.VirtualAddress;
+const VirtualRange = kernel.VirtualRange;
+const vmm = kernel.vmm;
 
-const current = switch (kernel.info.arch) {
+const current = switch (info.arch) {
     .x86_64 => @import("arch/x86_64/x86_64.zig"),
     .aarch64 => @import("arch/aarch64/aarch64.zig"),
 };
@@ -22,8 +29,8 @@ pub const ArchProcessor = current.ArchProcessor;
 /// Get the current processor.
 ///
 /// Panics if interrupts are enabled.
-pub inline fn getProcessor() *kernel.Processor {
-    checkSupport(current, "getProcessor", fn () *kernel.Processor);
+pub inline fn getProcessor() *Processor {
+    checkSupport(current, "getProcessor", fn () *Processor);
 
     core.debugAssert(!interrupts.interruptsEnabled());
 
@@ -33,8 +40,8 @@ pub inline fn getProcessor() *kernel.Processor {
 /// Get the current processor, supports returning null for early boot before the processor is set.
 ///
 /// Panics if interrupts are enabled.
-pub inline fn earlyGetProcessor() ?*kernel.Processor {
-    checkSupport(current, "earlyGetProcessor", fn () ?*kernel.Processor);
+pub inline fn earlyGetProcessor() ?*Processor {
+    checkSupport(current, "earlyGetProcessor", fn () ?*Processor);
 
     core.debugAssert(!interrupts.interruptsEnabled());
 
@@ -44,8 +51,8 @@ pub inline fn earlyGetProcessor() ?*kernel.Processor {
 /// Begins executing the provided function on the provided stack.
 ///
 /// It is the callers responsibility to push a dummy return address if it is requried.
-pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noreturn) error{StackOverflow}!noreturn {
-    checkSupport(current, "jumpTo", fn (*kernel.Stack, *const fn () noreturn) error{StackOverflow}!noreturn);
+pub inline fn jumpTo(stack: *Stack, target_function: *const fn () noreturn) error{StackOverflow}!noreturn {
+    checkSupport(current, "jumpTo", fn (*Stack, *const fn () noreturn) error{StackOverflow}!noreturn);
 
     try current.jumpTo(stack, target_function);
 }
@@ -53,8 +60,8 @@ pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noretur
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
     /// Prepares the provided Processor for the bootstrap processor.
-    pub inline fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
-        checkSupport(current.init, "prepareBootstrapProcessor", fn (*kernel.Processor) void);
+    pub inline fn prepareBootstrapProcessor(bootstrap_processor: *Processor) void {
+        checkSupport(current.init, "prepareBootstrapProcessor", fn (*Processor) void);
 
         current.init.prepareBootstrapProcessor(bootstrap_processor);
     }
@@ -62,15 +69,15 @@ pub const init = struct {
     /// Prepares the provided Processor for use.
     ///
     /// **WARNING**: This function will panic if the processor cannot be prepared.
-    pub inline fn prepareProcessor(processor: *kernel.Processor) void {
-        checkSupport(current.init, "prepareProcessor", fn (*kernel.Processor) void);
+    pub inline fn prepareProcessor(processor: *Processor) void {
+        checkSupport(current.init, "prepareProcessor", fn (*Processor) void);
 
         current.init.prepareProcessor(processor);
     }
 
     /// Performs any actions required to load the provided Processor for the current execution context.
-    pub inline fn loadProcessor(processor: *kernel.Processor) void {
-        checkSupport(current.init, "loadProcessor", fn (*kernel.Processor) void);
+    pub inline fn loadProcessor(processor: *Processor) void {
+        checkSupport(current.init, "loadProcessor", fn (*Processor) void);
 
         current.init.loadProcessor(processor);
     }
@@ -182,7 +189,7 @@ pub const paging = struct {
     }
 
     /// The virtual address of the higher half.
-    pub const higher_half: kernel.VirtualAddress = current.paging.higher_half;
+    pub const higher_half: VirtualAddress = current.paging.higher_half;
 
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
@@ -199,8 +206,8 @@ pub const paging = struct {
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
     ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
-    pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
-        checkSupport(current.paging, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!kernel.VirtualRange);
+    pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!VirtualRange {
+        checkSupport(current.paging, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!VirtualRange);
 
         // TODO: randomize location of the heap/stacks https://github.com/CascadeOS/CascadeOS/issues/56
         // the chance that the heap will occupy the the very first higher half table is very high
@@ -219,15 +226,15 @@ pub const paging = struct {
     /// This function will only use the architecture's `standard_page_size`.
     pub inline fn mapToPhysicalRange(
         page_table: *PageTable,
-        virtual_range: kernel.VirtualRange,
-        physical_range: kernel.PhysicalRange,
-        map_type: kernel.vmm.MapType,
+        virtual_range: VirtualRange,
+        physical_range: PhysicalRange,
+        map_type: vmm.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
-            kernel.VirtualRange,
-            kernel.PhysicalRange,
-            kernel.vmm.MapType,
+            VirtualRange,
+            PhysicalRange,
+            vmm.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
@@ -238,9 +245,9 @@ pub const paging = struct {
     /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
     pub fn unmap(
         page_table: *PageTable,
-        virtual_range: kernel.VirtualRange,
+        virtual_range: VirtualRange,
     ) void {
-        checkSupport(current.paging, "unmap", fn (*PageTable, kernel.VirtualRange) void);
+        checkSupport(current.paging, "unmap", fn (*PageTable, VirtualRange) void);
 
         current.paging.unmap(page_table, virtual_range);
     }
@@ -250,15 +257,15 @@ pub const paging = struct {
     /// This function is allowed to use all page sizes available to the architecture.
     pub inline fn mapToPhysicalRangeAllPageSizes(
         page_table: *PageTable,
-        virtual_range: kernel.VirtualRange,
-        physical_range: kernel.PhysicalRange,
-        map_type: kernel.vmm.MapType,
+        virtual_range: VirtualRange,
+        physical_range: PhysicalRange,
+        map_type: vmm.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
             *PageTable,
-            kernel.VirtualRange,
-            kernel.PhysicalRange,
-            kernel.vmm.MapType,
+            VirtualRange,
+            PhysicalRange,
+            vmm.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
@@ -281,7 +288,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        core.panic("`" ++ @tagName(kernel.info.arch) ++ "` does not implement `" ++ name ++ "`");
+        core.panic("`" ++ @tagName(info.arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));

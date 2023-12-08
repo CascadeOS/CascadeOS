@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
-const core = @import("core");
-const kernel = @import("kernel");
-
 const arch = kernel.arch;
+const boot = kernel.boot;
+const core = @import("core");
+const info = kernel.info;
+const kernel = @import("kernel");
+const PhysicalRange = kernel.PhysicalRange;
+const pmm = kernel.pmm;
+const std = @import("std");
+const VirtualAddress = kernel.VirtualAddress;
 
 const log = kernel.log.scoped(.phys_mm);
 
@@ -15,7 +19,7 @@ var total_usable_memory: core.Size = core.Size.zero;
 var free_memory: core.Size = core.Size.zero;
 
 /// Allocates a physical page.
-pub fn allocatePage() ?kernel.PhysicalRange {
+pub fn allocatePage() ?PhysicalRange {
     var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Acquire);
 
     while (first_free_page_opt) |first_free_page| {
@@ -40,8 +44,8 @@ pub fn allocatePage() ?kernel.PhysicalRange {
             .AcqRel,
         );
 
-        const physical_address = kernel.VirtualAddress.fromPtr(first_free_page).toPhysicalFromDirectMap() catch unreachable;
-        const allocated_range = kernel.PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
+        const physical_address = VirtualAddress.fromPtr(first_free_page).toPhysicalFromDirectMap() catch unreachable;
+        const allocated_range = PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
 
         log.debug("allocated page: {}", .{allocated_range});
 
@@ -55,9 +59,9 @@ pub fn allocatePage() ?kernel.PhysicalRange {
 /// Deallocates a physical range.
 ///
 /// **REQUIREMENTS**:
-/// - `range.address` must be aligned to `kernel.arch.paging.standard_page_size`
-/// - `range.size` must be aligned to `kernel.arch.paging.standard_page_size`
-pub fn deallocateRange(range: kernel.PhysicalRange) void {
+/// - `range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `range.size` must be aligned to `arch.paging.standard_page_size`
+pub fn deallocateRange(range: PhysicalRange) void {
     core.debugAssert(range.address.isAligned(arch.paging.standard_page_size));
     core.debugAssert(range.size.isAligned(arch.paging.standard_page_size));
 
@@ -71,7 +75,7 @@ pub fn deallocateRange(range: kernel.PhysicalRange) void {
     // build up linked list
     const last_page_node = blk: {
         var current_virtual_address = range.address.toDirectMap();
-        const end_virtual_address: kernel.VirtualAddress = range.end().toDirectMap();
+        const end_virtual_address: VirtualAddress = range.end().toDirectMap();
 
         var previous: *PhysPageNode = first_page_node;
 
@@ -81,7 +85,7 @@ pub fn deallocateRange(range: kernel.PhysicalRange) void {
             previous.next = page_node;
             previous = page_node;
 
-            current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+            current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
         }
 
         break :blk previous;
@@ -93,9 +97,9 @@ pub fn deallocateRange(range: kernel.PhysicalRange) void {
 /// Deallocates a physical page.
 ///
 /// **REQUIREMENTS**:
-/// - `range.address` must be aligned to `kernel.arch.paging.standard_page_size`
-/// - `range.size` must be *equal* to `kernel.arch.paging.standard_page_size`
-pub fn deallocatePage(range: kernel.PhysicalRange) void {
+/// - `range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `range.size` must be *equal* to `arch.paging.standard_page_size`
+pub fn deallocatePage(range: PhysicalRange) void {
     core.debugAssert(range.address.isAligned(arch.paging.standard_page_size));
     core.debugAssert(range.size.equal(arch.paging.standard_page_size));
 
@@ -139,15 +143,15 @@ const PhysPageNode = extern struct {
     next: ?*PhysPageNode = null,
 
     comptime {
-        core.assert(core.Size.of(PhysPageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
+        core.assert(core.Size.of(PhysPageNode).lessThanOrEqual(arch.paging.standard_page_size));
     }
 };
 
 pub const init = struct {
     const indent = "  ";
 
-    pub fn initPmm() linksection(kernel.info.init_code) void {
-        var memory_map_iterator = kernel.boot.memoryMap(.forwards);
+    pub fn initPmm() linksection(info.init_code) void {
+        var memory_map_iterator = boot.memoryMap(.forwards);
 
         while (memory_map_iterator.next()) |memory_map_entry| {
             log.debug(comptime indent ++ "{}", .{memory_map_entry});
@@ -170,7 +174,7 @@ pub const init = struct {
     }
 
     pub fn reclaimBootloaderReclaimableMemory() void {
-        var memory_map_iterator = kernel.boot.memoryMap(.forwards);
+        var memory_map_iterator = boot.memoryMap(.forwards);
         while (memory_map_iterator.next()) |memory_map_entry| {
             if (memory_map_entry.type != .reclaimable) continue;
 
@@ -179,7 +183,7 @@ pub const init = struct {
     }
 
     /// Adds a memory map entry to the physical page allocator.
-    fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) linksection(kernel.info.init_code) void {
+    fn addMemoryMapEntryToAllocator(memory_map_entry: boot.MemoryMapEntry) linksection(info.init_code) void {
         if (!memory_map_entry.range.address.isAligned(arch.paging.standard_page_size)) {
             core.panicFmt("memory map entry address is not aligned to page size: {}", .{memory_map_entry});
         }
@@ -204,7 +208,7 @@ pub const init = struct {
         while (current_virtual_address.lessThan(end_virtual_address)) : ({
             current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
         }) {
-            const page = current_virtual_address.toPtr(*kernel.pmm.PhysPageNode);
+            const page = current_virtual_address.toPtr(*pmm.PhysPageNode);
             page.next = null;
             if (first_page_opt == null) {
                 first_page_opt = page;

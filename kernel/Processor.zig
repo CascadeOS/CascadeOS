@@ -4,12 +4,12 @@
 //!
 //! Even though this is called `Processor` it represents a single core in a multi-core system.
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
 const Stack = kernel.Stack;
 const std = @import("std");
-const Thread = kernel.Task.Thread;
+const Task = kernel.Task;
 
 /// The list of processors in the system.
 ///
@@ -25,21 +25,17 @@ panicked: bool = false,
 /// The stack used for idle.
 ///
 /// Also used during the move from the bootloader provided stack until we start scheduling.
-idle_stack: kernel.Stack,
+idle_stack: Stack,
 
 /// The currently running thread.
 ///
 /// This is set to `null` when the processor is idle and also before we start scheduling.
-current_thread: ?*Thread = null,
+current_task: ?*Task = null,
 
-_arch: kernel.arch.ArchProcessor,
+arch: arch.ArchProcessor,
 
 pub inline fn get() *Processor {
-    return kernel.arch.getProcessor();
-}
-
-pub inline fn arch(self: *Processor) *kernel.arch.ArchProcessor {
-    return &self._arch;
+    return arch.getProcessor();
 }
 
 pub const Id = enum(usize) {

@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
+const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
+const Stack = kernel.Stack;
+const std = @import("std");
 
 const Task = @This();
 
 id: Id,
 _name: Name,
 
-page_table: *kernel.arch.paging.PageTable,
+page_table: *arch.paging.PageTable,
 
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();
@@ -29,7 +31,7 @@ pub const Thread = struct {
 
     task: *kernel.Task,
 
-    kernel_stack: kernel.Stack,
+    kernel_stack: Stack,
 
     pub const Id = enum(usize) {
         _,

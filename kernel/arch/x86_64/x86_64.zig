@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const info = kernel.info;
 const kernel = @import("kernel");
+const Processor = kernel.Processor;
+const Stack = kernel.Stack;
+const std = @import("std");
+const VirtualAddress = kernel.VirtualAddress;
 
 comptime {
     // make sure any interrupt handlers are referenced
     _ = interrupts;
 }
 
+pub const arch_info = @import("arch_info.zig");
 pub const ArchProcessor = @import("ArchProcessor.zig");
 pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
-pub const info = @import("info.zig");
 pub const init = @import("init.zig");
 pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
@@ -21,11 +25,11 @@ pub const registers = @import("registers.zig");
 pub const serial = @import("serial.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
-pub inline fn getProcessor() *kernel.Processor {
+pub inline fn getProcessor() *Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
-pub inline fn earlyGetProcessor() ?*kernel.Processor {
+pub inline fn earlyGetProcessor() ?*Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
@@ -48,8 +52,8 @@ pub const spinLoopHint = instructions.pause;
 /// Begins executing the provided function on the provided stack.
 ///
 /// It is the callers responsibility to push a dummy return address if it is requried.
-pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noreturn) error{StackOverflow}!noreturn {
-    try stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(target_function));
+pub inline fn jumpTo(stack: *Stack, target_function: *const fn () noreturn) error{StackOverflow}!noreturn {
+    try stack.pushReturnAddress(VirtualAddress.fromPtr(target_function));
     asm volatile (
         \\  mov %[stack], %%rsp
         \\  ret
@@ -61,7 +65,7 @@ pub inline fn jumpTo(stack: *kernel.Stack, target_function: *const fn () noretur
 }
 
 comptime {
-    if (kernel.info.arch != .x86_64) {
-        @compileError("x86_64 implementation has been referenced when building " ++ @tagName(kernel.info.arch));
+    if (info.arch != .x86_64) {
+        @compileError("x86_64 implementation has been referenced when building " ++ @tagName(info.arch));
     }
 }

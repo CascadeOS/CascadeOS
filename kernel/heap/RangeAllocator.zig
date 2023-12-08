@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const containers = @import("containers");
 const core = @import("core");
+const heap = kernel.heap;
 const kernel = @import("kernel");
-
 const RedBlack = containers.RedBlack;
 const RegionAddressRedBlackTree = RedBlack.Tree(rangeAddressCompare);
 const RegionSizeRedBlackTree = RedBlack.Tree(rangeSizeCompare);
+const std = @import("std");
+const VirtualRange = kernel.VirtualRange;
 
-var range_pool: kernel.heap.DirectObjectPool(RangeWithNodes, .range_pool) = .{};
+var range_pool: heap.DirectObjectPool(RangeWithNodes, .range_pool) = .{};
 
 const RangeAllocator = @This();
 
@@ -20,7 +21,7 @@ range_size_tree: RegionSizeRedBlackTree = .{},
 ///
 /// **REQUIREMENTS**:
 /// - size of `total_range` must be non-zero
-pub fn init(total_range: kernel.VirtualRange) error{OutOfMemory}!RangeAllocator {
+pub fn init(total_range: VirtualRange) error{OutOfMemory}!RangeAllocator {
     core.assert(total_range.size.bytes != 0);
 
     const range_with_nodes = try range_pool.get();
@@ -38,7 +39,7 @@ pub fn init(total_range: kernel.VirtualRange) error{OutOfMemory}!RangeAllocator 
     return range_allocator;
 }
 
-pub fn allocateRange(self: *RangeAllocator, size: core.Size) error{RangeAllocatorExhausted}!kernel.VirtualRange {
+pub fn allocateRange(self: *RangeAllocator, size: core.Size) error{RangeAllocatorExhausted}!VirtualRange {
     // we use `findLastMatch` so we don't immediately grab the first large range we see when there are smaller ones
     // available, we prefer to continue searching in hopes of finding a range with an exact size match or as close as possible
     const matching_range_size_ordered_node = self.range_size_tree.findLastMatch(size, rangeSizeEqualOrGreater) orelse return error.RangeAllocatorExhausted;
@@ -65,10 +66,10 @@ pub fn allocateRange(self: *RangeAllocator, size: core.Size) error{RangeAllocato
         self.range_size_tree.insert(&matching_range_with_nodes.size_ordered_node) catch unreachable;
     }
 
-    return kernel.VirtualRange.fromAddr(address, size);
+    return VirtualRange.fromAddr(address, size);
 }
 
-pub fn deallocateRange(self: *RangeAllocator, range: kernel.VirtualRange) error{OutOfMemory}!void {
+pub fn deallocateRange(self: *RangeAllocator, range: VirtualRange) error{OutOfMemory}!void {
     // find pre-existing range that directly precedes the new range
     if (self.range_address_tree.findFirstMatch(range, rangeDirectlyFollowsCompare)) |matching_range_address_node| {
         // situation: |matching_range| |range|
@@ -164,7 +165,7 @@ pub fn deallocateRange(self: *RangeAllocator, range: kernel.VirtualRange) error{
 }
 
 const RangeWithNodes = struct {
-    range: kernel.VirtualRange,
+    range: VirtualRange,
 
     address_ordered_node: RedBlack.Node = .{},
     size_ordered_node: RedBlack.Node = .{},
@@ -215,7 +216,7 @@ fn rangeSizeEqualOrGreater(size: core.Size, other_node: *const RedBlack.Node) Re
     };
 }
 
-fn rangeDirectlyFollowsCompare(range: kernel.VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
+fn rangeDirectlyFollowsCompare(range: VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_range = RangeWithNodes.fromAddressNodeConst(other_node).range;
 
     const other_end = other_range.end();
@@ -225,7 +226,7 @@ fn rangeDirectlyFollowsCompare(range: kernel.VirtualRange, other_node: *const Re
     return if (range.address.lessThanOrEqual(other_range.address)) .less else .greater;
 }
 
-fn rangeDirectlyPrecedesCompare(range: kernel.VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
+fn rangeDirectlyPrecedesCompare(range: VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_range = RangeWithNodes.fromAddressNodeConst(other_node).range;
 
     const end = range.end();
