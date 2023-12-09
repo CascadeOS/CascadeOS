@@ -22,6 +22,7 @@ pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
 pub const paging = @import("paging/paging.zig");
 pub const registers = @import("registers.zig");
+pub const scheduling = @import("scheduling.zig");
 pub const serial = @import("serial.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
@@ -48,20 +49,6 @@ pub const PrivilegeLevel = enum(u2) {
 };
 
 pub const spinLoopHint = instructions.pause;
-
-/// Switches to the provided stack and returns.
-///
-/// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub inline fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
-    asm volatile (
-        \\  mov %[stack], %%rsp
-        \\  ret
-        :
-        : [stack] "rm" (stack_pointer.value),
-        : "memory", "stack"
-    );
-    unreachable;
-}
 
 comptime {
     if (info.arch != .x86_64) {

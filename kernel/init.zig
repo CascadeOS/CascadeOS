@@ -89,7 +89,7 @@ fn kernelInitStage2(processor: *Processor) linksection(info.init_code) noreturn 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
-    arch.changeStackAndReturn(idle_stack_pointer);
+    arch.scheduling.changeStackAndReturn(idle_stack_pointer);
 }
 
 var processors_in_stage3 = std.atomic.Value(usize).init(0);

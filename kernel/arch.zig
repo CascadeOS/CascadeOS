@@ -48,13 +48,7 @@ pub inline fn earlyGetProcessor() ?*Processor {
     return current.earlyGetProcessor();
 }
 
-/// Switches to the provided stack and returns.
-///
-/// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub inline fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
-    checkSupport(current, "changeStackAndReturn", fn (VirtualAddress) noreturn);
 
-    try current.changeStackAndReturn(stack_pointer);
 }
 
 /// Functionality that is intended to be used during kernel init only.
@@ -276,6 +270,17 @@ pub const paging = struct {
         checkSupport(current.paging, "switchToPageTable", fn (*const PageTable) void);
 
         current.paging.switchToPageTable(page_table);
+    }
+};
+
+pub const scheduling = struct {
+    /// Switches to the provided stack and returns.
+    ///
+    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
+    pub inline fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
+        checkSupport(current.scheduling, "changeStackAndReturn", fn (VirtualAddress) noreturn);
+
+        try current.scheduling.changeStackAndReturn(stack_pointer);
     }
 };
 
