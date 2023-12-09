@@ -32,6 +32,7 @@ range: VirtualRange,
 /// The usable range excluding the guard page.
 usable_range: VirtualRange,
 
+/// The current stack pointer.
 stack_pointer: VirtualAddress,
 
 pub fn fromRangeNoGuard(range: VirtualRange) Stack {
@@ -99,12 +100,7 @@ pub fn destroy(stack: Stack) void {
     // TODO: Cache needs to be flushed on this core and others.
 }
 
-pub const init = struct {
-    pub fn initStacks(kernel_stacks_range: VirtualRange) linksection(info.init_code) !void {
-        stacks_range_allocator = try heap.RangeAllocator.init(kernel_stacks_range);
-    }
-};
-
+/// Pushes a value onto the stack.
 pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
     const T = @TypeOf(value);
 
@@ -117,6 +113,7 @@ pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
     ptr.* = value;
 }
 
+/// Aligns the stack pointer to the given alignment.
 pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
     const new_stack_pointer: VirtualAddress = stack.stack_pointer.alignBackward(alignment);
 
@@ -127,6 +124,7 @@ pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
 
 const RETURN_ADDRESS_ALIGNMENT = core.Size.from(16, .byte);
 
+/// Pushes a return address to the stack.
 pub fn pushReturnAddress(stack: *Stack, return_address: VirtualAddress) error{StackOverflow}!void {
     const old_stack_pointer = stack.stack_pointer;
 
@@ -135,3 +133,25 @@ pub fn pushReturnAddress(stack: *Stack, return_address: VirtualAddress) error{St
 
     try stack.push(return_address.value);
 }
+
+/// Pushes a return address to the stack without changing the stack pointer.
+///
+/// Returns the stack pointer with the return address pushed.
+pub fn pushReturnAddressWithoutChangingPointer(
+    stack: *Stack,
+    return_address: VirtualAddress,
+) error{StackOverflow}!VirtualAddress {
+    const old_stack_pointer = stack.stack_pointer;
+    defer stack.stack_pointer = old_stack_pointer;
+
+    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?
+    try stack.push(return_address.value);
+
+    return stack.stack_pointer;
+}
+
+pub const init = struct {
+    pub fn initStacks(kernel_stacks_range: VirtualRange) linksection(info.init_code) !void {
+        stacks_range_allocator = try heap.RangeAllocator.init(kernel_stacks_range);
+    }
+};
