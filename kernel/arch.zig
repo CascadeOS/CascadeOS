@@ -48,7 +48,11 @@ pub inline fn earlyGetProcessor() ?*Processor {
     return current.earlyGetProcessor();
 }
 
+/// Halts the current processor
+pub inline fn halt() void {
+    checkSupport(current, "halt", fn () void);
 
+    current.halt();
 }
 
 /// Functionality that is intended to be used during kernel init only.

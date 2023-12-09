@@ -12,6 +12,11 @@ pub inline fn pause() void {
     asm volatile ("pause" ::: "memory");
 }
 
+/// Issues a HLT instruction.
+pub inline fn halt() void {
+    asm volatile ("hlt");
+}
+
 /// Reads a byte from the given I/O port.
 pub inline fn portReadU8(port: u16) u8 {
     return asm ("inb %[port],%[ret]"

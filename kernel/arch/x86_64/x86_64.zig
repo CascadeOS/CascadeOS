@@ -49,6 +49,7 @@ pub const PrivilegeLevel = enum(u2) {
 };
 
 pub const spinLoopHint = instructions.pause;
+pub const halt = instructions.halt;
 
 comptime {
     if (info.arch != .x86_64) {
