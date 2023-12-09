@@ -14,7 +14,7 @@ pub inline fn pause() void {
 
 /// Reads a byte from the given I/O port.
 pub inline fn portReadU8(port: u16) u8 {
-    return asm volatile ("inb %[port],%[ret]"
+    return asm ("inb %[port],%[ret]"
         : [ret] "={al}" (-> u8),
         : [port] "N{dx}" (port),
     );
@@ -22,7 +22,7 @@ pub inline fn portReadU8(port: u16) u8 {
 
 /// Reads a word (16 bits) from the given I/O port.
 pub inline fn portReadU16(port: u16) u16 {
-    return asm volatile ("inw %[port],%[ret]"
+    return asm ("inw %[port],%[ret]"
         : [ret] "={al}" (-> u16),
         : [port] "N{dx}" (port),
     );
@@ -30,7 +30,7 @@ pub inline fn portReadU16(port: u16) u16 {
 
 /// Reads a doubleword (32 bits) from the given I/O port.
 pub inline fn portReadU32(port: u16) u32 {
-    return asm volatile ("inl %[port],%[ret]"
+    return asm ("inl %[port],%[ret]"
         : [ret] "={eax}" (-> u32),
         : [port] "N{dx}" (port),
     );

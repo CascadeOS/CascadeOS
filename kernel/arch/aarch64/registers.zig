@@ -10,7 +10,7 @@ pub const TPIDR_EL1 = MSR(u64, "TPIDR_EL1");
 pub fn MSR(comptime T: type, comptime name: []const u8) type {
     return struct {
         pub fn read() T {
-            return asm volatile ("MRS %[out], " ++ name
+            return asm ("MRS %[out], " ++ name
                 : [out] "=r" (-> T),
             );
         }
