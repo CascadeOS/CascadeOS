@@ -26,6 +26,14 @@ pub const Held = struct {
     }
 };
 
+pub fn isLocked(self: SpinLock) bool {
+    return @atomicLoad(usize, &self._processor_plus_one, .Acquire) != 0;
+}
+
+pub fn isLockedByCurrent(self: SpinLock) bool {
+    return @atomicLoad(usize, &self._processor_plus_one, .Acquire) == @intFromEnum(Processor.get().id) + 1;
+}
+
 pub fn unsafeUnlock(self: *SpinLock) void {
     @atomicStore(usize, &self._processor_plus_one, 0, .Release);
 }
