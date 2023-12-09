@@ -13,17 +13,17 @@ pub const log = @import("log.zig");
 pub const PhysicalAddress = address.PhysicalAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const pmm = @import("pmm.zig");
+pub const Process = @import("Process.zig");
 pub const Processor = @import("Processor.zig");
 pub const SpinLock = @import("SpinLock.zig");
 pub const Stack = @import("Stack.zig");
-pub const Task = @import("Task.zig");
 pub const VirtualAddress = address.VirtualAddress;
 pub const VirtualRange = address.VirtualRange;
 pub const vmm = @import("vmm.zig");
 
-pub var kernel_task: Task = .{
+pub var kernel_process: Process = .{
     .id = .kernel,
-    ._name = Task.Name.fromSlice("kernel") catch unreachable,
+    ._name = Process.Name.fromSlice("kernel") catch unreachable,
     .page_table = undefined, // initialized in `initVmm`
 };
 

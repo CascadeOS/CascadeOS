@@ -6,19 +6,19 @@ const kernel = @import("kernel");
 const Stack = kernel.Stack;
 const std = @import("std");
 
-const Task = @This();
+const Process = @This();
 
 id: Id,
 _name: Name,
 
 page_table: *arch.paging.PageTable,
 
-pub fn name(self: *const Task) []const u8 {
+pub fn name(self: *const Process) []const u8 {
     return self._name.constSlice();
 }
 
-pub const TASK_NAME_LEN: usize = 16; // TODO: This should be configurable
-pub const Name = std.BoundedArray(u8, TASK_NAME_LEN);
+pub const PROCESS_NAME_LEN: usize = 16; // TODO: This should be configurable
+pub const Name = std.BoundedArray(u8, PROCESS_NAME_LEN);
 
 pub const Id = enum(usize) {
     kernel = 0,
@@ -29,7 +29,7 @@ pub const Id = enum(usize) {
 pub const Thread = struct {
     id: Thread.Id,
 
-    task: *kernel.Task,
+    process: *kernel.Process,
 
     kernel_stack: Stack,
 
@@ -41,7 +41,7 @@ pub const Thread = struct {
         try writer.writeAll("Thread<");
         try std.fmt.formatInt(@intFromEnum(self.id), 10, .lower, .{}, writer);
         try writer.writeAll(" @ ");
-        try self.task.print(writer);
+        try self.process.print(writer);
         try writer.writeByte('>');
     }
 
@@ -57,8 +57,8 @@ pub const Thread = struct {
     }
 };
 
-pub fn print(self: *const Task, writer: anytype) !void {
-    try writer.writeAll("Task<");
+pub fn print(self: *const Process, writer: anytype) !void {
+    try writer.writeAll("Process<");
     try std.fmt.formatInt(@intFromEnum(self.id), 10, .lower, .{}, writer);
     try writer.writeAll(" - '");
     try writer.writeAll(self.name());
@@ -66,7 +66,7 @@ pub fn print(self: *const Task, writer: anytype) !void {
 }
 
 pub inline fn format(
-    self: *const Task,
+    self: *const Process,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,

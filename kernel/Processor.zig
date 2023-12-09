@@ -9,7 +9,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const Stack = kernel.Stack;
 const std = @import("std");
-const Task = kernel.Task;
+const Thread = kernel.Process.Thread;
 
 /// The list of processors in the system.
 ///
@@ -30,7 +30,7 @@ idle_stack: Stack,
 /// The currently running thread.
 ///
 /// This is set to `null` when the processor is idle and also before we start scheduling.
-current_task: ?*Task = null,
+current_thread: ?*Thread = null,
 
 arch: arch.ArchProcessor,
 
