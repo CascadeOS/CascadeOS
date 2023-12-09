@@ -50,15 +50,6 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
 
     // switch to the next thread
     core.panic("UNIMPLEMENTED: switching to next thread from other thread"); // TODO
-
-}
-
-fn jumpToIdle(processor: *Processor) noreturn {
-    const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
-        VirtualAddress.fromPtr(&idle),
-    ) catch unreachable; // the idle stack is always big enough to hold a return address
-
-    arch.scheduling.changeStackAndReturn(idle_stack_pointer);
 }
 
 /// Queues a thread to be run by the scheduler.
@@ -75,6 +66,8 @@ pub fn queueThread(thread: *Thread) void {
 fn queueThreadImpl(thread: *Thread) void {
     core.debugAssert(scheduler_lock.isLockedByCurrent());
 
+    thread.state = .ready;
+
     if (ready_to_run_end) |last_thread| {
         last_thread.next_thread = thread;
         ready_to_run_end = thread;
@@ -83,6 +76,14 @@ fn queueThreadImpl(thread: *Thread) void {
         ready_to_run_start = thread;
         ready_to_run_end = thread;
     }
+}
+
+fn jumpToIdle(processor: *Processor) noreturn {
+    const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
+        VirtualAddress.fromPtr(&idle),
+    ) catch unreachable; // the idle stack is always big enough to hold a return address
+
+    arch.scheduling.changeStackAndReturn(idle_stack_pointer);
 }
 
 fn idle() noreturn {

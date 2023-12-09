@@ -10,11 +10,18 @@ const Thread = @This();
 
 id: Thread.Id,
 
+state: State = .ready,
+
 process: *kernel.Process,
 
 kernel_stack: Stack,
 
 next_thread: ?*Thread = null,
+
+pub const State = enum {
+    ready,
+    running,
+};
 
 pub const Id = enum(usize) {
     _,
