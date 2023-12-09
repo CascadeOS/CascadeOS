@@ -9,7 +9,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const Stack = kernel.Stack;
 const std = @import("std");
-const Thread = kernel.Process.Thread;
+const Thread = kernel.Thread;
 
 /// The list of processors in the system.
 ///

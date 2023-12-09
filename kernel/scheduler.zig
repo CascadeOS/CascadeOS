@@ -6,7 +6,7 @@ const kernel = @import("kernel");
 const Processor = kernel.Processor;
 const SpinLock = kernel.SpinLock;
 const std = @import("std");
-const Thread = kernel.Process.Thread;
+const Thread = kernel.Thread;
 const VirtualAddress = kernel.VirtualAddress;
 
 // TODO: Replace this simple round robin with a proper scheduler
