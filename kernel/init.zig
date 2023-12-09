@@ -126,7 +126,8 @@ fn kernelInitStage3() noreturn {
     // now that the init only mappings are gone we reload the page table
     arch.paging.switchToPageTable(vmm.kernel_page_table);
 
-    core.panic("UNIMPLEMENTED"); // TODO: implement intialization stage 3
+    kernel.scheduler.schedule(false);
+    unreachable;
 }
 
 /// Copy the kernel file from the bootloader provided memory to the kernel heap.

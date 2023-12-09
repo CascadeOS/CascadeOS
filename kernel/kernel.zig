@@ -15,6 +15,7 @@ pub const PhysicalRange = address.PhysicalRange;
 pub const pmm = @import("pmm.zig");
 pub const Process = @import("Process.zig");
 pub const Processor = @import("Processor.zig");
+pub const scheduler = @import("scheduler.zig");
 pub const SpinLock = @import("SpinLock.zig");
 pub const Stack = @import("Stack.zig");
 pub const VirtualAddress = address.VirtualAddress;

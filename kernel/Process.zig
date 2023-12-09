@@ -33,6 +33,8 @@ pub const Thread = struct {
 
     kernel_stack: Stack,
 
+    next_thread: ?*Thread = null,
+
     pub const Id = enum(usize) {
         _,
     };
