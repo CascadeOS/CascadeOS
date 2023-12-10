@@ -32,26 +32,26 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
         }
     }
 
-    const next_thread = ready_to_run_start orelse {
+    const new_thread = ready_to_run_start orelse {
         // there are no more threads to run, so we need to switch to idle
+
         jumpToIdle(processor, opt_current_thread);
         unreachable;
     };
 
-    ready_to_run_start = next_thread.next_thread;
-    if (next_thread == ready_to_run_end) ready_to_run_end = null;
+    ready_to_run_start = new_thread.next_thread;
+    if (new_thread == ready_to_run_end) ready_to_run_end = null;
 
     const current_thread = opt_current_thread orelse {
-        // we were previously idle
+        // switch to the thread from idle
 
-        processor.current_thread = next_thread;
-
-        arch.scheduling.switchToThreadFromIdle(processor, next_thread);
+        processor.current_thread = new_thread;
+        arch.scheduling.switchToThreadFromIdle(processor, new_thread);
         unreachable;
     };
 
     // if we are already running the next thread, no switch is required
-    if (next_thread == current_thread) return;
+    if (new_thread == current_thread) return;
 
     // switch to the next thread
     core.panic("UNIMPLEMENTED: switching to next thread from other thread"); // TODO
@@ -95,10 +95,9 @@ fn jumpToIdle(processor: *Processor, opt_previous_thread: ?*Thread) noreturn {
         }
     }
 
-
     processor.current_thread = null;
-
     arch.scheduling.changeStackAndReturn(idle_stack_pointer);
+    unreachable;
 }
 
 fn idle() noreturn {
