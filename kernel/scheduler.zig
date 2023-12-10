@@ -102,13 +102,19 @@ fn jumpToIdle(processor: *Processor, opt_previous_thread: ?*Thread) noreturn {
 }
 
 fn idle() noreturn {
-    core.debugAssert(scheduler_lock.isLockedByCurrent());
-
-    scheduler_lock.unsafeUnlock();
+    unsafeUnlockScheduler();
     arch.interrupts.enableInterrupts();
 
     while (true) {
         // TODO: improve power management
         arch.halt();
     }
+}
+
+/// Unlocks the scheduler lock.
+///
+/// It is the callers responsibility to ensure the current processor has the lock.
+pub fn unsafeUnlockScheduler() void {
+    core.debugAssert(scheduler_lock.isLockedByCurrent());
+    scheduler_lock.unsafeUnlock();
 }
