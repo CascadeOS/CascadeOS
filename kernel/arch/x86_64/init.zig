@@ -35,9 +35,11 @@ var bootstrap_non_maskable_interrupt_stack align(16) linksection(info.init_data)
 pub fn prepareBootstrapProcessor(bootstrap_processor: *Processor) linksection(info.init_code) void {
     bootstrap_processor.arch = .{
         .double_fault_stack = Stack.fromRangeNoGuard(VirtualRange.fromSlice(
+            u8,
             @as([]u8, &bootstrap_double_fault_stack),
         )),
         .non_maskable_interrupt_stack = Stack.fromRangeNoGuard(VirtualRange.fromSlice(
+            u8,
             @as([]u8, &bootstrap_non_maskable_interrupt_stack),
         )),
     };

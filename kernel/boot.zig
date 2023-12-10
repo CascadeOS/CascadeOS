@@ -60,7 +60,7 @@ pub fn kernelBaseAddress() linksection(info.init_code) ?KernelBaseAddress {
 /// Returns the kernel file contents as a VirtualRange, if provided by the bootloader.
 pub fn kernelFile() linksection(info.init_code) ?VirtualRange {
     if (limine_requests.kernel_file.response) |resp| {
-        return VirtualRange.fromSlice(resp.kernel_file.getContents());
+        return VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
     }
     return null;
 }

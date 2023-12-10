@@ -36,6 +36,7 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
 
     // we need to get the processor data loaded early as the panic handler and logging use it
     bootstrap_processor.idle_stack = Stack.fromRangeNoGuard(VirtualRange.fromSlice(
+        u8,
         @as([]u8, &bootstrap_interrupt_stack),
     ));
     arch.init.prepareBootstrapProcessor(&bootstrap_processor);

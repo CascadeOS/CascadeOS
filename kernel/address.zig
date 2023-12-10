@@ -182,14 +182,10 @@ pub const VirtualRange = extern struct {
     const name = "VirtualRange";
 
     /// Returns a virtual range corresponding to the given slice.
-    pub fn fromSlice(slice: anytype) VirtualRange {
-        const type_info: std.builtin.Type = @typeInfo(@TypeOf(slice));
-        if (type_info != .Pointer) @compileError("Type of `slice` is not a pointer: " ++ @typeName(@TypeOf(slice)));
-        const pointer_info: std.builtin.Type.Pointer = type_info.Pointer;
-        if (pointer_info.size != .Slice) @compileError("`slice` is not a slice: " ++ @typeName(@TypeOf(slice)));
+    pub fn fromSlice(comptime T: type, slice: []const T) VirtualRange {
         return .{
             .address = VirtualAddress.fromPtr(slice.ptr),
-            .size = core.Size.from(@sizeOf(pointer_info.child) * slice.len, .byte),
+            .size = core.Size.from(@sizeOf(T) * slice.len, .byte),
         };
     }
 
