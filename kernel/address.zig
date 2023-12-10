@@ -86,14 +86,14 @@ fn AddrMixin(comptime Self: type) type {
         /// Returns the address rounded up to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
-        pub fn alignForward(self: Self, alignment: core.Size) Self {
+        pub inline fn alignForward(self: Self, alignment: core.Size) Self {
             return .{ .value = std.mem.alignForward(usize, self.value, alignment.bytes) };
         }
 
         /// Returns the address rounded down to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
-        pub fn alignBackward(self: Self, alignment: core.Size) Self {
+        pub inline fn alignBackward(self: Self, alignment: core.Size) Self {
             return .{ .value = std.mem.alignBackward(usize, self.value, alignment.bytes) };
         }
 
@@ -199,7 +199,7 @@ pub const VirtualRange = extern struct {
         return self.address.toPtr([*]T)[0..len];
     }
 
-    pub fn toByteSlice(self: VirtualRange) []u8 {
+    pub inline fn toByteSlice(self: VirtualRange) []u8 {
         return self.address.toPtr([*]u8)[0..self.size.bytes];
     }
 

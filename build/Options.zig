@@ -241,7 +241,7 @@ fn addEnumType(options: *Step.Options, name: []const u8, comptime EnumT: type) v
 
     out.print("pub const {} = enum {{\n", .{std.zig.fmtId(name)}) catch unreachable;
 
-    inline for (std.meta.tags(EnumT)) |tag| {
+    for (std.meta.tags(EnumT)) |tag| {
         out.print("    {s},\n", .{std.zig.fmtId(@tagName(tag))}) catch unreachable;
     }
 

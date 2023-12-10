@@ -13,7 +13,7 @@ const x86_64 = @import("x86_64.zig");
 /// Switches to the provided stack and returns.
 ///
 /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub inline fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
+pub fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
     asm volatile (
         \\  mov %[stack], %%rsp
         \\  ret
@@ -24,7 +24,7 @@ pub inline fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
     unreachable;
 }
 
-pub inline fn prepareStackForNewThread(
+pub fn prepareStackForNewThread(
     stack: *Stack,
     thread: *kernel.Thread,
     context: u64,

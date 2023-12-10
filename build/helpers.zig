@@ -3,7 +3,7 @@
 const std = @import("std");
 
 /// Joins paths relative to the root directory.
-pub inline fn pathJoinFromRoot(b: *std.Build, paths: []const []const u8) []const u8 {
+pub fn pathJoinFromRoot(b: *std.Build, paths: []const []const u8) []const u8 {
     return b.pathFromRoot(b.pathJoin(paths));
 }
 
