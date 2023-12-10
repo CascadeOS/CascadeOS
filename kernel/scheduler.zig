@@ -43,7 +43,8 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
 
     const current_thread = opt_current_thread orelse {
         // we were previously idle
-        core.panic("UNIMPLEMENTED: switching to next thread from idle"); // TODO
+        arch.scheduling.switchToThreadFromIdle(processor, next_thread);
+        unreachable;
     };
 
     // if we are already running the next thread, no switch is required

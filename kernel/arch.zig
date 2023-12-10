@@ -7,6 +7,7 @@ const PhysicalRange = kernel.PhysicalRange;
 const Processor = kernel.Processor;
 const Stack = kernel.Stack;
 const std = @import("std");
+const Thread = kernel.Thread;
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
 const vmm = kernel.vmm;
@@ -285,6 +286,12 @@ pub const scheduling = struct {
         checkSupport(current.scheduling, "changeStackAndReturn", fn (VirtualAddress) noreturn);
 
         try current.scheduling.changeStackAndReturn(stack_pointer);
+    }
+
+    pub inline fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
+        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*Processor, *Thread) noreturn);
+
+        current.scheduling.switchToThreadFromIdle(processor, thread);
     }
 };
 
