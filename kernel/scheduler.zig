@@ -16,7 +16,7 @@ var scheduler_lock: SpinLock = .{};
 var ready_to_run_start: ?*Thread = null;
 var ready_to_run_end: ?*Thread = null;
 
-pub noinline fn schedule(requeue_current_thread: bool) void {
+pub fn schedule(requeue_current_thread: bool) void {
     const held = scheduler_lock.lock();
     defer held.unlock();
 
@@ -39,6 +39,7 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
         unreachable;
     };
 
+    // update the ready queue
     ready_to_run_start = new_thread.next_thread;
     if (new_thread == ready_to_run_end) ready_to_run_end = null;
 
@@ -46,16 +47,18 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
         // switch to the thread from idle
 
         processor.current_thread = new_thread;
+        new_thread.state = .running;
         arch.scheduling.switchToThreadFromIdle(processor, new_thread);
         unreachable;
     };
 
-    // if we are already running the next thread, no switch is required
+    // if we are already running the new thread, no switch is required
     if (new_thread == current_thread) return;
 
-    // switch to the next thread
+    // switch to the new thread
 
     processor.current_thread = new_thread;
+    new_thread.state = .running;
     arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
 }
 
