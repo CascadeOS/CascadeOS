@@ -3,9 +3,6 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
-// TODO: Is there a better way to provide access to the libraries at build time? https://github.com/CascadeOS/CascadeOS/issues/12
-const ansi = @import("../libraries/ansi/ansi.zig");
-
 const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
@@ -207,7 +204,7 @@ fn ensureCurrentStdoutLineIsEmpty() !void {
         },
         .escape_codes => {
             // clear the current line and return the cursor to the beginning of the line
-            try stdout.writeAll(comptime ansi.clear.line ++ "\r");
+            try stdout.writeAll("\x1b[2K\r");
         },
     }
 }

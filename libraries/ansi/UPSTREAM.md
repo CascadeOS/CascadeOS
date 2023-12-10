@@ -1,1 +1,0 @@
-This library is a simplified copy of https://github.com/xyaman/mibu, its license is included in the file `mibu-LICENSE`.
