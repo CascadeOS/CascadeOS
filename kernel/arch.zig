@@ -293,6 +293,22 @@ pub const scheduling = struct {
 
         current.scheduling.switchToThreadFromIdle(processor, thread);
     }
+
+    pub inline fn prepareStackForNewThread(
+        stack: *Stack,
+        thread: *kernel.Thread,
+        context: u64,
+        target_function: *const fn (thread: *kernel.Thread, context: u64) noreturn,
+    ) error{StackOverflow}!void {
+        checkSupport(current.scheduling, "prepareStackForNewThread", fn (
+            *Stack,
+            *kernel.Thread,
+            u64,
+            *const fn (thread: *kernel.Thread, context: u64) noreturn,
+        ) error{StackOverflow}!void);
+
+        return current.scheduling.prepareStackForNewThread(stack, thread, context, target_function);
+    }
 };
 
 /// Checks if the current architecture implements the given function.
