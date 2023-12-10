@@ -43,6 +43,9 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
 
     const current_thread = opt_current_thread orelse {
         // we were previously idle
+
+        processor.current_thread = next_thread;
+
         arch.scheduling.switchToThreadFromIdle(processor, next_thread);
         unreachable;
     };
@@ -91,6 +94,9 @@ fn jumpToIdle(processor: *Processor, opt_previous_thread: ?*Thread) noreturn {
             arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
         }
     }
+
+
+    processor.current_thread = null;
 
     arch.scheduling.changeStackAndReturn(idle_stack_pointer);
 }
