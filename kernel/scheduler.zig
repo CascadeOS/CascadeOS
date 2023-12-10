@@ -20,7 +20,7 @@ pub fn schedule(requeue_current_thread: bool) void {
     const held = scheduler_lock.lock();
     defer held.unlock();
 
-    const processor = Processor.get();
+    const processor = arch.getProcessor();
 
     const opt_current_thread = processor.current_thread;
 

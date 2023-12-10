@@ -99,7 +99,7 @@ var reload_page_table_gate = std.atomic.Value(bool).init(false);
 fn kernelInitStage3() noreturn {
     _ = processors_in_stage3.fetchAdd(1, .AcqRel);
 
-    const processor = Processor.get();
+    const processor = arch.getProcessor();
 
     if (processor.id == .bootstrap) {
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap

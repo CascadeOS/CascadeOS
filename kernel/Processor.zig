@@ -34,10 +34,6 @@ current_thread: ?*Thread = null,
 
 arch: arch.ArchProcessor,
 
-pub inline fn get() *Processor {
-    return arch.getProcessor();
-}
-
 pub const Id = enum(usize) {
     bootstrap = 0,
 

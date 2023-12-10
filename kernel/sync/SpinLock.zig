@@ -19,7 +19,7 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
-        core.debugAssert(@intFromEnum(Processor.get().id) + 1 == self.spinlock._processor_plus_one);
+        core.debugAssert(@intFromEnum(arch.getProcessor().id) + 1 == self.spinlock._processor_plus_one);
 
         @atomicStore(usize, &self.spinlock._processor_plus_one, 0, .Release);
         if (self.interrupts_enabled) arch.interrupts.enableInterrupts();
@@ -31,7 +31,7 @@ pub fn isLocked(self: SpinLock) bool {
 }
 
 pub fn isLockedByCurrent(self: SpinLock) bool {
-    return @atomicLoad(usize, &self._processor_plus_one, .Acquire) == @intFromEnum(Processor.get().id) + 1;
+    return @atomicLoad(usize, &self._processor_plus_one, .Acquire) == @intFromEnum(arch.getProcessor().id) + 1;
 }
 
 pub fn unsafeUnlock(self: *SpinLock) void {
@@ -42,7 +42,7 @@ pub fn lock(self: *SpinLock) Held {
     const interrupts_enabled = arch.interrupts.interruptsEnabled();
     if (interrupts_enabled) arch.interrupts.disableInterrupts();
 
-    const processor = Processor.get();
+    const processor = arch.getProcessor();
 
     const processor_id_plus_one = @intFromEnum(processor.id) + 1;
 
