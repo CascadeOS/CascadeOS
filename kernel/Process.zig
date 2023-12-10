@@ -17,6 +17,10 @@ pub fn name(self: *const Process) []const u8 {
     return self._name.constSlice();
 }
 
+pub fn isKernel(self: *const Process) bool {
+    return self == &kernel.kernel_process;
+}
+
 pub const PROCESS_NAME_LEN: usize = 16; // TODO: This should be configurable
 pub const Name = std.BoundedArray(u8, PROCESS_NAME_LEN);
 
