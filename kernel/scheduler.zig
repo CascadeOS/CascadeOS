@@ -54,7 +54,9 @@ pub noinline fn schedule(requeue_current_thread: bool) void {
     if (new_thread == current_thread) return;
 
     // switch to the next thread
-    core.panic("UNIMPLEMENTED: switching to next thread from other thread"); // TODO
+
+    processor.current_thread = new_thread;
+    arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
 }
 
 /// Queues a thread to be run by the scheduler.
