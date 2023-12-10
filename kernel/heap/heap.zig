@@ -3,15 +3,15 @@
 const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const SpinLock = kernel.SpinLock;
+const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
 const vmm = kernel.vmm;
 
-pub const AddressSpace = @import("heap/AddressSpace.zig");
-pub const DirectObjectPool = @import("heap/DirectObjectPool.zig").DirectObjectPool;
-pub const RangeAllocator = @import("heap/RangeAllocator.zig");
+pub const AddressSpace = @import("AddressSpace.zig");
+pub const DirectObjectPool = @import("DirectObjectPool.zig").DirectObjectPool;
+pub const RangeAllocator = @import("RangeAllocator.zig");
 
 var address_space: AddressSpace = undefined; // Initialised in `initHeap`
 var address_space_lock: SpinLock = .{};

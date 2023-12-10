@@ -13,8 +13,8 @@ const VirtualRange = kernel.VirtualRange;
 const vmm = kernel.vmm;
 
 const current = switch (info.arch) {
-    .x86_64 => @import("arch/x86_64/x86_64.zig"),
-    .aarch64 => @import("arch/aarch64/aarch64.zig"),
+    .x86_64 => @import("x86_64/x86_64.zig"),
+    .aarch64 => @import("aarch64/aarch64.zig"),
 };
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.

@@ -5,7 +5,7 @@ const core = @import("core");
 const DwarfSymbolMap = @import("DwarfSymbolMap.zig");
 const info = kernel.info;
 const kernel = @import("kernel");
-const SpinLock = kernel.SpinLock;
+const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 
 var symbols_loaded: bool = false;

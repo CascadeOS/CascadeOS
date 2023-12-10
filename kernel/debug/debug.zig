@@ -4,9 +4,9 @@ const arch = kernel.arch;
 const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
-const SpinLock = kernel.SpinLock;
+const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
-const symbols = @import("debug/symbols.zig");
+const symbols = @import("symbols.zig");
 
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
 
