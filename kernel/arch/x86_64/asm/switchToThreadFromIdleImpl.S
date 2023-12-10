@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 
 /*
-extern fn switchToThreadFromIdleImpl(
+extern fn _switchToThreadFromIdleImpl(
     new_kernel_stack_pointer: VirtualAddress, // rdi
 ) callconv(.C) void;
 */
 
 .section .text
-.global switchToThreadFromIdleImpl
-.type switchToThreadFromIdleImpl, @function
-switchToThreadFromIdleImpl:
+.global _switchToThreadFromIdleImpl
+.type _switchToThreadFromIdleImpl, @function
+_switchToThreadFromIdleImpl:
     // switch to `new_kernel_stack_pointer`
     mov %rdi, %rsp
 

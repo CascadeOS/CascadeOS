@@ -34,9 +34,9 @@ pub fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
         processor.arch.tss.setPrivilegeStack(.kernel, thread.kernel_stack);
     }
 
-    switchToThreadFromIdleImpl(thread.kernel_stack.stack_pointer);
+    _switchToThreadFromIdleImpl(thread.kernel_stack.stack_pointer);
     unreachable;
 }
 
 // Implemented in 'x86_64/asm/switchToThreadFromIdleImpl.S'
-extern fn switchToThreadFromIdleImpl(new_kernel_stack_pointer: VirtualAddress) callconv(.C) void;
+extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: VirtualAddress) callconv(.C) void;
