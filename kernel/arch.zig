@@ -294,6 +294,12 @@ pub const scheduling = struct {
         current.scheduling.switchToThreadFromIdle(processor, thread);
     }
 
+    pub inline fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_thread: *Thread) void {
+        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*Processor, *Thread, *Thread) void);
+
+        current.scheduling.switchToThreadFromThread(processor, old_thread, new_thread);
+    }
+
     pub inline fn prepareStackForNewThread(
         stack: *Stack,
         thread: *kernel.Thread,

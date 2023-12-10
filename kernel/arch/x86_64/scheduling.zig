@@ -60,6 +60,22 @@ pub fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
     unreachable;
 }
 
+pub fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_thread: *Thread) void {
+    const new_process = new_thread.process;
+
+    // If the process is changing we need to switch the page table.
+    if (old_thread.process != new_process) {
+        x86_64.paging.switchToPageTable(new_process.page_table);
+    }
+
+    processor.arch.tss.setPrivilegeStack(.kernel, new_thread.kernel_stack);
+
+    _switchToThreadFromThreadImpl(
+        new_thread.kernel_stack.stack_pointer,
+        &old_thread.kernel_stack.stack_pointer,
+    );
+}
+
 fn startNewThread(
     thread: *kernel.Thread,
     context: u64,
@@ -78,3 +94,6 @@ extern fn _startNewThread() callconv(.C) noreturn;
 
 // Implemented in 'x86_64/asm/switchToThreadFromIdleImpl.S'
 extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: VirtualAddress) callconv(.C) noreturn;
+
+// Implemented in 'x86_64/asm/switchToThreadFromThreadImpl.S'
+extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: VirtualAddress, previous_kernel_stack_pointer: *VirtualAddress) callconv(.C) void;
