@@ -76,6 +76,27 @@ pub fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_
     );
 }
 
+/// It is the caller's responsibility to ensure the stack is valid, with a return address.
+pub fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*Thread) noreturn {
+    const old_thread = opt_old_thread orelse {
+        // we were already idle
+        changeStackAndReturn(stack_pointer);
+        unreachable;
+    };
+
+    if (!old_thread.process.isKernel()) {
+        // the process was not the kernel so we need to switch to the kernel page table
+        x86_64.paging.switchToPageTable(kernel.vmm.kernel_page_table);
+    }
+
+    processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);
+
+    _switchToIdleImpl(
+        stack_pointer,
+        &old_thread.kernel_stack.stack_pointer,
+    );
+}
+
 fn startNewThread(
     thread: *kernel.Thread,
     context: u64,
@@ -97,3 +118,6 @@ extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: VirtualAddress) 
 
 // Implemented in 'x86_64/asm/switchToThreadFromThreadImpl.S'
 extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: VirtualAddress, previous_kernel_stack_pointer: *VirtualAddress) callconv(.C) void;
+
+// Implemented in 'x86_64/asm/switchToIdleImpl.S'
+extern fn _switchToIdleImpl(new_kernel_stack_pointer: VirtualAddress, previous_kernel_stack_pointer: *VirtualAddress) callconv(.C) noreturn;

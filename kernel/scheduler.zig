@@ -35,7 +35,12 @@ pub fn schedule(requeue_current_thread: bool) void {
     const new_thread = ready_to_run_start orelse {
         // there are no more threads to run, so we need to switch to idle
 
-        jumpToIdle(processor, opt_current_thread);
+        const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
+            VirtualAddress.fromPtr(&idle),
+        ) catch unreachable; // the idle stack is always big enough to hold a return address
+
+        processor.current_thread = null;
+        arch.scheduling.switchToIdle(processor, idle_stack_pointer, opt_current_thread);
         unreachable;
     };
 
@@ -86,23 +91,6 @@ fn queueThreadImpl(thread: *Thread) void {
         ready_to_run_start = thread;
         ready_to_run_end = thread;
     }
-}
-
-fn jumpToIdle(processor: *Processor, opt_previous_thread: ?*Thread) noreturn {
-    const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
-        VirtualAddress.fromPtr(&idle),
-    ) catch unreachable; // the idle stack is always big enough to hold a return address
-
-    // If we were previously non-idle and the process was not the kernel, we need to switch to the kernel page table
-    if (opt_previous_thread) |previous_thread| {
-        if (!previous_thread.process.isKernel()) {
-            arch.paging.switchToPageTable(kernel.vmm.kernel_page_table);
-        }
-    }
-
-    processor.current_thread = null;
-    arch.scheduling.changeStackAndReturn(idle_stack_pointer);
-    unreachable;
 }
 
 fn idle() noreturn {

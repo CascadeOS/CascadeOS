@@ -300,6 +300,13 @@ pub const scheduling = struct {
         current.scheduling.switchToThreadFromThread(processor, old_thread, new_thread);
     }
 
+    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
+    pub inline fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*Thread) noreturn {
+        checkSupport(current.scheduling, "switchToIdle", fn (*Processor, VirtualAddress, ?*Thread) noreturn);
+
+        current.scheduling.switchToIdle(processor, stack_pointer, opt_old_thread);
+    }
+
     pub inline fn prepareStackForNewThread(
         stack: *Stack,
         thread: *kernel.Thread,
