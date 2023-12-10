@@ -138,12 +138,22 @@ inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime messag
 
 /// Checks if a scope is in the list of scopes forced to log at debug level.
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
-    const scope_name = @tagName(scope);
-    inline for (kernel_options.forced_debug_log_scopes) |debug_scope| {
-        if (std.mem.indexOf(u8, scope_name, debug_scope) != null) return true;
-    }
-    return false;
+    if (kernel_options.forced_debug_log_scopes.len == 0) return false; // TODO: Remove this line - https://github.com/ziglang/zig/issues/18212
+    return comptime debug_scopes.has(@tagName(scope));
 }
+
+const debug_scopes = std.ComptimeStringMap(
+    void,
+    blk: {
+        var scopes: [kernel_options.forced_debug_log_scopes.len]struct { []const u8 } = undefined;
+
+        for (kernel_options.forced_debug_log_scopes, 0..) |debug_scope, i| {
+            scopes[i] = .{debug_scope};
+        }
+
+        break :blk scopes;
+    },
+);
 
 const level: Level = blk: {
     if (kernel_options.force_debug_log) break :blk .debug;
