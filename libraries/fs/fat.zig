@@ -485,7 +485,7 @@ fn refAllDeclsRecursive(comptime T: type) void {
     comptime {
         if (!@import("builtin").is_test) return;
 
-        inline for (std.meta.declarations(T)) |decl| {
+        for (std.meta.declarations(T)) |decl| {
             if (std.mem.eql(u8, decl.name, "std")) continue;
 
             if (!@hasDecl(T, decl.name)) continue;

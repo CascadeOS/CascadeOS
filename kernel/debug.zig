@@ -267,7 +267,7 @@ const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_
         []const u8,
     } = undefined;
 
-    inline for (embedded_source_files_import.file_paths, 0..) |name, i| {
+    for (embedded_source_files_import.file_paths, 0..) |name, i| {
         array[i] = .{ name, @embedFile(name) };
     }
     break :embedded_source_files array[0..];

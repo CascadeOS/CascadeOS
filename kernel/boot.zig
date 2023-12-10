@@ -196,7 +196,7 @@ pub const MemoryMapEntry = struct {
     /// The length of the longest tag name in the `MemoryMapEntry.Type` enum.
     const length_of_longest_tag_name = blk: {
         var longest_so_far = 0;
-        inline for (std.meta.tags(Type)) |tag| {
+        for (std.meta.tags(Type)) |tag| {
             const length = @tagName(tag).len;
             if (length > longest_so_far) longest_so_far = length;
         }
