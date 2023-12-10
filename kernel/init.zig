@@ -30,7 +30,7 @@ var bootstrap_processor: Processor linksection(info.init_data) = .{
 /// Entry point from the bootloader specific code.
 ///
 /// Only the bootstrap processor executes this function.
-pub fn kernelInitStage1() linksection(info.init_code) void {
+pub fn kernelInitStage1() linksection(info.init_code) noreturn {
     // get output up and running as soon as possible
     arch.init.setupEarlyOutput();
 
