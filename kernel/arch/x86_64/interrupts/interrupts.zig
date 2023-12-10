@@ -456,16 +456,3 @@ pub fn disableInterruptsAndHalt() noreturn {
         asm volatile ("cli; hlt");
     }
 }
-
-/// Enable interrupts and put the CPU to sleep.
-pub noinline fn enableInterruptsAndHalt() void {
-    // TODO: The NMI handler will need to check if the IP is equal to __halt_address and if so, it will need to skip the
-    // hlt instruction. https://github.com/CascadeOS/CascadeOS/issues/33
-    asm volatile (
-        \\sti
-        \\.globl __halt_address
-        \\__halt_address:
-        \\hlt
-        \\
-    );
-}
