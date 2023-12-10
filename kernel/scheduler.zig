@@ -107,6 +107,10 @@ fn idle() noreturn {
     arch.interrupts.enableInterrupts();
 
     while (true) {
+        if (ready_to_run_start != null) {
+            schedule(false);
+        }
+
         // TODO: improve power management
         arch.halt();
     }
