@@ -77,4 +77,4 @@ fn startNewThread(
 extern fn _startNewThread() callconv(.C) noreturn;
 
 // Implemented in 'x86_64/asm/switchToThreadFromIdleImpl.S'
-extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: VirtualAddress) callconv(.C) void;
+extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: VirtualAddress) callconv(.C) noreturn;

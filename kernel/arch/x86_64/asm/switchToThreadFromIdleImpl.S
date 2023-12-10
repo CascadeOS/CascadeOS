@@ -3,7 +3,7 @@
 /*
 extern fn _switchToThreadFromIdleImpl(
     new_kernel_stack_pointer: VirtualAddress, // rdi
-) callconv(.C) void;
+) callconv(.C) noreturn;
 */
 
 .section .text
