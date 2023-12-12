@@ -193,11 +193,11 @@ pub const paging = struct {
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
-    /// Allocates a new page table.
-    pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
-        checkSupport(current.paging, "allocatePageTable", fn () error{PageAllocationFailed}!*PageTable);
+    /// Initializes a page table.
+    pub inline fn initPageTable(page_table: *PageTable) void {
+        checkSupport(current.paging, "initPageTable", fn (*PageTable) void);
 
-        return current.paging.allocatePageTable();
+        return current.paging.initPageTable(page_table);
     }
 
     /// This function is only called during kernel init, it is required to:

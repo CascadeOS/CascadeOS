@@ -75,11 +75,11 @@ pub fn create(push_null_return_value: bool) !Stack {
     usable_range.size.subtractInPlace(arch.paging.standard_page_size);
 
     try vmm.mapRange(
-        vmm.kernel_page_table,
+        &kernel.kernel_process.page_table,
         usable_range,
         .{ .global = true, .writeable = true },
     );
-    errdefer vmm.unmap(vmm.kernel_page_table, usable_range);
+    errdefer vmm.unmap(&kernel.kernel_process.page_table, usable_range);
 
     var stack = fromRangeWithGuard(virtual_range, usable_range);
 

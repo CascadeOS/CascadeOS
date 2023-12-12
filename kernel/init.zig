@@ -84,7 +84,7 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
 ///
 /// All processors are using the bootloader provided stack.
 fn kernelInitStage2(processor: *Processor) linksection(info.init_code) noreturn {
-    arch.paging.switchToPageTable(vmm.kernel_page_table);
+    arch.paging.switchToPageTable(&kernel.kernel_process.page_table);
     arch.init.loadProcessor(processor);
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
@@ -125,7 +125,7 @@ fn kernelInitStage3() noreturn {
     }
 
     // now that the init only mappings are gone we reload the page table
-    arch.paging.switchToPageTable(vmm.kernel_page_table);
+    arch.paging.switchToPageTable(&kernel.kernel_process.page_table);
 
     kernel.scheduler.schedule(false);
     unreachable;

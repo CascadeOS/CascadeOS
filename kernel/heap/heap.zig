@@ -54,7 +54,7 @@ const PageAllocator = struct {
         }
 
         try vmm.mapRange(
-            vmm.kernel_page_table,
+            &kernel.kernel_process.page_table,
             allocated_range,
             heap_map_type,
         );
@@ -106,7 +106,7 @@ const PageAllocator = struct {
             address_space.deallocate(range);
         }
 
-        vmm.unmap(vmm.kernel_page_table, range);
+        vmm.unmap(&kernel.kernel_process.page_table, range);
 
         // TODO: Cache needs to be flushed on this core and others.
     }

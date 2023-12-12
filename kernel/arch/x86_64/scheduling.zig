@@ -51,7 +51,7 @@ pub fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
     if (!process.isKernel()) {
         // If the process is not the kernel we need to switch the page table and privilege stack.
 
-        x86_64.paging.switchToPageTable(process.page_table);
+        x86_64.paging.switchToPageTable(&process.page_table);
 
         processor.arch.tss.setPrivilegeStack(.kernel, thread.kernel_stack);
     }
@@ -65,7 +65,7 @@ pub fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_
 
     // If the process is changing we need to switch the page table.
     if (old_thread.process != new_process) {
-        x86_64.paging.switchToPageTable(new_process.page_table);
+        x86_64.paging.switchToPageTable(&new_process.page_table);
     }
 
     processor.arch.tss.setPrivilegeStack(.kernel, new_thread.kernel_stack);
@@ -86,7 +86,7 @@ pub fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_ol
 
     if (!old_thread.process.isKernel()) {
         // the process was not the kernel so we need to switch to the kernel page table
-        x86_64.paging.switchToPageTable(kernel.vmm.kernel_page_table);
+        x86_64.paging.switchToPageTable(&kernel.kernel_process.page_table);
     }
 
     processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);

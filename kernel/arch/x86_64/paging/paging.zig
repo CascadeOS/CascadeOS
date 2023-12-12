@@ -37,15 +37,8 @@ pub const higher_half = VirtualAddress.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
-/// Allocates a new page table.
-pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
-    const range = pmm.allocatePage() orelse return error.PageAllocationFailed;
-    core.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
-
-    const page_table = range.toDirectMap().address.toPtr(*PageTable);
+pub fn initPageTable(page_table: *PageTable) void {
     page_table.zero();
-
-    return page_table;
 }
 
 /// Switches to the given page table.
