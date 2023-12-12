@@ -4,9 +4,8 @@ const core = @import("core");
 const kernel = @import("kernel");
 const PhysicalAddress = kernel.PhysicalAddress;
 const Processor = kernel.Processor;
-const Stack = kernel.Stack;
 const std = @import("std");
-const Thread = kernel.Thread;
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 const x86_64 = @import("x86_64.zig");
 
@@ -25,10 +24,10 @@ pub fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
 }
 
 pub fn prepareStackForNewThread(
-    stack: *Stack,
-    thread: *kernel.Thread,
+    stack: *task.Stack,
+    thread: *task.Thread,
     context: u64,
-    target_function: *const fn (thread: *kernel.Thread, context: u64) noreturn,
+    target_function: *const fn (thread: *task.Thread, context: u64) noreturn,
 ) error{StackOverflow}!void {
     const old_stack_pointer = stack.stack_pointer;
     errdefer stack.stack_pointer = old_stack_pointer;
@@ -45,13 +44,13 @@ pub fn prepareStackForNewThread(
     for (0..6) |_| stack.push(@as(u64, 0)) catch unreachable;
 }
 
-pub fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
+pub fn switchToThreadFromIdle(processor: *Processor, thread: *task.Thread) noreturn {
     const process = thread.process;
 
     if (!process.isKernel()) {
         // If the process is not the kernel we need to switch the page table and privilege stack.
 
-        x86_64.paging.switchToPageTable(&process.page_table);
+        x86_64.paging.switchToPageTable(process.page_table);
 
         processor.arch.tss.setPrivilegeStack(.kernel, thread.kernel_stack);
     }
@@ -60,12 +59,12 @@ pub fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
     unreachable;
 }
 
-pub fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_thread: *Thread) void {
+pub fn switchToThreadFromThread(processor: *Processor, old_thread: *task.Thread, new_thread: *task.Thread) void {
     const new_process = new_thread.process;
 
     // If the process is changing we need to switch the page table.
     if (old_thread.process != new_process) {
-        x86_64.paging.switchToPageTable(&new_process.page_table);
+        x86_64.paging.switchToPageTable(new_process.page_table);
     }
 
     processor.arch.tss.setPrivilegeStack(.kernel, new_thread.kernel_stack);
@@ -77,7 +76,7 @@ pub fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_
 }
 
 /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*Thread) noreturn {
+pub fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*task.Thread) noreturn {
     const old_thread = opt_old_thread orelse {
         // we were already idle
         changeStackAndReturn(stack_pointer);
@@ -86,7 +85,7 @@ pub fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_ol
 
     if (!old_thread.process.isKernel()) {
         // the process was not the kernel so we need to switch to the kernel page table
-        x86_64.paging.switchToPageTable(&kernel.kernel_process.page_table);
+        x86_64.paging.switchToPageTable(kernel.kernel_process.page_table);
     }
 
     processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);

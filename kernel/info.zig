@@ -52,5 +52,3 @@ pub var non_cached_direct_map: VirtualRange = undefined;
 ///
 /// Initialized during `initKernelStage1`.
 pub var kernel_file: ?VirtualRange = null;
-
-const log = kernel.log.scoped(.info);

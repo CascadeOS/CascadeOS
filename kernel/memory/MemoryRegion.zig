@@ -2,9 +2,9 @@
 
 const core = @import("core");
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const std = @import("std");
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
 const MemoryRegion = @This();
 
@@ -12,7 +12,7 @@ const MemoryRegion = @This();
 range: VirtualRange,
 
 /// The type of mapping.
-map_type: vmm.MapType,
+map_type: memory.virtual.MapType,
 
 pub fn print(region: MemoryRegion, writer: anytype) !void {
     try writer.writeAll("MemoryRegion{ 0x");

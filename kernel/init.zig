@@ -6,18 +6,17 @@ const core = @import("core");
 const heap = kernel.heap;
 const info = kernel.info;
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const PhysicalAddress = kernel.PhysicalAddress;
-const pmm = kernel.pmm;
 const Processor = kernel.Processor;
-const Stack = kernel.Stack;
 const std = @import("std");
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
-const log = kernel.log.scoped(.init);
+const log = kernel.debug.log.scoped(.init);
 
-var bootstrap_interrupt_stack align(16) linksection(info.init_data) = [_]u8{0} ** Stack.usable_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) linksection(info.init_data) = [_]u8{0} ** task.Stack.usable_stack_size.bytes;
 
 var bootstrap_processor: Processor linksection(info.init_data) = .{
     .id = .bootstrap,
@@ -35,7 +34,7 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
     arch.init.setupEarlyOutput();
 
     // we need to get the processor data loaded early as the panic handler and logging use it
-    bootstrap_processor.idle_stack = Stack.fromRangeNoGuard(VirtualRange.fromSlice(
+    bootstrap_processor.idle_stack = task.Stack.fromRangeNoGuard(VirtualRange.fromSlice(
         u8,
         @as([]u8, &bootstrap_interrupt_stack),
     ));
@@ -64,10 +63,10 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
     arch.init.configureSystemFeatures();
 
     log.info("initializing physical memory", .{});
-    pmm.init.initPmm();
+    memory.physical.init.initPhysicalMemory();
 
     log.info("initializing virtual memory", .{});
-    vmm.init.initVmm();
+    memory.virtual.init.initVirtualMemory();
 
     log.debug("copying kernel file from bootloader memory", .{});
     copyKernelFileFromBootloaderMemory();
@@ -84,7 +83,7 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
 ///
 /// All processors are using the bootloader provided stack.
 fn kernelInitStage2(processor: *Processor) linksection(info.init_code) noreturn {
-    arch.paging.switchToPageTable(&kernel.kernel_process.page_table);
+    arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     arch.init.loadProcessor(processor);
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
@@ -110,9 +109,9 @@ fn kernelInitStage3() noreturn {
             arch.spinLoopHint();
         }
 
-        pmm.init.reclaimBootloaderReclaimableMemory();
+        memory.physical.init.reclaimBootloaderReclaimableMemory();
 
-        vmm.init.unmapInitOnlyKernelSections();
+        memory.virtual.init.unmapInitOnlyKernelSections();
 
         reload_page_table_gate.store(true, .Release);
     } else {
@@ -125,9 +124,9 @@ fn kernelInitStage3() noreturn {
     }
 
     // now that the init only mappings are gone we reload the page table
-    arch.paging.switchToPageTable(&kernel.kernel_process.page_table);
+    arch.paging.switchToPageTable(kernel.kernel_process.page_table);
 
-    kernel.scheduler.schedule(false);
+    task.scheduler.schedule(false);
     unreachable;
 }
 
@@ -168,7 +167,7 @@ fn initProcessors() linksection(info.init_code) void {
 
         const processor = &Processor.all[i];
 
-        const idle_stack = Stack.create(true) catch {
+        const idle_stack = task.Stack.create(true) catch {
             core.panic("failed to allocate idle stack");
         };
 

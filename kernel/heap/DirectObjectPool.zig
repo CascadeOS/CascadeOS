@@ -3,7 +3,7 @@
 const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const pmm = kernel.pmm;
+const memory = kernel.memory;
 const std = @import("std");
 
 /// A pool of objects that are allocated within the direct map.
@@ -27,7 +27,7 @@ pub fn DirectObjectPool(
         const Self = @This();
 
         const objects_per_page: usize = core.Size.of(T).amountToCover(arch.paging.standard_page_size);
-        const log = kernel.log.scoped(log_scope);
+        const log = kernel.debug.log.scoped(log_scope);
 
         /// Get an object from the pool.
         pub fn get(self: *Self) error{OutOfMemory}!*T {
@@ -130,7 +130,7 @@ pub fn DirectObjectPool(
         }
 
         fn getMoreObjects(self: *Self) error{OutOfMemory}!void {
-            const page = pmm.allocatePage() orelse return error.OutOfMemory;
+            const page = memory.physical.allocatePage() orelse return error.OutOfMemory;
             const direct_map_range = page.toDirectMap();
 
             const objects = direct_map_range.address.toPtr([*]Object)[0..objects_per_page];

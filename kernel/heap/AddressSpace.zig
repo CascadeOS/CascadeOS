@@ -5,12 +5,12 @@ const containers = @import("containers");
 const core = @import("core");
 const heap = kernel.heap;
 const kernel = @import("kernel");
-const MemoryRegion = vmm.MemoryRegion;
+const memory = kernel.memory;
+const MemoryRegion = memory.virtual.MemoryRegion;
 const MemoryRegionRedBlackTree = RedBlack.Tree(memoryRegionAddressCompare);
 const RedBlack = containers.RedBlack;
 const std = @import("std");
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
 var memory_region_pool: heap.DirectObjectPool(MemoryRegionWithNode, .memory_region_pool) = .{};
 
@@ -48,7 +48,7 @@ pub const AllocateError = error{
 /// **REQUIREMENTS**:
 /// - `size` must be non-zero
 /// - `size` must be aligned to `arch.paging.standard_page_size`
-pub fn allocate(self: *AddressSpace, size: core.Size, map_type: vmm.MapType) AllocateError!VirtualRange {
+pub fn allocate(self: *AddressSpace, size: core.Size, map_type: memory.virtual.MapType) AllocateError!VirtualRange {
     core.assert(size.bytes != 0);
     core.assert(size.isAligned(arch.paging.standard_page_size));
 

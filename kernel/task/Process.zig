@@ -3,7 +3,7 @@
 const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const Stack = kernel.Stack;
+const task = kernel.task;
 const std = @import("std");
 
 const Process = @This();
@@ -11,7 +11,7 @@ const Process = @This();
 id: Id,
 _name: Name,
 
-page_table: arch.paging.PageTable,
+page_table: *arch.paging.PageTable,
 
 pub fn name(self: *const Process) []const u8 {
     return self._name.constSlice();

@@ -5,17 +5,16 @@ const arch_info = x86_64.arch_info;
 const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const PhysicalAddress = kernel.PhysicalAddress;
 const PhysicalRange = kernel.PhysicalRange;
-const pmm = kernel.pmm;
 const registers = x86_64.registers;
 const std = @import("std");
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 const x86_64 = @import("../x86_64.zig");
 
-const log = kernel.log.scoped(.paging);
+const log = kernel.debug.log.scoped(.paging);
 
 pub const small_page_size = core.Size.from(4, .kib);
 pub const medium_page_size = core.Size.from(2, .mib);
@@ -37,8 +36,15 @@ pub const higher_half = VirtualAddress.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
-pub fn initPageTable(page_table: *PageTable) void {
+/// Allocates a new page table.
+pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
+    const range = memory.physical.allocatePage() orelse return error.PageAllocationFailed;
+    core.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
+
+    const page_table = range.toDirectMap().address.toPtr(*PageTable);
     page_table.zero();
+
+    return page_table;
 }
 
 /// Switches to the given page table.
@@ -87,7 +93,7 @@ pub fn mapToPhysicalRange(
     page_table: *PageTable,
     virtual_range: VirtualRange,
     physical_range: PhysicalRange,
-    map_type: vmm.MapType,
+    map_type: memory.virtual.MapType,
 ) MapError!void {
     log.debug("mapStandardRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
@@ -143,7 +149,7 @@ pub fn mapToPhysicalRangeAllPageSizes(
     page_table: *PageTable,
     virtual_range: VirtualRange,
     physical_range: PhysicalRange,
-    map_type: vmm.MapType,
+    map_type: memory.virtual.MapType,
 ) MapError!void {
     log.debug("mapRangeUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
@@ -232,7 +238,7 @@ fn mapTo4KiB(
     level4_table: *PageTable,
     virtual_address: VirtualAddress,
     physical_address: PhysicalAddress,
-    map_type: vmm.MapType,
+    map_type: memory.virtual.MapType,
 ) MapError!void {
     core.debugAssert(virtual_address.isAligned(small_page_size));
 
@@ -264,7 +270,7 @@ fn mapTo2MiB(
     level4_table: *PageTable,
     virtual_address: VirtualAddress,
     physical_address: PhysicalAddress,
-    map_type: vmm.MapType,
+    map_type: memory.virtual.MapType,
 ) MapError!void {
     core.debugAssert(virtual_address.isAligned(medium_page_size));
     core.debugAssert(physical_address.isAligned(medium_page_size));
@@ -293,7 +299,7 @@ fn mapTo1GiB(
     level4_table: *PageTable,
     virtual_address: VirtualAddress,
     physical_address: PhysicalAddress,
-    map_type: vmm.MapType,
+    map_type: memory.virtual.MapType,
 ) MapError!void {
     core.debugAssert(arch_info.has_gib_pages); // assert that 1GiB pages are available
     core.debugAssert(virtual_address.isAligned(large_page_size));
@@ -335,12 +341,14 @@ fn unmap4KiB(
     const level1_entry = level1_table.getEntryLevel1(virtual_address);
     if (!level2_entry.present.read()) return;
 
-    pmm.deallocatePage(PhysicalRange.fromAddr(level1_entry.getAddress4kib(), arch.paging.standard_page_size));
+    memory.physical.deallocatePage(
+        PhysicalRange.fromAddr(level1_entry.getAddress4kib(), arch.paging.standard_page_size),
+    );
 
     level1_entry.zero();
 }
 
-fn applyMapType(map_type: vmm.MapType, entry: *PageTable.Entry) void {
+fn applyMapType(map_type: memory.virtual.MapType, entry: *PageTable.Entry) void {
     entry.present.write(true);
 
     if (map_type.user) {
@@ -361,7 +369,7 @@ fn applyMapType(map_type: vmm.MapType, entry: *PageTable.Entry) void {
     }
 }
 
-fn applyParentMapType(map_type: vmm.MapType, entry: *PageTable.Entry) void {
+fn applyParentMapType(map_type: memory.virtual.MapType, entry: *PageTable.Entry) void {
     entry.present.write(true);
     entry.writeable.write(true);
     if (map_type.user) entry.user_accessible.write(true);
@@ -370,17 +378,17 @@ fn applyParentMapType(map_type: vmm.MapType, entry: *PageTable.Entry) void {
 /// Ensures the next page table level exists.
 fn ensureNextTable(
     self: *PageTable.Entry,
-    map_type: vmm.MapType,
+    map_type: memory.virtual.MapType,
 ) error{ AllocationFailed, Unexpected }!*PageTable {
     var opt_range: ?PhysicalRange = null;
 
     if (!self.present.read()) {
-        opt_range = pmm.allocatePage() orelse return error.AllocationFailed;
+        opt_range = memory.physical.allocatePage() orelse return error.AllocationFailed;
         self.setAddress4kib(opt_range.?.address);
     }
     errdefer if (opt_range) |range| {
         self.setAddress4kib(PhysicalAddress.zero);
-        pmm.deallocatePage(range);
+        memory.physical.deallocatePage(range);
     };
 
     applyParentMapType(map_type, self);

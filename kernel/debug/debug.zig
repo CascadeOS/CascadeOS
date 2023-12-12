@@ -8,6 +8,8 @@ const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 const symbols = @import("symbols.zig");
 
+pub const log = @import("log.zig");
+
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
 
 /// Entry point from the Zig language upon a panic.

@@ -5,8 +5,8 @@ const interrupts = x86_64.interrupts;
 const InterruptStackSelector = interrupts.InterruptStackSelector;
 const kernel = @import("kernel");
 const PrivilegeLevel = x86_64.PrivilegeLevel;
-const Stack = kernel.Stack;
 const std = @import("std");
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 const x86_64 = @import("x86_64.zig");
 
@@ -30,12 +30,12 @@ pub const Tss = extern struct {
     iomap_base: u16 align(1) = 0,
 
     /// Sets the stack for the given stack selector.
-    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: Stack) void {
+    pub fn setInterruptStack(self: *Tss, stack_selector: InterruptStackSelector, stack: task.Stack) void {
         self.interrupt_stack_table[@intFromEnum(stack_selector)] = stack.stack_pointer;
     }
 
     /// Sets the stack for the given privilege level.
-    pub fn setPrivilegeStack(self: *Tss, privilege_level: PrivilegeLevel, stack: Stack) void {
+    pub fn setPrivilegeStack(self: *Tss, privilege_level: PrivilegeLevel, stack: task.Stack) void {
         core.assert(privilege_level != .user);
         self.privilege_stack_table[@intFromEnum(privilege_level)] = stack.stack_pointer;
     }

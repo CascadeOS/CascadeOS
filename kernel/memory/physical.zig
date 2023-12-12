@@ -5,12 +5,12 @@ const boot = kernel.boot;
 const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const PhysicalRange = kernel.PhysicalRange;
-const pmm = kernel.pmm;
 const std = @import("std");
 const VirtualAddress = kernel.VirtualAddress;
 
-const log = kernel.log.scoped(.phys_mm);
+const log = kernel.debug.log.scoped(.physical);
 
 // TODO: better data structure https://github.com/CascadeOS/CascadeOS/issues/20
 
@@ -150,7 +150,7 @@ const PhysPageNode = extern struct {
 pub const init = struct {
     const indent = "  ";
 
-    pub fn initPmm() linksection(info.init_code) void {
+    pub fn initPhysicalMemory() linksection(info.init_code) void {
         var memory_map_iterator = boot.memoryMap(.forwards);
 
         while (memory_map_iterator.next()) |memory_map_entry| {
@@ -208,7 +208,7 @@ pub const init = struct {
         while (current_virtual_address.lessThan(end_virtual_address)) : ({
             current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
         }) {
-            const page = current_virtual_address.toPtr(*pmm.PhysPageNode);
+            const page = current_virtual_address.toPtr(*PhysPageNode);
             page.next = null;
             if (first_page_opt == null) {
                 first_page_opt = page;

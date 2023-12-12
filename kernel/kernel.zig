@@ -1,32 +1,26 @@
 // SPDX-License-Identifier: MIT
 
 const address = @import("address.zig");
-const core = @import("core");
-const std = @import("std");
+
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot.zig");
 pub const debug = @import("debug/debug.zig");
 pub const heap = @import("heap/heap.zig");
 pub const info = @import("info.zig");
 pub const init = @import("init.zig");
-pub const log = @import("log.zig");
+pub const memory = @import("memory/memory.zig");
 pub const PhysicalAddress = address.PhysicalAddress;
 pub const PhysicalRange = address.PhysicalRange;
-pub const pmm = @import("pmm.zig");
-pub const Process = @import("Process.zig");
 pub const Processor = @import("Processor.zig");
-pub const scheduler = @import("scheduler.zig");
-pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
-pub const Thread = @import("Thread.zig");
+pub const task = @import("task/task.zig");
 pub const VirtualAddress = address.VirtualAddress;
 pub const VirtualRange = address.VirtualRange;
-pub const vmm = @import("vmm/vmm.zig");
 
-pub var kernel_process: Process = .{
+pub var kernel_process: task.Process = .{
     .id = .kernel,
-    ._name = Process.Name.fromSlice("kernel") catch unreachable,
-    .page_table = undefined, // initialized in `initVmm`
+    ._name = task.Process.Name.fromSlice("kernel") catch unreachable,
+    .page_table = undefined, // initialized in `initVirtualMemory`
 };
 
 comptime {

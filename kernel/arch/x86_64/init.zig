@@ -10,12 +10,12 @@ const kernel = @import("kernel");
 const Processor = kernel.Processor;
 const registers = x86_64.registers;
 const SerialPort = x86_64.serial.SerialPort;
-const Stack = kernel.Stack;
 const std = @import("std");
+const task = kernel.task;
 const VirtualRange = kernel.VirtualRange;
 const x86_64 = @import("x86_64.zig");
 
-const log = kernel.log.scoped(.init);
+const log = kernel.debug.log.scoped(.init);
 
 pub const EarlyOutputWriter = SerialPort.Writer;
 var early_output_serial_port: ?SerialPort = null; // TODO: Put in init_data section
@@ -28,17 +28,17 @@ pub fn getEarlyOutputWriter() ?SerialPort.Writer { // TODO: Put in init_code sec
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
-var bootstrap_interrupt_stack align(16) linksection(info.init_data) = [_]u8{0} ** Stack.usable_stack_size.bytes;
-var bootstrap_double_fault_stack align(16) linksection(info.init_data) = [_]u8{0} ** Stack.usable_stack_size.bytes;
-var bootstrap_non_maskable_interrupt_stack align(16) linksection(info.init_data) = [_]u8{0} ** Stack.usable_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) linksection(info.init_data) = [_]u8{0} ** task.Stack.usable_stack_size.bytes;
+var bootstrap_double_fault_stack align(16) linksection(info.init_data) = [_]u8{0} ** task.Stack.usable_stack_size.bytes;
+var bootstrap_non_maskable_interrupt_stack align(16) linksection(info.init_data) = [_]u8{0} ** task.Stack.usable_stack_size.bytes;
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *Processor) linksection(info.init_code) void {
     bootstrap_processor.arch = .{
-        .double_fault_stack = Stack.fromRangeNoGuard(VirtualRange.fromSlice(
+        .double_fault_stack = task.Stack.fromRangeNoGuard(VirtualRange.fromSlice(
             u8,
             @as([]u8, &bootstrap_double_fault_stack),
         )),
-        .non_maskable_interrupt_stack = Stack.fromRangeNoGuard(VirtualRange.fromSlice(
+        .non_maskable_interrupt_stack = task.Stack.fromRangeNoGuard(VirtualRange.fromSlice(
             u8,
             @as([]u8, &bootstrap_non_maskable_interrupt_stack),
         )),
@@ -52,8 +52,8 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *Processor) linksection(in
 /// **WARNING**: This function will panic if the processor cannot be prepared.
 pub fn prepareProcessor(processor: *Processor) linksection(info.init_code) void {
     processor.arch = .{
-        .double_fault_stack = Stack.create(true) catch core.panic("unable to create double fault stack"),
-        .non_maskable_interrupt_stack = Stack.create(true) catch core.panic("unable to create non-mackable interrupt stack"),
+        .double_fault_stack = task.Stack.create(true) catch core.panic("unable to create double fault stack"),
+        .non_maskable_interrupt_stack = task.Stack.create(true) catch core.panic("unable to create non-mackable interrupt stack"),
     };
 
     processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);

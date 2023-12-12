@@ -6,15 +6,15 @@ const kernel = @import("kernel");
 const Processor = kernel.Processor;
 const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
-const Thread = kernel.Thread;
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 
 // TODO: Replace this simple round robin with a proper scheduler
 
 var scheduler_lock: SpinLock = .{};
 
-var ready_to_run_start: ?*Thread = null;
-var ready_to_run_end: ?*Thread = null;
+var ready_to_run_start: ?*task.Thread = null;
+var ready_to_run_end: ?*task.Thread = null;
 
 pub fn schedule(requeue_current_thread: bool) void {
     const held = scheduler_lock.lock();
@@ -68,7 +68,7 @@ pub fn schedule(requeue_current_thread: bool) void {
 }
 
 /// Queues a thread to be run by the scheduler.
-pub fn queueThread(thread: *Thread) void {
+pub fn queueThread(thread: *task.Thread) void {
     const held = scheduler_lock.lock();
     defer held.unlock();
 
@@ -78,7 +78,7 @@ pub fn queueThread(thread: *Thread) void {
 /// Queues a thread to be run by the scheduler.
 ///
 /// The `scheduler_lock` must be held when calling this function.
-fn queueThreadImpl(thread: *Thread) void {
+fn queueThreadImpl(thread: *task.Thread) void {
     core.debugAssert(scheduler_lock.isLockedByCurrent());
 
     thread.state = .ready;

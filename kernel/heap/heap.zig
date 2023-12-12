@@ -3,11 +3,11 @@
 const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
 pub const AddressSpace = @import("AddressSpace.zig");
 pub const DirectObjectPool = @import("DirectObjectPool.zig").DirectObjectPool;
@@ -26,7 +26,7 @@ pub const page_allocator = std.mem.Allocator{
 };
 
 const PageAllocator = struct {
-    const heap_map_type: vmm.MapType = .{ .global = true, .writeable = true };
+    const heap_map_type: memory.virtual.MapType = .{ .global = true, .writeable = true };
 
     fn alloc(_: *anyopaque, len: usize, _: u8, _: usize) ?[*]u8 {
         core.debugAssert(len != 0);
@@ -53,8 +53,8 @@ const PageAllocator = struct {
             address_space.deallocate(allocated_range);
         }
 
-        try vmm.mapRange(
-            &kernel.kernel_process.page_table,
+        try memory.virtual.mapRange(
+            kernel.kernel_process.page_table,
             allocated_range,
             heap_map_type,
         );
@@ -106,7 +106,7 @@ const PageAllocator = struct {
             address_space.deallocate(range);
         }
 
-        vmm.unmap(&kernel.kernel_process.page_table, range);
+        memory.virtual.unmap(kernel.kernel_process.page_table, range);
 
         // TODO: Cache needs to be flushed on this core and others.
     }

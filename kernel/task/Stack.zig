@@ -7,11 +7,11 @@ const core = @import("core");
 const heap = kernel.heap;
 const info = kernel.info;
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
 const Stack = @This();
 
@@ -74,12 +74,12 @@ pub fn create(push_null_return_value: bool) !Stack {
     var usable_range = virtual_range.moveForward(arch.paging.standard_page_size);
     usable_range.size.subtractInPlace(arch.paging.standard_page_size);
 
-    try vmm.mapRange(
-        &kernel.kernel_process.page_table,
+    try memory.virtual.mapRange(
+        kernel.kernel_process.page_table,
         usable_range,
         .{ .global = true, .writeable = true },
     );
-    errdefer vmm.unmap(&kernel.kernel_process.page_table, usable_range);
+    errdefer memory.virtual.unmap(kernel.kernel_process.page_table, usable_range);
 
     var stack = fromRangeWithGuard(virtual_range, usable_range);
 
@@ -95,7 +95,7 @@ pub fn create(push_null_return_value: bool) !Stack {
 /// **REQUIREMENTS**:
 /// - `stack` must have been created with `create`.
 pub fn destroy(stack: Stack) void {
-    vmm.unmap(kernel.root_page_table, stack.usable_range);
+    memory.virtual.unmap(kernel.root_page_table, stack.usable_range);
 
     // TODO: Cache needs to be flushed on this core and others.
 }

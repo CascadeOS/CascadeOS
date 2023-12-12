@@ -3,14 +3,13 @@
 const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const PhysicalRange = kernel.PhysicalRange;
 const Processor = kernel.Processor;
-const Stack = kernel.Stack;
 const std = @import("std");
-const Thread = kernel.Thread;
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
 const current = switch (info.arch) {
     .x86_64 => @import("x86_64/x86_64.zig"),
@@ -193,11 +192,11 @@ pub const paging = struct {
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
-    /// Initializes a page table.
-    pub inline fn initPageTable(page_table: *PageTable) void {
-        checkSupport(current.paging, "initPageTable", fn (*PageTable) void);
+    /// Allocates a new page table.
+    pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
+        checkSupport(current.paging, "allocatePageTable", fn () error{PageAllocationFailed}!*PageTable);
 
-        return current.paging.initPageTable(page_table);
+        return current.paging.allocatePageTable();
     }
 
     /// This function is only called during kernel init, it is required to:
@@ -227,13 +226,13 @@ pub const paging = struct {
         page_table: *PageTable,
         virtual_range: VirtualRange,
         physical_range: PhysicalRange,
-        map_type: vmm.MapType,
+        map_type: memory.virtual.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
             VirtualRange,
             PhysicalRange,
-            vmm.MapType,
+            memory.virtual.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
@@ -258,13 +257,13 @@ pub const paging = struct {
         page_table: *PageTable,
         virtual_range: VirtualRange,
         physical_range: PhysicalRange,
-        map_type: vmm.MapType,
+        map_type: memory.virtual.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
             *PageTable,
             VirtualRange,
             PhysicalRange,
-            vmm.MapType,
+            memory.virtual.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
@@ -288,36 +287,36 @@ pub const scheduling = struct {
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
 
-    pub inline fn switchToThreadFromIdle(processor: *Processor, thread: *Thread) noreturn {
-        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*Processor, *Thread) noreturn);
+    pub inline fn switchToThreadFromIdle(processor: *Processor, thread: *task.Thread) noreturn {
+        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*Processor, *task.Thread) noreturn);
 
         current.scheduling.switchToThreadFromIdle(processor, thread);
     }
 
-    pub inline fn switchToThreadFromThread(processor: *Processor, old_thread: *Thread, new_thread: *Thread) void {
-        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*Processor, *Thread, *Thread) void);
+    pub inline fn switchToThreadFromThread(processor: *Processor, old_thread: *task.Thread, new_thread: *task.Thread) void {
+        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*Processor, *task.Thread, *task.Thread) void);
 
         current.scheduling.switchToThreadFromThread(processor, old_thread, new_thread);
     }
 
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*Thread) noreturn {
-        checkSupport(current.scheduling, "switchToIdle", fn (*Processor, VirtualAddress, ?*Thread) noreturn);
+    pub inline fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*task.Thread) noreturn {
+        checkSupport(current.scheduling, "switchToIdle", fn (*Processor, VirtualAddress, ?*task.Thread) noreturn);
 
         current.scheduling.switchToIdle(processor, stack_pointer, opt_old_thread);
     }
 
     pub inline fn prepareStackForNewThread(
-        stack: *Stack,
-        thread: *kernel.Thread,
+        stack: *task.Stack,
+        thread: *task.Thread,
         context: u64,
-        target_function: *const fn (thread: *kernel.Thread, context: u64) noreturn,
+        target_function: *const fn (thread: *task.Thread, context: u64) noreturn,
     ) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareStackForNewThread", fn (
-            *Stack,
-            *kernel.Thread,
+            *task,
+            *task.Thread,
             u64,
-            *const fn (thread: *kernel.Thread, context: u64) noreturn,
+            *const fn (thread: *task.Thread, context: u64) noreturn,
         ) error{StackOverflow}!void);
 
         return current.scheduling.prepareStackForNewThread(stack, thread, context, target_function);

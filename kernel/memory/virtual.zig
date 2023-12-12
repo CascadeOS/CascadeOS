@@ -5,22 +5,21 @@ const core = @import("core");
 const heap = kernel.heap;
 const info = kernel.info;
 const kernel = @import("kernel");
+const memory = kernel.memory;
 const PageTable = paging.PageTable;
 const paging = arch.paging;
 const PhysicalAddress = kernel.PhysicalAddress;
 const PhysicalRange = kernel.PhysicalRange;
-const pmm = kernel.pmm;
-const Stack = kernel.Stack;
 const std = @import("std");
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
-const vmm = kernel.vmm;
 
 pub const KernelMemoryLayout = @import("KernelMemoryLayout.zig");
 pub const MapType = @import("MapType.zig");
 pub const MemoryRegion = @import("MemoryRegion.zig");
 
-const log = kernel.log.scoped(.virt_mm);
+const log = kernel.debug.log.scoped(.virtual);
 
 pub var memory_layout: KernelMemoryLayout = .{};
 
@@ -37,16 +36,16 @@ pub fn mapRange(page_table: *PageTable, virtual_range: VirtualRange, map_type: M
     errdefer {
         // Unmap all pages that have been mapped.
         while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
-            vmm.unmap(page_table, current_virtual_range);
+            unmap(page_table, current_virtual_range);
             current_virtual_range.address.moveBackwardInPlace(arch.paging.standard_page_size);
         }
     }
 
     // Map all pages that were allocated.
     while (!current_virtual_range.address.equal(virtual_range_end)) {
-        const physical_range = pmm.allocatePage() orelse return error.OutOfMemory;
+        const physical_range = memory.physical.allocatePage() orelse return error.OutOfMemory;
 
-        try vmm.mapToPhysicalRange(
+        try mapToPhysicalRange(
             page_table,
             current_virtual_range,
             physical_range,
@@ -101,9 +100,10 @@ pub fn unmap(
 }
 
 pub const init = struct {
-    pub fn initVmm() linksection(info.init_code) void {
+    pub fn initVirtualMemory() linksection(info.init_code) void {
         log.debug("populating kernel page table", .{});
-        arch.paging.initPageTable(&kernel.kernel_process.page_table);
+        kernel.kernel_process.page_table = paging.allocatePageTable() catch
+            core.panic("unable to allocate physical page for root page table");
 
         // the below functions setup the mappings in `kernel_root_page_table` and also register each region in
         // the kernel memory layout
@@ -125,7 +125,7 @@ pub const init = struct {
         };
 
         log.debug("switching to kernel page table", .{});
-        paging.switchToPageTable(&kernel.kernel_process.page_table);
+        paging.switchToPageTable(kernel.kernel_process.page_table);
 
         log.debug("kernel memory regions:", .{});
 
@@ -138,7 +138,7 @@ pub const init = struct {
         log.debug("preparing kernel heap", .{});
 
         const kernel_heap_range = try arch.paging.getTopLevelRangeAndFillFirstLevel(
-            &kernel.kernel_process.page_table,
+            kernel.kernel_process.page_table,
         );
 
         try heap.init.initHeap(kernel_heap_range);
@@ -152,10 +152,10 @@ pub const init = struct {
         log.debug("preparing kernel stacks", .{});
 
         const kernel_stacks_range = try arch.paging.getTopLevelRangeAndFillFirstLevel(
-            &kernel.kernel_process.page_table,
+            kernel.kernel_process.page_table,
         );
 
-        try Stack.init.initStacks(kernel_stacks_range);
+        try task.Stack.init.initStacks(kernel_stacks_range);
 
         memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
 
@@ -195,7 +195,7 @@ pub const init = struct {
         log.debug("mapping the direct map", .{});
 
         try mapToPhysicalRangeAllPageSizes(
-            &kernel.kernel_process.page_table,
+            kernel.kernel_process.page_table,
             info.direct_map,
             direct_map_physical_range,
             .{ .writeable = true, .global = true },
@@ -205,7 +205,7 @@ pub const init = struct {
         log.debug("mapping the non-cached direct map", .{});
 
         try mapToPhysicalRangeAllPageSizes(
-            &kernel.kernel_process.page_table,
+            kernel.kernel_process.page_table,
             info.non_cached_direct_map,
             direct_map_physical_range,
             .{ .writeable = true, .no_cache = true, .global = true },
@@ -307,7 +307,7 @@ pub const init = struct {
         const physical_range = PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
         try mapToPhysicalRangeAllPageSizes(
-            &kernel.kernel_process.page_table,
+            kernel.kernel_process.page_table,
             virtual_range,
             physical_range,
             map_type,
@@ -331,7 +331,7 @@ pub const init = struct {
                 continue;
             }
 
-            unmap(&kernel.kernel_process.page_table, region.range);
+            unmap(kernel.kernel_process.page_table, region.range);
 
             _ = memory_layout.layout.swapRemove(i);
         }

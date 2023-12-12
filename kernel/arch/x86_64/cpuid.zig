@@ -11,7 +11,7 @@ const registers = x86_64.registers;
 const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
-const log = kernel.log.scoped(.cpuid);
+const log = kernel.debug.log.scoped(.cpuid);
 
 pub fn capture() linksection(info.init_code) void {
     if (!isCPUIDAvailable()) core.panic("cpuid is not supported");

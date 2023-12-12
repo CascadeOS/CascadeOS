@@ -3,7 +3,7 @@
 const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const Stack = kernel.Stack;
+const task = kernel.task;
 const std = @import("std");
 
 const Thread = @This();
@@ -12,9 +12,9 @@ id: Thread.Id,
 
 state: State = .ready,
 
-process: *kernel.Process,
+process: *task.Process,
 
-kernel_stack: Stack,
+kernel_stack: task.Stack,
 
 next_thread: ?*Thread = null,
 

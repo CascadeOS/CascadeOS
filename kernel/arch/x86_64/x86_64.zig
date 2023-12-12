@@ -4,8 +4,8 @@ const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
 const Processor = kernel.Processor;
-const Stack = kernel.Stack;
 const std = @import("std");
+const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 
 comptime {
