@@ -170,7 +170,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
     if (should_use_acceleration) {
         switch (b.host.target.os.tag) {
-            .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
+            .linux => if (helpers.fileExists("/dev/kvm")) run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
             .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
             .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
             else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.host.target.os.tag)}),
