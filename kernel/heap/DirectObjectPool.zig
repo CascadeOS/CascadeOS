@@ -35,7 +35,7 @@ pub fn DirectObjectPool(
 
             while (true) {
                 const first_free: *Object = opt_first_free orelse {
-                    // TODO: @cold
+                    // TODO: per branch cold
 
                     // we are out of objects
                     const interrupt_guard = arch.interrupts.interruptGuard();

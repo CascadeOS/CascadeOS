@@ -34,7 +34,6 @@ fn panicImpl(
     stack_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
 ) void {
-    // TODO: Implement `panicImpl` https://github.com/CascadeOS/CascadeOS/issues/16
     init.earlyPanicImpl(msg, stack_trace, return_address);
 }
 
@@ -61,8 +60,6 @@ fn printCurrentBackTrace(
     writer: anytype,
     return_address: usize,
 ) void {
-    // TODO: Use DWARF frame unwinding - https://github.com/CascadeOS/CascadeOS/issues/62
-
     var stack_iter = std.debug.StackIterator.init(return_address, @frameAddress());
 
     while (stack_iter.next()) |address| {

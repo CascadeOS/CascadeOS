@@ -12,15 +12,10 @@ const VirtualRange = kernel.VirtualRange;
 
 const limine = @import("limine");
 
-// TODO: Support more than just limine. https://github.com/CascadeOS/CascadeOS/issues/35
-//       Multiboot, etc.
-
 /// Entry point.
 export fn _start() linksection(info.init_code) noreturn {
     @call(.never_inline, init.kernelInitStage1, .{});
-
-    // TODO: This should halt the entire kernel not just this cpu.
-    core.panic("kernelInit returned");
+    core.panic("kernelInitStage1 returned");
 }
 
 const limine_requests = struct {

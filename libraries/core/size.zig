@@ -159,9 +159,8 @@ pub const Size = extern struct {
         var value = size.bytes;
         var emitted_anything = false;
 
-        // TODO: use `continue` instead of `break :blk` https://github.com/CascadeOS/CascadeOS/issues/55
         inline for (unit_table) |unit| blk: {
-            if (value < unit.value) break :blk;
+            if (value < unit.value) break :blk; // continue loop
 
             const part = value / unit.value;
 

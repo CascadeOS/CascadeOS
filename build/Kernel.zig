@@ -55,7 +55,7 @@ fn create(
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
         .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "root.zig" }) },
-        .target = target.getCrossTarget(),
+        .target = target.getKernelCrossTarget(),
         .optimize = options.optimize,
     });
 
@@ -98,11 +98,8 @@ fn create(
 
     kernel_exe.addModule("kernel", kernel_module);
 
-    // TODO: LTO cannot be enabled https://github.com/CascadeOS/CascadeOS/issues/8
     kernel_exe.want_lto = false;
     kernel_exe.pie = true;
-
-    // TODO: Implement DWARF based stack unwinding
     kernel_exe.omit_frame_pointer = false;
 
     target.targetSpecificSetup(kernel_exe);
@@ -186,9 +183,6 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
         const library: *Library = libraries.get(library_name).?;
         try addFilesFromLibrary(b, &modules, &file_paths, root_path, libraries, library, &processed_libraries);
     }
-
-    // TODO: compress the embeded files https://github.com/CascadeOS/CascadeOS/issues/48
-    // TODO: embed the std lib (all of it or parts?) https://github.com/CascadeOS/CascadeOS/issues/49
 
     const files_option = b.addOptions();
     files_option.addOption([]const []const u8, "file_paths", file_paths.items);

@@ -92,10 +92,10 @@ const PageAllocator = struct {
     }
 
     fn free(_: *anyopaque, buf: []u8, _: u8, _: usize) void {
-        var unallocated_range = VirtualRange.fromSlice(u8, buf);
-        unallocated_range.size = unallocated_range.size.alignForward(arch.paging.standard_page_size);
+        var allocated_range = VirtualRange.fromSlice(u8, buf);
+        allocated_range.size = allocated_range.size.alignForward(arch.paging.standard_page_size);
 
-        freeImpl(unallocated_range);
+        freeImpl(allocated_range);
     }
 
     fn freeImpl(range: VirtualRange) void {

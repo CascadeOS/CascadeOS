@@ -13,8 +13,6 @@ const DwarfSymbolMap = @This();
 debug_info: std.dwarf.DwarfInfo,
 allocator: std.mem.Allocator,
 
-// TODO: Needing such a big buffer for DWARF is annoying https://github.com/CascadeOS/CascadeOS/issues/47
-// this buffer needs to be big enough to initialize the DWARF debug info for the kernel
 const size_of_dwarf_debug_allocator = core.Size.from(16, .mib);
 
 var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.bytes]u8 = undefined;

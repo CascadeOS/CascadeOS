@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+//! A simple intrusive linked list of physical pages.
+
 const arch = kernel.arch;
 const boot = kernel.boot;
 const core = @import("core");
@@ -11,8 +13,6 @@ const std = @import("std");
 const VirtualAddress = kernel.VirtualAddress;
 
 const log = kernel.debug.log.scoped(.physical);
-
-// TODO: better data structure https://github.com/CascadeOS/CascadeOS/issues/20
 
 var first_free_physical_page: ?*PhysPageNode = null;
 var total_usable_memory: core.Size = core.Size.zero;

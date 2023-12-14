@@ -207,9 +207,6 @@ pub const paging = struct {
     pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!VirtualRange {
         checkSupport(current.paging, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!VirtualRange);
 
-        // TODO: randomize location of the heap/stacks https://github.com/CascadeOS/CascadeOS/issues/56
-        // the chance that the heap will occupy the the very first higher half table is very high
-        // especially due to kaslr. to reduce this problem we need to add a bit of random.
         return current.paging.getTopLevelRangeAndFillFirstLevel(page_table);
     }
 

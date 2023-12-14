@@ -131,7 +131,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     const self = @fieldParentPtr(ImageStep, "step", step);
 
-    // TODO: using caching somehow.
+    // TODO: use cache system
 
     var timer = try std.time.Timer.start();
 
@@ -166,7 +166,6 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
     );
     defer builder.deinit();
 
-    // TODO: The EFI partition fills the whole image.
     const efi_partition = try builder.addPartition("EFI", 0, .fat32, .efi);
 
     try efi_partition.addFile(.{
@@ -236,8 +235,6 @@ fn hashDirectoryRecursive(
     path: []const u8,
     cache_manifest: *std.Build.Cache.Manifest,
 ) !void {
-    // TODO: Re-write this non-recursively, using a stack.
-
     var dir = try std.fs.cwd().openIterableDir(path, .{});
     defer dir.close();
 

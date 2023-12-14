@@ -52,7 +52,7 @@ pub const CascadeTarget = enum {
     }
 
     /// Returns a CrossTarget for building the kernel for the given target.
-    pub fn getCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
+    pub fn getKernelCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
         switch (self) {
             .aarch64 => {
                 const features = std.Target.aarch64.Feature;

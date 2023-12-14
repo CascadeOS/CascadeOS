@@ -138,7 +138,6 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
             // The "-M smm=off" below disables the SMM generated spam that happens before the kernel starts.
             run_qemu.addArgs(&[_][]const u8{ "-d", "int", "-M", "smm=off" });
         } else {
-            // TODO: Is there some way to disable the pre-kernel interrupt spam for other archs? https://github.com/CascadeOS/CascadeOS/issues/50
             run_qemu.addArgs(&[_][]const u8{ "-d", "int" });
         }
     }
@@ -199,7 +198,7 @@ fn ensureCurrentStdoutLineIsEmpty() !void {
     const stdout = std.io.getStdOut();
     const tty_config = std.io.tty.detectConfig(stdout);
     switch (tty_config) {
-        .no_color, .windows_api => { // TODO: proper support for windows api https://github.com/CascadeOS/CascadeOS/issues/13
+        .no_color, .windows_api => {
             try stdout.writeAll("\r\n");
         },
         .escape_codes => {

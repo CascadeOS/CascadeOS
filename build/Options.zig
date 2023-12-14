@@ -16,24 +16,41 @@ cascade_version_string: []const u8,
 build_for_host: bool,
 
 /// Enable QEMU monitor.
+///
+/// Defaults to false.
 qemu_monitor: bool,
 
 /// Enable QEMU remote debug.
+///
+/// If true, disables acceleration.
+///
+/// Defaults to false.
 qemu_remote_debug: bool,
 
 /// Disable QEMU graphical display.
-/// TODO: Enable display by default when we have a graphical display https://github.com/CascadeOS/CascadeOS/issues/11
+///
+/// Defaults to false.
 no_display: bool,
 
 /// Disable usage of any virtualization accelerators.
 ///
-/// Defaults to false, forced to true if interrupt_details is requested.
+/// Defaults to false.
+///
+/// Forced to true if any of the below are true:
+///  - `interrupt_details`
+///  - `qemu_remote_debug`
 no_acceleration: bool,
 
 /// Show detailed QEMU interrupt details.
+///
+/// If true, disables acceleration.
+///
+/// Defaults to false.
 interrupt_details: bool,
 
 /// Number of cores.
+///
+/// Defaults to 1.
 number_of_cores: usize,
 
 /// Force QEMU to run in UEFI mode.
@@ -197,6 +214,7 @@ fn buildKernelTargetOptionModules(
     return target_option_modules;
 }
 
+/// Create a module containing target independent kernel options.
 fn buildKernelOptionModule(
     b: *std.Build,
     force_debug_log: bool,
@@ -248,6 +266,7 @@ fn addEnumType(options: *Step.Options, name: []const u8, comptime EnumT: type) v
     out.writeAll("};\n") catch unreachable;
 }
 
+/// Adds target-specific options to the options.
 fn addTargetOptions(options: *Step.Options, target: CascadeTarget) void {
     addEnumType(options, "Arch", CascadeTarget);
 

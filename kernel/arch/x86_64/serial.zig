@@ -10,17 +10,13 @@ const x86_64 = @import("x86_64.zig");
 
 const OUTPUT_READY: u8 = 1 << 5;
 
-// TODO: Implement a proper serial port driver https://github.com/CascadeOS/CascadeOS/issues/30
-
+/// A basic write only serial port.
 pub const SerialPort = struct {
     _data_port: u16,
     _line_status_port: u16,
 
     /// Initialize the serial port at `com_port` with the baud rate `baud_rate`
     pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
-        // TODO: Check if the serial port exists before using it. https://github.com/CascadeOS/CascadeOS/issues/37
-        // Writing to then reading the scratch register `data_port_number + 7` should return the same value.
-
         const data_port_number = com_port.toPort();
 
         // Disable interrupts
@@ -64,7 +60,6 @@ pub const SerialPort = struct {
     fn writerImpl(self: SerialPort, bytes: []const u8) error{}!usize {
         for (bytes) |char| {
             self.waitForOutputReady();
-            // TODO: Does a serial port need `\r` before `\n`? https://github.com/CascadeOS/CascadeOS/issues/31
             portWriteU8(self._data_port, char);
         }
         return bytes.len;

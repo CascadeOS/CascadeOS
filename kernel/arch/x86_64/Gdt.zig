@@ -31,8 +31,6 @@ pub const Gdt = extern struct {
     const mask_u24: u64 = std.math.maxInt(u24);
 
     pub fn setTss(self: *Gdt, tss: *Tss) linksection(info.init_code) void {
-        // TODO: packed struct to represent the below
-
         const tss_ptr = @intFromPtr(tss);
 
         const low_base: u64 = (tss_ptr & mask_u24) << 16;

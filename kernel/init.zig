@@ -275,9 +275,6 @@ fn calculateKernelOffsets() linksection(info.init_code) void {
     const kernel_base_address = boot.kernelBaseAddress() orelse
         core.panic("bootloader did not provide the kernel base address");
 
-    // TODO: Can we calculate the kernel offsets from the the bootloaders page table?
-    // https://github.com/CascadeOS/CascadeOS/issues/36
-
     const kernel_virtual = kernel_base_address.virtual;
     const kernel_physical = kernel_base_address.physical;
 

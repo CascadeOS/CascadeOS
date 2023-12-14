@@ -43,7 +43,7 @@ pub const Id = enum(usize) {
             @intFromEnum(self),
             10,
             .lower,
-            .{ .width = 2, .fill = '0' }, // TODO: What should the width be?
+            .{ .width = 2, .fill = '0' },
             writer,
         ) catch unreachable;
     }

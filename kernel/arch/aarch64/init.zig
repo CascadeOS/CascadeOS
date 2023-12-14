@@ -15,7 +15,6 @@ pub const EarlyOutputWriter = Uart.Writer;
 var early_output_uart: ?Uart = null; // TODO: Put in init_data section
 
 pub fn setupEarlyOutput() linksection(info.init_code) void {
-    // TODO: Use the device tree to find the UART base address https://github.com/CascadeOS/CascadeOS/issues/24
     early_output_uart = Uart.init(0x09000000);
 }
 

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
+//! A basic write only UART.
+
 const aarch64 = @import("aarch64.zig");
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
 const Uart = @This();
-
-// TODO: Implement a proper UART driver https://github.com/CascadeOS/CascadeOS/issues/28
 
 address: *volatile u8,
 

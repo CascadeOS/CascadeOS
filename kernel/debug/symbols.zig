@@ -40,8 +40,6 @@ pub fn loadSymbols() void {
         } else |_| {}
     }
 
-    // TODO: Embed a simple symbol map to use when DWARF fails us.
-
     @atomicStore(bool, &symbol_loading_failed, true, .Release);
 }
 

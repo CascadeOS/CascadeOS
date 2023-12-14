@@ -43,7 +43,7 @@ fn logFnDispatch(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    // TODO Use per branch cold https://github.com/CascadeOS/CascadeOS/issues/17
+    // TODO per branch cold
     if (initialized) {
         standardLogFn(scope, message_level, format, args);
     } else {
@@ -63,7 +63,7 @@ fn standardLogFn(
     _ = message_level;
     _ = scope;
 
-    core.panic("UNIMPLEMENTED `standardLogFn`"); // TODO: implement standardLogFn https://github.com/CascadeOS/CascadeOS/issues/18
+    core.panic("UNIMPLEMENTED `standardLogFn`");
 }
 
 /// Logging function for early boot only.
@@ -138,7 +138,7 @@ inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime messag
 
 /// Checks if a scope is in the list of scopes forced to log at debug level.
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
-    if (kernel_options.forced_debug_log_scopes.len == 0) return false; // TODO: Remove this line - https://github.com/ziglang/zig/issues/18212
+    if (kernel_options.forced_debug_log_scopes.len == 0) return false;
     return comptime debug_scopes.has(@tagName(scope));
 }
 
@@ -158,7 +158,6 @@ const debug_scopes = std.ComptimeStringMap(
 const level: Level = blk: {
     if (kernel_options.force_debug_log) break :blk .debug;
 
-    // TODO: Once the kernel matures use per mode logging levels https://github.com/CascadeOS/CascadeOS/issues/19
     if (true) break :blk .info;
 
     break :blk switch (info.mode) {

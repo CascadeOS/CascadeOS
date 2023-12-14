@@ -9,8 +9,6 @@ const gpt = fs.gpt;
 const fat = fs.fat;
 const mbr = fs.mbr;
 
-// TODO: Add support for ext2
-
 const ImageDescription = @import("ImageDescription.zig");
 
 const disk_block_size = core.Size.from(512, .byte);
@@ -860,8 +858,6 @@ const FATDateTime = struct {
 };
 
 fn getFATDateAndTime() FATDateTime {
-    // TODO: Check this logic
-
     const unix_timestamp_ms = std.time.milliTimestamp();
     const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = @intCast(@divFloor(unix_timestamp_ms, std.time.ms_per_s)) };
 

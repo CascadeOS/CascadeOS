@@ -4,8 +4,6 @@
 
 const std = @import("std");
 
-// TODO: Add support for ext2
-
 const ImageDescription = @This();
 
 /// The output path the image will be written too.

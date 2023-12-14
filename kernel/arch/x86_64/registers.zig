@@ -103,8 +103,6 @@ pub const RFlags = packed struct(u64) {
 };
 
 pub const Cr0 = packed struct(u64) {
-    // TODO: Add field level documentation
-
     protected_mode_enable: bool,
 
     monitor_coprocessor: bool,
@@ -171,8 +169,6 @@ pub const Cr3 = struct {
 
 /// Extended Feature Enable Register (EFER)
 pub const EFER = packed struct(u64) {
-    // TODO: Add field level documentation
-
     syscall_enable: bool,
 
     _reserved1_7: u7,

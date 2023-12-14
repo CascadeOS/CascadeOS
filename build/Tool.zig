@@ -170,8 +170,6 @@ fn createExe(
         .root_source_file = file_source,
     });
 
-    // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
-
     for (dependencies) |dep| {
         const module = dep.non_cascade_module_for_host orelse {
             std.debug.panic(
@@ -195,8 +193,6 @@ fn createTestExe(
         .name = tool_description.name,
         .root_source_file = file_source,
     });
-
-    // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
 
     for (dependencies) |dep| {
         const module = dep.non_cascade_module_for_host orelse {

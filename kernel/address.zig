@@ -11,7 +11,6 @@ pub const PhysicalAddress = extern struct {
     const name = "PhysicalAddress";
 
     pub inline fn fromInt(value: usize) PhysicalAddress {
-        // TODO: check that the address is valid (cannoical) https://github.com/CascadeOS/CascadeOS/issues/15
         return .{ .value = value };
     }
 
@@ -38,7 +37,6 @@ pub const VirtualAddress = extern struct {
     const name = "VirtualAddress";
 
     pub inline fn fromInt(value: usize) VirtualAddress {
-        // TODO: check that the address is valid (cannoical) https://github.com/CascadeOS/CascadeOS/issues/15
         return .{ .value = value };
     }
 

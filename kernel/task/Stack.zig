@@ -65,8 +65,7 @@ pub fn create(push_null_return_value: bool) !Stack {
         defer held.unlock();
 
         stacks_range_allocator.deallocateRange(virtual_range) catch {
-            // FIXME: we have no way to recover from this
-            core.panic("deallocateRange failed");
+            core.panic("deallocateRange failed"); // FIXME
         };
     }
 

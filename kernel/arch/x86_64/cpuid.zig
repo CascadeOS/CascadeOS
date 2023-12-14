@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 // The specification used is "Intel® 64 and IA-32 Architectures Software Developer's Manual Volume 2A March 2023"
-// TODO: implement any stuff in the AMD manual that is not in the Intel manual as well https://github.com/CascadeOS/CascadeOS/issues/29
 
 const arch_info = x86_64.arch_info;
 const core = @import("core");
@@ -45,21 +44,15 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(info.init_data
 ///
 /// Loops through the `simple_leaf_handlers` performing the declared actions for each handler.
 fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection(info.init_code) void {
-    // TODO: use `continue` instead of `break :blk` https://github.com/CascadeOS/CascadeOS/issues/55
-    // we use a little trick here, the `blk:` below is not on the loop so breaking to that label
-    // does not end the loop but instead starts the next iteration.
-    //
-    // this means `break :blk;` below acts how `continue;` would if it were allowed in this case
-
     inline for (simple_leaf_handlers) |leaf_handler| blk: {
         if (leaf_handler.leaf.type == .standard and leaf_handler.leaf.value > max_standard_leaf) {
             // leaf is out of range of available standard functions
-            break :blk;
+            break :blk; // continue loop
         }
 
         if (leaf_handler.leaf.type == .extended and leaf_handler.leaf.value > max_extended_leaf) {
             // leaf is out of range of available extended functions
-            break :blk;
+            break :blk; // continue loop
         }
 
         const cpuid_result = raw_cpuid(leaf_handler.leaf.value, 0);

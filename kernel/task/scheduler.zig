@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+//! A simple round robin scheduler.
+
 const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
@@ -9,13 +11,14 @@ const std = @import("std");
 const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 
-// TODO: Replace this simple round robin with a proper scheduler
-
 var scheduler_lock: SpinLock = .{};
 
 var ready_to_run_start: ?*task.Thread = null;
 var ready_to_run_end: ?*task.Thread = null;
 
+/// Performs a round robin scheduling of the ready threads.
+///
+/// If `requeue_current_thread` is set to true, the current thread will be requeued before the next thread is found.
 pub fn schedule(requeue_current_thread: bool) void {
     const held = scheduler_lock.lock();
     defer held.unlock();
@@ -100,9 +103,9 @@ fn idle() noreturn {
     while (true) {
         if (ready_to_run_start != null) {
             schedule(false);
+            unreachable;
         }
 
-        // TODO: improve power management
         arch.halt();
     }
 }

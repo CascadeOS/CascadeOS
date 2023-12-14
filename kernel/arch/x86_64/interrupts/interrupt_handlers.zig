@@ -13,7 +13,6 @@ const log = kernel.debug.log.scoped(.interrupts);
 pub fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
     const idt_vector = interrupt_frame.getIdtVector();
 
-    // TODO: print specific things for each exception, especially page fault https://github.com/CascadeOS/CascadeOS/issues/32
     if (idt_vector.isException()) {
         core.panicFmt("exception: {s}", .{@tagName(idt_vector)}) catch unreachable;
     }

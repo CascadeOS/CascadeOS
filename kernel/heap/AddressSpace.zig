@@ -54,8 +54,7 @@ pub fn allocate(self: *AddressSpace, size: core.Size, map_type: memory.virtual.M
 
     const virtual_range = self.range_allocator.allocateRange(size) catch return error.AddressSpaceExhausted;
     errdefer self.range_allocator.deallocateRange(virtual_range) catch {
-        // FIXME: we have no way to recover from this
-        core.panic("deallocateRange failed, this AddressSpace may now be in an invalid state");
+        core.panic("deallocateRange failed, this AddressSpace may now be in an invalid state"); // FIXME
     };
 
     try self.allocateMemoryRegion(.{ .range = virtual_range, .map_type = map_type });
@@ -75,10 +74,12 @@ pub fn deallocate(self: *AddressSpace, range: VirtualRange) void {
     core.assert(range.address.isAligned(arch.paging.standard_page_size));
     core.assert(range.size.isAligned(arch.paging.standard_page_size));
 
-    // TODO: support failure below, we need to have a way to rollback the changes from `allocateVirtualRange`
-
-    self.range_allocator.deallocateRange(range) catch unreachable;
-    self.deallocateMemoryRegion(range) catch unreachable;
+    self.range_allocator.deallocateRange(range) catch {
+        core.panic("deallocate failed, this AddressSpace may now be in an invalid state"); // FIXME
+    };
+    self.deallocateMemoryRegion(range) catch {
+        core.panic("deallocate failed, this AddressSpace may now be in an invalid state"); // FIXME
+    };
 }
 
 fn allocateMemoryRegion(

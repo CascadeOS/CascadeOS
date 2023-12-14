@@ -79,7 +79,7 @@ pub fn getLibraries(
         }
 
         if (!resolved_any_this_iteration) {
-            @panic("STUCK IN A LOOP"); // TODO: Report this better https://github.com/CascadeOS/CascadeOS/issues/9
+            @panic("STUCK IN A LOOP");
         }
     }
 
@@ -342,9 +342,6 @@ fn createTestExe(
         .target = if (build_for_cascade) target.getCascadeTestCrossTarget() else target.getNonCascadeTestCrossTarget(),
     });
 
-    // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
-    // test_exe.addModule(library_description.name, module);
-
     if (build_for_cascade) {
         test_exe.addModule("cascade_flag", options.cascade_os_options_module);
     } else {
@@ -375,9 +372,6 @@ fn createModule(
     const module = b.createModule(.{
         .source_file = file_source,
     });
-
-    // TODO: self-referential module https://github.com/CascadeOS/CascadeOS/issues/10
-    // try module.dependencies.put(library_description.name, module);
 
     if (build_for_cascade) {
         try module.dependencies.put("cascade_flag", options.cascade_os_options_module);
