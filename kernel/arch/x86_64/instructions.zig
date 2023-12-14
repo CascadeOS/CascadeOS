@@ -13,15 +13,8 @@ pub inline fn pause() void {
 }
 
 /// Issues a HLT instruction.
-pub noinline fn halt() void {
-    // TODO: The NMI handler will need to check if the IP is equal to __halt_address and if so, it will need to skip the
-    // hlt instruction. https://github.com/CascadeOS/CascadeOS/issues/33
-    asm volatile (
-        \\.globl __halt_address
-        \\__halt_address:
-        \\hlt
-        \\
-    );
+pub inline fn halt() void {
+    asm volatile ("hlt");
 }
 
 /// Reads a byte from the given I/O port.
