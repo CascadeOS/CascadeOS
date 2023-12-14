@@ -46,8 +46,12 @@ pub const interrupts = struct {
     }
 
     /// Are interrupts enabled?
-    pub inline fn interruptsEnabled() bool {
-        return false; // TODO: Actually figure this out https://github.com/CascadeOS/CascadeOS/issues/46
+    pub fn interruptsEnabled() bool {
+        const daif = asm ("MRS %[daif], DAIF"
+            : [daif] "=r" (-> u64),
+        );
+        const mask: u64 = 0b1111000000;
+        return (daif & mask) == 0;
     }
 };
 
