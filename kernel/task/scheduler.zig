@@ -11,6 +11,8 @@ const std = @import("std");
 const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
 
+const log = kernel.debug.log.scoped(.scheduler);
+
 var scheduler_lock: SpinLock = .{};
 
 var ready_to_run_start: ?*task.Thread = null;
@@ -38,6 +40,8 @@ pub fn schedule(requeue_current_thread: bool) void {
     const new_thread = ready_to_run_start orelse {
         // there are no more threads to run, so we need to switch to idle
 
+        log.debug("no threads to run, switching to idle", .{});
+
         const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
             VirtualAddress.fromPtr(&idle),
         ) catch unreachable; // the idle stack is always big enough to hold a return address
@@ -54,6 +58,8 @@ pub fn schedule(requeue_current_thread: bool) void {
     const current_thread = opt_current_thread orelse {
         // switch to the thread from idle
 
+        log.debug("switching to {} from idle", .{new_thread});
+
         processor.current_thread = new_thread;
         new_thread.state = .running;
         arch.scheduling.switchToThreadFromIdle(processor, new_thread);
@@ -61,10 +67,13 @@ pub fn schedule(requeue_current_thread: bool) void {
     };
 
     // if we are already running the new thread, no switch is required
-    if (new_thread == current_thread) return;
+    if (new_thread == current_thread) {
+        log.debug("already running new thread", .{});
+        return;
+    }
 
     // switch to the new thread
-
+    log.debug("switching to {} from {}", .{ new_thread, current_thread });
     processor.current_thread = new_thread;
     new_thread.state = .running;
     arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);

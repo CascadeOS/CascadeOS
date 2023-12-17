@@ -87,6 +87,8 @@ fn kernelInitStage2(processor: *Processor) linksection(info.init_code) noreturn 
     arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     arch.init.loadProcessor(processor);
 
+    log.debug("kernel init stage 2 started on processor {}", .{processor.id});
+
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
@@ -102,6 +104,8 @@ fn kernelInitStage3() noreturn {
 
     const processor = arch.getProcessor();
 
+    log.debug("kernel init stage 3 started on processor {}", .{processor.id});
+
     if (processor.id == .bootstrap) {
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
         // the init only mappings.
@@ -110,8 +114,12 @@ fn kernelInitStage3() noreturn {
             arch.spinLoopHint();
         }
 
+        log.debug("all processors in init stage 3", .{});
+
+        log.debug("reclaiming bootloader reclaimable memory", .{});
         memory.physical.init.reclaimBootloaderReclaimableMemory();
 
+        log.debug("unmapping init only kernel sections", .{});
         memory.virtual.init.unmapInitOnlyKernelSections();
 
         reload_page_table_gate.store(true, .Release);
@@ -127,12 +135,13 @@ fn kernelInitStage3() noreturn {
     // now that the init only mappings are gone we reload the page table
     arch.paging.switchToPageTable(kernel.kernel_process.page_table);
 
+    log.debug("entering scheduler on processor {}", .{processor.id});
     task.scheduler.schedule(false);
     unreachable;
 }
 
 /// Copy the kernel file from the bootloader provided memory to the kernel heap.
-pub fn copyKernelFileFromBootloaderMemory() void {
+fn copyKernelFileFromBootloaderMemory() linksection(info.init_code) void {
     const bootloader_provided_kernel_file = info.kernel_file.?;
 
     const kernel_file_buffer = heap.page_allocator.alloc(
@@ -164,7 +173,7 @@ fn initProcessors() linksection(info.init_code) void {
     var i: usize = 0;
 
     while (processor_descriptors.next()) |processor_descriptor| : (i += 1) {
-        log.debug("initializing processor {}", .{i});
+        log.debug("initializing processor {:0>2}", .{i});
 
         const processor = &Processor.all[i];
 
@@ -181,6 +190,7 @@ fn initProcessors() linksection(info.init_code) void {
         arch.init.prepareProcessor(processor);
 
         if (processor.id != .bootstrap) {
+            log.debug("booting processor {}", .{i});
             processor_descriptor.boot(processor, kernelInitStage2);
         }
     }

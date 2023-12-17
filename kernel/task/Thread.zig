@@ -28,11 +28,9 @@ pub const Id = enum(usize) {
 };
 
 pub fn print(self: *const Thread, writer: anytype) !void {
-    try writer.writeAll("Thread<");
-    try std.fmt.formatInt(@intFromEnum(self.process.id), 10, .lower, .{}, writer);
-    try writer.writeByte('-');
+    try writer.writeAll(self.process.name());
+    try writer.writeByte(':');
     try std.fmt.formatInt(@intFromEnum(self.id), 10, .lower, .{}, writer);
-    try writer.writeByte('>');
 }
 
 pub inline fn format(
