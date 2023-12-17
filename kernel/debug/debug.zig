@@ -4,7 +4,6 @@ const arch = kernel.arch;
 const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
-const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 const symbols = @import("symbols.zig");
 
@@ -300,19 +299,17 @@ fn printErrorAndCurrentStackTrace(writer: anytype, stack_trace: ?*const std.buil
 }
 
 pub const init = struct {
-    var panic_lock: SpinLock = .{}; // TODO: Put in init_data section
-
     /// Panic implementation used before the kernel is fully initialized and running.
     fn earlyPanicImpl(
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void { // TODO: Put in init_code section
-        const writer = arch.init.getEarlyOutputWriter() orelse return;
-
         const processor = arch.earlyGetProcessor() orelse {
             // Somehow we have panicked before we have loaded a processor.
-            // As we have not acquired the panic lock we might clobber another processors output but we don't have a choice.
+            // We might clobber another processors output but we don't have a choice.
+
+            const writer = arch.init.getEarlyOutputNoLock() orelse return;
 
             writer.writeAll("\nPANIC - before processor loaded") catch unreachable;
 
@@ -326,8 +323,10 @@ pub const init = struct {
         if (processor.panicked) {
             // We have already panicked on this processor.
 
-            const lock_held = panic_lock._processor_plus_one == @intFromEnum(processor.id) + 1;
-            if (!lock_held) _ = panic_lock.lock();
+            const lock_held = arch.init.EarlyOutput.lock._processor_plus_one == @intFromEnum(processor.id) + 1;
+            if (!lock_held) _ = arch.init.EarlyOutput.lock.lock();
+
+            const writer = arch.init.getEarlyOutputNoLock() orelse return;
 
             writer.writeAll("\nPANIC IN PANIC on processor ") catch unreachable;
 
@@ -338,8 +337,8 @@ pub const init = struct {
             printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
 
             if (lock_held) {
-                // we need to unlock the panic lock or other panicking processors will be deadlocked
-                panic_lock.unsafeUnlock();
+                // we need to unlock the output lock or other processors will be deadlocked
+                arch.init.EarlyOutput.lock.unsafeUnlock();
             }
 
             return;
@@ -347,15 +346,15 @@ pub const init = struct {
 
         processor.panicked = true;
 
-        const held = panic_lock.lock();
-        defer held.unlock();
+        const early_output = arch.init.getEarlyOutput() orelse return;
+        defer early_output.deinit();
 
-        writer.writeAll("\nPANIC on processor ") catch unreachable;
+        early_output.writer.writeAll("\nPANIC on processor ") catch unreachable;
 
-        processor.id.print(writer) catch unreachable;
+        processor.id.print(early_output.writer) catch unreachable;
 
-        printUserPanicMessage(writer, msg);
+        printUserPanicMessage(early_output.writer, msg);
 
-        printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
+        printErrorAndCurrentStackTrace(early_output.writer, stack_trace, return_address);
     }
 };

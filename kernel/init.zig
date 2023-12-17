@@ -46,8 +46,9 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
         core.panic("bootloader did not provide the kernel file");
 
     // print starting message
-    if (arch.init.getEarlyOutputWriter()) |writer| {
-        writer.writeAll(comptime "starting CascadeOS " ++ info.version ++ "\n") catch {};
+    if (arch.init.getEarlyOutput()) |early_output| {
+        defer early_output.deinit();
+        early_output.writer.writeAll(comptime "starting CascadeOS " ++ info.version ++ "\n") catch {};
     }
 
     log.info("performing early system initialization", .{});

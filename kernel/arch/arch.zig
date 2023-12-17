@@ -6,6 +6,7 @@ const kernel = @import("kernel");
 const memory = kernel.memory;
 const PhysicalRange = kernel.PhysicalRange;
 const Processor = kernel.Processor;
+const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
 const task = kernel.task;
 const VirtualAddress = kernel.VirtualAddress;
@@ -87,13 +88,37 @@ pub const init = struct {
         current.init.setupEarlyOutput();
     }
 
-    pub const EarlyOutputWriter = current.init.EarlyOutputWriter;
+    pub const EarlyOutput = struct {
+        writer: current.init.EarlyOutputWriter,
+        held: SpinLock.Held,
 
-    /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
-    pub inline fn getEarlyOutputWriter() ?EarlyOutputWriter {
-        checkSupport(current.init, "getEarlyOutputWriter", fn () ?EarlyOutputWriter);
+        pub inline fn deinit(self: EarlyOutput) void {
+            self.held.unlock();
+        }
+
+        pub var lock: SpinLock = .{};
+    };
+
+    pub fn getEarlyOutputNoLock() ?current.init.EarlyOutputWriter {
+        checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
 
         return current.init.getEarlyOutputWriter();
+    }
+
+    /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
+    pub fn getEarlyOutput() ?EarlyOutput { // TODO: Put in init_code section
+        checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
+
+        if (current.init.getEarlyOutputWriter()) |early_output_writer| {
+            const held = EarlyOutput.lock.lock();
+
+            return .{
+                .writer = early_output_writer,
+                .held = held,
+            };
+        }
+
+        return null;
     }
 
     /// Initialize the architecture specific registers and structures into the state required for early kernel init.

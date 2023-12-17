@@ -72,14 +72,31 @@ fn earlyLogFn(
     comptime message_level: Level,
     comptime format: []const u8,
     args: anytype,
-) linksection(info.init_code) void {
-    const writer = arch.init.getEarlyOutputWriter() orelse return;
+) void { // TODO: Put in init_code section
+    const early_output = arch.init.getEarlyOutput() orelse return;
+    defer early_output.deinit();
 
-    const scopeAndLevelText = comptime formatScopeAndLevel(message_level, scope);
-    writer.writeAll(scopeAndLevelText) catch unreachable;
+    if (arch.earlyGetProcessor()) |processor| {
+        processor.id.print(early_output.writer) catch unreachable;
+
+        if (processor.current_thread) |thread| {
+            early_output.writer.writeAll(" | ") catch unreachable;
+            thread.print(early_output.writer) catch unreachable;
+        } else {
+            early_output.writer.writeAll(" | kernel:0") catch unreachable;
+        }
+    } else {
+        early_output.writer.writeAll("?? | kernel:0") catch unreachable;
+    }
+
+    early_output.writer.writeAll(" | ") catch unreachable;
+
+    early_output.writer.writeAll(
+        comptime @tagName(scope) ++ " | " ++ message_level.asText() ++ " | ",
+    ) catch unreachable;
 
     const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n') format else format ++ "\n";
-    writer.print(user_fmt, args) catch unreachable;
+    early_output.writer.print(user_fmt, args) catch unreachable;
 }
 
 pub const Level = enum {
@@ -102,34 +119,6 @@ pub const Level = enum {
         };
     }
 };
-
-const maximum_log_scope_length = 18;
-
-/// Helper function to format the scope and level text at the beginning of a log message.
-inline fn formatScopeAndLevel(
-    comptime message_level: Level,
-    comptime scope: @TypeOf(.EnumLiteral),
-) []const u8 {
-    const tag: []const u8 = tag: {
-        const tag = @tagName(scope);
-        if (tag.len > maximum_log_scope_length) {
-            // if the scope is longer than `maximum_log_scope_length` then display it truncated by '..'
-            var tag_buf = [_]u8{'.'} ** maximum_log_scope_length;
-            // `-2` in order to leave '..' at the end of the `tag_buf` array
-            std.mem.copy(u8, &tag_buf, tag[0..(maximum_log_scope_length - 2)]);
-            break :tag &tag_buf;
-        }
-        break :tag tag;
-    };
-
-    const tag_padding = [_]u8{' '} ** (maximum_log_scope_length - tag.len);
-
-    const level_txt = message_level.asText();
-    // `7` is the length of the longest `Level` variant
-    const level_padding = [_]u8{' '} ** (7 - level_txt.len);
-
-    comptime return tag ++ tag_padding ++ " | " ++ level_txt ++ level_padding ++ " | ";
-}
 
 /// Determine if a specific scope and log level pair is enabled for logging.
 inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime message_level: Level) bool {
