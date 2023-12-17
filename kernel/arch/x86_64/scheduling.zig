@@ -97,13 +97,13 @@ pub fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_ol
 }
 
 fn startNewThread(
-    thread: *kernel.Thread,
+    thread: *task.Thread,
     context: u64,
     target_function_addr: *const anyopaque,
 ) callconv(.C) noreturn {
-    kernel.scheduler.unsafeUnlockScheduler();
+    task.scheduler.unsafeUnlockScheduler();
 
-    const target_function: *const fn (thread: *kernel.Thread, context: u64) noreturn = @ptrCast(target_function_addr);
+    const target_function: *const fn (thread: *task.Thread, context: u64) noreturn = @ptrCast(target_function_addr);
 
     target_function(thread, context);
     unreachable;

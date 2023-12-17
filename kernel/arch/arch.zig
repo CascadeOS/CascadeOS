@@ -335,7 +335,7 @@ pub const scheduling = struct {
         target_function: *const fn (thread: *task.Thread, context: u64) noreturn,
     ) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareStackForNewThread", fn (
-            *task,
+            *task.Stack,
             *task.Thread,
             u64,
             *const fn (thread: *task.Thread, context: u64) noreturn,
