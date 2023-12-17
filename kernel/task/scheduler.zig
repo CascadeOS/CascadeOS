@@ -109,6 +109,8 @@ fn idle() noreturn {
     unsafeUnlockScheduler();
     arch.interrupts.enableInterrupts();
 
+    log.debug("entering idle", .{});
+
     while (true) {
         if (ready_to_run_start != null) {
             schedule(false);
