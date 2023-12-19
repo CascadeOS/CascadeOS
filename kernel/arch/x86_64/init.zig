@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+const apic = x86_64.apic;
 const arch_info = x86_64.arch_info;
 const ArchProcessor = x86_64.ArchProcessor;
 const boot = kernel.boot;
@@ -18,6 +19,8 @@ const VirtualRange = kernel.VirtualRange;
 const x86_64 = @import("x86_64.zig");
 
 const log = kernel.debug.log.scoped(.init_x86_64);
+
+pub const initLocalInterruptController = apic.init.initApic;
 
 pub const EarlyOutputWriter = SerialPort.Writer;
 var early_output_serial_port: ?SerialPort = null; // TODO: Put in init_data section

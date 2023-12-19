@@ -86,6 +86,7 @@ pub fn kernelInitStage1() linksection(info.init_code) noreturn {
 fn kernelInitStage2(processor: *Processor) linksection(info.init_code) noreturn {
     arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     arch.init.loadProcessor(processor);
+    arch.init.initLocalInterruptController(processor);
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         VirtualAddress.fromPtr(&kernelInitStage3),

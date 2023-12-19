@@ -13,6 +13,7 @@ comptime {
     _ = interrupts;
 }
 
+pub const apic = @import("apic.zig");
 pub const arch_info = @import("arch_info.zig");
 pub const ArchProcessor = @import("ArchProcessor.zig");
 pub const cpuid = @import("cpuid.zig");

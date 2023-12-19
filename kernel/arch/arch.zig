@@ -151,6 +151,15 @@ pub const init = struct {
 
         current.init.configureSystemFeatures();
     }
+
+    /// Initialize the local interrupt controller for the provided processor.
+    ///
+    /// For example, on x86_64 this should initialize the APIC.
+    pub inline fn initLocalInterruptController(processor: *Processor) void {
+        checkSupport(current.init, "initLocalInterruptController", fn (*Processor) void);
+
+        current.init.initLocalInterruptController(processor);
+    }
 };
 
 pub const interrupts = struct {
