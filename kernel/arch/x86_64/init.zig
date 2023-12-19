@@ -5,6 +5,7 @@ const ArchProcessor = x86_64.ArchProcessor;
 const core = @import("core");
 const cpuid = x86_64.cpuid;
 const info = kernel.info;
+const instructions = x86_64.instructions;
 const interrupts = x86_64.interrupts;
 const kernel = @import("kernel");
 const Processor = kernel.Processor;
@@ -77,6 +78,9 @@ pub fn loadProcessor(processor: *Processor) linksection(info.init_code) void {
 pub fn earlyArchInitialization() linksection(info.init_code) void {
     log.debug("initializing idt", .{});
     interrupts.initIdt();
+
+    log.debug("disabling pic", .{});
+    disablePic();
 }
 
 /// Captures x86_64 system information.
@@ -112,4 +116,48 @@ pub fn configureSystemFeatures() linksection(info.init_code) void {
 
         log.debug("EFER set", .{});
     }
+}
+
+const portWriteU8 = instructions.portWriteU8;
+
+fn disablePic() linksection(info.init_code) void {
+    const PRIMARY_COMMAND_PORT = 0x20;
+    const PRIMARY_DATA_PORT = 0x21;
+    const SECONDARY_COMMAND_PORT = 0xA0;
+    const SECONDARY_DATA_PORT = 0xA1;
+
+    const CMD_INIT = 0x11;
+    const MODE_8086: u8 = 0x01;
+
+    // Tell each PIC that we're going to send it a three-byte initialization sequence on its data port.
+    portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
+    portWriteU8(0x80, 0); // wait
+
+    // Remap master PIC to 0x20
+    portWriteU8(PRIMARY_DATA_PORT, 0x20);
+    portWriteU8(0x80, 0); // wait
+
+    // Remap slave PIC to 0x28
+    portWriteU8(SECONDARY_DATA_PORT, 0x28);
+    portWriteU8(0x80, 0); // wait
+
+    // Configure chaining between master and slave
+    portWriteU8(PRIMARY_DATA_PORT, 4);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 2);
+    portWriteU8(0x80, 0); // wait
+
+    // Set our mode.
+    portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
+    portWriteU8(0x80, 0); // wait
+
+    // Mask all interrupts
+    portWriteU8(PRIMARY_DATA_PORT, 0xFF);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 0xFF);
+    portWriteU8(0x80, 0); // wait
 }
