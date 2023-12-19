@@ -15,7 +15,7 @@ const task = kernel.task;
 const VirtualRange = kernel.VirtualRange;
 const x86_64 = @import("x86_64.zig");
 
-const log = kernel.debug.log.scoped(.init);
+const log = kernel.debug.log.scoped(.init_x86_64);
 
 pub const EarlyOutputWriter = SerialPort.Writer;
 var early_output_serial_port: ?SerialPort = null; // TODO: Put in init_data section

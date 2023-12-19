@@ -12,7 +12,7 @@ const x86_64 = @import("../x86_64.zig");
 
 pub const number_of_handlers = Idt.number_of_handlers;
 
-const log = kernel.debug.log.scoped(.interrupts);
+const log = kernel.debug.log.scoped(.interrupts_x86_64);
 
 var idt: Idt = .{};
 const raw_handlers = makeRawHandlers();

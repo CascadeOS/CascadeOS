@@ -87,8 +87,6 @@ fn kernelInitStage2(processor: *Processor) linksection(info.init_code) noreturn 
     arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     arch.init.loadProcessor(processor);
 
-    log.debug("kernel init stage 2 started on processor {}", .{processor.id});
-
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
@@ -103,8 +101,6 @@ fn kernelInitStage3() noreturn {
     _ = processors_in_stage3.fetchAdd(1, .AcqRel);
 
     const processor = arch.getProcessor();
-
-    log.debug("kernel init stage 3 started on processor {}", .{processor.id});
 
     if (processor.id == .bootstrap) {
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap

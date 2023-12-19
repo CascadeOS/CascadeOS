@@ -14,7 +14,7 @@ const VirtualAddress = kernel.VirtualAddress;
 const VirtualRange = kernel.VirtualRange;
 const x86_64 = @import("../x86_64.zig");
 
-const log = kernel.debug.log.scoped(.paging);
+const log = kernel.debug.log.scoped(.paging_x86_64);
 
 pub const small_page_size = core.Size.from(4, .kib);
 pub const medium_page_size = core.Size.from(2, .mib);

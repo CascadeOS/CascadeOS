@@ -9,7 +9,7 @@ const registers = aarch64.registers;
 const std = @import("std");
 const Uart = aarch64.Uart;
 
-const log = kernel.debug.log.scoped(.init);
+const log = kernel.debug.log.scoped(.init_aarch64);
 
 pub const EarlyOutputWriter = Uart.Writer;
 var early_output_uart: ?Uart = null; // TODO: Put in init_data section

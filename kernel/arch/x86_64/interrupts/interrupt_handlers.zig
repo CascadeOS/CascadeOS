@@ -7,8 +7,6 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("../x86_64.zig");
 
-const log = kernel.debug.log.scoped(.interrupts);
-
 /// Handles unhandled interrupts by printing the vector and then panicking.
 pub fn unhandledInterrupt(interrupt_frame: *const InterruptFrame) void {
     const idt_vector = interrupt_frame.getIdtVector();
