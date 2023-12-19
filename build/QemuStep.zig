@@ -106,6 +106,11 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     // no shutdown
     run_qemu.addArg("-no-shutdown");
 
+    // no default devices
+    run_qemu.addArg("-nodefaults");
+
+    run_qemu.addArgs(&.{ "-boot", "menu=off" });
+
     // RAM
     run_qemu.addArgs(&.{
         "-m",
@@ -114,10 +119,12 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     // boot disk
     run_qemu.addArgs(&.{
+        "-device",
+        "virtio-blk-pci,drive=drive0,bootindex=0",
         "-drive",
         try std.fmt.allocPrint(
             b.allocator,
-            "file={s},format=raw,if=virtio",
+            "file={s},format=raw,if=none,id=drive0",
             .{self.image.getPath(b)},
         ),
     });
