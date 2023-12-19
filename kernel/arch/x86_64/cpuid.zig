@@ -29,6 +29,12 @@ pub fn capture() linksection(info.init_code) void {
 
 const simple_leaf_handlers: []const SimpleLeafHandler linksection(info.init_data) = &.{
     .{
+        .leaf = .{ .type = .standard, .value = 0x01 },
+        .handlers = &.{
+            .{ .name = "apic", .register = .edx, .mask_bit = 9, .target = &arch_info.has_apic },
+        },
+    },
+    .{
         .leaf = .{ .type = .extended, .value = 0x80000001 },
         .handlers = &.{
             .{ .name = "syscall", .register = .edx, .mask_bit = 11, .target = &arch_info.has_syscall },
