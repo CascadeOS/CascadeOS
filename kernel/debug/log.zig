@@ -128,21 +128,20 @@ inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime messag
 /// Checks if a scope is in the list of scopes forced to log at debug level.
 inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
     if (kernel_options.forced_debug_log_scopes.len == 0) return false;
-    return comptime debug_scopes.has(@tagName(scope));
-}
 
-const debug_scopes = std.ComptimeStringMap(
-    void,
-    blk: {
-        var scopes: [kernel_options.forced_debug_log_scopes.len]struct { []const u8 } = undefined;
+    const tag = @tagName(scope);
 
-        for (kernel_options.forced_debug_log_scopes, 0..) |debug_scope, i| {
-            scopes[i] = .{debug_scope};
+    inline for (kernel_options.forced_debug_log_scopes) |debug_scope| {
+        if (std.mem.endsWith(u8, debug_scope, "+")) {
+            // if this debug_scope ends with a +, then it is a prefix match
+            if (std.mem.startsWith(u8, tag, debug_scope[0 .. debug_scope.len - 1])) return true;
         }
 
-        break :blk scopes;
-    },
-);
+        if (std.mem.eql(u8, tag, debug_scope)) return true;
+    }
+
+    return false;
+}
 
 const level: Level = blk: {
     if (kernel_options.force_debug_log) break :blk .debug;

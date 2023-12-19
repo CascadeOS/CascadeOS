@@ -63,7 +63,12 @@ uefi: bool,
 /// Defaults to 256 for UEFI and 128 otherwise.
 memory: usize,
 
-/// Force the provided log scopes to be debug in the kernel (comma separated list of wildcard scope matchers).
+/// Force the provided log scopes to be debug in the kernel (comma separated list of scope matchers).
+///
+/// If a scope ends with a `+` it will match any scope that starts with the prefix.
+///
+/// Example:
+/// `virtual,init+,physical` will exact match `virtual` and `physcial` and match any scope that starts with `init`.
 kernel_forced_debug_log_scopes: []const u8,
 
 /// Force the log level of every scope to be debug in the kernel.
@@ -153,7 +158,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     const kernel_forced_debug_log_scopes = b.option(
         []const u8,
         "debug_scope",
-        "Force the provided log scopes to be debug in the kernel (comma separated list of wildcard scope matchers)",
+        "Force the provided log scopes to be debug in the kernel (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
     ) orelse "";
 
     const cascade_version_string = try getVersionString(b, cascade_version);
