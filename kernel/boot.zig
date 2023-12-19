@@ -104,6 +104,20 @@ pub const ProcessorDescriptor = struct {
         }
     }
 
+    pub fn acpiId(self: ProcessorDescriptor) linksection(info.init_code) u32 {
+        return switch (self._raw) {
+            .limine => |limine_info| limine_info.processor_id,
+        };
+    }
+
+    pub fn lapicId(self: ProcessorDescriptor) linksection(info.init_code) u32 {
+        if (info.arch != .x86_64) @compileError("apicId can only be called on x86_64");
+
+        return switch (self._raw) {
+            .limine => |limine_info| limine_info.lapic_id,
+        };
+    }
+
     pub const Raw = union(enum) {
         limine: *limine.SMP.Response.SMPInfo,
     };
