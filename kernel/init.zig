@@ -183,7 +183,7 @@ fn initProcessors() linksection(info.init_code) void {
             .arch = undefined, // initialized by `prepareProcessor`
         };
 
-        arch.init.prepareProcessor(processor);
+        arch.init.prepareProcessor(processor, processor_descriptor);
 
         if (processor.id != .bootstrap) {
             log.debug("booting processor {}", .{i});

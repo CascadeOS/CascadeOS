@@ -8,6 +8,8 @@ const task = kernel.task;
 const Tss = x86_64.Tss;
 const x86_64 = @import("x86_64.zig");
 
+lapic_id: u32,
+
 gdt: Gdt = .{},
 tss: Tss = .{},
 

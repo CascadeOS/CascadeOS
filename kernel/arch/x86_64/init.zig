@@ -35,6 +35,8 @@ var bootstrap_non_maskable_interrupt_stack align(16) linksection(info.init_data)
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *Processor) linksection(info.init_code) void {
     bootstrap_processor.arch = .{
+        .lapic_id = 0,
+
         .double_fault_stack = task.Stack.fromRangeNoGuard(VirtualRange.fromSlice(
             u8,
             @as([]u8, &bootstrap_double_fault_stack),
@@ -51,8 +53,10 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *Processor) linksection(in
 /// Prepares the provided Processor for use.
 ///
 /// **WARNING**: This function will panic if the processor cannot be prepared.
-pub fn prepareProcessor(processor: *Processor) linksection(info.init_code) void {
+pub fn prepareProcessor(processor: *Processor, processor_descriptor: boot.ProcessorDescriptor) linksection(info.init_code) void {
     processor.arch = .{
+        .lapic_id = processor_descriptor.lapicId(),
+
         .double_fault_stack = task.Stack.create(true) catch core.panic("unable to create double fault stack"),
         .non_maskable_interrupt_stack = task.Stack.create(true) catch core.panic("unable to create non-mackable interrupt stack"),
     };

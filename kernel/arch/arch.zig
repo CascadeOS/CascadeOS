@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+const boot = kernel.boot;
 const core = @import("core");
 const info = kernel.info;
 const kernel = @import("kernel");
@@ -68,10 +69,10 @@ pub const init = struct {
     /// Prepares the provided Processor for use.
     ///
     /// **WARNING**: This function will panic if the processor cannot be prepared.
-    pub inline fn prepareProcessor(processor: *Processor) void {
-        checkSupport(current.init, "prepareProcessor", fn (*Processor) void);
+    pub inline fn prepareProcessor(processor: *Processor, processor_descriptor: boot.ProcessorDescriptor) void {
+        checkSupport(current.init, "prepareProcessor", fn (*Processor, boot.ProcessorDescriptor) void);
 
-        current.init.prepareProcessor(processor);
+        current.init.prepareProcessor(processor, processor_descriptor);
     }
 
     /// Performs any actions required to load the provided Processor for the current execution context.
