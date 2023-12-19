@@ -25,7 +25,7 @@ const limine_requests = struct {
     export var hhdm: limine.HHDM linksection(info.init_data) = .{};
     export var kernel_address: limine.KernelAddress linksection(info.init_data) = .{};
     export var memmap: limine.Memmap linksection(info.init_data) = .{};
-    export var smp: limine.SMP linksection(info.init_data) = .{};
+    export var smp: limine.SMP linksection(info.init_data) = .{ .flags = .{ .x2apic = false } }; // TODO: Enable x2apic
 };
 
 /// Returns the direct map address provided by the bootloader, if any.
@@ -58,6 +58,13 @@ pub fn kernelFile() linksection(info.init_code) ?VirtualRange {
         return VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
     }
     return null;
+}
+
+pub fn x2apicEnabled() linksection(info.init_code) bool {
+    if (info.arch != .x86_64) @compileError("x2apicEnabled can only be called on x86_64");
+
+    const smp_response = limine_requests.smp.response orelse return false;
+    return smp_response.flags.x2apic_enabled;
 }
 
 pub fn processorDescriptors() linksection(info.init_code) ProcessorDescriptorIterator {

@@ -2,6 +2,7 @@
 
 const arch_info = x86_64.arch_info;
 const ArchProcessor = x86_64.ArchProcessor;
+const boot = kernel.boot;
 const core = @import("core");
 const cpuid = x86_64.cpuid;
 const info = kernel.info;
@@ -91,6 +92,7 @@ pub fn earlyArchInitialization() linksection(info.init_code) void {
 pub fn captureSystemInformation() linksection(info.init_code) void {
     log.debug("capturing cpuid information", .{});
     cpuid.capture();
+    arch_info.x2apic_enabled = boot.x2apicEnabled();
 }
 
 /// Configures x86_64 system features.

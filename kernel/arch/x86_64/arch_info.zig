@@ -9,3 +9,4 @@ pub var has_apic: bool = false;
 pub var has_execute_disable: bool = false;
 pub var has_gib_pages: bool = false;
 pub var has_syscall: bool = false;
+pub var x2apic_enabled: bool = false;
