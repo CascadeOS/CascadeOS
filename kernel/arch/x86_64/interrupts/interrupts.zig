@@ -404,6 +404,8 @@ pub const IdtVector = enum(u8) {
 
     _reserved8 = 0x1F,
 
+    spurious_interrupt = 0xFF,
+
     _,
 
     /// Checks if the given interrupt vector is an exception.
