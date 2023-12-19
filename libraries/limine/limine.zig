@@ -378,7 +378,7 @@ pub const SMP = extern struct {
 
         pub const ResponseFlags = packed struct(u32) {
             /// X2APIC has been enabled
-            x2apic_enabled: u1 = 0,
+            x2apic_enabled: bool = false,
             _: u31 = 0,
         };
 
