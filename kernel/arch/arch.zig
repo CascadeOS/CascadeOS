@@ -1,19 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-const boot = kernel.boot;
 const core = @import("core");
-const info = kernel.info;
 const kernel = @import("kernel");
-const memory = kernel.memory;
-const PhysicalRange = kernel.PhysicalRange;
-const Processor = kernel.Processor;
-const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
-const task = kernel.task;
-const VirtualAddress = kernel.VirtualAddress;
-const VirtualRange = kernel.VirtualRange;
 
-const current = switch (info.arch) {
+const current = switch (kernel.info.arch) {
     .x86_64 => @import("x86_64/x86_64.zig"),
     .aarch64 => @import("aarch64/aarch64.zig"),
 };
@@ -31,8 +22,8 @@ pub const ArchProcessor = current.ArchProcessor;
 /// Get the current processor.
 ///
 /// Panics if interrupts are enabled.
-pub inline fn getProcessor() *Processor {
-    checkSupport(current, "getProcessor", fn () *Processor);
+pub inline fn getProcessor() *kernel.Processor {
+    checkSupport(current, "getProcessor", fn () *kernel.Processor);
 
     core.debugAssert(!interrupts.interruptsEnabled());
 
@@ -42,8 +33,8 @@ pub inline fn getProcessor() *Processor {
 /// Get the current processor, supports returning null for early boot before the processor is set.
 ///
 /// Panics if interrupts are enabled.
-pub inline fn earlyGetProcessor() ?*Processor {
-    checkSupport(current, "earlyGetProcessor", fn () ?*Processor);
+pub inline fn earlyGetProcessor() ?*kernel.Processor {
+    checkSupport(current, "earlyGetProcessor", fn () ?*kernel.Processor);
 
     core.debugAssert(!interrupts.interruptsEnabled());
 
@@ -59,25 +50,25 @@ pub inline fn halt() void {
 
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
-    /// Prepares the provided Processor for the bootstrap processor.
-    pub inline fn prepareBootstrapProcessor(bootstrap_processor: *Processor) void {
-        checkSupport(current.init, "prepareBootstrapProcessor", fn (*Processor) void);
+    /// Prepares the provided kernel.Processor for the bootstrap processor.
+    pub inline fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+        checkSupport(current.init, "prepareBootstrapProcessor", fn (*kernel.Processor) void);
 
         current.init.prepareBootstrapProcessor(bootstrap_processor);
     }
 
-    /// Prepares the provided Processor for use.
+    /// Prepares the provided kernel.Processor for use.
     ///
     /// **WARNING**: This function will panic if the processor cannot be prepared.
-    pub inline fn prepareProcessor(processor: *Processor, processor_descriptor: boot.ProcessorDescriptor) void {
-        checkSupport(current.init, "prepareProcessor", fn (*Processor, boot.ProcessorDescriptor) void);
+    pub inline fn prepareProcessor(processor: *kernel.Processor, processor_descriptor: kernel.boot.ProcessorDescriptor) void {
+        checkSupport(current.init, "prepareProcessor", fn (*kernel.Processor, kernel.boot.ProcessorDescriptor) void);
 
         current.init.prepareProcessor(processor, processor_descriptor);
     }
 
-    /// Performs any actions required to load the provided Processor for the current execution context.
-    pub inline fn loadProcessor(processor: *Processor) void {
-        checkSupport(current.init, "loadProcessor", fn (*Processor) void);
+    /// Performs any actions required to load the provided kernel.Processor for the current execution context.
+    pub inline fn loadProcessor(processor: *kernel.Processor) void {
+        checkSupport(current.init, "loadProcessor", fn (*kernel.Processor) void);
 
         current.init.loadProcessor(processor);
     }
@@ -91,13 +82,13 @@ pub const init = struct {
 
     pub const EarlyOutput = struct {
         writer: current.init.EarlyOutputWriter,
-        held: SpinLock.Held,
+        held: kernel.SpinLock.Held,
 
         pub inline fn deinit(self: EarlyOutput) void {
             self.held.unlock();
         }
 
-        pub var lock: SpinLock = .{};
+        pub var lock: kernel.SpinLock = .{};
     };
 
     pub fn getEarlyOutputNoLock() ?current.init.EarlyOutputWriter { // TODO: Put in init_code section
@@ -155,8 +146,8 @@ pub const init = struct {
     /// Initialize the local interrupt controller for the provided processor.
     ///
     /// For example, on x86_64 this should initialize the APIC.
-    pub inline fn initLocalInterruptController(processor: *Processor) void {
-        checkSupport(current.init, "initLocalInterruptController", fn (*Processor) void);
+    pub inline fn initLocalInterruptController(processor: *kernel.Processor) void {
+        checkSupport(current.init, "initLocalInterruptController", fn (*kernel.Processor) void);
 
         current.init.initLocalInterruptController(processor);
     }
@@ -222,7 +213,7 @@ pub const paging = struct {
     }
 
     /// The virtual address of the higher half.
-    pub const higher_half: VirtualAddress = current.paging.higher_half;
+    pub const higher_half: kernel.VirtualAddress = current.paging.higher_half;
 
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
@@ -245,15 +236,15 @@ pub const paging = struct {
     /// This function will only use the architecture's `standard_page_size`.
     pub inline fn mapToPhysicalRange(
         page_table: *PageTable,
-        virtual_range: VirtualRange,
-        physical_range: PhysicalRange,
-        map_type: memory.virtual.MapType,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
+        map_type: kernel.memory.virtual.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
-            VirtualRange,
-            PhysicalRange,
-            memory.virtual.MapType,
+            kernel.VirtualRange,
+            kernel.PhysicalRange,
+            kernel.memory.virtual.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
@@ -264,9 +255,9 @@ pub const paging = struct {
     /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
     pub inline fn unmap(
         page_table: *PageTable,
-        virtual_range: VirtualRange,
+        virtual_range: kernel.VirtualRange,
     ) void {
-        checkSupport(current.paging, "unmap", fn (*PageTable, VirtualRange) void);
+        checkSupport(current.paging, "unmap", fn (*PageTable, kernel.VirtualRange) void);
 
         current.paging.unmap(page_table, virtual_range);
     }
@@ -276,15 +267,15 @@ pub const paging = struct {
     /// This function is allowed to use all page sizes available to the architecture.
     pub inline fn mapToPhysicalRangeAllPageSizes(
         page_table: *PageTable,
-        virtual_range: VirtualRange,
-        physical_range: PhysicalRange,
-        map_type: memory.virtual.MapType,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
+        map_type: kernel.memory.virtual.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
             *PageTable,
-            VirtualRange,
-            PhysicalRange,
-            memory.virtual.MapType,
+            kernel.VirtualRange,
+            kernel.PhysicalRange,
+            kernel.memory.virtual.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
@@ -302,9 +293,9 @@ pub const paging = struct {
         ///   1. search the higher half of the *top level* of the given page table for a free entry
         ///   2. allocate a backing frame for it
         ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-        ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
-        pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!VirtualRange {
-            checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!VirtualRange);
+        ///   4. return the `kernel.VirtualRange` representing the entire virtual range that entry covers
+        pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
+            checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!kernel.VirtualRange);
 
             return current.paging.init.getTopLevelRangeAndFillFirstLevel(page_table);
         }
@@ -315,42 +306,42 @@ pub const scheduling = struct {
     /// Switches to the provided stack and returns.
     ///
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn changeStackAndReturn(stack_pointer: VirtualAddress) noreturn {
-        checkSupport(current.scheduling, "changeStackAndReturn", fn (VirtualAddress) noreturn);
+    pub inline fn changeStackAndReturn(stack_pointer: kernel.VirtualAddress) noreturn {
+        checkSupport(current.scheduling, "changeStackAndReturn", fn (kernel.VirtualAddress) noreturn);
 
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
 
-    pub inline fn switchToThreadFromIdle(processor: *Processor, thread: *task.Thread) noreturn {
-        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*Processor, *task.Thread) noreturn);
+    pub inline fn switchToThreadFromIdle(processor: *kernel.Processor, thread: *kernel.scheduler.Thread) noreturn {
+        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*kernel.Processor, *kernel.scheduler.Thread) noreturn);
 
         current.scheduling.switchToThreadFromIdle(processor, thread);
     }
 
-    pub inline fn switchToThreadFromThread(processor: *Processor, old_thread: *task.Thread, new_thread: *task.Thread) void {
-        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*Processor, *task.Thread, *task.Thread) void);
+    pub inline fn switchToThreadFromThread(processor: *kernel.Processor, old_thread: *kernel.scheduler.Thread, new_thread: *kernel.scheduler.Thread) void {
+        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Processor, *kernel.scheduler.Thread, *kernel.scheduler.Thread) void);
 
         current.scheduling.switchToThreadFromThread(processor, old_thread, new_thread);
     }
 
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn switchToIdle(processor: *Processor, stack_pointer: VirtualAddress, opt_old_thread: ?*task.Thread) noreturn {
-        checkSupport(current.scheduling, "switchToIdle", fn (*Processor, VirtualAddress, ?*task.Thread) noreturn);
+    pub inline fn switchToIdle(processor: *kernel.Processor, stack_pointer: kernel.VirtualAddress, opt_old_thread: ?*kernel.scheduler.Thread) noreturn {
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Processor, kernel.VirtualAddress, ?*kernel.scheduler.Thread) noreturn);
 
         current.scheduling.switchToIdle(processor, stack_pointer, opt_old_thread);
     }
 
     pub inline fn prepareStackForNewThread(
-        stack: *task.Stack,
-        thread: *task.Thread,
+        stack: *kernel.Stack,
+        thread: *kernel.scheduler.Thread,
         context: u64,
-        target_function: *const fn (thread: *task.Thread, context: u64) noreturn,
+        target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
     ) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareStackForNewThread", fn (
-            *task.Stack,
-            *task.Thread,
+            *kernel.Stack,
+            *kernel.scheduler.Thread,
             u64,
-            *const fn (thread: *task.Thread, context: u64) noreturn,
+            *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
         ) error{StackOverflow}!void);
 
         return current.scheduling.prepareStackForNewThread(stack, thread, context, target_function);
@@ -366,7 +357,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        core.panic("`" ++ @tagName(info.arch) ++ "` does not implement `" ++ name ++ "`");
+        core.panic("`" ++ @tagName(kernel.info.arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const aarch64 = @import("aarch64.zig");
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
+const aarch64 = @import("aarch64.zig");
 
 pub const TPIDR_EL1 = MSR(u64, "TPIDR_EL1");
 

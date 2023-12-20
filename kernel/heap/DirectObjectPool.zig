@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const memory = kernel.memory;
 const std = @import("std");
 
 /// A pool of objects that are allocated within the direct map.
@@ -26,7 +24,7 @@ pub fn DirectObjectPool(
 
         const Self = @This();
 
-        const objects_per_page: usize = core.Size.of(T).amountToCover(arch.paging.standard_page_size);
+        const objects_per_page: usize = core.Size.of(T).amountToCover(kernel.arch.paging.standard_page_size);
         const log = kernel.debug.log.scoped(log_scope);
 
         /// Get an object from the pool.
@@ -38,7 +36,7 @@ pub fn DirectObjectPool(
                     // TODO: per branch cold
 
                     // we are out of objects
-                    const interrupt_guard = arch.interrupts.interruptGuard();
+                    const interrupt_guard = kernel.arch.interrupts.interruptGuard();
                     defer interrupt_guard.release();
 
                     if (@cmpxchgStrong(
@@ -130,7 +128,7 @@ pub fn DirectObjectPool(
         }
 
         fn getMoreObjects(self: *Self) error{OutOfMemory}!void {
-            const page = memory.physical.allocatePage() orelse return error.OutOfMemory;
+            const page = kernel.memory.physical.allocatePage() orelse return error.OutOfMemory;
             const direct_map_range = page.toDirectMap();
 
             const objects = direct_map_range.address.toPtr([*]Object)[0..objects_per_page];
@@ -163,7 +161,7 @@ pub fn DirectObjectPool(
 
         comptime {
             if (@sizeOf(T) == 0) @compileError("zero sized types are unsupported");
-            if (arch.paging.standard_page_size.lessThan(core.Size.of(T))) {
+            if (kernel.arch.paging.standard_page_size.lessThan(core.Size.of(T))) {
                 @compileError("'" ++ @typeName(T) ++ "' is larger than a standard page size");
             }
 

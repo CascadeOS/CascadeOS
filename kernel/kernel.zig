@@ -12,14 +12,15 @@ pub const memory = @import("memory/memory.zig");
 pub const PhysicalAddress = address.PhysicalAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const Processor = @import("Processor.zig");
-pub const sync = @import("sync/sync.zig");
-pub const task = @import("task/task.zig");
+pub const scheduler = @import("scheduler/scheduler.zig");
+pub const SpinLock = @import("SpinLock.zig");
+pub const Stack = @import("Stack.zig");
 pub const VirtualAddress = address.VirtualAddress;
 pub const VirtualRange = address.VirtualRange;
 
-pub var kernel_process: task.Process = .{
+pub var kernel_process: scheduler.Process = .{
     .id = .kernel,
-    ._name = task.Process.Name.fromSlice("kernel") catch unreachable,
+    ._name = scheduler.Process.Name.fromSlice("kernel") catch unreachable,
     .page_table = undefined, // initialized in `initVirtualMemory`
 };
 

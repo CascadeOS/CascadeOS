@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const task = kernel.task;
 const std = @import("std");
 
 const Thread = @This();
@@ -12,9 +10,9 @@ id: Thread.Id,
 
 state: State = .ready,
 
-process: *task.Process,
+process: *kernel.scheduler.Process,
 
-kernel_stack: task.Stack,
+kernel_stack: kernel.Stack,
 
 next_thread: ?*Thread = null,
 

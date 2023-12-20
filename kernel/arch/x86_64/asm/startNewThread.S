@@ -7,9 +7,9 @@ extern fn _startNewThread() callconv(.C) noreturn;
 /*
 We need to prepare the arguments inorder to call:
 export fn startNewThread(
-    thread: *kernel.Thread, // rdi
+    thread: *kernel.scheduler.Thread, // rdi
     context: u64, // rsi
-    target_function: *const fn (thread: *kernel.Thread, context: u64) noreturn, // rdx
+    target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn, // rdx
 ) callconv(.C) noreturn {
 */
 

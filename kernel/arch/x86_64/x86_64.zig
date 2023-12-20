@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 const core = @import("core");
-const info = kernel.info;
 const kernel = @import("kernel");
-const Processor = kernel.Processor;
 const std = @import("std");
-const task = kernel.task;
-const VirtualAddress = kernel.VirtualAddress;
 
 comptime {
     // make sure any interrupt handlers are referenced
@@ -24,14 +20,13 @@ pub const interrupts = @import("interrupts/interrupts.zig");
 pub const paging = @import("paging/paging.zig");
 pub const registers = @import("registers.zig");
 pub const scheduling = @import("scheduling.zig");
-pub const serial = @import("serial.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
-pub inline fn getProcessor() *Processor {
+pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
-pub inline fn earlyGetProcessor() ?*Processor {
+pub inline fn earlyGetProcessor() ?*kernel.Processor {
     return @ptrFromInt(registers.KERNEL_GS_BASE.read());
 }
 
@@ -53,7 +48,7 @@ pub const spinLoopHint = instructions.pause;
 pub const halt = instructions.halt;
 
 comptime {
-    if (info.arch != .x86_64) {
-        @compileError("x86_64 implementation has been referenced when building " ++ @tagName(info.arch));
+    if (kernel.info.arch != .x86_64) {
+        @compileError("x86_64 implementation has been referenced when building " ++ @tagName(kernel.info.arch));
     }
 }

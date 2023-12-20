@@ -1,19 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const arch = kernel.arch;
 const core = @import("core");
-const heap = kernel.heap;
-const info = kernel.info;
 const kernel = @import("kernel");
-const memory = kernel.memory;
-const PageTable = paging.PageTable;
-const paging = arch.paging;
-const PhysicalAddress = kernel.PhysicalAddress;
-const PhysicalRange = kernel.PhysicalRange;
 const std = @import("std");
-const task = kernel.task;
-const VirtualAddress = kernel.VirtualAddress;
-const VirtualRange = kernel.VirtualRange;
+const paging = kernel.arch.paging;
 
 pub const KernelMemoryLayout = @import("KernelMemoryLayout.zig");
 pub const MapType = @import("MapType.zig");
@@ -26,24 +16,24 @@ pub var memory_layout: KernelMemoryLayout = .{};
 /// Maps a virtual range using the standard page size.
 ///
 /// Physical pages are allocated for each page in the virtual range.
-pub fn mapRange(page_table: *PageTable, virtual_range: VirtualRange, map_type: MapType) !void {
-    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+pub fn mapRange(page_table: *paging.PageTable, virtual_range: kernel.VirtualRange, map_type: MapType) !void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     const virtual_range_end = virtual_range.end();
-    var current_virtual_range = VirtualRange.fromAddr(virtual_range.address, arch.paging.standard_page_size);
+    var current_virtual_range = kernel.VirtualRange.fromAddr(virtual_range.address, kernel.arch.paging.standard_page_size);
 
     errdefer {
         // Unmap all pages that have been mapped.
         while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
             unmap(page_table, current_virtual_range);
-            current_virtual_range.address.moveBackwardInPlace(arch.paging.standard_page_size);
+            current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
         }
     }
 
     // Map all pages that were allocated.
     while (!current_virtual_range.address.equal(virtual_range_end)) {
-        const physical_range = memory.physical.allocatePage() orelse return error.OutOfMemory;
+        const physical_range = kernel.memory.physical.allocatePage() orelse return error.OutOfMemory;
 
         try mapToPhysicalRange(
             page_table,
@@ -52,21 +42,21 @@ pub fn mapRange(page_table: *PageTable, virtual_range: VirtualRange, map_type: M
             map_type,
         );
 
-        current_virtual_range.address.moveForwardInPlace(arch.paging.standard_page_size);
+        current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
     }
 }
 
 /// Maps a virtual address range to a physical range using the standard page size.
 pub fn mapToPhysicalRange(
-    page_table: *PageTable,
-    virtual_range: VirtualRange,
-    physical_range: PhysicalRange,
+    page_table: *paging.PageTable,
+    virtual_range: kernel.VirtualRange,
+    physical_range: kernel.PhysicalRange,
     map_type: MapType,
 ) !void {
-    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(physical_range.size.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(virtual_range.size.equal(virtual_range.size));
 
     log.debug(
@@ -74,7 +64,7 @@ pub fn mapToPhysicalRange(
         .{ virtual_range, physical_range, map_type },
     );
 
-    return arch.paging.mapToPhysicalRange(
+    return kernel.arch.paging.mapToPhysicalRange(
         page_table,
         virtual_range,
         physical_range,
@@ -85,22 +75,22 @@ pub fn mapToPhysicalRange(
 /// Unmaps a virtual range.
 ///
 /// **REQUIREMENTS**:
-/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
-/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
 pub fn unmap(
-    page_table: *PageTable,
-    virtual_range: VirtualRange,
+    page_table: *paging.PageTable,
+    virtual_range: kernel.VirtualRange,
 ) void {
-    core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     log.debug("unmapping: {}", .{virtual_range});
 
-    return arch.paging.unmap(page_table, virtual_range);
+    return kernel.arch.paging.unmap(page_table, virtual_range);
 }
 
 pub const init = struct {
-    pub fn initVirtualMemory() linksection(info.init_code) void {
+    pub fn initVirtualMemory() linksection(kernel.info.init_code) void {
         log.debug("populating kernel page table", .{});
         kernel.kernel_process.page_table = paging.allocatePageTable() catch
             core.panic("unable to allocate physical page for root page table");
@@ -134,28 +124,28 @@ pub const init = struct {
         }
     }
 
-    fn prepareKernelHeap() linksection(info.init_code) !void {
+    fn prepareKernelHeap() linksection(kernel.info.init_code) !void {
         log.debug("preparing kernel heap", .{});
 
-        const kernel_heap_range = try arch.paging.init.getTopLevelRangeAndFillFirstLevel(
+        const kernel_heap_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
             kernel.kernel_process.page_table,
         );
 
-        try heap.init.initHeap(kernel_heap_range);
+        try kernel.heap.init.initHeap(kernel_heap_range);
 
         memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .heap });
 
         log.debug("kernel heap: {}", .{kernel_heap_range});
     }
 
-    fn prepareKernelStacks() linksection(info.init_code) !void {
+    fn prepareKernelStacks() linksection(kernel.info.init_code) !void {
         log.debug("preparing kernel stacks", .{});
 
-        const kernel_stacks_range = try arch.paging.init.getTopLevelRangeAndFillFirstLevel(
+        const kernel_stacks_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
             kernel.kernel_process.page_table,
         );
 
-        try task.Stack.init.initStacks(kernel_stacks_range);
+        try kernel.Stack.init.initStacks(kernel_stacks_range);
 
         memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .stacks });
 
@@ -164,15 +154,15 @@ pub const init = struct {
 
     /// Maps a virtual address range to a physical address range using all available page sizes.
     fn mapToPhysicalRangeAllPageSizes(
-        page_table: *PageTable,
-        virtual_range: VirtualRange,
-        physical_range: PhysicalRange,
+        page_table: *paging.PageTable,
+        virtual_range: kernel.VirtualRange,
+        physical_range: kernel.PhysicalRange,
         map_type: MapType,
-    ) linksection(info.init_code) !void {
-        core.debugAssert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-        core.debugAssert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-        core.debugAssert(physical_range.address.isAligned(arch.paging.standard_page_size));
-        core.debugAssert(physical_range.size.isAligned(arch.paging.standard_page_size));
+    ) linksection(kernel.info.init_code) !void {
+        core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+        core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+        core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+        core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
         core.debugAssert(virtual_range.size.equal(virtual_range.size));
 
         log.debug(
@@ -180,7 +170,7 @@ pub const init = struct {
             .{ virtual_range, physical_range, map_type },
         );
 
-        return arch.paging.mapToPhysicalRangeAllPageSizes(
+        return kernel.arch.paging.mapToPhysicalRangeAllPageSizes(
             page_table,
             virtual_range,
             physical_range,
@@ -189,28 +179,28 @@ pub const init = struct {
     }
 
     /// Maps the direct maps.
-    fn mapDirectMaps() linksection(info.init_code) !void {
-        const direct_map_physical_range = PhysicalRange.fromAddr(PhysicalAddress.zero, info.direct_map.size);
+    fn mapDirectMaps() linksection(kernel.info.init_code) !void {
+        const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
 
         log.debug("mapping the direct map", .{});
 
         try mapToPhysicalRangeAllPageSizes(
             kernel.kernel_process.page_table,
-            info.direct_map,
+            kernel.info.direct_map,
             direct_map_physical_range,
             .{ .writeable = true, .global = true },
         );
-        memory_layout.registerRegion(.{ .range = info.direct_map, .type = .direct_map });
+        memory_layout.registerRegion(.{ .range = kernel.info.direct_map, .type = .direct_map });
 
         log.debug("mapping the non-cached direct map", .{});
 
         try mapToPhysicalRangeAllPageSizes(
             kernel.kernel_process.page_table,
-            info.non_cached_direct_map,
+            kernel.info.non_cached_direct_map,
             direct_map_physical_range,
             .{ .writeable = true, .no_cache = true, .global = true },
         );
-        memory_layout.registerRegion(.{ .range = info.non_cached_direct_map, .type = .non_cached_direct_map });
+        memory_layout.registerRegion(.{ .range = kernel.info.non_cached_direct_map, .type = .non_cached_direct_map });
     }
 
     const linker_symbols = struct {
@@ -228,7 +218,7 @@ pub const init = struct {
     };
 
     /// Maps the kernel sections.
-    fn mapKernelSections() linksection(info.init_code) !void {
+    fn mapKernelSections() linksection(kernel.info.init_code) !void {
         log.debug("mapping .init_text section", .{});
         try mapSection(
             @intFromPtr(&linker_symbols.__init_text_start),
@@ -285,14 +275,14 @@ pub const init = struct {
         section_end: usize,
         map_type: MapType,
         region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
-    ) linksection(info.init_code) !void {
+    ) linksection(kernel.info.init_code) !void {
         if (section_start == section_end) return;
 
         core.assert(section_end > section_start);
 
-        const virt_address = VirtualAddress.fromInt(section_start);
+        const virt_address = kernel.VirtualAddress.fromInt(section_start);
 
-        const virtual_range = VirtualRange.fromAddr(
+        const virtual_range = kernel.VirtualRange.fromAddr(
             virt_address,
             core.Size
                 .from(section_end - section_start, .byte)
@@ -300,11 +290,11 @@ pub const init = struct {
         );
         core.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
-        const phys_address = PhysicalAddress.fromInt(
-            virt_address.value - info.kernel_physical_to_virtual_offset.bytes,
+        const phys_address = kernel.PhysicalAddress.fromInt(
+            virt_address.value - kernel.info.kernel_physical_to_virtual_offset.bytes,
         );
 
-        const physical_range = PhysicalRange.fromAddr(phys_address, virtual_range.size);
+        const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
         try mapToPhysicalRangeAllPageSizes(
             kernel.kernel_process.page_table,

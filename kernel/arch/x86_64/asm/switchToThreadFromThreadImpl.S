@@ -2,8 +2,8 @@
 
 /*
 extern fn _switchToThreadFromThreadImpl(
-    new_kernel_stack_pointer: VirtualAddress, // rdi
-    previous_kernel_stack_pointer: *VirtualAddress  // rsi
+    new_kernel_stack_pointer: kernel.VirtualAddress, // rdi
+    previous_kernel_stack_pointer: *kernel.VirtualAddress  // rsi
 ) callconv(.C) noreturn;
 */
 

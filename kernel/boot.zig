@@ -1,35 +1,29 @@
 // SPDX-License-Identifier: MIT
 
 const core = @import("core");
-const info = kernel.info;
-const init = kernel.init;
 const kernel = @import("kernel");
-const PhysicalAddress = kernel.PhysicalAddress;
-const PhysicalRange = kernel.PhysicalRange;
-const Processor = kernel.Processor;
-const std = @import("std");
-const VirtualRange = kernel.VirtualRange;
 
+const std = @import("std");
 const limine = @import("limine");
 
 /// Entry point.
-export fn _start() linksection(info.init_code) noreturn {
-    @call(.never_inline, init.kernelInitStage1, .{});
+export fn _start() linksection(kernel.info.init_code) noreturn {
+    @call(.never_inline, kernel.init.kernelInitStage1, .{});
     core.panic("kernelInitStage1 returned");
 }
 
 const limine_requests = struct {
     // TODO: setting this to 1 causes aarch64 to hang at "limine: Loading kernel `boot:///kernel`..."
-    export var limine_revison: limine.BaseRevison linksection(info.init_data) = .{ .revison = 0 };
-    export var kernel_file: limine.KernelFile linksection(info.init_data) = .{};
-    export var hhdm: limine.HHDM linksection(info.init_data) = .{};
-    export var kernel_address: limine.KernelAddress linksection(info.init_data) = .{};
-    export var memmap: limine.Memmap linksection(info.init_data) = .{};
-    export var smp: limine.SMP linksection(info.init_data) = .{ .flags = .{ .x2apic = false } }; // TODO: Enable x2apic
+    export var limine_revison: limine.BaseRevison linksection(kernel.info.init_data) = .{ .revison = 0 };
+    export var kernel_file: limine.KernelFile linksection(kernel.info.init_data) = .{};
+    export var hhdm: limine.HHDM linksection(kernel.info.init_data) = .{};
+    export var kernel_address: limine.KernelAddress linksection(kernel.info.init_data) = .{};
+    export var memmap: limine.Memmap linksection(kernel.info.init_data) = .{};
+    export var smp: limine.SMP linksection(kernel.info.init_data) = .{ .flags = .{ .x2apic = false } }; // TODO: Enable x2apic
 };
 
 /// Returns the direct map address provided by the bootloader, if any.
-pub fn directMapAddress() linksection(info.init_code) ?u64 {
+pub fn directMapAddress() linksection(kernel.info.init_code) ?u64 {
     if (limine_requests.hhdm.response) |resp| {
         return resp.offset;
     }
@@ -42,7 +36,7 @@ pub const KernelBaseAddress = struct {
 };
 
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
-pub fn kernelBaseAddress() linksection(info.init_code) ?KernelBaseAddress {
+pub fn kernelBaseAddress() linksection(kernel.info.init_code) ?KernelBaseAddress {
     if (limine_requests.kernel_address.response) |resp| {
         return .{
             .virtual = resp.virtual_base,
@@ -52,22 +46,22 @@ pub fn kernelBaseAddress() linksection(info.init_code) ?KernelBaseAddress {
     return null;
 }
 
-/// Returns the kernel file contents as a VirtualRange, if provided by the bootloader.
-pub fn kernelFile() linksection(info.init_code) ?VirtualRange {
+/// Returns the kernel file contents as a kernel.VirtualRange, if provided by the bootloader.
+pub fn kernelFile() linksection(kernel.info.init_code) ?kernel.VirtualRange {
     if (limine_requests.kernel_file.response) |resp| {
-        return VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
+        return kernel.VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
     }
     return null;
 }
 
-pub fn x2apicEnabled() linksection(info.init_code) bool {
-    if (info.arch != .x86_64) @compileError("x2apicEnabled can only be called on x86_64");
+pub fn x2apicEnabled() linksection(kernel.info.init_code) bool {
+    if (kernel.info.arch != .x86_64) @compileError("x2apicEnabled can only be called on x86_64");
 
     const smp_response = limine_requests.smp.response orelse return false;
     return smp_response.flags.x2apic_enabled;
 }
 
-pub fn processorDescriptors() linksection(info.init_code) ProcessorDescriptorIterator {
+pub fn processorDescriptors() linksection(kernel.info.init_code) ProcessorDescriptorIterator {
     const smp_response = limine_requests.smp.response orelse core.panic("no processor descriptors from the bootloader");
     const entries = smp_response.cpus();
     return .{
@@ -83,9 +77,9 @@ pub const ProcessorDescriptor = struct {
 
     pub fn boot(
         self: ProcessorDescriptor,
-        processor: *Processor,
-        comptime targetFn: fn (processor: *Processor) noreturn,
-    ) linksection(info.init_code) void {
+        processor: *kernel.Processor,
+        comptime targetFn: fn (processor: *kernel.Processor) noreturn,
+    ) linksection(kernel.info.init_code) void {
         switch (self._raw) {
             .limine => |limine_info| {
                 const trampolineFn = struct {
@@ -111,14 +105,14 @@ pub const ProcessorDescriptor = struct {
         }
     }
 
-    pub fn acpiId(self: ProcessorDescriptor) linksection(info.init_code) u32 {
+    pub fn acpiId(self: ProcessorDescriptor) linksection(kernel.info.init_code) u32 {
         return switch (self._raw) {
             .limine => |limine_info| limine_info.processor_id,
         };
     }
 
-    pub fn lapicId(self: ProcessorDescriptor) linksection(info.init_code) u32 {
-        if (info.arch != .x86_64) @compileError("apicId can only be called on x86_64");
+    pub fn lapicId(self: ProcessorDescriptor) linksection(kernel.info.init_code) u32 {
+        if (kernel.info.arch != .x86_64) @compileError("apicId can only be called on x86_64");
 
         return switch (self._raw) {
             .limine => |limine_info| limine_info.lapic_id,
@@ -134,14 +128,14 @@ pub const ProcessorDescriptor = struct {
 pub const ProcessorDescriptorIterator = union(enum) {
     limine: LimineProcessorDescriptorIterator,
 
-    pub fn count(self: ProcessorDescriptorIterator) linksection(info.init_code) usize {
+    pub fn count(self: ProcessorDescriptorIterator) linksection(kernel.info.init_code) usize {
         return switch (self) {
             inline else => |i| i.count(),
         };
     }
 
     /// Returns the next processor descriptor from the iterator, if any remain.
-    pub fn next(self: *ProcessorDescriptorIterator) linksection(info.init_code) ?ProcessorDescriptor {
+    pub fn next(self: *ProcessorDescriptorIterator) linksection(kernel.info.init_code) ?ProcessorDescriptor {
         return switch (self.*) {
             inline else => |*i| i.next(),
         };
@@ -152,11 +146,11 @@ const LimineProcessorDescriptorIterator = struct {
     index: usize,
     entries: []*limine.SMP.Response.SMPInfo,
 
-    pub fn count(self: LimineProcessorDescriptorIterator) linksection(info.init_code) usize {
+    pub fn count(self: LimineProcessorDescriptorIterator) linksection(kernel.info.init_code) usize {
         return self.entries.len;
     }
 
-    pub fn next(self: *LimineProcessorDescriptorIterator) linksection(info.init_code) ?ProcessorDescriptor {
+    pub fn next(self: *LimineProcessorDescriptorIterator) linksection(kernel.info.init_code) ?ProcessorDescriptor {
         if (self.index >= self.entries.len) return null;
 
         const smp_info = self.entries[self.index];
@@ -170,7 +164,7 @@ const LimineProcessorDescriptorIterator = struct {
 };
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMap(direction: Direction) linksection(info.init_code) MemoryMapIterator {
+pub fn memoryMap(direction: Direction) linksection(kernel.info.init_code) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
     const entries = memmap_response.entries();
     return .{
@@ -190,7 +184,7 @@ pub const MemoryMapIterator = union(enum) {
     limine: LimineMemoryMapIterator,
 
     /// Returns the next memory map entry from the iterator, if any remain.
-    pub fn next(self: *MemoryMapIterator) linksection(info.init_code) ?MemoryMapEntry {
+    pub fn next(self: *MemoryMapIterator) linksection(kernel.info.init_code) ?MemoryMapEntry {
         return switch (self.*) {
             inline else => |*i| i.next(),
         };
@@ -199,7 +193,7 @@ pub const MemoryMapIterator = union(enum) {
 
 /// An entry in the memory map provided by the bootloader.
 pub const MemoryMapEntry = struct {
-    range: PhysicalRange,
+    range: kernel.PhysicalRange,
     type: Type,
 
     pub const Type = enum {
@@ -219,7 +213,7 @@ pub const MemoryMapEntry = struct {
         break :blk longest_so_far;
     };
 
-    pub fn print(entry: MemoryMapEntry, writer: anytype) linksection(info.init_code) !void {
+    pub fn print(entry: MemoryMapEntry, writer: anytype) linksection(kernel.info.init_code) !void {
         try writer.writeAll("MemoryMapEntry - ");
 
         try std.fmt.formatBuf(
@@ -258,7 +252,7 @@ const LimineMemoryMapIterator = struct {
     entries: []const *const limine.Memmap.Entry,
     direction: Direction,
 
-    pub fn next(self: *LimineMemoryMapIterator) linksection(info.init_code) ?MemoryMapEntry {
+    pub fn next(self: *LimineMemoryMapIterator) linksection(kernel.info.init_code) ?MemoryMapEntry {
         const limine_entry = switch (self.direction) {
             .backwards => blk: {
                 if (self.index == 0) return null;
@@ -274,8 +268,8 @@ const LimineMemoryMapIterator = struct {
         };
 
         return .{
-            .range = PhysicalRange.fromAddr(
-                PhysicalAddress.fromInt(limine_entry.base),
+            .range = kernel.PhysicalRange.fromAddr(
+                kernel.PhysicalAddress.fromInt(limine_entry.base),
                 core.Size.from(limine_entry.length, .byte),
             ),
             .type = switch (limine_entry.type) {

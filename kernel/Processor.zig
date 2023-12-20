@@ -4,10 +4,8 @@
 //!
 //! Even though this is called `Processor` it represents a single core in a multi-core system.
 
-const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const task = kernel.task;
 const std = @import("std");
 
 /// The list of processors in the system.
@@ -24,14 +22,14 @@ panicked: bool = false,
 /// The stack used for idle.
 ///
 /// Also used during the move from the bootloader provided stack until we start scheduling.
-idle_stack: task.Stack,
+idle_stack: kernel.Stack,
 
 /// The currently running thread.
 ///
 /// This is set to `null` when the processor is idle and also before we start scheduling.
-current_thread: ?*task.Thread = null,
+current_thread: ?*kernel.scheduler.Thread = null,
 
-arch: arch.ArchProcessor,
+arch: kernel.arch.ArchProcessor,
 
 pub const Id = enum(usize) {
     bootstrap = 0,

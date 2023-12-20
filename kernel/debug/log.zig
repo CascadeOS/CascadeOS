@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-const arch = kernel.arch;
 const core = @import("core");
-const info = kernel.info;
 const kernel = @import("kernel");
-const kernel_options = @import("kernel_options");
 const std = @import("std");
+const kernel_options = @import("kernel_options");
 
 var initialized: bool = false;
 
@@ -73,10 +71,10 @@ fn earlyLogFn(
     comptime format: []const u8,
     args: anytype,
 ) void { // TODO: Put in init_code section
-    const early_output = arch.init.getEarlyOutput() orelse return;
+    const early_output = kernel.arch.init.getEarlyOutput() orelse return;
     defer early_output.deinit();
 
-    if (arch.earlyGetProcessor()) |processor| {
+    if (kernel.arch.earlyGetProcessor()) |processor| {
         processor.id.print(early_output.writer) catch unreachable;
 
         if (processor.current_thread) |thread| {
@@ -148,7 +146,7 @@ const level: Level = blk: {
 
     if (true) break :blk .info;
 
-    break :blk switch (info.mode) {
+    break :blk switch (kernel.info.mode) {
         .Debug => .info,
         .ReleaseSafe => .warn,
         .ReleaseFast, .ReleaseSmall => .err,

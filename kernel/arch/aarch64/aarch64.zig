@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-const arch = kernel.arch;
 const core = @import("core");
-const info = kernel.info;
 const kernel = @import("kernel");
-const Processor = kernel.Processor;
 const std = @import("std");
-const VirtualAddress = kernel.VirtualAddress;
 
 pub const init = @import("init.zig");
 pub const registers = @import("registers.zig");
-pub const Uart = @import("Uart.zig");
 
 pub inline fn spinLoopHint() void {
     asm volatile ("isb" ::: "memory");
@@ -18,11 +13,11 @@ pub inline fn spinLoopHint() void {
 
 pub const ArchProcessor = struct {};
 
-pub inline fn getProcessor() *Processor {
+pub inline fn getProcessor() *kernel.Processor {
     return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
-pub inline fn earlyGetProcessor() ?*Processor {
+pub inline fn earlyGetProcessor() ?*kernel.Processor {
     return @ptrFromInt(registers.TPIDR_EL1.read());
 }
 
@@ -62,13 +57,13 @@ pub const paging = struct {
 
     pub const standard_page_size = small_page_size;
 
-    pub const higher_half = VirtualAddress.fromInt(0xffff800000000000);
+    pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
 
     pub const PageTable = struct {};
 };
 
 comptime {
-    if (info.arch != .aarch64) {
-        @compileError("aarch64 implementation has been referenced when building " ++ @tagName(info.arch));
+    if (kernel.info.arch != .aarch64) {
+        @compileError("aarch64 implementation has been referenced when building " ++ @tagName(kernel.info.arch));
     }
 }

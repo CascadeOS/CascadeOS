@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-const arch_info = x86_64.arch_info;
 const core = @import("core");
-const info = kernel.info;
 const kernel = @import("kernel");
-const PhysicalAddress = kernel.PhysicalAddress;
-const Processor = kernel.Processor;
-const registers = x86_64.registers;
 const std = @import("std");
-const interrupts = x86_64.interrupts;
 const x86_64 = @import("x86_64.zig");
 
 // TODO: Support x2apic
@@ -21,7 +15,7 @@ const log = kernel.debug.log.scoped(.apic);
 var lapic_ptr: [*]volatile u8 = undefined;
 
 fn readRegister(comptime T: type, register: LAPICRegister) T {
-    if (arch_info.x2apic_enabled) {
+    if (x86_64.arch_info.x2apic_enabled) {
         core.panic("x2APIC not supported yet");
     }
 
@@ -37,7 +31,7 @@ fn readRegister(comptime T: type, register: LAPICRegister) T {
 }
 
 fn writeRegister(comptime T: type, register: LAPICRegister, value: T) void {
-    if (arch_info.x2apic_enabled) {
+    if (x86_64.arch_info.x2apic_enabled) {
         core.panic("x2APIC not supported yet");
     }
 
@@ -69,7 +63,7 @@ const LAPICRegister = enum(usize) {
     /// Read Only
     arbitration_priority = 0x0090,
 
-    /// Processor Priority Register (PPR)
+    /// kernel.Processor Priority Register (PPR)
     /// Read Only
     processor_priority = 0x00A0,
 
@@ -243,8 +237,8 @@ const LAPICRegister = enum(usize) {
 };
 
 pub const init = struct {
-    pub fn initApic(_: *Processor) linksection(info.init_code) void {
-        if (arch_info.x2apic_enabled) {
+    pub fn initApic(_: *kernel.Processor) linksection(kernel.info.init_code) void {
+        if (x86_64.arch_info.x2apic_enabled) {
             core.panic("x2APIC not supported yet");
         } else {
             const lapic_base = getLapicBase();
@@ -259,7 +253,7 @@ pub const init = struct {
         const version = readVersionRegister();
         log.debug("version register: {}", .{version});
 
-        enable(@intFromEnum(interrupts.IdtVector.spurious_interrupt));
+        enable(@intFromEnum(x86_64.interrupts.IdtVector.spurious_interrupt));
     }
 
     const VersionRegister = packed struct(u32) {
@@ -278,19 +272,19 @@ pub const init = struct {
         pub const format = core.formatStructIgnoreReservedAndHiddenFields;
     };
 
-    fn readVersionRegister() linksection(info.init_code) VersionRegister {
+    fn readVersionRegister() linksection(kernel.info.init_code) VersionRegister {
         return @bitCast(readRegister(u32, .version));
     }
 
     const APIC_ENABLE_BIT: u32 = 0b100000000;
 
-    fn enable(spurious_interrupt_number: u8) linksection(info.init_code) void {
+    fn enable(spurious_interrupt_number: u8) linksection(kernel.info.init_code) void {
         writeRegister(u32, .spurious_interrupt, APIC_ENABLE_BIT | spurious_interrupt_number);
     }
 
-    const IA32_APIC_BASE_MSR = registers.MSR(u32, 0x1B);
+    const IA32_APIC_BASE_MSR = x86_64.registers.MSR(u32, 0x1B);
 
-    fn getLapicBase() linksection(info.init_code) PhysicalAddress {
-        return PhysicalAddress.fromInt(IA32_APIC_BASE_MSR.read() & 0xfffff000);
+    fn getLapicBase() linksection(kernel.info.init_code) kernel.PhysicalAddress {
+        return kernel.PhysicalAddress.fromInt(IA32_APIC_BASE_MSR.read() & 0xfffff000);
     }
 };

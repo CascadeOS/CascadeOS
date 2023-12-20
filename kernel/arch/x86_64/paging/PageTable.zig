@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-const Bitfield = bitjuggle.Bitfield;
-const bitjuggle = @import("bitjuggle");
-const Boolean = bitjuggle.Boolean;
 const core = @import("core");
 const kernel = @import("kernel");
-const paging = @import("paging.zig");
-const PhysicalAddress = kernel.PhysicalAddress;
 const std = @import("std");
-const VirtualAddress = kernel.VirtualAddress;
 const x86_64 = @import("../x86_64.zig");
+const bitjuggle = @import("bitjuggle");
 
 /// A page table for x86_64.
 pub const PageTable = extern struct {
-    entries: [number_of_entries]Entry align(paging.small_page_size.bytes),
+    entries: [number_of_entries]Entry align(x86_64.paging.small_page_size.bytes),
 
     pub const number_of_entries = 512;
 
@@ -22,41 +17,41 @@ pub const PageTable = extern struct {
         @memset(bytes, 0);
     }
 
-    pub fn getEntryLevel4(self: *PageTable, virtual_address: VirtualAddress) *Entry {
+    pub fn getEntryLevel4(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
         return &self.entries[p4Index(virtual_address)];
     }
 
-    pub fn getEntryLevel3(self: *PageTable, virtual_address: VirtualAddress) *Entry {
+    pub fn getEntryLevel3(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
         return &self.entries[p3Index(virtual_address)];
     }
 
-    pub fn getEntryLevel2(self: *PageTable, virtual_address: VirtualAddress) *Entry {
+    pub fn getEntryLevel2(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
         return &self.entries[p2Index(virtual_address)];
     }
 
-    pub fn getEntryLevel1(self: *PageTable, virtual_address: VirtualAddress) *Entry {
+    pub fn getEntryLevel1(self: *PageTable, virtual_address: kernel.VirtualAddress) *Entry {
         return &self.entries[p1Index(virtual_address)];
     }
 
-    pub fn p1Index(address: VirtualAddress) u9 {
+    pub fn p1Index(address: kernel.VirtualAddress) u9 {
         return @truncate(address.value >> level_1_shift);
     }
 
-    pub fn p2Index(address: VirtualAddress) u9 {
+    pub fn p2Index(address: kernel.VirtualAddress) u9 {
         return @truncate(address.value >> level_2_shift);
     }
 
-    pub fn p3Index(address: VirtualAddress) u9 {
+    pub fn p3Index(address: kernel.VirtualAddress) u9 {
         return @truncate(address.value >> level_3_shift);
     }
 
-    pub fn p4Index(address: VirtualAddress) u9 {
+    pub fn p4Index(address: kernel.VirtualAddress) u9 {
         return @truncate(address.value >> level_4_shift);
     }
 
     /// Converts page table indices to a virtual address.
-    pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) VirtualAddress {
-        return VirtualAddress.fromInt(
+    pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) kernel.VirtualAddress {
+        return kernel.VirtualAddress.fromInt(
             signExtendAddress(
                 @as(u64, level_4_index) << level_4_shift |
                     @as(u64, level_3_index) << level_3_shift |
@@ -79,7 +74,7 @@ pub const PageTable = extern struct {
             // The level 4 part is sign extended to ensure the address is cannonical.
             const level4_part = signExtendAddress(level4_index << level_4_shift);
 
-            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_index, VirtualAddress.fromInt(level4_part) });
+            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_index, kernel.VirtualAddress.fromInt(level4_part) });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
@@ -90,7 +85,7 @@ pub const PageTable = extern struct {
                 const level3_part = level3_index << level_3_shift;
 
                 if (level3_entry.huge.read()) {
-                    const virtual = VirtualAddress.fromInt(level4_part | level3_part);
+                    const virtual = kernel.VirtualAddress.fromInt(level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
                     try writer.print("  [{}] 1GIB {} -> {}    Flags: ", .{ level3_index, virtual, physical });
                     try level3_entry.printHugeEntryFlags(writer);
@@ -98,7 +93,7 @@ pub const PageTable = extern struct {
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_index, VirtualAddress.fromInt(level4_part | level3_part) });
+                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_index, kernel.VirtualAddress.fromInt(level4_part | level3_part) });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
@@ -109,7 +104,7 @@ pub const PageTable = extern struct {
                     const level2_part = level2_index << level_2_shift;
 
                     if (level2_entry.huge.read()) {
-                        const virtual = VirtualAddress.fromInt(level4_part | level3_part | level2_part);
+                        const virtual = kernel.VirtualAddress.fromInt(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
                         try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ virtual, physical, level2_index });
                         try level2_entry.printHugeEntryFlags(writer);
@@ -117,7 +112,7 @@ pub const PageTable = extern struct {
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_index, VirtualAddress.fromInt(level4_part | level3_part | level2_part) });
+                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_index, kernel.VirtualAddress.fromInt(level4_part | level3_part | level2_part) });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
@@ -137,7 +132,7 @@ pub const PageTable = extern struct {
 
                         const level1_part = level1_index << level_1_shift;
 
-                        const virtual = VirtualAddress.fromInt(level4_part | level3_part | level2_part | level1_part);
+                        const virtual = kernel.VirtualAddress.fromInt(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
                         try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ virtual, physical, level1_index });
                         try level1_entry.printSmallEntryFlags(writer);
@@ -163,7 +158,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        present: Boolean(u64, 0),
+        present: bitjuggle.Boolean(u64, 0),
 
         /// Controls whether writes to the mapped physical pages are allowed.
         ///
@@ -179,7 +174,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        writeable: Boolean(u64, 1),
+        writeable: bitjuggle.Boolean(u64, 1),
 
         /// Controls whether accesses from userspace (i.e. ring 3) are permitted.
         ///
@@ -191,7 +186,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        user_accessible: Boolean(u64, 2),
+        user_accessible: bitjuggle.Boolean(u64, 2),
 
         /// If this bit is set, a "write-through" policy is used for the cache, else a "write-back" policy is used.
         ///
@@ -203,7 +198,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        write_through: Boolean(u64, 3),
+        write_through: bitjuggle.Boolean(u64, 3),
 
         /// Disables caching for the pointed entry is cacheable.
         ///
@@ -215,7 +210,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        no_cache: Boolean(u64, 4),
+        no_cache: bitjuggle.Boolean(u64, 4),
 
         /// Set by the CPU when the mapped physical page or page table is accessed.
         ///
@@ -227,7 +222,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        accessed: Boolean(u64, 5),
+        accessed: bitjuggle.Boolean(u64, 5),
 
         /// Set by the CPU on a write to the mapped physical page.
         ///
@@ -235,20 +230,20 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        dirty: Boolean(u64, 6),
+        dirty: bitjuggle.Boolean(u64, 6),
 
         /// Specifies that the entry maps a huge physical page instead of a page table.
         ///
         /// Valid for:
         ///  - 1GiB
         ///  - 2MiB
-        huge: Boolean(u64, 7),
+        huge: bitjuggle.Boolean(u64, 7),
 
         /// Determines the memory types used
         ///
         /// Valid for:
         ///  - 4KiB
-        pat: Boolean(u64, 7),
+        pat: bitjuggle.Boolean(u64, 7),
 
         /// Indicates that the mapping is present in all address spaces, so it isn't flushed from the TLB on an address space switch.
         ///
@@ -256,14 +251,14 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        global: Boolean(u64, 8),
+        global: bitjuggle.Boolean(u64, 8),
 
         /// Determines the memory types used
         ///
         /// Valid for:
         ///  - 1GiB
         ///  - 2MiB
-        pat_huge: Boolean(u64, 12),
+        pat_huge: bitjuggle.Boolean(u64, 12),
 
         /// The page aligned physical address
         ///
@@ -273,19 +268,19 @@ pub const PageTable = extern struct {
         ///  - PDPTE
         ///  - PDE
         ///  - 4KiB
-        address_4kib_aligned: Bitfield(u64, level_1_shift, length_of_4kib_aligned_address),
+        address_4kib_aligned: bitjuggle.Bitfield(u64, level_1_shift, length_of_4kib_aligned_address),
 
         /// The 2MiB aligned physical address
         ///
         /// Valid for:
         ///  - 2MiB
-        address_2mib_aligned: Bitfield(u64, level_2_shift, length_of_2mib_aligned_address),
+        address_2mib_aligned: bitjuggle.Bitfield(u64, level_2_shift, length_of_2mib_aligned_address),
 
         /// The 1GiB aligned physical address
         ///
         /// Valid for:
         ///  - 1GiB
-        address_1gib_aligned: Bitfield(u64, level_3_shift, length_of_1gib_aligned_address),
+        address_1gib_aligned: bitjuggle.Bitfield(u64, level_3_shift, length_of_1gib_aligned_address),
 
         /// Forbid code execution from the mapped physical pages.
         ///
@@ -297,7 +292,7 @@ pub const PageTable = extern struct {
         ///  - 1GiB
         ///  - 2MiB
         ///  - 4KiB
-        no_execute: Boolean(u64, 63),
+        no_execute: bitjuggle.Boolean(u64, 63),
 
         _backing: u64,
 
@@ -307,30 +302,30 @@ pub const PageTable = extern struct {
             self._backing = 0;
         }
 
-        pub fn getAddress4kib(self: Entry) PhysicalAddress {
+        pub fn getAddress4kib(self: Entry) kernel.PhysicalAddress {
             return .{ .value = self.address_4kib_aligned.readNoShiftFullSize() };
         }
 
-        pub fn setAddress4kib(self: *Entry, address: PhysicalAddress) void {
-            core.debugAssert(address.isAligned(paging.small_page_size));
+        pub fn setAddress4kib(self: *Entry, address: kernel.PhysicalAddress) void {
+            core.debugAssert(address.isAligned(x86_64.paging.small_page_size));
             self.address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        pub fn getAddress2mib(self: Entry) PhysicalAddress {
+        pub fn getAddress2mib(self: Entry) kernel.PhysicalAddress {
             return .{ .value = self.address_2mib_aligned.readNoShiftFullSize() };
         }
 
-        pub fn setAddress2mib(self: *Entry, address: PhysicalAddress) void {
-            core.debugAssert(address.isAligned(paging.medium_page_size));
+        pub fn setAddress2mib(self: *Entry, address: kernel.PhysicalAddress) void {
+            core.debugAssert(address.isAligned(x86_64.paging.medium_page_size));
             self.address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        pub fn getAddress1gib(self: Entry) PhysicalAddress {
+        pub fn getAddress1gib(self: Entry) kernel.PhysicalAddress {
             return .{ .value = self.address_1gib_aligned.readNoShiftFullSize() };
         }
 
-        pub fn setAddress1gib(self: *Entry, address: PhysicalAddress) void {
-            core.debugAssert(address.isAligned(paging.large_page_size));
+        pub fn setAddress1gib(self: *Entry, address: kernel.PhysicalAddress) void {
+            core.debugAssert(address.isAligned(x86_64.paging.large_page_size));
             self.address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 

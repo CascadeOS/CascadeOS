@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 const core = @import("core");
-const Gdt = x86_64.Gdt;
-const Idt = @import("Idt.zig");
-const interrupt_handlers = @import("interrupt_handlers.zig");
-const interrupts = x86_64.interrupts;
 const kernel = @import("kernel");
-const registers = x86_64.registers;
 const std = @import("std");
 const x86_64 = @import("../x86_64.zig");
+
+const Idt = @import("Idt.zig");
+const interrupt_handlers = @import("interrupt_handlers.zig");
 
 pub const number_of_handlers = Idt.number_of_handlers;
 
@@ -43,7 +41,7 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
         // is always aligned in the same way for every vector
         const error_code_asm = if (comptime !idt_vector.hasErrorCode()) "push $0\n" else "";
         const vector_number_asm = std.fmt.comptimePrint("push ${d}", .{vector_number});
-        const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{Gdt.kernel_data_selector});
+        const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{x86_64.Gdt.kernel_data_selector});
 
         const rawInterruptHandler = struct {
             fn rawInterruptHandler() callconv(.Naked) void {
@@ -126,7 +124,7 @@ pub const InterruptFrame = extern struct {
     error_code: u64,
     rip: u64,
     cs: u64,
-    rflags: registers.RFlags,
+    rflags: x86_64.registers.RFlags,
     rsp: u64,
     ss: u64,
 
@@ -137,12 +135,12 @@ pub const InterruptFrame = extern struct {
 
     /// Checks if this interrupt occurred in kernel mode.
     pub inline fn isKernel(self: *const InterruptFrame) bool {
-        return self.cs == Gdt.kernel_code_selector;
+        return self.cs == x86_64.Gdt.kernel_code_selector;
     }
 
     /// Checks if this interrupt occurred in user mode.
     pub inline fn isUser(self: *const InterruptFrame) bool {
-        return self.cs == Gdt.user_code_selector;
+        return self.cs == x86_64.Gdt.user_code_selector;
     }
 
     pub fn print(
@@ -199,7 +197,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
-    interrupts.disableInterrupts();
+    disableInterrupts();
 }
 
 pub const IdtVector = enum(u8) {
@@ -278,7 +276,7 @@ pub const IdtVector = enum(u8) {
     ///
     /// When the exception occurred before loading the segment selectors from the TSS, the saved instruction pointer
     /// points to the instruction which caused the exception. Otherwise, and this is more common, it points to the
-    /// first instruction in the new task.
+    /// first instruction in the new
     invalid_tss = 0x0A,
 
     /// Occurs when trying to load a segment or gate which has its `Present` bit set to 0.
@@ -294,7 +292,7 @@ pub const IdtVector = enum(u8) {
     ///
     /// The saved instruction pointer points to the instruction which caused the exception, unless the fault occurred
     /// because of loading a non-present stack segment during a hardware task switch, in which case it points to the
-    /// next instruction of the new task.
+    /// next instruction of the new
     stack = 0x0C,
 
     /// A General Protection Fault may occur for various reasons.
@@ -419,7 +417,7 @@ pub const IdtVector = enum(u8) {
 
 /// Are interrupts enabled?
 pub inline fn interruptsEnabled() bool {
-    return registers.RFlags.read().interrupt;
+    return x86_64.registers.RFlags.read().interrupt;
 }
 
 /// Enable interrupts.
@@ -450,7 +448,7 @@ pub const init = struct {
         log.debug("mapping idt entries to raw handlers", .{});
         for (raw_handlers, 0..) |raw_handler, i| {
             idt.handlers[i].init(
-                Gdt.kernel_code_selector,
+                x86_64.Gdt.kernel_code_selector,
                 .interrupt,
                 raw_handler,
             );

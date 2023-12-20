@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 const core = @import("core");
-const info = kernel.info;
 const kernel = @import("kernel");
 const std = @import("std");
 
@@ -16,12 +15,12 @@ pub const PhysicalAddress = extern struct {
 
     /// Returns the virtual address corresponding to this physical address in the direct map.
     pub inline fn toDirectMap(self: PhysicalAddress) VirtualAddress {
-        return .{ .value = self.value + info.direct_map.address.value };
+        return .{ .value = self.value + kernel.info.direct_map.address.value };
     }
 
     /// Returns the virtual address corresponding to this physical address in the non-cached direct map.
     pub inline fn toNonCachedDirectMap(self: PhysicalAddress) VirtualAddress {
-        return .{ .value = self.value + info.non_cached_direct_map.address.value };
+        return .{ .value = self.value + kernel.info.non_cached_direct_map.address.value };
     }
 
     pub usingnamespace AddrMixin(@This());
@@ -52,16 +51,16 @@ pub const VirtualAddress = extern struct {
     ///
     /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
     pub fn unsafeToPhysicalFromDirectMap(self: VirtualAddress) PhysicalAddress {
-        return .{ .value = self.value -% info.direct_map.address.value };
+        return .{ .value = self.value -% kernel.info.direct_map.address.value };
     }
 
     /// Returns the physical address of the given virtual address if it is in one of the direct maps.
     pub fn toPhysicalFromDirectMap(self: VirtualAddress) error{AddressNotInAnyDirectMap}!PhysicalAddress {
-        if (info.direct_map.contains(self)) {
-            return .{ .value = self.value -% info.direct_map.address.value };
+        if (kernel.info.direct_map.contains(self)) {
+            return .{ .value = self.value -% kernel.info.direct_map.address.value };
         }
-        if (info.non_cached_direct_map.contains(self)) {
-            return .{ .value = self.value -% info.non_cached_direct_map.address.value };
+        if (kernel.info.non_cached_direct_map.contains(self)) {
+            return .{ .value = self.value -% kernel.info.non_cached_direct_map.address.value };
         }
         return error.AddressNotInAnyDirectMap;
     }

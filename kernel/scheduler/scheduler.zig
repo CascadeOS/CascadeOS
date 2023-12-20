@@ -2,21 +2,19 @@
 
 //! A simple round robin scheduler.
 
-const arch = kernel.arch;
 const core = @import("core");
 const kernel = @import("kernel");
-const Processor = kernel.Processor;
-const SpinLock = kernel.sync.SpinLock;
 const std = @import("std");
-const task = kernel.task;
-const VirtualAddress = kernel.VirtualAddress;
+
+pub const Process = @import("Process.zig");
+pub const Thread = @import("Thread.zig");
 
 const log = kernel.debug.log.scoped(.scheduler);
 
-var scheduler_lock: SpinLock = .{};
+var scheduler_lock: kernel.SpinLock = .{};
 
-var ready_to_run_start: ?*task.Thread = null;
-var ready_to_run_end: ?*task.Thread = null;
+var ready_to_run_start: ?*Thread = null;
+var ready_to_run_end: ?*Thread = null;
 
 /// Performs a round robin scheduling of the ready threads.
 ///
@@ -25,7 +23,7 @@ pub fn schedule(requeue_current_thread: bool) void {
     const held = scheduler_lock.lock();
     defer held.unlock();
 
-    const processor = arch.getProcessor();
+    const processor = kernel.arch.getProcessor();
 
     const opt_current_thread = processor.current_thread;
 
@@ -43,11 +41,11 @@ pub fn schedule(requeue_current_thread: bool) void {
         log.debug("no threads to run, switching to idle", .{});
 
         const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
-            VirtualAddress.fromPtr(&idle),
+            kernel.VirtualAddress.fromPtr(&idle),
         ) catch unreachable; // the idle stack is always big enough to hold a return address
 
         processor.current_thread = null;
-        arch.scheduling.switchToIdle(processor, idle_stack_pointer, opt_current_thread);
+        kernel.arch.scheduling.switchToIdle(processor, idle_stack_pointer, opt_current_thread);
         unreachable;
     };
 
@@ -62,7 +60,7 @@ pub fn schedule(requeue_current_thread: bool) void {
 
         processor.current_thread = new_thread;
         new_thread.state = .running;
-        arch.scheduling.switchToThreadFromIdle(processor, new_thread);
+        kernel.arch.scheduling.switchToThreadFromIdle(processor, new_thread);
         unreachable;
     };
 
@@ -76,11 +74,11 @@ pub fn schedule(requeue_current_thread: bool) void {
     log.debug("switching to {} from {}", .{ new_thread, current_thread });
     processor.current_thread = new_thread;
     new_thread.state = .running;
-    arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
+    kernel.arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
 }
 
 /// Queues a thread to be run by the scheduler.
-pub fn queueThread(thread: *task.Thread) void {
+pub fn queueThread(thread: *Thread) void {
     const held = scheduler_lock.lock();
     defer held.unlock();
 
@@ -90,7 +88,7 @@ pub fn queueThread(thread: *task.Thread) void {
 /// Queues a thread to be run by the scheduler.
 ///
 /// The `scheduler_lock` must be held when calling this function.
-fn queueThreadImpl(thread: *task.Thread) void {
+fn queueThreadImpl(thread: *Thread) void {
     core.debugAssert(scheduler_lock.isLockedByCurrent());
 
     thread.state = .ready;
@@ -107,7 +105,7 @@ fn queueThreadImpl(thread: *task.Thread) void {
 
 fn idle() noreturn {
     unsafeUnlockScheduler();
-    arch.interrupts.enableInterrupts();
+    kernel.arch.interrupts.enableInterrupts();
 
     log.debug("entering idle", .{});
 
@@ -117,7 +115,7 @@ fn idle() noreturn {
             unreachable;
         }
 
-        arch.halt();
+        kernel.arch.halt();
     }
 }
 
