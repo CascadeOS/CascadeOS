@@ -4,7 +4,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();
 
-const safety = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
+pub const debug = builtin.mode == .Debug;
+pub const safety = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
 
 const size = @import("size.zig");
 pub const Size = size.Size;
@@ -17,7 +18,7 @@ pub fn assert(ok: bool) void {
 }
 
 pub fn debugAssert(ok: bool) void {
-    if (comptime @inComptime() or builtin.mode == .Debug)
+    if (comptime @inComptime() or debug)
         if (!ok) panic("assertion failure");
 }
 
