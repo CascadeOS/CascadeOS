@@ -96,7 +96,7 @@ pub const Entry = extern struct {
     pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
-pub fn load(self: *const Idt) void {
+pub fn load(self: *const Idt) linksection(kernel.info.init_code) void {
     const Idtr = packed struct {
         limit: u16,
         address: u64,

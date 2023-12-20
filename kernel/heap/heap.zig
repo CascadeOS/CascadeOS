@@ -113,7 +113,7 @@ const PageAllocator = struct {
 };
 
 pub const init = struct {
-    pub fn initHeap(kernel_heap_range: VirtualRange) !void {
+    pub fn initHeap(kernel_heap_range: VirtualRange) linksection(kernel.info.init_code) !void {
         address_space = try AddressSpace.init(kernel_heap_range);
     }
 };

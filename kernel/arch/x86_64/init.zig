@@ -78,14 +78,14 @@ pub fn loadProcessor(processor: *Processor) linksection(info.init_code) void {
 
     arch.gdt.setTss(&arch.tss);
 
-    interrupts.loadIdt();
+    interrupts.init.loadIdt();
 
     registers.KERNEL_GS_BASE.write(@intFromPtr(processor));
 }
 
 pub fn earlyArchInitialization() linksection(info.init_code) void {
     log.debug("initializing idt", .{});
-    interrupts.initIdt();
+    interrupts.init.initIdt();
 
     log.debug("disabling pic", .{});
     disablePic();

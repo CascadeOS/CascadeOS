@@ -20,35 +20,15 @@ var handlers = [_]InterruptHandler{interrupt_handlers.unhandledInterrupt} ** num
 
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
-/// Load the IDT on this core.
-pub fn loadIdt() void {
-    idt.load();
-}
-
-/// initialize the IDT with raw handlers and correct stacks.
-pub fn initIdt() void {
-    log.debug("mapping idt entries to raw handlers", .{});
-    for (raw_handlers, 0..) |raw_handler, i| {
-        idt.handlers[i].init(
-            Gdt.kernel_code_selector,
-            .interrupt,
-            raw_handler,
-        );
-    }
-
-    setVectorStack(.double_fault, .double_fault);
-    setVectorStack(.non_maskable_interrupt, .non_maskable_interrupt);
+/// Sets the interrupt stack for the given interrupt vector.
+fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
+    idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
 }
 
 pub const InterruptStackSelector = enum(u3) {
     double_fault,
     non_maskable_interrupt,
 };
-
-/// Sets the interrupt stack for the given interrupt vector.
-fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
-    idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
-}
 
 /// Creates an array of raw interrupt handlers, one for each vector.
 fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
@@ -458,3 +438,25 @@ pub fn disableInterruptsAndHalt() noreturn {
         asm volatile ("cli; hlt");
     }
 }
+
+pub const init = struct {
+    /// Load the IDT on this core.
+    pub fn loadIdt() linksection(kernel.info.init_code) void {
+        idt.load();
+    }
+
+    /// initialize the IDT with raw handlers and correct stacks.
+    pub fn initIdt() linksection(kernel.info.init_code) void {
+        log.debug("mapping idt entries to raw handlers", .{});
+        for (raw_handlers, 0..) |raw_handler, i| {
+            idt.handlers[i].init(
+                Gdt.kernel_code_selector,
+                .interrupt,
+                raw_handler,
+            );
+        }
+
+        setVectorStack(.double_fault, .double_fault);
+        setVectorStack(.non_maskable_interrupt, .non_maskable_interrupt);
+    }
+};

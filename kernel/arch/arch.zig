@@ -100,7 +100,7 @@ pub const init = struct {
         pub var lock: SpinLock = .{};
     };
 
-    pub fn getEarlyOutputNoLock() ?current.init.EarlyOutputWriter {
+    pub fn getEarlyOutputNoLock() ?current.init.EarlyOutputWriter { // TODO: Put in init_code section
         checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
 
         return current.init.getEarlyOutputWriter();
@@ -234,17 +234,6 @@ pub const paging = struct {
         return current.paging.allocatePageTable();
     }
 
-    /// This function is only called during kernel init, it is required to:
-    ///   1. search the higher half of the *top level* of the given page table for a free entry
-    ///   2. allocate a backing frame for it
-    ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-    ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
-    pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!VirtualRange {
-        checkSupport(current.paging, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!VirtualRange);
-
-        return current.paging.getTopLevelRangeAndFillFirstLevel(page_table);
-    }
-
     pub const MapError = error{
         AlreadyMapped,
         AllocationFailed,
@@ -273,7 +262,7 @@ pub const paging = struct {
     /// Unmaps the `virtual_range`.
     ///
     /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
-    pub fn unmap(
+    pub inline fn unmap(
         page_table: *PageTable,
         virtual_range: VirtualRange,
     ) void {
@@ -307,6 +296,19 @@ pub const paging = struct {
 
         current.paging.switchToPageTable(page_table);
     }
+
+    pub const init = struct {
+        /// This function is only called during kernel init, it is required to:
+        ///   1. search the higher half of the *top level* of the given page table for a free entry
+        ///   2. allocate a backing frame for it
+        ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
+        ///   4. return the `VirtualRange` representing the entire virtual range that entry covers
+        pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!VirtualRange {
+            checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!VirtualRange);
+
+            return current.paging.init.getTopLevelRangeAndFillFirstLevel(page_table);
+        }
+    };
 };
 
 pub const scheduling = struct {

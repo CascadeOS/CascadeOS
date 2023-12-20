@@ -173,7 +173,7 @@ pub const init = struct {
         );
     }
 
-    pub fn reclaimBootloaderReclaimableMemory() void {
+    pub fn reclaimBootloaderReclaimableMemory() linksection(info.init_code) void {
         var memory_map_iterator = boot.memoryMap(.forwards);
         while (memory_map_iterator.next()) |memory_map_entry| {
             if (memory_map_entry.type != .reclaimable) continue;

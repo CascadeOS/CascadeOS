@@ -137,7 +137,7 @@ pub const init = struct {
     fn prepareKernelHeap() linksection(info.init_code) !void {
         log.debug("preparing kernel heap", .{});
 
-        const kernel_heap_range = try arch.paging.getTopLevelRangeAndFillFirstLevel(
+        const kernel_heap_range = try arch.paging.init.getTopLevelRangeAndFillFirstLevel(
             kernel.kernel_process.page_table,
         );
 
@@ -151,7 +151,7 @@ pub const init = struct {
     fn prepareKernelStacks() linksection(info.init_code) !void {
         log.debug("preparing kernel stacks", .{});
 
-        const kernel_stacks_range = try arch.paging.getTopLevelRangeAndFillFirstLevel(
+        const kernel_stacks_range = try arch.paging.init.getTopLevelRangeAndFillFirstLevel(
             kernel.kernel_process.page_table,
         );
 
