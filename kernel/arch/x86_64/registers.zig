@@ -215,6 +215,7 @@ pub const EFER = packed struct(u64) {
     pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
+pub const IA32_APIC_BASE_MSR = x86_64.registers.MSR(u32, 0x1B);
 pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);
 
 pub fn MSR(comptime T: type, comptime register: u32) type {
