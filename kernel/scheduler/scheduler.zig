@@ -11,7 +11,7 @@ pub const Thread = @import("Thread.zig");
 
 const log = kernel.debug.log.scoped(.scheduler);
 
-var scheduler_lock: kernel.SpinLock = .{};
+pub var lock: kernel.SpinLock = .{};
 
 var ready_to_run_start: ?*Thread = null;
 var ready_to_run_end: ?*Thread = null;
@@ -19,9 +19,10 @@ var ready_to_run_end: ?*Thread = null;
 /// Performs a round robin scheduling of the ready threads.
 ///
 /// If `requeue_current_thread` is set to true, the current thread will be requeued before the next thread is found.
+///
+/// The scheduler `lock` must be held when calling this function.
 pub fn schedule(requeue_current_thread: bool) void {
-    const held = scheduler_lock.lock();
-    defer held.unlock();
+    core.debugAssert(lock.isLockedByCurrent());
 
     const processor = kernel.arch.getProcessor();
 
@@ -31,7 +32,7 @@ pub fn schedule(requeue_current_thread: bool) void {
     // in case the current thread is the last thread in the ready queue.
     if (requeue_current_thread) {
         if (opt_current_thread) |current_thread| {
-            queueThreadImpl(current_thread);
+            queueThread(current_thread);
         }
     }
 
@@ -79,17 +80,7 @@ pub fn schedule(requeue_current_thread: bool) void {
 
 /// Queues a thread to be run by the scheduler.
 pub fn queueThread(thread: *Thread) void {
-    const held = scheduler_lock.lock();
-    defer held.unlock();
-
-    @call(.always_inline, queueThreadImpl, .{thread});
-}
-
-/// Queues a thread to be run by the scheduler.
-///
-/// The `scheduler_lock` must be held when calling this function.
-fn queueThreadImpl(thread: *Thread) void {
-    core.debugAssert(scheduler_lock.isLockedByCurrent());
+    core.debugAssert(lock.isLockedByCurrent());
 
     thread.state = .ready;
 
@@ -104,25 +95,22 @@ fn queueThreadImpl(thread: *Thread) void {
 }
 
 fn idle() noreturn {
-    unsafeUnlockScheduler();
+    lock.unsafeUnlock();
     kernel.arch.interrupts.enableInterrupts();
 
     log.debug("entering idle", .{});
 
     while (true) {
         if (ready_to_run_start != null) {
-            schedule(false);
-            unreachable;
+            const held = lock.lock();
+            defer held.unlock();
+
+            if (ready_to_run_start != null) {
+                schedule(false);
+                unreachable;
+            }
         }
 
         kernel.arch.halt();
     }
-}
-
-/// Unlocks the scheduler lock.
-///
-/// It is the callers responsibility to ensure the current processor has the lock.
-pub fn unsafeUnlockScheduler() void {
-    core.debugAssert(scheduler_lock.isLockedByCurrent());
-    scheduler_lock.unsafeUnlock();
 }

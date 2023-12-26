@@ -97,7 +97,7 @@ fn startNewThread(
     context: u64,
     target_function_addr: *const anyopaque,
 ) callconv(.C) noreturn {
-    kernel.scheduler.unsafeUnlockScheduler();
+    kernel.scheduler.lock.unsafeUnlock();
 
     const target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn = @ptrCast(target_function_addr);
 
