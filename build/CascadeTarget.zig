@@ -131,7 +131,7 @@ pub const CascadeTarget = enum {
     /// Appends the correct QEMU machine arguments for the target to the `run_qemu` step.
     pub fn setQemuMachine(self: CascadeTarget, run_qemu: *Step.Run) void {
         switch (self) {
-            .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-M", "virt" }),
+            .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
             .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
         }
     }
