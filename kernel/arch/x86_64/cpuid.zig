@@ -7,6 +7,8 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
+const arch_info = x86_64.arch_info;
+
 const log = kernel.debug.log.scoped(.cpuid);
 
 pub fn capture() linksection(kernel.info.init_code) void {
@@ -21,6 +23,10 @@ pub fn capture() linksection(kernel.info.init_code) void {
     const max_extended_leaf = cpuid_leaf_extended.eax;
     log.debug("largest extended function: 0x{x}", .{max_extended_leaf});
 
+    const vendor_string_array = [_]u32{ cpuid_leaf_0.ebx, cpuid_leaf_0.edx, cpuid_leaf_0.ecx };
+    std.mem.copyForwards(u8, &arch_info.cpu_vendor_string, std.mem.sliceAsBytes(&vendor_string_array));
+    log.debug("cpu vendor string: {s}", .{arch_info.cpu_vendor_string});
+
     handleSimpleLeafs(max_standard_leaf, max_extended_leaf);
 }
 
@@ -28,17 +34,48 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
     .{
         .leaf = .{ .type = .standard, .value = 0x01 },
         .handlers = &.{
-            .{ .name = "apic", .register = .edx, .mask_bit = 9, .target = &x86_64.arch_info.has_apic, .required = true },
+            .{
+                .name = "apic",
+                .register = .edx,
+                .mask_bit = 9,
+                .target = &x86_64.arch_info.has_apic,
+                .required = true,
+            },
         },
     },
     .{
         .leaf = .{ .type = .extended, .value = 0x80000001 },
         .handlers = &.{
-            .{ .name = "syscall", .register = .edx, .mask_bit = 11, .target = &x86_64.arch_info.has_syscall },
-            .{ .name = "execute disable", .register = .edx, .mask_bit = 20, .target = &x86_64.arch_info.has_execute_disable },
-            .{ .name = "1 GiB large pages", .register = .edx, .mask_bit = 26, .target = &x86_64.arch_info.has_gib_pages },
-            .{ .name = "rdtscp", .register = .edx, .mask_bit = 27, .required = true },
-            .{ .name = "64-bit", .register = .edx, .mask_bit = 29, .required = true },
+            .{
+                .name = "syscall",
+                .register = .edx,
+                .mask_bit = 11,
+                .target = &x86_64.arch_info.has_syscall,
+            },
+            .{
+                .name = "execute disable",
+                .register = .edx,
+                .mask_bit = 20,
+                .target = &x86_64.arch_info.has_execute_disable,
+            },
+            .{
+                .name = "1 GiB large pages",
+                .register = .edx,
+                .mask_bit = 26,
+                .target = &x86_64.arch_info.has_gib_pages,
+            },
+            .{
+                .name = "rdtscp",
+                .register = .edx,
+                .mask_bit = 27,
+                .required = true,
+            },
+            .{
+                .name = "64-bit",
+                .register = .edx,
+                .mask_bit = 29,
+                .required = true,
+            },
         },
     },
 };
