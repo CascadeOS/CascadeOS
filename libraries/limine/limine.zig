@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-//! This module contains the definitions of the Limine protocol version v5.20231103.0 as per
-//! [PROTOCOL](https://github.com/limine-bootloader/limine/blob/v5.20231103.0/PROTOCOL.md)
+//! This module contains the definitions of the Limine protocol version v6.20231227.0 as per
+//! [PROTOCOL](https://github.com/limine-bootloader/limine/blob/v6.20231227.0/PROTOCOL.md)
 //!
 //! Unimplemented features:
 //!   - Terminal Feature: deprecated and not used by Cascade
@@ -591,6 +591,32 @@ pub const EFISystemTable = extern struct {
 
         /// Address of EFI system table.
         address: *anyopaque,
+    };
+};
+
+/// EFI Memory Map Feature
+///
+/// This feature provides data suitable for use with RT->SetVirtualAddressMap(), provided HHDM offset is subtracted from memmap.
+pub const EFIMemoryMap = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x7df62a431d6872d5, 0xa4fcdfb3e57306c8 },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// Address (HHDM) of the EFI memory map..
+        memmap: *anyopaque,
+
+        /// Size in bytes of the EFI memory map.
+        memmap_size: u64,
+
+        /// EFI memory map descriptor size in bytes.
+        desc_size: u64,
+
+        /// Version of EFI memory map descriptors.
+        desc_version: u64,
     };
 };
 

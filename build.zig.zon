@@ -8,9 +8,9 @@
     .minimum_zig_version = "0.12.0-dev.1717+54f4abae2",
 
     .dependencies = .{
-        .limine = .{ // tag: v5.20231103.0-binary
-            .url = "https://github.com/limine-bootloader/limine/archive/1976e465744d68c26e2e0b2675e57771b235ee3d.tar.gz",
-            .hash = "1220eb87ab4a60d05cd07fd887cc96a744bfa003f0539d4cd58d8f5c4cd60a6f03a8",
+        .limine = .{ // tag: v6.20231227.0-binary
+            .url = "https://github.com/limine-bootloader/limine/archive/b87531f3fa9823a1a73ad072ae0e753e0a480fe9.tar.gz",
+            .hash = "122092aa0068ec305ce6e0e55667b68d992b45465493cbf12c37f2e067836746e929",
         },
     },
 
