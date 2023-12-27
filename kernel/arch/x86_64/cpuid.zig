@@ -28,7 +28,7 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
     .{
         .leaf = .{ .type = .standard, .value = 0x01 },
         .handlers = &.{
-            .{ .name = "apic", .register = .edx, .mask_bit = 9, .target = &x86_64.arch_info.has_apic },
+            .{ .name = "apic", .register = .edx, .mask_bit = 9, .target = &x86_64.arch_info.has_apic, .required = true },
         },
     },
     .{
@@ -37,8 +37,8 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
             .{ .name = "syscall", .register = .edx, .mask_bit = 11, .target = &x86_64.arch_info.has_syscall },
             .{ .name = "execute disable", .register = .edx, .mask_bit = 20, .target = &x86_64.arch_info.has_execute_disable },
             .{ .name = "1 GiB large pages", .register = .edx, .mask_bit = 26, .target = &x86_64.arch_info.has_gib_pages },
-            .{ .name = "rdtscp", .register = .edx, .mask_bit = 27 },
-            .{ .name = "64-bit", .register = .edx, .mask_bit = 29 },
+            .{ .name = "rdtscp", .register = .edx, .mask_bit = 27, .required = true },
+            .{ .name = "64-bit", .register = .edx, .mask_bit = 29, .required = true },
         },
     },
 };
@@ -69,6 +69,7 @@ fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection
             };
 
             const feature_present = register & (1 << handler.mask_bit) != 0;
+            if (handler.required and !feature_present) core.panic("required feature " ++ comptime handler.name ++ " is not supported");
             if (handler.target) |target| target.* = feature_present;
             log.debug(comptime handler.name ++ ": {}", .{feature_present});
         }
@@ -105,6 +106,9 @@ const SimpleLeafHandler = struct {
 
         /// Optional pointer to a bool that will be set based on the value of the bit.
         target: ?*bool = null,
+
+        /// Is this feature required by Cascade
+        required: bool = false,
 
         pub const Register = enum {
             eax,
