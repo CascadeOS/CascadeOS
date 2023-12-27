@@ -19,7 +19,7 @@ const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
 pub const standard_page_size = small_page_size;
 
 pub inline fn largestPageSize() core.Size {
-    if (x86_64.arch_info.has_gib_pages) return large_page_size;
+    if (x86_64.arch_info.gib_pages) return large_page_size;
     return medium_page_size;
 }
 
@@ -124,7 +124,7 @@ pub fn mapToPhysicalRangeAllPageSizes(
     var kib_page_mappings: usize = 0;
 
     while (current_virtual_address.lessThan(end_virtual_address)) {
-        const map_1gib = x86_64.arch_info.has_gib_pages and
+        const map_1gib = x86_64.arch_info.gib_pages and
             size_remaining.greaterThanOrEqual(large_page_size) and
             current_virtual_address.isAligned(large_page_size) and
             current_physical_address.isAligned(large_page_size);
@@ -262,7 +262,7 @@ fn mapTo1GiB(
     physical_address: kernel.PhysicalAddress,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
-    core.debugAssert(x86_64.arch_info.has_gib_pages); // assert that 1GiB pages are available
+    core.debugAssert(x86_64.arch_info.gib_pages);
     core.debugAssert(virtual_address.isAligned(large_page_size));
     core.debugAssert(physical_address.isAligned(large_page_size));
 
@@ -320,7 +320,7 @@ fn applyMapType(map_type: kernel.memory.virtual.MapType, entry: *PageTable.Entry
         entry.global.write(true);
     }
 
-    if (!map_type.executable and x86_64.arch_info.has_execute_disable) entry.no_execute.write(true);
+    if (!map_type.executable and x86_64.arch_info.execute_disable) entry.no_execute.write(true);
 
     if (map_type.writeable) entry.writeable.write(true);
 

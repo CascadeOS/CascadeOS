@@ -106,8 +106,8 @@ pub fn configureSystemFeatures() linksection(kernel.info.init_code) void {
 
         if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
 
-        if (x86_64.arch_info.has_syscall) efer.syscall_enable = true;
-        if (x86_64.arch_info.has_execute_disable) efer.no_execute_enable = true;
+        if (x86_64.arch_info.syscall) efer.syscall_enable = true;
+        if (x86_64.arch_info.execute_disable) efer.no_execute_enable = true;
 
         efer.write();
 
