@@ -123,6 +123,7 @@ fn kernelInitStage3() noreturn {
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
 
     log.debug("entering scheduler on processor {}", .{processor.id});
+    _ = kernel.scheduler.lock.lock();
     kernel.scheduler.schedule(false);
     unreachable;
 }
