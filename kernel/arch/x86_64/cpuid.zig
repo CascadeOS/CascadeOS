@@ -42,17 +42,6 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
                 .target = &x86_64.arch_info.monitor,
             },
             .{
-                .name = "pcid",
-                .register = .ecx,
-                .mask_bit = 17,
-                .target = &x86_64.arch_info.pcid,
-            },
-            .{
-                .name = "x2apic",
-                .register = .ecx,
-                .mask_bit = 21,
-            },
-            .{
                 .name = "tsc-deadline",
                 .register = .ecx,
                 .mask_bit = 24,
@@ -100,12 +89,6 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
                 .mask_bit = 13,
                 .required = true,
             },
-            .{
-                .name = "fxsr",
-                .register = .edx,
-                .mask_bit = 24,
-                .target = &x86_64.arch_info.fxsr,
-            },
         },
     },
     .{
@@ -127,12 +110,6 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
                 .register = .ebx,
                 .mask_bit = 7,
                 .target = &x86_64.arch_info.smep,
-            },
-            .{
-                .name = "invpcid",
-                .register = .ebx,
-                .mask_bit = 10,
-                .target = &x86_64.arch_info.invpcid,
             },
             .{
                 .name = "rdseed",
@@ -170,22 +147,10 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
                 .target = &x86_64.arch_info.xsavec,
             },
             .{
-                .name = "xgetbv with ecx = 1",
-                .register = .eax,
-                .mask_bit = 2,
-                .target = &x86_64.arch_info.xgetbv_with_ecx_1,
-            },
-            .{
                 .name = "xsaves/xrstors",
                 .register = .eax,
                 .mask_bit = 3,
                 .target = &x86_64.arch_info.xsaves,
-            },
-            .{
-                .name = "extended feature disable",
-                .register = .eax,
-                .mask_bit = 4,
-                .target = &x86_64.arch_info.xfd,
             },
         },
     },
