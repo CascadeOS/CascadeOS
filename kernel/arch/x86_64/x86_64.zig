@@ -6,7 +6,7 @@ const std = @import("std");
 
 comptime {
     // make sure any interrupt handlers are referenced
-    _ = interrupts;
+    _ = &interrupts;
 }
 
 pub const apic = @import("apic.zig");

@@ -26,8 +26,8 @@ pub var kernel_process: scheduler.Process = .{
 
 comptime {
     // make sure any bootloader specific code that needs to be referenced is
-    _ = boot;
+    _ = &boot;
 
     // ensure any architecture specific code that needs to be referenced is
-    _ = arch;
+    _ = &arch;
 }

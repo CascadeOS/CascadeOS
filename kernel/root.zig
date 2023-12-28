@@ -8,7 +8,7 @@ const std = @import("std");
 const kernel = @import("kernel");
 
 comptime {
-    _ = kernel;
+    _ = &kernel;
 }
 
 pub const std_options = struct {
