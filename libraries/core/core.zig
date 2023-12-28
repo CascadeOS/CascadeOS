@@ -12,12 +12,12 @@ pub const Size = size.Size;
 
 pub const testing = @import("testing.zig");
 
-pub fn assert(ok: bool) void {
+pub inline fn assert(ok: bool) void {
     if (comptime @inComptime() or safety)
         if (!ok) panic("assertion failure");
 }
 
-pub fn debugAssert(ok: bool) void {
+pub inline fn debugAssert(ok: bool) void {
     if (comptime @inComptime() or debug)
         if (!ok) panic("assertion failure");
 }
