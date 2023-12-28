@@ -20,7 +20,16 @@ const limine_requests = struct {
     export var kernel_address: limine.KernelAddress linksection(kernel.info.init_data) = .{};
     export var memmap: limine.Memmap linksection(kernel.info.init_data) = .{};
     export var smp: limine.SMP linksection(kernel.info.init_data) = .{ .flags = .{ .x2apic = true } };
+    export var rsdp: limine.RSDP linksection(kernel.info.init_data) = .{};
 };
+
+/// Returns the ACPI RSDP address provided by the bootloader, if any.
+pub fn rsdp() linksection(kernel.info.init_code) ?kernel.VirtualAddress {
+    if (limine_requests.rsdp.response) |resp| {
+        return kernel.VirtualAddress.fromPtr(resp.address);
+    }
+    return null;
+}
 
 /// Returns the direct map address provided by the bootloader, if any.
 pub fn directMapAddress() linksection(kernel.info.init_code) ?u64 {
