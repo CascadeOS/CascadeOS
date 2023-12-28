@@ -76,7 +76,7 @@ pub const CascadeTarget = enum {
                     .cpu_arch = .x86_64,
                     .os_tag = .freestanding,
                     .abi = .none,
-                    .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64 },
+                    .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64 }, // TODO: As we only support modern machines maybe make this v2 or v3?
                 };
 
                 // Remove all SSE/AVX features
