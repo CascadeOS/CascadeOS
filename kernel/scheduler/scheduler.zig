@@ -37,16 +37,8 @@ pub fn schedule(requeue_current_thread: bool) void {
     }
 
     const new_thread = ready_to_run_start orelse {
-        // there are no more threads to run, so we need to switch to idle
-
-        log.debug("no threads to run, switching to idle", .{});
-
-        const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
-            kernel.VirtualAddress.fromPtr(&idle),
-        ) catch unreachable; // the idle stack is always big enough to hold a return address
-
-        processor.current_thread = null;
-        kernel.arch.scheduling.switchToIdle(processor, idle_stack_pointer, opt_current_thread);
+        // no thread to run
+        switchToIdle(processor, opt_current_thread);
         unreachable;
     };
 
@@ -55,13 +47,8 @@ pub fn schedule(requeue_current_thread: bool) void {
     if (new_thread == ready_to_run_end) ready_to_run_end = null;
 
     const current_thread = opt_current_thread orelse {
-        // switch to the thread from idle
-
-        log.debug("switching to {} from idle", .{new_thread});
-
-        processor.current_thread = new_thread;
-        new_thread.state = .running;
-        kernel.arch.scheduling.switchToThreadFromIdle(processor, new_thread);
+        // we were previously idle
+        switchToThreadFromIdle(processor, new_thread);
         unreachable;
     };
 
@@ -71,11 +58,7 @@ pub fn schedule(requeue_current_thread: bool) void {
         return;
     }
 
-    // switch to the new thread
-    log.debug("switching to {} from {}", .{ new_thread, current_thread });
-    processor.current_thread = new_thread;
-    new_thread.state = .running;
-    kernel.arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
+    switchToThreadFromThread(processor, current_thread, new_thread);
 }
 
 /// Queues a thread to be run by the scheduler.
@@ -92,6 +75,38 @@ pub fn queueThread(thread: *Thread) void {
         ready_to_run_start = thread;
         ready_to_run_end = thread;
     }
+}
+
+fn switchToIdle(processor: *kernel.Processor, opt_current_thread: ?*Thread) noreturn {
+    log.debug("no threads to run, switching to idle", .{});
+
+    const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
+        kernel.VirtualAddress.fromPtr(&idle),
+    ) catch unreachable; // the idle stack is always big enough to hold a return address
+
+    processor.current_thread = null;
+
+    kernel.arch.scheduling.switchToIdle(processor, idle_stack_pointer, opt_current_thread);
+    unreachable;
+}
+
+fn switchToThreadFromIdle(processor: *kernel.Processor, new_thread: *Thread) noreturn {
+    log.debug("switching to {} from idle", .{new_thread});
+
+    processor.current_thread = new_thread;
+    new_thread.state = .running;
+
+    kernel.arch.scheduling.switchToThreadFromIdle(processor, new_thread);
+    unreachable;
+}
+
+fn switchToThreadFromThread(processor: *kernel.Processor, current_thread: *Thread, new_thread: *Thread) void {
+    log.debug("switching to {} from {}", .{ new_thread, current_thread });
+
+    processor.current_thread = new_thread;
+    new_thread.state = .running;
+
+    kernel.arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
 }
 
 fn idle() noreturn {
