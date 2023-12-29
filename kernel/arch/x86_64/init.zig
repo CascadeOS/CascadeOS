@@ -81,7 +81,7 @@ pub fn earlyArchInitialization() linksection(kernel.info.init_code) void {
 
 /// Captures x86_64 system information.
 pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
-    log.debug("capturing x86_64.cpuid information", .{});
+    log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
     x86_64.arch_info.x2apic_enabled = kernel.boot.x2apicEnabled();
 }
