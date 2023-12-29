@@ -44,8 +44,9 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     log.info("performing early system initialization", .{});
     kernel.arch.init.earlyArchInitialization();
 
-    log.info("capturing bootloader information", .{});
-    captureBootloaderInformation();
+    log.info("capturing bootloader provided information", .{});
+    calculateKernelOffsets();
+    calculateDirectMaps();
 
     log.info("capturing system information", .{});
     kernel.arch.init.captureSystemInformation();
@@ -81,7 +82,9 @@ fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_c
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         kernel.VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
+
     kernel.arch.scheduling.changeStackAndReturn(idle_stack_pointer);
+    unreachable;
 }
 
 var processors_in_stage3 = std.atomic.Value(usize).init(0);
@@ -182,14 +185,6 @@ fn initProcessors() linksection(kernel.info.init_code) void {
             processor_descriptor.boot(processor, kernelInitStage2);
         }
     }
-}
-
-fn captureBootloaderInformation() linksection(kernel.info.init_code) void {
-    calculateKernelOffsets();
-    calculateDirectMaps();
-
-    // the kernel file was captured earlier in the init process, now we can debug log what was captured
-    log.debug("kernel file: {}", .{kernel.info.kernel_file.?});
 }
 
 fn calculateDirectMaps() linksection(kernel.info.init_code) void {
