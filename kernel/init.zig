@@ -48,6 +48,9 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     calculateKernelOffsets();
     calculateDirectMaps();
 
+    log.info("initializing ACPI tables", .{});
+    kernel.acpi.init.initializeACPITables();
+
     log.info("capturing system information", .{});
     kernel.arch.init.captureSystemInformation();
 
