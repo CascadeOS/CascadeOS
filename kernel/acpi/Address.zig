@@ -6,7 +6,7 @@ const std = @import("std");
 
 pub const Address = extern struct {
     /// The address space where the data structure or register exists.
-    address_space_id: AddressSpace,
+    address_space: AddressSpace,
 
     /// The size in bits of the given register.
     register_bit_width: u8,
@@ -74,7 +74,7 @@ pub const Address = extern struct {
         platform_communications_channel = 0xA,
         platform_runtime_mechanism = 0xB,
 
-        /// Use of GAS fields other than Address_Space_ID is specified by the CPU manufacturer.
+        /// Use of GAS fields other than address_space is specified by the CPU manufacturer.
         ///
         /// The use of functional fixed hardware carries with it a reliance on OS specific software that must be considered.
         ///
