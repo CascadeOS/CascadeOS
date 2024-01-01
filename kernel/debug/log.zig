@@ -119,7 +119,7 @@ pub const Level = enum {
 };
 
 /// Determine if a specific scope and log level pair is enabled for logging.
-inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime message_level: Level) bool {
+pub inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime message_level: Level) bool {
     comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(level);
 }
 
