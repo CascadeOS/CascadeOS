@@ -5,20 +5,22 @@ const kernel = @import("kernel");
 const std = @import("std");
 
 const log = kernel.debug.log.scoped(.acpi);
+const RSDP = @import("RSDP.zig").RSDP;
 
 pub const Address = @import("Address.zig").Address;
 pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 
-const RSDP = @import("RSDP.zig").RSDP;
-
 /// Initialized during `initializeACPITables`.
 var sdt_header: *const SharedHeader = undefined;
 
-pub fn getTable(signature: *const [4]u8) ?*const SharedHeader {
+/// Get the ACPI table if present.
+///
+/// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
+pub fn getTable(comptime T: type) ?*const T {
     var iter = tableIterator();
 
     while (iter.next()) |table| {
-        if (table.signatureIs(signature)) return table;
+        if (table.signatureIs(T.SIGNATURE_STRING)) return @ptrCast(table);
     }
 
     return null;
