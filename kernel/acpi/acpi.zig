@@ -11,6 +11,7 @@ pub const Address = @import("Address.zig").Address;
 pub const FADT = @import("FADT.zig").FADT;
 pub const HPET = @import("HPET.zig").HPET;
 pub const MADT = @import("MADT.zig").MADT;
+pub const MCFG = @import("MCFG.zig").MCFG;
 pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 
 /// Initialized during `initializeACPITables`.
