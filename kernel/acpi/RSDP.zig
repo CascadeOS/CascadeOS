@@ -55,10 +55,8 @@ pub const RSDP = extern struct {
 
     const BYTES_IN_ACPI_1_STRUCTURE = 20;
 
-    /// Validates the table.
-    ///
-    /// Panics if the table is invalid.
-    pub fn validate(self: *const RSDP) void {
+    /// Returns `true` is the table is valid.
+    pub fn isValid(self: *const RSDP) bool {
         // Before the RSDP is relied upon you should check that the checksum is valid.
         // For ACPI 1.0 you add up every byte in the structure and make sure the lowest byte of the result is equal
         // to zero.
@@ -82,7 +80,7 @@ pub const RSDP = extern struct {
         };
 
         // the sum of all bytes must have zero in the lowest byte
-        if (sum_of_bytes & 0xFF != 0) core.panic("RSDP validation failed");
+        return sum_of_bytes & 0xFF == 0;
     }
 
     comptime {

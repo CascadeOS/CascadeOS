@@ -61,10 +61,8 @@ pub const SharedHeader = extern struct {
         return std.mem.asBytes(&self.signature);
     }
 
-    /// Validates the table.
-    ///
-    /// Panics if the table is invalid.
-    pub fn validate(self: *const SharedHeader) void {
+    /// Returns `true` is the table is valid.
+    pub fn isValid(self: *const SharedHeader) bool {
         const bytes = blk: {
             const ptr: [*]const u8 = @ptrCast(self);
             break :blk ptr[0..self.length];
@@ -77,9 +75,7 @@ pub const SharedHeader = extern struct {
         };
 
         // the sum of all bytes must have zero in the lowest byte
-        if (sum_of_bytes & 0xFF != 0) {
-            core.panicFmt("ACPI table '{s}' validation failed", .{self.signatureAsString()});
-        }
+        return sum_of_bytes & 0xFF == 0;
     }
 
     comptime {

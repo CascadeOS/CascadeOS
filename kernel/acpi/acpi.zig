@@ -70,7 +70,7 @@ pub const init = struct {
         log.debug("ACPI revision: {d}", .{rsdp.revision});
 
         log.debug("validating rsdp", .{});
-        rsdp.validate();
+        if (!rsdp.isValid()) core.panic("invalid RSDP");
 
         const sdt_physical_address = kernel.PhysicalAddress.fromInt(
             switch (rsdp.revision) {
@@ -83,6 +83,6 @@ pub const init = struct {
         sdt_header = sdt_physical_address.toDirectMap().toPtr(*const SharedHeader);
 
         log.debug("validating sdt", .{});
-        sdt_header.validate();
+        if (!sdt_header.isValid()) core.panic("invalid SDT");
     }
 };
