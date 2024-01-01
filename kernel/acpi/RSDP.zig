@@ -4,6 +4,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
+/// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#root-system-description-pointer-rsdp-structure)
 pub const RSDP = extern struct {
     /// "RSD PTR "
     signature: [8]u8 align(1),
@@ -41,9 +42,13 @@ pub const RSDP = extern struct {
     length: u32 align(1),
 
     /// 64 bit physical address of the XSDT.
+    ///
+    /// This field is not available in the ACPI version 1.0 RSDP Structure.
     xsdt_addr: u64 align(1),
 
     /// This is a checksum of the entire table, including both checksum fields.
+    ///
+    /// This field is not available in the ACPI version 1.0 RSDP Structure.
     extended_checksum: u8 align(1),
 
     _reserved: [3]u8 align(1),

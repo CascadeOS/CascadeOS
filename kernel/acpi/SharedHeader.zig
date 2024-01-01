@@ -4,6 +4,9 @@ const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
+/// All system description tables begin with this structure.
+///
+/// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#system-description-table-header)
 pub const SharedHeader = extern struct {
     /// The ASCII string representation of the table identifier.
     ///

@@ -4,6 +4,9 @@ const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
+/// The Generic Address Structure (GAS) provides the platform with a robust means to describe register locations.
+///
+/// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#generic-address-structure)
 pub const Address = extern struct {
     /// The address space where the data structure or register exists.
     address_space: AddressSpace,

@@ -6,6 +6,23 @@ const std = @import("std");
 
 const acpi = @import("acpi.zig");
 
+/// The Fixed ACPI Description Table (FADT) defines various fixed hardware ACPI information vital to an ACPI-compatible
+/// OS, such as the base address for the following hardware registers blocks:
+///  - PM1a_EVT_BLK
+///  - PM1b_EVT_BLK
+///  - PM1a_CNT_BLK
+///  - PM1b_CNT_BLK
+///  - PM2_CNT_BLK
+///  - PM_TMR_BLK
+///  - GPE0_BLK
+///  - GPE1_BLK.
+///
+/// The FADT also has a pointer to the DSDT that contains the Differentiated Definition Block, which in turn provides
+/// variable information to an ACPI-compatible OS concerning the base system design.
+///
+/// All fields in the FADT that provide hardware addresses provide processor-relative physical addresses.
+///
+/// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#fixed-acpi-description-table-fadt)
 pub const FADT = extern struct {
     header: acpi.SharedHeader align(1),
 
@@ -464,7 +481,7 @@ pub const FADT = extern struct {
     /// actual firmware.
     hypervisor_vedor_identity: u64 align(1),
 
-    pub const SIGNATURE_STRING: *const [4]u8 = "FACP";
+    pub const SIGNATURE_STRING = "FACP";
 
     pub const PowerManagementProfile = enum(u8) {
         unspecified = 0,
