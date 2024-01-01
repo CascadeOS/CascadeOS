@@ -17,17 +17,26 @@ var sdt_header: *const SharedHeader = undefined;
 /// Get the ACPI table if present.
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
+///
+/// If the table is not valid, returns `null`.
 pub fn getTable(comptime T: type) ?*const T {
     var iter = tableIterator();
 
     while (iter.next()) |table| {
-        if (table.signatureIs(T.SIGNATURE_STRING)) return @ptrCast(table);
+        if (!table.signatureIs(T.SIGNATURE_STRING)) continue;
+
+        if (!table.isValid()) {
+            log.warn("invalid table: {s}", .{table.signatureAsString()});
+            return null;
+        }
+
+        return @ptrCast(table);
     }
 
     return null;
 }
 
-pub fn tableIterator() TableIterator {
+fn tableIterator() TableIterator {
     const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
 
     return .{
@@ -37,7 +46,7 @@ pub fn tableIterator() TableIterator {
     };
 }
 
-pub const TableIterator = struct {
+const TableIterator = struct {
     ptr: [*]const u8,
     end_ptr: [*]const u8,
 
