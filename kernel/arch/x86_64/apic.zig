@@ -27,8 +27,6 @@ const VersionRegister = packed struct(u32) {
 
     _reserved2: u7,
 
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
-
     pub fn read() VersionRegister {
         return @bitCast(readRegister(.version));
     }
@@ -56,8 +54,6 @@ const SupriousInterruptRegister = packed struct(u32) {
     eoi_broadcast_suppression: bool = false,
 
     _reserved2: u19 = 0,
-
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 
     pub fn read() SupriousInterruptRegister {
         return @bitCast(readRegister(.spurious_interrupt));

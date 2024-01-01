@@ -94,8 +94,6 @@ pub const RFlags = packed struct(u64) {
         );
     }
 
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
-
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }
@@ -144,8 +142,6 @@ pub const Cr0 = packed struct(u64) {
             : [value] "r" (@as(u64, @bitCast(self))),
         );
     }
-
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 pub const Cr3 = struct {
@@ -211,8 +207,6 @@ pub const EFER = packed struct(u64) {
     }
 
     const msr = MSR(u64, 0xC0000080);
-
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 pub const IA32_APIC_BASE_MSR = x86_64.registers.MSR(u32, 0x1B);

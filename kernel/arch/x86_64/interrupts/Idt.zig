@@ -45,8 +45,6 @@ pub const Entry = extern struct {
         privilege_level: x86_64.PrivilegeLevel = .kernel,
 
         present: bool,
-
-        pub const format = core.formatStructIgnoreReservedAndHiddenFields;
     };
 
     pub const GateType = enum(u4) {
@@ -91,8 +89,6 @@ pub const Entry = extern struct {
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64) * 2);
     }
-
-    pub const format = core.formatStructIgnoreReservedAndHiddenFields;
 };
 
 pub fn load(self: *const Idt) linksection(kernel.info.init_code) void {

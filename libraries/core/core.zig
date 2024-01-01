@@ -42,53 +42,6 @@ pub const OrderedComparison = enum {
     greater,
 };
 
-/// This function formats structs but skips:
-///  - fields containing "reserved" in their name
-///  - fields starting with '_'
-pub fn formatStructIgnoreReservedAndHiddenFields(
-    self: anytype,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
-    _ = options;
-    _ = fmt;
-
-    const BaseType: type = switch (@typeInfo(@TypeOf(self))) {
-        .Pointer => |ptr| switch (ptr.size) {
-            .One => ptr.child,
-            inline else => |x| @compileError("Unsupported type of pointer " ++ @typeName(@TypeOf(x))),
-        },
-        .Struct => self,
-        inline else => |x| @compileError("Unsupported type " ++ @typeName(@TypeOf(x))),
-    };
-
-    const struct_info: std.builtin.Type.Struct = @typeInfo(BaseType).Struct;
-
-    try writer.writeAll(comptime @typeName(BaseType) ++ "{");
-
-    comptime var first: bool = true;
-
-    inline for (struct_info.fields) |field| {
-        if (comptime field.name[0] == '_') continue;
-        if (comptime std.mem.indexOf(u8, field.name, "reserved") != null) continue;
-
-        try writer.writeAll(comptime (if (first) "" else ",") ++ " ." ++ field.name ++ " = ");
-
-        const field_type_info: std.builtin.Type = @typeInfo(field.type);
-
-        switch (field_type_info) {
-            .Bool => try (if (@field(self, field.name)) writer.writeAll("true") else writer.writeAll("false")),
-            .Int => try std.fmt.formatInt(@field(self, field.name), 10, .lower, .{}, writer),
-            else => @compileError("unsupported type: " ++ @typeName(field.type)),
-        }
-
-        first = false;
-    }
-
-    try writer.writeAll(" }");
-}
-
 /// Converts an integer which has host endianness to the desired endianness.
 ///
 /// Copied from `std.mem`, changed to be inline and `desired_endianness` has been marked as comptime.
