@@ -93,5 +93,15 @@ pub const init = struct {
 
         log.debug("validating sdt", .{});
         if (!sdt_header.isValid()) core.panic("invalid SDT");
+
+        if (kernel.debug.log.loggingEnabledFor(.acpi, .debug)) {
+            var iterator = tableIterator();
+
+            log.debug("ACPI tables:", .{});
+
+            while (iterator.next()) |table| {
+                log.debug("  {s}", .{table.signatureAsString()});
+            }
+        }
     }
 };
