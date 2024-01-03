@@ -12,14 +12,17 @@ pub const Size = size.Size;
 
 pub const testing = @import("testing.zig");
 
-pub inline fn assert(ok: bool) void {
+/// Using `.Unspecified` prevents stack frames being lost due to inlining in debug mode.
+const assert_calling_convention = if (debug) .Unspecified else .Inline;
+
+pub fn assert(ok: bool) callconv(assert_calling_convention) void {
     if (comptime @inComptime() or safety)
-        if (!ok) panic("assertion failure");
+        if (!ok) unreachable;
 }
 
-pub inline fn debugAssert(ok: bool) void {
+pub fn debugAssert(ok: bool) callconv(assert_calling_convention) void {
     if (comptime @inComptime() or debug)
-        if (!ok) panic("assertion failure");
+        if (!ok) unreachable;
 }
 
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
