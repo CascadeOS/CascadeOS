@@ -42,6 +42,8 @@ pub fn schedule(requeue_current_thread: bool) void {
         unreachable;
     };
 
+    new_thread.next_thread = null;
+
     // update the ready queue
     ready_to_run_start = new_thread.next_thread;
     if (new_thread == ready_to_run_end) ready_to_run_end = null;
@@ -64,6 +66,7 @@ pub fn schedule(requeue_current_thread: bool) void {
 /// Queues a thread to be run by the scheduler.
 pub fn queueThread(thread: *Thread) void {
     core.debugAssert(lock.isLockedByCurrent());
+    core.debugAssert(thread.next_thread == null);
 
     thread.state = .ready;
 
@@ -71,7 +74,6 @@ pub fn queueThread(thread: *Thread) void {
         last_thread.next_thread = thread;
         ready_to_run_end = thread;
     } else {
-        thread.next_thread = null;
         ready_to_run_start = thread;
         ready_to_run_end = thread;
     }
