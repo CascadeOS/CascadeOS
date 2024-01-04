@@ -60,6 +60,11 @@ pub const paging = struct {
     pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
 
     pub const PageTable = struct {};
+
+    pub inline fn largestPageSize() core.Size {
+        // FIXME: Are large pages an optional feature like x86?
+        return large_page_size;
+    }
 };
 
 comptime {
