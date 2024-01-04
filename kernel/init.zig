@@ -31,22 +31,17 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     kernel.arch.init.prepareBootstrapProcessor(&bootstrap_processor);
     kernel.arch.init.loadProcessor(&bootstrap_processor);
 
-    // as we need the kernel elf file to output symbols and source locations, we acquire it early
-    kernel.info.kernel_file = kernel.boot.kernelFile() orelse
-        core.panic("bootloader did not provide the kernel file");
-
     // print starting message
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
         defer early_output.deinit();
         early_output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.info.version ++ "\n") catch {};
     }
 
+    log.info("capturing bootloader provided information", .{});
+    captureBootloaderProvidedInformation();
+
     log.info("performing early system initialization", .{});
     kernel.arch.init.earlyArchInitialization();
-
-    log.info("capturing bootloader provided information", .{});
-    calculateKernelOffsets();
-    calculateDirectMaps();
 
     log.info("initializing ACPI tables", .{});
     kernel.acpi.init.initializeACPITables();
@@ -62,9 +57,6 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
 
     log.info("initializing virtual memory", .{});
     kernel.memory.virtual.init.initVirtualMemory();
-
-    log.debug("copying kernel file from bootloader memory", .{});
-    copyKernelFileFromBootloaderMemory();
 
     log.info("initializing processors", .{});
     initProcessors();
@@ -100,6 +92,9 @@ fn kernelInitStage3() noreturn {
     const processor = kernel.arch.getProcessor();
 
     if (processor.id == .bootstrap) {
+        log.debug("copying kernel file from bootloader memory", .{});
+        copyKernelFileFromBootloaderMemory();
+
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
         // the init only mappings.
         const processor_count = kernel.Processor.all.len;
@@ -127,6 +122,8 @@ fn kernelInitStage3() noreturn {
 
     // now that the init only mappings are gone we reload the page table
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
+
+    // TODO: Flush TLB
 
     log.debug("entering scheduler on processor {}", .{processor.id});
     _ = kernel.scheduler.lock.lock();
@@ -188,6 +185,14 @@ fn initProcessors() linksection(kernel.info.init_code) void {
             processor_descriptor.boot(processor, kernelInitStage2);
         }
     }
+}
+
+fn captureBootloaderProvidedInformation() linksection(kernel.info.init_code) void {
+    kernel.info.kernel_file = kernel.boot.kernelFile() orelse
+        core.panic("bootloader did not provide the kernel file");
+
+    calculateKernelOffsets();
+    calculateDirectMaps();
 }
 
 fn calculateDirectMaps() linksection(kernel.info.init_code) void {
