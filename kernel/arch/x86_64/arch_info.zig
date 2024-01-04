@@ -12,6 +12,8 @@ pub var cpu_vendor_string: [12]u8 = [_]u8{0} ** 12;
 pub var processor_brand_string: [48]u8 = [_]u8{0} ** 48;
 
 pub var x2apic_enabled: bool = false;
+/// Do we have a PIC?
+pub var have_pic: bool = true;
 
 // CPUID.01h:ECX
 

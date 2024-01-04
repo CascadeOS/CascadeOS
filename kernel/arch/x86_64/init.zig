@@ -74,9 +74,6 @@ pub fn loadProcessor(processor: *kernel.Processor) linksection(kernel.info.init_
 pub fn earlyArchInitialization() linksection(kernel.info.init_code) void {
     log.debug("initializing idt", .{});
     x86_64.interrupts.init.initIdt();
-
-    log.debug("disabling pic", .{});
-    disablePic();
 }
 
 /// Captures x86_64 system information.
@@ -84,10 +81,24 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
     x86_64.arch_info.x2apic_enabled = kernel.boot.x2apicEnabled();
+
+    log.debug("capturing MADT information", .{});
+    captureMADTInformation();
 }
 
+fn captureMADTInformation() linksection(kernel.info.init_code) void {
+    const madt = kernel.acpi.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
+
+    x86_64.arch_info.have_pic = madt.flags.PCAT_COMPAT;
+    log.debug("have pic: {}", .{x86_64.arch_info.have_pic});
+}
 /// Configures x86_64 system features.
 pub fn configureSystemFeatures() linksection(kernel.info.init_code) void {
+    if (x86_64.arch_info.have_pic) {
+        log.debug("disabling pic", .{});
+        disablePic();
+    }
+
     // CR0
     {
         var cr0 = x86_64.registers.Cr0.read();
