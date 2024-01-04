@@ -14,66 +14,10 @@ pub const MADT = @import("MADT.zig").MADT;
 pub const MCFG = @import("MCFG.zig").MCFG;
 pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 
-/// Initialized during `initializeACPITables`.
-var sdt_header: *const SharedHeader = undefined;
-
-/// Get the ACPI table if present.
-///
-/// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
-///
-/// If the table is not valid, returns `null`.
-pub fn getTable(comptime T: type) ?*const T {
-    var iter = tableIterator();
-
-    while (iter.next()) |table| {
-        if (!table.signatureIs(T.SIGNATURE_STRING)) continue;
-
-        if (!table.isValid()) {
-            log.warn("invalid table: {s}", .{table.signatureAsString()});
-            return null;
-        }
-
-        return @ptrCast(table);
-    }
-
-    return null;
-}
-
-fn tableIterator() TableIterator {
-    const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
-
-    return .{
-        .ptr = sdt_ptr + @sizeOf(SharedHeader),
-        .end_ptr = sdt_ptr + sdt_header.length,
-        .is_xsdt = sdt_header.signatureIs("XSDT"),
-    };
-}
-
-const TableIterator = struct {
-    ptr: [*]const u8,
-    end_ptr: [*]const u8,
-
-    is_xsdt: bool,
-
-    pub fn next(self: *TableIterator) ?*const SharedHeader {
-        if (self.is_xsdt) return self.nextImpl(u64);
-        return self.nextImpl(u32);
-    }
-
-    fn nextImpl(self: *TableIterator, comptime T: type) ?*const SharedHeader {
-        if (@intFromPtr(self.ptr) + @sizeOf(T) >= @intFromPtr(self.end_ptr)) return null;
-
-        const physical_address = kernel.PhysicalAddress.fromInt(
-            std.mem.readInt(T, @ptrCast(self.ptr), .little), // TODO: is little endian correct?
-        );
-
-        self.ptr += @sizeOf(T);
-
-        return physical_address.toDirectMap().toPtr(*const SharedHeader);
-    }
-};
-
 pub const init = struct {
+    /// Initialized during `initializeACPITables`.
+    var sdt_header: *const SharedHeader linksection(kernel.info.init_data) = undefined;
+
     /// Initializes access to the ACPI tables.
     pub fn initializeACPITables() linksection(kernel.info.init_code) void {
         const rsdp_address = kernel.boot.rsdp() orelse core.panic("RSDP not provided by bootloader");
@@ -107,4 +51,60 @@ pub const init = struct {
             }
         }
     }
+
+    /// Get the ACPI table if present.
+    ///
+    /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
+    ///
+    /// If the table is not valid, returns `null`.
+    pub fn getTable(comptime T: type) linksection(kernel.info.init_code) ?*const T {
+        var iter = tableIterator();
+
+        while (iter.next()) |table| {
+            if (!table.signatureIs(T.SIGNATURE_STRING)) continue;
+
+            if (!table.isValid()) {
+                log.warn("invalid table: {s}", .{table.signatureAsString()});
+                return null;
+            }
+
+            return @ptrCast(table);
+        }
+
+        return null;
+    }
+
+    fn tableIterator() linksection(kernel.info.init_code) TableIterator {
+        const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
+
+        return .{
+            .ptr = sdt_ptr + @sizeOf(SharedHeader),
+            .end_ptr = sdt_ptr + sdt_header.length,
+            .is_xsdt = sdt_header.signatureIs("XSDT"),
+        };
+    }
+
+    const TableIterator = struct {
+        ptr: [*]const u8,
+        end_ptr: [*]const u8,
+
+        is_xsdt: bool,
+
+        pub fn next(self: *TableIterator) linksection(kernel.info.init_code) ?*const SharedHeader {
+            if (self.is_xsdt) return self.nextImpl(u64);
+            return self.nextImpl(u32);
+        }
+
+        fn nextImpl(self: *TableIterator, comptime T: type) linksection(kernel.info.init_code) ?*const SharedHeader {
+            if (@intFromPtr(self.ptr) + @sizeOf(T) >= @intFromPtr(self.end_ptr)) return null;
+
+            const physical_address = kernel.PhysicalAddress.fromInt(
+                std.mem.readInt(T, @ptrCast(self.ptr), .little), // TODO: is little endian correct?
+            );
+
+            self.ptr += @sizeOf(T);
+
+            return physical_address.toDirectMap().toPtr(*const SharedHeader);
+        }
+    };
 };

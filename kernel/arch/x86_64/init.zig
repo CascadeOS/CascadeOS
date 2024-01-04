@@ -86,7 +86,7 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
 }
 
 fn captureMADTInformation() linksection(kernel.info.init_code) void {
-    const madt = kernel.acpi.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
+    const madt = kernel.acpi.init.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
 
     x86_64.apic.lapic_ptr = kernel.PhysicalAddress
         .fromInt(madt.local_interrupt_controller_address)
