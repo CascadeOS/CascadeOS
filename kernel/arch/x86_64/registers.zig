@@ -212,51 +212,59 @@ pub const EFER = packed struct(u64) {
 pub const IA32_APIC_BASE_MSR = x86_64.registers.MSR(u32, 0x1B);
 pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);
 
+pub inline fn readMSR(comptime T: type, register: u32) T {
+    switch (T) {
+        u64 => {
+            var low: u32 = undefined;
+            var high: u32 = undefined;
+            asm volatile ("rdmsr"
+                : [low] "={eax}" (low),
+                  [high] "={edx}" (high),
+                : [register] "{ecx}" (register),
+            );
+            return (@as(u64, high) << 32) | @as(u64, low);
+        },
+        u32 => {
+            return asm volatile ("rdmsr"
+                : [low] "={eax}" (-> u32),
+                : [register] "{ecx}" (register),
+                : "edx"
+            );
+        },
+        else => @compileError("read not implemented for " ++ @typeName(T)),
+    }
+}
+
+pub inline fn writeMSR(comptime T: type, register: u32, value: T) void {
+    switch (T) {
+        u64 => {
+            asm volatile ("wrmsr"
+                :
+                : [reg] "{ecx}" (register),
+                  [low] "{eax}" (@as(u32, @truncate(value))),
+                  [high] "{edx}" (@as(u32, @truncate(value >> 32))),
+            );
+        },
+        u32 => {
+            asm volatile ("wrmsr"
+                :
+                : [reg] "{ecx}" (register),
+                  [low] "{eax}" (value),
+                  [high] "{edx}" (@as(u32, 0)),
+            );
+        },
+        else => @compileError("write not implemented for " ++ @typeName(T)),
+    }
+}
+
 pub fn MSR(comptime T: type, comptime register: u32) type {
     return struct {
         pub inline fn read() T {
-            switch (T) {
-                u64 => {
-                    var low: u32 = undefined;
-                    var high: u32 = undefined;
-                    asm volatile ("rdmsr"
-                        : [low] "={eax}" (low),
-                          [high] "={edx}" (high),
-                        : [register] "{ecx}" (register),
-                    );
-                    return (@as(u64, high) << 32) | @as(u64, low);
-                },
-                u32 => {
-                    return asm volatile ("rdmsr"
-                        : [low] "={eax}" (-> u32),
-                        : [register] "{ecx}" (register),
-                        : "edx"
-                    );
-                },
-                else => @compileError("read not implemented for " ++ @typeName(T)),
-            }
+            return readMSR(T, register);
         }
 
         pub inline fn write(value: T) void {
-            switch (T) {
-                u64 => {
-                    asm volatile ("wrmsr"
-                        :
-                        : [reg] "{ecx}" (register),
-                          [low] "{eax}" (@as(u32, @truncate(value))),
-                          [high] "{edx}" (@as(u32, @truncate(value >> 32))),
-                    );
-                },
-                u32 => {
-                    asm volatile ("wrmsr"
-                        :
-                        : [reg] "{ecx}" (register),
-                          [low] "{eax}" (value),
-                          [high] "{edx}" (@as(u32, 0)),
-                    );
-                },
-                else => @compileError("write not implemented for " ++ @typeName(T)),
-            }
+            writeMSR(T, register, value);
         }
     };
 }
