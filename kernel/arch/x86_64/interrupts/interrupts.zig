@@ -382,6 +382,23 @@ pub const IdtVector = enum(u8) {
 
     _reserved8 = 0x1F,
 
+    pic_pit = 0x20,
+    pic_keyboard = 0x21,
+    pic_cascade = 0x22,
+    pic_com2 = 0x23,
+    pic_com1 = 0x24,
+    pic_lpt2 = 0x25,
+    pic_floppy = 0x26,
+    pic_lpt1 = 0x27,
+    pic_rtc = 0x28,
+    pic_free1 = 0x29,
+    pic_free2 = 0x2A,
+    pic_free3 = 0x2B,
+    pic_ps2mouse = 0x2C,
+    pic_fpu = 0x2D,
+    pic_primary_ata = 0x2E,
+    pic_secondary_ata = 0x2F,
+
     spurious_interrupt = 0xFF,
 
     _,
