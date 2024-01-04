@@ -5,14 +5,15 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
-// TODO: Support x2apic
-
 const log = kernel.debug.log.scoped(.apic);
 
-/// The local APIC base pointer when in xAPIC mode.
+/// The local APIC pointer used when in xAPIC mode.
 ///
-/// Not set when in x2APIC mode.
-var lapic_ptr: [*]volatile u8 = undefined;
+/// Initialized in `x86_64.init.captureMADTInformation`.
+pub var lapic_ptr: [*]volatile u8 = undefined;
+
+/// Initialized in `init.initApic`
+var x2apic: bool = false;
 
 const VersionRegister = packed struct(u32) {
     version: u8,
@@ -66,21 +67,7 @@ const SupriousInterruptRegister = packed struct(u32) {
 
 pub const init = struct {
     pub fn initApic(_: *kernel.Processor) linksection(kernel.info.init_code) void {
-        if (!x86_64.arch_info.x2apic_enabled) {
-            // Initialize the xAPIC base pointer.
-
-            const lapic_base = getLapicBase();
-
-            log.debug("lapic base: {}", .{lapic_base});
-
-            lapic_ptr = lapic_base.toNonCachedDirectMap().toPtr([*]volatile u8);
-
-            log.debug("lapic ptr: {*}", .{lapic_ptr});
-
-            log.debug("apic mode: xapic", .{});
-        } else {
-            log.debug("apic mode: x2apic", .{});
-        }
+        x2apic = kernel.boot.x2apicEnabled();
 
         const version = VersionRegister.read();
         log.debug("version register: {}", .{version});
@@ -98,7 +85,7 @@ pub const init = struct {
 };
 
 fn readRegister(register: LAPICRegister) u32 {
-    if (x86_64.arch_info.x2apic_enabled) {
+    if (x2apic) {
         if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register");
 
         return asm volatile ("rdmsr"
@@ -115,7 +102,7 @@ fn readRegister(register: LAPICRegister) u32 {
 }
 
 fn writeRegister(register: LAPICRegister, value: u32) void {
-    if (x86_64.arch_info.x2apic_enabled) {
+    if (x2apic) {
         if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register");
 
         asm volatile ("wrmsr"

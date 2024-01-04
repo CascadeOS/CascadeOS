@@ -80,7 +80,6 @@ pub fn earlyArchInitialization() linksection(kernel.info.init_code) void {
 pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
-    x86_64.arch_info.x2apic_enabled = kernel.boot.x2apicEnabled();
 
     log.debug("capturing MADT information", .{});
     captureMADTInformation();
@@ -89,9 +88,16 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
 fn captureMADTInformation() linksection(kernel.info.init_code) void {
     const madt = kernel.acpi.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
 
+    x86_64.apic.lapic_ptr = kernel.PhysicalAddress
+        .fromInt(madt.local_interrupt_controller_address)
+        .toNonCachedDirectMap()
+        .toPtr([*]volatile u8);
+    log.debug("lapic address: {*}", .{x86_64.apic.lapic_ptr});
+
     x86_64.arch_info.have_pic = madt.flags.PCAT_COMPAT;
     log.debug("have pic: {}", .{x86_64.arch_info.have_pic});
 }
+
 /// Configures x86_64 system features.
 pub fn configureSystemFeatures() linksection(kernel.info.init_code) void {
     if (x86_64.arch_info.have_pic) {
