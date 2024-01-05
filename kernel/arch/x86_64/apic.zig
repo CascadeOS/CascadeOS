@@ -101,6 +101,57 @@ pub const init = struct {
         }
     };
 
+    /// LVT Timer Register
+    const LVTTimerRegister = packed struct(u32) {
+        /// Interrupt vector number.
+        vector: u8,
+
+        _reserved1: u4,
+
+        /// Indicates the interrupt delivery status.
+        ///
+        /// Read Only
+        status: DeliveryStatus,
+
+        _reserved2: u3,
+
+        /// Interrupt mask: `false` enables reception of the interrupt and `true` inhibits reception of the interrupt.
+        ///
+        /// When the local APIC handles a performance-monitoring counters interrupt, it automatically sets the mask flag in
+        /// the LVT performance counter register.
+        ///
+        /// This flag is set to `true` on reset.
+        ///
+        /// It can be cleared only by software.
+        masked: bool,
+
+        /// The timer mode.
+        timer_mode: TimerMode,
+
+        _reserved3: u13,
+
+        pub const TimerMode = enum(u2) {
+            /// One-shot mode using a count-down value.
+            oneshot = 0b00,
+
+            /// Periodic mode reloading a count-down value.
+            periodic = 0b01,
+
+            /// TSC-Deadline mode using absolute target value in IA32_TSC_DEADLINE MSR.
+            tsc_deadline = 0b10,
+
+            _,
+        };
+
+        pub fn read() linksection(kernel.info.init_code) LVTTimerRegister {
+            return @bitCast(readRegister(.lvt_timer));
+        }
+
+        pub fn write(self: LVTTimerRegister) linksection(kernel.info.init_code) void {
+            writeRegister(.lvt_timer, @bitCast(self));
+        }
+    };
+
     /// LVT Error Register
     const LVTErrorRegister = packed struct(u32) {
         /// Interrupt vector number.
