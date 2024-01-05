@@ -81,6 +81,9 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 
+    log.debug("capturing FADT information", .{});
+    captureFADTInformation();
+
     log.debug("capturing MADT information", .{});
     captureMADTInformation();
 }
@@ -96,6 +99,21 @@ fn captureMADTInformation() linksection(kernel.info.init_code) void {
 
     x86_64.arch_info.have_pic = madt.flags.PCAT_COMPAT;
     log.debug("have pic: {}", .{x86_64.arch_info.have_pic});
+}
+
+fn captureFADTInformation() linksection(kernel.info.init_code) void {
+    const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
+
+    const flags = fadt.IA_PC_BOOT_ARCH;
+
+    x86_64.arch_info.have_ps2_controller = flags.@"8042";
+    log.debug("have ps2 controller: {}", .{x86_64.arch_info.have_ps2_controller});
+
+    x86_64.arch_info.msi_supported = !flags.msi_not_supported;
+    log.debug("message signaled interrupts supported: {}", .{x86_64.arch_info.msi_supported});
+
+    x86_64.arch_info.have_cmos_rtc = !flags.cmos_rtc_not_present;
+    log.debug("have cmos rtc: {}", .{x86_64.arch_info.have_cmos_rtc});
 }
 
 /// Configures x86_64 system features.
