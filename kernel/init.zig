@@ -61,7 +61,7 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     log.info("initializing processors", .{});
     initProcessors();
 
-    kernelInitStage2(&kernel.Processor.all[0]);
+    kernelInitStage2(kernel.Processor.get(.bootstrap));
 }
 
 /// Stage 2 of kernel initialization.
@@ -97,7 +97,7 @@ fn kernelInitStage3() noreturn {
 
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
         // the init only mappings.
-        const processor_count = kernel.Processor.all.len;
+        const processor_count = kernel.Processor._all.len;
         while (processors_in_stage3.load(.Acquire) != processor_count) {
             kernel.arch.spinLoopHint();
         }
@@ -156,24 +156,26 @@ fn copyKernelFileFromBootloaderMemory() linksection(kernel.info.init_code) void 
 fn initProcessors() linksection(kernel.info.init_code) void {
     var processor_descriptors = kernel.boot.processorDescriptors();
 
-    kernel.Processor.all = kernel.heap.page_allocator.alloc(
+    kernel.Processor._all = kernel.heap.page_allocator.alloc(
         kernel.Processor,
         processor_descriptors.count(),
     ) catch core.panic("failed to allocate processors");
 
-    var i: usize = 0;
+    var processor_id: kernel.Processor.Id = .bootstrap;
 
-    while (processor_descriptors.next()) |processor_descriptor| : (i += 1) {
-        log.debug("initializing processor {:0>2}", .{i});
+    while (processor_descriptors.next()) |processor_descriptor| : ({
+        processor_id = @enumFromInt(@intFromEnum(processor_id) + 1);
+    }) {
+        log.debug("initializing processor {}", .{processor_id});
 
-        const processor = &kernel.Processor.all[i];
+        const processor = kernel.Processor.get(processor_id);
 
         const idle_stack = kernel.Stack.create(true) catch {
             core.panic("failed to allocate idle stack");
         };
 
         processor.* = .{
-            .id = @enumFromInt(i),
+            .id = processor_id,
             .idle_stack = idle_stack,
             .arch = undefined, // initialized by `prepareProcessor`
         };
@@ -181,7 +183,7 @@ fn initProcessors() linksection(kernel.info.init_code) void {
         kernel.arch.init.prepareProcessor(processor, processor_descriptor);
 
         if (processor.id != .bootstrap) {
-            log.debug("booting processor {}", .{i});
+            log.debug("booting processor {}", .{processor_id});
             processor_descriptor.boot(processor, kernelInitStage2);
         }
     }

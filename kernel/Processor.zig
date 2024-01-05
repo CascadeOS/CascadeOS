@@ -8,11 +8,6 @@ const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
-/// The list of processors in the system.
-///
-/// Initialized during `init.initKernelStage1`.
-pub var all: []Processor = undefined;
-
 const Processor = @This();
 
 id: Id,
@@ -32,7 +27,9 @@ current_thread: ?*kernel.scheduler.Thread = null,
 arch: kernel.arch.ArchProcessor,
 
 pub const Id = enum(usize) {
-    bootstrap = 0,
+    none = 0,
+
+    bootstrap = 1,
 
     _,
 
@@ -57,3 +54,12 @@ pub const Id = enum(usize) {
         return print(self, writer);
     }
 };
+
+/// The list of processors in the system.
+///
+/// Initialized during `init.initKernelStage1`.
+pub var _all: []Processor = undefined;
+
+pub fn get(id: Id) *Processor {
+    return &_all[@intFromEnum(id) - 1];
+}

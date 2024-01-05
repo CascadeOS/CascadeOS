@@ -323,8 +323,8 @@ pub const init = struct {
         if (processor.panicked) {
             // We have already panicked on this processor.
 
-            const lock_held = kernel.arch.init.EarlyOutput.lock._processor_plus_one == @intFromEnum(processor.id) + 1;
-            if (!lock_held) _ = kernel.arch.init.EarlyOutput.lock.lock();
+            const have_lock = kernel.arch.init.EarlyOutput.lock._processor_id == processor.id;
+            if (!have_lock) _ = kernel.arch.init.EarlyOutput.lock.lock();
 
             const writer = kernel.arch.init.getEarlyOutputNoLock() orelse return;
 
@@ -336,7 +336,7 @@ pub const init = struct {
 
             printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
 
-            if (lock_held) {
+            if (have_lock) {
                 // we need to unlock the output lock or other processors will be deadlocked
                 kernel.arch.init.EarlyOutput.lock.unsafeUnlock();
             }

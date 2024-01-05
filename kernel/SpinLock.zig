@@ -6,10 +6,8 @@ const std = @import("std");
 
 const SpinLock = @This();
 
-/// The id of the processor that currently holds the lock + 1.
-///
-/// If the lock is currently unlocked, this is 0.
-_processor_plus_one: usize = 0,
+/// The id of the processor that currently holds the lock.
+_processor_id: kernel.Processor.Id = .none,
 
 pub const Held = struct {
     interrupts_enabled: bool,
@@ -17,23 +15,23 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
-        core.debugAssert(@intFromEnum(kernel.arch.getProcessor().id) + 1 == self.spinlock._processor_plus_one);
+        core.debugAssert(kernel.arch.getProcessor().id == self.spinlock._processor_id);
 
-        @atomicStore(usize, &self.spinlock._processor_plus_one, 0, .Release);
+        @atomicStore(kernel.Processor.Id, &self.spinlock._processor_id, .none, .Release);
         if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
     }
 };
 
 pub fn isLocked(self: SpinLock) bool {
-    return @atomicLoad(usize, &self._processor_plus_one, .Acquire) != 0;
+    return @atomicLoad(kernel.Processor.Id, &self._processor_id, .Acquire) != .none;
 }
 
 pub fn isLockedByCurrent(self: SpinLock) bool {
-    return @atomicLoad(usize, &self._processor_plus_one, .Acquire) == @intFromEnum(kernel.arch.getProcessor().id) + 1;
+    return @atomicLoad(kernel.Processor.Id, &self._processor_id, .Acquire) == kernel.arch.getProcessor().id;
 }
 
 pub fn unsafeUnlock(self: *SpinLock) void {
-    @atomicStore(usize, &self._processor_plus_one, 0, .Release);
+    @atomicStore(kernel.Processor.Id, &self._processor_id, .none, .Release);
 }
 
 pub fn lock(self: *SpinLock) Held {
@@ -42,14 +40,14 @@ pub fn lock(self: *SpinLock) Held {
 
     const processor = kernel.arch.getProcessor();
 
-    const processor_id_plus_one = @intFromEnum(processor.id) + 1;
+    const processor_id = processor.id;
 
     while (true) {
         if (@cmpxchgWeak(
-            usize,
-            &self._processor_plus_one,
-            0,
-            processor_id_plus_one,
+            kernel.Processor.Id,
+            &self._processor_id,
+            .none,
+            processor_id,
             .AcqRel,
             .Acquire,
         )) |_| {

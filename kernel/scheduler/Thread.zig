@@ -22,6 +22,8 @@ pub const State = enum {
 };
 
 pub const Id = enum(usize) {
+    none = 0,
+
     _,
 };
 
