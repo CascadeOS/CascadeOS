@@ -93,6 +93,8 @@ pub const Address = extern struct {
         word = 2,
         dword = 3,
         qword = 4,
+
+        _,
     };
 
     comptime {
