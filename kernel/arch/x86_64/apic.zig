@@ -84,13 +84,10 @@ pub const init = struct {
 
 fn readRegister(register: LAPICRegister) u32 {
     if (x2apic) {
+        core.debugAssert(register != .interrupt_command_32_63); // not supported in x2apic mode
         if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register");
 
-        return asm volatile ("rdmsr"
-            : [low] "={eax}" (-> u32),
-            : [register] "{ecx}" (register.x2apicRegister()),
-            : "edx"
-        );
+        return x86_64.registers.readMSR(u32, register.x2apicRegister());
     }
 
     const ptr: *align(16) volatile u32 = @ptrCast(@alignCast(
@@ -101,14 +98,10 @@ fn readRegister(register: LAPICRegister) u32 {
 
 fn writeRegister(register: LAPICRegister, value: u32) void {
     if (x2apic) {
+        core.debugAssert(register != .interrupt_command_32_63); // not supported in x2apic mode
         if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register");
 
-        asm volatile ("wrmsr"
-            :
-            : [reg] "{ecx}" (register.x2apicRegister()),
-              [low] "{eax}" (value),
-              [high] "{edx}" (@as(u32, 0)),
-        );
+        x86_64.registers.writeMSR(u32, register.x2apicRegister(), value);
         return;
     }
 
