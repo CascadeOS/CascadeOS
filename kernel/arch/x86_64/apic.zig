@@ -101,6 +101,45 @@ pub const init = struct {
         }
     };
 
+    /// LVT Error Register
+    const LVTErrorRegister = packed struct(u32) {
+        /// Interrupt vector number.
+        vector: u8,
+
+        /// Specifies the type of interrupt to be sent to the processor.
+        ///
+        /// Some delivery modes will only operate as intended when used in conjunction with a specific trigger mode.
+        delivery_mode: DeliveryMode,
+
+        /// Indicates the interrupt delivery status.
+        ///
+        /// Read Only
+        status: DeliveryStatus,
+
+        _reserved2: u3,
+
+        /// Interrupt mask: `false` enables reception of the interrupt and `true` inhibits reception of the interrupt.
+        ///
+        /// When the local APIC handles a performance-monitoring counters interrupt, it automatically sets the mask flag in
+        /// the LVT performance counter register.
+        ///
+        /// This flag is set to `true` on reset.
+        ///
+        /// It can be cleared only by software.
+        masked: bool,
+
+        _reserved3: u16,
+
+        pub fn read() linksection(kernel.info.init_code) LVTErrorRegister {
+            return @bitCast(readRegister(.lvt_error));
+        }
+
+        pub fn write(self: LVTErrorRegister) linksection(kernel.info.init_code) void {
+            writeRegister(.lvt_error, @bitCast(self));
+        }
+    };
+};
+
 /// The local APIC records errors detected during interrupt handling in the error status register (ESR).
 ///
 /// The ESR is a write/read register.
@@ -179,6 +218,60 @@ pub const ErrorStatusRegister = packed struct(u32) {
         writeRegister(.error_status, 0);
         return @bitCast(readRegister(.error_status));
     }
+};
+
+/// Indicates the interrupt delivery status.
+const DeliveryStatus = enum(u1) {
+    /// There is currently no activity for this interrupt source, or the previous interrupt from this source was
+    /// delivered to the processor core and accepted.
+    idle = 0,
+
+    /// Indicates that an interrupt from this source has been delivered to the processor core but has not yet been
+    /// accepted.
+    send_pending = 1,
+};
+
+/// Specifies the type of interrupt to be sent to the processor.
+///
+/// Some delivery modes will only operate as intended when used in conjunction with a specific trigger mode.
+const DeliveryMode = enum(u3) {
+    /// Delivers the interrupt specified in the vector field.
+    fixed = 0b000,
+
+    /// Delivers an SMI interrupt to the processor core through the processor’s local SMI signal path.
+    ///
+    /// When using this delivery mode, the vector field should be set to 00H for future compatibility.
+    smi = 0b010,
+
+    /// Delivers an NMI interrupt to the processor.
+    ///
+    /// The vector information is ignored.
+    nmi = 0b100,
+
+    /// Delivers an INIT request to the processor core, which causes the processor to perform an INIT.
+    ///
+    /// When using this delivery mode, the vector field should be set to 00H for future compatibility.
+    ///
+    /// Not supported for the LVT CMCI register, the LVT thermal monitor register, or the LVT performance counter
+    /// register.
+    init = 0b101,
+
+    /// Causes the processor to respond to the interrupt as if the interrupt originated in an externally connected
+    /// (8259A-compatible) interrupt controller.
+    ///
+    /// A special INTA bus cycle corresponding to ExtINT, is routed to the external controller.
+    ///
+    /// The external controller is expected to supply the vector information.
+    ///
+    /// The APIC architecture supports only one ExtINT source in a system, usually contained in the compatibility bridge.
+    ///
+    /// Only one processor in the system should have an LVT entry configured to use the ExtINT delivery mode.
+    ///
+    /// Not supported for the LVT CMCI register, the LVT thermal monitor register, or the LVT performance counter
+    /// register.
+    ext_int = 0b111,
+
+    _,
 };
 
 fn readRegister(register: LAPICRegister) u32 {
