@@ -16,6 +16,14 @@ pub var lapic_ptr: [*]volatile u8 = undefined;
 var x2apic: bool = false;
 
 /// Signal end of interrupt.
+///
+/// For all interrupts except those delivered with the NMI, SMI, INIT, ExtINT, the start-up, or INIT-Deassert delivery
+/// mode, the interrupt handler must include a write to the end-of-interrupt (EOI) register.
+///
+/// This write must occur at the end of the handler routine, sometime before the IRET instruction.
+///
+/// This action indicates that the servicing of the current interrupt is complete and the local APIC can issue the next
+/// interrupt from the ISR.
 pub fn eoi() void {
     writeRegister(.eoi, 0);
 }
@@ -35,7 +43,13 @@ pub const init = struct {
         spurious_interrupt_register.write();
     }
 
+    /// Local APIC Version Register
     const VersionRegister = packed struct(u32) {
+        /// The version numbers of the local APIC.
+        ///
+        ///  - 0XH - 82489DX discrete APIC.
+        ///  - 10H - 15H Integrated APIC.
+        ///  - Other values reserved.
         version: u8,
 
         _reserved1: u8,
@@ -53,6 +67,7 @@ pub const init = struct {
         }
     };
 
+    /// Spurious-Interrupt Vector Register
     const SupriousInterruptRegister = packed struct(u32) {
         /// The vector number to be delivered to the processor when the local APIC generates a spurious vector.
         spurious_vector: u8,
@@ -67,7 +82,8 @@ pub const init = struct {
 
         _reserved1: u2 = 0,
 
-        /// Determines whether an EOI for a level-triggered interrupt causes EOI messages to be broadcast to the I/O APICs or not.
+        /// Determines whether an EOI for a level-triggered interrupt causes EOI messages to be broadcast to the I/O
+        /// APICs or not.
         ///
         /// The default value is `false`, indicating that EOI broadcasts are performed.
         ///
