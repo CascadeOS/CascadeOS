@@ -25,7 +25,7 @@ limine_exe: *std.Build.Step.Compile,
 image_builder_tool: Tool,
 
 image_file: std.Build.GeneratedFile,
-image_file_source: std.Build.FileSource,
+image_lazy_path: std.Build.LazyPath,
 
 kernel: Kernel,
 
@@ -44,6 +44,7 @@ pub fn registerImageSteps(
     const limine_exe = b.addExecutable(.{
         .name = "limine",
         .link_libc = true,
+        .target = b.host,
     });
     limine_exe.addIncludePath(limine_dep.path(""));
     limine_exe.addCSourceFile(.{
@@ -106,11 +107,11 @@ fn create(
         .limine_dep = limine_dep,
         .limine_exe = limine_exe,
         .image_file = undefined,
-        .image_file_source = undefined,
+        .image_lazy_path = undefined,
         .image_builder_tool = image_builder_tool,
     };
     self.image_file = .{ .step = &self.step };
-    self.image_file_source = .{ .generated = &self.image_file };
+    self.image_lazy_path = .{ .generated = &self.image_file };
 
     // TODO: Why do we need to depend on the emitted bin instead of just depending on the compile step?
     // If this line is changed to `self.step.dependOn(&limine_exe.step);` then the `Run` step fails to execute the binary.

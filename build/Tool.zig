@@ -72,9 +72,9 @@ fn resolveTool(
         root_file_name,
     });
 
-    const file_source: std.Build.FileSource = .{ .path = root_file_path };
+    const lazy_path: std.Build.LazyPath = .{ .path = root_file_path };
 
-    const exe = try createExe(b, tool_description, file_source, dependencies);
+    const exe = try createExe(b, tool_description, lazy_path, dependencies);
 
     const exe_install_step = b.addInstallArtifact(
         exe,
@@ -106,7 +106,7 @@ fn resolveTool(
     const build_step = b.step(build_step_name, build_step_description);
     build_step.dependOn(&exe_install_step.step);
 
-    const test_exe = try createTestExe(b, tool_description, file_source, dependencies);
+    const test_exe = try createTestExe(b, tool_description, lazy_path, dependencies);
     const run_test = b.addRunArtifact(test_exe);
 
     const test_step_name = try std.fmt.allocPrint(
@@ -162,12 +162,13 @@ fn resolveTool(
 fn createExe(
     b: *std.Build,
     tool_description: ToolDescription,
-    file_source: std.Build.FileSource,
+    lazy_path: std.Build.LazyPath,
     dependencies: []const *Library,
 ) !*Step.Compile {
     const exe = b.addExecutable(.{
         .name = tool_description.name,
-        .root_source_file = file_source,
+        .root_source_file = lazy_path,
+        .target = b.host,
     });
 
     for (dependencies) |dep| {
@@ -177,7 +178,7 @@ fn createExe(
                 .{ tool_description.name, dep.name },
             );
         };
-        exe.addModule(dep.name, module);
+        exe.root_module.addImport(dep.name, module);
     }
 
     return exe;
@@ -186,12 +187,12 @@ fn createExe(
 fn createTestExe(
     b: *std.Build,
     tool_description: ToolDescription,
-    file_source: std.Build.FileSource,
+    lazy_path: std.Build.LazyPath,
     dependencies: []const *Library,
 ) !*Step.Compile {
     const test_exe = b.addTest(.{
         .name = tool_description.name,
-        .root_source_file = file_source,
+        .root_source_file = lazy_path,
     });
 
     for (dependencies) |dep| {
@@ -201,7 +202,7 @@ fn createTestExe(
                 .{ tool_description.name, dep.name },
             );
         };
-        test_exe.addModule(dep.name, module);
+        test_exe.root_module.addImport(dep.name, module);
     }
 
     return test_exe;

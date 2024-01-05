@@ -16,7 +16,7 @@ b: *std.Build,
 step: Step,
 
 dep_file: std.Build.GeneratedFile,
-dep_file_source: std.Build.FileSource,
+dep_lazy_path: std.Build.LazyPath,
 
 kernels: Kernel.Collection,
 libraries: Library.Collection,
@@ -51,14 +51,14 @@ fn create(
             .makeFn = make,
         }),
         .dep_file = undefined,
-        .dep_file_source = undefined,
+        .dep_lazy_path = undefined,
 
         .kernels = kernels,
         .libraries = libraries,
         .tools = tools,
     };
     self.dep_file = .{ .step = &self.step };
-    self.dep_file_source = .{ .generated = &self.dep_file };
+    self.dep_lazy_path = .{ .generated = &self.dep_file };
 
     return self;
 }

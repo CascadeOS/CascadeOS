@@ -10,33 +10,29 @@ pub const CascadeTarget = enum {
     x86_64,
 
     /// Returns a CrossTarget for building tests targeting the host system.
-    pub fn getNonCascadeTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
-        switch (self) {
-            .aarch64 => return std.zig.CrossTarget{
-                .cpu_arch = .aarch64,
-            },
-            .x86_64 => return std.zig.CrossTarget{
-                .cpu_arch = .x86_64,
-            },
-        }
+    pub fn getNonCascadeTestCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
+        const target_query: std.Target.Query = switch (self) {
+            .aarch64 => .{ .cpu_arch = .aarch64 },
+            .x86_64 => .{ .cpu_arch = .x86_64 },
+        };
+
+        return b.resolveTargetQuery(target_query);
     }
 
     /// Returns a CrossTarget for building tests targeting cascade.
-    pub fn getCascadeTestCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
+    pub fn getCascadeTestCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         // TODO: os_tag should be other
-        switch (self) {
-            .aarch64 => return std.zig.CrossTarget{
-                .cpu_arch = .aarch64,
-            },
-            .x86_64 => return std.zig.CrossTarget{
-                .cpu_arch = .x86_64,
-            },
-        }
+        const target_query: std.Target.Query = switch (self) {
+            .aarch64 => .{ .cpu_arch = .aarch64 },
+            .x86_64 => .{ .cpu_arch = .x86_64 },
+        };
+
+        return b.resolveTargetQuery(target_query);
     }
 
     /// Returns true if the targets architecture is equal to the host systems.
     pub fn isNative(self: CascadeTarget, b: *std.Build) bool {
-        return switch (b.host.target.cpu.arch) {
+        return switch (b.host.result.cpu.arch) {
             .aarch64 => self == .aarch64,
             .x86_64 => self == .x86_64,
             else => false,
@@ -52,11 +48,11 @@ pub const CascadeTarget = enum {
     }
 
     /// Returns a CrossTarget for building the kernel for the given target.
-    pub fn getKernelCrossTarget(self: CascadeTarget) std.zig.CrossTarget {
+    pub fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         switch (self) {
             .aarch64 => {
                 const features = std.Target.aarch64.Feature;
-                var target = std.zig.CrossTarget{
+                var target_query = std.Target.Query{
                     .cpu_arch = .aarch64,
                     .os_tag = .freestanding,
                     .abi = .none,
@@ -64,15 +60,15 @@ pub const CascadeTarget = enum {
                 };
 
                 // Remove neon and fp features
-                target.cpu_features_sub.addFeature(@intFromEnum(features.neon));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.neon));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
 
-                return target;
+                return b.resolveTargetQuery(target_query);
             },
 
             .x86_64 => {
                 const features = std.Target.x86.Feature;
-                var target = std.zig.CrossTarget{
+                var target_query = std.Target.Query{
                     .cpu_arch = .x86_64,
                     .os_tag = .freestanding,
                     .abi = .none,
@@ -80,29 +76,29 @@ pub const CascadeTarget = enum {
                 };
 
                 // Remove all SSE/AVX features
-                target.cpu_features_sub.addFeature(@intFromEnum(features.x87));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.mmx));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.sse));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.f16c));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.fma));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.sse2));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.sse3));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.sse4_1));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.sse4_2));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.ssse3));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.vzeroupper));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx2));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512bw));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512cd));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512dq));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512f));
-                target.cpu_features_sub.addFeature(@intFromEnum(features.avx512vl));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.x87));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.mmx));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.f16c));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.fma));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse2));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse3));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse4_1));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse4_2));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.ssse3));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.vzeroupper));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx2));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512bw));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512cd));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512dq));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512f));
+                target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512vl));
 
                 // Add soft float
-                target.cpu_features_add.addFeature(@intFromEnum(features.soft_float));
+                target_query.cpu_features_add.addFeature(@intFromEnum(features.soft_float));
 
-                return target;
+                return b.resolveTargetQuery(target_query);
             },
         }
     }
@@ -149,8 +145,8 @@ pub const CascadeTarget = enum {
         switch (self) {
             .aarch64 => {},
             .x86_64 => {
-                kernel_exe.code_model = .kernel;
-                kernel_exe.red_zone = false;
+                kernel_exe.root_module.code_model = .kernel;
+                kernel_exe.root_module.red_zone = false;
             },
         }
     }

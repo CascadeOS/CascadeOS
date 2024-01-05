@@ -14,7 +14,7 @@ step: Step,
 target: CascadeTarget,
 
 firmware: std.Build.GeneratedFile,
-firmware_source: std.Build.FileSource,
+firmware_source: std.Build.LazyPath,
 
 timestamp_path: []const u8,
 edk2_dir: []const u8,

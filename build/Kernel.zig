@@ -55,7 +55,7 @@ fn create(
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
         .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "root.zig" }) },
-        .target = target.getKernelCrossTarget(),
+        .target = target.getKernelCrossTarget(b),
         .optimize = options.optimize,
     });
 
@@ -67,40 +67,40 @@ fn create(
 
     const kernel_module = blk: {
         const kernel_module = b.createModule(.{
-            .source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
+            .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
         });
 
         // self reference
-        try kernel_module.dependencies.put("kernel", kernel_module);
+        kernel_module.addImport("kernel", kernel_module);
 
         // target options
-        try kernel_module.dependencies.put("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
+        kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
 
         // kernel options
-        try kernel_module.dependencies.put("kernel_options", options.kernel_option_module);
+        kernel_module.addImport("kernel_options", options.kernel_option_module);
 
         // dependencies
 
         for (declared_dependencies) |dependency| {
             const library = libraries.get(dependency).?;
             const library_module = library.cascade_modules.get(target) orelse continue;
-            try kernel_module.dependencies.put(library.name, library_module);
+            kernel_module.addImport(library.name, library_module);
             dependencies.appendAssumeCapacity(library);
         }
 
         // source file modules
         for (source_file_modules) |module| {
-            try kernel_module.dependencies.put(module.name, module.module);
+            kernel_module.addImport(module.name, module.module);
         }
 
         break :blk kernel_module;
     };
 
-    kernel_exe.addModule("kernel", kernel_module);
+    kernel_exe.root_module.addImport("kernel", kernel_module);
 
     kernel_exe.want_lto = false;
     kernel_exe.pie = true;
-    kernel_exe.omit_frame_pointer = false;
+    kernel_exe.root_module.omit_frame_pointer = false;
 
     target.targetSpecificSetup(kernel_exe);
 
@@ -237,7 +237,7 @@ fn addFilesRecursive(
                     if (removeRootPrefixFromPath(path, root_path)) |name| {
                         try files.append(name);
                         const module = b.createModule(.{
-                            .source_file = .{ .path = path },
+                            .root_source_file = .{ .path = path },
                         });
                         try modules.append(.{ .name = name, .module = module });
                     } else {

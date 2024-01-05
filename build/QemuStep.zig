@@ -14,7 +14,7 @@ const StepCollection = @import("StepCollection.zig");
 const QemuStep = @This();
 
 step: Step,
-image: std.Build.FileSource,
+image: std.Build.LazyPath,
 
 target: CascadeTarget,
 options: Options,
@@ -36,7 +36,7 @@ pub fn registerQemuSteps(
     for (targets) |target| {
         const image_step = image_steps.get(target).?;
 
-        const qemu_step = try QemuStep.create(b, target, image_step.image_file_source, options);
+        const qemu_step = try QemuStep.create(b, target, image_step.image_lazy_path, options);
 
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
@@ -54,7 +54,7 @@ pub fn registerQemuSteps(
     }
 }
 
-fn create(b: *std.Build, target: CascadeTarget, image: std.Build.FileSource, options: Options) !*QemuStep {
+fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, options: Options) !*QemuStep {
     const uefi = options.uefi or target.needsUefi();
 
     const edk2_step: ?*EDK2Step = if (uefi) try EDK2Step.create(b, target) else null;
@@ -175,11 +175,11 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     // qemu acceleration
     const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
     if (should_use_acceleration) {
-        switch (b.host.target.os.tag) {
+        switch (b.host.result.os.tag) {
             .linux => if (helpers.fileExists("/dev/kvm")) run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
             .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
             .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
-            else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.host.target.os.tag)}),
+            else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.host.result.os.tag)}),
         }
     }
 
