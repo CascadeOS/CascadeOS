@@ -15,6 +15,12 @@ pub var lapic_ptr: [*]volatile u8 = undefined;
 /// Initialized in `init.initApic`
 var x2apic: bool = false;
 
+/// Initialized in `init.initApic`
+var force_apic_cluster_model: bool = false;
+
+/// Initialized in `init.initApic`
+var force_apic_physical_destination_mode: bool = false;
+
 /// Signal end of interrupt.
 ///
 /// For all interrupts except those delivered with the NMI, SMI, INIT, ExtINT, the start-up, or INIT-Deassert delivery
@@ -33,6 +39,8 @@ pub const init = struct {
         x2apic = kernel.boot.x2apicEnabled();
         if (x2apic) log.debug("x2apic mode", .{}) else log.debug("xapic mode", .{});
 
+        captureFADTInformation();
+
         const version = VersionRegister.read();
         log.debug("version register: {}", .{version});
 
@@ -41,6 +49,18 @@ pub const init = struct {
             .spurious_vector = @intFromEnum(x86_64.interrupts.IdtVector.spurious_interrupt),
         };
         spurious_interrupt_register.write();
+    }
+
+    fn captureFADTInformation() void {
+        const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
+
+        const fixed_feature_flags = fadt.fixed_feature_flags;
+
+        force_apic_cluster_model = fixed_feature_flags.FORCE_APIC_CLUSTER_MODEL;
+        log.debug("force apic cluster model: {}", .{force_apic_cluster_model});
+
+        force_apic_physical_destination_mode = fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE;
+        log.debug("force apic physical destination mode: {}", .{force_apic_physical_destination_mode});
     }
 
     /// Local APIC Version Register
