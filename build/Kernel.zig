@@ -54,7 +54,7 @@ fn create(
 ) !Kernel {
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
-        .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "root.zig" }) },
+        .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
         .target = target.getKernelCrossTarget(b),
         .optimize = options.optimize,
     });
@@ -65,38 +65,28 @@ fn create(
     var dependencies = try std.ArrayListUnmanaged(*const Library).initCapacity(b.allocator, declared_dependencies.len);
     defer dependencies.deinit(b.allocator);
 
-    const kernel_module = blk: {
-        const kernel_module = b.createModule(.{
-            .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
-        });
+    // self reference
+    kernel_exe.root_module.addImport("kernel", &kernel_exe.root_module);
 
-        // self reference
-        kernel_module.addImport("kernel", kernel_module);
+    // target options
+    kernel_exe.root_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
 
-        // target options
-        kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
+    // kernel options
+    kernel_exe.root_module.addImport("kernel_options", options.kernel_option_module);
 
-        // kernel options
-        kernel_module.addImport("kernel_options", options.kernel_option_module);
+    // dependencies
 
-        // dependencies
+    for (declared_dependencies) |dependency| {
+        const library = libraries.get(dependency).?;
+        const library_module = library.cascade_modules.get(target) orelse continue;
+        kernel_exe.root_module.addImport(library.name, library_module);
+        dependencies.appendAssumeCapacity(library);
+    }
 
-        for (declared_dependencies) |dependency| {
-            const library = libraries.get(dependency).?;
-            const library_module = library.cascade_modules.get(target) orelse continue;
-            kernel_module.addImport(library.name, library_module);
-            dependencies.appendAssumeCapacity(library);
-        }
-
-        // source file modules
-        for (source_file_modules) |module| {
-            kernel_module.addImport(module.name, module.module);
-        }
-
-        break :blk kernel_module;
-    };
-
-    kernel_exe.root_module.addImport("kernel", kernel_module);
+    // source file modules
+    for (source_file_modules) |module| {
+        kernel_exe.root_module.addImport(module.name, module.module);
+    }
 
     kernel_exe.want_lto = false;
     kernel_exe.pie = true;

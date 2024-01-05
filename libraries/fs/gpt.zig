@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
+const fs = @import("fs");
+const std = @import("std");
 const UUID = @import("uuid").UUID;
 
-const fs = @import("fs.zig");
 const MBR = fs.mbr.MBR;
 
 pub const Crc32 = std.hash.crc.Crc32IsoHdlc;

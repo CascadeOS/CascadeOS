@@ -32,3 +32,13 @@ comptime {
     // ensure any architecture specific code that needs to be referenced is
     _ = &arch;
 }
+
+pub const std_options = struct {
+    // ensure using `std.log` in the kernel is a compile error
+    pub const log_level = @compileError("use `kernel.log` for logging in the kernel");
+
+    // ensure using `std.log` in the kernel is a compile error
+    pub const logFn = @compileError("use `kernel.log` for logging in the kernel");
+};
+
+pub const panic = debug.panic;
