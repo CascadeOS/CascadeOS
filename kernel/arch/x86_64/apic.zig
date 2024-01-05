@@ -100,6 +100,85 @@ pub const init = struct {
             writeRegister(.spurious_interrupt, @bitCast(self));
         }
     };
+
+/// The local APIC records errors detected during interrupt handling in the error status register (ESR).
+///
+/// The ESR is a write/read register.
+///
+/// Before attempt to read from the ESR, software should first write to it.
+/// (The value written does not affect the values read subsequently; only zero may be written in x2APIC mode.)
+///
+/// This write clears any previously logged errors and updates the ESR with any errors detected since the last write to
+/// the ESR.
+///
+/// This write also rearms the APIC error interrupt triggering mechanism.
+///
+/// The LVT Error Register allows specification of the vector of the interrupt to be delivered to the processor core
+/// when APIC error is detected.
+/// The register also provides a means of masking an APIC-error interrupt.
+/// This masking only prevents delivery of APIC-error interrupts; the APIC continues to record errors in the ESR.
+pub const ErrorStatusRegister = packed struct(u32) {
+    /// Set when the local APIC detects a checksum error for a message that it sent on the APIC bus.
+    ///
+    /// Used only on P6 family and Pentium processors.
+    send_checksum: bool,
+
+    /// Set when the local APIC detects a checksum error for a message that it received on the APIC bus.
+    ///
+    /// Used only on P6 family and Pentium processors.
+    receive_checksum: bool,
+
+    /// Set when the local APIC detects that a message it sent was not accepted by any APIC on the APIC bus.
+    ///
+    /// Used only on P6 family and Pentium processors.
+    send_accept: bool,
+
+    /// Set when the local APIC detects that the message it received was not accepted by any APIC on the APIC bus,
+    /// including itself.
+    ///
+    /// Used only on P6 family and Pentium processors.
+    receive_accept: bool,
+
+    /// Set when the local APIC detects an attempt to send an IPI with the lowest-priority delivery mode and the local
+    /// APIC does not support the sending of such IPIs.
+    ///
+    /// This bit is used on some Intel Core and Intel Xeon processors.
+    ///
+    /// The ability of a processor to send a lowest-priority IPI is model-specific and should be avoided.
+    redirectable_ipi: bool,
+
+    /// Set when the local APIC detects an illegal vector (one in the range 0 to 15) in the message that it is sending.
+    ///
+    /// This occurs as the result of a write to the ICR (in both xAPIC and x2APIC modes) or to SELF IPI register
+    /// (x2APIC mode only) with an illegal vector.
+    ///
+    /// If the local APIC does not support the sending of lowest-priority IPIs and software writes the ICR to send a
+    /// lowest-priority IPI with an illegal vector, the local APIC sets only the `redirectable_ipi` error bit.
+    /// The interrupt is not processed and hence the `send_illegal` bit is not set in the ESR.
+    send_illegal: bool,
+
+    /// Set when the local APIC detects an illegal vector (one in the range 0 to 15) in an interrupt message it receives
+    /// or in an interrupt generated locally from the local vector table or via a self IPI.
+    ///
+    /// Such interrupts are not delivered to the processor; the local APIC will never set an IRR bit in the range 0 to 15.
+    received_illegal: bool,
+
+    /// Set when the local APIC is in xAPIC mode and software attempts to access a register that is reserved in the
+    /// processor's local-APIC register-address space.
+    ///
+    /// Used only on Intel Core, Intel Atom, Pentium 4, Intel Xeon, and P6 family processors.
+    ///
+    /// In x2APIC mode, software accesses the APIC registers using the RDMSR and WRMSR instructions.
+    /// Use of one of these instructions to access a reserved register cause a general-protection exception.
+    /// They do not set the `illegal_register` bit in the ESR.
+    illegal_register: bool,
+
+    _reserved: u24,
+
+    pub fn read() ErrorStatusRegister {
+        writeRegister(.error_status, 0);
+        return @bitCast(readRegister(.error_status));
+    }
 };
 
 fn readRegister(register: LAPICRegister) u32 {
