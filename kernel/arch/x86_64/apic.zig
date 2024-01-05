@@ -15,6 +15,10 @@ pub var lapic_ptr: [*]volatile u8 = undefined;
 /// Initialized in `init.initApic`
 var x2apic: bool = false;
 
+/// Signal end of interrupt.
+pub fn eoi() void {
+    writeRegister(.eoi, 0);
+}
 
 pub const init = struct {
     pub fn initApic(_: *kernel.Processor) linksection(kernel.info.init_code) void {
