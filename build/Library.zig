@@ -252,7 +252,15 @@ fn cascadeTestExecutableAndModule(
     all_build_and_run_step.dependOn(build_step);
     step_collection.registerCascadeLibrary(target, build_step);
 
-    const module = try createModule(b, lazy_path, options, target, dependencies, true);
+    const module = try createModule(
+        b,
+        library_description,
+        lazy_path,
+        options,
+        target,
+        dependencies,
+        true,
+    );
     try cascade_modules.putNoClobber(b.allocator, target, module);
 }
 
@@ -318,7 +326,15 @@ fn hostTestExecutableAndModule(
     all_build_and_run_step.dependOn(build_step);
     step_collection.registerNonCascadeLibrary(target, build_step);
 
-    const module = try createModule(b, lazy_path, options, target, dependencies, false);
+    const module = try createModule(
+        b,
+        library_description,
+        lazy_path,
+        options,
+        target,
+        dependencies,
+        false,
+    );
     try non_cascade_modules.putNoClobber(b.allocator, target, module);
 
     if (target.isNative(b)) return module;
@@ -342,20 +358,14 @@ fn createTestExe(
         .target = if (build_for_cascade) target.getCascadeTestCrossTarget(b) else target.getNonCascadeTestCrossTarget(b),
     });
 
-    if (build_for_cascade) {
-        test_exe.root_module.addImport("cascade_flag", options.cascade_os_options_module);
-    } else {
-        test_exe.root_module.addImport("cascade_flag", options.non_cascade_os_options_module);
-    }
-
-    for (dependencies) |dependency| {
-        const dependency_module = if (build_for_cascade)
-            dependency.cascade_modules.get(target) orelse continue
-        else
-            dependency.non_cascade_modules.get(target) orelse continue;
-
-        test_exe.root_module.addImport(dependency.name, dependency_module);
-    }
+    addDependenciesToModule(
+        &test_exe.root_module,
+        library_description,
+        options,
+        target,
+        dependencies,
+        build_for_cascade,
+    );
 
     return test_exe;
 }
@@ -363,6 +373,7 @@ fn createTestExe(
 /// Creates a module for a library.
 fn createModule(
     b: *std.Build,
+    library_description: LibraryDescription,
     lazy_path: std.Build.LazyPath,
     options: Options,
     target: CascadeTarget,
@@ -372,6 +383,29 @@ fn createModule(
     const module = b.createModule(.{
         .root_source_file = lazy_path,
     });
+
+    addDependenciesToModule(
+        module,
+        library_description,
+        options,
+        target,
+        dependencies,
+        build_for_cascade,
+    );
+
+    return module;
+}
+
+fn addDependenciesToModule(
+    module: *std.Build.Module,
+    library_description: LibraryDescription,
+    options: Options,
+    target: CascadeTarget,
+    dependencies: []const *Library,
+    build_for_cascade: bool,
+) void {
+    // self reference
+    module.addImport(library_description.name, module);
 
     if (build_for_cascade) {
         module.addImport("cascade_flag", options.cascade_os_options_module);
@@ -387,6 +421,4 @@ fn createModule(
 
         module.addImport(dependency.name, dependency_module);
     }
-
-    return module;
 }

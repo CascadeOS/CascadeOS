@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-const std = @import("std");
 const core = @import("core");
-
-const fs = @import("fs.zig");
+const fs = @import("fs");
+const std = @import("std");
 
 /// FAT12 file allocation table entry.
 pub const FAT12Entry = enum(u12) {

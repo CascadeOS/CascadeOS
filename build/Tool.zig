@@ -171,15 +171,7 @@ fn createExe(
         .target = b.host,
     });
 
-    for (dependencies) |dep| {
-        const module = dep.non_cascade_module_for_host orelse {
-            std.debug.panic(
-                "tool '{s}' depends on '{s}' that does not support the host architecture.\n",
-                .{ tool_description.name, dep.name },
-            );
-        };
-        exe.root_module.addImport(dep.name, module);
-    }
+    addDependenciesToModule(&exe.root_module, tool_description, dependencies);
 
     return exe;
 }
@@ -195,15 +187,26 @@ fn createTestExe(
         .root_source_file = lazy_path,
     });
 
+    addDependenciesToModule(&test_exe.root_module, tool_description, dependencies);
+
+    return test_exe;
+}
+
+fn addDependenciesToModule(
+    module: *std.Build.Module,
+    tool_description: ToolDescription,
+    dependencies: []const *Library,
+) void {
+    // self reference
+    module.addImport(tool_description.name, module);
+
     for (dependencies) |dep| {
-        const module = dep.non_cascade_module_for_host orelse {
+        const dep_module = dep.non_cascade_module_for_host orelse {
             std.debug.panic(
                 "tool '{s}' depends on '{s}' that does not support the host architecture.\n",
                 .{ tool_description.name, dep.name },
             );
         };
-        test_exe.root_module.addImport(dep.name, module);
+        module.addImport(dep.name, dep_module);
     }
-
-    return test_exe;
 }

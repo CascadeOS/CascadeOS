@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
-const core = @import("core.zig");
+const core = @import("core");
 
 /// Asserts that the size and bit size of the given type matches the expected size.
 pub inline fn expectSize(comptime T: type, comptime bytes: comptime_int) void {

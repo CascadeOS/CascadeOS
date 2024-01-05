@@ -2,12 +2,10 @@
 
 // TODO: This file is *very* WIP.
 
-const std = @import("std");
 const core = @import("core");
-
+const fs = @import("fs");
+const std = @import("std");
 const UUID = @import("uuid").UUID;
-
-const fs = @import("fs.zig");
 
 pub const signature: u16 = 0xef53;
 

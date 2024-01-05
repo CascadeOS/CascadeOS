@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 const std = @import("std");
-const core = @import("core.zig");
+const core = @import("core");
 
 /// Represents a size in bytes.
 pub const Size = extern struct {
