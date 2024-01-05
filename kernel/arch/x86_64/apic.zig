@@ -15,59 +15,11 @@ pub var lapic_ptr: [*]volatile u8 = undefined;
 /// Initialized in `init.initApic`
 var x2apic: bool = false;
 
-const VersionRegister = packed struct(u32) {
-    version: u8,
-
-    _reserved1: u8,
-
-    /// The number of LVT entries minus 1.
-    max_lvt_entry: u8,
-
-    /// Indicates whether software can inhibit the broadcast of EOI messages.
-    supports_eoi_broadcast_suppression: bool,
-
-    _reserved2: u7,
-
-    pub fn read() VersionRegister {
-        return @bitCast(readRegister(.version));
-    }
-};
-
-const SupriousInterruptRegister = packed struct(u32) {
-    /// The vector number to be delivered to the processor when the local APIC generates a spurious vector.
-    spurious_vector: u8,
-
-    /// Indicates whether the local APIC is enabled.
-    apic_enable: bool,
-
-    /// Is focus processor checking enabled when using lowest-priority delivery mode.
-    ///
-    /// In Pentium 4 and Intel Xeon processors, this bit is reserved and should be set to `false`.
-    focus_processor_checking: bool = false,
-
-    _reserved1: u2 = 0,
-
-    /// Determines whether an EOI for a level-triggered interrupt causes EOI messages to be broadcast to the I/O APICs or not.
-    ///
-    /// The default value is `false`, indicating that EOI broadcasts are performed.
-    ///
-    /// This is reserved to `false` if the processor does not support EOI-broadcast suppression.
-    eoi_broadcast_suppression: bool = false,
-
-    _reserved2: u19 = 0,
-
-    pub fn read() SupriousInterruptRegister {
-        return @bitCast(readRegister(.spurious_interrupt));
-    }
-
-    pub fn write(self: SupriousInterruptRegister) void {
-        writeRegister(.spurious_interrupt, @bitCast(self));
-    }
-};
 
 pub const init = struct {
     pub fn initApic(_: *kernel.Processor) linksection(kernel.info.init_code) void {
         x2apic = kernel.boot.x2apicEnabled();
+        if (x2apic) log.debug("x2apic mode", .{}) else log.debug("xapic mode", .{});
 
         const version = VersionRegister.read();
         log.debug("version register: {}", .{version});
@@ -79,9 +31,55 @@ pub const init = struct {
         spurious_interrupt_register.write();
     }
 
-    fn getLapicBase() linksection(kernel.info.init_code) kernel.PhysicalAddress {
-        return kernel.PhysicalAddress.fromInt(x86_64.registers.IA32_APIC_BASE_MSR.read() & 0xfffff000);
-    }
+    const VersionRegister = packed struct(u32) {
+        version: u8,
+
+        _reserved1: u8,
+
+        /// The number of LVT entries minus 1.
+        max_lvt_entry: u8,
+
+        /// Indicates whether software can inhibit the broadcast of EOI messages.
+        supports_eoi_broadcast_suppression: bool,
+
+        _reserved2: u7,
+
+        pub fn read() linksection(kernel.info.init_code) VersionRegister {
+            return @bitCast(readRegister(.version));
+        }
+    };
+
+    const SupriousInterruptRegister = packed struct(u32) {
+        /// The vector number to be delivered to the processor when the local APIC generates a spurious vector.
+        spurious_vector: u8,
+
+        /// Indicates whether the local APIC is enabled.
+        apic_enable: bool,
+
+        /// Is focus processor checking enabled when using lowest-priority delivery mode.
+        ///
+        /// In Pentium 4 and Intel Xeon processors, this bit is reserved and should be set to `false`.
+        focus_processor_checking: bool = false,
+
+        _reserved1: u2 = 0,
+
+        /// Determines whether an EOI for a level-triggered interrupt causes EOI messages to be broadcast to the I/O APICs or not.
+        ///
+        /// The default value is `false`, indicating that EOI broadcasts are performed.
+        ///
+        /// This is reserved to `false` if the processor does not support EOI-broadcast suppression.
+        eoi_broadcast_suppression: bool = false,
+
+        _reserved2: u19 = 0,
+
+        pub fn read() linksection(kernel.info.init_code) SupriousInterruptRegister {
+            return @bitCast(readRegister(.spurious_interrupt));
+        }
+
+        pub fn write(self: SupriousInterruptRegister) linksection(kernel.info.init_code) void {
+            writeRegister(.spurious_interrupt, @bitCast(self));
+        }
+    };
 };
 
 fn readRegister(register: LAPICRegister) u32 {
