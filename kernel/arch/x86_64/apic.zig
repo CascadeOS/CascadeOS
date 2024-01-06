@@ -15,12 +15,6 @@ pub var lapic_ptr: [*]volatile u8 = undefined;
 /// Initialized in `init.initApic`
 var x2apic: bool = false;
 
-/// Initialized in `init.initApic`
-var force_apic_cluster_model: bool = false;
-
-/// Initialized in `init.initApic`
-var force_apic_physical_destination_mode: bool = false;
-
 /// Signal end of interrupt.
 ///
 /// For all interrupts except those delivered with the NMI, SMI, INIT, ExtINT, the start-up, or INIT-Deassert delivery
@@ -44,6 +38,13 @@ pub const init = struct {
         const version = VersionRegister.read();
         log.debug("version register: {}", .{version});
 
+        // Set the TPR `priority_class` to 2 as that is the lowest priority that does not overlap with
+        // exceptions/PIC interrupts.
+        TaskPriorityRegister.write(.{
+            .priority_sub_class = 0,
+            .priority_class = 2,
+        });
+
         const spurious_interrupt_register: SupriousInterruptRegister = .{
             .apic_enable = true,
             .spurious_vector = @intFromEnum(x86_64.interrupts.IdtVector.spurious_interrupt),
@@ -51,16 +52,12 @@ pub const init = struct {
         spurious_interrupt_register.write();
     }
 
-    fn captureFADTInformation() void {
+    fn captureFADTInformation() linksection(kernel.info.init_code) void {
         const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
 
         const fixed_feature_flags = fadt.fixed_feature_flags;
 
-        force_apic_cluster_model = fixed_feature_flags.FORCE_APIC_CLUSTER_MODEL;
-        log.debug("force apic cluster model: {}", .{force_apic_cluster_model});
-
-        force_apic_physical_destination_mode = fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE;
-        log.debug("force apic physical destination mode: {}", .{force_apic_physical_destination_mode});
+        if (fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) core.panic("physical destination mode is forced");
     }
 
     /// Local APIC Version Register
@@ -122,18 +119,31 @@ pub const init = struct {
     };
 
     /// LVT Timer Register
+    ///
+    /// The timer can be configured through the timer LVT entry for one-shot or periodic operation.
+    ///
+    /// In one-shot mode, the timer is started by programming its initial-count register. The initial count value is
+    /// then copied into the current count register and count-down begins.
+    /// After the timer reaches zero, a timer interrupt is generated and the timer remains at its 0 value until reprogrammed.
+    ///
+    /// In periodic mode, the timer is started by writing to the initial-count register (as in one-shot mode), and the
+    /// value written is copied into the current-count register, which counts down.
+    /// The current-count register is automatically reloaded from the initial-count register when the count reaches 0
+    /// and a timer interrupt is generated, and the count-down is repeated.
+    /// If during the count-down process the initial-count register is set, counting will restart, using the new
+    /// initial-count value.
     const LVTTimerRegister = packed struct(u32) {
         /// Interrupt vector number.
         vector: u8,
 
-        _reserved1: u4,
+        _reserved1: u4 = 0,
 
         /// Indicates the interrupt delivery status.
         ///
         /// Read Only
         status: DeliveryStatus,
 
-        _reserved2: u3,
+        _reserved2: u3 = 0,
 
         /// Interrupt mask: `false` enables reception of the interrupt and `true` inhibits reception of the interrupt.
         ///
@@ -148,7 +158,7 @@ pub const init = struct {
         /// The timer mode.
         timer_mode: TimerMode,
 
-        _reserved3: u13,
+        _reserved3: u13 = 0,
 
         pub const TimerMode = enum(u2) {
             /// One-shot mode using a count-down value.
@@ -158,6 +168,39 @@ pub const init = struct {
             periodic = 0b01,
 
             /// TSC-Deadline mode using absolute target value in IA32_TSC_DEADLINE MSR.
+            ///
+            /// TSC-deadline mode allows software to use the local APIC timer to signal an interrupt at an absolute time.
+            ///
+            /// In TSC-deadline mode, writes to the initial-count register are ignored; and current-count register
+            /// always reads 0.
+            ///
+            /// Instead, timer behavior is controlled using the IA32_TSC_DEADLINE MSR.
+            ///
+            /// The IA32_TSC_DEADLINE MSR (MSR address 6E0H) is a per-logical processor MSR that specifies the time at
+            /// which a timer interrupt should occur.
+            /// Writing a non-zero 64-bit value into IA32_TSC_DEADLINE arms the timer.
+            /// An interrupt is generated when the logical processor’s time-stamp counter equals or exceeds the target
+            /// value in the IA32_TSC_DEADLINE MSR.
+            ///
+            /// When the timer generates an interrupt, it disarms itself and clears the IA32_TSC_DEADLINE MSR.
+            /// Thus, each write to the IA32_TSC_DEADLINE MSR generates at most one timer interrupt.
+            ///
+            /// In TSC-deadline mode, writing 0 to the IA32_TSC_DEADLINE MSR disarms the local-APIC timer.
+            ///
+            /// Transitioning between TSC-deadline mode and other timer modes also disarms the timer.
+            ///
+            /// If software disarms the timer or postpones the deadline, race conditions may result in the delivery of
+            /// a spurious timer interrupt.
+            /// Software is expected to detect such spurious interrupts by checking the current value of the time-stamp
+            /// counter to confirm that the interrupt was desired.
+            ///
+            /// In xAPIC mode (in which the local-APIC registers are memory-mapped), software must order the
+            /// memory-mapped write to the LVT entry that enables TSC-deadline mode and any subsequent WRMSR to the
+            /// IA32_TSC_DEADLINE MSR.
+            /// Software can assure proper ordering by executing the MFENCE instruction after the memory-mapped write
+            /// and before any WRMSR.
+            /// (In x2APIC mode, the WRMSR instruction is used to write to the LVT entry. The processor ensures the
+            /// ordering of this write and any subsequent WRMSR to the deadline; no fencing is required.)
             tsc_deadline = 0b10,
 
             _,
@@ -187,7 +230,7 @@ pub const init = struct {
         /// Read Only
         status: DeliveryStatus,
 
-        _reserved2: u3,
+        _reserved2: u3 = 0,
 
         /// Interrupt mask: `false` enables reception of the interrupt and `true` inhibits reception of the interrupt.
         ///
@@ -199,7 +242,7 @@ pub const init = struct {
         /// It can be cleared only by software.
         masked: bool,
 
-        _reserved3: u16,
+        _reserved3: u16 = 0,
 
         pub fn read() linksection(kernel.info.init_code) LVTErrorRegister {
             return @bitCast(readRegister(.lvt_error));
@@ -209,6 +252,391 @@ pub const init = struct {
             writeRegister(.lvt_error, @bitCast(self));
         }
     };
+
+    /// Divide Configuration Register
+    ///
+    /// The APIC timer frequency will be the processor’s bus clock or core crystal clock frequency (when TSC/core
+    /// crystal clock ratio is enumerated in CPUID leaf 0x15) divided by the value specified in the divide configuration
+    /// register.
+    const DivideConfigurationRegister = enum(u32) {
+        /// Divide by 2
+        @"2" = 0b0000,
+
+        /// Divide by 4
+        @"4" = 0b0001,
+
+        /// Divide by 8
+        @"8" = 0b0010,
+
+        /// Divide by 16
+        @"16" = 0b0011,
+
+        /// Divide by 32
+        @"32" = 0b1000,
+
+        /// Divide by 64
+        @"64" = 0b1001,
+
+        /// Divide by 128
+        @"128" = 0b1010,
+
+        /// Divide by 1
+        @"1" = 0b1011,
+
+        pub fn read() linksection(kernel.info.init_code) DivideConfigurationRegister {
+            return @enumFromInt(readRegister(.divide_configuration));
+        }
+
+        pub fn write(self: DivideConfigurationRegister) linksection(kernel.info.init_code) void {
+            writeRegister(.divide_configuration, @intFromEnum(self));
+        }
+    };
+
+    /// In x2APIC mode, the Logical Destination Register (LDR) is increased to 32 bits wide and is read-only.
+    pub const LogicalDestinationRegister = packed union {
+        xapic: packed struct(u32) {
+            _reserved: u24 = 0,
+
+            /// The 8-bit logical APIC ID used to create an identifier that can be compared with the MDA.
+            logical_apic_id: u8,
+        },
+
+        x2apic: packed struct(u32) {
+            /// The 32-bit logical APIC ID used to create an identifier that can be compared with the MDA.
+            ///
+            /// The 32-bit logical x2APIC ID field of LDR is partitioned into two sub-fields:
+            ///  - Cluster ID (LDR[31:16]): is the address of the destination cluster
+            ///  - Logical ID (LDR[15:0]): defines a logical ID of the individual local x2APIC within the cluster specified
+            ///    by LDR[31:16].
+            logical_apic_id: u32,
+        },
+
+        pub fn read() linksection(kernel.info.init_code) LogicalDestinationRegister {
+            return @bitCast(readRegister(.logical_destination));
+        }
+
+        pub fn write(self: LogicalDestinationRegister) linksection(kernel.info.init_code) void {
+            core.debugAssert(!x2apic); // read only in x2APIC mode
+            writeRegister(.logical_destination, @bitCast(self));
+        }
+    };
+
+    /// This register selects one of two models (flat or cluster) that can be used to interpret the MDA when using
+    /// logical destination mode.
+    ///
+    /// NOTE: All processors that have their APIC software enabled (using the spurious vector enable/disable bit) must
+    /// have their DFRs (Destination Format Registers) programmed identically.
+    ///
+    /// The default mode for DFR is flat mode.
+    ///
+    /// If you are using cluster mode, DFRs must be programmed before the APIC is software enabled.
+    ///
+    /// Since some chipsets do not accurately track a system view of the logical mode, program DFRs as soon as possible
+    /// after starting the processor.
+    ///
+    /// Not supported in x2APIC mode, where the destination mode is always cluster.
+    pub const DestinationFormatRegister = packed struct(u32) {
+        _reserved: u24 = std.math.maxInt(u24),
+
+        model: Model,
+
+        pub const Model = enum(u4) {
+            /// This model supports two basic destination schemes:
+            ///  - flat cluster
+            ///  - hierarchical cluster
+            ///
+            /// The flat cluster destination model is only supported for P6 family and Pentium processors.
+            /// Using this model, all APICs are assumed to be connected through the APIC bus.
+            /// Bits 60 through 63 of the MDA contains the encoded address of the destination cluster and bits 56
+            /// through 59 identify up to four local APICs within the cluster (each bit is assigned to one local APIC in
+            /// the cluster, as in the flat connection model).
+            /// To identify one or more local APICs, bits 60 through 63 of the MDA are compared with bits 28 through 31
+            /// of the LDR to determine if a local APIC is part of the cluster.
+            /// Bits 56 through 59 of the MDA are compared with Bits 24 through 27 of the LDR to identify a local APICs
+            /// within the cluster.
+            /// Sets of processors within a cluster can be specified by writing the target cluster address in bits 60
+            /// through 63 of the MDA and setting selected bits in bits 56 through 59 of the MDA, corresponding to the
+            /// chosen members of the cluster.
+            /// In this mode, 15 clusters (with cluster addresses of 0 through 14) each having 4 local APICs can be
+            /// specified in the message.
+            /// For the P6 and Pentium processor's local APICs, however, the APIC arbitration ID supports only 15 APIC
+            /// agents.
+            /// Therefore, the total number of processors and their local APICs supported in this mode is limited to 15.
+            /// Broadcast to all local APICs is achieved by setting all destination bits to one.
+            /// This guarantees a match on all clusters and selects all APICs in each cluster.
+            /// A broadcast IPI or I/O subsystem broadcast interrupt with lowest priority delivery mode is not supported
+            /// n cluster mode and must not be configured by software.
+            ///
+            /// The hierarchical cluster destination model can be used with Pentium 4, Intel Xeon, P6 family, or Pentium
+            /// processors.
+            /// With this model, a hierarchical network can be created by connecting different flat clusters via
+            /// independent system or APIC buses.
+            ///
+            /// This scheme requires a cluster manager within each cluster, which is responsible for handling message
+            /// passing between system or APIC buses.
+            ///
+            /// One cluster contains up to 4 agents. Thus 15 cluster managers, each with 4 agents, can form a network of
+            /// up to 60 APIC agents. Note that hierarchical APIC networks requires a special cluster manager device,
+            /// which is not part of the local or the I/O APIC units.
+            cluster = 0b0000,
+
+            /// Here, a unique logical APIC ID can be established for up to 8 local APICs by setting a different bit in
+            /// the logical APIC ID field of the LDR for each local APIC.
+            ///
+            /// A group of local APICs can then be selected by setting one or more bits in the MDA.
+            ///
+            /// Each local APIC performs a bit-wise AND of the MDA and its logical APIC ID.
+            /// If a true condition (non-zero) is detected, the local APIC accepts the IPI message.
+            ///
+            /// A broadcast to all APICs is achieved by setting the MDA to 1s.
+            flat = 0b1111,
+        };
+
+        pub fn read() linksection(kernel.info.init_code) LogicalDestinationRegister {
+            core.debugAssert(!x2apic); // not supported in x2APIC mode
+            return @bitCast(readRegister(.logical_destination));
+        }
+
+        pub fn write(self: LogicalDestinationRegister) linksection(kernel.info.init_code) void {
+            core.debugAssert(!x2apic); // not supported in x2APIC mode
+            writeRegister(.logical_destination, @bitCast(self));
+        }
+    };
+};
+
+/// The task priority allows software to set a priority threshold for interrupting the processor.
+///
+/// This mechanism enables the operating system to temporarily block low priority interrupts from disturbing
+/// high-priority work that the processor is doing.
+///
+/// The ability to block such interrupts using task priority results from the way that the TPR controls the value of the
+/// processor-priority register (PPR).
+pub const TaskPriorityRegister = packed struct(u32) {
+    priority_sub_class: u4,
+
+    priority_class: u4,
+
+    _reserved: u24 = 0,
+
+    pub fn read() TaskPriorityRegister {
+        return @bitCast(readRegister(.task_priority));
+    }
+
+    pub fn write(self: TaskPriorityRegister) void {
+        writeRegister(.task_priority, @bitCast(self));
+    }
+};
+
+/// In one-shot mode, the timer is started by programming its initial-count register. The initial count value is
+/// then copied into the current count register and count-down begins.
+/// After the timer reaches zero, a timer interrupt is generated and the timer remains at its 0 value until reprogrammed.
+///
+/// In periodic mode, the timer is started by writing to the initial-count register (as in one-shot mode), and the
+/// value written is copied into the current-count register, which counts down.
+/// The current-count register is automatically reloaded from the initial-count register when the count reaches 0
+/// and a timer interrupt is generated, and the count-down is repeated.
+/// If during the count-down process the initial-count register is set, counting will restart, using the new
+/// initial-count value.
+///
+/// A write of 0 to the initial-count register effectively stops the local APIC timer, in both one-shot and periodic mode.
+pub const InitialCountRegister = struct {
+    pub fn read() linksection(kernel.info.init_code) u32 {
+        return readRegister(.initial_count);
+    }
+
+    pub fn write(count: u32) linksection(kernel.info.init_code) void {
+        writeRegister(.initial_count, count);
+    }
+};
+
+/// The primary local APIC facility for issuing IPIs is the interrupt command register (ICR).
+///
+/// The ICR can be used for the following functions:
+///  - To send an interrupt to another processor.
+///  - To allow a processor to forward an interrupt that it received but did not service to another processor for
+///    servicing.
+///  - To direct the processor to interrupt itself (perform a self interrupt).
+///  - To deliver special IPIs, such as the start-up IPI (SIPI) message, to other processors.
+///
+/// Interrupts generated with this facility are delivered to the other processors in the system through the system bus
+/// (for Pentium 4 and Intel Xeon processors) or the APIC bus (for P6 family and Pentium processors).
+///
+/// The ability for a processor to send a lowest priority IPI is model specific and should be avoided by BIOS and
+/// operating system software.
+///
+/// To send an IPI, software must set up the ICR to indicate the type of IPI message to be sent and the destination
+/// processor or processors.
+///
+/// The act of writing to the low doubleword of the ICR causes the IPI to be sent.
+pub const InterruptCommandRegister = packed struct(u64) {
+    /// The vector number of the interrupt being sent.
+    vector: x86_64.interrupts.IdtVector,
+
+    /// Specifies the type of IPI to be sent.
+    delivery_mode: DeliveryMode,
+
+    /// Specifies the destination mode to use.
+    destination_mode: DestinationMode,
+
+    /// Indicates the IPI delivery status.
+    ///
+    /// Reserved in x2APIC mode.
+    delivery_status: DeliveryStatus,
+
+    _reserved1: u1 = 0,
+
+    /// For the INIT level de-assert delivery mode this flag must be set to 0; for all other delivery modes it must be
+    /// set to 1.
+    ///
+    ///
+    /// This flag has no meaning in Pentium 4 and Intel Xeon processors, and will always be issued as `assert`.
+    level: Level,
+
+    /// Selects the trigger mode when using the INIT level de-assert delivery mode.
+    ///
+    /// It is ignored for all other delivery modes.
+    ///
+    /// This flag has no meaning in Pentium 4 and Intel Xeon processors, and will always be issued as `edge`.
+    trigger_mode: TriggerMode,
+
+    _reserved2: u2 = 0,
+
+    /// Indicates whether a shorthand notation is used to specify the destination of the interrupt and, if so, which
+    /// shorthand is used.
+    ///
+    /// Destination shorthands are used in place of the 8-bit destination field, and can be sent by software using a
+    /// single write to the low doubleword of the ICR.
+    destination_shorthand: DestinationShorthand,
+
+    _reserved3: u12 = 0,
+
+    /// Specifies the target processor or processors.
+    ///
+    /// This field is only used when the `destination_shorthand` field is set to `.no_shorthand`.
+    ///
+    /// If `destination_mode` is set to `.physical`, then bits 56 through 59 contain the APIC ID of the target processor
+    /// for Pentium and P6 family processors and bits 56 through 63 contain the APIC ID of the target processor the for
+    /// Pentium 4 and Intel Xeon processors.
+    ///
+    /// If the `destination_mode` is set to `.logical`, the interpretation of the 8-bit destination field depends on the
+    /// settings of the DFR and LDR registers of the local APICs in all the processors in the system.
+    ///
+    /// The destination field is expanded to 32 bits in x2APIC mode.
+    ///
+    /// In x2APIC mode a destination value of FFFF_FFFFH is used for broadcast of interrupts in both logical destination
+    /// and physical destination modes.
+    destination_field: Destination,
+
+    pub const Destination = packed union {
+        xapic: packed struct(u32) {
+            _reserved: u24 = 0,
+            destination: u8,
+        },
+        x2apic: packed struct {
+            destination: u32,
+        },
+    };
+
+    pub const DestinationShorthand = enum(u2) {
+        /// The destination is specified in the destination field.
+        no_shorthand = 0b00,
+
+        /// The issuing APIC is the one and only destination of the IPI.
+        ///
+        /// This destination shorthand allows software to interrupt the processor on which it is executing.
+        ///
+        /// An APIC implementation is free to deliver the self-interrupt message internally or to issue the message to
+        /// the bus and "snoop" it as with any other IPI message.
+        self = 0b01,
+
+        /// The IPI is sent to all processors in the system including the processor sending the IPI.
+        ///
+        /// The APIC will broadcast an IPI message with the destination field set to FH for Pentium and P6 family
+        /// processors and to FFH for Pentium 4 and Intel Xeon processors.
+        all_including_self = 0b10,
+
+        /// The IPI is sent to all processors in a system with the exception of the processor sending the IPI.
+        ///
+        /// The APIC broadcasts a message with the physical destination mode and destination field set to FH for Pentium
+        /// and P6 family processors and to FFH for Pentium 4 and Intel Xeon processors.
+        ///
+        /// Support for this destination shorthand in conjunction with the lowest-priority delivery mode is model
+        /// specific.
+        ///
+        /// For Pentium 4 and Intel Xeon processors, when this shorthand is used together with lowest priority delivery
+        /// mode, the IPI may be redirected back to the issuing processor.
+        all_excluding_self = 0b11,
+    };
+
+    pub const DestinationMode = enum(u1) {
+        /// In physical destination mode, the destination processor is specified by its local APIC ID.
+        ///
+        /// For Pentium 4 and Intel Xeon processors, either a single destination (local APIC IDs 00H through FEH) or a
+        /// broadcast to all APICs (the APIC ID is FFH) may be specified in physical destination mode.
+        ///
+        /// A broadcast IPI (bits 28-31 of the MDA are 1's) or I/O subsystem initiated interrupt with lowest priority
+        /// delivery mode is not supported in physical destination mode and must not be configured by software.
+        ///
+        /// Also, for any non-broadcast IPI or I/O subsystem initiated interrupt with lowest priority delivery mode,
+        /// software must ensure that APICs defined in the interrupt address are present and enabled to receive interrupts.
+        ///
+        /// For the P6 family and Pentium processors, a single destination is specified in physical destination mode
+        /// with a local APIC ID of 0H through 0EH, allowing up to 15 local APICs to be addressed on the APIC bus.
+        ///
+        /// A broadcast to all local APICs is specified with 0FH.
+        physical = 0,
+
+        /// In logical destination mode, IPI destination is specified using an 8-bit message destination address (MDA),
+        /// which is entered in the destination field of the ICR.
+        ///
+        /// Upon receiving an IPI message that was sent using logical destination mode, a local APIC compares the MDA in
+        /// the message with the values in its LDR and DFR to determine if it should accept and handle the IPI.
+        ///
+        /// For both configurations of logical destination mode, when combined with lowest priority delivery mode,
+        /// software is responsible for ensuring that all of the local APICs included in or addressed by the IPI or I/O
+        /// subsystem interrupt are present and enabled to receive the interrupt.
+        logical = 1,
+    };
+
+    pub const Level = enum(u1) {
+        deassert = 0,
+        assert = 1,
+    };
+
+    pub const TriggerMode = enum(u1) {
+        edge = 0,
+        level = 1,
+    };
+
+    pub fn read() InterruptCommandRegister {
+        if (x2apic) {
+            return @bitCast(
+                x86_64.registers.readMSR(u64, LAPICRegister.interrupt_command_0_31.x2apicRegister()),
+            );
+        }
+
+        const low: u64 = readRegister(.interrupt_command_0_31);
+        const high: u64 = readRegister(.interrupt_command_32_63);
+
+        return @bitCast(high << 32 | low);
+    }
+
+    pub fn write(self: InterruptCommandRegister) void {
+        if (x2apic) {
+            x86_64.registers.writeMSR(
+                u64,
+                LAPICRegister.interrupt_command_0_31.x2apicRegister(),
+                @bitCast(self),
+            );
+            return;
+        }
+
+        const value: u64 = @bitCast(self);
+
+        writeRegister(.interrupt_command_32_63, @truncate(value >> 32));
+        @fence(.SeqCst);
+        writeRegister(.interrupt_command_0_31, @truncate(value));
+    }
 };
 
 /// The local APIC records errors detected during interrupt handling in the error status register (ESR).
