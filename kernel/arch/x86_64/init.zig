@@ -118,6 +118,14 @@ pub fn configureGlobalSystemFeatures() linksection(kernel.info.init_code) void {
         log.debug("disabling pic", .{});
         disablePic();
     }
+}
+
+pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
+    core.debugAssert(processor == x86_64.getProcessor());
+
+    if (x86_64.arch_info.rdtscp) {
+        x86_64.registers.IA32_TSC_AUX.write(@intFromEnum(processor.id));
+    }
 
     // CR0
     {
@@ -143,14 +151,6 @@ pub fn configureGlobalSystemFeatures() linksection(kernel.info.init_code) void {
         efer.write();
 
         log.debug("EFER set", .{});
-    }
-}
-
-pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
-    core.debugAssert(processor == x86_64.getProcessor());
-
-    if (x86_64.arch_info.rdtscp) {
-        x86_64.registers.IA32_TSC_AUX.write(@intFromEnum(processor.id));
     }
 }
 

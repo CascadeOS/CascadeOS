@@ -49,7 +49,7 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     log.info("capturing system information", .{});
     kernel.arch.init.captureSystemInformation();
 
-    log.info("configuring system features", .{});
+    log.info("configuring global system features", .{});
     kernel.arch.init.configureGlobalSystemFeatures();
 
     log.info("initializing physical memory", .{});
@@ -72,13 +72,18 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
 fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_code) noreturn {
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     kernel.arch.init.loadProcessor(processor);
+
+    log.info("configuring processor-local system features", .{});
     kernel.arch.init.configureSystemFeaturesForCurrentProcessor(processor);
+
+    log.info("configuring local interrupt controller", .{});
     kernel.arch.init.initLocalInterruptController(processor);
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         kernel.VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
 
+    log.info("leaving bootloader provided stack", .{});
     kernel.arch.scheduling.changeStackAndReturn(idle_stack_pointer);
     unreachable;
 }
@@ -123,8 +128,6 @@ fn kernelInitStage3() noreturn {
 
     // now that the init only mappings are gone we reload the page table
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
-
-    // TODO: Flush TLB
 
     log.debug("entering scheduler on processor {}", .{processor.id});
     _ = kernel.scheduler.lock.lock();
