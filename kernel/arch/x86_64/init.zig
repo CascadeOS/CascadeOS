@@ -8,7 +8,7 @@ const SerialPort = @import("SerialPort.zig");
 
 const log = kernel.debug.log.scoped(.init_x86_64);
 
-pub const initLocalInterruptController = x86_64.apic.init.initApic;
+pub const initLocalInterruptController = x86_64.apic.init.initApicOnProcessor;
 
 pub const EarlyOutputWriter = SerialPort.Writer;
 var early_output_serial_port: ?SerialPort = null; // TODO: Put in init_data section
@@ -81,29 +81,25 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 
+    const madt = kernel.acpi.init.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
+    const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
+
     log.debug("capturing FADT information", .{});
-    captureFADTInformation();
+    captureFADTInformation(fadt);
 
     log.debug("capturing MADT information", .{});
-    captureMADTInformation();
+    captureMADTInformation(madt);
+
+    log.debug("capturing APIC information", .{});
+    x86_64.apic.init.captureApicInformation(fadt, madt);
 }
 
-fn captureMADTInformation() linksection(kernel.info.init_code) void {
-    const madt = kernel.acpi.init.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
-
-    x86_64.apic.lapic_ptr = kernel.PhysicalAddress
-        .fromInt(madt.local_interrupt_controller_address)
-        .toNonCachedDirectMap()
-        .toPtr([*]volatile u8);
-    log.debug("lapic address: {*}", .{x86_64.apic.lapic_ptr});
-
+fn captureMADTInformation(madt: *const kernel.acpi.MADT) linksection(kernel.info.init_code) void {
     x86_64.arch_info.have_pic = madt.flags.PCAT_COMPAT;
     log.debug("have pic: {}", .{x86_64.arch_info.have_pic});
 }
 
-fn captureFADTInformation() linksection(kernel.info.init_code) void {
-    const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
-
+fn captureFADTInformation(fadt: *const kernel.acpi.FADT) linksection(kernel.info.init_code) void {
     const flags = fadt.IA_PC_BOOT_ARCH;
 
     x86_64.arch_info.have_ps2_controller = flags.@"8042";

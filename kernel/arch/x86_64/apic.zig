@@ -10,9 +10,9 @@ const log = kernel.debug.log.scoped(.apic);
 /// The local APIC pointer used when in xAPIC mode.
 ///
 /// Initialized in `x86_64.init.captureMADTInformation`.
-pub var lapic_ptr: [*]volatile u8 = undefined;
+var lapic_ptr: [*]volatile u8 = undefined;
 
-/// Initialized in `init.initApic`
+/// Initialized in `init.captureApicInformation`
 var x2apic: bool = false;
 
 /// Signal end of interrupt.
@@ -28,13 +28,42 @@ pub fn eoi() void {
     writeRegister(.eoi, 0);
 }
 
+/// Set the task priority to the given priority.
+pub fn setTaskPriority(priority: kernel.scheduler.Priority) void {
+    // Set the TPR `priority_class` to 2 as that is the lowest priority that does not overlap with
+    // exceptions/PIC interrupts.
+    TaskPriorityRegister.write(.{
+        .priority_sub_class = @intFromEnum(priority),
+        .priority_class = 2,
+    });
+
+    log.debug("set task priority to: {s}", .{@tagName(priority)});
+}
+
 pub const init = struct {
-    pub fn initApic(_: *kernel.Processor) linksection(kernel.info.init_code) void {
+    pub fn captureApicInformation(
+        fadt: *const kernel.acpi.FADT,
+        madt: *const kernel.acpi.MADT,
+    ) linksection(kernel.info.init_code) void {
         x2apic = kernel.boot.x2apicEnabled();
-        if (x2apic) log.debug("x2apic mode", .{}) else log.debug("xapic mode", .{});
+        if (x2apic) {
+            log.debug("x2apic mode", .{});
+        } else {
+            log.debug("xapic mode", .{});
 
-        captureFADTInformation();
+            lapic_ptr = kernel.PhysicalAddress
+                .fromInt(madt.local_interrupt_controller_address)
+                .toNonCachedDirectMap()
+                .toPtr([*]volatile u8);
+            log.debug("lapic address: {*}", .{lapic_ptr});
+        }
 
+        if (fadt.fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) {
+            core.panic("physical destination mode is forced");
+        }
+    }
+
+    pub fn initApicOnProcessor(_: *kernel.Processor) linksection(kernel.info.init_code) void {
         setTaskPriority(.idle);
 
         const spurious_interrupt_register: SupriousInterruptRegister = .{
@@ -42,14 +71,6 @@ pub const init = struct {
             .spurious_vector = @intFromEnum(x86_64.interrupts.IdtVector.spurious_interrupt),
         };
         spurious_interrupt_register.write();
-    }
-
-    fn captureFADTInformation() linksection(kernel.info.init_code) void {
-        const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
-
-        const fixed_feature_flags = fadt.fixed_feature_flags;
-
-        if (fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) core.panic("physical destination mode is forced");
     }
 
     /// Local APIC Version Register
@@ -285,7 +306,7 @@ pub const init = struct {
     };
 
     /// In x2APIC mode, the Logical Destination Register (LDR) is increased to 32 bits wide and is read-only.
-    pub const LogicalDestinationRegister = packed union {
+    const LogicalDestinationRegister = packed union {
         xapic: packed struct(u32) {
             _reserved: u24 = 0,
 
@@ -327,8 +348,8 @@ pub const init = struct {
     /// after starting the processor.
     ///
     /// Not supported in x2APIC mode, where the destination mode is always cluster.
-    pub const DestinationFormatRegister = packed struct(u32) {
-        _reserved: u24 = std.math.maxInt(u24),
+    const DestinationFormatRegister = packed struct(u32) {
+        _reserved: u28 = std.math.maxInt(u28),
 
         model: Model,
 
@@ -384,31 +405,19 @@ pub const init = struct {
             flat = 0b1111,
         };
 
-        pub fn read() linksection(kernel.info.init_code) LogicalDestinationRegister {
+        pub fn read() linksection(kernel.info.init_code) DestinationFormatRegister {
             core.debugAssert(!x2apic); // not supported in x2APIC mode
             return @bitCast(readRegister(.logical_destination));
         }
 
-        pub fn write(self: LogicalDestinationRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: DestinationFormatRegister) linksection(kernel.info.init_code) void {
             core.debugAssert(!x2apic); // not supported in x2APIC mode
             writeRegister(.logical_destination, @bitCast(self));
         }
     };
 };
 
-/// Set the task priority to the given priority.
-pub fn setTaskPriority(priority: kernel.scheduler.Priority) void {
-    // Set the TPR `priority_class` to 2 as that is the lowest priority that does not overlap with
-    // exceptions/PIC interrupts.
-    TaskPriorityRegister.write(.{
-        .priority_sub_class = @intFromEnum(priority),
-        .priority_class = 2,
-    });
-
-    log.debug("set task priority to: {s}", .{@tagName(priority)});
-}
-
-/// The task priority allows software to set a priority threshold for interrupting the processor.
+/// The task priority register allows software to set a priority threshold for interrupting the processor.
 ///
 /// This mechanism enables the operating system to temporarily block low priority interrupts from disturbing
 /// high-priority work that the processor is doing.
@@ -572,46 +581,6 @@ pub const InterruptCommandRegister = packed struct(u64) {
         all_excluding_self = 0b11,
     };
 
-    pub const DestinationMode = enum(u1) {
-        /// In physical destination mode, the destination processor is specified by its local APIC ID.
-        ///
-        /// For Pentium 4 and Intel Xeon processors, either a single destination (local APIC IDs 00H through FEH) or a
-        /// broadcast to all APICs (the APIC ID is FFH) may be specified in physical destination mode.
-        ///
-        /// A broadcast IPI (bits 28-31 of the MDA are 1's) or I/O subsystem initiated interrupt with lowest priority
-        /// delivery mode is not supported in physical destination mode and must not be configured by software.
-        ///
-        /// Also, for any non-broadcast IPI or I/O subsystem initiated interrupt with lowest priority delivery mode,
-        /// software must ensure that APICs defined in the interrupt address are present and enabled to receive interrupts.
-        ///
-        /// For the P6 family and Pentium processors, a single destination is specified in physical destination mode
-        /// with a local APIC ID of 0H through 0EH, allowing up to 15 local APICs to be addressed on the APIC bus.
-        ///
-        /// A broadcast to all local APICs is specified with 0FH.
-        physical = 0,
-
-        /// In logical destination mode, IPI destination is specified using an 8-bit message destination address (MDA),
-        /// which is entered in the destination field of the ICR.
-        ///
-        /// Upon receiving an IPI message that was sent using logical destination mode, a local APIC compares the MDA in
-        /// the message with the values in its LDR and DFR to determine if it should accept and handle the IPI.
-        ///
-        /// For both configurations of logical destination mode, when combined with lowest priority delivery mode,
-        /// software is responsible for ensuring that all of the local APICs included in or addressed by the IPI or I/O
-        /// subsystem interrupt are present and enabled to receive the interrupt.
-        logical = 1,
-    };
-
-    pub const Level = enum(u1) {
-        deassert = 0,
-        assert = 1,
-    };
-
-    pub const TriggerMode = enum(u1) {
-        edge = 0,
-        level = 1,
-    };
-
     pub fn read() InterruptCommandRegister {
         if (x2apic) {
             return @bitCast(
@@ -641,6 +610,46 @@ pub const InterruptCommandRegister = packed struct(u64) {
         @fence(.SeqCst);
         writeRegister(.interrupt_command_0_31, @truncate(value));
     }
+};
+
+pub const Level = enum(u1) {
+    deassert = 0,
+    assert = 1,
+};
+
+pub const TriggerMode = enum(u1) {
+    edge = 0,
+    level = 1,
+};
+
+pub const DestinationMode = enum(u1) {
+    /// In physical destination mode, the destination processor is specified by its local APIC ID.
+    ///
+    /// For Pentium 4 and Intel Xeon processors, either a single destination (local APIC IDs 00H through FEH) or a
+    /// broadcast to all APICs (the APIC ID is FFH) may be specified in physical destination mode.
+    ///
+    /// A broadcast IPI (bits 28-31 of the MDA are 1's) or I/O subsystem initiated interrupt with lowest priority
+    /// delivery mode is not supported in physical destination mode and must not be configured by software.
+    ///
+    /// Also, for any non-broadcast IPI or I/O subsystem initiated interrupt with lowest priority delivery mode,
+    /// software must ensure that APICs defined in the interrupt address are present and enabled to receive interrupts.
+    ///
+    /// For the P6 family and Pentium processors, a single destination is specified in physical destination mode
+    /// with a local APIC ID of 0H through 0EH, allowing up to 15 local APICs to be addressed on the APIC bus.
+    ///
+    /// A broadcast to all local APICs is specified with 0FH.
+    physical = 0,
+
+    /// In logical destination mode, IPI destination is specified using an 8-bit message destination address (MDA),
+    /// which is entered in the destination field of the ICR.
+    ///
+    /// Upon receiving an IPI message that was sent using logical destination mode, a local APIC compares the MDA in
+    /// the message with the values in its LDR and DFR to determine if it should accept and handle the IPI.
+    ///
+    /// For both configurations of logical destination mode, when combined with lowest priority delivery mode,
+    /// software is responsible for ensuring that all of the local APICs included in or addressed by the IPI or I/O
+    /// subsystem interrupt are present and enabled to receive the interrupt.
+    logical = 1,
 };
 
 /// The local APIC records errors detected during interrupt handling in the error status register (ESR).
