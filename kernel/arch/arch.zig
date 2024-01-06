@@ -182,6 +182,12 @@ pub const interrupts = struct {
         return current.interrupts.interruptsEnabled();
     }
 
+    pub inline fn setTaskPriority(priority: kernel.scheduler.Priority) void {
+        checkSupport(current.interrupts, "setTaskPriority", fn (kernel.scheduler.Priority) void);
+
+        current.interrupts.setTaskPriority(priority);
+    }
+
     pub const InterruptGuard = struct {
         enable_interrupts: bool,
 

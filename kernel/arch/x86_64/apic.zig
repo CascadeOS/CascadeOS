@@ -35,15 +35,7 @@ pub const init = struct {
 
         captureFADTInformation();
 
-        const version = VersionRegister.read();
-        log.debug("version register: {}", .{version});
-
-        // Set the TPR `priority_class` to 2 as that is the lowest priority that does not overlap with
-        // exceptions/PIC interrupts.
-        TaskPriorityRegister.write(.{
-            .priority_sub_class = 0,
-            .priority_class = 2,
-        });
+        setTaskPriority(.idle);
 
         const spurious_interrupt_register: SupriousInterruptRegister = .{
             .apic_enable = true,
@@ -404,6 +396,18 @@ pub const init = struct {
     };
 };
 
+/// Set the task priority to the given priority.
+pub fn setTaskPriority(priority: kernel.scheduler.Priority) void {
+    // Set the TPR `priority_class` to 2 as that is the lowest priority that does not overlap with
+    // exceptions/PIC interrupts.
+    TaskPriorityRegister.write(.{
+        .priority_sub_class = @intFromEnum(priority),
+        .priority_class = 2,
+    });
+
+    log.debug("set task priority to: {s}", .{@tagName(priority)});
+}
+
 /// The task priority allows software to set a priority threshold for interrupting the processor.
 ///
 /// This mechanism enables the operating system to temporarily block low priority interrupts from disturbing
@@ -411,7 +415,7 @@ pub const init = struct {
 ///
 /// The ability to block such interrupts using task priority results from the way that the TPR controls the value of the
 /// processor-priority register (PPR).
-pub const TaskPriorityRegister = packed struct(u32) {
+const TaskPriorityRegister = packed struct(u32) {
     priority_sub_class: u4,
 
     priority_class: u4,

@@ -454,6 +454,8 @@ pub fn disableInterruptsAndHalt() noreturn {
     }
 }
 
+pub const setTaskPriority = x86_64.apic.setTaskPriority;
+
 pub const init = struct {
     /// Load the IDT on this core.
     pub fn loadIdt() linksection(kernel.info.init_code) void {
