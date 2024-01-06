@@ -94,6 +94,7 @@ fn switchToIdle(processor: *kernel.Processor, opt_current_thread: ?*Thread) nore
     ) catch unreachable; // the idle stack is always big enough to hold a return address
 
     processor.current_thread = null;
+    kernel.arch.interrupts.setTaskPriority(.idle);
 
     kernel.arch.scheduling.switchToIdle(processor, idle_stack_pointer, opt_current_thread);
     unreachable;
@@ -104,6 +105,7 @@ fn switchToThreadFromIdle(processor: *kernel.Processor, new_thread: *Thread) nor
 
     processor.current_thread = new_thread;
     new_thread.state = .running;
+    kernel.arch.interrupts.setTaskPriority(new_thread.priority);
 
     kernel.arch.scheduling.switchToThreadFromIdle(processor, new_thread);
     unreachable;
@@ -114,6 +116,7 @@ fn switchToThreadFromThread(processor: *kernel.Processor, current_thread: *Threa
 
     processor.current_thread = new_thread;
     new_thread.state = .running;
+    kernel.arch.interrupts.setTaskPriority(new_thread.priority);
 
     kernel.arch.scheduling.switchToThreadFromThread(processor, current_thread, new_thread);
 }
