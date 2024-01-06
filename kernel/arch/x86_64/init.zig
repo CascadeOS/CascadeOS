@@ -113,7 +113,7 @@ fn captureFADTInformation(fadt: *const kernel.acpi.FADT) linksection(kernel.info
 }
 
 /// Configures x86_64 system features.
-pub fn configureSystemFeatures() linksection(kernel.info.init_code) void {
+pub fn configureGlobalSystemFeatures() linksection(kernel.info.init_code) void {
     if (x86_64.arch_info.have_pic) {
         log.debug("disabling pic", .{});
         disablePic();
@@ -143,6 +143,14 @@ pub fn configureSystemFeatures() linksection(kernel.info.init_code) void {
         efer.write();
 
         log.debug("EFER set", .{});
+    }
+}
+
+pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
+    core.debugAssert(processor == x86_64.getProcessor());
+
+    if (x86_64.arch_info.rdtscp) {
+        x86_64.registers.IA32_TSC_AUX.write(@intFromEnum(processor.id));
     }
 }
 

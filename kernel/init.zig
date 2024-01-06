@@ -50,7 +50,7 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     kernel.arch.init.captureSystemInformation();
 
     log.info("configuring system features", .{});
-    kernel.arch.init.configureSystemFeatures();
+    kernel.arch.init.configureGlobalSystemFeatures();
 
     log.info("initializing physical memory", .{});
     kernel.memory.physical.init.initPhysicalMemory();
@@ -72,6 +72,7 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
 fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_code) noreturn {
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     kernel.arch.init.loadProcessor(processor);
+    kernel.arch.init.configureSystemFeaturesForCurrentProcessor(processor);
     kernel.arch.init.initLocalInterruptController(processor);
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(

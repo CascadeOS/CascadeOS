@@ -134,13 +134,18 @@ pub const init = struct {
         current.init.captureSystemInformation();
     }
 
-    /// Configure any system features.
-    ///
-    /// For example, on x86_64 this should enable any CPU features that are required.
-    pub inline fn configureSystemFeatures() void {
-        checkSupport(current.init, "configureSystemFeatures", fn () void);
+    /// Configure any global system features.
+    pub inline fn configureGlobalSystemFeatures() void {
+        checkSupport(current.init, "configureGlobalSystemFeatures", fn () void);
 
-        current.init.configureSystemFeatures();
+        current.init.configureGlobalSystemFeatures();
+    }
+
+    /// Configure any processor local system features.
+    pub inline fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) void {
+        checkSupport(current.init, "configureSystemFeaturesForCurrentProcessor", fn (*kernel.Processor) void);
+
+        current.init.configureSystemFeaturesForCurrentProcessor(processor);
     }
 
     /// Initialize the local interrupt controller for the provided processor.

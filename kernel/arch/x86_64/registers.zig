@@ -209,6 +209,20 @@ pub const EFER = packed struct(u64) {
     const msr = MSR(u64, 0xC0000080);
 };
 
+/// Processors based on Nehalem microarchitecture provide an auxiliary TSC register, IA32_TSC_AUX that is designed to
+/// be used in conjunction with IA32_TSC.
+///
+/// IA32_TSC_AUX provides a 32-bit field that is initialized by privileged software with a signature value
+/// (for example, a logical processor ID).
+///
+/// The primary usage of IA32_TSC_AUX in conjunction with IA32_TSC is to allow software to read the 64-bit time stamp in
+/// IA32_TSC and signature value in IA32_TSC_AUX with the instruction RDTSCP in an atomic operation.
+///
+/// RDTSCP returns the 64-bit time stamp in EDX:EAX and the 32-bit TSC_AUX signature value in ECX.
+///
+/// The atomicity of RDTSCP ensures that no context switch can occur between the reads of the TSC and TSC_AUX values.
+pub const IA32_TSC_AUX = MSR(u64, 0xC0000103);
+
 pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);
 
 pub inline fn readMSR(comptime T: type, register: u32) T {
