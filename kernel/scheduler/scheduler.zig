@@ -16,6 +16,13 @@ pub var lock: kernel.SpinLock = .{};
 var ready_to_run_start: ?*Thread = null;
 var ready_to_run_end: ?*Thread = null;
 
+pub const Priority = enum(u4) {
+    idle = 0,
+    background_kernel = 1,
+    user = 2,
+    normal_kernel = 3,
+};
+
 /// Performs a round robin scheduling of the ready threads.
 ///
 /// If `requeue_current_thread` is set to true, the current thread will be requeued before the next thread is found.

@@ -10,6 +10,8 @@ id: Thread.Id,
 
 state: State = .ready,
 
+priority: kernel.scheduler.Priority,
+
 process: *kernel.scheduler.Process,
 
 kernel_stack: kernel.Stack,
