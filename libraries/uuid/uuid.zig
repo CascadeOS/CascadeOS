@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: MIT
-// Various parts of the below implementation are from:
-//  - https://github.com/dmgk/zig-uuid (see LICENSE-zig-uuid for upstream license)
-//  - https://github.com/HelenOS/helenos (see LICENSE-helenos for upstream license)
+// SPDX-License-Identifier: MIT AND BSD-2-Clause AND 0BSD
+// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2015 Jiri Svoboda (https://github.com/HelenOS/helenos)
+// SPDX-FileCopyrightText: 2021 Dmitri Goutnik (https://github.com/dmgk/zig-uuid)
 
 const std = @import("std");
 const core = @import("core");

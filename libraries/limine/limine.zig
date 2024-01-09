@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 //! This module contains the definitions of the Limine protocol version v6.20231227.0 as per
 //! [PROTOCOL](https://github.com/limine-bootloader/limine/blob/v6.20231227.0/PROTOCOL.md)
