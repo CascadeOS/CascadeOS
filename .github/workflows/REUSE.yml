@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+
+name: REUSE Compliance Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  compliance_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: REUSE Compliance Check
+        uses: fsfe/reuse-action@v2

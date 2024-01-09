@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const builtin = @import("builtin");
 const std = @import("std");

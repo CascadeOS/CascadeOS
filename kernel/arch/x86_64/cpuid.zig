@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 // The specification used is "Intel® 64 and IA-32 Architectures Software Developer's Manual Volume 2A March 2023"
 
