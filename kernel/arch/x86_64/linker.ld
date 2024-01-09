@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: CC0-1.0
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+/* SPDX-License-Identifier: CC0-1.0 */
+/* SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz> */
 
 OUTPUT_FORMAT(elf64-x86-64)
 OUTPUT_ARCH(i386:x86-64)
