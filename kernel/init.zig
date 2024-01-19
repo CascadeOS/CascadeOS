@@ -84,7 +84,7 @@ fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_c
         kernel.VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
 
-    log.info("leaving bootloader provided stack", .{});
+    log.debug("leaving bootloader provided stack", .{});
     kernel.arch.scheduling.changeStackAndReturn(idle_stack_pointer);
     unreachable;
 }
