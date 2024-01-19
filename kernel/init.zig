@@ -50,14 +50,14 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     log.info("capturing system information", .{});
     kernel.arch.init.captureSystemInformation();
 
-    log.info("configuring global system features", .{});
-    kernel.arch.init.configureGlobalSystemFeatures();
-
     log.info("initializing physical memory", .{});
     kernel.memory.physical.init.initPhysicalMemory();
 
     log.info("initializing virtual memory", .{});
     kernel.memory.virtual.init.initVirtualMemory();
+
+    log.info("configuring global system features", .{});
+    kernel.arch.init.configureGlobalSystemFeatures();
 
     log.info("initializing processors", .{});
     initProcessors();
