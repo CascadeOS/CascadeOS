@@ -22,6 +22,7 @@ pub const interrupts = @import("interrupts/interrupts.zig");
 pub const paging = @import("paging/paging.zig");
 pub const registers = @import("registers.zig");
 pub const scheduling = @import("scheduling.zig");
+pub const Tsc = @import("Tsc.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
 pub inline fn getProcessor() *kernel.Processor {
