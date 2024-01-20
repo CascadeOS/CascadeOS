@@ -15,6 +15,7 @@ pub const arch_info = @import("arch_info.zig");
 pub const ArchProcessor = @import("ArchProcessor.zig");
 pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
+pub const Hpet = @import("Hpet.zig");
 pub const init = @import("init.zig");
 pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
