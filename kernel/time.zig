@@ -101,6 +101,26 @@ pub const init = struct {
         parent_time_source_ptr.* = time_source;
     }
 
+    const TimeSourceQuery = struct {
+        pre_calibrated: bool = false,
+
+        reference_counter: bool = false,
+    };
+
+    fn findTimeSource(query: TimeSourceQuery) linksection(kernel.info.init_code) ?*CandidateTimeSource {
+        var opt_time_source = candidate_time_source_list_start;
+
+        while (opt_time_source) |time_source| : (opt_time_source = time_source.list_next) {
+            if (query.pre_calibrated and time_source.initialization == .calibration_required) continue;
+
+            if (query.reference_counter and time_source.reference_counter == null) continue;
+
+            return time_source;
+        }
+
+        return null;
+    }
+
     pub const ReferenceCounterTimeSource = struct {
         /// Prepares the counter to wait for `duration`.
         ///
