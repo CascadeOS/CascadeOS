@@ -149,6 +149,15 @@ pub const init = struct {
         current.init.configureSystemFeaturesForCurrentProcessor(processor);
     }
 
+    /// Register any architectural time sources.
+    ///
+    /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
+    pub inline fn registerArchitecturalTimeSources() void {
+        checkSupport(current.init, "registerArchitecturalTimeSources", fn () void);
+
+        current.init.registerArchitecturalTimeSources();
+    }
+
     /// Initialize the local interrupt controller for the provided processor.
     ///
     /// For example, on x86_64 this should initialize the APIC.

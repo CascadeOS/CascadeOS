@@ -59,6 +59,9 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     log.info("configuring global system features", .{});
     kernel.arch.init.configureGlobalSystemFeatures();
 
+    log.info("initializing time", .{});
+    kernel.time.init.initTime();
+
     log.info("initializing processors", .{});
     initProcessors();
 

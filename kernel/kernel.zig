@@ -17,6 +17,7 @@ pub const Processor = @import("Processor.zig");
 pub const scheduler = @import("scheduler/scheduler.zig");
 pub const SpinLock = @import("SpinLock.zig");
 pub const Stack = @import("Stack.zig");
+pub const time = @import("time.zig");
 pub const VirtualAddress = address.VirtualAddress;
 pub const VirtualRange = address.VirtualRange;
 
