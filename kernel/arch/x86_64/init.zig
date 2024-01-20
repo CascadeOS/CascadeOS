@@ -159,6 +159,22 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) void {
+    // TSC
+    if (x86_64.arch_info.invariant_tsc) {
+        // TODO: If we can determine the TSC frequency from CPUID then it can be used without calibration and therefore
+        // would be suitable as a reference time source.
+        kernel.time.init.addTimeSource(.{
+            .name = "tsc",
+            .priority = 200,
+            .per_core = true,
+            .initialization = .{ .calibration_required = x86_64.Tsc.init.initializeTsc },
+            .wallclock = .{
+                .readCounterFn = x86_64.Tsc.readCounter,
+                .elapsedFn = x86_64.Tsc.elapsed,
+            },
+        });
+    }
+
     // HPET
     if (x86_64.Hpet.init.haveHpet()) {
         kernel.time.init.addTimeSource(.{
@@ -172,6 +188,9 @@ pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) voi
             },
         });
     }
+
+    // TODO: APIC, PIT, KVMCLOCK
+
 }
 
 const portWriteU8 = x86_64.instructions.portWriteU8;
