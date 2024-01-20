@@ -152,12 +152,13 @@ pub const Size = extern struct {
     };
 
     pub fn print(size: Size, writer: anytype) !void {
-        if (size.bytes == 0) {
+        var value = size.bytes;
+
+        if (value == 0) {
             try writer.writeAll("0 bytes");
             return;
         }
 
-        var value = size.bytes;
         var emitted_anything = false;
 
         inline for (unit_table) |unit| blk: {
