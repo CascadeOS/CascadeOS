@@ -15,23 +15,86 @@ const log = kernel.debug.log.scoped(.cpuid);
 pub fn capture() linksection(kernel.info.init_code) void {
     if (!isCPUIDAvailable()) core.panic("cpuid is not supported");
 
-    const cpuid_leaf_0 = raw_cpuid(0x0, 0);
-
-    captureVendorString(cpuid_leaf_0);
+    const cpuid_leaf_0 = rawCpuid(0x0, 0);
 
     const max_standard_leaf = cpuid_leaf_0.eax;
     log.debug("maximum standard function: 0x{x}", .{max_standard_leaf});
 
-    const cpuid_leaf_extended = raw_cpuid(0x80000000, 0);
+    const cpuid_leaf_extended = rawCpuid(0x80000000, 0);
 
     const max_extended_leaf = cpuid_leaf_extended.eax;
     log.debug("largest extended function: 0x{x}", .{max_extended_leaf});
+
+    const hypervisor_info = HypervisorInformation.read();
+    const max_hypervisor_leaf = hypervisor_info.max_hypervisor_leaf;
+    if (max_hypervisor_leaf != 0) {
+        log.debug("maximum hypervisor function: 0x{x}", .{max_hypervisor_leaf});
+        captureHypervisorVendorId(hypervisor_info);
+    }
+
+    captureVendorString(cpuid_leaf_0);
 
     captureBrandString(max_extended_leaf);
 
     handleSimpleLeafs(max_standard_leaf, max_extended_leaf);
 }
 
+fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
+    const orig_rflags = x86_64.registers.RFlags.read();
+    var modified_rflags = orig_rflags;
+
+    modified_rflags.id = !modified_rflags.id;
+    modified_rflags.write();
+
+    const new_rflags = x86_64.registers.RFlags.read();
+
+    return orig_rflags.id != new_rflags.id;
+}
+
+/// Captures the hypervisor vendor id from CPUID.40000000h
+fn captureHypervisorVendorId(hypervisor_info: HypervisorInformation) linksection(kernel.info.init_code) void {
+    const vendor_string_array = [_]u32{
+        hypervisor_info.hypervisor_vendor_id_1,
+        hypervisor_info.hypervisor_vendor_id_2,
+        hypervisor_info.hypervisor_vendor_id_3,
+    };
+    std.mem.copyForwards(u8, &arch_info.hypervisor_vendor_id.?, std.mem.sliceAsBytes(&vendor_string_array));
+    log.debug("hypervisor vendor id: {s}", .{arch_info.hypervisor_vendor_id.?});
+}
+
+/// Captures the vendor string from CPUID.00h
+fn captureVendorString(cpuid_leaf_0: Leaf) linksection(kernel.info.init_code) void {
+    const vendor_string_array = [_]u32{ cpuid_leaf_0.ebx, cpuid_leaf_0.edx, cpuid_leaf_0.ecx };
+    std.mem.copyForwards(u8, &arch_info.cpu_vendor_string, std.mem.sliceAsBytes(&vendor_string_array));
+    log.debug("cpu vendor string: {s}", .{arch_info.cpu_vendor_string});
+}
+
+/// Captures the brand string from CPUID.80000002h - CPUID.80000004h
+fn captureBrandString(max_extended_leaf: u32) linksection(kernel.info.init_code) void {
+    if (max_extended_leaf < 0x80000004) {
+        log.debug("processor brand string is not available", .{});
+        return;
+    }
+
+    var brand_string_array: [12]u32 = [_]u32{0} ** 12;
+    var i: usize = 0;
+
+    for (0x80000002..0x80000004) |leaf| {
+        const leaf_value = rawCpuid(@truncate(leaf), 0);
+
+        brand_string_array[i] = leaf_value.eax;
+        i += 1;
+        brand_string_array[i] = leaf_value.ebx;
+        i += 1;
+        brand_string_array[i] = leaf_value.ecx;
+        i += 1;
+        brand_string_array[i] = leaf_value.edx;
+        i += 1;
+    }
+
+    std.mem.copyForwards(u8, &arch_info.processor_brand_string, std.mem.sliceAsBytes(&brand_string_array));
+    log.debug("processor brand string: {s}", .{arch_info.processor_brand_string});
+}
 const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.init_data) = &.{
     .{
         .leaf = .{ .type = .standard, .leaf = 0x01 },
@@ -229,7 +292,7 @@ fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection
             break :blk; // continue loop
         }
 
-        const cpuid_result = raw_cpuid(leaf_handler.leaf.leaf, leaf_handler.leaf.subleaf);
+        const cpuid_result = rawCpuid(leaf_handler.leaf.leaf, leaf_handler.leaf.subleaf);
 
         inline for (leaf_handler.handlers) |handler| {
             const register = switch (handler.register) {
@@ -291,52 +354,6 @@ const SimpleLeafHandler = struct {
     };
 };
 
-fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
-    const orig_rflags = x86_64.registers.RFlags.read();
-    var modified_rflags = orig_rflags;
-
-    modified_rflags.id = !modified_rflags.id;
-    modified_rflags.write();
-
-    const new_rflags = x86_64.registers.RFlags.read();
-
-    return orig_rflags.id != new_rflags.id;
-}
-
-/// Captures the vendor string from CPUID.00h
-fn captureVendorString(cpuid_leaf_0: Leaf) linksection(kernel.info.init_code) void {
-    const vendor_string_array = [_]u32{ cpuid_leaf_0.ebx, cpuid_leaf_0.edx, cpuid_leaf_0.ecx };
-    std.mem.copyForwards(u8, &arch_info.cpu_vendor_string, std.mem.sliceAsBytes(&vendor_string_array));
-    log.debug("cpu vendor string: {s}", .{arch_info.cpu_vendor_string});
-}
-
-/// Captures the brand string from CPUID.80000002h - CPUID.80000004h
-fn captureBrandString(max_extended_leaf: u32) linksection(kernel.info.init_code) void {
-    if (max_extended_leaf < 0x80000004) {
-        log.debug("Processor brand string is not available", .{});
-        return;
-    }
-
-    var brand_string_array: [12]u32 = [_]u32{0} ** 12;
-    var i: usize = 0;
-
-    for (0x80000002..0x80000004) |leaf| {
-        const leaf_value = raw_cpuid(@truncate(leaf), 0);
-
-        brand_string_array[i] = leaf_value.eax;
-        i += 1;
-        brand_string_array[i] = leaf_value.ebx;
-        i += 1;
-        brand_string_array[i] = leaf_value.ecx;
-        i += 1;
-        brand_string_array[i] = leaf_value.edx;
-        i += 1;
-    }
-
-    std.mem.copyForwards(u8, &arch_info.processor_brand_string, std.mem.sliceAsBytes(&brand_string_array));
-    log.debug("processor brand string: {s}", .{arch_info.processor_brand_string});
-}
-
 const Leaf = struct {
     eax: u32,
     ebx: u32,
@@ -344,7 +361,7 @@ const Leaf = struct {
     edx: u32,
 };
 
-fn raw_cpuid(leaf_id: u32, subid: u32) Leaf {
+fn rawCpuid(leaf_id: u32, subid: u32) Leaf {
     var eax: u32 = undefined;
     var ebx: u32 = undefined;
     var ecx: u32 = undefined;

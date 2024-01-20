@@ -12,6 +12,9 @@ pub var cpu_vendor_string: [12]u8 = [_]u8{0} ** 12;
 /// Brand string from CPUID.80000002h - CPUID.80000004h
 pub var processor_brand_string: [48]u8 = [_]u8{0} ** 48;
 
+/// Hypervisor vendor id from CPUID.40000000h
+pub var hypervisor_vendor_id: ?[12]u8 = [_]u8{0} ** 12;
+
 /// Do we have a PIC?
 ///
 /// Assumed to be true until proven otherwise.
