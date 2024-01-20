@@ -95,7 +95,7 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
     const fsinfo_sector = 1;
     const reserved_sectors = sectors_per_track; // TODO: Is it always one track reserved?
 
-    const number_of_sectors = core.Size.from(slice.len, .byte).divide(sector_size);
+    const number_of_sectors = core.Size.from(slice.len, .byte).divide(sector_size).value;
     const number_of_clusters: u32 = @intCast(number_of_sectors / sectors_per_cluster);
 
     const bpb = asPtr(*fat.BPB, slice, 0, sector_size);
@@ -336,7 +336,7 @@ const FATContext = struct {
     ) FATContext {
         core.assert(root_cluster == 2); // TODO: Remove this requirement
 
-        const cluster_size = sector_size.multiply(sectors_per_cluster);
+        const cluster_size = sector_size.multiplyScalar(sectors_per_cluster);
         return FATContext{
             .fat_partition = fat_partition,
             .fat_table = asPtr(
@@ -351,7 +351,7 @@ const FATContext = struct {
             .sectors_per_cluster = sectors_per_cluster,
             .cluster_size = cluster_size,
             .cluster_begin_sector = cluster_begin_sector,
-            .directory_entries_per_cluster = cluster_size.divide(core.Size.of(fat.DirectoryEntry)),
+            .directory_entries_per_cluster = cluster_size.divide(core.Size.of(fat.DirectoryEntry)).value,
             .date_time = getFATDateAndTime(),
             .number_of_clusters = number_of_clusters,
         };
@@ -378,7 +378,7 @@ const FATContext = struct {
         number_of_clusters: usize,
     ) []u8 {
         const start = self.cluster_begin_sector + (cluster_index - 2) * self.sectors_per_cluster;
-        const size = self.sector_size.multiply(self.sectors_per_cluster * number_of_clusters);
+        const size = self.sector_size.multiplyScalar(self.sectors_per_cluster * number_of_clusters);
         return asPtr([*]u8, self.fat_partition, start, self.sector_size)[0..size.value];
     }
 
@@ -686,7 +686,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
         @intCast(image_description.partitions.len);
 
     const partition_array_size_in_blocks: u64 = disk_block_size.amountToCover(
-        gpt.PartitionEntry.size.multiply(number_of_partition_entries),
+        gpt.PartitionEntry.size.multiplyScalar(number_of_partition_entries),
     );
 
     const first_usable_block = 2 + partition_array_size_in_blocks;
@@ -707,7 +707,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
     )[0..number_of_partition_entries];
 
     const partition_table_crc = partition_table_crc: {
-        const partition_alignment = gpt.recommended_alignment_of_partitions.divide(disk_block_size);
+        const partition_alignment = gpt.recommended_alignment_of_partitions.divide(disk_block_size).value;
 
         var next_free_block = first_usable_block;
 

@@ -14,7 +14,7 @@ pub const Crc32 = std.hash.crc.Crc32IsoHdlc;
 pub const minimum_size_of_partition_entry_array = core.Size.from(16, .kib);
 
 /// The minimum number of partition entries due to the minimum size reserved for the partition array.
-pub const minimum_number_of_partition_entries: u32 = @intCast(minimum_size_of_partition_entry_array.divide(PartitionEntry.size));
+pub const minimum_number_of_partition_entries: u32 = @intCast(minimum_size_of_partition_entry_array.divide(PartitionEntry.size).value);
 
 /// Almost every tool generates partitions with this alignment.
 /// https://en.wikipedia.org/wiki/Logical_Disk_Manager#Advantages_of_using_a_1-MB_alignment_boundary

@@ -8,6 +8,8 @@ const core = @import("core");
 pub const Size = extern struct {
     value: usize,
 
+    pub usingnamespace core.ValueTypeMixin(@This());
+
     pub const Unit = enum(usize) {
         byte = 1,
         kib = 1024,
@@ -15,8 +17,6 @@ pub const Size = extern struct {
         gib = 1024 * 1024 * 1024,
         tib = 1024 * 1024 * 1024 * 1024,
     };
-
-    pub const zero: Size = .{ .value = 0 };
 
     pub inline fn of(comptime T: type) Size {
         return .{ .value = @sizeOf(T) };
@@ -43,43 +43,12 @@ pub const Size = extern struct {
         return .{ .value = std.mem.alignBackward(usize, self.value, alignment.value) };
     }
 
-    pub inline fn add(self: Size, other: Size) Size {
-        return .{ .value = self.value + other.value };
-    }
-
-    pub inline fn addInPlace(self: *Size, other: Size) void {
-        self.value += other.value;
-    }
-
-    pub inline fn subtract(self: Size, other: Size) Size {
-        return .{ .value = self.value - other.value };
-    }
-
-    pub inline fn subtractInPlace(self: *Size, other: Size) void {
-        self.value -= other.value;
-    }
-
-    pub inline fn multiply(self: Size, value: usize) Size {
-        return .{ .value = self.value * value };
-    }
-
-    pub inline fn multiplyInPlace(self: *Size, value: usize) void {
-        self.value *= value;
-    }
-
-    /// Division is performed on integers, so the result is rounded down.
-    ///
-    /// Caller must ensure `other` is not zero.
-    pub inline fn divide(self: Size, other: Size) usize {
-        return self.value / other.value;
-    }
-
     /// Returns the amount of `self` sizes needed to cover `target`.
     ///
     /// Caller must ensure `self` is not zero.
     pub fn amountToCover(self: Size, target: Size) usize {
         const one_byte = core.Size{ .value = 1 };
-        return target.add(self.subtract(one_byte)).divide(self);
+        return target.add(self.subtract(one_byte)).divide(self).value;
     }
 
     test amountToCover {
@@ -114,32 +83,6 @@ pub const Size = extern struct {
 
             try std.testing.expectEqual(expected, size.amountToCover(target));
         }
-    }
-
-    pub inline fn lessThan(self: Size, other: Size) bool {
-        return self.value < other.value;
-    }
-
-    pub inline fn lessThanOrEqual(self: Size, other: Size) bool {
-        return self.value <= other.value;
-    }
-
-    pub inline fn greaterThan(self: Size, other: Size) bool {
-        return self.value > other.value;
-    }
-
-    pub inline fn greaterThanOrEqual(self: Size, other: Size) bool {
-        return self.value >= other.value;
-    }
-
-    pub inline fn equal(self: Size, other: Size) bool {
-        return self.value == other.value;
-    }
-
-    pub fn compare(self: Size, other: Size) core.OrderedComparison {
-        if (self.lessThan(other)) return .less;
-        if (self.greaterThan(other)) return .greater;
-        return .match;
     }
 
     // Must be kept in descending size order due to the logic in `print`

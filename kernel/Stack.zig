@@ -9,7 +9,7 @@ const std = @import("std");
 
 const Stack = @This();
 
-pub const usable_stack_size = kernel.arch.paging.standard_page_size.multiply(16);
+pub const usable_stack_size = kernel.arch.paging.standard_page_size.multiplyScalar(16);
 
 /// The size of the stack including the guard page.
 ///

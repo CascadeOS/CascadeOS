@@ -8,8 +8,9 @@ const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();
 pub const debug = builtin.mode == .Debug;
 pub const safety = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
 
-const size = @import("size.zig");
-pub const Size = size.Size;
+pub const ValueTypeMixin = @import("value_type_mixin.zig").ValueTypeMixin;
+
+pub const Size = @import("size.zig").Size;
 
 pub const testing = @import("testing.zig");
 
