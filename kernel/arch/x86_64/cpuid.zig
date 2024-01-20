@@ -37,6 +37,8 @@ pub fn capture() linksection(kernel.info.init_code) void {
     captureBrandString(max_extended_leaf);
 
     handleSimpleLeafs(max_standard_leaf, max_extended_leaf);
+
+    determineTscTickDuration(max_standard_leaf, max_hypervisor_leaf);
 }
 
 fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
@@ -95,6 +97,149 @@ fn captureBrandString(max_extended_leaf: u32) linksection(kernel.info.init_code)
     std.mem.copyForwards(u8, &arch_info.processor_brand_string, std.mem.sliceAsBytes(&brand_string_array));
     log.debug("processor brand string: {s}", .{arch_info.processor_brand_string});
 }
+
+/// Attempts to determine the TSC tick duration from CPUID information.
+fn determineTscTickDuration(max_standard_leaf: u32, max_hypervisor_leaf: u32) void {
+    const frequency: u64 = blk: {
+        if (determineTscTickFrequencyLeaf15And16(max_standard_leaf)) |frequency| {
+            log.debug("tsc frequency determined from leaf 0x15 and 0x16", .{});
+            break :blk frequency;
+        }
+
+        if (determineTscTickFrequencyLeaf40000010(max_hypervisor_leaf)) |frequency| {
+            log.debug("tsc frequency determined from leaf 0x40000010", .{});
+            break :blk frequency;
+        }
+
+        // TODO: VMWare, Hyper-V, KVM, Xen, etc.
+
+        log.debug("unable to determine tsc frequency from cpuid", .{});
+        return;
+    };
+
+    arch_info.tsc_tick_duration_ps = kernel.time.ps_per_s / frequency;
+    log.debug("tsc tick duration (ps): {}", .{arch_info.tsc_tick_duration_ps.?});
+}
+
+fn determineTscTickFrequencyLeaf15And16(max_standard_leaf: u32) ?u64 {
+    // TODO: Is this Intel only?
+
+    if (max_standard_leaf < 0x15) return null;
+
+    const tsc_and_core_crystal_info = TscAndCrystalClockInformation.read();
+
+    if (tsc_and_core_crystal_info.numerator == 0 or tsc_and_core_crystal_info.denominator == 0) {
+        return null;
+    }
+
+    var crystal_hz = tsc_and_core_crystal_info.crystal_frequency;
+
+    // TODO: if `crystal_hz` == 0 and model is Denverton SoCs (linux INTEL_FAM6_ATOM_GOLDMONT_D) then crystal is 25MHz
+
+    if (crystal_hz == 0 and max_standard_leaf >= 0x16) {
+        // use the crystal ratio and the CPU speed to determine the crystal frequency
+        const processor_frequency_info = ProcessorFrequencyInformation.read();
+
+        crystal_hz =
+            processor_frequency_info.processor_base_frequency *
+            hz_per_mhz *
+            (tsc_and_core_crystal_info.denominator / tsc_and_core_crystal_info.numerator);
+    }
+
+    if (crystal_hz == 0) return null;
+
+    arch_info.lapic_tick_duration_ps = kernel.time.ps_per_s / crystal_hz;
+
+    return crystal_hz * (tsc_and_core_crystal_info.numerator / tsc_and_core_crystal_info.denominator);
+}
+
+fn determineTscTickFrequencyLeaf40000010(max_hypervisor_leaf: u32) ?u64 {
+    if (max_hypervisor_leaf < 0x40000010) return null;
+
+    const hypervisor_timing_info = HypervisorTimingInformation.read();
+
+    return hypervisor_timing_info.tsc_frequency * hz_per_khz;
+}
+
+const hz_per_mhz = 1000000;
+const hz_per_khz = 1000;
+
+const TscAndCrystalClockInformation = struct {
+    /// The denominator of the TSC/"core crystal clock" ratio.
+    denominator: u64,
+
+    /// The numerator of the TSC/"core crystal clock" ratio.
+    numerator: u64,
+
+    /// The nominal frequency of the core crystal clock in Hz.
+    crystal_frequency: u64,
+
+    pub fn read() TscAndCrystalClockInformation {
+        const tsc_and_crystal_clock_info = rawCpuid(0x15, 0);
+        return .{
+            .denominator = tsc_and_crystal_clock_info.eax,
+            .numerator = tsc_and_crystal_clock_info.ebx,
+            .crystal_frequency = tsc_and_crystal_clock_info.ecx,
+        };
+    }
+};
+
+const ProcessorFrequencyInformation = struct {
+    /// The processor base frequency in MHz.
+    processor_base_frequency: u64,
+
+    /// The processor maximum frequency in MHz.
+    processor_max_frequency: u64,
+
+    /// The bus (reference) frequency in MHz.
+    bus_frequency: u64,
+
+    pub fn read() ProcessorFrequencyInformation {
+        const processor_frequency_info = rawCpuid(0x16, 0);
+        return .{
+            .processor_base_frequency = processor_frequency_info.eax,
+            .processor_max_frequency = processor_frequency_info.ebx,
+            .bus_frequency = processor_frequency_info.ecx,
+        };
+    }
+};
+
+const HypervisorInformation = struct {
+    max_hypervisor_leaf: u32,
+
+    hypervisor_vendor_id_1: u32,
+
+    hypervisor_vendor_id_2: u32,
+
+    hypervisor_vendor_id_3: u32,
+
+    pub fn read() HypervisorInformation {
+        const hypervisor_info = rawCpuid(0x40000000, 0);
+        return .{
+            .max_hypervisor_leaf = hypervisor_info.eax,
+            .hypervisor_vendor_id_1 = hypervisor_info.ebx,
+            .hypervisor_vendor_id_2 = hypervisor_info.ecx,
+            .hypervisor_vendor_id_3 = hypervisor_info.edx,
+        };
+    }
+};
+
+const HypervisorTimingInformation = struct {
+    /// TSC frequency in KHz.
+    tsc_frequency: u64,
+
+    /// Bus (local apic timer) frequency in KHz.
+    bus_frequency: u64,
+
+    pub fn read() HypervisorTimingInformation {
+        const hypervisor_timing_info = rawCpuid(0x40000010, 0);
+        return .{
+            .tsc_frequency = hypervisor_timing_info.eax,
+            .bus_frequency = hypervisor_timing_info.ebx,
+        };
+    }
+};
+
 const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.init_data) = &.{
     .{
         .leaf = .{ .type = .standard, .leaf = 0x01 },
