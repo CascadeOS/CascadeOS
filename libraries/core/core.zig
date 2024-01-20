@@ -10,12 +10,14 @@ pub const safety = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
 
 pub const ValueTypeMixin = @import("value_type_mixin.zig").ValueTypeMixin;
 
+pub const Duration = @import("duration.zig").Duration;
+
 pub const Size = @import("size.zig").Size;
 
 pub const testing = @import("testing.zig");
 
 /// Using `.Unspecified` prevents stack frames being lost due to inlining in debug mode.
-const assert_calling_convention = if (debug) .Unspecified else .Inline;
+const assert_calling_convention: std.builtin.CallingConvention = if (debug) .Unspecified else .Inline;
 
 pub fn assert(ok: bool) callconv(assert_calling_convention) void {
     if (comptime @inComptime() or safety)
