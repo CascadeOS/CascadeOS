@@ -11,6 +11,26 @@ pub const init = struct {
     pub fn initTime() linksection(kernel.info.init_code) void {
         log.debug("registering architectural time sources", .{});
         kernel.arch.init.registerArchitecturalTimeSources();
+
+        const reference_counter = getReferenceCounter();
+    }
+
+    fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounterTimeSource {
+        const time_source = findTimeSource(.{
+            .pre_calibrated = true,
+            .reference_counter = true,
+        }) orelse core.panic("no reference counter found");
+
+        log.debug("using reference counter: {s}", .{time_source.name});
+
+        time_source.initialize(undefined);
+
+        const reference_counter = time_source.reference_counter.?;
+
+        return .{
+            ._prepareToWaitForFn = reference_counter.prepareToWaitForFn,
+            ._waitForFn = reference_counter.waitForFn,
+        };
     }
 
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) linksection(kernel.info.init_data) = .{};
