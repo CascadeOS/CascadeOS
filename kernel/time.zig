@@ -7,6 +7,15 @@ const std = @import("std");
 
 const log = kernel.debug.log.scoped(.time);
 
+/// Femptoseconds per nanosecond.
+pub const fs_per_ns = 1000000;
+
+/// Picoseconds per nanosecond.
+pub const ps_per_ns = 1000;
+
+/// Picoseconds per second.
+pub const ps_per_s = ps_per_ns * std.time.ns_per_s;
+
 var wallclock_time_source: WallclockTimeSource = undefined;
 
 /// Read the wallclock value.

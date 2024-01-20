@@ -13,15 +13,13 @@ const Tsc = @This();
 /// The duration of a tick in picoseconds.
 var tick_duration_ps: u64 = undefined; // Initalized during `initializeTsc`
 
-const PICOSECONDS_IN_A_NANOSECOND = 1000;
-
 pub fn readCounter() u64 {
     return readTsc();
 }
 
 pub fn elapsed(value1: u64, value2: u64) core.Duration {
     const number_of_ticks = value2 - value1;
-    return core.Duration.from((number_of_ticks * tick_duration_ps) / PICOSECONDS_IN_A_NANOSECOND, .nanosecond);
+    return core.Duration.from((number_of_ticks * tick_duration_ps) / kernel.time.ps_per_ns, .nanosecond);
 }
 
 pub const init = struct {
@@ -39,7 +37,7 @@ pub const init = struct {
         reference_time_source.waitFor(reference_duration);
         const end = readTsc();
 
-        tick_duration_ps = (reference_duration.value * PICOSECONDS_IN_A_NANOSECOND) / (end - start);
+        tick_duration_ps = (reference_duration.value * kernel.time.ps_per_ns) / (end - start);
         log.debug("tick duration (ps): {}", .{tick_duration_ps});
     }
 };

@@ -20,8 +20,6 @@ var tick_duration_fs: u64 = undefined; // Initalized during `initializeHPET`
 // Initalized during `initializeHPET`
 var number_of_timers_minus_one: u5 = undefined;
 
-const FEMPTOSECONDS_IN_A_NANOSECOND = 1000000;
-
 pub const init = struct {
     pub fn initializeHPET() linksection(kernel.info.init_code) void {
         base = getHpetBase();
@@ -68,7 +66,7 @@ pub const init = struct {
     pub fn waitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
         const current_value = CounterRegister.read();
 
-        const target_value = current_value + ((duration.value * FEMPTOSECONDS_IN_A_NANOSECOND) / tick_duration_fs);
+        const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
 
         while (CounterRegister.read() < target_value) {
             kernel.arch.spinLoopHint();
