@@ -292,7 +292,7 @@ pub const init = struct {
         core.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
         const phys_address = kernel.PhysicalAddress.fromInt(
-            virt_address.value - kernel.info.kernel_physical_to_virtual_offset.bytes,
+            virt_address.value - kernel.info.kernel_physical_to_virtual_offset.value,
         );
 
         const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);

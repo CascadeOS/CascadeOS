@@ -60,7 +60,7 @@ fn createDiskImage(allocator: std.mem.Allocator, image_description: ImageDescrip
     };
 
     const disk_size = blk: {
-        if (!std.mem.isAligned(image_description.size, disk_block_size.bytes)) {
+        if (!std.mem.isAligned(image_description.size, disk_block_size.value)) {
             core.panic("image size is not a multiple of 512 bytes");
         }
         break :blk core.Size.from(image_description.size, .byte);
@@ -75,7 +75,7 @@ fn createDiskImage(allocator: std.mem.Allocator, image_description: ImageDescrip
     try createGpt(allocator, image_description, disk_image, random, gpt_partitions);
 
     for (image_description.partitions, gpt_partitions) |partition, gpt_partition| {
-        const partition_slice = disk_image[gpt_partition.start_block * disk_block_size.bytes ..][0 .. gpt_partition.block_count * disk_block_size.bytes];
+        const partition_slice = disk_image[gpt_partition.start_block * disk_block_size.value ..][0 .. gpt_partition.block_count * disk_block_size.value];
 
         switch (partition.filesystem) {
             .fat32 => try buildFATPartition(allocator, partition, partition_slice),
@@ -101,7 +101,7 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
     const bpb = asPtr(*fat.BPB, slice, 0, sector_size);
     bpb.* = fat.BPB{
         .oem_identifier = [_]u8{ 'C', 'A', 'S', 'C', 'A', 'D', 'E', 0 },
-        .bytes_per_sector = @intCast(sector_size.bytes),
+        .bytes_per_sector = @intCast(sector_size.value),
         .sectors_per_cluster = sectors_per_cluster,
         .reserved_sectors = reserved_sectors,
         .number_of_fats = number_of_fat,
@@ -151,12 +151,12 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
         .subtract(size_of_info);
 
     @memcpy(
-        slice[padding_before_backup_info.bytes..][0..size_of_info.bytes],
-        slice[0..size_of_info.bytes],
+        slice[padding_before_backup_info.value..][0..size_of_info.value],
+        slice[0..size_of_info.value],
     );
 
     const fat_begin = reserved_sectors;
-    const number_of_fat_entries = (sectors_per_fat * sector_size.bytes) / 4;
+    const number_of_fat_entries = (sectors_per_fat * sector_size.value) / 4;
 
     const cluster_begin_sector = reserved_sectors + (number_of_fat * sectors_per_fat);
 
@@ -379,7 +379,7 @@ const FATContext = struct {
     ) []u8 {
         const start = self.cluster_begin_sector + (cluster_index - 2) * self.sectors_per_cluster;
         const size = self.sector_size.multiply(self.sectors_per_cluster * number_of_clusters);
-        return asPtr([*]u8, self.fat_partition, start, self.sector_size)[0..size.bytes];
+        return asPtr([*]u8, self.fat_partition, start, self.sector_size)[0..size.value];
     }
 
     fn getRootDirectory(self: *FATContext) FATDirectory {
@@ -658,11 +658,11 @@ fn createAndMapDiskImage(disk_image_path: []const u8, disk_size: core.Size) ![]a
     const file = try parent_directory.createFile(std.fs.path.basename(disk_image_path), .{ .truncate = true, .read = true });
     defer file.close();
 
-    try file.setEndPos(disk_size.bytes);
+    try file.setEndPos(disk_size.value);
 
     return std.os.mmap(
         null,
-        disk_size.bytes,
+        disk_size.value,
         std.os.PROT.READ | std.os.PROT.WRITE,
         std.os.MAP.SHARED,
         file.handle,
@@ -676,9 +676,9 @@ const GptPartition = struct {
 };
 
 fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, disk_image: []u8, random: std.rand.Random, gpt_partitions: []GptPartition) !void {
-    core.assert(std.mem.isAligned(disk_image.len, disk_block_size.bytes));
+    core.assert(std.mem.isAligned(disk_image.len, disk_block_size.value));
 
-    const number_of_blocks = disk_image.len / disk_block_size.bytes;
+    const number_of_blocks = disk_image.len / disk_block_size.value;
 
     const number_of_partition_entries: u32 = if (image_description.partitions.len < gpt.minimum_number_of_partition_entries)
         gpt.minimum_number_of_partition_entries
@@ -839,7 +839,7 @@ fn fillInPrimaryGptHeader(
         .disk_guid = guid,
         .partition_entry_lba = 2,
         .number_of_partition_entries = number_of_partition_entries,
-        .size_of_partition_entry = @intCast(gpt.PartitionEntry.size.bytes),
+        .size_of_partition_entry = @intCast(gpt.PartitionEntry.size.value),
         .partition_entry_array_crc32 = partition_table_crc,
     };
     primary_header.updateHash();
@@ -847,7 +847,7 @@ fn fillInPrimaryGptHeader(
 }
 
 inline fn asPtr(comptime T: type, file_contents: []u8, index: usize, item_size: core.Size) T {
-    return @ptrCast(@alignCast(file_contents.ptr + (index * item_size.bytes)));
+    return @ptrCast(@alignCast(file_contents.ptr + (index * item_size.value)));
 }
 
 const FATDateTime = struct {

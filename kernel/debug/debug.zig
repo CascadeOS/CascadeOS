@@ -84,7 +84,7 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
     }
 
     var kernel_virtual_slide_is_null: bool = false;
-    const kernel_virtual_slide = if (kernel.info.kernel_virtual_slide) |slide| slide.bytes else blk: {
+    const kernel_virtual_slide = if (kernel.info.kernel_virtual_slide) |slide| slide.value else blk: {
         kernel_virtual_slide_is_null = true;
         break :blk 0;
     };

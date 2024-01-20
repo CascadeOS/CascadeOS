@@ -9,7 +9,7 @@ const bitjuggle = @import("bitjuggle");
 
 /// A page table for x86_64.
 pub const PageTable = extern struct {
-    entries: [number_of_entries]Entry align(x86_64.paging.small_page_size.bytes),
+    entries: [number_of_entries]Entry align(x86_64.paging.small_page_size.value),
 
     pub const number_of_entries = 512;
 

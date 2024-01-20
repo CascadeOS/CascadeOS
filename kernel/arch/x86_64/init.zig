@@ -22,9 +22,9 @@ pub fn getEarlyOutputWriter() ?SerialPort.Writer { // TODO: Put in init_code sec
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
-var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
-var bootstrap_double_fault_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
-var bootstrap_non_maskable_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
+var bootstrap_double_fault_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
+var bootstrap_non_maskable_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
 
 pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksection(kernel.info.init_code) void {
     bootstrap_processor.arch = .{

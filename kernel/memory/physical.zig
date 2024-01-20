@@ -33,9 +33,9 @@ pub fn allocatePage() ?kernel.PhysicalRange {
         // decrement `free_memory`
         _ = @atomicRmw(
             usize,
-            &free_memory.bytes,
+            &free_memory.value,
             .Sub,
-            kernel.arch.paging.standard_page_size.bytes,
+            kernel.arch.paging.standard_page_size.value,
             .AcqRel,
         );
 
@@ -127,9 +127,9 @@ fn deallocateImpl(first_page_node: *PhysPageNode, last_page_node: *PhysPageNode,
     // increment `free_memory`
     _ = @atomicRmw(
         usize,
-        &free_memory.bytes,
+        &free_memory.value,
         .Add,
-        size.bytes,
+        size.value,
         .AcqRel,
     );
 }

@@ -78,37 +78,37 @@ fn AddrMixin(comptime Self: type) type {
         pub const zero: Self = .{ .value = 0 };
 
         pub inline fn isAligned(self: Self, alignment: core.Size) bool {
-            return std.mem.isAligned(self.value, alignment.bytes);
+            return std.mem.isAligned(self.value, alignment.value);
         }
 
         /// Returns the address rounded up to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
         pub inline fn alignForward(self: Self, alignment: core.Size) Self {
-            return .{ .value = std.mem.alignForward(usize, self.value, alignment.bytes) };
+            return .{ .value = std.mem.alignForward(usize, self.value, alignment.value) };
         }
 
         /// Returns the address rounded down to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
         pub inline fn alignBackward(self: Self, alignment: core.Size) Self {
-            return .{ .value = std.mem.alignBackward(usize, self.value, alignment.bytes) };
+            return .{ .value = std.mem.alignBackward(usize, self.value, alignment.value) };
         }
 
         pub inline fn moveForward(self: Self, size: core.Size) Self {
-            return .{ .value = self.value + size.bytes };
+            return .{ .value = self.value + size.value };
         }
 
         pub inline fn moveForwardInPlace(self: *Self, size: core.Size) void {
-            self.value += size.bytes;
+            self.value += size.value;
         }
 
         pub inline fn moveBackward(self: Self, size: core.Size) Self {
-            return .{ .value = self.value - size.bytes };
+            return .{ .value = self.value - size.value };
         }
 
         pub inline fn moveBackwardInPlace(self: *Self, size: core.Size) void {
-            self.value -= size.bytes;
+            self.value -= size.value;
         }
 
         pub inline fn equal(self: Self, other: Self) bool {
@@ -189,12 +189,12 @@ pub const VirtualRange = extern struct {
 
     /// Returns a slice of type `T` corresponding to this virtual range.
     pub fn toSlice(self: VirtualRange, comptime T: type) ![]T {
-        const len = try std.math.divExact(usize, self.size.bytes, @sizeOf(T));
+        const len = try std.math.divExact(usize, self.size.value, @sizeOf(T));
         return self.address.toPtr([*]T)[0..len];
     }
 
     pub inline fn toByteSlice(self: VirtualRange) []u8 {
-        return self.address.toPtr([*]u8)[0..self.size.bytes];
+        return self.address.toPtr([*]u8)[0..self.size.value];
     }
 
     pub usingnamespace RangeMixin(@This());

@@ -7,7 +7,7 @@ const std = @import("std");
 
 const log = kernel.debug.log.scoped(.init);
 
-var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.bytes;
+var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
 
 var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .{
     .id = .bootstrap,
@@ -142,13 +142,13 @@ fn copyKernelFileFromBootloaderMemory() linksection(kernel.info.init_code) void 
 
     const kernel_file_buffer = kernel.heap.page_allocator.alloc(
         u8,
-        bootloader_provided_kernel_file.size.bytes,
+        bootloader_provided_kernel_file.size.value,
     ) catch {
         core.panic("Failed to allocate memory for kernel file buffer");
     };
 
     @memcpy(
-        kernel_file_buffer[0..bootloader_provided_kernel_file.size.bytes],
+        kernel_file_buffer[0..bootloader_provided_kernel_file.size.value],
         bootloader_provided_kernel_file.toByteSlice(),
     );
 
@@ -294,6 +294,6 @@ fn calculateKernelOffsets() linksection(kernel.info.init_code) void {
 
     kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
     kernel.info.kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
-    log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.?.bytes});
-    log.debug("kernel physical to virtual offset: 0x{x}", .{kernel.info.kernel_physical_to_virtual_offset.bytes});
+    log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.?.value});
+    log.debug("kernel physical to virtual offset: 0x{x}", .{kernel.info.kernel_physical_to_virtual_offset.value});
 }

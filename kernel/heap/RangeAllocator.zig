@@ -22,7 +22,7 @@ range_size_tree: RegionSizeRedBlackTree = .{},
 /// **REQUIREMENTS**:
 /// - size of `total_range` must be non-zero
 pub fn init(total_range: kernel.VirtualRange) error{OutOfMemory}!RangeAllocator {
-    core.assert(total_range.size.bytes != 0);
+    core.assert(total_range.size.value != 0);
 
     const range_with_nodes = try range_pool.get();
     errdefer range_pool.give(range_with_nodes);

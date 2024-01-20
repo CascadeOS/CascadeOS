@@ -24,7 +24,7 @@ memory_region_tree: MemoryRegionRedBlackTree = .{},
 /// - address of `total_range` must be aligned to `kernel.arch.paging.standard_page_size`
 /// - size of `total_range` must be aligned to `kernel.arch.paging.standard_page_size`
 pub fn init(total_range: kernel.VirtualRange) error{OutOfMemory}!AddressSpace {
-    core.assert(total_range.size.bytes != 0);
+    core.assert(total_range.size.value != 0);
     core.assert(total_range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.assert(total_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
@@ -47,7 +47,7 @@ pub const AllocateError = error{
 /// - `size` must be non-zero
 /// - `size` must be aligned to `kernel.arch.paging.standard_page_size`
 pub fn allocate(self: *AddressSpace, size: core.Size, map_type: kernel.memory.virtual.MapType) AllocateError!kernel.VirtualRange {
-    core.assert(size.bytes != 0);
+    core.assert(size.value != 0);
     core.assert(size.isAligned(kernel.arch.paging.standard_page_size));
 
     const virtual_range = self.range_allocator.allocateRange(size) catch return error.AddressSpaceExhausted;
@@ -68,7 +68,7 @@ pub fn allocate(self: *AddressSpace, size: core.Size, map_type: kernel.memory.vi
 /// - address of `range` must be aligned to `kernel.arch.paging.standard_page_size`
 /// - size of `range` must be aligned to `kernel.arch.paging.standard_page_size`
 pub fn deallocate(self: *AddressSpace, range: kernel.VirtualRange) void {
-    core.assert(range.size.bytes != 0);
+    core.assert(range.size.value != 0);
     core.assert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.assert(range.size.isAligned(kernel.arch.paging.standard_page_size));
 

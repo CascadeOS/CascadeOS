@@ -15,7 +15,7 @@ allocator: std.mem.Allocator,
 
 const size_of_dwarf_debug_allocator = core.Size.from(16, .mib);
 
-var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.bytes]u8 = undefined;
+var dwarf_debug_allocator_bytes: [size_of_dwarf_debug_allocator.value]u8 = undefined;
 var dwarf_debug_allocator = std.heap.FixedBufferAllocator.init(dwarf_debug_allocator_bytes[0..]);
 
 // This function is a re-implementation of `std.debug.readElfDebugInfo`
