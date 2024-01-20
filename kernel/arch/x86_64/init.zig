@@ -155,6 +155,25 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
     }
 }
 
+/// Register any architectural time sources.
+///
+/// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
+pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) void {
+    // HPET
+    if (x86_64.Hpet.init.haveHpet()) {
+        kernel.time.init.addTimeSource(.{
+            .name = "hpet",
+            .priority = 100,
+            .per_core = false,
+            .initialization = .{ .simple = x86_64.Hpet.init.initializeHPET },
+            .reference_counter = .{
+                .prepareToWaitForFn = x86_64.Hpet.init.prepareToWaitFor,
+                .waitForFn = x86_64.Hpet.init.waitFor,
+            },
+        });
+    }
+}
+
 const portWriteU8 = x86_64.instructions.portWriteU8;
 
 fn disablePic() linksection(kernel.info.init_code) void {

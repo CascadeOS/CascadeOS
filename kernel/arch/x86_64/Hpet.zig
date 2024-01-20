@@ -19,6 +19,9 @@ var tick_duration_fs: u64 = undefined; // Initalized during `initializeHPET`
 
 // Initalized during `initializeHPET`
 var number_of_timers_minus_one: u5 = undefined;
+
+const FEMPTOSECONDS_IN_A_NANOSECOND = 1000000;
+
 pub const init = struct {
     pub fn initializeHPET() linksection(kernel.info.init_code) void {
         base = getHpetBase();
@@ -47,6 +50,29 @@ pub const init = struct {
 
     pub fn haveHpet() linksection(kernel.info.init_code) bool {
         return kernel.acpi.init.getTable(DescriptionTable) != null;
+    }
+
+    pub fn prepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+        _ = duration;
+
+        var general_configuration = GeneralConfigurationRegister.read();
+        general_configuration.enable = false;
+        general_configuration.write();
+
+        CounterRegister.write(0);
+
+        general_configuration.enable = true;
+        general_configuration.write();
+    }
+
+    pub fn waitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+        const current_value = CounterRegister.read();
+
+        const target_value = current_value + ((duration.value * FEMPTOSECONDS_IN_A_NANOSECOND) / tick_duration_fs);
+
+        while (CounterRegister.read() < target_value) {
+            kernel.arch.spinLoopHint();
+        }
     }
 
     fn getHpetBase() linksection(kernel.info.init_code) [*]volatile u64 {
