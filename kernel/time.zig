@@ -7,12 +7,30 @@ const std = @import("std");
 
 const log = kernel.debug.log.scoped(.time);
 
+var wallclock_time_source: WallclockTimeSource = undefined;
+
+/// Read the wallclock value.
+///
+/// The value returned is an opaque timer tick, to acquire an actual time value, use `wallclockElapsed`.
+pub fn wallclockRead() u64 {
+    return wallclock_time_source.readCounterFn();
+}
+
+/// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+///
+/// Counter wraparound is assumed to have not occured.
+pub fn wallclockElapsed(value1: u64, value2: u64) core.Duration {
+    return wallclock_time_source.elapsedFn(value1, value2);
+}
+
 pub const init = struct {
     pub fn initTime() linksection(kernel.info.init_code) void {
         log.debug("registering architectural time sources", .{});
         kernel.arch.init.registerArchitecturalTimeSources();
 
         const reference_counter = getReferenceCounter();
+
+        wallclock_time_source = getWallclockTimeSource(reference_counter);
     }
 
     fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounterTimeSource {
@@ -33,6 +51,25 @@ pub const init = struct {
         };
     }
 
+    fn getWallclockTimeSource(
+        reference_counter: ReferenceCounterTimeSource,
+    ) linksection(kernel.info.init_code) WallclockTimeSource {
+        const time_source = findTimeSource(.{
+            .wallclock = true,
+        }) orelse core.panic("no wallclock found");
+
+        log.debug("using wallclock: {s}", .{time_source.name});
+
+        time_source.initialize(reference_counter);
+
+        const wallclock = time_source.wallclock.?;
+
+        return .{
+            .readCounterFn = wallclock.readCounterFn,
+            .elapsedFn = wallclock.elapsedFn,
+        };
+    }
+
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) linksection(kernel.info.init_data) = .{};
 
     pub const CandidateTimeSource = struct {
@@ -45,6 +82,8 @@ pub const init = struct {
         initialization: Initialization = .none,
 
         reference_counter: ?ReferenceCounter = null,
+
+        wallclock: ?Wallclock = null,
 
         list_next: ?*CandidateTimeSource = null,
 
@@ -77,6 +116,17 @@ pub const init = struct {
             waitForFn: *const fn (duration: core.Duration) void,
         };
 
+        pub const Wallclock = struct {
+            /// Read the wallclock value.
+            ///
+            /// The value returned is an opaque timer tick.
+            readCounterFn: *const fn () u64,
+
+            /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+            ///
+            /// Counter wraparound is assumed to have not occured.
+            elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
+        };
     };
 
     pub fn addTimeSource(time_source: CandidateTimeSource) linksection(kernel.info.init_code) void {
@@ -125,6 +175,8 @@ pub const init = struct {
         pre_calibrated: bool = false,
 
         reference_counter: bool = false,
+
+        wallclock: bool = false,
     };
 
     fn findTimeSource(query: TimeSourceQuery) linksection(kernel.info.init_code) ?*CandidateTimeSource {
@@ -134,6 +186,8 @@ pub const init = struct {
             if (query.pre_calibrated and time_source.initialization == .calibration_required) continue;
 
             if (query.reference_counter and time_source.reference_counter == null) continue;
+
+            if (query.wallclock and time_source.wallclock == null) continue;
 
             return time_source;
         }
@@ -166,4 +220,16 @@ pub const init = struct {
             self._waitForFn(duration);
         }
     };
+};
+
+const WallclockTimeSource = struct {
+    /// Read the wallclock value.
+    ///
+    /// The value returned is an opaque timer tick.
+    readCounterFn: *const fn () u64,
+
+    /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+    ///
+    /// Counter wraparound is assumed to have not occured.
+    elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
 };
