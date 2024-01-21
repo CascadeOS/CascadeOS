@@ -17,14 +17,14 @@ pub const Size = @import("size.zig").Size;
 pub const testing = @import("testing.zig");
 
 /// Using `.Unspecified` prevents stack frames being lost due to inlining in debug mode.
-const assert_calling_convention: std.builtin.CallingConvention = if (debug) .Unspecified else .Inline;
+pub const inline_in_non_debug_calling_convention: std.builtin.CallingConvention = if (debug) .Unspecified else .Inline;
 
-pub fn assert(ok: bool) callconv(assert_calling_convention) void {
+pub fn assert(ok: bool) callconv(inline_in_non_debug_calling_convention) void {
     if (comptime @inComptime() or safety)
         if (!ok) unreachable;
 }
 
-pub fn debugAssert(ok: bool) callconv(assert_calling_convention) void {
+pub fn debugAssert(ok: bool) callconv(inline_in_non_debug_calling_convention) void {
     if (comptime @inComptime() or debug)
         if (!ok) unreachable;
 }
