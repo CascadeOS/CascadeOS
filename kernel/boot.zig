@@ -20,7 +20,7 @@ const limine_requests = struct {
     export var hhdm: limine.HHDM linksection(kernel.info.init_data) = .{};
     export var kernel_address: limine.KernelAddress linksection(kernel.info.init_data) = .{};
     export var memmap: limine.Memmap linksection(kernel.info.init_data) = .{};
-    export var smp: limine.SMP linksection(kernel.info.init_data) = .{ .flags = .{ .x2apic = false } };
+    export var smp: limine.SMP linksection(kernel.info.init_data) = .{ .flags = .{ .x2apic = true } };
     export var rsdp: limine.RSDP linksection(kernel.info.init_data) = .{};
 };
 
