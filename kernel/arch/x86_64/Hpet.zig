@@ -30,8 +30,8 @@ pub const init = struct {
             .per_core = false,
             .initialization = .{ .simple = initializeHPET },
             .reference_counter = .{
-                .prepareToWaitForFn = prepareToWaitFor,
-                .waitForFn = waitFor,
+                .prepareToWaitForFn = referenceCounterPrepareToWaitFor,
+                .waitForFn = referenceCounterWaitFor,
             },
         });
     }
@@ -61,7 +61,7 @@ pub const init = struct {
         CounterRegister.write(0);
     }
 
-    fn prepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn referenceCounterPrepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
         _ = duration;
 
         var general_configuration = GeneralConfigurationRegister.read();
@@ -74,7 +74,7 @@ pub const init = struct {
         general_configuration.write();
     }
 
-    fn waitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn referenceCounterWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
         const current_value = CounterRegister.read();
 
         const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
