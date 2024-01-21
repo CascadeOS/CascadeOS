@@ -354,7 +354,7 @@ pub const init = struct {
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
-    ) void { // TODO: Put in init_code section
+    ) linksection(kernel.info.init_code) void {
         const processor = kernel.arch.earlyGetProcessor() orelse {
             const writer = kernel.arch.init.getEarlyOutputNoLock() orelse return;
 
