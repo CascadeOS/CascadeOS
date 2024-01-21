@@ -18,14 +18,14 @@ var wallclock_time_source: WallclockTimeSource = undefined;
 /// Read the wallclock value.
 ///
 /// The value returned is an opaque timer tick, to acquire an actual time value, use `wallclockElapsed`.
-pub fn wallclockRead() u64 {
+pub fn wallclockRead() callconv(core.inline_in_non_debug_calling_convention) u64 {
     return wallclock_time_source.readCounterFn();
 }
 
 /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
 ///
 /// Counter wraparound is assumed to have not occured.
-pub fn wallclockElapsed(value1: u64, value2: u64) core.Duration {
+pub fn wallclockElapsed(value1: u64, value2: u64) callconv(core.inline_in_non_debug_calling_convention) core.Duration {
     return wallclock_time_source.elapsedFn(value1, value2);
 }
 
@@ -219,14 +219,20 @@ pub const init = struct {
         /// Prepares the counter to wait for `duration`.
         ///
         /// Must be called before `waitFor` is called.
-        pub inline fn prepareToWaitFor(self: ReferenceCounterTimeSource, duration: core.Duration) void {
+        pub fn prepareToWaitFor(
+            self: ReferenceCounterTimeSource,
+            duration: core.Duration,
+        ) callconv(core.inline_in_non_debug_calling_convention) void {
             self._prepareToWaitForFn(duration);
         }
 
         /// Waits for `duration`.
         ///
         /// Must be called after `prepareToWaitFor` is called.
-        pub inline fn waitFor(self: ReferenceCounterTimeSource, duration: core.Duration) void {
+        pub fn waitFor(
+            self: ReferenceCounterTimeSource,
+            duration: core.Duration,
+        ) callconv(core.inline_in_non_debug_calling_convention) void {
             self._waitForFn(duration);
         }
     };

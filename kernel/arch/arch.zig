@@ -11,7 +11,7 @@ const current = switch (kernel.info.arch) {
 };
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
-pub inline fn spinLoopHint() void {
+pub fn spinLoopHint() callconv(core.inline_in_non_debug_calling_convention) void {
     checkSupport(current, "spinLoopHint", fn () void);
 
     current.spinLoopHint();
@@ -23,7 +23,7 @@ pub const ArchProcessor = current.ArchProcessor;
 /// Get the current processor.
 ///
 /// Panics if interrupts are enabled.
-pub inline fn getProcessor() *kernel.Processor {
+pub fn getProcessor() callconv(core.inline_in_non_debug_calling_convention) *kernel.Processor {
     checkSupport(current, "getProcessor", fn () *kernel.Processor);
 
     core.debugAssert(!interrupts.interruptsEnabled());
@@ -34,7 +34,7 @@ pub inline fn getProcessor() *kernel.Processor {
 /// Get the current processor, supports returning null for early boot before the processor is set.
 ///
 /// Panics if interrupts are enabled.
-pub inline fn earlyGetProcessor() ?*kernel.Processor {
+pub fn earlyGetProcessor() callconv(core.inline_in_non_debug_calling_convention) ?*kernel.Processor {
     checkSupport(current, "earlyGetProcessor", fn () ?*kernel.Processor);
 
     core.debugAssert(!interrupts.interruptsEnabled());
@@ -43,7 +43,7 @@ pub inline fn earlyGetProcessor() ?*kernel.Processor {
 }
 
 /// Halts the current processor
-pub inline fn halt() void {
+pub fn halt() callconv(core.inline_in_non_debug_calling_convention) void {
     checkSupport(current, "halt", fn () void);
 
     current.halt();
@@ -52,7 +52,9 @@ pub inline fn halt() void {
 /// Functionality that is intended to be used during kernel init only.
 pub const init = struct {
     /// Prepares the provided kernel.Processor for the bootstrap processor.
-    pub inline fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
+    pub fn prepareBootstrapProcessor(
+        bootstrap_processor: *kernel.Processor,
+    ) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "prepareBootstrapProcessor", fn (*kernel.Processor) void);
 
         current.init.prepareBootstrapProcessor(bootstrap_processor);
@@ -61,21 +63,24 @@ pub const init = struct {
     /// Prepares the provided kernel.Processor for use.
     ///
     /// **WARNING**: This function will panic if the processor cannot be prepared.
-    pub inline fn prepareProcessor(processor: *kernel.Processor, processor_descriptor: kernel.boot.ProcessorDescriptor) void {
+    pub fn prepareProcessor(
+        processor: *kernel.Processor,
+        processor_descriptor: kernel.boot.ProcessorDescriptor,
+    ) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "prepareProcessor", fn (*kernel.Processor, kernel.boot.ProcessorDescriptor) void);
 
         current.init.prepareProcessor(processor, processor_descriptor);
     }
 
     /// Performs any actions required to load the provided kernel.Processor for the current execution context.
-    pub inline fn loadProcessor(processor: *kernel.Processor) void {
+    pub fn loadProcessor(processor: *kernel.Processor) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "loadProcessor", fn (*kernel.Processor) void);
 
         current.init.loadProcessor(processor);
     }
 
     /// Attempt to set up some form of early output.
-    pub inline fn setupEarlyOutput() void {
+    pub fn setupEarlyOutput() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "setupEarlyOutput", fn () void);
 
         current.init.setupEarlyOutput();
@@ -85,14 +90,14 @@ pub const init = struct {
         writer: current.init.EarlyOutputWriter,
         held: kernel.SpinLock.Held,
 
-        pub inline fn deinit(self: EarlyOutput) void {
+        pub fn deinit(self: EarlyOutput) callconv(core.inline_in_non_debug_calling_convention) void {
             self.held.unlock();
         }
 
         pub var lock: kernel.SpinLock = .{};
     };
 
-    pub fn getEarlyOutputNoLock() ?current.init.EarlyOutputWriter { // TODO: Put in init_code section
+    pub fn getEarlyOutputNoLock() callconv(core.inline_in_non_debug_calling_convention) ?current.init.EarlyOutputWriter { // TODO: Put in init_code section
         checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
 
         return current.init.getEarlyOutputWriter();
@@ -120,7 +125,7 @@ pub const init = struct {
     ///
     /// For example, on x86_64 after this function has completed a GDT, TSS and an IDT with a simple handler on every vector
     /// should be in place.
-    pub inline fn earlyArchInitialization() void {
+    pub fn earlyArchInitialization() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "earlyArchInitialization", fn () void);
 
         current.init.earlyArchInitialization();
@@ -129,21 +134,21 @@ pub const init = struct {
     /// Capture any system information that is required for the architecture.
     ///
     /// For example, on x86_64 this should capture the CPUID information.
-    pub inline fn captureSystemInformation() void {
+    pub fn captureSystemInformation() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "captureSystemInformation", fn () void);
 
         current.init.captureSystemInformation();
     }
 
     /// Configure any global system features.
-    pub inline fn configureGlobalSystemFeatures() void {
+    pub fn configureGlobalSystemFeatures() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "configureGlobalSystemFeatures", fn () void);
 
         current.init.configureGlobalSystemFeatures();
     }
 
     /// Configure any processor local system features.
-    pub inline fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) void {
+    pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "configureSystemFeaturesForCurrentProcessor", fn (*kernel.Processor) void);
 
         current.init.configureSystemFeaturesForCurrentProcessor(processor);
@@ -152,7 +157,7 @@ pub const init = struct {
     /// Register any architectural time sources.
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
-    pub inline fn registerArchitecturalTimeSources() void {
+    pub fn registerArchitecturalTimeSources() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "registerArchitecturalTimeSources", fn () void);
 
         current.init.registerArchitecturalTimeSources();
@@ -161,7 +166,7 @@ pub const init = struct {
     /// Initialize the local interrupt controller for the provided processor.
     ///
     /// For example, on x86_64 this should initialize the APIC.
-    pub inline fn initLocalInterruptController(processor: *kernel.Processor) void {
+    pub fn initLocalInterruptController(processor: *kernel.Processor) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.init, "initLocalInterruptController", fn (*kernel.Processor) void);
 
         current.init.initLocalInterruptController(processor);
@@ -169,41 +174,41 @@ pub const init = struct {
 };
 
 pub const interrupts = struct {
-    pub inline fn panicInterruptOtherCores() void {
+    pub fn panicInterruptOtherCores() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.interrupts, "panicInterruptOtherCores", fn () void);
 
         current.interrupts.panicInterruptOtherCores();
     }
 
     /// Disable interrupts and put the CPU to sleep.
-    pub inline fn disableInterruptsAndHalt() noreturn {
+    pub fn disableInterruptsAndHalt() callconv(core.inline_in_non_debug_calling_convention) noreturn {
         checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);
 
         current.interrupts.disableInterruptsAndHalt();
     }
 
     /// Disable interrupts.
-    pub inline fn disableInterrupts() void {
+    pub fn disableInterrupts() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.interrupts, "disableInterrupts", fn () void);
 
         current.interrupts.disableInterrupts();
     }
 
     /// Enable interrupts.
-    pub inline fn enableInterrupts() void {
+    pub fn enableInterrupts() callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.interrupts, "enableInterrupts", fn () void);
 
         current.interrupts.enableInterrupts();
     }
 
     /// Are interrupts enabled?
-    pub inline fn interruptsEnabled() bool {
+    pub fn interruptsEnabled() callconv(core.inline_in_non_debug_calling_convention) bool {
         checkSupport(current.interrupts, "interruptsEnabled", fn () bool);
 
         return current.interrupts.interruptsEnabled();
     }
 
-    pub inline fn setTaskPriority(priority: kernel.scheduler.Priority) void {
+    pub fn setTaskPriority(priority: kernel.scheduler.Priority) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.interrupts, "setTaskPriority", fn (kernel.scheduler.Priority) void);
 
         current.interrupts.setTaskPriority(priority);
@@ -212,7 +217,7 @@ pub const interrupts = struct {
     pub const InterruptGuard = struct {
         enable_interrupts: bool,
 
-        pub inline fn release(self: InterruptGuard) void {
+        pub fn release(self: InterruptGuard) callconv(core.inline_in_non_debug_calling_convention) void {
             if (self.enable_interrupts) enableInterrupts();
         }
     };
@@ -233,7 +238,7 @@ pub const paging = struct {
     pub const standard_page_size: core.Size = current.paging.standard_page_size;
 
     /// Returns the largest page size supported by the architecture.
-    pub inline fn largestPageSize() core.Size {
+    pub fn largestPageSize() callconv(core.inline_in_non_debug_calling_convention) core.Size {
         checkSupport(current.paging, "largestPageSize", fn () core.Size);
 
         return current.paging.largestPageSize();
@@ -246,7 +251,7 @@ pub const paging = struct {
     pub const PageTable: type = current.paging.PageTable;
 
     /// Allocates a new page table.
-    pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
+    pub fn allocatePageTable() callconv(core.inline_in_non_debug_calling_convention) error{PageAllocationFailed}!*PageTable {
         checkSupport(current.paging, "allocatePageTable", fn () error{PageAllocationFailed}!*PageTable);
 
         return current.paging.allocatePageTable();
@@ -261,12 +266,12 @@ pub const paging = struct {
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// This function will only use the architecture's `standard_page_size`.
-    pub inline fn mapToPhysicalRange(
+    pub fn mapToPhysicalRange(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
         map_type: kernel.memory.virtual.MapType,
-    ) MapError!void {
+    ) callconv(core.inline_in_non_debug_calling_convention) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
             kernel.VirtualRange,
@@ -280,10 +285,10 @@ pub const paging = struct {
     /// Unmaps the `virtual_range`.
     ///
     /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
-    pub inline fn unmap(
+    pub fn unmap(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
-    ) void {
+    ) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.paging, "unmap", fn (*PageTable, kernel.VirtualRange) void);
 
         current.paging.unmap(page_table, virtual_range);
@@ -292,12 +297,12 @@ pub const paging = struct {
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// This function is allowed to use all page sizes available to the architecture.
-    pub inline fn mapToPhysicalRangeAllPageSizes(
+    pub fn mapToPhysicalRangeAllPageSizes(
         page_table: *PageTable,
         virtual_range: kernel.VirtualRange,
         physical_range: kernel.PhysicalRange,
         map_type: kernel.memory.virtual.MapType,
-    ) MapError!void {
+    ) callconv(core.inline_in_non_debug_calling_convention) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
             *PageTable,
             kernel.VirtualRange,
@@ -309,7 +314,7 @@ pub const paging = struct {
     }
 
     /// Switches to the given page table.
-    pub inline fn switchToPageTable(page_table: *const PageTable) void {
+    pub fn switchToPageTable(page_table: *const PageTable) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.paging, "switchToPageTable", fn (*const PageTable) void);
 
         current.paging.switchToPageTable(page_table);
@@ -321,7 +326,9 @@ pub const paging = struct {
         ///   2. allocate a backing frame for it
         ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
         ///   4. return the `kernel.VirtualRange` representing the entire virtual range that entry covers
-        pub inline fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) MapError!kernel.VirtualRange {
+        pub fn getTopLevelRangeAndFillFirstLevel(
+            page_table: *PageTable,
+        ) callconv(core.inline_in_non_debug_calling_convention) MapError!kernel.VirtualRange {
             checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!kernel.VirtualRange);
 
             return current.paging.init.getTopLevelRangeAndFillFirstLevel(page_table);
@@ -333,36 +340,49 @@ pub const scheduling = struct {
     /// Switches to the provided stack and returns.
     ///
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn changeStackAndReturn(stack_pointer: kernel.VirtualAddress) noreturn {
+    pub fn changeStackAndReturn(
+        stack_pointer: kernel.VirtualAddress,
+    ) callconv(core.inline_in_non_debug_calling_convention) noreturn {
         checkSupport(current.scheduling, "changeStackAndReturn", fn (kernel.VirtualAddress) noreturn);
 
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
 
-    pub inline fn switchToThreadFromIdle(processor: *kernel.Processor, thread: *kernel.scheduler.Thread) noreturn {
+    pub fn switchToThreadFromIdle(
+        processor: *kernel.Processor,
+        thread: *kernel.scheduler.Thread,
+    ) callconv(core.inline_in_non_debug_calling_convention) noreturn {
         checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*kernel.Processor, *kernel.scheduler.Thread) noreturn);
 
         current.scheduling.switchToThreadFromIdle(processor, thread);
     }
 
-    pub inline fn switchToThreadFromThread(processor: *kernel.Processor, old_thread: *kernel.scheduler.Thread, new_thread: *kernel.scheduler.Thread) void {
+    pub fn switchToThreadFromThread(
+        processor: *kernel.Processor,
+        old_thread: *kernel.scheduler.Thread,
+        new_thread: *kernel.scheduler.Thread,
+    ) callconv(core.inline_in_non_debug_calling_convention) void {
         checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Processor, *kernel.scheduler.Thread, *kernel.scheduler.Thread) void);
 
         current.scheduling.switchToThreadFromThread(processor, old_thread, new_thread);
     }
 
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn switchToIdle(processor: *kernel.Processor, stack_pointer: kernel.VirtualAddress, opt_old_thread: ?*kernel.scheduler.Thread) noreturn {
+    pub fn switchToIdle(
+        processor: *kernel.Processor,
+        stack_pointer: kernel.VirtualAddress,
+        opt_old_thread: ?*kernel.scheduler.Thread,
+    ) callconv(core.inline_in_non_debug_calling_convention) noreturn {
         checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Processor, kernel.VirtualAddress, ?*kernel.scheduler.Thread) noreturn);
 
         current.scheduling.switchToIdle(processor, stack_pointer, opt_old_thread);
     }
 
-    pub inline fn prepareStackForNewThread(
+    pub fn prepareStackForNewThread(
         thread: *kernel.scheduler.Thread,
         context: u64,
         target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
-    ) error{StackOverflow}!void {
+    ) callconv(core.inline_in_non_debug_calling_convention) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareStackForNewThread", fn (
             *kernel.scheduler.Thread,
             u64,
