@@ -24,7 +24,7 @@ fn elapsed(value1: u64, value2: u64) core.Duration {
 
 pub const init = struct {
     pub fn registerTimeSource() linksection(kernel.info.init_code) void {
-        if (!x86_64.arch_info.invariant_tsc) return;
+        if (!shouldUseTsc()) return;
 
         kernel.time.init.addTimeSource(.{
             .name = "tsc",
@@ -49,9 +49,8 @@ pub const init = struct {
     }
 
     fn initializeTsc() linksection(kernel.info.init_code) void {
+        core.debugAssert(shouldUseTsc());
         core.debugAssert(x86_64.arch_info.tsc_tick_duration_fs != null);
-        core.debugAssert(x86_64.arch_info.invariant_tsc);
-        core.debugAssert(x86_64.arch_info.rdtscp);
 
         tick_duration_fs = x86_64.arch_info.tsc_tick_duration_fs.?;
         log.debug("tick duration (fs) from cpuid: {}", .{tick_duration_fs});
@@ -60,8 +59,7 @@ pub const init = struct {
     fn initializeTscCalibrate(
         reference_time_source: kernel.time.init.ReferenceCounterTimeSource,
     ) linksection(kernel.info.init_code) void {
-        core.debugAssert(x86_64.arch_info.invariant_tsc);
-        core.debugAssert(x86_64.arch_info.rdtscp);
+        core.debugAssert(shouldUseTsc());
 
         const reference_duration = core.Duration.from(15, .millisecond);
 
@@ -87,6 +85,10 @@ pub const init = struct {
         while (readTsc() < target_value) {
             kernel.arch.spinLoopHint();
         }
+    }
+
+    fn shouldUseTsc() linksection(kernel.info.init_code) bool {
+        return x86_64.arch_info.rdtscp and (x86_64.arch_info.invariant_tsc or kernel.info.hypervisor == .tcg);
     }
 };
 
