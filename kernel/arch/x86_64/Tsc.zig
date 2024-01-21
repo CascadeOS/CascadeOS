@@ -61,15 +61,43 @@ pub const init = struct {
     ) linksection(kernel.info.init_code) void {
         core.debugAssert(shouldUseTsc());
 
-        const reference_duration = core.Duration.from(15, .millisecond);
+        // warmup
+        {
+            const warmup_duration = core.Duration.from(1, .millisecond);
+            const number_of_warmups = 5;
 
-        reference_time_source.prepareToWaitFor(reference_duration);
+            var total_warmup_ticks: u64 = 0;
 
-        const start = readTsc();
-        reference_time_source.waitFor(reference_duration);
-        const end = readTsc();
+            for (0..number_of_warmups) |_| {
+                reference_time_source.prepareToWaitFor(warmup_duration);
 
-        tick_duration_fs = (reference_duration.value * kernel.time.fs_per_ns) / (end - start);
+                const start = readTsc();
+                reference_time_source.waitFor(warmup_duration);
+                const end = readTsc();
+
+                total_warmup_ticks += end - start;
+            }
+
+            std.mem.doNotOptimizeAway(&total_warmup_ticks);
+        }
+
+        const sample_duration = core.Duration.from(5, .millisecond);
+        const number_of_samples = 5;
+        var total_ticks: u64 = 0;
+
+        for (0..number_of_samples) |_| {
+            reference_time_source.prepareToWaitFor(sample_duration);
+
+            const start = readTsc();
+            reference_time_source.waitFor(sample_duration);
+            const end = readTsc();
+
+            total_ticks += end - start;
+        }
+
+        const average_ticks = total_ticks / number_of_samples;
+
+        tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
         log.debug("tick duration (fs) using reference counter: {}", .{tick_duration_fs});
     }
 
