@@ -94,17 +94,21 @@ pub const init = struct {
 
         wallclock: ?Wallclock = null,
 
+        initialized: bool = false,
+
         list_next: ?*CandidateTimeSource = null,
 
         fn initialize(
             self: *CandidateTimeSource,
             reference_time_source: ReferenceCounterTimeSource,
         ) linksection(kernel.info.init_code) void {
+            if (self.initialized) return;
             switch (self.initialization) {
                 .none => {},
                 .simple => |simple| simple(),
                 .calibration_required => |calibration_required| calibration_required(reference_time_source),
             }
+            self.initialized = true;
         }
 
         pub const Initialization = union(enum) {
