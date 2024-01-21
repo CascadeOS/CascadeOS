@@ -161,13 +161,21 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) void {
     // TSC
     if (x86_64.arch_info.invariant_tsc) {
-        // TODO: If we can determine the TSC frequency from CPUID then it can be used without calibration and therefore
-        // would be suitable as a reference time source.
         kernel.time.init.addTimeSource(.{
             .name = "tsc",
             .priority = 200,
             .per_core = true,
-            .initialization = .{ .calibration_required = x86_64.Tsc.init.initializeTsc },
+            .initialization = if (x86_64.arch_info.tsc_tick_duration_ps != null)
+                .{ .simple = x86_64.Tsc.init.initializeTsc }
+            else
+                .{ .calibration_required = x86_64.Tsc.init.initializeTscCalibrate },
+            .reference_counter = if (x86_64.arch_info.tsc_tick_duration_ps != null)
+                .{
+                    .prepareToWaitForFn = x86_64.Tsc.init.prepareToWaitFor,
+                    .waitForFn = x86_64.Tsc.init.waitFor,
+                }
+            else
+                null,
             .wallclock = .{
                 .readCounterFn = x86_64.Tsc.readCounter,
                 .elapsedFn = x86_64.Tsc.elapsed,
