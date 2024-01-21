@@ -141,9 +141,8 @@ fn determineTscTickFrequencyLeaf15And16(max_standard_leaf: u32) ?u64 {
         const processor_frequency_info = ProcessorFrequencyInformation.read();
 
         crystal_hz =
-            processor_frequency_info.processor_base_frequency *
-            hz_per_mhz *
-            (tsc_and_core_crystal_info.denominator / tsc_and_core_crystal_info.numerator);
+            (processor_frequency_info.processor_base_frequency * hz_per_mhz * tsc_and_core_crystal_info.denominator) /
+            tsc_and_core_crystal_info.numerator;
     }
 
     if (crystal_hz == 0) return null;
@@ -151,7 +150,7 @@ fn determineTscTickFrequencyLeaf15And16(max_standard_leaf: u32) ?u64 {
     arch_info.lapic_tick_duration_fs = kernel.time.fs_per_s / crystal_hz;
     log.debug("lapic tick duration (fs): {}", .{arch_info.lapic_tick_duration_fs.?});
 
-    return crystal_hz * (tsc_and_core_crystal_info.numerator / tsc_and_core_crystal_info.denominator);
+    return (crystal_hz * tsc_and_core_crystal_info.numerator) / tsc_and_core_crystal_info.denominator;
 }
 
 fn determineTscTickFrequencyLeaf40000010(max_hypervisor_leaf: u32) ?u64 {
