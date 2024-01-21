@@ -8,6 +8,8 @@ const symbols = @import("symbols.zig");
 
 pub const log = @import("log.zig");
 
+var panicked_processor = std.atomic.Value(kernel.Processor.Id).init(.none);
+
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
 
 /// Entry point from the Zig language upon a panic.
@@ -32,7 +34,45 @@ fn panicImpl(
     stack_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
 ) void {
-    init.earlyPanicImpl(msg, stack_trace, return_address);
+    const processor = kernel.arch.getProcessor();
+
+    if (panicked_processor.cmpxchgStrong(
+        .none,
+        processor.id,
+        .AcqRel,
+        .Acquire,
+    )) |unexpected_processor| {
+        if (unexpected_processor != processor.id) return;
+
+        // we have already panicked on this processor.
+
+        const have_lock = kernel.arch.init.EarlyOutput.lock._processor_id == processor.id;
+        if (!have_lock) _ = kernel.arch.init.EarlyOutput.lock.lock();
+
+        const writer = kernel.arch.init.getEarlyOutputNoLock() orelse return;
+
+        writer.writeAll("\nPANIC IN PANIC on processor ") catch unreachable;
+
+        processor.id.print(writer) catch unreachable;
+
+        printUserPanicMessage(writer, msg);
+
+        printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
+
+        return;
+    }
+
+    // TODO: We need to move off of the early output writer in the main panic impl.
+    const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+    defer early_output.deinit();
+
+    early_output.writer.writeAll("\nPANIC on processor ") catch unreachable;
+
+    processor.id.print(early_output.writer) catch unreachable;
+
+    printUserPanicMessage(early_output.writer, msg);
+
+    printErrorAndCurrentStackTrace(early_output.writer, stack_trace, return_address);
 }
 
 fn printStackTrace(
@@ -300,6 +340,10 @@ fn printErrorAndCurrentStackTrace(writer: anytype, stack_trace: ?*const std.buil
 }
 
 pub const init = struct {
+    pub fn switchToMainPanicImpl() linksection(kernel.info.init_code) void {
+        panic_impl = panicImpl;
+    }
+
     /// Panic implementation used before the kernel is fully initialized and running.
     fn earlyPanicImpl(
         msg: []const u8,
@@ -307,9 +351,6 @@ pub const init = struct {
         return_address: usize,
     ) void { // TODO: Put in init_code section
         const processor = kernel.arch.earlyGetProcessor() orelse {
-            // Somehow we have panicked before we have loaded a processor.
-            // We might clobber another processors output but we don't have a choice.
-
             const writer = kernel.arch.init.getEarlyOutputNoLock() orelse return;
 
             writer.writeAll("\nPANIC - before processor loaded") catch unreachable;
@@ -321,8 +362,15 @@ pub const init = struct {
             return;
         };
 
-        if (processor.panicked) {
-            // We have already panicked on this processor.
+        if (panicked_processor.cmpxchgStrong(
+            .none,
+            processor.id,
+            .AcqRel,
+            .Acquire,
+        )) |unexpected_processor| {
+            if (unexpected_processor != processor.id) return;
+
+            // we have already panicked on this processor.
 
             const have_lock = kernel.arch.init.EarlyOutput.lock._processor_id == processor.id;
             if (!have_lock) _ = kernel.arch.init.EarlyOutput.lock.lock();
@@ -337,15 +385,8 @@ pub const init = struct {
 
             printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
 
-            if (have_lock) {
-                // we need to unlock the output lock or other processors will be deadlocked
-                kernel.arch.init.EarlyOutput.lock.unsafeUnlock();
-            }
-
             return;
         }
-
-        processor.panicked = true;
 
         const early_output = kernel.arch.init.getEarlyOutput() orelse return;
         defer early_output.deinit();

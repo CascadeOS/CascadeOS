@@ -114,6 +114,8 @@ fn kernelInitStage3() noreturn {
 
         log.debug("all processors in init stage 3", .{});
 
+        kernel.debug.init.switchToMainPanicImpl();
+
         log.debug("reclaiming bootloader reclaimable memory", .{});
         kernel.memory.physical.init.reclaimBootloaderReclaimableMemory();
 

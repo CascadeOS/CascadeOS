@@ -13,8 +13,6 @@ const Processor = @This();
 
 id: Id,
 
-panicked: bool = false,
-
 /// The stack used for idle.
 ///
 /// Also used during the move from the bootloader provided stack until we start scheduling.
