@@ -25,18 +25,22 @@ pub fn capture() linksection(kernel.info.init_code) void {
     const max_extended_leaf = cpuid_leaf_extended.eax;
     log.debug("largest extended function: 0x{x}", .{max_extended_leaf});
 
-    const hypervisor_info = HypervisorInformation.read();
-    const max_hypervisor_leaf = hypervisor_info.max_hypervisor_leaf;
-    if (max_hypervisor_leaf != 0) {
-        log.debug("maximum hypervisor function: 0x{x}", .{max_hypervisor_leaf});
-        captureHypervisorVendorId(hypervisor_info);
-    }
-
     captureVendorString(cpuid_leaf_0);
 
     captureBrandString(max_extended_leaf);
 
     handleSimpleLeafs(max_standard_leaf, max_extended_leaf);
+
+    var max_hypervisor_leaf: u32 = 0;
+
+    if (arch_info.hypervisor_present) {
+        const hypervisor_info = HypervisorInformation.read();
+        max_hypervisor_leaf = hypervisor_info.max_hypervisor_leaf;
+        log.debug("maximum hypervisor function: 0x{x}", .{max_hypervisor_leaf});
+
+        kernel.info.hypervisor = determineHypervisor(hypervisor_info);
+        log.debug("hypervisor: {s}", .{@tagName(kernel.info.hypervisor.?)});
+    }
 
     determineTscTickDuration(max_standard_leaf, max_hypervisor_leaf);
 }
@@ -53,15 +57,26 @@ fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
     return orig_rflags.id != new_rflags.id;
 }
 
-/// Captures the hypervisor vendor id from CPUID.40000000h
-fn captureHypervisorVendorId(hypervisor_info: HypervisorInformation) linksection(kernel.info.init_code) void {
-    const vendor_string_array = [_]u32{
-        hypervisor_info.hypervisor_vendor_id_1,
-        hypervisor_info.hypervisor_vendor_id_2,
-        hypervisor_info.hypervisor_vendor_id_3,
+fn determineHypervisor(hypervisor_info: HypervisorInformation) linksection(kernel.info.init_code) kernel.info.Hypervisor {
+    const hypervisor_vendor_id: [12]u8 = blk: {
+        var hypervisor_vendor_id = [_]u8{0} ** 12;
+        std.mem.copyForwards(u8, hypervisor_vendor_id[0..][0..4], std.mem.asBytes(&hypervisor_info.hypervisor_vendor_id_1));
+        std.mem.copyForwards(u8, hypervisor_vendor_id[4..][0..4], std.mem.asBytes(&hypervisor_info.hypervisor_vendor_id_2));
+        std.mem.copyForwards(u8, hypervisor_vendor_id[8..][0..4], std.mem.asBytes(&hypervisor_info.hypervisor_vendor_id_3));
+        break :blk hypervisor_vendor_id;
     };
-    std.mem.copyForwards(u8, &arch_info.hypervisor_vendor_id.?, std.mem.sliceAsBytes(&vendor_string_array));
-    log.debug("hypervisor vendor id: {s}", .{arch_info.hypervisor_vendor_id.?});
+    log.debug("hypervisor vendor id: {s}", .{hypervisor_vendor_id});
+
+    if (std.mem.startsWith(u8, &hypervisor_vendor_id, "KVMKVMKVM")) return .kvm;
+
+    if (std.mem.startsWith(u8, &hypervisor_vendor_id, "TCGTCGTCGTCG")) return .tcg;
+
+    if (std.mem.startsWith(u8, &hypervisor_vendor_id, "VMwareVMware")) return .vmware;
+
+    if (std.mem.startsWith(u8, &hypervisor_vendor_id, "Microsoft Hv")) return .hyperv;
+
+    log.warn("unable to determine hypervisor from vendor id: {s}", .{hypervisor_vendor_id});
+    return .unknown;
 }
 
 /// Captures the vendor string from CPUID.00h
@@ -251,7 +266,7 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
                 .target = &x86_64.arch_info.monitor,
             },
             .{
-                .name = "tsc-deadline",
+                .name = "tsc deadline",
                 .register = .ecx,
                 .mask_bit = 24,
                 .target = &x86_64.arch_info.tsc_deadline,
@@ -267,6 +282,12 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
                 .register = .ecx,
                 .mask_bit = 30,
                 .target = &x86_64.arch_info.rdrand,
+            },
+            .{
+                .name = "hypervisor present",
+                .register = .ecx,
+                .mask_bit = 31,
+                .target = &x86_64.arch_info.hypervisor_present,
             },
             .{
                 .name = "tsc",

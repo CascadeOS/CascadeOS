@@ -50,3 +50,14 @@ pub var non_cached_direct_map: kernel.VirtualRange = undefined;
 ///
 /// Initialized during `initKernelStage1`.
 pub var kernel_file: ?kernel.VirtualRange = null;
+
+/// The hypervisor we are running on or null if we are not running on a hypervisor.
+pub var hypervisor: ?Hypervisor = null;
+
+pub const Hypervisor = enum {
+    kvm,
+    tcg,
+    hyperv,
+    vmware,
+    unknown,
+};

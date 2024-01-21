@@ -12,9 +12,6 @@ pub var cpu_vendor_string: [12]u8 = [_]u8{0} ** 12;
 /// Brand string from CPUID.80000002h - CPUID.80000004h
 pub var processor_brand_string: [48]u8 = [_]u8{0} ** 48;
 
-/// Hypervisor vendor id from CPUID.40000000h
-pub var hypervisor_vendor_id: ?[12]u8 = [_]u8{0} ** 12;
-
 /// The duration of a TSC tick in femptopseconds, if known from CPUID.
 pub var tsc_tick_duration_fs: ?u64 = null;
 
@@ -50,6 +47,8 @@ pub var tsc_deadline: bool = false;
 pub var xsave: bool = false;
 
 pub var rdrand: bool = false;
+
+pub var hypervisor_present: bool = false;
 
 // CPUID.07h.00h:EBX
 
