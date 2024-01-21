@@ -64,7 +64,6 @@ fn panicImpl(
 
     // TODO: We need to move off of the early output writer in the main panic impl.
     const early_output = kernel.arch.init.getEarlyOutput() orelse return;
-    defer early_output.deinit();
 
     early_output.writer.writeAll("\nPANIC on processor ") catch unreachable;
 
@@ -389,7 +388,6 @@ pub const init = struct {
         }
 
         const early_output = kernel.arch.init.getEarlyOutput() orelse return;
-        defer early_output.deinit();
 
         early_output.writer.writeAll("\nPANIC on processor ") catch unreachable;
 
