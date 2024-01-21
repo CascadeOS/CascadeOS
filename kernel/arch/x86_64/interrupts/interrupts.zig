@@ -456,6 +456,7 @@ pub fn disableInterruptsAndHalt() noreturn {
 }
 
 pub const setTaskPriority = x86_64.apic.setTaskPriority;
+pub const panicInterruptOtherCores = x86_64.apic.panicInterruptOtherCores;
 
 pub const init = struct {
     /// Load the IDT on this core.

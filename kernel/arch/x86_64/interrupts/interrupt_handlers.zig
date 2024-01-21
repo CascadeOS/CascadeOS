@@ -11,6 +11,11 @@ const log = kernel.debug.log.scoped(.interrupt);
 pub fn nonMaskableInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
     _ = interrupt_frame;
 
+    if (kernel.debug.hasAProcessorPanicked()) {
+        // We have received a panic nmi
+        kernel.arch.interrupts.disableInterruptsAndHalt();
+    }
+
     log.debug("non-maskable interrupt", .{});
 }
 

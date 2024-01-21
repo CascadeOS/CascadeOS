@@ -41,6 +41,19 @@ pub fn setTaskPriority(priority: kernel.scheduler.Priority) void {
     log.debug("set task priority to: {s}", .{@tagName(priority)});
 }
 
+pub fn panicInterruptOtherCores() void {
+    const icr: InterruptCommandRegister = .{
+        .vector = undefined, // overriden by `delivery_mode`
+        .delivery_mode = .nmi,
+        .destination_mode = .logical,
+        .level = .assert,
+        .trigger_mode = .edge,
+        .destination_shorthand = .all_excluding_self,
+        .destination_field = undefined, // destination shorthand is set
+    };
+    icr.write();
+}
+
 pub const init = struct {
     pub fn captureApicInformation(
         fadt: *const kernel.acpi.FADT,
