@@ -66,7 +66,11 @@ pub const paging = struct {
         // FIXME: Are large pages an optional feature like x86?
         return large_page_size;
     }
+
+    pub const init = struct {};
 };
+
+pub const scheduling = struct {};
 
 comptime {
     if (kernel.info.arch != .aarch64) {

@@ -24,8 +24,12 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksec
     _ = bootstrap_processor;
 }
 
-pub fn prepareProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
+pub fn prepareProcessor(
+    processor: *kernel.Processor,
+    processor_descriptor: kernel.boot.ProcessorDescriptor,
+) linksection(kernel.info.init_code) void {
     _ = processor;
+    _ = processor_descriptor;
 }
 
 pub fn loadProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
