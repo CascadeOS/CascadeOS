@@ -21,24 +21,23 @@ pub fn changeStackAndReturn(stack_pointer: kernel.VirtualAddress) noreturn {
 }
 
 pub fn prepareStackForNewThread(
-    stack: *kernel.Stack,
     thread: *kernel.scheduler.Thread,
     context: u64,
     target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
 ) error{StackOverflow}!void {
-    const old_stack_pointer = stack.stack_pointer;
-    errdefer stack.stack_pointer = old_stack_pointer;
+    const old_stack_pointer = thread.kernel_stack.stack_pointer;
+    errdefer thread.kernel_stack.stack_pointer = old_stack_pointer;
 
-    try stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
+    try thread.kernel_stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
 
-    try stack.push(kernel.VirtualAddress.fromPtr(@ptrCast(target_function)));
-    try stack.push(context);
-    try stack.push(kernel.VirtualAddress.fromPtr(thread));
+    try thread.kernel_stack.push(kernel.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try thread.kernel_stack.push(context);
+    try thread.kernel_stack.push(kernel.VirtualAddress.fromPtr(thread));
 
-    try stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
+    try thread.kernel_stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
 
     // general purpose registers
-    for (0..6) |_| stack.push(@as(u64, 0)) catch unreachable;
+    for (0..6) |_| thread.kernel_stack.push(@as(u64, 0)) catch unreachable;
 }
 
 pub fn switchToThreadFromIdle(processor: *kernel.Processor, thread: *kernel.scheduler.Thread) noreturn {

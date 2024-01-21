@@ -353,19 +353,17 @@ pub const scheduling = struct {
     }
 
     pub inline fn prepareStackForNewThread(
-        stack: *kernel.Stack,
         thread: *kernel.scheduler.Thread,
         context: u64,
         target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
     ) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareStackForNewThread", fn (
-            *kernel.Stack,
             *kernel.scheduler.Thread,
             u64,
             *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
         ) error{StackOverflow}!void);
 
-        return current.scheduling.prepareStackForNewThread(stack, thread, context, target_function);
+        return current.scheduling.prepareStackForNewThread(thread, context, target_function);
     }
 };
 
