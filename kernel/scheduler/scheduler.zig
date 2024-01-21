@@ -50,11 +50,11 @@ pub fn schedule(requeue_current_thread: bool) void {
         unreachable;
     };
 
-    new_thread.next_thread = null;
-
     // update the ready queue
     ready_to_run_start = new_thread.next_thread;
     if (new_thread == ready_to_run_end) ready_to_run_end = null;
+
+    new_thread.next_thread = null;
 
     const current_thread = opt_current_thread orelse {
         // we were previously idle
@@ -72,6 +72,8 @@ pub fn schedule(requeue_current_thread: bool) void {
 }
 
 /// Queues a thread to be run by the scheduler.
+///
+/// The scheduler `lock` must be held when calling this function.
 pub fn queueThread(thread: *Thread) void {
     core.debugAssert(lock.isLockedByCurrent());
     core.debugAssert(thread.next_thread == null);
