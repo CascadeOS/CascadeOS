@@ -117,8 +117,8 @@ fn determineTscTickDuration(max_standard_leaf: u32, max_hypervisor_leaf: u32) vo
         return;
     };
 
-    arch_info.tsc_tick_duration_ps = kernel.time.ps_per_s / frequency;
-    log.debug("tsc tick duration (ps): {}", .{arch_info.tsc_tick_duration_ps.?});
+    arch_info.tsc_tick_duration_fs = kernel.time.fs_per_s / frequency;
+    log.debug("tsc tick duration (fs): {}", .{arch_info.tsc_tick_duration_fs.?});
 }
 
 fn determineTscTickFrequencyLeaf15And16(max_standard_leaf: u32) ?u64 {
@@ -148,7 +148,8 @@ fn determineTscTickFrequencyLeaf15And16(max_standard_leaf: u32) ?u64 {
 
     if (crystal_hz == 0) return null;
 
-    arch_info.lapic_tick_duration_ps = kernel.time.ps_per_s / crystal_hz;
+    arch_info.lapic_tick_duration_fs = kernel.time.fs_per_s / crystal_hz;
+    log.debug("lapic tick duration (fs): {}", .{arch_info.lapic_tick_duration_fs.?});
 
     return crystal_hz * (tsc_and_core_crystal_info.numerator / tsc_and_core_crystal_info.denominator);
 }

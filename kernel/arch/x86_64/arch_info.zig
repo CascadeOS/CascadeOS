@@ -15,11 +15,11 @@ pub var processor_brand_string: [48]u8 = [_]u8{0} ** 48;
 /// Hypervisor vendor id from CPUID.40000000h
 pub var hypervisor_vendor_id: ?[12]u8 = [_]u8{0} ** 12;
 
-/// The duration of a TSC tick in picoseconds, if known from CPUID.
-pub var tsc_tick_duration_ps: ?u64 = null;
+/// The duration of a TSC tick in femptopseconds, if known from CPUID.
+pub var tsc_tick_duration_fs: ?u64 = null;
 
-/// The duration of a LAPIC tick in picoseconds, if known from CPUID.
-pub var lapic_tick_duration_ps: ?u64 = null;
+/// The duration of a LAPIC tick in femptoseconds, if known from CPUID.
+pub var lapic_tick_duration_fs: ?u64 = null;
 
 /// Do we have a PIC?
 ///
