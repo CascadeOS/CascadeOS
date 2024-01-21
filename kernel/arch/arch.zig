@@ -169,6 +169,12 @@ pub const init = struct {
 };
 
 pub const interrupts = struct {
+    pub inline fn panicInterruptOtherCores() void {
+        checkSupport(current.interrupts, "panicInterruptOtherCores", fn () void);
+
+        current.interrupts.panicInterruptOtherCores();
+    }
+
     /// Disable interrupts and put the CPU to sleep.
     pub inline fn disableInterruptsAndHalt() noreturn {
         checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);

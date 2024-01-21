@@ -12,6 +12,10 @@ var panicked_processor = std.atomic.Value(kernel.Processor.Id).init(.none);
 
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
 
+pub fn hasAProcessorPanicked() bool {
+    return panicked_processor.load(.Acquire) != .none;
+}
+
 /// Entry point from the Zig language upon a panic.
 pub fn panic(
     msg: []const u8,
@@ -64,6 +68,8 @@ fn panicImpl(
 
     // TODO: We need to move off of the early output writer in the main panic impl.
     const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+
+    kernel.arch.interrupts.panicInterruptOtherCores();
 
     early_output.writer.writeAll("\nPANIC on processor ") catch unreachable;
 
