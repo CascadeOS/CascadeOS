@@ -159,43 +159,8 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) void {
-    // TSC
-    if (x86_64.arch_info.invariant_tsc) {
-        kernel.time.init.addTimeSource(.{
-            .name = "tsc",
-            .priority = 200,
-            .per_core = true,
-            .initialization = if (x86_64.arch_info.tsc_tick_duration_ps != null)
-                .{ .simple = x86_64.Tsc.init.initializeTsc }
-            else
-                .{ .calibration_required = x86_64.Tsc.init.initializeTscCalibrate },
-            .reference_counter = if (x86_64.arch_info.tsc_tick_duration_ps != null)
-                .{
-                    .prepareToWaitForFn = x86_64.Tsc.init.prepareToWaitFor,
-                    .waitForFn = x86_64.Tsc.init.waitFor,
-                }
-            else
-                null,
-            .wallclock = .{
-                .readCounterFn = x86_64.Tsc.readCounter,
-                .elapsedFn = x86_64.Tsc.elapsed,
-            },
-        });
-    }
-
-    // HPET
-    if (x86_64.Hpet.init.haveHpet()) {
-        kernel.time.init.addTimeSource(.{
-            .name = "hpet",
-            .priority = 100,
-            .per_core = false,
-            .initialization = .{ .simple = x86_64.Hpet.init.initializeHPET },
-            .reference_counter = .{
-                .prepareToWaitForFn = x86_64.Hpet.init.prepareToWaitFor,
-                .waitForFn = x86_64.Hpet.init.waitFor,
-            },
-        });
-    }
+    x86_64.Tsc.init.registerTimeSource();
+    x86_64.Hpet.init.registerTimeSource();
 
     // TODO: APIC, PIT, KVMCLOCK
 

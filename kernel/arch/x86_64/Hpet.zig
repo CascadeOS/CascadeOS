@@ -21,7 +21,22 @@ var tick_duration_fs: u64 = undefined; // Initalized during `initializeHPET`
 var number_of_timers_minus_one: u5 = undefined;
 
 pub const init = struct {
-    pub fn initializeHPET() linksection(kernel.info.init_code) void {
+    pub fn registerTimeSource() linksection(kernel.info.init_code) void {
+        if (kernel.acpi.init.getTable(DescriptionTable) == null) return;
+
+        kernel.time.init.addTimeSource(.{
+            .name = "hpet",
+            .priority = 100,
+            .per_core = false,
+            .initialization = .{ .simple = initializeHPET },
+            .reference_counter = .{
+                .prepareToWaitForFn = prepareToWaitFor,
+                .waitForFn = waitFor,
+            },
+        });
+    }
+
+    fn initializeHPET() linksection(kernel.info.init_code) void {
         base = getHpetBase();
         log.debug("using base address: {*}", .{base});
 
@@ -46,11 +61,7 @@ pub const init = struct {
         CounterRegister.write(0);
     }
 
-    pub fn haveHpet() linksection(kernel.info.init_code) bool {
-        return kernel.acpi.init.getTable(DescriptionTable) != null;
-    }
-
-    pub fn prepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn prepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
         _ = duration;
 
         var general_configuration = GeneralConfigurationRegister.read();
@@ -63,7 +74,7 @@ pub const init = struct {
         general_configuration.write();
     }
 
-    pub fn waitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn waitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
         const current_value = CounterRegister.read();
 
         const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
