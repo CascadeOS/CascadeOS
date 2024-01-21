@@ -463,7 +463,7 @@ pub const init = struct {
         idt.load();
     }
 
-    /// initialize the IDT with raw handlers and correct stacks.
+    /// Initialize the IDT with raw handlers and correct stacks.
     pub fn initIdt() linksection(kernel.info.init_code) void {
         log.debug("mapping idt entries to raw handlers", .{});
         for (raw_handlers, 0..) |raw_handler, i| {
@@ -474,7 +474,13 @@ pub const init = struct {
             );
         }
 
+        setExceptionHandlers();
+
         setVectorStack(.double_fault, .double_fault);
         setVectorStack(.non_maskable_interrupt, .non_maskable_interrupt);
+    }
+
+    fn setExceptionHandlers() linksection(kernel.info.init_code) void {
+        handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = interrupt_handlers.nonMaskableInterrupt;
     }
 };
