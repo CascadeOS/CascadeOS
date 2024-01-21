@@ -495,15 +495,15 @@ pub const InterruptCommandRegister = packed struct(u64) {
     /// Indicates the IPI delivery status.
     ///
     /// Reserved in x2APIC mode.
-    delivery_status: DeliveryStatus,
+    delivery_status: DeliveryStatus = .idle,
 
     _reserved1: u1 = 0,
 
-    /// For the INIT level de-assert delivery mode this flag must be set to 0; for all other delivery modes it must be
-    /// set to 1.
+    /// For the INIT level de-assert delivery mode this flag must be set to `.deassert`; for all other delivery modes it must be
+    /// set to `.assert`.
     ///
     ///
-    /// This flag has no meaning in Pentium 4 and Intel Xeon processors, and will always be issued as `assert`.
+    /// This flag has no meaning in Pentium 4 and Intel Xeon processors, and will always be issued as `.assert`.
     level: Level,
 
     /// Selects the trigger mode when using the INIT level de-assert delivery mode.
@@ -751,6 +751,13 @@ const DeliveryMode = enum(u3) {
     /// Delivers the interrupt specified in the vector field.
     fixed = 0b000,
 
+    /// Same as fixed mode, except that the interrupt is delivered to the processor executing at the lowest priority
+    /// among the set of processors specified in the destination field.
+    ///
+    /// The ability for a processor to send a lowest priority IPI is model specific and should be avoided by BIOS and
+    /// operating system software.
+    lowest_priority = 0b001,
+
     /// Delivers an SMI interrupt to the processor core through the processor’s local SMI signal path.
     ///
     /// When using this delivery mode, the vector field should be set to 00H for future compatibility.
@@ -761,28 +768,22 @@ const DeliveryMode = enum(u3) {
     /// The vector information is ignored.
     nmi = 0b100,
 
-    /// Delivers an INIT request to the processor core, which causes the processor to perform an INIT.
+    /// Delivers an INIT request to the target processor or processors, which causes them to perform an INIT.
     ///
-    /// When using this delivery mode, the vector field should be set to 00H for future compatibility.
+    /// As a result of this IPI message, all the target processors perform an INIT.
     ///
-    /// Not supported for the LVT CMCI register, the LVT thermal monitor register, or the LVT performance counter
-    /// register.
+    /// The vector field must be programmed to 00H for future compatibility.
     init = 0b101,
 
-    /// Causes the processor to respond to the interrupt as if the interrupt originated in an externally connected
-    /// (8259A-compatible) interrupt controller.
+    /// Sends a special "start-up" IPI (called a SIPI) to the target processor or processors.
     ///
-    /// A special INTA bus cycle corresponding to ExtINT, is routed to the external controller.
+    /// The vector typically points to a start-up routine that is part of the BIOS boot-strap code.
     ///
-    /// The external controller is expected to supply the vector information.
+    /// IPIs sent with this delivery mode are not automatically retried if the source APIC is unable to deliver it.
     ///
-    /// The APIC architecture supports only one ExtINT source in a system, usually contained in the compatibility bridge.
-    ///
-    /// Only one processor in the system should have an LVT entry configured to use the ExtINT delivery mode.
-    ///
-    /// Not supported for the LVT CMCI register, the LVT thermal monitor register, or the LVT performance counter
-    /// register.
-    ext_int = 0b111,
+    /// It is up to the software to determine if the SIPI was not successfully delivered and to reissue the SIPI if
+    /// necessary.
+    start_up = 0b110,
 
     _,
 };
@@ -1070,6 +1071,9 @@ const LAPICRegister = enum(u32) {
     }
 
     pub fn x2apicRegister(self: LAPICRegister) u32 {
+        core.debugAssert(self != .destination_format); // not supported in x2APIC mode
+        core.debugAssert(self != .arbitration_priority); // not supported in x2APIC mode
+        core.debugAssert(self != .remote_read); // not supported in x2APIC mode
         core.debugAssert(self != .interrupt_command_32_63); // not supported in x2APIC mode
 
         return 0x800 + @intFromEnum(self);
