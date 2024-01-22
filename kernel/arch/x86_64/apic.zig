@@ -16,6 +16,9 @@ var lapic_ptr: [*]volatile u8 = undefined;
 /// Initialized in `init.captureApicInformation`
 var x2apic: bool = false;
 
+/// The duration of a tick in femptoseconds.
+var tick_duration_fs: u64 = undefined; // Initalized during `initializeLapicTimer[Calibrate]`
+
 /// Signal end of interrupt.
 ///
 /// For all interrupts except those delivered with the NMI, SMI, INIT, ExtINT, the start-up, or INIT-Deassert delivery
@@ -25,7 +28,7 @@ var x2apic: bool = false;
 ///
 /// This action indicates that the servicing of the current interrupt is complete and the local APIC can issue the next
 /// interrupt from the ISR.
-pub fn eoi() void {
+pub inline fn eoi() void {
     writeRegister(.eoi, 0);
 }
 
@@ -79,6 +82,8 @@ pub const init = struct {
 
     pub fn initApicOnProcessor(_: *kernel.Processor) linksection(kernel.info.init_code) void {
         setTaskPriority(.idle);
+
+        // TODO: Error interrupt
 
         const spurious_interrupt_register: SupriousInterruptRegister = .{
             .apic_enable = true,
@@ -168,7 +173,7 @@ pub const init = struct {
         /// Indicates the interrupt delivery status.
         ///
         /// Read Only
-        status: DeliveryStatus,
+        status: DeliveryStatus = .idle,
 
         _reserved2: u3 = 0,
 
@@ -255,7 +260,7 @@ pub const init = struct {
         /// Indicates the interrupt delivery status.
         ///
         /// Read Only
-        status: DeliveryStatus,
+        status: DeliveryStatus = .idle,
 
         _reserved2: u3 = 0,
 
@@ -316,6 +321,19 @@ pub const init = struct {
 
         pub fn write(self: DivideConfigurationRegister) linksection(kernel.info.init_code) void {
             writeRegister(.divide_configuration, @intFromEnum(self));
+        }
+
+        pub fn toInt(self: DivideConfigurationRegister) usize {
+            return switch (self) {
+                .@"2" => 2,
+                .@"4" => 4,
+                .@"8" => 8,
+                .@"16" => 16,
+                .@"32" => 32,
+                .@"64" => 64,
+                .@"128" => 128,
+                .@"1" => 1,
+            };
         }
     };
 
@@ -466,13 +484,15 @@ const TaskPriorityRegister = packed struct(u32) {
 /// initial-count value.
 ///
 /// A write of 0 to the initial-count register effectively stops the local APIC timer, in both one-shot and periodic mode.
-pub const InitialCountRegister = struct {
-    pub fn read() linksection(kernel.info.init_code) u32 {
-        return readRegister(.initial_count);
-    }
-
-    pub fn write(count: u32) linksection(kernel.info.init_code) void {
+const InitialCountRegister = struct {
+    pub fn write(count: u32) void {
         writeRegister(.initial_count, count);
+    }
+};
+
+const CurrentCountRegister = struct {
+    pub fn read() linksection(kernel.info.init_code) u32 {
+        return readRegister(.current_count);
     }
 };
 
@@ -495,7 +515,7 @@ pub const InitialCountRegister = struct {
 /// processor or processors.
 ///
 /// The act of writing to the low doubleword of the ICR causes the IPI to be sent.
-pub const InterruptCommandRegister = packed struct(u64) {
+const InterruptCommandRegister = packed struct(u64) {
     /// The vector number of the interrupt being sent.
     vector: x86_64.interrupts.IdtVector,
 
@@ -626,17 +646,17 @@ pub const InterruptCommandRegister = packed struct(u64) {
     }
 };
 
-pub const Level = enum(u1) {
+const Level = enum(u1) {
     deassert = 0,
     assert = 1,
 };
 
-pub const TriggerMode = enum(u1) {
+const TriggerMode = enum(u1) {
     edge = 0,
     level = 1,
 };
 
-pub const DestinationMode = enum(u1) {
+const DestinationMode = enum(u1) {
     /// In physical destination mode, the destination processor is specified by its local APIC ID.
     ///
     /// For Pentium 4 and Intel Xeon processors, either a single destination (local APIC IDs 00H through FEH) or a
@@ -682,7 +702,7 @@ pub const DestinationMode = enum(u1) {
 /// when APIC error is detected.
 /// The register also provides a means of masking an APIC-error interrupt.
 /// This masking only prevents delivery of APIC-error interrupts; the APIC continues to record errors in the ESR.
-pub const ErrorStatusRegister = packed struct(u32) {
+const ErrorStatusRegister = packed struct(u32) {
     /// Set when the local APIC detects a checksum error for a message that it sent on the APIC bus.
     ///
     /// Used only on P6 family and Pentium processors.
