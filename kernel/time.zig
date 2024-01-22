@@ -127,7 +127,7 @@ pub const init = struct {
         wallclock: bool = false,
     };
 
-    fn findTimeSource(query: TimeSourceQuery) linksection(kernel.info.init_code) ?*CandidateTimeSource {
+    fn findAndInitializeTimeSource(query: TimeSourceQuery, reference_counter: ReferenceCounter) linksection(kernel.info.init_code) ?*CandidateTimeSource {
         var opt_best_candidate: ?*CandidateTimeSource = null;
 
         for (candidate_time_sources.slice()) |*time_source| {
@@ -144,18 +144,18 @@ pub const init = struct {
             }
         }
 
+        if (opt_best_candidate) |best_candidate| best_candidate.initialize(reference_counter);
+
         return opt_best_candidate;
     }
 
     fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounter {
-        const time_source = findTimeSource(.{
+        const time_source = findAndInitializeTimeSource(.{
             .pre_calibrated = true,
             .reference_counter = true,
-        }) orelse core.panic("no reference counter found");
+        }, undefined) orelse core.panic("no reference counter found");
 
         log.debug("using reference counter: {s}", .{time_source.name});
-
-        time_source.initialize(undefined);
 
         const reference_counter_impl = time_source.reference_counter.?;
 
@@ -168,13 +168,11 @@ pub const init = struct {
     fn configureWallclockTimeSource(
         reference_counter: ReferenceCounter,
     ) linksection(kernel.info.init_code) void {
-        const time_source = findTimeSource(.{
+        const time_source = findAndInitializeTimeSource(.{
             .wallclock = true,
-        }) orelse core.panic("no wallclock found");
+        }, reference_counter) orelse core.panic("no wallclock found");
 
         log.debug("using wallclock: {s}", .{time_source.name});
-
-        time_source.initialize(reference_counter);
 
         const wallclock_impl = time_source.wallclock.?;
 
