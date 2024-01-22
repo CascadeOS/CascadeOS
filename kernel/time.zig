@@ -14,33 +14,22 @@ pub const fs_per_ns = 1000000;
 pub const fs_per_s = fs_per_ns * std.time.ns_per_s;
 
 pub const wallclock = struct {
-    var wallclock_time_source: WallclockTimeSource = undefined;
+    var readFn: *const fn () u64 = undefined;
+    var elapsedFn: *const fn (value1: u64, value2: u64) core.Duration = undefined;
 
     /// Read the wallclock value.
     ///
     /// The value returned is an opaque timer tick, to acquire an actual time value, use `elapsed`.
-    pub fn read() callconv(core.inline_in_non_debug_calling_convention) u64 {
-        return wallclock_time_source.readCounterFn();
+    pub inline fn read() u64 {
+        return readFn();
     }
 
     /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
     ///
     /// Counter wraparound is assumed to have not occured.
-    pub fn elapsed(value1: u64, value2: u64) callconv(core.inline_in_non_debug_calling_convention) core.Duration {
-        return wallclock_time_source.elapsedFn(value1, value2);
+    pub inline fn elapsed(value1: u64, value2: u64) core.Duration {
+        return elapsedFn(value1, value2);
     }
-
-    const WallclockTimeSource = struct {
-        /// Read the wallclock value.
-        ///
-        /// The value returned is an opaque timer tick.
-        readCounterFn: *const fn () u64,
-
-        /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
-        ///
-        /// Counter wraparound is assumed to have not occured.
-        elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
-    };
 };
 
 pub const init = struct {
@@ -50,7 +39,7 @@ pub const init = struct {
 
         const reference_counter = getReferenceCounter();
 
-        wallclock.wallclock_time_source = getWallclockTimeSource(reference_counter);
+        configureWallclockTimeSource(reference_counter);
     }
 
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) linksection(kernel.info.init_data) = .{};
@@ -107,7 +96,7 @@ pub const init = struct {
             /// Read the wallclock value.
             ///
             /// The value returned is an opaque timer tick.
-            readCounterFn: *const fn () u64,
+            readFn: *const fn () u64,
 
             /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
             ///
@@ -200,9 +189,9 @@ pub const init = struct {
         };
     }
 
-    fn getWallclockTimeSource(
+    fn configureWallclockTimeSource(
         reference_counter: ReferenceCounter,
-    ) linksection(kernel.info.init_code) wallclock.WallclockTimeSource {
+    ) linksection(kernel.info.init_code) void {
         const time_source = findTimeSource(.{
             .wallclock = true,
         }) orelse core.panic("no wallclock found");
@@ -213,10 +202,8 @@ pub const init = struct {
 
         const wallclock_impl = time_source.wallclock.?;
 
-        return .{
-            .readCounterFn = wallclock_impl.readCounterFn,
-            .elapsedFn = wallclock_impl.elapsedFn,
-        };
+        wallclock.readFn = wallclock_impl.readFn;
+        wallclock.elapsedFn = wallclock_impl.elapsedFn;
     }
 
     pub const ReferenceCounter = struct {

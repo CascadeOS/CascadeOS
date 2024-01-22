@@ -13,7 +13,7 @@ const Tsc = @This();
 /// The duration of a tick in femptoseconds.
 var tick_duration_fs: u64 = undefined; // Initalized during `initializeTsc`
 
-fn wallClockReadCounter() u64 {
+fn wallClockRead() u64 {
     return readTsc();
 }
 
@@ -42,7 +42,7 @@ pub const init = struct {
             else
                 null,
             .wallclock = .{
-                .readCounterFn = wallClockReadCounter,
+                .readFn = wallClockRead,
                 .elapsedFn = wallClockElapsed,
             },
         });
