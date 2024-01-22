@@ -32,6 +32,20 @@ pub const wallclock = struct {
     }
 };
 
+pub const per_core_periodic = struct {
+    var setInterruptFn: *const fn (period: core.Duration, handler: *const fn () void) void = undefined;
+
+    /// Sets and enables an interrupt that calls `handler` every `period`.
+    ///
+    /// NOTE: Must be called only once.
+    pub inline fn setInterrupt(
+        period: core.Duration,
+        handler: *const fn () void,
+    ) linksection(kernel.info.init_code) void {
+        return setInterruptFn(period, handler);
+    }
+};
+
 pub const init = struct {
     pub fn initTime() linksection(kernel.info.init_code) void {
         log.debug("registering architectural time sources", .{});
@@ -40,6 +54,7 @@ pub const init = struct {
         const reference_counter = getReferenceCounter();
 
         configureWallclockTimeSource(reference_counter);
+        configurePerCorePeriodicTimeSource(reference_counter);
     }
 
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) linksection(kernel.info.init_data) = .{};
@@ -55,11 +70,18 @@ pub const init = struct {
         ///
         /// To be a valid reference counter the time source must not require calibration.
         ///
-        /// The reference counter interface is only used during initialization.
+        /// NOTE: The reference counter interface is only used during initialization.
         reference_counter: ?ReferenceCounterOptions = null,
 
         /// Provided if the time source is usable as a wallclock.
         wallclock: ?WallclockOptions = null,
+
+        /// Provided if the time source is usable as a per-core periodic interrupt.
+        ///
+        /// If there is only one core then a non-per-core time source is acceptable.
+        ///
+        /// NOTE: The per core period interface is only used during initialization.
+        per_core_periodic: ?PerCorePeriodicOptions = null,
 
         initialized: bool = false,
 
@@ -105,6 +127,13 @@ pub const init = struct {
             /// Counter wraparound is assumed to have not occured.
             elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
         };
+
+        pub const PerCorePeriodicOptions = struct {
+            /// Sets and enables an interrupt that calls `handler` every `period`.
+            ///
+            /// NOTE: Must be called only once.
+            setInterruptFn: *const fn (period: core.Duration, handler: *const fn () void) void,
+        };
     };
 
     pub fn addTimeSource(time_source: CandidateTimeSource) linksection(kernel.info.init_code) void {
@@ -120,9 +149,10 @@ pub const init = struct {
 
         log.debug("adding time source: {s}", .{time_source.name});
         log.debug("  priority: {}", .{time_source.priority});
-        log.debug("  reference counter: {} - wall clock: {}", .{
+        log.debug("  reference counter: {} - wall clock: {} - per core periodic: {}", .{
             time_source.reference_counter != null,
             time_source.wallclock != null,
+            time_source.per_core_periodic != null,
         });
     }
 
@@ -132,6 +162,8 @@ pub const init = struct {
         reference_counter: bool = false,
 
         wallclock: bool = false,
+
+        per_core_periodic: bool = false,
     };
 
     fn findAndInitializeTimeSource(query: TimeSourceQuery, reference_counter: ReferenceCounter) linksection(kernel.info.init_code) ?*CandidateTimeSource {
@@ -143,6 +175,8 @@ pub const init = struct {
             if (query.reference_counter and time_source.reference_counter == null) continue;
 
             if (query.wallclock and time_source.wallclock == null) continue;
+
+            if (query.per_core_periodic and time_source.per_core_periodic == null) continue;
 
             if (opt_best_candidate) |best_candidate| {
                 if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
@@ -185,6 +219,20 @@ pub const init = struct {
 
         wallclock.readFn = wallclock_impl.readFn;
         wallclock.elapsedFn = wallclock_impl.elapsedFn;
+    }
+
+    fn configurePerCorePeriodicTimeSource(
+        reference_counter: ReferenceCounter,
+    ) linksection(kernel.info.init_code) void {
+        const time_source = findAndInitializeTimeSource(.{
+            .per_core_periodic = true,
+        }, reference_counter) orelse core.panic("no per-core periodic found");
+
+        log.debug("using per-core periodic: {s}", .{time_source.name});
+
+        const per_core_periodic_impl = time_source.per_core_periodic.?;
+
+        per_core_periodic.setInterruptFn = per_core_periodic_impl.setInterruptFn;
     }
 
     pub const ReferenceCounter = struct {
