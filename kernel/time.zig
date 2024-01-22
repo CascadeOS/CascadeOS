@@ -114,6 +114,10 @@ pub const init = struct {
 
         log.debug("adding time source: {s}", .{time_source.name});
         log.debug("  priority: {}", .{time_source.priority});
+        log.debug("  reference counter: {} - wall clock: {}", .{
+            time_source.reference_counter != null,
+            time_source.wallclock != null,
+        });
     }
 
     const TimeSourceQuery = struct {
