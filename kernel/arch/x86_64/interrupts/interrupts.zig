@@ -400,6 +400,8 @@ pub const IdtVector = enum(u8) {
     pic_primary_ata = 0x2E,
     pic_secondary_ata = 0x2F,
 
+    scheduler = 0x30,
+
     spurious_interrupt = 0xFF,
 
     _,
@@ -483,5 +485,6 @@ pub const init = struct {
 
     fn setFixedHandlers() linksection(kernel.info.init_code) void {
         handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = interrupt_handlers.nonMaskableInterrupt;
+        handlers[@intFromEnum(IdtVector.scheduler)] = interrupt_handlers.scheduler;
     }
 };

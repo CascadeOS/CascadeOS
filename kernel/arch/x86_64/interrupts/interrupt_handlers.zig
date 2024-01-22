@@ -19,6 +19,16 @@ pub fn nonMaskableInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptF
     log.debug("non-maskable interrupt", .{});
 }
 
+pub fn scheduler(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+    _ = interrupt_frame;
+
+    x86_64.apic.eoi();
+
+    const held = kernel.scheduler.lock.lock();
+    defer held.unlock();
+    kernel.scheduler.schedule(true);
+}
+
 /// Handles unhandled interrupts by printing the vector and then panicking.
 pub fn unhandledInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
     const idt_vector = interrupt_frame.getIdtVector();
