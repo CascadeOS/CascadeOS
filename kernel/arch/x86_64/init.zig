@@ -160,10 +160,10 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) void {
     x86_64.tsc.init.registerTimeSource();
+    x86_64.apic.init.registerTimeSource();
     x86_64.hpet.init.registerTimeSource();
 
-    // TODO: APIC, PIT, KVMCLOCK
-
+    // TODO: PIT, KVMCLOCK
 }
 
 const portWriteU8 = x86_64.instructions.portWriteU8;

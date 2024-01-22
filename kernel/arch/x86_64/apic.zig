@@ -92,6 +92,98 @@ pub const init = struct {
         spurious_interrupt_register.write();
     }
 
+    pub fn registerTimeSource() linksection(kernel.info.init_code) void {
+        kernel.time.init.addTimeSource(.{
+            .name = "lapic",
+            .priority = 150,
+            .initialization = if (x86_64.arch_info.lapic_base_tick_duration_fs != null)
+                .{ .simple = initializeLapicTimer }
+            else
+                .{ .calibration_required = initializeLapicTimerCalibrate },
+            .per_core_periodic = .{ .enableSchedulerInterruptFn = perCorePeriodicEnableSchedulerInterrupt },
+        });
+    }
+
+    const divide_configuration: DivideConfigurationRegister = .@"2";
+
+    fn initializeLapicTimer() linksection(kernel.info.init_code) void {
+        core.debugAssert(x86_64.arch_info.lapic_base_tick_duration_fs != null);
+
+        tick_duration_fs = x86_64.arch_info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
+        log.debug("tick duration (fs) from cpuid: {}", .{tick_duration_fs});
+    }
+
+    fn initializeLapicTimerCalibrate(
+        reference_counter: kernel.time.init.ReferenceCounter,
+    ) linksection(kernel.info.init_code) void {
+        DivideConfigurationRegister.write(divide_configuration);
+
+        const timer_register = LVTTimerRegister{
+            .vector = 0xFF, // interrupt is masked
+            .timer_mode = .oneshot,
+            .masked = true,
+        };
+        timer_register.write();
+
+        // warmup
+        {
+            const warmup_duration = core.Duration.from(1, .millisecond);
+            const number_of_warmups = 5;
+
+            var total_warmup_ticks: u64 = 0;
+
+            for (0..number_of_warmups) |_| {
+                reference_counter.prepareToWaitFor(warmup_duration);
+
+                InitialCountRegister.write(std.math.maxInt(u32));
+                reference_counter.waitFor(warmup_duration);
+                const end = CurrentCountRegister.read();
+                InitialCountRegister.write(0);
+
+                total_warmup_ticks += std.math.maxInt(u32) - end;
+            }
+
+            std.mem.doNotOptimizeAway(&total_warmup_ticks);
+        }
+
+        const sample_duration = core.Duration.from(5, .millisecond);
+        const number_of_samples = 5;
+        var total_ticks: u64 = 0;
+
+        for (0..number_of_samples) |_| {
+            reference_counter.prepareToWaitFor(sample_duration);
+
+            InitialCountRegister.write(std.math.maxInt(u32));
+            reference_counter.waitFor(sample_duration);
+            const end = CurrentCountRegister.read();
+            InitialCountRegister.write(0);
+
+            total_ticks += std.math.maxInt(u32) - end;
+        }
+
+        const average_ticks = total_ticks / number_of_samples;
+
+        tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
+        log.debug("tick duration (fs) using reference counter: {}", .{tick_duration_fs});
+    }
+
+    fn perCorePeriodicEnableSchedulerInterrupt(period: core.Duration) linksection(kernel.info.init_code) void {
+        InitialCountRegister.write(0);
+        DivideConfigurationRegister.write(divide_configuration);
+        const timer_register = LVTTimerRegister{
+            .vector = @intFromEnum(x86_64.interrupts.IdtVector.scheduler),
+            .timer_mode = .periodic,
+            .masked = false,
+        };
+        timer_register.write();
+
+        const ticks = std.math.cast(
+            u32,
+            (period.value * kernel.time.fs_per_ns) / tick_duration_fs,
+        ) orelse core.panic("period is too long");
+        InitialCountRegister.write(ticks);
+    }
+
     /// Local APIC Version Register
     const VersionRegister = packed struct(u32) {
         /// The version numbers of the local APIC.
