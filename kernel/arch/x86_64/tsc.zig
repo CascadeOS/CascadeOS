@@ -9,7 +9,7 @@ const x86_64 = @import("x86_64.zig");
 const log = kernel.debug.log.scoped(.tsc);
 
 /// The duration of a tick in femptoseconds.
-var tick_duration_fs: u64 = undefined; // Initalized during `initializeTsc`
+var tick_duration_fs: u64 = undefined; // Initalized during `initializeTsc[Calibrate]`
 
 fn wallClockRead() u64 {
     return readTsc();
