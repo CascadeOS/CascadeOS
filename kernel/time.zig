@@ -59,8 +59,6 @@ pub const init = struct {
 
         initialized: bool = false,
 
-        list_next: ?*CandidateTimeSource = null,
-
         fn initialize(
             self: *CandidateTimeSource,
             reference_counter: ReferenceCounter,
@@ -112,39 +110,13 @@ pub const init = struct {
             }
         }
 
-        const candidate_time_source = candidate_time_sources.addOne() catch {
+        candidate_time_sources.append(time_source) catch {
             core.panic("exceeded maximum number of time sources");
         };
 
-        candidate_time_source.* = time_source;
-        addToLinkedList(candidate_time_source);
-
-        log.debug("adding time source: {s}", .{candidate_time_source.name});
-        log.debug("  priority: {}", .{candidate_time_source.priority});
-        log.debug("  per core: {}", .{candidate_time_source.per_core});
-    }
-
-    var candidate_time_source_list_start: ?*CandidateTimeSource linksection(kernel.info.init_data) = null;
-
-    fn addToLinkedList(
-        time_source: *CandidateTimeSource,
-    ) linksection(kernel.info.init_code) void {
-        var parent_time_source_ptr: *?*CandidateTimeSource = &candidate_time_source_list_start;
-
-        var opt_other_time_source: ?*CandidateTimeSource = parent_time_source_ptr.*;
-        while (opt_other_time_source) |other_time_source| {
-            if (time_source.priority > other_time_source.priority) {
-                // we are higher priority so we should be first
-                time_source.list_next = other_time_source;
-                parent_time_source_ptr.* = time_source;
-                return;
-            }
-
-            parent_time_source_ptr = &other_time_source.list_next;
-            opt_other_time_source = other_time_source.list_next;
-        }
-
-        parent_time_source_ptr.* = time_source;
+        log.debug("adding time source: {s}", .{time_source.name});
+        log.debug("  priority: {}", .{time_source.priority});
+        log.debug("  per core: {}", .{time_source.per_core});
     }
 
     const TimeSourceQuery = struct {
@@ -156,19 +128,23 @@ pub const init = struct {
     };
 
     fn findTimeSource(query: TimeSourceQuery) linksection(kernel.info.init_code) ?*CandidateTimeSource {
-        var opt_time_source = candidate_time_source_list_start;
+        var opt_best_candidate: ?*CandidateTimeSource = null;
 
-        while (opt_time_source) |time_source| : (opt_time_source = time_source.list_next) {
+        for (candidate_time_sources.slice()) |*time_source| {
             if (query.pre_calibrated and time_source.initialization == .calibration_required) continue;
 
             if (query.reference_counter and time_source.reference_counter == null) continue;
 
             if (query.wallclock and time_source.wallclock == null) continue;
 
-            return time_source;
+            if (opt_best_candidate) |best_candidate| {
+                if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
+            } else {
+                opt_best_candidate = time_source;
+            }
         }
 
-        return null;
+        return opt_best_candidate;
     }
 
     fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounter {
