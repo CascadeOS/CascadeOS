@@ -29,7 +29,6 @@ pub const init = struct {
         kernel.time.init.addTimeSource(.{
             .name = "tsc",
             .priority = 200,
-            .per_core = true,
             .initialization = if (x86_64.arch_info.tsc_tick_duration_fs != null)
                 .{ .simple = initializeTsc }
             else

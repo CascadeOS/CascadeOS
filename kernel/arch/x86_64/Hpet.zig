@@ -27,7 +27,6 @@ pub const init = struct {
         kernel.time.init.addTimeSource(.{
             .name = "hpet",
             .priority = 100,
-            .per_core = false,
             .initialization = .{ .simple = initializeHPET },
             .reference_counter = .{
                 .prepareToWaitForFn = referenceCounterPrepareToWaitFor,

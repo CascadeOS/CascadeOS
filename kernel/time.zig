@@ -49,8 +49,6 @@ pub const init = struct {
 
         priority: u8,
 
-        per_core: bool,
-
         initialization: Initialization = .none,
 
         reference_counter: ?ReferenceCounterOptions = null,
@@ -116,7 +114,6 @@ pub const init = struct {
 
         log.debug("adding time source: {s}", .{time_source.name});
         log.debug("  priority: {}", .{time_source.priority});
-        log.debug("  per core: {}", .{time_source.per_core});
     }
 
     const TimeSourceQuery = struct {
