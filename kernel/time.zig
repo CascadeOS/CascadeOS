@@ -33,11 +33,11 @@ pub const wallclock = struct {
 };
 
 pub const per_core_periodic = struct {
-    var enableInterruptFn: *const fn (period: core.Duration) void = undefined;
+    var enableSchedulerInterruptFn: *const fn (period: core.Duration) void = undefined;
 
-    /// Enables a per-core interrupt to be delivered every `period`.
-    pub inline fn enableInterrupt(period: core.Duration) linksection(kernel.info.init_code) void {
-        return enableInterruptFn(period);
+    /// Enables a per-core scheduler interrupt to be delivered every `period`.
+    pub inline fn enableSchedulerInterrupt(period: core.Duration) linksection(kernel.info.init_code) void {
+        return enableSchedulerInterruptFn(period);
     }
 };
 
@@ -124,8 +124,8 @@ pub const init = struct {
         };
 
         pub const PerCorePeriodicOptions = struct {
-            /// Enables a per-core interrupt to be delivered every `period`.
-            enableInterruptFn: *const fn (period: core.Duration) void,
+            /// Enables a per-core scheduler interrupt to be delivered every `period`.
+            enableSchedulerInterruptFn: *const fn (period: core.Duration) void,
         };
     };
 
@@ -225,7 +225,7 @@ pub const init = struct {
 
         const per_core_periodic_impl = time_source.per_core_periodic.?;
 
-        per_core_periodic.enableInterruptFn = per_core_periodic_impl.enableInterruptFn;
+        per_core_periodic.enableSchedulerInterruptFn = per_core_periodic_impl.enableSchedulerInterruptFn;
     }
 
     pub const ReferenceCounter = struct {
