@@ -15,14 +15,14 @@ pub const arch_info = @import("arch_info.zig");
 pub const ArchProcessor = @import("ArchProcessor.zig");
 pub const cpuid = @import("cpuid.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
-pub const Hpet = @import("Hpet.zig");
+pub const hpet = @import("hpet.zig");
 pub const init = @import("init.zig");
 pub const instructions = @import("instructions.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
 pub const paging = @import("paging/paging.zig");
 pub const registers = @import("registers.zig");
 pub const scheduling = @import("scheduling.zig");
-pub const Tsc = @import("Tsc.zig");
+pub const tsc = @import("tsc.zig");
 pub const Tss = @import("Tss.zig").Tss;
 
 pub inline fn getProcessor() *kernel.Processor {

@@ -9,8 +9,6 @@ const std = @import("std");
 
 const log = kernel.debug.log.scoped(.hpet);
 
-const HPET = @This();
-
 // Initalized during `initializeHPET`
 var base: [*]volatile u64 = undefined;
 
