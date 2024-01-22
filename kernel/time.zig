@@ -33,16 +33,11 @@ pub const wallclock = struct {
 };
 
 pub const per_core_periodic = struct {
-    var setInterruptFn: *const fn (period: core.Duration, handler: *const fn () void) void = undefined;
+    var enableInterruptFn: *const fn (period: core.Duration) void = undefined;
 
-    /// Sets and enables an interrupt that calls `handler` every `period`.
-    ///
-    /// NOTE: Must be called only once.
-    pub inline fn setInterrupt(
-        period: core.Duration,
-        handler: *const fn () void,
-    ) linksection(kernel.info.init_code) void {
-        return setInterruptFn(period, handler);
+    /// Enables a per-core interrupt to be delivered every `period`.
+    pub inline fn enableInterrupt(period: core.Duration) linksection(kernel.info.init_code) void {
+        return enableInterruptFn(period);
     }
 };
 
@@ -129,10 +124,8 @@ pub const init = struct {
         };
 
         pub const PerCorePeriodicOptions = struct {
-            /// Sets and enables an interrupt that calls `handler` every `period`.
-            ///
-            /// NOTE: Must be called only once.
-            setInterruptFn: *const fn (period: core.Duration, handler: *const fn () void) void,
+            /// Enables a per-core interrupt to be delivered every `period`.
+            enableInterruptFn: *const fn (period: core.Duration) void,
         };
     };
 
@@ -232,7 +225,7 @@ pub const init = struct {
 
         const per_core_periodic_impl = time_source.per_core_periodic.?;
 
-        per_core_periodic.setInterruptFn = per_core_periodic_impl.setInterruptFn;
+        per_core_periodic.enableInterruptFn = per_core_periodic_impl.enableInterruptFn;
     }
 
     pub const ReferenceCounter = struct {
