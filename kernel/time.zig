@@ -51,8 +51,14 @@ pub const init = struct {
 
         initialization: Initialization = .none,
 
+        /// Provided if the time source is usable as a reference counter.
+        ///
+        /// To be a valid reference counter the time source must not require calibration.
+        ///
+        /// The reference counter interface is only used during initialization.
         reference_counter: ?ReferenceCounterOptions = null,
 
+        /// Provided if the time source is usable as a wallclock.
         wallclock: ?WallclockOptions = null,
 
         initialized: bool = false,
