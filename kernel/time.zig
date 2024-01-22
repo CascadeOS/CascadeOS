@@ -53,43 +53,6 @@ pub const init = struct {
         wallclock.wallclock_time_source = getWallclockTimeSource(reference_counter);
     }
 
-    fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounterTimeSource {
-        const time_source = findTimeSource(.{
-            .pre_calibrated = true,
-            .reference_counter = true,
-        }) orelse core.panic("no reference counter found");
-
-        log.debug("using reference counter: {s}", .{time_source.name});
-
-        time_source.initialize(undefined);
-
-        const reference_counter_impl = time_source.reference_counter.?;
-
-        return .{
-            ._prepareToWaitForFn = reference_counter_impl.prepareToWaitForFn,
-            ._waitForFn = reference_counter_impl.waitForFn,
-        };
-    }
-
-    fn getWallclockTimeSource(
-        reference_counter: ReferenceCounterTimeSource,
-    ) linksection(kernel.info.init_code) wallclock.WallclockTimeSource {
-        const time_source = findTimeSource(.{
-            .wallclock = true,
-        }) orelse core.panic("no wallclock found");
-
-        log.debug("using wallclock: {s}", .{time_source.name});
-
-        time_source.initialize(reference_counter);
-
-        const wallclock_impl = time_source.wallclock.?;
-
-        return .{
-            .readCounterFn = wallclock_impl.readCounterFn,
-            .elapsedFn = wallclock_impl.elapsedFn,
-        };
-    }
-
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) linksection(kernel.info.init_data) = .{};
 
     pub const CandidateTimeSource = struct {
@@ -101,9 +64,9 @@ pub const init = struct {
 
         initialization: Initialization = .none,
 
-        reference_counter: ?ReferenceCounter = null,
+        reference_counter: ?ReferenceCounterOptions = null,
 
-        wallclock: ?Wallclock = null,
+        wallclock: ?WallclockOptions = null,
 
         initialized: bool = false,
 
@@ -111,13 +74,13 @@ pub const init = struct {
 
         fn initialize(
             self: *CandidateTimeSource,
-            reference_time_source: ReferenceCounterTimeSource,
+            reference_counter: ReferenceCounter,
         ) linksection(kernel.info.init_code) void {
             if (self.initialized) return;
             switch (self.initialization) {
                 .none => {},
                 .simple => |simple| simple(),
-                .calibration_required => |calibration_required| calibration_required(reference_time_source),
+                .calibration_required => |calibration_required| calibration_required(reference_counter),
             }
             self.initialized = true;
         }
@@ -125,10 +88,10 @@ pub const init = struct {
         pub const Initialization = union(enum) {
             none,
             simple: *const fn () void,
-            calibration_required: *const fn (reference_time_source: ReferenceCounterTimeSource) void,
+            calibration_required: *const fn (reference_counter: ReferenceCounter) void,
         };
 
-        pub const ReferenceCounter = struct {
+        pub const ReferenceCounterOptions = struct {
             /// Prepares the counter to wait for `duration`.
             ///
             /// Must be called before `waitForFn` is called.
@@ -140,7 +103,7 @@ pub const init = struct {
             waitForFn: *const fn (duration: core.Duration) void,
         };
 
-        pub const Wallclock = struct {
+        pub const WallclockOptions = struct {
             /// Read the wallclock value.
             ///
             /// The value returned is an opaque timer tick.
@@ -219,7 +182,44 @@ pub const init = struct {
         return null;
     }
 
-    pub const ReferenceCounterTimeSource = struct {
+    fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounter {
+        const time_source = findTimeSource(.{
+            .pre_calibrated = true,
+            .reference_counter = true,
+        }) orelse core.panic("no reference counter found");
+
+        log.debug("using reference counter: {s}", .{time_source.name});
+
+        time_source.initialize(undefined);
+
+        const reference_counter_impl = time_source.reference_counter.?;
+
+        return .{
+            ._prepareToWaitForFn = reference_counter_impl.prepareToWaitForFn,
+            ._waitForFn = reference_counter_impl.waitForFn,
+        };
+    }
+
+    fn getWallclockTimeSource(
+        reference_counter: ReferenceCounter,
+    ) linksection(kernel.info.init_code) wallclock.WallclockTimeSource {
+        const time_source = findTimeSource(.{
+            .wallclock = true,
+        }) orelse core.panic("no wallclock found");
+
+        log.debug("using wallclock: {s}", .{time_source.name});
+
+        time_source.initialize(reference_counter);
+
+        const wallclock_impl = time_source.wallclock.?;
+
+        return .{
+            .readCounterFn = wallclock_impl.readCounterFn,
+            .elapsedFn = wallclock_impl.elapsedFn,
+        };
+    }
+
+    pub const ReferenceCounter = struct {
         /// Prepares the counter to wait for `duration`.
         ///
         /// Must be called before `_waitForFn` is called.
@@ -234,9 +234,9 @@ pub const init = struct {
         ///
         /// Must be called before `waitFor` is called.
         pub fn prepareToWaitFor(
-            self: ReferenceCounterTimeSource,
+            self: ReferenceCounter,
             duration: core.Duration,
-        ) callconv(core.inline_in_non_debug_calling_convention) void {
+        ) linksection(kernel.info.init_code) callconv(core.inline_in_non_debug_calling_convention) void {
             self._prepareToWaitForFn(duration);
         }
 
@@ -244,9 +244,9 @@ pub const init = struct {
         ///
         /// Must be called after `prepareToWaitFor` is called.
         pub fn waitFor(
-            self: ReferenceCounterTimeSource,
+            self: ReferenceCounter,
             duration: core.Duration,
-        ) callconv(core.inline_in_non_debug_calling_convention) void {
+        ) linksection(kernel.info.init_code) callconv(core.inline_in_non_debug_calling_convention) void {
             self._waitForFn(duration);
         }
     };

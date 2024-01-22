@@ -57,7 +57,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
-        reference_time_source: kernel.time.init.ReferenceCounterTimeSource,
+        reference_counter: kernel.time.init.ReferenceCounter,
     ) linksection(kernel.info.init_code) void {
         core.debugAssert(shouldUseTsc());
 
@@ -69,10 +69,10 @@ pub const init = struct {
             var total_warmup_ticks: u64 = 0;
 
             for (0..number_of_warmups) |_| {
-                reference_time_source.prepareToWaitFor(warmup_duration);
+                reference_counter.prepareToWaitFor(warmup_duration);
 
                 const start = readTsc();
-                reference_time_source.waitFor(warmup_duration);
+                reference_counter.waitFor(warmup_duration);
                 const end = readTsc();
 
                 total_warmup_ticks += end - start;
@@ -86,10 +86,10 @@ pub const init = struct {
         var total_ticks: u64 = 0;
 
         for (0..number_of_samples) |_| {
-            reference_time_source.prepareToWaitFor(sample_duration);
+            reference_counter.prepareToWaitFor(sample_duration);
 
             const start = readTsc();
-            reference_time_source.waitFor(sample_duration);
+            reference_counter.waitFor(sample_duration);
             const end = readTsc();
 
             total_ticks += end - start;
