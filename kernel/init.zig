@@ -83,6 +83,9 @@ fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_c
     log.info("configuring local interrupt controller", .{});
     kernel.arch.init.initLocalInterruptController(processor);
 
+    log.info("initializing scheduler", .{});
+    kernel.scheduler.init.initScheduler();
+
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
         kernel.VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address

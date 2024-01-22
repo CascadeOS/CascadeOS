@@ -17,6 +17,8 @@ pub var lock: kernel.SpinLock = .{};
 var ready_to_run_start: ?*Thread = null;
 var ready_to_run_end: ?*Thread = null;
 
+const time_slice = core.Duration.from(5, .millisecond);
+
 pub const Priority = enum(u4) {
     idle = 0,
     background_kernel = 1,
@@ -144,3 +146,13 @@ fn idle() noreturn {
         kernel.arch.halt();
     }
 }
+
+pub const init = struct {
+    /// Initializes the scheduler.
+    ///
+    /// This function will be called on each core.
+    pub fn initScheduler() linksection(kernel.info.init_code) void {
+        log.debug("set scheduler interrupt period: {}", .{time_slice});
+        kernel.time.per_core_periodic.enableSchedulerInterrupt(time_slice);
+    }
+};
