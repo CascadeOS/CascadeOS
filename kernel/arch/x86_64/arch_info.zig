@@ -16,7 +16,9 @@ pub var processor_brand_string: [48]u8 = [_]u8{0} ** 48;
 pub var tsc_tick_duration_fs: ?u64 = null;
 
 /// The duration of a LAPIC tick in femptoseconds, if known from CPUID.
-pub var lapic_tick_duration_fs: ?u64 = null;
+///
+/// This needs to be multipled by the divide configuration register value to get the actual tick duration.
+pub var lapic_base_tick_duration_fs: ?u64 = null;
 
 /// Do we have a PIC?
 ///
