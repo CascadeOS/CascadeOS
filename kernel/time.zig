@@ -13,21 +13,35 @@ pub const fs_per_ns = 1000000;
 /// Femptoseconds per second.
 pub const fs_per_s = fs_per_ns * std.time.ns_per_s;
 
-var wallclock_time_source: WallclockTimeSource = undefined;
+pub const wallclock = struct {
+    var wallclock_time_source: WallclockTimeSource = undefined;
 
-/// Read the wallclock value.
-///
-/// The value returned is an opaque timer tick, to acquire an actual time value, use `wallclockElapsed`.
-pub fn wallclockRead() callconv(core.inline_in_non_debug_calling_convention) u64 {
-    return wallclock_time_source.readCounterFn();
-}
+    /// Read the wallclock value.
+    ///
+    /// The value returned is an opaque timer tick, to acquire an actual time value, use `elapsed`.
+    pub fn read() callconv(core.inline_in_non_debug_calling_convention) u64 {
+        return wallclock_time_source.readCounterFn();
+    }
 
-/// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
-///
-/// Counter wraparound is assumed to have not occured.
-pub fn wallclockElapsed(value1: u64, value2: u64) callconv(core.inline_in_non_debug_calling_convention) core.Duration {
-    return wallclock_time_source.elapsedFn(value1, value2);
-}
+    /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+    ///
+    /// Counter wraparound is assumed to have not occured.
+    pub fn elapsed(value1: u64, value2: u64) callconv(core.inline_in_non_debug_calling_convention) core.Duration {
+        return wallclock_time_source.elapsedFn(value1, value2);
+    }
+
+    const WallclockTimeSource = struct {
+        /// Read the wallclock value.
+        ///
+        /// The value returned is an opaque timer tick.
+        readCounterFn: *const fn () u64,
+
+        /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+        ///
+        /// Counter wraparound is assumed to have not occured.
+        elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
+    };
+};
 
 pub const init = struct {
     pub fn initTime() linksection(kernel.info.init_code) void {
@@ -36,7 +50,7 @@ pub const init = struct {
 
         const reference_counter = getReferenceCounter();
 
-        wallclock_time_source = getWallclockTimeSource(reference_counter);
+        wallclock.wallclock_time_source = getWallclockTimeSource(reference_counter);
     }
 
     fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounterTimeSource {
@@ -49,17 +63,17 @@ pub const init = struct {
 
         time_source.initialize(undefined);
 
-        const reference_counter = time_source.reference_counter.?;
+        const reference_counter_impl = time_source.reference_counter.?;
 
         return .{
-            ._prepareToWaitForFn = reference_counter.prepareToWaitForFn,
-            ._waitForFn = reference_counter.waitForFn,
+            ._prepareToWaitForFn = reference_counter_impl.prepareToWaitForFn,
+            ._waitForFn = reference_counter_impl.waitForFn,
         };
     }
 
     fn getWallclockTimeSource(
         reference_counter: ReferenceCounterTimeSource,
-    ) linksection(kernel.info.init_code) WallclockTimeSource {
+    ) linksection(kernel.info.init_code) wallclock.WallclockTimeSource {
         const time_source = findTimeSource(.{
             .wallclock = true,
         }) orelse core.panic("no wallclock found");
@@ -68,11 +82,11 @@ pub const init = struct {
 
         time_source.initialize(reference_counter);
 
-        const wallclock = time_source.wallclock.?;
+        const wallclock_impl = time_source.wallclock.?;
 
         return .{
-            .readCounterFn = wallclock.readCounterFn,
-            .elapsedFn = wallclock.elapsedFn,
+            .readCounterFn = wallclock_impl.readCounterFn,
+            .elapsedFn = wallclock_impl.elapsedFn,
         };
     }
 
@@ -236,16 +250,4 @@ pub const init = struct {
             self._waitForFn(duration);
         }
     };
-};
-
-const WallclockTimeSource = struct {
-    /// Read the wallclock value.
-    ///
-    /// The value returned is an opaque timer tick.
-    readCounterFn: *const fn () u64,
-
-    /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
-    ///
-    /// Counter wraparound is assumed to have not occured.
-    elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
 };
