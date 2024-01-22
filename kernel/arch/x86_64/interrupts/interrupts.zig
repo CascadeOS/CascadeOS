@@ -475,13 +475,13 @@ pub const init = struct {
             );
         }
 
-        setExceptionHandlers();
+        setFixedHandlers();
 
         setVectorStack(.double_fault, .double_fault);
         setVectorStack(.non_maskable_interrupt, .non_maskable_interrupt);
     }
 
-    fn setExceptionHandlers() linksection(kernel.info.init_code) void {
+    fn setFixedHandlers() linksection(kernel.info.init_code) void {
         handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = interrupt_handlers.nonMaskableInterrupt;
     }
 };
