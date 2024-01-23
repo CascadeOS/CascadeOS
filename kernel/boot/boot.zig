@@ -3,9 +3,9 @@
 
 const core = @import("core");
 const kernel = @import("kernel");
-
 const std = @import("std");
-const limine = @import("limine");
+
+const limine = @import("limine.zig");
 
 /// Entry point.
 export fn _start() linksection(kernel.info.init_code) noreturn {

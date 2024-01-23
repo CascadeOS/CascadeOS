@@ -5,7 +5,7 @@ const address = @import("address.zig");
 
 pub const acpi = @import("acpi/acpi.zig");
 pub const arch = @import("arch/arch.zig");
-pub const boot = @import("boot.zig");
+pub const boot = @import("boot/boot.zig");
 pub const debug = @import("debug/debug.zig");
 pub const heap = @import("heap/heap.zig");
 pub const info = @import("info.zig");
