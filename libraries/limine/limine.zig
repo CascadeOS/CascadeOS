@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-//! This module contains the definitions of the Limine protocol version v6.20231227.0 as per
-//! [PROTOCOL](https://github.com/limine-bootloader/limine/blob/v6.20231227.0/PROTOCOL.md)
+//! This module contains the definitions of the Limine protocol as of 2024-01-23.
+//!
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/cc579a8da24fcbdd95467d374a89496f03106156/PROTOCOL.md)
 //!
 //! Unimplemented features:
 //!   - Terminal Feature: deprecated and not used by Cascade
@@ -542,7 +543,12 @@ pub const Module = extern struct {
             /// If `true` then fail if the requested module is not found.
             required: bool = false,
 
-            _reserved: u63 = 0,
+            /// The module is GZ-compressed and should be decompressed by the bootloader.
+            ///
+            /// This is honoured if the response is revision 2 or greater.
+            compressed: bool = false,
+
+            _reserved: u62 = 0,
         };
     };
 };
