@@ -51,16 +51,16 @@ pub fn getLibraries(
     options: Options,
     targets: []const CascadeTarget,
 ) !Collection {
-    const library_descriptions: []const LibraryDescription = @import("../libraries/listing.zig").libraries;
+    const all_library_descriptions: []const LibraryDescription = @import("../libraries/listing.zig").libraries;
 
     var resolved_libraries: Collection = .{};
-    try resolved_libraries.ensureTotalCapacity(b.allocator, library_descriptions.len);
+    try resolved_libraries.ensureTotalCapacity(b.allocator, all_library_descriptions.len);
 
     // The library descriptions still left to resolve
-    var unresolved_library_descriptions = try std.ArrayListUnmanaged(LibraryDescription).initCapacity(b.allocator, library_descriptions.len);
+    var unresolved_library_descriptions = try std.ArrayListUnmanaged(LibraryDescription).initCapacity(b.allocator, all_library_descriptions.len);
 
     // Fill the unresolved list with all the libraries
-    unresolved_library_descriptions.appendSliceAssumeCapacity(library_descriptions);
+    unresolved_library_descriptions.appendSliceAssumeCapacity(all_library_descriptions);
 
     while (unresolved_library_descriptions.items.len != 0) {
         var resolved_any_this_iteration = false;
@@ -69,7 +69,15 @@ pub fn getLibraries(
         while (i < unresolved_library_descriptions.items.len) {
             const library_description: LibraryDescription = unresolved_library_descriptions.items[i];
 
-            if (try resolveLibrary(b, library_description, resolved_libraries, step_collection, options, targets)) |library| {
+            if (try resolveLibrary(
+                b,
+                library_description,
+                resolved_libraries,
+                step_collection,
+                options,
+                targets,
+                all_library_descriptions,
+            )) |library| {
                 resolved_libraries.putAssumeCapacityNoClobber(library_description.name, library);
 
                 resolved_any_this_iteration = true;
@@ -95,6 +103,7 @@ fn resolveLibrary(
     step_collection: StepCollection,
     options: Options,
     targets: []const CascadeTarget,
+    all_library_descriptions: []const LibraryDescription,
 ) !?*Library {
     const dependencies = blk: {
         var dependencies = try std.ArrayList(*Library).initCapacity(b.allocator, library_description.dependencies.len);
@@ -104,6 +113,16 @@ fn resolveLibrary(
             if (resolved_libraries.get(dep)) |dep_library| {
                 dependencies.appendAssumeCapacity(dep_library);
             } else {
+                // check if the dependency is a library that actually exists
+                for (all_library_descriptions) |desc| {
+                    if (std.mem.eql(u8, dep, desc.name)) break;
+                } else {
+                    std.debug.panic(
+                        "library '{s}' depends on non-existant library '{s}'",
+                        .{ library_description.name, dep },
+                    );
+                }
+
                 return null;
             }
         }

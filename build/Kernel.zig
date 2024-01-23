@@ -78,7 +78,9 @@ fn create(
     // dependencies
 
     for (declared_dependencies) |dependency| {
-        const library = libraries.get(dependency).?;
+        const library = libraries.get(dependency) orelse
+            std.debug.panic("kernel depends on non-existant library '{s}'", .{dependency});
+
         const library_module = library.cascade_modules.get(target) orelse continue;
         kernel_exe.root_module.addImport(library.name, library_module);
         dependencies.appendAssumeCapacity(library);
@@ -171,7 +173,9 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
     var processed_libraries = std.AutoHashMap(*Library, void).init(b.allocator);
 
     for (kernel_dependencies) |library_name| {
-        const library: *Library = libraries.get(library_name).?;
+        const library: *Library = libraries.get(library_name) orelse
+            std.debug.panic("kernel depends on non-existant library '{s}'", .{library_name});
+
         try addFilesFromLibrary(b, &modules, &file_paths, root_path, libraries, library, &processed_libraries);
     }
 
