@@ -73,7 +73,7 @@ pub fn getLibraries(
                 resolved_libraries.putAssumeCapacityNoClobber(library_description.name, library);
 
                 resolved_any_this_iteration = true;
-                _ = unresolved_library_descriptions.swapRemove(i);
+                _ = unresolved_library_descriptions.orderedRemove(i);
             } else {
                 i += 1;
             }
