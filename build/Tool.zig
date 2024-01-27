@@ -9,6 +9,7 @@ const helpers = @import("helpers.zig");
 const Library = @import("Library.zig");
 const StepCollection = @import("StepCollection.zig");
 const ToolDescription = @import("ToolDescription.zig");
+const Options = @import("Options.zig");
 
 const Tool = @This();
 
@@ -30,6 +31,7 @@ pub fn getTools(
     b: *std.Build,
     step_collection: StepCollection,
     libraries: Library.Collection,
+    optimize_mode: std.builtin.OptimizeMode,
 ) !Collection {
     const tool_descriptions: []const ToolDescription = @import("../tools/listing.zig").tools;
 
@@ -37,7 +39,7 @@ pub fn getTools(
     try tools.ensureTotalCapacity(b.allocator, tool_descriptions.len);
 
     for (tool_descriptions) |tool_description| {
-        const tool = try resolveTool(b, step_collection, libraries, tool_description);
+        const tool = try resolveTool(b, step_collection, libraries, tool_description, optimize_mode);
         tools.putAssumeCapacityNoClobber(tool_description.name, tool);
     }
 
@@ -49,6 +51,7 @@ fn resolveTool(
     step_collection: StepCollection,
     libraries: Library.Collection,
     tool_description: ToolDescription,
+    optimize_mode: std.builtin.OptimizeMode,
 ) !Tool {
     const dependencies = blk: {
         var dependencies = try std.ArrayList(*Library).initCapacity(b.allocator, tool_description.dependencies.len);
@@ -75,7 +78,13 @@ fn resolveTool(
 
     const lazy_path: std.Build.LazyPath = .{ .path = root_file_path };
 
-    const exe = try createExe(b, tool_description, lazy_path, dependencies);
+    const exe = try createExe(
+        b,
+        tool_description,
+        lazy_path,
+        dependencies,
+        optimize_mode,
+    );
 
     const exe_install_step = b.addInstallArtifact(
         exe,
@@ -165,11 +174,13 @@ fn createExe(
     tool_description: ToolDescription,
     lazy_path: std.Build.LazyPath,
     dependencies: []const *Library,
+    optimize_mode: std.builtin.OptimizeMode,
 ) !*Step.Compile {
     const exe = b.addExecutable(.{
         .name = tool_description.name,
         .root_source_file = lazy_path,
         .target = b.host,
+        .optimize = optimize_mode,
     });
 
     addDependenciesToModule(&exe.root_module, tool_description, dependencies);

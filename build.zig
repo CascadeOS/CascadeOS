@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) !void {
 
     const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
 
-    const tools = try Tool.getTools(b, step_collection, libraries);
+    const tools = try Tool.getTools(b, step_collection, libraries, options.optimize);
 
     const kernels = try Kernel.getKernels(b, step_collection, libraries, options, all_targets);
 
