@@ -117,7 +117,22 @@ fn resolveTool(
     build_step.dependOn(&exe_install_step.step);
 
     const test_exe = try createTestExe(b, tool_description, lazy_path, dependencies);
+    const test_install_step = b.addInstallArtifact(
+        test_exe,
+        .{
+            .dest_dir = .{
+                .override = .{
+                    .custom = b.pathJoin(&.{
+                        "tools",
+                        tool_description.name,
+                    }),
+                },
+            },
+        },
+    );
+
     const run_test = b.addRunArtifact(test_exe);
+    run_test.step.dependOn(&test_install_step.step);
 
     const test_step_name = try std.fmt.allocPrint(
         b.allocator,
@@ -151,6 +166,7 @@ fn resolveTool(
     );
 
     const run = b.addRunArtifact(exe);
+    run.step.dependOn(&exe_install_step.step);
 
     if (b.args) |args| {
         run.addArgs(args);
@@ -195,7 +211,7 @@ fn createTestExe(
     dependencies: []const *Library,
 ) !*Step.Compile {
     const test_exe = b.addTest(.{
-        .name = tool_description.name,
+        .name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_test" }),
         .root_source_file = lazy_path,
     });
 
