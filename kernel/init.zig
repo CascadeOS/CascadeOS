@@ -38,31 +38,31 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
         early_output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.info.version ++ "\n") catch {};
     }
 
-    log.info("capturing bootloader provided information", .{});
+    log.debug("capturing bootloader provided information", .{});
     captureBootloaderProvidedInformation();
 
-    log.info("performing early system initialization", .{});
+    log.debug("performing early arch initialization", .{});
     kernel.arch.init.earlyArchInitialization();
 
-    log.info("initializing ACPI tables", .{});
+    log.debug("initializing ACPI tables", .{});
     kernel.acpi.init.initializeACPITables();
 
-    log.info("capturing system information", .{});
+    log.debug("capturing system information", .{});
     kernel.arch.init.captureSystemInformation();
 
-    log.info("initializing physical memory", .{});
+    log.debug("initializing physical memory", .{});
     kernel.memory.physical.init.initPhysicalMemory();
 
-    log.info("initializing virtual memory", .{});
+    log.debug("initializing virtual memory", .{});
     kernel.memory.virtual.init.initVirtualMemory();
 
-    log.info("configuring global system features", .{});
+    log.debug("configuring global system features", .{});
     kernel.arch.init.configureGlobalSystemFeatures();
 
-    log.info("initializing time", .{});
+    log.debug("initializing time", .{});
     kernel.time.init.initTime();
 
-    log.info("initializing processors", .{});
+    log.debug("initializing processors", .{});
     initProcessors();
 
     kernelInitStage2(kernel.Processor.get(.bootstrap));
@@ -77,13 +77,13 @@ fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_c
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     kernel.arch.init.loadProcessor(processor);
 
-    log.info("configuring processor-local system features", .{});
+    log.debug("configuring processor-local system features", .{});
     kernel.arch.init.configureSystemFeaturesForCurrentProcessor(processor);
 
-    log.info("configuring local interrupt controller", .{});
+    log.debug("configuring local interrupt controller", .{});
     kernel.arch.init.initLocalInterruptController(processor);
 
-    log.info("initializing scheduler", .{});
+    log.debug("initializing scheduler", .{});
     kernel.scheduler.init.initScheduler();
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
