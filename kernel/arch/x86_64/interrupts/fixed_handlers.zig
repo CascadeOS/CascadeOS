@@ -305,9 +305,7 @@ pub fn scheduler(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void 
 pub fn unhandledInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
     const idt_vector = interrupt_frame.getIdtVector();
 
-    if (idt_vector.isException()) {
-        core.panicFmt("exception: {s}", .{@tagName(idt_vector)}) catch unreachable;
-    }
+    core.assert(!idt_vector.isException());
 
     core.panicFmt("interrupt {d}", .{@intFromEnum(idt_vector)}) catch unreachable;
 }
