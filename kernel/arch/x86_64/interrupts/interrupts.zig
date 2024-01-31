@@ -7,7 +7,7 @@ const std = @import("std");
 const x86_64 = @import("../x86_64.zig");
 
 const Idt = @import("Idt.zig");
-const interrupt_handlers = @import("interrupt_handlers.zig");
+const fixed_handlers = @import("fixed_handlers.zig");
 
 pub const number_of_handlers = Idt.number_of_handlers;
 
@@ -15,7 +15,7 @@ const log = kernel.debug.log.scoped(.interrupts_x86_64);
 
 var idt: Idt = .{};
 const raw_handlers = makeRawHandlers();
-var handlers = [_]InterruptHandler{interrupt_handlers.unhandledInterrupt} ** number_of_handlers;
+var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** number_of_handlers;
 
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
@@ -202,207 +202,59 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
 }
 
 pub const IdtVector = enum(u8) {
-    /// Occurs when dividing any number by 0 using the DIV or IDIV instruction, or when the division result is too
-    /// large to be represented in the destination.
-    ///
-    /// The saved instruction pointer points to the DIV or IDIV instruction which caused the exception.
-    division = 0x00,
+    divide = 0,
+    debug = 1,
+    non_maskable_interrupt = 2,
+    breakpoint = 3,
+    overflow = 4,
+    bound_range = 5,
+    invalid_opcode = 6,
+    device_not_available = 7,
+    double_fault = 8,
+    coprocessor_segment_overrun = 9,
+    invalid_tss = 10,
+    segment_not_present = 11,
+    stack_fault = 12,
+    general_protection = 13,
+    page_fault = 14,
+    _reserved1 = 15,
+    x87_floating_point = 16,
+    alignment_check = 17,
+    machine_check = 18,
+    simd_floating_point = 19,
+    virtualization = 20,
+    control_protection = 21,
+    _reserved2 = 22,
+    _reserved3 = 23,
+    _reserved4 = 24,
+    _reserved5 = 25,
+    _reserved6 = 26,
+    _reserved7 = 27,
+    hypervisor_injection = 28,
+    vmm_communication = 29,
+    security = 30,
+    _reserved8 = 31,
 
-    /// The Debug exception occurs on the following conditions:
-    /// - Instruction fetch breakpoint (Fault)
-    /// - General detect condition (Fault)
-    /// - Data read or write breakpoint (Trap)
-    /// - I/O read or write breakpoint (Trap)
-    /// - Single-step (Trap)
-    /// - Task-switch (Trap)
-    ///
-    /// When the exception is a fault, the saved instruction pointer points to the instruction which caused the
-    /// exception.
-    ///
-    /// When the exception is a trap, the saved instruction pointer points to the instruction after the instruction
-    /// which caused the exception.
-    debug = 0x01,
+    pic_pit = 32,
+    pic_keyboard = 33,
+    pic_cascade = 34,
+    pic_com2 = 35,
+    pic_com1 = 36,
+    pic_lpt2 = 37,
+    pic_floppy = 38,
+    pic_lpt1 = 39,
+    pic_rtc = 40,
+    pic_free1 = 41,
+    pic_free2 = 42,
+    pic_free3 = 43,
+    pic_ps2mouse = 44,
+    pic_fpu = 45,
+    pic_primary_ata = 46,
+    pic_secondary_ata = 47,
 
-    /// Non-Maskable Interrupt
-    non_maskable_interrupt = 0x02,
+    scheduler = 48,
 
-    /// Occurs at the execution of the INT3 instruction.
-    ///
-    /// The saved instruction pointer points to the byte after the INT3 instruction.
-    breakpoint = 0x03,
-
-    /// Raised when the INTO instruction is executed while the overflow bit in RFLAGS is set to 1.
-    ///
-    /// The saved instruction pointer points to the instruction after the INTO instruction.
-    overflow = 0x04,
-
-    /// Can occur when the BOUND instruction is executed.
-    ///
-    /// The BOUND instruction compares an array index with the lower and upper bounds of an array.
-    ///
-    /// When the index is out of bounds, the Bound Range Exceeded exception occurs.
-    ///
-    /// The saved instruction pointer points to the BOUND instruction which caused the exception.
-    bound_range = 0x05,
-
-    /// The Invalid Opcode exception occurs when the processor tries to execute an invalid or undefined opcode,
-    /// or an instruction with invalid prefixes.
-    ///
-    /// It also occurs in other cases, such as:
-    /// - The instruction length exceeds 15 bytes, but this only occurs with redundant prefixes.
-    /// - The instruction tries to access a non-existent control register (for example, mov cr6, eax).
-    /// - The UD instruction is executed.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception.
-    invalid_opcode = 0x06,
-
-    /// Occurs when an FPU instruction is attempted but there is no FPU.
-    ///
-    /// The saved instruction pointer points to the instruction that caused the exception.
-    device_not_available = 0x07,
-
-    /// Occurs when an exception is unhandled or when an exception occurs while the CPU is trying to call an exception
-    /// handler.
-    ///
-    /// The saved instruction pointer is undefined. A double fault cannot be recovered. The faulting process must be
-    /// terminated.
-    double_fault = 0x08,
-
-    /// Legacy
-    coprocessor_segment_overrun = 0x09,
-
-    /// Occurs when an invalid segment selector is referenced as part of a task switch, or as a result of a control
-    /// transfer through a gate descriptor, which results in an invalid stack-segment reference using an SS selector in
-    /// the TSS.
-    ///
-    /// When the exception occurred before loading the segment selectors from the TSS, the saved instruction pointer
-    /// points to the instruction which caused the exception. Otherwise, and this is more common, it points to the
-    /// first instruction in the new
-    invalid_tss = 0x0A,
-
-    /// Occurs when trying to load a segment or gate which has its `Present` bit set to 0.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception.
-    segment_not_present = 0x0B,
-
-    /// The Stack-Segment Fault occurs when:
-    /// - Loading a stack-segment referencing a segment descriptor which is not present.
-    /// - Any PUSH or POP instruction or any instruction using ESP or EBP as a base register is executed, while the
-    /// stack address is not in canonical form.
-    /// - When the stack-limit check fails.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception, unless the fault occurred
-    /// because of loading a non-present stack segment during a hardware task switch, in which case it points to the
-    /// next instruction of the new
-    stack = 0x0C,
-
-    /// A General Protection Fault may occur for various reasons.
-    ///
-    /// The most common are:
-    /// - Segment error (privilege, type, limit, read/write rights).
-    /// - Executing a privileged instruction while CPL != 0.
-    /// - Writing a 1 in a reserved register field or writing invalid value combinations (e.g. CR0 with PE=0 and PG=1).
-    /// - Referencing or accessing a null-descriptor.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception.
-    general_protection = 0x0D,
-
-    /// A Page Fault occurs when:
-    /// - A page directory or table entry is not present in physical memory.
-    /// - Attempting to load the instruction TLB with a translation for a non-executable page.
-    /// - A protection check (privileges, read/write) failed.
-    /// - A reserved bit in the page directory or table entries is set to 1.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception.
-    page = 0x0E,
-
-    _reserved1 = 0x0F,
-
-    /// Occurs when the FWAIT or WAIT instruction, or any waiting floating-point instruction is executed, and the
-    /// following conditions are true:
-    /// - CR0.NE is 1;
-    /// - an unmasked x87 floating point exception is pending (i.e. the exception bit in the x87 floating point
-    /// status-word register is set to 1).
-    ///
-    /// The saved instruction pointer points to the instruction which is about to be executed when the exception
-    /// occurred.
-    ///
-    /// The x87 instruction pointer register contains the address of the last instruction which caused the exception.
-    x87_floating_point = 0x10,
-
-    /// Occurs when alignment checking is enabled and an unaligned memory data reference is performed.
-    ///
-    /// Alignment checking is only performed in CPL 3.
-    ///
-    /// Alignment checking is disabled by default. To enable it, set the CR0.AM and RFLAGS.AC bits both to 1.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception.
-    alignment_check = 0x11,
-
-    /// The Machine Check exception is model specific and processor implementations are not required to support it.
-    ///
-    /// It uses model-specific registers to provide error information.
-    ///
-    /// Ddisabled by default, to enable set CR4.MCE bit to 1.
-    ///
-    /// Machine check exceptions occur when the processor detects internal errors, such as bad memory, bus errors,
-    /// cache errors, etc.
-    ///
-    /// The value of the saved instruction pointer depends on the implementation and the exception.
-    machine_check = 0x12,
-
-    /// Occurs when an unmasked 128-bit media floating-point exception occurs and the CR4.OSXMMEXCPT bit is set to 1.
-    ///
-    /// If the OSXMMEXCPT flag is not set, then SIMD floating-point exceptions will cause an Undefined Opcode exception
-    /// instead of this.
-    ///
-    /// The saved instruction pointer points to the instruction which caused the exception.
-    simd_floating_point = 0x13,
-
-    /// Virtualization Exception (Intel-only)
-    virtualization = 0x14,
-
-    /// Control Protection Exception
-    control_protection = 0x15,
-
-    _reserved2 = 0x16,
-    _reserved3 = 0x17,
-    _reserved4 = 0x18,
-    _reserved5 = 0x19,
-    _reserved6 = 0x1A,
-    _reserved7 = 0x1B,
-
-    /// Hypervisor Injection (AMD-only)
-    hypervisor_injection = 0x1C,
-
-    /// VMM Communication (AMD-only)
-    vmm_communication = 0x1D,
-
-    /// Security Exception
-    security = 0x1E,
-
-    _reserved8 = 0x1F,
-
-    pic_pit = 0x20,
-    pic_keyboard = 0x21,
-    pic_cascade = 0x22,
-    pic_com2 = 0x23,
-    pic_com1 = 0x24,
-    pic_lpt2 = 0x25,
-    pic_floppy = 0x26,
-    pic_lpt1 = 0x27,
-    pic_rtc = 0x28,
-    pic_free1 = 0x29,
-    pic_free2 = 0x2A,
-    pic_free3 = 0x2B,
-    pic_ps2mouse = 0x2C,
-    pic_fpu = 0x2D,
-    pic_primary_ata = 0x2E,
-    pic_secondary_ata = 0x2F,
-
-    scheduler = 0x30,
-
-    spurious_interrupt = 0xFF,
+    spurious_interrupt = 255,
 
     _,
 
@@ -484,7 +336,30 @@ pub const init = struct {
     }
 
     fn setFixedHandlers() linksection(kernel.info.init_code) void {
-        handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = interrupt_handlers.nonMaskableInterrupt;
-        handlers[@intFromEnum(IdtVector.scheduler)] = interrupt_handlers.scheduler;
+        handlers[@intFromEnum(IdtVector.divide)] = fixed_handlers.divideErrorException;
+        handlers[@intFromEnum(IdtVector.debug)] = fixed_handlers.debugException;
+        handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = fixed_handlers.nonMaskableInterrupt;
+        handlers[@intFromEnum(IdtVector.breakpoint)] = fixed_handlers.breakpointException;
+        handlers[@intFromEnum(IdtVector.overflow)] = fixed_handlers.overflowException;
+        handlers[@intFromEnum(IdtVector.bound_range)] = fixed_handlers.boundRangeExceededException;
+        handlers[@intFromEnum(IdtVector.invalid_opcode)] = fixed_handlers.invalidOpcodeException;
+        handlers[@intFromEnum(IdtVector.device_not_available)] = fixed_handlers.deviceNotAvailableException;
+        handlers[@intFromEnum(IdtVector.double_fault)] = fixed_handlers.doubleFaultException;
+        handlers[@intFromEnum(IdtVector.invalid_tss)] = fixed_handlers.invalidTSSException;
+        handlers[@intFromEnum(IdtVector.segment_not_present)] = fixed_handlers.segmentNotPresentException;
+        handlers[@intFromEnum(IdtVector.stack_fault)] = fixed_handlers.stackFaultException;
+        handlers[@intFromEnum(IdtVector.general_protection)] = fixed_handlers.generalProtectionException;
+        handlers[@intFromEnum(IdtVector.page_fault)] = fixed_handlers.pageFaultException;
+        handlers[@intFromEnum(IdtVector.x87_floating_point)] = fixed_handlers.x87FPUFloatingPointException;
+        handlers[@intFromEnum(IdtVector.alignment_check)] = fixed_handlers.alignmentCheckException;
+        handlers[@intFromEnum(IdtVector.machine_check)] = fixed_handlers.machineCheckException;
+        handlers[@intFromEnum(IdtVector.simd_floating_point)] = fixed_handlers.simdFloatingPointException;
+        handlers[@intFromEnum(IdtVector.virtualization)] = fixed_handlers.virtualizationException;
+        handlers[@intFromEnum(IdtVector.control_protection)] = fixed_handlers.controlProtectionException;
+        handlers[@intFromEnum(IdtVector.hypervisor_injection)] = fixed_handlers.hypervisorInjectionException;
+        handlers[@intFromEnum(IdtVector.vmm_communication)] = fixed_handlers.vmmCommunicationException;
+        handlers[@intFromEnum(IdtVector.security)] = fixed_handlers.securityException;
+
+        handlers[@intFromEnum(IdtVector.scheduler)] = fixed_handlers.scheduler;
     }
 };
