@@ -145,6 +145,15 @@ pub const Cr0 = packed struct(u64) {
     }
 };
 
+pub const Cr2 = struct {
+    /// Read the page fault linear address from the CR2 register.
+    pub inline fn readAddress() kernel.VirtualAddress {
+        return kernel.VirtualAddress.fromInt(asm ("mov %%cr2, %[value]"
+            : [value] "=r" (-> u64),
+        ));
+    }
+};
+
 pub const Cr3 = struct {
     /// Reads the CR3 register and returns the page table address.
     pub inline fn readAddress() kernel.PhysicalAddress {
