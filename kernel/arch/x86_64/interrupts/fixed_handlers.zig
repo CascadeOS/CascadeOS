@@ -179,7 +179,12 @@ pub fn generalProtectionException(interrupt_frame: *const x86_64.interrupts.Inte
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn pageFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
-    _ = interrupt_frame;
+    if (interrupt_frame.isKernel()) {
+        const faulting_address = x86_64.registers.Cr2.readAddress();
+        const fault = x86_64.interrupts.PageFaultErrorCode.fromErrorCode(interrupt_frame.error_code);
+
+        core.panicFmt("kernel page fault @ {} - {}", .{ faulting_address, fault });
+    }
 
     core.panic("page fault exception");
 }
