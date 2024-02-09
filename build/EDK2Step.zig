@@ -146,7 +146,7 @@ fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
             null,
             content_length,
             std.os.PROT.WRITE,
-            std.os.MAP.SHARED,
+            .{ .TYPE = .SHARED },
             file.handle,
             0,
         );

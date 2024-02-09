@@ -664,7 +664,7 @@ fn createAndMapDiskImage(disk_image_path: []const u8, disk_size: core.Size) ![]a
         null,
         disk_size.value,
         std.os.PROT.READ | std.os.PROT.WRITE,
-        std.os.MAP.SHARED,
+        .{ .TYPE = .SHARED },
         file.handle,
         0,
     );

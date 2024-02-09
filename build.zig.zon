@@ -8,7 +8,7 @@
     .version = "0.0.1",
 
     // Endure this is kept in sync with `build.zig` and `README.md`
-    .minimum_zig_version = "0.12.0-dev.2046+d3a163f86",
+    .minimum_zig_version = "0.12.0-dev.2665+919a3bae1",
 
     .dependencies = .{
         .limine = .{ // tag: v7.0.1-binary
