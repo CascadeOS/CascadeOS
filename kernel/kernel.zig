@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
 const address = @import("address.zig");
 
 pub const acpi = @import("acpi/acpi.zig");
@@ -35,12 +37,16 @@ comptime {
     _ = &arch;
 }
 
-pub const std_options = struct {
+pub const std_options: std.Options = .{
     // ensure using `std.log` in the kernel is a compile error
-    pub const log_level = @compileError("use `kernel.log` for logging in the kernel");
+    .log_level = undefined,
 
     // ensure using `std.log` in the kernel is a compile error
-    pub const logFn = @compileError("use `kernel.log` for logging in the kernel");
+    .logFn = struct {
+        fn logFn(comptime _: std.log.Level, comptime _: @TypeOf(.enum_literal), comptime _: []const u8, _: anytype) void {
+            @compileError("use `kernel.log` for logging in the kernel");
+        }
+    }.logFn,
 };
 
 pub const panic = debug.panic;

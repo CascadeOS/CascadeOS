@@ -16,7 +16,7 @@ const StepCollection = @import("build/StepCollection.zig");
 const Tool = @import("build/Tool.zig");
 
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
-const min_zig_version = "0.12.0-dev.2665+919a3bae1";
+const min_zig_version = "0.12.0-dev.2701+d18f52197";
 
 comptime {
     const current_zig = builtin.zig_version;
