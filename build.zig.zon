@@ -11,6 +11,11 @@
     .minimum_zig_version = "0.12.0-dev.2755+07c1dd3d1",
 
     .dependencies = .{
+        .edk2 = .{
+            .url = "https://github.com/rust-osdev/ovmf-prebuilt/releases/download/edk2-stable202311-r2/edk2-stable202311-r2-bin.tar.xz",
+            .hash = "1220d04d17ae9b3a3eefd808ec5b8245b6b207e692b8c1f9b022ee554fbe2d88999d",
+        },
+
         .limine = .{
             .url = "git+https://github.com/limine-bootloader/limine.git#v7.0.5-binary",
             .hash = "1220fe4055a1e5ae60114990c94f97c431f3b9e5b8cce39141486a194a36f17ada6c",
