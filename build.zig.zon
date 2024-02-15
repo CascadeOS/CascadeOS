@@ -11,9 +11,9 @@
     .minimum_zig_version = "0.12.0-dev.2701+d18f52197",
 
     .dependencies = .{
-        .limine = .{ // tag: v7.0.1-binary
-            .url = "https://github.com/limine-bootloader/limine/archive/4ce28780ae24346d2ea2cf00d6b45a3cf8a24c05.tar.gz",
-            .hash = "1220f8347fbea076b7921024536d2409cdde1301695ee53db6511b2dff0db1f476e8",
+        .limine = .{
+            .url = "git+https://github.com/limine-bootloader/limine.git#v7.0.4-binary",
+            .hash = "1220fd9bdb1f9eafa2ea6eed9208728aebe79d5a0a1e520e26cb83ab3d239ac64a7f",
         },
     },
 
