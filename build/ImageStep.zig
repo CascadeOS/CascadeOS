@@ -39,8 +39,8 @@ pub fn registerImageSteps(
     tools: Tool.Collection,
     step_collection: StepCollection,
     targets: []const CascadeTarget,
-) !Collection {
-    const limine_dep = b.dependency("limine", .{});
+) !?Collection {
+    const limine_dep = b.lazyDependency("limine", .{}) orelse return null;
 
     const limine_exe = b.addExecutable(.{
         .name = "limine",

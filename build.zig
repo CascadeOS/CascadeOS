@@ -43,13 +43,35 @@ pub fn build(b: *std.Build) !void {
 
     const options = try Options.get(b, cascade_version, all_targets);
 
-    const libraries = try Library.getLibraries(b, step_collection, options, all_targets);
+    const libraries = try Library.getLibraries(
+        b,
+        step_collection,
+        options,
+        all_targets,
+    );
 
-    const tools = try Tool.getTools(b, step_collection, libraries, options.optimize);
+    const tools = try Tool.getTools(
+        b,
+        step_collection,
+        libraries,
+        options.optimize,
+    );
 
-    const kernels = try Kernel.getKernels(b, step_collection, libraries, options, all_targets);
+    const kernels = try Kernel.getKernels(
+        b,
+        step_collection,
+        libraries,
+        options,
+        all_targets,
+    );
 
-    const image_steps = try ImageStep.registerImageSteps(b, kernels, tools, step_collection, all_targets);
+    const image_steps = (try ImageStep.registerImageSteps(
+        b,
+        kernels,
+        tools,
+        step_collection,
+        all_targets,
+    )) orelse return;
 
     try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
 
