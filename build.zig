@@ -65,13 +65,13 @@ pub fn build(b: *std.Build) !void {
         all_targets,
     );
 
-    const image_steps = (try ImageStep.registerImageSteps(
+    const image_steps = try ImageStep.registerImageSteps(
         b,
         kernels,
         tools,
         step_collection,
         all_targets,
-    )) orelse return;
+    );
 
     try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
 
