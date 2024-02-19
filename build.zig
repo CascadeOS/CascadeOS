@@ -61,6 +61,7 @@ pub fn build(b: *std.Build) !void {
         b,
         step_collection,
         libraries,
+        tools,
         options,
         all_targets,
     );

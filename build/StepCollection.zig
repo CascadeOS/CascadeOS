@@ -31,8 +31,14 @@ pub fn registerTool(self: StepCollection, build_step: *Step, test_step: *Step) v
 }
 
 /// Registers a kernel build step for a target.
-pub fn registerKernel(self: StepCollection, target: CascadeTarget, step: *Step) void {
-    self.kernel_build_steps_per_target.get(target).?.dependOn(step);
+pub fn registerKernel(
+    self: StepCollection,
+    target: CascadeTarget,
+    install_kernel_step: *Step,
+    install_debug_info_setp: *Step,
+) void {
+    self.kernel_build_steps_per_target.get(target).?.dependOn(install_kernel_step);
+    self.kernel_build_steps_per_target.get(target).?.dependOn(install_debug_info_setp);
 }
 
 /// Registers an image build step for a target.

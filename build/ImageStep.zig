@@ -196,7 +196,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
 
     try efi_partition.addFile(.{
         .destination_path = "/kernel",
-        .source_path = self.kernel.install_step.emitted_bin.?.getPath(self.b),
+        .source_path = self.kernel.stripped_kernel_with_sdf_path.getPath(self.b),
     });
 
     {
@@ -215,6 +215,8 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
 
         try run_image_builder.step.make(progress_node);
     }
+
+    // TODO: Make this a dependency rather than invoking directly
 
     const run_limine = self.b.addRunArtifact(self.limine_exe);
 

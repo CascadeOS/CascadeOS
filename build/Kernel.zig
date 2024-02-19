@@ -9,6 +9,7 @@ const helpers = @import("helpers.zig");
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const Library = @import("Library.zig");
 const Options = @import("Options.zig");
+const Tool = @import("Tool.zig");
 const StepCollection = @import("StepCollection.zig");
 
 const Kernel = @This();
@@ -18,7 +19,13 @@ b: *std.Build,
 target: CascadeTarget,
 options: Options,
 
-install_step: *Step.InstallArtifact,
+stripped_kernel_with_sdf_path: std.Build.LazyPath,
+
+/// Installs the debug-info stripped kernel with SDF data embedded.
+install_stripped_kernel_with_sdf_step: *Step,
+
+/// Installs the kernel debug-info in a seperate file.
+install_seperated_debug_step: *Step,
 
 /// only used for generating a dependency graph
 dependencies: []const *const Library,
@@ -29,6 +36,7 @@ pub fn getKernels(
     b: *std.Build,
     step_collection: StepCollection,
     libraries: Library.Collection,
+    tools: Tool.Collection,
     options: Options,
     targets: []const CascadeTarget,
 ) !Collection {
@@ -37,10 +45,23 @@ pub fn getKernels(
 
     const source_file_modules = try getSourceFileModules(b, libraries);
 
+    const sdf_builder = tools.get("sdf_builder").?;
+
     for (targets) |target| {
-        const kernel = try Kernel.create(b, target, libraries, options, source_file_modules);
+        const kernel = try Kernel.create(
+            b,
+            target,
+            libraries,
+            sdf_builder,
+            options,
+            source_file_modules,
+        );
         kernels.putAssumeCapacityNoClobber(target, kernel);
-        step_collection.registerKernel(target, &kernel.install_step.step);
+        step_collection.registerKernel(
+            target,
+            kernel.install_stripped_kernel_with_sdf_step,
+            kernel.install_seperated_debug_step,
+        );
     }
 
     return kernels;
@@ -50,6 +71,7 @@ fn create(
     b: *std.Build,
     target: CascadeTarget,
     libraries: Library.Collection,
+    sdf_builder: Tool,
     options: Options,
     source_file_modules: []const SourceFileModule,
 ) !Kernel {
@@ -123,16 +145,52 @@ fn create(
         }
     }
 
-    const install_step = b.addInstallArtifact(
-        kernel_exe,
-        .{ .dest_dir = .{ .override = .{ .custom = b.pathJoin(&.{@tagName(target)}) } } },
+    const run_sdf_builder = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+    run_sdf_builder.addFileArg(kernel_exe.getEmittedBin());
+    const sdf_data_path = run_sdf_builder.addOutputFileArg("sdf.output");
+
+    const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
+        .basename = kernel_exe.out_filename,
+        .strip = .debug,
+        .extract_to_separate_file = true,
+    });
+
+    const objcopy_binary = if (target == .x86_64) "objcopy" else "llvm-objcopy"; // TODO: This is disgusting.
+
+    const run_objcopy = b.addSystemCommand(&.{objcopy_binary});
+    run_objcopy.addArg("--add-section");
+    run_objcopy.addPrefixedFileArg(".sdf=", sdf_data_path);
+    run_objcopy.addArgs(&.{
+        "--set-section-alignment", ".sdf=8",
+    });
+    run_objcopy.addArgs(&.{
+        "--set-section-flags", ".sdf=contents,alloc,load,readonly,data",
+    });
+    run_objcopy.addFileArg(stripped_kernel_exe.getOutput());
+    const stripped_kernel_with_sdf = run_objcopy.addOutputFileArg(
+        b.fmt("{s}", .{kernel_exe.out_filename}),
+    );
+    _ = run_objcopy.captureStdErr(); // suppress stderr warning "allocated section `.sdf' not in segment"
+
+    const install_stripped_kernel_with_sdf = b.addInstallFile(
+        stripped_kernel_with_sdf,
+        b.pathJoin(&.{ @tagName(target), "kernel" }),
+    );
+
+    const install_seperated_debug = b.addInstallFile(
+        stripped_kernel_exe.getOutputSeparatedDebug().?,
+        b.pathJoin(&.{ @tagName(target), "kernel.debug" }),
     );
 
     return Kernel{
         .b = b,
         .target = target,
         .options = options,
-        .install_step = install_step,
+
+        .stripped_kernel_with_sdf_path = stripped_kernel_with_sdf,
+
+        .install_stripped_kernel_with_sdf_step = &install_stripped_kernel_with_sdf.step,
+        .install_seperated_debug_step = &install_seperated_debug.step,
 
         .dependencies = try dependencies.toOwnedSlice(b.allocator),
     };
