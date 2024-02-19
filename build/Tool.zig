@@ -17,11 +17,18 @@ pub const Collection = std.StringArrayHashMapUnmanaged(Tool);
 
 name: []const u8,
 
-exe: *Step.Compile,
+/// The compile step using the user provided `OptimizeMode`.
+compile_step: *Step.Compile,
 
-test_exe: *Step.Compile,
+/// The compile step using `OptimizeMode.ReleaseSafe`.
+///
+/// If the user provided `OptimizeMode` is `.ReleaseSafe` then `release_safe_compile_step == compile_step`.
+release_safe_compile_step: *Step.Compile,
 
-exe_install_step: *Step,
+test_compile_step: *Step.Compile,
+
+/// Installs the artifact produced by `compile_step`
+compile_step_install_step: *Step,
 
 /// only used for generating a dependency graph
 dependencies: []const *const Library,
@@ -78,7 +85,7 @@ fn resolveTool(
 
     const lazy_path: std.Build.LazyPath = .{ .path = root_file_path };
 
-    const exe = try createExe(
+    const compile_step = try createExe(
         b,
         tool_description,
         lazy_path,
@@ -86,8 +93,19 @@ fn resolveTool(
         optimize_mode,
     );
 
-    const exe_install_step = b.addInstallArtifact(
-        exe,
+    const release_safe_compile_step = if (optimize_mode == .ReleaseSafe)
+        compile_step
+    else
+        try createExe(
+            b,
+            tool_description,
+            lazy_path,
+            dependencies,
+            .ReleaseSafe,
+        );
+
+    const compile_step_install_step = b.addInstallArtifact(
+        compile_step,
         .{
             .dest_dir = .{
                 .override = .{
@@ -114,11 +132,11 @@ fn resolveTool(
     );
 
     const build_step = b.step(build_step_name, build_step_description);
-    build_step.dependOn(&exe_install_step.step);
+    build_step.dependOn(&compile_step_install_step.step);
 
-    const test_exe = try createTestExe(b, tool_description, lazy_path, dependencies);
+    const test_compile_step = try createTestExe(b, tool_description, lazy_path, dependencies);
     const test_install_step = b.addInstallArtifact(
-        test_exe,
+        test_compile_step,
         .{
             .dest_dir = .{
                 .override = .{
@@ -131,7 +149,7 @@ fn resolveTool(
         },
     );
 
-    const run_test = b.addRunArtifact(test_exe);
+    const run_test = b.addRunArtifact(test_compile_step);
     run_test.step.dependOn(&test_install_step.step);
 
     const test_step_name = try std.fmt.allocPrint(
@@ -165,8 +183,8 @@ fn resolveTool(
         .{tool_description.name},
     );
 
-    const run = b.addRunArtifact(exe);
-    run.step.dependOn(&exe_install_step.step);
+    const run = b.addRunArtifact(compile_step);
+    run.step.dependOn(&compile_step_install_step.step);
 
     if (b.args) |args| {
         run.addArgs(args);
@@ -177,9 +195,10 @@ fn resolveTool(
 
     return .{
         .name = tool_description.name,
-        .exe = exe,
-        .test_exe = test_exe,
-        .exe_install_step = &exe_install_step.step,
+        .compile_step = compile_step,
+        .release_safe_compile_step = release_safe_compile_step,
+        .test_compile_step = test_compile_step,
+        .compile_step_install_step = &compile_step_install_step.step,
 
         .dependencies = dependencies,
     };

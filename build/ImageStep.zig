@@ -114,12 +114,9 @@ fn create(
     self.image_file = .{ .step = &self.step };
     self.image_lazy_path = .{ .generated = &self.image_file };
 
-    // TODO: Why do we need to depend on the emitted bin instead of just depending on the compile step?
-    // If this line is changed to `self.step.dependOn(&limine_exe.step);` then the `Run` step fails to execute the binary.
-    const bin_file = limine_exe.getEmittedBin();
-    bin_file.addStepDependencies(&self.step);
+    limine_exe.getEmittedBin().addStepDependencies(&self.step);
+    image_builder_tool.release_safe_compile_step.getEmittedBin().addStepDependencies(&self.step);
 
-    self.step.dependOn(&image_builder_tool.exe.step);
     self.step.dependOn(step_collection.kernel_build_steps_per_target.get(target).?);
 
     return self;
@@ -208,7 +205,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
 
         try builder.serialize(image_description_buffer.writer());
 
-        const run_image_builder = self.b.addRunArtifact(self.image_builder_tool.exe);
+        const run_image_builder = self.b.addRunArtifact(self.image_builder_tool.release_safe_compile_step);
         run_image_builder.addArg("-");
         run_image_builder.has_side_effects = true;
 
