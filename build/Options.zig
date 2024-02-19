@@ -132,7 +132,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
 
     if (number_of_cores == 0) {
         std.debug.print("number of cores must be greater than zero", .{});
-        return error.InvalidNumberOfCoreRequested;
+        std.process.exit(1);
     }
 
     const no_acceleration = blk: {
