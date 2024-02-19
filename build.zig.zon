@@ -11,6 +11,11 @@
     .minimum_zig_version = "0.12.0-dev.2811+3cafb9655",
 
     .dependencies = .{
+        .libdwarf = .{
+            .url = "git+https://github.com/davea42/libdwarf-code.git#v0.9.1",
+            .hash = "12206c399d5c7a46305adca48531db49df15f729d465b63d76953d0794e534f72545",
+        },
+
         .limine = .{
             .url = "git+https://github.com/limine-bootloader/limine.git#v7.0.5-binary",
             .hash = "1220fe4055a1e5ae60114990c94f97c431f3b9e5b8cce39141486a194a36f17ada6c",
