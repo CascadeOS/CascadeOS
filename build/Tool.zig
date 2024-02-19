@@ -220,6 +220,8 @@ fn createExe(
 
     addDependenciesToModule(&exe.root_module, tool_description, dependencies);
 
+    if (tool_description.custom_configuration) |f| f(b, tool_description, exe);
+
     return exe;
 }
 
@@ -235,6 +237,8 @@ fn createTestExe(
     });
 
     addDependenciesToModule(&test_exe.root_module, tool_description, dependencies);
+
+    if (tool_description.custom_configuration) |f| f(b, tool_description, test_exe);
 
     return test_exe;
 }
