@@ -83,6 +83,7 @@ fn create(
     });
 
     kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
+    kernel_exe.entry = .disabled;
 
     const declared_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
     var dependencies = try std.ArrayListUnmanaged(*const Library).initCapacity(b.allocator, declared_dependencies.len);

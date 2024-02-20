@@ -7,8 +7,12 @@ const std = @import("std");
 
 const limine = @import("limine.zig");
 
-/// Entry point.
 export fn _start() linksection(kernel.info.init_code) noreturn {
+    core.panic("bare _start function called");
+}
+
+/// Limine Entry point.
+export fn limineEntryPoint() linksection(kernel.info.init_code) callconv(.C) noreturn {
     @call(.never_inline, kernel.init.kernelInitStage1, .{});
     core.panic("kernelInitStage1 returned");
 }
@@ -22,6 +26,7 @@ const limine_requests = struct {
     export var memmap: limine.Memmap linksection(kernel.info.init_data) = .{};
     export var smp: limine.SMP linksection(kernel.info.init_data) = .{ .flags = .{ .x2apic = true } };
     export var rsdp: limine.RSDP linksection(kernel.info.init_data) = .{};
+    export var entry_point: limine.EntryPoint linksection(kernel.info.init_data) = .{ .entry = &limineEntryPoint };
 };
 
 /// Returns the ACPI RSDP address provided by the bootloader, if any.

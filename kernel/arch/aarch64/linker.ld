@@ -4,8 +4,6 @@
 OUTPUT_FORMAT(elf64-littleaarch64)
 OUTPUT_ARCH(aarch64)
 
-ENTRY(_start)
-
 PHDRS
 {
     null         PT_NULL    FLAGS(0) ;                   /* Null segment */
