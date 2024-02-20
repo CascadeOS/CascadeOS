@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const core = @import("core");
 
 const libdwarf = @import("libdwarf.zig");
 
@@ -18,9 +19,9 @@ const default_chunk_size = 8 * 1024;
 pub fn main() !void {
     const allocator = std.heap.c_allocator;
 
-    const input_path, const output_path = try getArguments(allocator);
+    const arguments = try getArguments(allocator);
 
-    const line_debug_info = try getDwarfLineDebugInfo(allocator, input_path);
+    const line_debug_info = try getDwarfLineDebugInfo(allocator, arguments.input_path);
 
     var string_table: StringTableBuilder = .{ .allocator = allocator };
     var file_table: FileTableBuilder = .{ .allocator = allocator };
@@ -34,6 +35,7 @@ pub fn main() !void {
         &file_table,
         &location_lookup,
         &location_program,
+        arguments.directory_prefixes_to_strip,
     );
 
     const created_debug_info = try createSdfDebugInfo(
@@ -44,26 +46,47 @@ pub fn main() !void {
         &location_program,
     );
 
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
+    const output_file = try std.fs.cwd().createFile(arguments.output_path, .{});
     defer output_file.close();
 
     try output_file.writeAll(created_debug_info);
 }
 
-fn getArguments(allocator: std.mem.Allocator) !struct { [:0]const u8, [:0]const u8 } {
+const Arguments = struct {
+    input_path: [:0]const u8,
+    output_path: [:0]const u8,
+    directory_prefixes_to_strip: []const []const u8,
+};
+
+fn getArguments(allocator: std.mem.Allocator) !Arguments {
     const args = try std.process.argsAlloc(allocator);
 
+    // TODO: Improve the argument parsing here
+
     const input_path = blk: {
-        if (args.len < 2) break :blk try std.fs.selfExePathAlloc(allocator);
+        if (args.len < 2) return error.NoInputPath;
         break :blk args[1];
     };
 
     const output_path = blk: {
-        if (args.len < 3) break :blk "output.debug";
+        if (args.len < 3) return error.NoOutputPath;
         break :blk args[2];
     };
 
-    return .{ try allocator.dupeZ(u8, input_path), try allocator.dupeZ(u8, output_path) };
+    var directory_prefixes_to_strip = std.ArrayList([]const u8).init(allocator);
+    errdefer directory_prefixes_to_strip.deinit();
+
+    if (args.len > 3) {
+        for (args[3..]) |arg| {
+            try directory_prefixes_to_strip.append(try allocator.dupe(u8, arg));
+        }
+    }
+
+    return .{
+        .input_path = try allocator.dupeZ(u8, input_path),
+        .output_path = try allocator.dupeZ(u8, output_path),
+        .directory_prefixes_to_strip = try directory_prefixes_to_strip.toOwnedSlice(),
+    };
 }
 
 const LineDebugInfo = struct {
@@ -238,6 +261,7 @@ fn fillInBuilders(
     file_table: *FileTableBuilder,
     location_lookup: *LocationLookupBuilder,
     location_program: *LocationProgramBuilder,
+    directory_prefixes_to_strip: []const []const u8,
 ) !void {
     var previous_address: u64 = 0;
     var next_chunk_start_address = previous_address + maximum_size_of_chunks;
@@ -265,8 +289,18 @@ fn fillInBuilders(
         const new_line: i64 = @intCast(line_info.line);
         const new_column: i64 = @intCast(line_info.column);
 
-        const directory = std.fs.path.dirname(line_info.file) orelse {
-            std.debug.panic("path with no directory: '{s}'", .{line_info.file});
+        const directory = blk: {
+            const directory = std.fs.path.dirname(line_info.file) orelse {
+                core.panicFmt("path with no directory: '{s}'", .{line_info.file});
+            };
+
+            for (directory_prefixes_to_strip) |directory_prefix_to_strip| {
+                if (std.mem.startsWith(u8, directory, directory_prefix_to_strip)) {
+                    break :blk directory[directory_prefix_to_strip.len..];
+                }
+            }
+
+            break :blk directory;
         };
 
         const file = std.fs.path.basename(line_info.file);

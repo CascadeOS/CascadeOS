@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const std = @import("std");
+const core = @import("core");
 
 const c = @cImport({
     @cInclude("dwarf.h");
@@ -654,6 +655,6 @@ fn toResult(return_value: c_int) !void {
     switch (return_value) {
         c.DW_DLV_OK => {},
         c.DW_DLV_ERROR, c.DW_DLV_NO_ENTRY => return error.DwarfError,
-        else => |v| std.debug.panic("unknown libdwarf return value: {}", .{v}),
+        else => |v| core.panicFmt("unknown libdwarf return value: {}", .{v}),
     }
 }
