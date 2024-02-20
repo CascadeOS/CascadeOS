@@ -162,37 +162,17 @@ fn printSourceAtAddress(writer: anytype, address: usize) void {
 fn printSymbol(writer: anytype, symbol: symbols.Symbol, kernel_virtual_slide_is_null: bool) void {
     writer.writeAll(indent) catch unreachable;
 
-    const location = symbol.location orelse {
-        if (symbol.name) |name| {
-            // setup - ???
-            // ^^^^^
-            writer.writeAll(name) catch unreachable;
-
-            // setup - ???
-            //      ^^^^^^
-            if (kernel_virtual_slide_is_null) {
-                writer.writeAll(" - ??? (address and symbol may be incorrect)\n") catch unreachable;
-            } else {
-                writer.writeAll(" - ???\n") catch unreachable;
-            }
-        } else {
-            // ??? - ???
-            // ^^^^^^^^^
-            writer.writeAll("??? - ???\n") catch unreachable;
-
-            if (kernel_virtual_slide_is_null) {
-                writer.writeAll("??? - ??? (address may be incorrect)\n") catch unreachable;
-            } else {
-                writer.writeAll("??? - ???\n") catch unreachable;
-            }
-        }
-
-        return;
-    };
+    // kernel/setup.zig:43:15 in setup
+    // ^^^^^^
+    writer.writeAll(symbol.directory) catch unreachable;
 
     // kernel/setup.zig:43:15 in setup
-    // ^^^^^^^^^^^^^^^^
-    writer.writeAll(location.file_name) catch unreachable;
+    //       ^
+    writer.writeByte('/') catch unreachable;
+
+    // kernel/setup.zig:43:15 in setup
+    //        ^^^^^^^^^
+    writer.writeAll(symbol.file) catch unreachable;
 
     // kernel/setup.zig:43:15 in setup
     //                 ^
@@ -201,61 +181,66 @@ fn printSymbol(writer: anytype, symbol: symbols.Symbol, kernel_virtual_slide_is_
     // kernel/setup.zig:43:15 in setup
     //                  ^^
     std.fmt.formatInt(
-        location.line,
+        symbol.line,
         10,
         .lower,
         .{},
         writer,
     ) catch unreachable;
 
-    if (location.column) |column| {
-        // kernel/setup.zig:43:15 in setup
-        //                    ^
-        writer.writeByte(':') catch unreachable;
+    // kernel/setup.zig:43:15 in setup
+    //                    ^
+    writer.writeByte(':') catch unreachable;
 
-        // kernel/setup.zig:43:15 in setup
-        //                     ^^
-        std.fmt.formatInt(
-            column,
-            10,
-            .lower,
-            .{},
-            writer,
-        ) catch unreachable;
-    }
+    // kernel/setup.zig:43:15 in setup
+    //                     ^^
+    std.fmt.formatInt(
+        symbol.column,
+        10,
+        .lower,
+        .{},
+        writer,
+    ) catch unreachable;
 
     // kernel/setup.zig:43:15 in setup
     //                       ^^^^
     writer.writeAll(" in ") catch unreachable;
 
-    if (symbol.name) |name| {
-        // kernel/setup.zig:43:15 in setup
-        //                           ^^^^^
-        writer.writeAll(name) catch unreachable;
-    } else {
-        // kernel/setup.zig:43:15 in ???
-        //                           ^^^
-        writer.writeAll("???") catch unreachable;
-    }
-
-    if (!location.is_line_expected_to_be_precise) {
-        // kernel/setup.zig:43:15 in setup (symbols line information is inprecise)
-        //                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        writer.writeAll(" (symbols line information is inprecise)") catch unreachable;
-    }
+    // kernel/setup.zig:43:15 in setup
+    //                           ^^^^^
+    writer.writeAll(symbol.name) catch unreachable;
 
     if (kernel_virtual_slide_is_null) {
         writer.writeAll(" (address and symbol may be incorrect)") catch unreachable;
     }
 
-    const file_contents = embedded_source_files.get(location.file_name) orelse {
-        // no matching file found
-        writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
-        writer.writeAll("no such file in embedded source files\n\n") catch unreachable;
-        return;
+    const file_contents = blk: {
+        var file_name_buffer: [512]u8 = undefined;
+
+        const file_name = std.fmt.bufPrint(
+            &file_name_buffer,
+            "{s}/{s}",
+            .{ symbol.directory, symbol.file },
+        ) catch {
+            // failed to format file name
+            writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+            writer.print("file name exceeds {} bytes! '{s}/{s}'\n", .{
+                file_name_buffer.len,
+                symbol.directory,
+                symbol.file,
+            }) catch unreachable;
+            return;
+        };
+
+        break :blk embedded_source_files.get(file_name) orelse {
+            // no matching file found
+            writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+            writer.writeAll("no such file in embedded source files\n\n") catch unreachable;
+            return;
+        };
     };
 
-    const line = findTargetLine(file_contents, location.line) orelse {
+    const line = findTargetLine(file_contents, symbol.line) orelse {
         // no matching line found
         writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
         writer.writeAll("no such line in file?\n") catch unreachable;
@@ -275,15 +260,11 @@ fn printSymbol(writer: anytype, symbol: symbols.Symbol, kernel_virtual_slide_is_
     //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     writer.writeAll(line[blank_spaces..]) catch unreachable;
 
-    if (location.column) |column| {
-        writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
+    writer.writeAll(comptime "\n" ++ (indent ** 2)) catch unreachable;
 
-        writer.writeByteNTimes(' ', column - 1 - blank_spaces) catch unreachable;
+    writer.writeByteNTimes(' ', symbol.column - 1 - blank_spaces) catch unreachable;
 
-        writer.writeAll("^\n") catch unreachable;
-    } else {
-        writer.writeAll("\n\n") catch unreachable;
-    }
+    writer.writeAll("^\n") catch unreachable;
 }
 
 /// Finds the target line in the given file contents.

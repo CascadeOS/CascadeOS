@@ -163,7 +163,7 @@ fn create(
         .extract_to_separate_file = true,
     });
 
-    const objcopy_binary = if (target == .x86_64) "objcopy" else "llvm-objcopy"; // TODO: This is disgusting.
+    const objcopy_binary = if (target.isNative(b)) "objcopy" else "llvm-objcopy"; // TODO: This is disgusting.
 
     const run_objcopy = b.addSystemCommand(&.{objcopy_binary});
     run_objcopy.addArg("--add-section");
