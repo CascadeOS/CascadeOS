@@ -3,6 +3,6 @@ Upstream-Name: CascadeOS
 Upstream-Contact: Lee Cannon <leecannon@leecannon.xyz>
 Source: https://github.com/CascadeOS
 
-Files: */*.md
+Files: *.md
 License: CC0-1.0
 Copyright: 2024 Lee Cannon <leecannon@leecannon.xyz>
