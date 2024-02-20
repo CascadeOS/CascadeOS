@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: CC0-1.0
+// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
