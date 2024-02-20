@@ -5,7 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
-const limine = @import("limine.zig");
+const limine = @import("limine");
 
 export fn _start() linksection(kernel.info.init_code) noreturn {
     core.panic("bare _start function called");

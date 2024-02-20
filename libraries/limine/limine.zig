@@ -11,7 +11,6 @@
 //!
 
 const std = @import("std");
-const core = @import("core");
 
 const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
 
