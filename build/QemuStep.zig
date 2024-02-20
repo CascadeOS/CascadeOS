@@ -107,9 +107,6 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     // no shutdown
     if (self.options.qemu_remote_debug) run_qemu.addArg("-no-shutdown");
 
-    // no default devices
-    run_qemu.addArg("-nodefaults");
-
     run_qemu.addArgs(&.{ "-boot", "menu=off" });
 
     // RAM
