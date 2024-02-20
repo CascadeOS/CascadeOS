@@ -149,6 +149,14 @@ fn create(
     run_sdf_builder.addFileArg(kernel_exe.getEmittedBin());
     const sdf_data_path = run_sdf_builder.addOutputFileArg("sdf.output");
 
+    const root_path = std.fmt.allocPrint(
+        b.allocator,
+        comptime "{s}" ++ std.fs.path.sep_str,
+        .{b.build_root.path.?},
+    ) catch unreachable;
+
+    run_sdf_builder.addArg(root_path);
+
     const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
         .basename = kernel_exe.out_filename,
         .strip = .debug,
