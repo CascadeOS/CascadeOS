@@ -196,7 +196,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
 
     try efi_partition.addFile(.{
         .destination_path = "/kernel",
-        .source_path = self.kernel.stripped_kernel_with_sdf_path.getPath(self.b),
+        .source_path = self.kernel.final_kernel_binary_path.getPath(self.b),
     });
 
     {

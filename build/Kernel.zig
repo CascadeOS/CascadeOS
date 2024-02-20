@@ -19,10 +19,10 @@ b: *std.Build,
 target: CascadeTarget,
 options: Options,
 
-stripped_kernel_with_sdf_path: std.Build.LazyPath,
+final_kernel_binary_path: std.Build.LazyPath,
 
 /// Installs the debug-info stripped kernel with SDF data embedded.
-install_stripped_kernel_with_sdf_step: *Step,
+install_final_kernel_binary: *Step,
 
 /// Installs the kernel debug-info in a seperate file.
 install_seperated_debug_step: *Step,
@@ -59,7 +59,7 @@ pub fn getKernels(
         kernels.putAssumeCapacityNoClobber(target, kernel);
         step_collection.registerKernel(
             target,
-            kernel.install_stripped_kernel_with_sdf_step,
+            kernel.install_final_kernel_binary,
             kernel.install_seperated_debug_step,
         );
     }
@@ -164,25 +164,34 @@ fn create(
         .extract_to_separate_file = true,
     });
 
-    const objcopy_binary = if (target.isNative(b)) "objcopy" else "llvm-objcopy"; // TODO: This is disgusting.
+    // TODO: The `target.isNative(b)` branch below is a hack due to zig objcopy not supporting add section.
+    //
+    //       This does mean that only kernels for the native target will have SDF data embedded as GNU `objcopy` only
+    //       supports the target it is compiled for.
+    //
+    //       `llvm-objcopy` does support adding sections and supports multiple targets but it incorrectly aligns the
+    //        section making it useless.
+    const final_kernel_binary_path = if (target.isNative(b)) blk: {
+        const run_objcopy = b.addSystemCommand(&.{"objcopy"});
+        run_objcopy.addArg("--add-section");
+        run_objcopy.addPrefixedFileArg(".sdf=", sdf_data_path);
+        run_objcopy.addArgs(&.{
+            "--set-section-alignment", ".sdf=8",
+        });
+        run_objcopy.addArgs(&.{
+            "--set-section-flags", ".sdf=contents,alloc,load,readonly,data",
+        });
+        run_objcopy.addFileArg(stripped_kernel_exe.getOutput());
+        const stripped_kernel_with_sdf = run_objcopy.addOutputFileArg(
+            b.fmt("{s}", .{kernel_exe.out_filename}),
+        );
+        _ = run_objcopy.captureStdErr(); // suppress stderr warning "allocated section `.sdf' not in segment"
 
-    const run_objcopy = b.addSystemCommand(&.{objcopy_binary});
-    run_objcopy.addArg("--add-section");
-    run_objcopy.addPrefixedFileArg(".sdf=", sdf_data_path);
-    run_objcopy.addArgs(&.{
-        "--set-section-alignment", ".sdf=8",
-    });
-    run_objcopy.addArgs(&.{
-        "--set-section-flags", ".sdf=contents,alloc,load,readonly,data",
-    });
-    run_objcopy.addFileArg(stripped_kernel_exe.getOutput());
-    const stripped_kernel_with_sdf = run_objcopy.addOutputFileArg(
-        b.fmt("{s}", .{kernel_exe.out_filename}),
-    );
-    _ = run_objcopy.captureStdErr(); // suppress stderr warning "allocated section `.sdf' not in segment"
+        break :blk stripped_kernel_with_sdf;
+    } else stripped_kernel_exe.getOutput();
 
-    const install_stripped_kernel_with_sdf = b.addInstallFile(
-        stripped_kernel_with_sdf,
+    const install_final_kernel_binary = b.addInstallFile(
+        final_kernel_binary_path,
         b.pathJoin(&.{ @tagName(target), "kernel" }),
     );
 
@@ -196,9 +205,9 @@ fn create(
         .target = target,
         .options = options,
 
-        .stripped_kernel_with_sdf_path = stripped_kernel_with_sdf,
+        .final_kernel_binary_path = final_kernel_binary_path,
 
-        .install_stripped_kernel_with_sdf_step = &install_stripped_kernel_with_sdf.step,
+        .install_final_kernel_binary = &install_final_kernel_binary.step,
         .install_seperated_debug_step = &install_seperated_debug.step,
 
         .dependencies = try dependencies.toOwnedSlice(b.allocator),
