@@ -43,7 +43,7 @@ pub fn getKernels(
     var kernels: Collection = .{};
     try kernels.ensureTotalCapacity(b.allocator, @intCast(targets.len));
 
-    const source_file_modules = try getSourceFileModules(b, libraries);
+    const source_file_modules = try getSourceFileModules(b, options, libraries);
 
     const sdf_builder = tools.get("sdf_builder").?;
 
@@ -150,13 +150,7 @@ fn create(
     run_sdf_builder.addFileArg(kernel_exe.getEmittedBin());
     const sdf_data_path = run_sdf_builder.addOutputFileArg("sdf.output");
 
-    const root_path = std.fmt.allocPrint(
-        b.allocator,
-        comptime "{s}" ++ std.fs.path.sep_str,
-        .{b.build_root.path.?},
-    ) catch unreachable;
-
-    run_sdf_builder.addArg(root_path);
+    generate_sdf.addArg(options.root_path);
 
     const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
         .basename = kernel_exe.out_filename,
@@ -228,21 +222,15 @@ const SourceFileModule = struct {
 ///
 /// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
 /// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
-fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const SourceFileModule {
+fn getSourceFileModules(b: *std.Build, options: Options, libraries: Library.Collection) ![]const SourceFileModule {
     var modules = std.ArrayList(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
 
     var file_paths = std.ArrayList([]const u8).init(b.allocator);
     defer file_paths.deinit();
 
-    const root_path = std.fmt.allocPrint(
-        b.allocator,
-        comptime "{s}" ++ std.fs.path.sep_str,
-        .{b.build_root.path.?},
-    ) catch unreachable;
-
     // add the kernel's files
-    try addFilesRecursive(b, &modules, &file_paths, root_path, helpers.pathJoinFromRoot(b, &.{"kernel"}));
+    try addFilesRecursive(b, &modules, &file_paths, options.root_path, helpers.pathJoinFromRoot(b, &.{"kernel"}));
 
     // add each dependencies files
     const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
@@ -252,7 +240,7 @@ fn getSourceFileModules(b: *std.Build, libraries: Library.Collection) ![]const S
         const library: *Library = libraries.get(library_name) orelse
             std.debug.panic("kernel depends on non-existant library '{s}'", .{library_name});
 
-        try addFilesFromLibrary(b, &modules, &file_paths, root_path, libraries, library, &processed_libraries);
+        try addFilesFromLibrary(b, &modules, &file_paths, options.root_path, libraries, library, &processed_libraries);
     }
 
     const files_option = b.addOptions();
