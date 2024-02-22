@@ -21,7 +21,14 @@ pub fn main() !void {
 
     const arguments = try getArguments(allocator);
 
-    const line_debug_info = try getDwarfLineDebugInfo(allocator, arguments.input_path);
+    switch (arguments) {
+        .generate => |generate_arguments| try generate(allocator, generate_arguments),
+        .embed => |embed_arguments| try embed(allocator, embed_arguments),
+    }
+}
+
+fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.GenerateArguments) !void {
+    const line_debug_info = try getDwarfLineDebugInfo(allocator, generate_arguments.binary_input_path);
 
     var string_table: StringTableBuilder = .{ .allocator = allocator };
     var file_table: FileTableBuilder = .{ .allocator = allocator };
@@ -35,7 +42,7 @@ pub fn main() !void {
         &file_table,
         &location_lookup,
         &location_program,
-        arguments.directory_prefixes_to_strip,
+        generate_arguments.directory_prefixes_to_strip,
     );
 
     const created_debug_info = try createSdfDebugInfo(
@@ -46,47 +53,120 @@ pub fn main() !void {
         &location_program,
     );
 
-    const output_file = try std.fs.cwd().createFile(arguments.output_path, .{});
+    const output_file = try std.fs.cwd().createFile(generate_arguments.binary_output_path, .{});
     defer output_file.close();
 
     try output_file.writeAll(created_debug_info);
 }
 
-const Arguments = struct {
-    input_path: [:0]const u8,
-    output_path: [:0]const u8,
-    directory_prefixes_to_strip: []const []const u8,
+fn embed(allocator: std.mem.Allocator, embed_arguments: Arguments.EmbedArguments) !void {
+    _ = allocator;
+    _ = embed_arguments;
+    @panic("UNIMPLEMENTED: embed");
+}
+
+const Action = enum {
+    generate,
+    embed,
 };
 
-fn getArguments(allocator: std.mem.Allocator) !Arguments {
-    const args = try std.process.argsAlloc(allocator);
+const Arguments = union(Action) {
+    generate: GenerateArguments,
+    embed: EmbedArguments,
 
-    // TODO: Improve the argument parsing here
-
-    const input_path = blk: {
-        if (args.len < 2) return error.NoInputPath;
-        break :blk args[1];
+    pub const GenerateArguments = struct {
+        binary_input_path: [:0]const u8,
+        binary_output_path: [:0]const u8,
+        directory_prefixes_to_strip: []const []const u8,
     };
 
-    const output_path = blk: {
-        if (args.len < 3) return error.NoOutputPath;
-        break :blk args[2];
+    pub const EmbedArguments = struct {
+        binary_input_path: [:0]const u8,
+        binary_output_path: [:0]const u8,
+        sdf_input_path: [:0]const u8,
     };
+};
 
-    var directory_prefixes_to_strip = std.ArrayList([]const u8).init(allocator);
-    errdefer directory_prefixes_to_strip.deinit();
+const usage =
+    \\
+    \\
+;
 
-    if (args.len > 3) {
-        for (args[3..]) |arg| {
-            try directory_prefixes_to_strip.append(try allocator.dupe(u8, arg));
+fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
+    const stderr = std.io.getStdErr().writer();
+
+    if (msg.len == 0) @compileError("no message given");
+
+    blk: {
+        stderr.writeAll("error: ") catch break :blk;
+
+        stderr.print(msg, args) catch break :blk;
+
+        if (msg[msg.len - 1] != '\n') {
+            stderr.writeAll("\n\n") catch break :blk;
+        } else {
+            stderr.writeByte('\n') catch break :blk;
         }
+
+        stderr.writeAll(usage) catch break :blk;
     }
 
-    return .{
-        .input_path = try allocator.dupeZ(u8, input_path),
-        .output_path = try allocator.dupeZ(u8, output_path),
-        .directory_prefixes_to_strip = try directory_prefixes_to_strip.toOwnedSlice(),
+    std.process.exit(1);
+}
+
+fn getArguments(allocator: std.mem.Allocator) !Arguments {
+    var args_iter = try std.process.argsWithAllocator(allocator);
+    defer args_iter.deinit();
+
+    if (!args_iter.skip()) argumentError("no self path argument?", .{});
+
+    const action = blk: {
+        const action_string = args_iter.next() orelse
+            argumentError("no action given", .{});
+
+        break :blk std.meta.stringToEnum(Action, action_string) orelse
+            argumentError("'{s}' is not a valid action", .{action_string});
     };
+
+    const binary_input_path: [:0]const u8 = try allocator.dupeZ(u8, args_iter.next() orelse
+        argumentError("no binary_input_path given", .{}));
+    errdefer allocator.free(binary_input_path);
+
+    const binary_output_path: [:0]const u8 = try allocator.dupeZ(u8, args_iter.next() orelse
+        argumentError("no binary_output_path given", .{}));
+    errdefer allocator.free(binary_output_path);
+
+    switch (action) {
+        .generate => {
+            var directory_prefixes_to_strip = std.ArrayList([]const u8).init(allocator);
+            errdefer directory_prefixes_to_strip.deinit();
+
+            while (args_iter.next()) |arg| {
+                try directory_prefixes_to_strip.append(try allocator.dupe(u8, arg));
+            }
+
+            return .{
+                .generate = .{
+                    .binary_input_path = binary_input_path,
+                    .binary_output_path = binary_output_path,
+                    .directory_prefixes_to_strip = try directory_prefixes_to_strip.toOwnedSlice(),
+                },
+            };
+        },
+        .embed => {
+            const sdf_input_path: [:0]const u8 = try allocator.dupeZ(u8, args_iter.next() orelse
+                argumentError("no sdf_input_path given", .{}));
+            errdefer allocator.free(sdf_input_path);
+
+            return .{
+                .embed = .{
+                    .binary_input_path = binary_input_path,
+                    .binary_output_path = binary_output_path,
+                    .sdf_input_path = sdf_input_path,
+                },
+            };
+        },
+    }
 }
 
 const LineDebugInfo = struct {
