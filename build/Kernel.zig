@@ -146,10 +146,14 @@ fn create(
         }
     }
 
-    const run_sdf_builder = b.addRunArtifact(sdf_builder.release_safe_compile_step);
-    run_sdf_builder.addFileArg(kernel_exe.getEmittedBin());
-    const sdf_data_path = run_sdf_builder.addOutputFileArg("sdf.output");
-
+    const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+    // action
+    generate_sdf.addArg("generate");
+    // binary_input_path
+    generate_sdf.addFileArg(kernel_exe.getEmittedBin());
+    // binary_output_path
+    const sdf_data_path = generate_sdf.addOutputFileArg("sdf.output");
+    // directory_prefixes_to_strip
     generate_sdf.addArg(options.root_path);
 
     const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
