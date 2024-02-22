@@ -8,6 +8,9 @@ const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 
 const Options = @This();
 
+/// The build directory root path
+root_path: []const u8,
+
 optimize: std.builtin.OptimizeMode,
 
 /// CascadeOS version.
@@ -162,9 +165,16 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         "Force the provided log scopes to be debug in the kernel (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
     ) orelse "";
 
-    const cascade_version_string = try getVersionString(b, cascade_version);
+    const root_path = std.fmt.allocPrint(
+        b.allocator,
+        comptime "{s}" ++ std.fs.path.sep_str,
+        .{b.build_root.path.?},
+    ) catch unreachable;
+
+    const cascade_version_string = try getVersionString(b, cascade_version, root_path);
 
     return .{
+        .root_path = root_path,
         .optimize = b.standardOptimizeOption(.{}),
         .cascade_version_string = cascade_version_string,
         .build_for_host = build_for_host,
@@ -227,20 +237,12 @@ fn buildKernelOptionModule(
     forced_debug_log_scopes: []const u8,
     cascade_version_string: []const u8,
 ) !*std.Build.Module {
-    const root_path = std.fmt.allocPrint(
-        b.allocator,
-        comptime "{s}" ++ std.fs.path.sep_str,
-        .{b.build_root.path.?},
-    ) catch unreachable;
-
     const kernel_options = b.addOptions();
 
     kernel_options.addOption([]const u8, "cascade_version", cascade_version_string);
 
     kernel_options.addOption(bool, "force_debug_log", force_debug_log);
     addStringLiteralSliceOption(kernel_options, "forced_debug_log_scopes", forced_debug_log_scopes);
-
-    kernel_options.addOption([]const u8, "root_path", root_path);
 
     return kernel_options.createModule();
 }
@@ -282,7 +284,7 @@ fn addTargetOptions(options: *Step.Options, target: CascadeTarget) void {
 }
 
 /// Gets the version string.
-fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion) ![]const u8 {
+fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion, root_path: []const u8) ![]const u8 {
     const version_string = b.fmt(
         "{d}.{d}.{d}",
         .{ base_semantic_version.major, base_semantic_version.minor, base_semantic_version.patch },
@@ -290,7 +292,7 @@ fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion) !
 
     var exit_code: u8 = undefined;
     const raw_git_describe_output = b.runAllowFail(&[_][]const u8{
-        "git", "-C", b.build_root.path.?, "describe", "--match", "*.*.*", "--tags", "--abbrev=9",
+        "git", "-C", root_path, "describe", "--match", "*.*.*", "--tags", "--abbrev=9",
     }, &exit_code, .Ignore) catch {
         return b.fmt("{s}-unknown", .{version_string});
     };
