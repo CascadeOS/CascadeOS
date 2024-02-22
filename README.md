@@ -18,6 +18,7 @@ Cascade is a general purpose operating system targeting standard desktops and la
 ## Build, testing, running
 ### Prerequisites:
 - zig master (0.12.0-dev.2811+3cafb9655)
+- objcopy (required as `zig objcopy` does not support `--add-section` https://github.com/CascadeOS/CascadeOS/issues/81)
 - qemu (optional; used for running and host testing)
 
 Run the x86_64 kernel in QEMU:
