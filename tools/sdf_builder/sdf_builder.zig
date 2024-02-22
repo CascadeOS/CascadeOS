@@ -60,9 +60,178 @@ fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.Generate
 }
 
 fn embed(allocator: std.mem.Allocator, embed_arguments: Arguments.EmbedArguments) !void {
-    _ = allocator;
-    _ = embed_arguments;
-    @panic("UNIMPLEMENTED: embed");
+    var atomic_output_file = blk: {
+        const binary_input_file = try std.fs.cwd().openFile(embed_arguments.binary_input_path, .{});
+        defer binary_input_file.close();
+
+        const binary_input_file_stat = try binary_input_file.stat();
+
+        const atomic_output_file = try custom_atomic_file.atomicFileReadAndWrite(
+            std.fs.cwd(),
+            embed_arguments.binary_output_path,
+            .{ .mode = binary_input_file_stat.mode },
+        );
+
+        try atomic_output_file.file.writeFileAll(binary_input_file, .{});
+
+        break :blk atomic_output_file;
+    };
+    defer atomic_output_file.deinit();
+
+    const output_file = atomic_output_file.file;
+
+    // ensure sdf data is 8 byte aligned
+    const sdf_pos = blk: {
+        const end_pos = try output_file.getEndPos();
+        const aligned_end_pos = std.mem.alignForward(u64, end_pos, 8);
+        if (end_pos != aligned_end_pos) try output_file.setEndPos(aligned_end_pos);
+        break :blk aligned_end_pos;
+    };
+
+    // append sdf data to the end of the elf file
+    const sdf_size = blk: {
+        const sdf_input_file = try std.fs.cwd().openFile(embed_arguments.sdf_input_path, .{});
+        defer sdf_input_file.close();
+
+        const sdf_stat = try sdf_input_file.stat();
+
+        _ = try sdf_input_file.copyRangeAll(0, output_file, sdf_pos, sdf_stat.size);
+
+        break :blk sdf_stat.size;
+    };
+
+    // add new section to the elf file
+    {
+        // read the elf header into a buffer
+        var elf_header_backing_buffer: [@sizeOf(std.elf.Elf64_Ehdr)]u8 align(@alignOf(std.elf.Elf64_Ehdr)) = undefined;
+        try output_file.seekTo(0);
+        const elf_header_buffer = elf_header_backing_buffer[0..try output_file.readAll(&elf_header_backing_buffer)];
+
+        const elf_header_elf32: *std.elf.Elf32_Ehdr = std.mem.bytesAsValue(std.elf.Elf32_Ehdr, elf_header_buffer);
+
+        if (!std.mem.eql(u8, elf_header_elf32.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
+        if (elf_header_elf32.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
+
+        if (elf_header_elf32.e_ident[std.elf.EI_DATA] != std.elf.ELFDATA2LSB) return error.BigEndianElf; // TODO: Support big endian
+
+        const is_64: bool = switch (elf_header_elf32.e_ident[std.elf.EI_CLASS]) {
+            std.elf.ELFCLASS32 => false,
+            std.elf.ELFCLASS64 => true,
+            else => return error.InvalidElfClass,
+        };
+
+        const elf_header_elf64: *std.elf.Elf64_Ehdr = std.mem.bytesAsValue(std.elf.Elf64_Ehdr, elf_header_buffer);
+
+        const old_section_table_offset: u64, const old_number_of_sections, const section_entry_size, const section_string_index =
+            if (is_64)
+            .{ elf_header_elf64.e_shoff, elf_header_elf64.e_shnum, elf_header_elf64.e_shentsize, elf_header_elf64.e_shstrndx }
+        else
+            .{ elf_header_elf32.e_shoff, elf_header_elf32.e_shnum, elf_header_elf32.e_shentsize, elf_header_elf32.e_shstrndx };
+        std.debug.assert(section_entry_size == @as(u16, if (is_64) @sizeOf(std.elf.Elf64_Shdr) else @sizeOf(std.elf.Elf32_Shdr)));
+
+        const old_section_table_size = old_number_of_sections * section_entry_size;
+
+        // allocate a buffer for building the new section table with enough space for one extra entry
+        const section_table_buffer = try allocator.alloc(u8, old_section_table_size + section_entry_size);
+        defer allocator.free(section_table_buffer);
+
+        // read the old section table into `section_table_buffer`
+        try output_file.seekTo(old_section_table_offset);
+        std.debug.assert(try output_file.readAll(section_table_buffer[0..old_section_table_size]) == old_section_table_size);
+
+        const section_string_entry_buffer = section_table_buffer[section_entry_size * section_string_index ..][0..section_entry_size];
+
+        const old_section_string_offset: u64, const old_section_string_size: u64 =
+            if (is_64)
+        blk: {
+            const section_header = std.mem.bytesAsValue(std.elf.Elf64_Shdr, section_string_entry_buffer);
+            break :blk .{ section_header.sh_offset, section_header.sh_size };
+        } else blk: {
+            const section_header = std.mem.bytesAsValue(std.elf.Elf32_Shdr, section_string_entry_buffer);
+            break :blk .{ section_header.sh_offset, section_header.sh_size };
+        };
+
+        // copy the old section header string section to the end of the elf file
+        const section_string_offset = try output_file.getEndPos();
+        std.debug.assert(try output_file.copyRangeAll(
+            old_section_string_offset,
+            output_file,
+            section_string_offset,
+            old_section_string_size,
+        ) == old_section_string_size);
+
+        const sdf_section_name = ".sdf\x00";
+
+        // add the string for the sdf section's header to end of the new section header name section
+        const sdf_section_name_file_offset = try output_file.getEndPos();
+        const sdf_section_name_offset: u32 = @intCast(sdf_section_name_file_offset - section_string_offset);
+
+        try output_file.seekTo(sdf_section_name_file_offset);
+        try output_file.writeAll(sdf_section_name);
+
+        // update the section header string section's offset and size
+        if (is_64) {
+            const section_header = std.mem.bytesAsValue(std.elf.Elf64_Shdr, section_string_entry_buffer);
+            section_header.sh_offset = section_string_offset;
+            section_header.sh_size = old_section_string_size + sdf_section_name.len;
+        } else {
+            const section_header = std.mem.bytesAsValue(std.elf.Elf32_Shdr, section_string_entry_buffer);
+            section_header.sh_offset = @intCast(section_string_offset);
+            section_header.sh_size = @intCast(old_section_string_size + sdf_section_name.len);
+        }
+
+        // fill in the new section header entry (last entry in the table) with the sdf section's data
+        if (is_64) {
+            const sdf_section_header = std.mem.bytesAsValue(std.elf.Elf64_Shdr, section_table_buffer[old_section_table_size..]);
+            sdf_section_header.* = .{
+                .sh_name = sdf_section_name_offset,
+                .sh_type = std.elf.SHT_LOUSER,
+                .sh_flags = std.elf.SHF_ALLOC,
+                .sh_addr = 0,
+                .sh_offset = sdf_pos,
+                .sh_size = sdf_size,
+                .sh_link = 0,
+                .sh_info = 0,
+                .sh_addralign = 8,
+                .sh_entsize = 0,
+            };
+        } else {
+            const sdf_section_header = std.mem.bytesAsValue(std.elf.Elf32_Shdr, section_table_buffer[old_section_table_size..]);
+            sdf_section_header.* = .{
+                .sh_name = sdf_section_name_offset,
+                .sh_type = std.elf.SHT_LOUSER,
+                .sh_flags = std.elf.SHF_ALLOC,
+                .sh_addr = 0,
+                .sh_offset = @intCast(sdf_pos),
+                .sh_size = @intCast(sdf_size),
+                .sh_link = 0,
+                .sh_info = 0,
+                .sh_addralign = 8,
+                .sh_entsize = 0,
+            };
+        }
+
+        // write the new section table to the end of the elf file
+        const section_table_offset = try output_file.getEndPos();
+        try output_file.seekTo(section_table_offset);
+        try output_file.writeAll(section_table_buffer);
+
+        // update the in memory elf header
+        if (is_64) {
+            elf_header_elf64.e_shoff = section_table_offset;
+            elf_header_elf64.e_shnum = old_number_of_sections + 1;
+        } else {
+            elf_header_elf32.e_shoff = @intCast(section_table_offset);
+            elf_header_elf32.e_shnum = old_number_of_sections + 1;
+        }
+
+        // overwrite the file's elf header with the in memory one
+        try output_file.seekTo(0);
+        try output_file.writeAll(elf_header_buffer);
+    }
+
+    std.fs.cwd().deleteFile(embed_arguments.binary_output_path) catch {};
+    try atomic_output_file.finish();
 }
 
 const Action = enum {
@@ -516,6 +685,64 @@ fn createSdfDebugInfo(
 
     return try output_buffer.toOwnedSlice();
 }
+
+const custom_atomic_file = struct {
+    /// The same as `std.fs.Dir.atomicFile` but it opens the file as read and write
+    fn atomicFileReadAndWrite(
+        self: std.fs.Dir,
+        dest_path: []const u8,
+        options: std.fs.Dir.AtomicFileOptions,
+    ) !std.fs.AtomicFile {
+        if (std.fs.path.dirname(dest_path)) |dirname| {
+            const dir = if (options.make_path)
+                try self.makeOpenPath(dirname, .{})
+            else
+                try self.openDir(dirname, .{});
+
+            return atomicFileInitReadAndWrite(std.fs.path.basename(dest_path), options.mode, dir, true);
+        } else {
+            return atomicFileInitReadAndWrite(dest_path, options.mode, self, false);
+        }
+    }
+
+    const random_bytes_len = 12;
+    const tmp_path_len = std.fs.base64_encoder.calcSize(random_bytes_len);
+
+    /// The same as `std.fs.AtomicFile.init` but it opens the file as read and write
+    fn atomicFileInitReadAndWrite(
+        dest_basename: []const u8,
+        mode: std.fs.File.Mode,
+        dir: std.fs.Dir,
+        close_dir_on_deinit: bool,
+    ) std.fs.AtomicFile.InitError!std.fs.AtomicFile {
+        var rand_buf: [random_bytes_len]u8 = undefined;
+        var tmp_path_buf: [tmp_path_len:0]u8 = undefined;
+
+        while (true) {
+            std.crypto.random.bytes(rand_buf[0..]);
+            const tmp_path = std.fs.base64_encoder.encode(&tmp_path_buf, &rand_buf);
+            tmp_path_buf[tmp_path.len] = 0;
+
+            const file = dir.createFile(
+                tmp_path,
+                .{ .mode = mode, .exclusive = true, .read = true },
+            ) catch |err| switch (err) {
+                error.PathAlreadyExists => continue,
+                else => |e| return e,
+            };
+
+            return std.fs.AtomicFile{
+                .file = file,
+                .tmp_path_buf = tmp_path_buf,
+                .dest_basename = dest_basename,
+                .file_open = true,
+                .file_exists = true,
+                .close_dir_on_deinit = close_dir_on_deinit,
+                .dir = dir,
+            };
+        }
+    }
+};
 
 comptime {
     refAllDeclsRecursive(@This());
