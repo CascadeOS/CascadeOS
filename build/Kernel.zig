@@ -162,31 +162,15 @@ fn create(
         .extract_to_separate_file = true,
     });
 
-    // TODO: The `target.isNative(b)` branch below is a hack due to zig objcopy not supporting add section.
-    //
-    //       This does mean that only kernels for the native target will have SDF data embedded as GNU `objcopy` only
-    //       supports the target it is compiled for.
-    //
-    //       `llvm-objcopy` does support adding sections and supports multiple targets but it incorrectly aligns the
-    //        section making it useless.
-    const final_kernel_binary_path = if (target.isNative(b)) blk: {
-        const run_objcopy = b.addSystemCommand(&.{"objcopy"});
-        run_objcopy.addArg("--add-section");
-        run_objcopy.addPrefixedFileArg(".sdf=", sdf_data_path);
-        run_objcopy.addArgs(&.{
-            "--set-section-alignment", ".sdf=8",
-        });
-        run_objcopy.addArgs(&.{
-            "--set-section-flags", ".sdf=contents,alloc,load,readonly,data",
-        });
-        run_objcopy.addFileArg(stripped_kernel_exe.getOutput());
-        const stripped_kernel_with_sdf = run_objcopy.addOutputFileArg(
-            b.fmt("{s}", .{kernel_exe.out_filename}),
-        );
-        _ = run_objcopy.captureStdErr(); // suppress stderr warning "allocated section `.sdf' not in segment"
-
-        break :blk stripped_kernel_with_sdf;
-    } else stripped_kernel_exe.getOutput();
+    const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+    // action
+    embed_sdf.addArg("embed");
+    // binary_input_path
+    embed_sdf.addFileArg(stripped_kernel_exe.getOutput());
+    // binary_output_path
+    const final_kernel_binary_path = embed_sdf.addOutputFileArg("kernel");
+    // sdf_input_path
+    embed_sdf.addFileArg(sdf_data_path);
 
     const install_final_kernel_binary = b.addInstallFile(
         final_kernel_binary_path,

@@ -45,26 +45,85 @@ pub fn loadSymbols() void {
         const kernel_file = kernel.info.kernel_file orelse break :sdf_blk;
         const kernel_file_slice = kernel_file.toSlice(u8) catch break :sdf_blk;
 
-        const hdr: *const std.elf.Ehdr = @ptrCast(@alignCast(&kernel_file_slice[0]));
-        if (!std.mem.eql(u8, hdr.e_ident[0..4], std.elf.MAGIC)) break :sdf_blk;
-        if (hdr.e_ident[std.elf.EI_VERSION] != 1) break :sdf_blk;
+        var kernel_file_fbs = std.io.fixedBufferStream(kernel_file_slice);
+        const reader = kernel_file_fbs.reader();
 
-        const shoff = hdr.e_shoff;
-        const str_section_off = shoff + @as(u64, hdr.e_shentsize) * @as(u64, hdr.e_shstrndx);
-        const str_shdr: *const std.elf.Shdr = @ptrCast(@alignCast(&kernel_file_slice[std.math.cast(usize, str_section_off) orelse break :sdf_blk]));
-        const header_strings = kernel_file_slice[str_shdr.sh_offset..][0..str_shdr.sh_size];
-        const shdrs = @as(
-            [*]const std.elf.Shdr,
-            @ptrCast(@alignCast(&kernel_file_slice[shoff])),
-        )[0..hdr.e_shnum];
+        const section_headers_offset, const str_section_offset, const number_of_sections, const is_64 = blk: {
+            // read the elf header into a buffer
+            var elf_header_backing_buffer: [@sizeOf(std.elf.Elf64_Ehdr)]u8 align(@alignOf(std.elf.Elf64_Ehdr)) = undefined;
+            reader.readNoEof(&elf_header_backing_buffer) catch break :sdf_blk;
 
-        const sdf_slice = sdf_slice: for (shdrs) |*shdr| {
-            const name = std.mem.sliceTo(header_strings[shdr.sh_name..], 0);
+            const elf_header_elf32: *std.elf.Elf32_Ehdr = std.mem.bytesAsValue(std.elf.Elf32_Ehdr, &elf_header_backing_buffer);
 
-            if (std.mem.eql(u8, name, ".sdf")) {
-                break :sdf_slice kernel_file_slice[shdr.sh_offset..][0..shdr.sh_size];
+            if (!std.mem.eql(u8, elf_header_elf32.e_ident[0..4], std.elf.MAGIC)) break :sdf_blk;
+            if (elf_header_elf32.e_ident[std.elf.EI_VERSION] != 1) break :sdf_blk;
+
+            if (elf_header_elf32.e_ident[std.elf.EI_DATA] != std.elf.ELFDATA2LSB) break :sdf_blk; // TODO: Support big endian
+
+            const is_64: bool = switch (elf_header_elf32.e_ident[std.elf.EI_CLASS]) {
+                std.elf.ELFCLASS32 => false,
+                std.elf.ELFCLASS64 => true,
+                else => break :sdf_blk,
+            };
+
+            const elf_header_elf64: *std.elf.Elf64_Ehdr = std.mem.bytesAsValue(std.elf.Elf64_Ehdr, &elf_header_backing_buffer);
+
+            break :blk if (is_64)
+                .{
+                    elf_header_elf64.e_shoff,
+                    elf_header_elf64.e_shoff + @as(u64, elf_header_elf64.e_shentsize) * @as(u64, elf_header_elf64.e_shstrndx),
+                    elf_header_elf64.e_shnum,
+                    is_64,
+                }
+            else
+                .{
+                    elf_header_elf32.e_shoff,
+                    elf_header_elf32.e_shoff + @as(u64, elf_header_elf64.e_shentsize) * @as(u64, elf_header_elf64.e_shstrndx),
+                    elf_header_elf32.e_shnum,
+                    is_64,
+                };
+        };
+
+        const size_of_section_header = if (is_64) @as(usize, @sizeOf(std.elf.Elf64_Shdr)) else @sizeOf(std.elf.Elf32_Shdr);
+
+        const header_strings = blk: {
+            var str_section_header_buffer: [@sizeOf(std.elf.Elf64_Shdr)]u8 align(@alignOf(std.elf.Elf64_Shdr)) = undefined;
+            kernel_file_fbs.pos = str_section_offset;
+            reader.readNoEof(str_section_header_buffer[0..size_of_section_header]) catch break :sdf_blk;
+
+            if (is_64) {
+                const str_section_header: *std.elf.Elf64_Shdr = std.mem.bytesAsValue(std.elf.Elf64_Shdr, &str_section_header_buffer);
+                break :blk kernel_file_slice[str_section_header.sh_offset..][0..str_section_header.sh_size];
+            } else {
+                const str_section_header: *std.elf.Elf32_Shdr = std.mem.bytesAsValue(std.elf.Elf32_Shdr, &str_section_header_buffer);
+                break :blk kernel_file_slice[str_section_header.sh_offset..][0..str_section_header.sh_size];
             }
-        } else break :sdf_blk;
+        };
+
+        const sdf_slice = sdf_slice: {
+            var section_header_buffer: [@sizeOf(std.elf.Elf64_Shdr)]u8 align(@alignOf(std.elf.Elf64_Shdr)) = undefined;
+            kernel_file_fbs.pos = section_headers_offset;
+
+            for (0..number_of_sections) |_| {
+                reader.readNoEof(section_header_buffer[0..size_of_section_header]) catch break :sdf_blk;
+
+                const name_offset, const section_offset, const section_size = if (is_64) blk: {
+                    const section_header: *std.elf.Elf64_Shdr = std.mem.bytesAsValue(std.elf.Elf64_Shdr, &section_header_buffer);
+                    break :blk .{ section_header.sh_name, section_header.sh_offset, section_header.sh_size };
+                } else blk: {
+                    const section_header: *std.elf.Elf32_Shdr = std.mem.bytesAsValue(std.elf.Elf32_Shdr, &section_header_buffer);
+                    break :blk .{ section_header.sh_name, section_header.sh_offset, section_header.sh_size };
+                };
+
+                const name = std.mem.sliceTo(header_strings[name_offset..], 0);
+                if (std.mem.eql(u8, name, ".sdf")) {
+                    break :sdf_slice kernel_file_slice[section_offset..][0..section_size];
+                }
+            }
+
+            break :sdf_blk;
+        };
+
         var sdf_fbs = std.io.fixedBufferStream(sdf_slice);
 
         const header = sdf.Header.read(sdf_fbs.reader()) catch break :sdf_blk;
