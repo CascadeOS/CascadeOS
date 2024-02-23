@@ -18,11 +18,7 @@ In any future versions of this specification added fields or data structures wil
 
 The entry point to SDF that provides access to each of the specific data structures.
 
-Under normal circumstances this header would be at the start of an ELF section containing the entire SDF data.
-
 Due to the offsets contained in this header being unsigned the header must proceed all other data structures in memory.
-
-Aligned to `8` bytes.
 
 | offset | name | type | description |
 |:-|:-|:-:|:-|
@@ -51,8 +47,6 @@ An array of `FileEntry` structures containing information about each file refere
 
 Files are referenced by index.
 
-Aligned to `8` bytes.
-
 #### File Entry (`FileEntry`)
 | offset | name | type | description |
 |:-|:-|:-:|:-|
@@ -63,19 +57,14 @@ Aligned to `8` bytes.
 
 An array of instruction addresses (`leu64`) sorted in ascending order.
 
-The index of the address is the index into the location program states of the state that is an efficent start point for the location program for that address.
-
-__TODO: The above is badly written.__
-
-Aligned to `8` bytes.
+The index of the address corresponds to the index within the location program states for the state for that address,
+this serves as an efficient starting point for the location program closer to the target address.
 
 ## Location Program States
 
 An array of `LocationProgramState` structures.
 
 States are referenced by index.
-
-Aligned to `8` bytes.
 
 #### Location Program State (`LocationProgramState`)
 | offset | name | type | description |

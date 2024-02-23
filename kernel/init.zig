@@ -176,6 +176,8 @@ fn initProcessors() linksection(kernel.info.init_code) void {
 
     var processor_id: kernel.Processor.Id = .bootstrap;
 
+    if (true) core.panic("Hello");
+
     while (processor_descriptors.next()) |processor_descriptor| : ({
         processor_id = @enumFromInt(@intFromEnum(processor_id) + 1);
     }) {
