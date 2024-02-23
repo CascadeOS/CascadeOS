@@ -27,10 +27,7 @@ pub fn addFile(self: *FileTableBuilder, file_entry: sdf.FileEntry) !u64 {
 }
 
 pub fn output(self: *const FileTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
-    const offset = std.mem.alignForward(u64, output_buffer.items.len, @alignOf(sdf.FileEntry));
-    if (offset != output_buffer.items.len) {
-        try output_buffer.appendNTimes(0, offset - output_buffer.items.len);
-    }
+    const file_table_offset = output_buffer.items.len;
 
     const writer = output_buffer.writer();
 
@@ -38,7 +35,7 @@ pub fn output(self: *const FileTableBuilder, output_buffer: *std.ArrayList(u8)) 
         try file_entry.write(writer);
     }
 
-    return .{ offset, self.file_table.items.len };
+    return .{ file_table_offset, self.file_table.items.len };
 }
 
 comptime {

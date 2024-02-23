@@ -36,10 +36,7 @@ pub fn addLocationLookup(
 pub fn output(self: *const LocationLookupBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64, u64 } {
     std.debug.assert(self.location_lookup.items.len == self.location_program_states.items.len);
 
-    const location_lookup_offset = std.mem.alignForward(u64, output_buffer.items.len, @alignOf(u64));
-    if (location_lookup_offset != output_buffer.items.len) {
-        try output_buffer.appendNTimes(0, location_lookup_offset - output_buffer.items.len);
-    }
+    const location_lookup_offset = output_buffer.items.len;
 
     const writer = output_buffer.writer();
 

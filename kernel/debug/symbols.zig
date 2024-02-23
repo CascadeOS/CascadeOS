@@ -65,8 +65,9 @@ pub fn loadSymbols() void {
                 break :sdf_slice kernel_file_slice[shdr.sh_offset..][0..shdr.sh_size];
             }
         } else break :sdf_blk;
+        var sdf_fbs = std.io.fixedBufferStream(sdf_slice);
 
-        const header = sdf.Header.read(sdf_slice) catch break :sdf_blk;
+        const header = sdf.Header.read(sdf_fbs.reader()) catch break :sdf_blk;
 
         sdf_string_table = header.stringTable(sdf_slice);
         sdf_file_table = header.fileTable(sdf_slice);
@@ -83,7 +84,7 @@ pub fn loadSymbols() void {
 pub fn getSymbol(address: usize) ?Symbol {
     if (!symbols_loaded) return null;
 
-    const start_state = sdf_location_lookup.getStartState(address);
+    const start_state = sdf_location_lookup.getStartState(address) catch return null;
 
     const location = sdf_location_program.getLocation(start_state, address) catch return null;
 

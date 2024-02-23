@@ -20,8 +20,6 @@
 //! version they are available from.
 
 const std = @import("std");
-const builtin = @import("builtin");
-const native_endian = builtin.cpu.arch.endian();
 
 pub const version: u8 = 1;
 
@@ -32,11 +30,7 @@ pub const magic: [8]u8 = "SDFSDFSD".*;
 ///
 /// The entry point to SDF that provides access to each of the specific data structures.
 ///
-/// Under normal circumstances this header would be at the start of an ELF section containing the entire SDF data.
-///
 /// Due to the offsets contained in this header being unsigned the header must proceed all other data structures in memory.
-///
-/// Aligned to `8` bytes.
 pub const Header = extern struct {
     /// Magic bytes to identify the data as SDF.
     magic: [8]u8 = magic,
@@ -110,53 +104,40 @@ pub const Header = extern struct {
     /// Stored in little endian, `write` and `read` perform the conversion if required.
     location_program_length: u64,
 
-    pub fn read(memory: []const u8) !Header {
-        var fbs = std.io.fixedBufferStream(memory[0..@sizeOf(Header)]);
-        const reader = fbs.reader();
+    pub fn read(reader: anytype) !Header {
+        var header: Header = undefined;
 
-        switch (native_endian) {
-            .little => return try reader.readStruct(Header),
-            .big => {
-                var header: Header = undefined;
+        header.magic = try reader.readBytesNoEof(magic.len);
+        if (!std.mem.eql(u8, &header.magic, &magic)) return error.InvalidSdfMagic;
 
-                header.magic = try reader.readBytesNoEof(magic.len);
-                if (!std.mem.eql(u8, header.magic, magic)) return error.InvalidSdfMagic;
+        header.version = try reader.readByte();
+        header._reserved = try reader.readBytesNoEof(7);
+        header.string_table_offset = try reader.readInt(u64, .little);
+        header.string_table_length = try reader.readInt(u64, .little);
+        header.file_table_offset = try reader.readInt(u64, .little);
+        header.file_table_entries = try reader.readInt(u64, .little);
+        header.location_lookup_offset = try reader.readInt(u64, .little);
+        header.location_program_states_offset = try reader.readInt(u64, .little);
+        header.location_lookup_entries = try reader.readInt(u64, .little);
+        header.location_program_offset = try reader.readInt(u64, .little);
+        header.location_program_length = try reader.readInt(u64, .little);
 
-                header.version = try reader.readByte();
-                header._reserved = try reader.readBytesNoEof(7);
-                header.string_table_offset = try reader.readInt(u64, .little);
-                header.string_table_length = try reader.readInt(u64, .little);
-                header.file_table_offset = try reader.readInt(u64, .little);
-                header.file_table_entries = try reader.readInt(u64, .little);
-                header.location_lookup_offset = try reader.readInt(u64, .little);
-                header.location_program_states_offset = try reader.readInt(u64, .little);
-                header.location_lookup_entries = try reader.readInt(u64, .little);
-                header.location_program_offset = try reader.readInt(u64, .little);
-                header.location_program_length = try reader.readInt(u64, .little);
-
-                return header;
-            },
-        }
+        return header;
     }
 
     pub fn write(header: Header, writer: anytype) !void {
-        switch (native_endian) {
-            .little => try writer.writeStruct(header),
-            .big => {
-                try writer.writeAll(&header.magic);
-                try writer.writeByte(header.version);
-                try writer.writeByteNTimes(0, 7);
-                try writer.writeInt(u64, header.string_table_offset, .little);
-                try writer.writeInt(u64, header.string_table_length, .little);
-                try writer.writeInt(u64, header.file_table_offset, .little);
-                try writer.writeInt(u64, header.file_table_entries, .little);
-                try writer.writeInt(u64, header.location_lookup_offset, .little);
-                try writer.writeInt(u64, header.location_program_states_offset, .little);
-                try writer.writeInt(u64, header.location_lookup_entries, .little);
-                try writer.writeInt(u64, header.location_program_offset, .little);
-                try writer.writeInt(u64, header.location_program_length, .little);
-            },
-        }
+        try writer.writeAll(&magic);
+        try writer.writeByte(header.version);
+        try writer.writeByteNTimes(0, 7);
+        try writer.writeInt(u64, header.string_table_offset, .little);
+        try writer.writeInt(u64, header.string_table_length, .little);
+        try writer.writeInt(u64, header.file_table_offset, .little);
+        try writer.writeInt(u64, header.file_table_entries, .little);
+        try writer.writeInt(u64, header.location_lookup_offset, .little);
+        try writer.writeInt(u64, header.location_program_states_offset, .little);
+        try writer.writeInt(u64, header.location_lookup_entries, .little);
+        try writer.writeInt(u64, header.location_program_offset, .little);
+        try writer.writeInt(u64, header.location_program_length, .little);
     }
 
     pub fn stringTable(header: Header, memory: []const u8) StringTable {
@@ -166,50 +147,18 @@ pub const Header = extern struct {
     }
 
     pub fn fileTable(header: Header, memory: []const u8) FileTable {
-        switch (native_endian) {
-            .little => {
-                const ptr: [*]const FileEntry = @ptrCast(@alignCast(&memory[header.file_table_offset]));
-                return .{
-                    .content = ptr[0..header.file_table_entries],
-                };
-            },
-            .big => {
-                return .{
-                    .content = .{
-                        .bytes = memory[header.file_table_offset..][0..(header.file_table_entries * @sizeOf(FileEntry))],
-                        .count = header.file_table_entries,
-                    },
-                };
-            },
-        }
+        return .{
+            .bytes = memory[header.file_table_offset..][0..(header.file_table_entries * @sizeOf(FileEntry))],
+            .entry_count = header.file_table_entries,
+        };
     }
 
     pub fn locationLookup(header: Header, memory: []const u8) LocationLookup {
-        switch (native_endian) {
-            .little => {
-                const instruction_addresses_ptr: [*]const u64 = @ptrCast(
-                    @alignCast(&memory[header.location_lookup_offset]),
-                );
-                const location_program_states_ptr: [*]const LocationProgramState = @ptrCast(
-                    @alignCast(&memory[header.location_program_states_offset]),
-                );
-                return .{
-                    .content = .{
-                        .instruction_addresses = instruction_addresses_ptr[0..header.location_lookup_entries],
-                        .location_program_states = location_program_states_ptr[0..header.location_lookup_entries],
-                    },
-                };
-            },
-            .big => {
-                return .{
-                    .content = .{
-                        .instruction_addresses_bytes = memory[header.location_lookup_offset..][0..(header.location_lookup_entries * @sizeOf(u64))],
-                        .location_program_states_bytes = memory[header.location_program_states_offset..][0..(header.location_lookup_entries * @sizeOf(LocationProgramState))],
-                        .count = header.location_lookup_entries,
-                    },
-                };
-            },
-        }
+        return .{
+            .instruction_addresses_bytes = memory[header.location_lookup_offset..][0..(header.location_lookup_entries * @sizeOf(u64))],
+            .location_program_states_bytes = memory[header.location_program_states_offset..][0..(header.location_lookup_entries * @sizeOf(LocationProgramState))],
+            .entry_count = header.location_lookup_entries,
+        };
     }
 
     pub fn locationProgram(header: Header, memory: []const u8) LocationProgram {
@@ -236,7 +185,8 @@ pub const Header = extern struct {
         var fbs = std.io.fixedBufferStream(&buffer);
         try orig_header.write(fbs.writer());
 
-        const new_header = try Header.read(&buffer);
+        fbs.pos = 0;
+        const new_header = try Header.read(fbs.reader());
 
         try std.testing.expectEqual(orig_header, new_header);
     }
@@ -262,36 +212,17 @@ pub const StringTable = struct {
 ///
 /// Files are referenced by index.
 pub const FileTable = struct {
-    content: switch (native_endian) {
-        .little => []const FileEntry,
-        .big => struct {
-            bytes: []const u8,
-            count: u64,
-        },
-    },
+    bytes: []const u8,
+    entry_count: u64,
 
     pub fn getFile(self: FileTable, index: u64) ?FileEntry {
-        switch (native_endian) {
-            .little => {
-                if (index >= self.content.len) return null;
-                return self.content[index];
-            },
-            .big => {
-                if (index >= self.content.count) return null;
+        if (index >= self.entry_count) return null;
 
-                var fbs = std.io.fixedBufferStream(
-                    self.content.bytes[index * @sizeOf(FileEntry) ..],
-                );
-                const reader = fbs.reader();
+        var fbs = std.io.fixedBufferStream(
+            self.bytes[index * @sizeOf(FileEntry) ..],
+        );
 
-                var entry: FileEntry = undefined;
-
-                entry.directory_offset = try reader.readInt(u64, .little);
-                entry.file_offset = try reader.readInt(u64, .little);
-
-                return entry;
-            },
-        }
+        return FileEntry.read(fbs.reader()) catch null;
     }
 };
 
@@ -307,14 +238,18 @@ pub const FileEntry = extern struct {
     /// Stored in little endian, `write` and `read` perform the conversion if required.
     file_offset: u64,
 
+    pub fn read(reader: anytype) !FileEntry {
+        var entry: FileEntry = undefined;
+
+        entry.directory_offset = try reader.readInt(u64, .little);
+        entry.file_offset = try reader.readInt(u64, .little);
+
+        return entry;
+    }
+
     pub fn write(file_entry: FileEntry, writer: anytype) !void {
-        switch (native_endian) {
-            .little => try writer.writeStruct(file_entry),
-            .big => {
-                try writer.writeInt(u64, file_entry.directory_offset, .little);
-                try writer.writeInt(u64, file_entry.file_offset, .little);
-            },
-        }
+        try writer.writeInt(u64, file_entry.directory_offset, .little);
+        try writer.writeInt(u64, file_entry.file_offset, .little);
     }
 
     pub fn directory(self: FileEntry, string_table: StringTable) [:0]const u8 {
@@ -334,43 +269,27 @@ pub const FileEntry = extern struct {
 /// Provides a mapping from instruction addresses to a location program state that is the optimal start point for
 /// the location program for that address.
 pub const LocationLookup = struct {
-    content: switch (native_endian) {
-        .little => struct {
-            /// An array of instruction addresses sorted in ascending order.
-            ///
-            /// The index of the address is the index into the location program start
-            /// states for the optimal start state for the location program.
-            instruction_addresses: []const u64,
+    instruction_addresses_bytes: []const u8,
+    location_program_states_bytes: []const u8,
+    entry_count: u64,
 
-            /// An array of location program states.
-            ///
-            /// Referenced by index into the `instruction_addresses` array.
-            location_program_states: []const LocationProgramState,
-        },
-        .big => struct {
-            instruction_addresses_bytes: []const u8,
-            location_program_states_bytes: []const u8,
-            count: u64,
-        },
-    },
+    pub fn getStartState(self: LocationLookup, address: u64) !LocationProgramState {
+        const index = blk: {
+            var instruction_addresses = std.io.fixedBufferStream(self.instruction_addresses_bytes);
+            const reader = instruction_addresses.reader();
 
-    pub fn getStartState(self: LocationLookup, address: u64) LocationProgramState {
-        switch (native_endian) {
-            .little => {
-                const index = blk: {
-                    var candidate_index: u64 = 0;
-                    while (candidate_index < self.content.instruction_addresses.len) : (candidate_index += 1) {
-                        if (self.content.instruction_addresses[candidate_index] > address) break;
-                    }
-                    break :blk if (candidate_index != 0) candidate_index - 1 else 0;
-                };
+            var candidate_index: u64 = 0;
+            while (reader.readInt(u64, .little) catch null) |candidate_address| : (candidate_index += 1) {
+                if (candidate_address > address) break;
+            }
+            break :blk if (candidate_index != 0) candidate_index - 1 else 0;
+        };
 
-                return self.content.location_program_states[index];
-            },
-            .big => {
-                @panic("UNIMPLEMENTED: LocationLookup.getStartState - big endian"); // TODO
-            },
-        }
+        var location_program_states = std.io.fixedBufferStream(
+            self.location_program_states_bytes[index * @sizeOf(LocationProgramState) ..],
+        );
+
+        return LocationProgramState.read(location_program_states.reader());
     }
 };
 
@@ -416,18 +335,26 @@ pub const LocationProgramState = extern struct {
     /// Stored in little endian, `write` and `read` perform the conversion if required.
     column: u64 = 0,
 
+    pub fn read(reader: anytype) !LocationProgramState {
+        var result: LocationProgramState = undefined;
+
+        result.instruction_offset = try reader.readInt(u64, .little);
+        result.address = try reader.readInt(u64, .little);
+        result.file_index = try reader.readInt(u64, .little);
+        result.symbol_offset = try reader.readInt(u64, .little);
+        result.line = try reader.readInt(u64, .little);
+        result.column = try reader.readInt(u64, .little);
+
+        return result;
+    }
+
     pub fn write(location_program_state: LocationProgramState, writer: anytype) !void {
-        switch (native_endian) {
-            .little => try writer.writeStruct(location_program_state),
-            .big => {
-                try writer.writeInt(u64, location_program_state.instruction_offset, .little);
-                try writer.writeInt(u64, location_program_state.address, .little);
-                try writer.writeInt(u64, location_program_state.file_index, .little);
-                try writer.writeInt(u64, location_program_state.symbol_offset, .little);
-                try writer.writeInt(u64, location_program_state.line, .little);
-                try writer.writeInt(u64, location_program_state.column, .little);
-            },
-        }
+        try writer.writeInt(u64, location_program_state.instruction_offset, .little);
+        try writer.writeInt(u64, location_program_state.address, .little);
+        try writer.writeInt(u64, location_program_state.file_index, .little);
+        try writer.writeInt(u64, location_program_state.symbol_offset, .little);
+        try writer.writeInt(u64, location_program_state.line, .little);
+        try writer.writeInt(u64, location_program_state.column, .little);
     }
 
     comptime {
