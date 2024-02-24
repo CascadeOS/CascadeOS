@@ -123,14 +123,12 @@ fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
     var http_client: std.http.Client = .{ .allocator = allocator };
     defer http_client.deinit();
 
-    var request_headers = std.http.Headers{ .allocator = allocator };
-    defer request_headers.deinit();
+    var server_header_buffer: [4 * 1024]u8 = undefined;
 
-    var request = try http_client.open(.GET, uri, request_headers, .{});
+    var request = try http_client.open(.GET, uri, .{
+        .server_header_buffer = &server_header_buffer,
+    });
     defer request.deinit();
-
-    try request.send(.{});
-    try request.wait();
 
     if (request.response.status != .ok) return error.ResponseNotOk;
 
