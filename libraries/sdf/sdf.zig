@@ -20,6 +20,7 @@
 //! version they are available from.
 
 const std = @import("std");
+const big_endian = @import("builtin").cpu.arch.endian() == .big;
 
 pub const version: u8 = 1;
 
@@ -107,37 +108,23 @@ pub const Header = extern struct {
     pub fn read(reader: anytype) !Header {
         var header: Header = undefined;
 
-        header.magic = try reader.readBytesNoEof(magic.len);
+        try reader.readNoEof(std.mem.asBytes(&header));
+
         if (!std.mem.eql(u8, &header.magic, &magic)) return error.InvalidSdfMagic;
 
-        header.version = try reader.readByte();
-        header._reserved = try reader.readBytesNoEof(7);
-        header.string_table_offset = try reader.readInt(u64, .little);
-        header.string_table_length = try reader.readInt(u64, .little);
-        header.file_table_offset = try reader.readInt(u64, .little);
-        header.file_table_entries = try reader.readInt(u64, .little);
-        header.location_lookup_offset = try reader.readInt(u64, .little);
-        header.location_program_states_offset = try reader.readInt(u64, .little);
-        header.location_lookup_entries = try reader.readInt(u64, .little);
-        header.location_program_offset = try reader.readInt(u64, .little);
-        header.location_program_length = try reader.readInt(u64, .little);
+        if (big_endian) std.mem.byteSwapAllFields(Header, &header);
 
         return header;
     }
 
     pub fn write(header: Header, writer: anytype) !void {
-        try writer.writeAll(&magic);
-        try writer.writeByte(header.version);
-        try writer.writeByteNTimes(0, 7);
-        try writer.writeInt(u64, header.string_table_offset, .little);
-        try writer.writeInt(u64, header.string_table_length, .little);
-        try writer.writeInt(u64, header.file_table_offset, .little);
-        try writer.writeInt(u64, header.file_table_entries, .little);
-        try writer.writeInt(u64, header.location_lookup_offset, .little);
-        try writer.writeInt(u64, header.location_program_states_offset, .little);
-        try writer.writeInt(u64, header.location_lookup_entries, .little);
-        try writer.writeInt(u64, header.location_program_offset, .little);
-        try writer.writeInt(u64, header.location_program_length, .little);
+        if (big_endian) {
+            var byte_swapped_header = header;
+            std.mem.byteSwapAllFields(Header, &byte_swapped_header);
+            try writer.writeAll(std.mem.asBytes(&byte_swapped_header));
+        } else {
+            try writer.writeAll(std.mem.asBytes(&header));
+        }
     }
 
     pub fn stringTable(header: Header, memory: []const u8) StringTable {
@@ -239,17 +226,23 @@ pub const FileEntry = extern struct {
     file_offset: u64,
 
     pub fn read(reader: anytype) !FileEntry {
-        var entry: FileEntry = undefined;
+        var file_entry: FileEntry = undefined;
 
-        entry.directory_offset = try reader.readInt(u64, .little);
-        entry.file_offset = try reader.readInt(u64, .little);
+        try reader.readNoEof(std.mem.asBytes(&file_entry));
 
-        return entry;
+        if (big_endian) std.mem.byteSwapAllFields(FileEntry, &file_entry);
+
+        return file_entry;
     }
 
     pub fn write(file_entry: FileEntry, writer: anytype) !void {
-        try writer.writeInt(u64, file_entry.directory_offset, .little);
-        try writer.writeInt(u64, file_entry.file_offset, .little);
+        if (big_endian) {
+            var byte_swapped_file_entry = file_entry;
+            std.mem.byteSwapAllFields(FileEntry, &byte_swapped_file_entry);
+            try writer.writeAll(std.mem.asBytes(&byte_swapped_file_entry));
+        } else {
+            try writer.writeAll(std.mem.asBytes(&file_entry));
+        }
     }
 
     pub fn directory(self: FileEntry, string_table: StringTable) [:0]const u8 {
@@ -353,25 +346,23 @@ pub const LocationProgramState = extern struct {
     column: u64 = 0,
 
     pub fn read(reader: anytype) !LocationProgramState {
-        var result: LocationProgramState = undefined;
+        var location_program_state: LocationProgramState = undefined;
 
-        result.instruction_offset = try reader.readInt(u64, .little);
-        result.address = try reader.readInt(u64, .little);
-        result.file_index = try reader.readInt(u64, .little);
-        result.symbol_offset = try reader.readInt(u64, .little);
-        result.line = try reader.readInt(u64, .little);
-        result.column = try reader.readInt(u64, .little);
+        try reader.readNoEof(std.mem.asBytes(&location_program_state));
 
-        return result;
+        if (big_endian) std.mem.byteSwapAllFields(LocationProgramState, &location_program_state);
+
+        return location_program_state;
     }
 
     pub fn write(location_program_state: LocationProgramState, writer: anytype) !void {
-        try writer.writeInt(u64, location_program_state.instruction_offset, .little);
-        try writer.writeInt(u64, location_program_state.address, .little);
-        try writer.writeInt(u64, location_program_state.file_index, .little);
-        try writer.writeInt(u64, location_program_state.symbol_offset, .little);
-        try writer.writeInt(u64, location_program_state.line, .little);
-        try writer.writeInt(u64, location_program_state.column, .little);
+        if (big_endian) {
+            var byte_swapped_location_program_state = location_program_state;
+            std.mem.byteSwapAllFields(LocationProgramState, &byte_swapped_location_program_state);
+            try writer.writeAll(std.mem.asBytes(&byte_swapped_location_program_state));
+        } else {
+            try writer.writeAll(std.mem.asBytes(&location_program_state));
+        }
     }
 
     test LocationProgramState {
