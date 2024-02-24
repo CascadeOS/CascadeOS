@@ -135,7 +135,8 @@ fn resolveLibrary(
         library_description.name,
     });
 
-    const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{library_description.name});
+    const root_file_name = library_description.root_file_name orelse
+        try std.fmt.allocPrint(b.allocator, "{s}.zig", .{library_description.name});
 
     const root_file_path = helpers.pathJoinFromRoot(b, &.{
         directory_path,

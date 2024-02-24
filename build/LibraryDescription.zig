@@ -23,3 +23,8 @@ supported_targets: ?[]const CascadeTarget = null,
 
 /// Whether the library can only be used or tested within Cascade.
 is_cascade_only: bool = false,
+
+/// The file name of the libraries root file.
+///
+/// If `null`, defaults to "name.zig".
+root_file_name: ?[]const u8 = null,
