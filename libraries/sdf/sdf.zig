@@ -169,15 +169,15 @@ pub const Header = extern struct {
 
     test Header {
         var orig_header: Header = .{
-            .string_table_offset = 1234,
-            .string_table_length = 1234,
-            .file_table_offset = 1234,
-            .file_table_entries = 1234,
-            .location_lookup_offset = 1234,
-            .location_program_states_offset = 1234,
-            .location_lookup_entries = 1234,
-            .location_program_offset = 1234,
-            .location_program_length = 1234,
+            .string_table_offset = 12,
+            .string_table_length = 23,
+            .file_table_offset = 34,
+            .file_table_entries = 45,
+            .location_lookup_offset = 56,
+            .location_program_states_offset = 67,
+            .location_lookup_entries = 78,
+            .location_program_offset = 89,
+            .location_program_length = 90,
         };
 
         var buffer: [@sizeOf(Header)]u8 = undefined;
@@ -258,6 +258,23 @@ pub const FileEntry = extern struct {
 
     pub fn file(self: FileEntry, string_table: StringTable) [:0]const u8 {
         return string_table.getString(self.file_offset);
+    }
+
+    test FileEntry {
+        var orig_file_entry: FileEntry = .{
+            .directory_offset = 12,
+            .file_offset = 32,
+        };
+
+        var buffer: [@sizeOf(FileEntry)]u8 = undefined;
+
+        var fbs = std.io.fixedBufferStream(&buffer);
+        try orig_file_entry.write(fbs.writer());
+
+        fbs.pos = 0;
+        const new_file_entry = try FileEntry.read(fbs.reader());
+
+        try std.testing.expectEqual(orig_file_entry, new_file_entry);
     }
 
     comptime {
@@ -355,6 +372,27 @@ pub const LocationProgramState = extern struct {
         try writer.writeInt(u64, location_program_state.symbol_offset, .little);
         try writer.writeInt(u64, location_program_state.line, .little);
         try writer.writeInt(u64, location_program_state.column, .little);
+    }
+
+    test LocationProgramState {
+        var orig_location_program_state: LocationProgramState = .{
+            .instruction_offset = 12,
+            .address = 23,
+            .file_index = 34,
+            .symbol_offset = 45,
+            .line = 56,
+            .column = 67,
+        };
+
+        var buffer: [@sizeOf(LocationProgramState)]u8 = undefined;
+
+        var fbs = std.io.fixedBufferStream(&buffer);
+        try orig_location_program_state.write(fbs.writer());
+
+        fbs.pos = 0;
+        const new_location_program_state = try LocationProgramState.read(fbs.reader());
+
+        try std.testing.expectEqual(orig_location_program_state, new_location_program_state);
     }
 
     comptime {
