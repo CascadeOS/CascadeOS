@@ -29,6 +29,10 @@ const limine_requests = struct {
     export var entry_point: limine.EntryPoint linksection(kernel.info.init_data) = .{ .entry = &limineEntryPoint };
 };
 
+comptime {
+    _ = &limine_requests;
+}
+
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
 pub fn rsdp() linksection(kernel.info.init_code) ?kernel.VirtualAddress {
     if (limine_requests.rsdp.response) |resp| {
