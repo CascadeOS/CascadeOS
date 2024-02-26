@@ -18,10 +18,13 @@ pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 pub fn tableIterator(sdt_header: *const SharedHeader) TableIterator {
     const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
 
+    const is_xsdt = sdt_header.signatureIs("XSDT");
+    core.assert(is_xsdt or sdt_header.signatureIs("RSDT")); // Invalid SDT signature.
+
     return .{
         .ptr = sdt_ptr + @sizeOf(SharedHeader),
         .end_ptr = sdt_ptr + sdt_header.length,
-        .is_xsdt = sdt_header.signatureIs("XSDT"),
+        .is_xsdt = is_xsdt,
     };
 }
 
