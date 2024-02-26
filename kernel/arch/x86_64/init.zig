@@ -7,6 +7,8 @@ const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 const SerialPort = @import("SerialPort.zig");
 
+const acpi = @import("acpi");
+
 const log = kernel.debug.log.scoped(.init_x86_64);
 
 pub const initLocalInterruptController = x86_64.apic.init.initApicOnProcessor;
@@ -82,8 +84,8 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 
-    const madt = kernel.acpi.init.getTable(kernel.acpi.MADT) orelse core.panic("unable to get MADT");
-    const fadt = kernel.acpi.init.getTable(kernel.acpi.FADT) orelse core.panic("unable to get FADT");
+    const madt = kernel.acpi.init.getTable(acpi.MADT) orelse core.panic("unable to get MADT");
+    const fadt = kernel.acpi.init.getTable(acpi.FADT) orelse core.panic("unable to get FADT");
 
     log.debug("capturing FADT information", .{});
     captureFADTInformation(fadt);
@@ -95,12 +97,12 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     x86_64.apic.init.captureApicInformation(fadt, madt);
 }
 
-fn captureMADTInformation(madt: *const kernel.acpi.MADT) linksection(kernel.info.init_code) void {
+fn captureMADTInformation(madt: *const acpi.MADT) linksection(kernel.info.init_code) void {
     x86_64.arch_info.have_pic = madt.flags.PCAT_COMPAT;
     log.debug("have pic: {}", .{x86_64.arch_info.have_pic});
 }
 
-fn captureFADTInformation(fadt: *const kernel.acpi.FADT) linksection(kernel.info.init_code) void {
+fn captureFADTInformation(fadt: *const acpi.FADT) linksection(kernel.info.init_code) void {
     const flags = fadt.IA_PC_BOOT_ARCH;
 
     x86_64.arch_info.have_ps2_controller = flags.@"8042";

@@ -5,7 +5,7 @@ const std = @import("std");
 
 const address = @import("address.zig");
 
-pub const acpi = @import("acpi/acpi.zig");
+pub const acpi = @import("acpi.zig");
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
 pub const debug = @import("debug/debug.zig");

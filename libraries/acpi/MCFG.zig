@@ -2,11 +2,11 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
 
-const acpi = @import("acpi.zig");
+const acpi = @import("acpi");
 
+/// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {
     header: acpi.SharedHeader align(1),
 
@@ -27,7 +27,7 @@ pub const MCFG = extern struct {
     pub const SIGNATURE_STRING = "MCFG";
 
     pub const BaseAllocation = extern struct {
-        base_address: kernel.PhysicalAddress align(1),
+        base_address: u64 align(1),
 
         segment_group: u16 align(1),
 

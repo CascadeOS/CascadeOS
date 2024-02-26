@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const dependencies: []const []const u8 = &.{
+    "acpi",
     "bitjuggle",
     "containers",
     "core",

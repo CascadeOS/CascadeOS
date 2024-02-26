@@ -2,10 +2,9 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
 
-const acpi = @import("acpi.zig");
+const acpi = @import("acpi");
 
 /// The Multiple APIC Description Table (MADT), provides OSPM with information necessary for operation on systems with
 /// APIC, SAPIC, GIC, or LPIC implementations.
@@ -305,7 +304,7 @@ pub const MADT = extern struct {
             /// Processor Interrupt Block.
             ///
             /// See the Intel® ItaniumTM Architecture Software Developer's Manual for more information.
-            local_apic_address: kernel.PhysicalAddress align(1),
+            local_apic_address: u64 align(1),
 
             comptime {
                 core.testing.expectSize(@This(), 10);
@@ -338,7 +337,7 @@ pub const MADT = extern struct {
             /// The 32-bit physical address to access this I/O SAPIC.
             ///
             /// Each I/O SAPIC resides at a unique address.
-            iosapic_address: kernel.PhysicalAddress align(1),
+            iosapic_address: u64 align(1),
 
             comptime {
                 core.testing.expectSize(@This(), 14);
@@ -607,13 +606,13 @@ pub const MADT = extern struct {
             performance_interrupt_gsiv: u32 align(1),
 
             /// The 64-bit physical address of the processor's Parking Protocol mailbox.
-            parked_address: kernel.PhysicalAddress align(1),
+            parked_address: u64 align(1),
 
             /// On GICv1/v2 systems and GICv3/4 systems in GICv2 compatibility mode, this field holds the 64-bit
             /// physical address at which the processor can access this GIC CPU Interface.
             ///
             /// If provided here, the "Local Interrupt Controller Address" field in the MADT must be ignored by the OSPM.
-            physical_base_address: kernel.PhysicalAddress align(1),
+            physical_base_address: u64 align(1),
 
             /// Address of the GIC virtual CPU interface registers.
             ///
@@ -635,7 +634,7 @@ pub const MADT = extern struct {
             /// describe the Redistributors instead, and this field must be set to 0.
             ///
             /// If a GICR structure is present in the MADT then this field must be ignored by the OSPM.
-            gicr_base_address: kernel.PhysicalAddress align(1),
+            gicr_base_address: u64 align(1),
 
             /// This fields follows the MPIDR formatting of ARM architecture.
             ///
@@ -734,7 +733,7 @@ pub const MADT = extern struct {
             gic_id: u32 align(1),
 
             /// The 64-bit physical address for this Distributor
-            physical_base_address: kernel.PhysicalAddress align(1),
+            physical_base_address: u64 align(1),
 
             /// Reserved - Must be zero
             system_vector_base: u32 align(1),
@@ -787,7 +786,7 @@ pub const MADT = extern struct {
             gic_msi_frame_id: u32 align(1),
 
             /// The 64-bit physical address for this MSI Frame.
-            physical_base_address: kernel.PhysicalAddress align(1),
+            physical_base_address: u64 align(1),
 
             /// Reserved - Must be zero
             flags: u32 align(1),
@@ -838,7 +837,7 @@ pub const MADT = extern struct {
             _reserved: u16 align(1),
 
             /// The 64-bit physical address of a page range containing all GIC Redistributors.
-            discovery_range_base_address: kernel.PhysicalAddress align(1),
+            discovery_range_base_address: u64 align(1),
 
             /// Length of the GIC Redistributor Discovery page range.
             discovery_range_length: u32 align(1),
@@ -860,7 +859,7 @@ pub const MADT = extern struct {
             gic_its_id: u32 align(1),
 
             /// The 64-bit physical address for the Interrupt Translation Service.
-            physical_base_address: kernel.PhysicalAddress align(1),
+            physical_base_address: u64 align(1),
 
             _reserved2: u32 align(1),
 
@@ -919,7 +918,7 @@ pub const MADT = extern struct {
             /// It must be in ACPINvs.
             ///
             /// It must also be 4K bytes aligned.
-            mailbox_address: kernel.PhysicalAddress align(1),
+            mailbox_address: u64 align(1),
 
             comptime {
                 core.testing.expectSize(@This(), 14);
@@ -980,7 +979,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of LIO PIC registers.
-            base_address: kernel.PhysicalAddress align(1),
+            base_address: u64 align(1),
 
             /// The register space size of LIO PIC.
             size: u16 align(1),
@@ -1012,7 +1011,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of HT PIC registers.
-            base_address: kernel.PhysicalAddress align(1),
+            base_address: u64 align(1),
 
             /// The register space size of HT PIC.
             size: u16 align(1),
@@ -1068,7 +1067,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The physical address for MSI.
-            message_address: kernel.PhysicalAddress align(1),
+            message_address: u64 align(1),
 
             /// The start vector allocated for MSI from global vectors of HT PIC or EIO PIC.
             start: u32 align(1),
@@ -1095,7 +1094,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of BIO PIC registers.
-            base_address: kernel.PhysicalAddress align(1),
+            base_address: u64 align(1),
 
             /// The register space size of BIO PIC.
             size: u16 align(1),
@@ -1128,7 +1127,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of LPC PIC registers.
-            base_address: kernel.PhysicalAddress align(1),
+            base_address: u64 align(1),
 
             /// The register space size of LPC PIC.
             size: u16 align(1),
@@ -1238,3 +1237,28 @@ pub const MADT = extern struct {
         core.testing.expectSize(@This(), @sizeOf(acpi.SharedHeader) + @sizeOf(MultipleAPICFlags) + @sizeOf(u32) + 1);
     }
 };
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .Struct => |info| info.decls,
+        .Enum => |info| info.decls,
+        .Union => |info| info.decls,
+        .Opaque => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}

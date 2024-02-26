@@ -6,6 +6,8 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
+const acpi = @import("acpi");
+
 const log = kernel.debug.log.scoped(.apic);
 
 /// The local APIC pointer used when in xAPIC mode.
@@ -59,8 +61,8 @@ pub fn panicInterruptOtherCores() void {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        fadt: *const kernel.acpi.FADT,
-        madt: *const kernel.acpi.MADT,
+        fadt: *const acpi.FADT,
+        madt: *const acpi.MADT,
     ) linksection(kernel.info.init_code) void {
         x2apic = kernel.boot.x2apicEnabled();
         if (x2apic) {

@@ -2,10 +2,9 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
 
-const acpi = @import("acpi.zig");
+const acpi = @import("acpi");
 
 /// The Fixed ACPI Description Table (FADT) defines various fixed hardware ACPI information vital to an ACPI-compatible
 /// OS, such as the base address for the following hardware registers blocks:
@@ -372,13 +371,13 @@ pub const FADT = extern struct {
     ///
     /// If `fixed_feature_flags.HARDWARE_REDUCED_ACPI` flag is set, and both this field and the `FIRMWARE_CTRL` field
     /// are zero, there is no FACS available
-    X_FIRMWARE_CTRL: kernel.PhysicalAddress align(1),
+    X_FIRMWARE_CTRL: u64 align(1),
 
     /// Extended physical address of the DSDT.
     ///
     /// If this field contains a nonzero value which can be used by the OSPM, then the `DSDT` field must be ignored
     /// by the OSPM.
-    X_DSDT: kernel.PhysicalAddress align(1),
+    X_DSDT: u64 align(1),
 
     /// Extended address of the PM1a Event Register Block.
     ///
@@ -828,3 +827,28 @@ pub const FADT = extern struct {
         core.testing.expectSize(@This(), 276);
     }
 };
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .Struct => |info| info.decls,
+        .Enum => |info| info.decls,
+        .Union => |info| info.decls,
+        .Opaque => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}
