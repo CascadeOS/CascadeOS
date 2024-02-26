@@ -42,7 +42,7 @@ pub const TableIterator = struct {
     fn nextImpl(self: *TableIterator, comptime T: type) ?u64 {
         if (@intFromPtr(self.ptr) + @sizeOf(T) >= @intFromPtr(self.end_ptr)) return null;
 
-        const physical_address = std.mem.readInt(T, @ptrCast(self.ptr), .little); // TODO: is little endian correct?
+        const physical_address = std.mem.readInt(T, @ptrCast(self.ptr), .little);
 
         self.ptr += @sizeOf(T);
 
