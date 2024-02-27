@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "inputs": [
+        {
+            "id": "arch",
+            "type": "pickString",
+            "options": ["aarch64", "x86_64"],
+            "default": "x86_64",
+            "description": "Architecture that is being debugged."
+        }
+    ],
+    "configurations": [
+        {
+            "name": "QEMU remote",
+            "type": "lldb",
+            "request": "custom",
+            "targetCreateCommands": ["target create ${workspaceFolder}/zig-out/${input:arch}/kernel"],
+            "processCreateCommands": ["gdb-remote 1234"]
+        }
+    ]
+}

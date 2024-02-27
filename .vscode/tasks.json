@@ -7,7 +7,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "zig build",
+            "label": "zig build test",
             "type": "process",
             "command": "zig",
             "isBuildCommand": true,
