@@ -6,11 +6,11 @@ const core = @import("core");
 
 /// Represents a size in bytes.
 pub const Size = extern struct {
-    value: usize,
+    value: u64,
 
     pub usingnamespace core.ValueTypeMixin(@This());
 
-    pub const Unit = enum(usize) {
+    pub const Unit = enum(u64) {
         byte = 1,
         kib = 1024,
         mib = 1024 * 1024,
@@ -22,7 +22,7 @@ pub const Size = extern struct {
         return .{ .value = @sizeOf(T) };
     }
 
-    pub inline fn from(amount: usize, unit: Unit) Size {
+    pub inline fn from(amount: u64, unit: Unit) Size {
         return .{
             .value = amount * @intFromEnum(unit),
         };
@@ -35,18 +35,18 @@ pub const Size = extern struct {
 
     /// Aligns the `Size` forward to the given alignment.
     pub inline fn alignForward(self: Size, alignment: Size) Size {
-        return .{ .value = std.mem.alignForward(usize, self.value, alignment.value) };
+        return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
     }
 
     /// Aligns the `Size` backward to the given alignment.
     pub inline fn alignBackward(self: Size, alignment: Size) Size {
-        return .{ .value = std.mem.alignBackward(usize, self.value, alignment.value) };
+        return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
     }
 
     /// Returns the amount of `self` sizes needed to cover `target`.
     ///
     /// Caller must ensure `self` is not zero.
-    pub fn amountToCover(self: Size, target: Size) usize {
+    pub fn amountToCover(self: Size, target: Size) u64 {
         const one_byte = core.Size{ .value = 1 };
         return target.add(self.subtract(one_byte)).divide(self).value;
     }
@@ -55,7 +55,7 @@ pub const Size = extern struct {
         {
             const size = Size{ .value = 10 };
             const target = Size{ .value = 25 };
-            const expected: usize = 3;
+            const expected: u64 = 3;
 
             try std.testing.expectEqual(expected, size.amountToCover(target));
         }
@@ -63,7 +63,7 @@ pub const Size = extern struct {
         {
             const size = Size{ .value = 1 };
             const target = Size{ .value = 30 };
-            const expected: usize = 30;
+            const expected: u64 = 30;
 
             try std.testing.expectEqual(expected, size.amountToCover(target));
         }
@@ -71,7 +71,7 @@ pub const Size = extern struct {
         {
             const size = Size{ .value = 100 };
             const target = Size{ .value = 100 };
-            const expected: usize = 1;
+            const expected: u64 = 1;
 
             try std.testing.expectEqual(expected, size.amountToCover(target));
         }
@@ -79,7 +79,7 @@ pub const Size = extern struct {
         {
             const size = Size{ .value = 512 };
             const target = core.Size.from(64, .mib);
-            const expected: usize = 131072;
+            const expected: u64 = 131072;
 
             try std.testing.expectEqual(expected, size.amountToCover(target));
         }
@@ -131,7 +131,7 @@ pub const Size = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(u64));
     }
 };
 
