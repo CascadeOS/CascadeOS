@@ -18,7 +18,12 @@
             "type": "lldb",
             "request": "custom",
             "targetCreateCommands": ["target create ${workspaceFolder}/zig-out/${input:arch}/kernel"],
-            "processCreateCommands": ["gdb-remote 1234"]
+            "processCreateCommands": [
+                "breakpoint set --name init.kernelInitStage1 --hardware --one-shot true",
+                // "process handle SIGTRAP -p false -s false -n false", // this is nice for TCG but not good for KVM
+                "settings set target.require-hardware-breakpoint true",
+                "gdb-remote 1234"
+            ]
         }
     ]
 }
