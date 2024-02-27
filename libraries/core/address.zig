@@ -165,7 +165,9 @@ pub const VirtualRange = extern struct {
 
     /// Returns a byte slice of the memory corresponding to this virtual range.
     ///
-    /// It is the caller's responsibility to ensure that the range is valid in the current address space.
+    /// It is the caller's responsibility to ensure:
+    ///   - the range is valid in the current address space
+    ///   - no writes are performed if the range is read-only
     pub inline fn toByteSlice(self: VirtualRange) []u8 {
         return self.address.toPtr([*]u8)[0..self.size.value];
     }
