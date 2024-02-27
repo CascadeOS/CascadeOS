@@ -36,13 +36,13 @@ comptime {
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
 pub fn rsdp() linksection(kernel.info.init_code) ?core.VirtualAddress {
     if (limine_requests.rsdp.response) |resp| {
-        return core.VirtualAddress.fromPtr(resp.address);
+        return resp.address;
     }
     return null;
 }
 
 /// Returns the direct map address provided by the bootloader, if any.
-pub fn directMapAddress() linksection(kernel.info.init_code) ?u64 {
+pub fn directMapAddress() linksection(kernel.info.init_code) ?core.VirtualAddress {
     if (limine_requests.hhdm.response) |resp| {
         return resp.offset;
     }
@@ -50,8 +50,8 @@ pub fn directMapAddress() linksection(kernel.info.init_code) ?u64 {
 }
 
 pub const KernelBaseAddress = struct {
-    virtual: u64,
-    physical: u64,
+    virtual: core.VirtualAddress,
+    physical: core.PhysicalAddress,
 };
 
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
@@ -287,10 +287,7 @@ const LimineMemoryMapIterator = struct {
         };
 
         return .{
-            .range = core.PhysicalRange.fromAddr(
-                core.PhysicalAddress.fromInt(limine_entry.base),
-                core.Size.from(limine_entry.length, .byte),
-            ),
+            .range = core.PhysicalRange.fromAddr(limine_entry.base, limine_entry.length),
             .type = switch (limine_entry.type) {
                 .usable => .free,
                 .kernel_and_modules, .framebuffer => .in_use,

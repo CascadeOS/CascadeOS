@@ -10,6 +10,7 @@
 //!   - 5-Level Paging Feature: deprecated in favour of Paging Mode Feature
 //!
 
+const core = @import("core");
 const std = @import("std");
 
 const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
@@ -95,7 +96,7 @@ pub const StackSize = extern struct {
     response: ?*const Response = null,
 
     /// The requested stack size (also used for SMP processors).
-    stack_size: u64,
+    stack_size: core.Size,
 
     pub const Response = extern struct {
         revision: u64,
@@ -113,7 +114,7 @@ pub const HHDM = extern struct {
         revision: u64,
 
         /// the virtual address offset of the beginning of the higher half direct map
-        offset: u64,
+        offset: core.VirtualAddress,
     };
 };
 
@@ -154,8 +155,8 @@ pub const Framebuffer = extern struct {
         blue_mask_shift: u8,
         unused: [7]u8,
 
-        _edid_size: u64,
-        _edid: [*]const u8,
+        _edid_size: core.Size,
+        _edid: core.VirtualAddress,
 
         /// Response revision 1 required
         _video_mode_count: u64,
@@ -164,7 +165,7 @@ pub const Framebuffer = extern struct {
         _video_modes: [*]const *const VideoMode,
 
         pub fn edid(self: *const LimineFramebuffer) []const u8 {
-            return self._edid[0..self._edid_size];
+            return core.VirtualRange.fromAddr(self._edid, self._edid_size).toByteSlice();
         }
 
         /// Response revision 1 required
@@ -444,10 +445,10 @@ pub const Memmap = extern struct {
 
     pub const Entry = extern struct {
         /// Physical address of the base of the memory section
-        base: u64,
+        base: core.PhysicalAddress,
 
         /// Length of the memory section
-        length: u64,
+        length: core.Size,
 
         type: Type,
 
@@ -563,7 +564,7 @@ pub const RSDP = extern struct {
         revision: u64,
 
         /// Address of the RSDP table.
-        address: *anyopaque,
+        address: core.VirtualAddress,
     };
 };
 
@@ -596,7 +597,7 @@ pub const EFISystemTable = extern struct {
         revision: u64,
 
         /// Address of EFI system table.
-        address: *anyopaque,
+        address: core.VirtualAddress,
     };
 };
 
@@ -613,13 +614,13 @@ pub const EFIMemoryMap = extern struct {
         revision: u64,
 
         /// Address (HHDM) of the EFI memory map..
-        memmap: *anyopaque,
+        memmap: core.VirtualAddress,
 
         /// Size in bytes of the EFI memory map.
-        memmap_size: u64,
+        memmap_size: core.Size,
 
         /// EFI memory map descriptor size in bytes.
-        desc_size: u64,
+        desc_size: core.Size,
 
         /// Version of EFI memory map descriptors.
         desc_version: u64,
@@ -652,10 +653,10 @@ pub const KernelAddress = extern struct {
         revision: u64,
 
         /// The physical base address of the kernel.
-        physical_base: u64,
+        physical_base: core.PhysicalAddress,
 
         /// The virtual base address of the kernel.
-        virtual_base: u64,
+        virtual_base: core.VirtualAddress,
     };
 };
 
@@ -673,7 +674,7 @@ pub const DeviceTreeBlob = extern struct {
         revision: u64,
 
         /// Virtual pointer to the device tree blob.
-        address: *anyopaque,
+        address: core.VirtualAddress,
     };
 };
 
@@ -681,10 +682,10 @@ pub const File = extern struct {
     revision: u64,
 
     /// The address of the file. This is always at least 4KiB aligned.
-    address: *anyopaque,
+    address: core.VirtualAddress,
 
     /// The size of the file, in bytes.
-    size: u64,
+    size: core.Size,
 
     /// The path of the file within the volume, with a leading slash
     _path: [*:0]const u8,
@@ -732,7 +733,7 @@ pub const File = extern struct {
     }
 
     pub fn getContents(self: *const File) []const u8 {
-        return @as([*]const u8, @ptrCast(self.address))[0..self.size];
+        return core.VirtualRange.fromAddr(self.address, self.size).toByteSlice();
     }
 
     pub const MediaType = enum(u32) {

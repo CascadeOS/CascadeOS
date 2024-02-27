@@ -224,13 +224,11 @@ fn calculateDirectMapRange(direct_map_size: core.Size) linksection(kernel.info.i
     const direct_map_address = kernel.boot.directMapAddress() orelse
         core.panic("bootloader did not provide the start of the direct map");
 
-    const direct_map_start_address = core.VirtualAddress.fromInt(direct_map_address);
-
-    if (!direct_map_start_address.isAligned(kernel.arch.paging.standard_page_size)) {
+    if (!direct_map_address.isAligned(kernel.arch.paging.standard_page_size)) {
         core.panic("direct map is not aligned to the standard page size");
     }
 
-    return core.VirtualRange.fromAddr(direct_map_start_address, direct_map_size);
+    return core.VirtualRange.fromAddr(direct_map_address, direct_map_size);
 }
 
 fn calculateNonCachedDirectMapRange(
@@ -295,13 +293,13 @@ fn calculateKernelOffsets() linksection(kernel.info.init_code) void {
     const kernel_virtual = kernel_base_address.virtual;
     const kernel_physical = kernel_base_address.physical;
 
-    kernel.info.kernel_virtual_base_address = core.VirtualAddress.fromInt(kernel_virtual);
-    kernel.info.kernel_physical_base_address = core.PhysicalAddress.fromInt(kernel_physical);
+    kernel.info.kernel_virtual_base_address = kernel_virtual;
+    kernel.info.kernel_physical_base_address = kernel_physical;
     log.debug("kernel virtual base address: {}", .{kernel.info.kernel_virtual_base_address});
     log.debug("kernel physical base address: {}", .{kernel.info.kernel_physical_base_address});
 
-    kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual - kernel.info.kernel_base_address.value, .byte);
-    kernel.info.kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual - kernel_physical, .byte);
+    kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual.value - kernel.info.kernel_base_address.value, .byte);
+    kernel.info.kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual.value - kernel_physical.value, .byte);
     log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.?.value});
     log.debug("kernel physical to virtual offset: 0x{x}", .{kernel.info.kernel_physical_to_virtual_offset.value});
 }
