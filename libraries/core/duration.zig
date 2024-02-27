@@ -6,11 +6,11 @@ const core = @import("core");
 
 /// Represents a duration.
 pub const Duration = extern struct {
-    value: usize,
+    value: u64,
 
     pub usingnamespace core.ValueTypeMixin(@This());
 
-    pub const Unit = enum(usize) {
+    pub const Unit = enum(u64) {
         nanosecond = 1,
         microsecond = 1000,
         millisecond = 1000 * 1000,
@@ -20,7 +20,7 @@ pub const Duration = extern struct {
         day = 24 * 60 * 60 * 1000 * 1000 * 1000,
     };
 
-    pub inline fn from(amount: usize, unit: Unit) Duration {
+    pub inline fn from(amount: u64, unit: Unit) Duration {
         return .{
             .value = amount * @intFromEnum(unit),
         };
@@ -94,7 +94,7 @@ pub const Duration = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(u64));
     }
 };
 
