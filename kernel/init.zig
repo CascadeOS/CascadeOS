@@ -25,7 +25,7 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
     kernel.arch.init.setupEarlyOutput();
 
     // we need to get the processor data loaded early as the panic handler and logging use it
-    bootstrap_processor.idle_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
+    bootstrap_processor.idle_stack = kernel.Stack.fromRangeNoGuard(core.VirtualRange.fromSlice(
         u8,
         @as([]u8, &bootstrap_interrupt_stack),
     ));
@@ -87,7 +87,7 @@ fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_c
     kernel.scheduler.init.initScheduler();
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
-        kernel.VirtualAddress.fromPtr(&kernelInitStage3),
+        core.VirtualAddress.fromPtr(&kernelInitStage3),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
 
     log.debug("leaving bootloader provided stack", .{});
@@ -160,7 +160,7 @@ fn copyKernelFileFromBootloaderMemory() linksection(kernel.info.init_code) void 
         bootloader_provided_kernel_file.toByteSlice(),
     );
 
-    kernel.info.kernel_file.?.address = kernel.VirtualAddress.fromPtr(kernel_file_buffer.ptr);
+    kernel.info.kernel_file.?.address = core.VirtualAddress.fromPtr(kernel_file_buffer.ptr);
 }
 
 /// Initialize the per processor data structures for all processors including the bootstrap processor.
@@ -220,23 +220,23 @@ fn calculateDirectMaps() linksection(kernel.info.init_code) void {
     log.debug("non-cached direct map: {}", .{kernel.info.non_cached_direct_map});
 }
 
-fn calculateDirectMapRange(direct_map_size: core.Size) linksection(kernel.info.init_code) kernel.VirtualRange {
+fn calculateDirectMapRange(direct_map_size: core.Size) linksection(kernel.info.init_code) core.VirtualRange {
     const direct_map_address = kernel.boot.directMapAddress() orelse
         core.panic("bootloader did not provide the start of the direct map");
 
-    const direct_map_start_address = kernel.VirtualAddress.fromInt(direct_map_address);
+    const direct_map_start_address = core.VirtualAddress.fromInt(direct_map_address);
 
     if (!direct_map_start_address.isAligned(kernel.arch.paging.standard_page_size)) {
         core.panic("direct map is not aligned to the standard page size");
     }
 
-    return kernel.VirtualRange.fromAddr(direct_map_start_address, direct_map_size);
+    return core.VirtualRange.fromAddr(direct_map_start_address, direct_map_size);
 }
 
 fn calculateNonCachedDirectMapRange(
     direct_map_size: core.Size,
-    direct_map_range: kernel.VirtualRange,
-) linksection(kernel.info.init_code) kernel.VirtualRange {
+    direct_map_range: core.VirtualRange,
+) linksection(kernel.info.init_code) core.VirtualRange {
     // try to place the non-cached direct map directly _before_ the direct map
     {
         const candidate_range = direct_map_range.moveBackward(direct_map_size);
@@ -295,8 +295,8 @@ fn calculateKernelOffsets() linksection(kernel.info.init_code) void {
     const kernel_virtual = kernel_base_address.virtual;
     const kernel_physical = kernel_base_address.physical;
 
-    kernel.info.kernel_virtual_base_address = kernel.VirtualAddress.fromInt(kernel_virtual);
-    kernel.info.kernel_physical_base_address = kernel.PhysicalAddress.fromInt(kernel_physical);
+    kernel.info.kernel_virtual_base_address = core.VirtualAddress.fromInt(kernel_virtual);
+    kernel.info.kernel_physical_base_address = core.PhysicalAddress.fromInt(kernel_physical);
     log.debug("kernel virtual base address: {}", .{kernel.info.kernel_virtual_base_address});
     log.debug("kernel physical base address: {}", .{kernel.info.kernel_physical_base_address});
 

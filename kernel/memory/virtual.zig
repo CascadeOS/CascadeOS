@@ -17,12 +17,12 @@ pub var memory_layout: KernelMemoryLayout = .{};
 /// Maps a virtual range using the standard page size.
 ///
 /// Physical pages are allocated for each page in the virtual range.
-pub fn mapRange(page_table: *paging.PageTable, virtual_range: kernel.VirtualRange, map_type: MapType) !void {
+pub fn mapRange(page_table: *paging.PageTable, virtual_range: core.VirtualRange, map_type: MapType) !void {
     core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     const virtual_range_end = virtual_range.end();
-    var current_virtual_range = kernel.VirtualRange.fromAddr(virtual_range.address, kernel.arch.paging.standard_page_size);
+    var current_virtual_range = core.VirtualRange.fromAddr(virtual_range.address, kernel.arch.paging.standard_page_size);
 
     errdefer {
         // Unmap all pages that have been mapped.
@@ -50,8 +50,8 @@ pub fn mapRange(page_table: *paging.PageTable, virtual_range: kernel.VirtualRang
 /// Maps a virtual address range to a physical range using the standard page size.
 pub fn mapToPhysicalRange(
     page_table: *paging.PageTable,
-    virtual_range: kernel.VirtualRange,
-    physical_range: kernel.PhysicalRange,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
     map_type: MapType,
 ) !void {
     core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
@@ -80,7 +80,7 @@ pub fn mapToPhysicalRange(
 /// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
 pub fn unmap(
     page_table: *paging.PageTable,
-    virtual_range: kernel.VirtualRange,
+    virtual_range: core.VirtualRange,
 ) void {
     core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
@@ -156,8 +156,8 @@ pub const init = struct {
     /// Maps a virtual address range to a physical address range using all available page sizes.
     fn mapToPhysicalRangeAllPageSizes(
         page_table: *paging.PageTable,
-        virtual_range: kernel.VirtualRange,
-        physical_range: kernel.PhysicalRange,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
         map_type: MapType,
     ) linksection(kernel.info.init_code) !void {
         core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
@@ -181,7 +181,7 @@ pub const init = struct {
 
     /// Maps the direct maps.
     fn mapDirectMaps() linksection(kernel.info.init_code) !void {
-        const direct_map_physical_range = kernel.PhysicalRange.fromAddr(kernel.PhysicalAddress.zero, kernel.info.direct_map.size);
+        const direct_map_physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, kernel.info.direct_map.size);
 
         log.debug("mapping the direct map", .{});
 
@@ -281,9 +281,9 @@ pub const init = struct {
 
         core.assert(section_end > section_start);
 
-        const virt_address = kernel.VirtualAddress.fromInt(section_start);
+        const virt_address = core.VirtualAddress.fromInt(section_start);
 
-        const virtual_range = kernel.VirtualRange.fromAddr(
+        const virtual_range = core.VirtualRange.fromAddr(
             virt_address,
             core.Size
                 .from(section_end - section_start, .byte)
@@ -291,11 +291,11 @@ pub const init = struct {
         );
         core.assert(virtual_range.size.isAligned(paging.standard_page_size));
 
-        const phys_address = kernel.PhysicalAddress.fromInt(
+        const phys_address = core.PhysicalAddress.fromInt(
             virt_address.value - kernel.info.kernel_physical_to_virtual_offset.value,
         );
 
-        const physical_range = kernel.PhysicalRange.fromAddr(phys_address, virtual_range.size);
+        const physical_range = core.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
         try mapToPhysicalRangeAllPageSizes(
             kernel.kernel_process.page_table,

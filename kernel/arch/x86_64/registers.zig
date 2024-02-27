@@ -147,8 +147,8 @@ pub const Cr0 = packed struct(u64) {
 
 pub const Cr2 = struct {
     /// Read the page fault linear address from the CR2 register.
-    pub inline fn readAddress() kernel.VirtualAddress {
-        return kernel.VirtualAddress.fromInt(asm ("mov %%cr2, %[value]"
+    pub inline fn readAddress() core.VirtualAddress {
+        return core.VirtualAddress.fromInt(asm ("mov %%cr2, %[value]"
             : [value] "=r" (-> u64),
         ));
     }
@@ -156,14 +156,14 @@ pub const Cr2 = struct {
 
 pub const Cr3 = struct {
     /// Reads the CR3 register and returns the page table address.
-    pub inline fn readAddress() kernel.PhysicalAddress {
-        return kernel.PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
+    pub inline fn readAddress() core.PhysicalAddress {
+        return core.PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
             : [value] "=r" (-> u64),
         ) & 0xFFFF_FFFF_FFFF_F000);
     }
 
     /// Writes the CR3 register with the given page table address.
-    pub inline fn writeAddress(address: kernel.PhysicalAddress) void {
+    pub inline fn writeAddress(address: core.PhysicalAddress) void {
         asm volatile ("mov %[address], %%cr3"
             :
             : [address] "r" (address.value & 0xFFFF_FFFF_FFFF_F000),

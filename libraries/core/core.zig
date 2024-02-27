@@ -14,6 +14,12 @@ pub const Duration = @import("duration.zig").Duration;
 
 pub const Size = @import("size.zig").Size;
 
+const address = @import("address.zig");
+pub const PhysicalAddress = address.PhysicalAddress;
+pub const PhysicalRange = address.PhysicalRange;
+pub const VirtualAddress = address.VirtualAddress;
+pub const VirtualRange = address.VirtualRange;
+
 pub const testing = @import("testing.zig");
 
 /// Using `.Unspecified` prevents stack frames being lost due to inlining in debug mode.

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+const core = @import("core");
 const std = @import("std");
-
-const address = @import("address.zig");
 
 pub const acpi = @import("acpi.zig");
 pub const arch = @import("arch/arch.zig");
@@ -13,15 +12,47 @@ pub const heap = @import("heap/heap.zig");
 pub const info = @import("info.zig");
 pub const init = @import("init.zig");
 pub const memory = @import("memory/memory.zig");
-pub const PhysicalAddress = address.PhysicalAddress;
-pub const PhysicalRange = address.PhysicalRange;
 pub const Processor = @import("Processor.zig");
 pub const scheduler = @import("scheduler/scheduler.zig");
 pub const SpinLock = @import("SpinLock.zig");
 pub const Stack = @import("Stack.zig");
 pub const time = @import("time.zig");
-pub const VirtualAddress = address.VirtualAddress;
-pub const VirtualRange = address.VirtualRange;
+
+/// Returns the virtual address corresponding to this physical address in the direct map.
+pub inline fn physicalToDirectMap(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + info.direct_map.address.value };
+}
+
+/// Returns the virtual address corresponding to this physical address in the non-cached direct map.
+pub inline fn physicalToNonCachedDirectMap(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + info.non_cached_direct_map.address.value };
+}
+
+/// Returns the physical address of the given virtual address if it is in one of the direct maps.
+pub fn directMapToPhysical(self: core.VirtualAddress) error{AddressNotInAnyDirectMap}!core.PhysicalAddress {
+    if (info.direct_map.contains(self)) {
+        return .{ .value = self.value -% info.direct_map.address.value };
+    }
+    if (info.non_cached_direct_map.contains(self)) {
+        return .{ .value = self.value -% info.non_cached_direct_map.address.value };
+    }
+    return error.AddressNotInAnyDirectMap;
+}
+
+/// Returns the physical address of the given direct map virtual address.
+///
+/// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
+pub fn unsafeDirectMapToPhysical(self: core.VirtualAddress) core.PhysicalAddress {
+    return .{ .value = self.value -% info.direct_map.address.value };
+}
+
+/// Returns a virtual range corresponding to this physical range in the direct map.
+pub inline fn physicalRangeToDirectMap(self: core.PhysicalRange) core.VirtualRange {
+    return .{
+        .address = physicalToDirectMap(self.address),
+        .size = self.size,
+    };
+}
 
 pub var kernel_process: scheduler.Process = .{
     .id = .kernel,

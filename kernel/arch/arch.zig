@@ -245,7 +245,7 @@ pub const paging = struct {
     }
 
     /// The virtual address of the higher half.
-    pub const higher_half: kernel.VirtualAddress = current.paging.higher_half;
+    pub const higher_half: core.VirtualAddress = current.paging.higher_half;
 
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
@@ -268,14 +268,14 @@ pub const paging = struct {
     /// This function will only use the architecture's `standard_page_size`.
     pub fn mapToPhysicalRange(
         page_table: *PageTable,
-        virtual_range: kernel.VirtualRange,
-        physical_range: kernel.PhysicalRange,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
         map_type: kernel.memory.virtual.MapType,
     ) callconv(core.inline_in_non_debug_calling_convention) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
-            kernel.VirtualRange,
-            kernel.PhysicalRange,
+            core.VirtualRange,
+            core.PhysicalRange,
             kernel.memory.virtual.MapType,
         ) MapError!void);
 
@@ -287,9 +287,9 @@ pub const paging = struct {
     /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
     pub fn unmap(
         page_table: *PageTable,
-        virtual_range: kernel.VirtualRange,
+        virtual_range: core.VirtualRange,
     ) callconv(core.inline_in_non_debug_calling_convention) void {
-        checkSupport(current.paging, "unmap", fn (*PageTable, kernel.VirtualRange) void);
+        checkSupport(current.paging, "unmap", fn (*PageTable, core.VirtualRange) void);
 
         current.paging.unmap(page_table, virtual_range);
     }
@@ -299,14 +299,14 @@ pub const paging = struct {
     /// This function is allowed to use all page sizes available to the architecture.
     pub fn mapToPhysicalRangeAllPageSizes(
         page_table: *PageTable,
-        virtual_range: kernel.VirtualRange,
-        physical_range: kernel.PhysicalRange,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
         map_type: kernel.memory.virtual.MapType,
     ) callconv(core.inline_in_non_debug_calling_convention) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
             *PageTable,
-            kernel.VirtualRange,
-            kernel.PhysicalRange,
+            core.VirtualRange,
+            core.PhysicalRange,
             kernel.memory.virtual.MapType,
         ) MapError!void);
 
@@ -325,11 +325,11 @@ pub const paging = struct {
         ///   1. search the higher half of the *top level* of the given page table for a free entry
         ///   2. allocate a backing frame for it
         ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-        ///   4. return the `kernel.VirtualRange` representing the entire virtual range that entry covers
+        ///   4. return the `core.VirtualRange` representing the entire virtual range that entry covers
         pub fn getTopLevelRangeAndFillFirstLevel(
             page_table: *PageTable,
-        ) callconv(core.inline_in_non_debug_calling_convention) MapError!kernel.VirtualRange {
-            checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!kernel.VirtualRange);
+        ) callconv(core.inline_in_non_debug_calling_convention) MapError!core.VirtualRange {
+            checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!core.VirtualRange);
 
             return current.paging.init.getTopLevelRangeAndFillFirstLevel(page_table);
         }
@@ -341,9 +341,9 @@ pub const scheduling = struct {
     ///
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
     pub fn changeStackAndReturn(
-        stack_pointer: kernel.VirtualAddress,
+        stack_pointer: core.VirtualAddress,
     ) callconv(core.inline_in_non_debug_calling_convention) noreturn {
-        checkSupport(current.scheduling, "changeStackAndReturn", fn (kernel.VirtualAddress) noreturn);
+        checkSupport(current.scheduling, "changeStackAndReturn", fn (core.VirtualAddress) noreturn);
 
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
@@ -370,10 +370,10 @@ pub const scheduling = struct {
     /// It is the caller's responsibility to ensure the stack is valid, with a return address.
     pub fn switchToIdle(
         processor: *kernel.Processor,
-        stack_pointer: kernel.VirtualAddress,
+        stack_pointer: core.VirtualAddress,
         opt_old_thread: ?*kernel.scheduler.Thread,
     ) callconv(core.inline_in_non_debug_calling_convention) noreturn {
-        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Processor, kernel.VirtualAddress, ?*kernel.scheduler.Thread) noreturn);
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Processor, core.VirtualAddress, ?*kernel.scheduler.Thread) noreturn);
 
         current.scheduling.switchToIdle(processor, stack_pointer, opt_old_thread);
     }

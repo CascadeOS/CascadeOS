@@ -8,7 +8,7 @@ const std = @import("std");
 const MemoryRegion = @This();
 
 /// The virtual range of this region.
-range: kernel.VirtualRange,
+range: core.VirtualRange,
 
 /// The type of mapping.
 map_type: kernel.memory.virtual.MapType,

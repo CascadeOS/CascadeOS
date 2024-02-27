@@ -26,7 +26,7 @@ fn sortKernelMemoryLayout(self: *KernelMemoryLayout) void {
 }
 
 pub const KernelMemoryRegion = struct {
-    range: kernel.VirtualRange,
+    range: core.VirtualRange,
     type: Type,
 
     pub const Type = enum {

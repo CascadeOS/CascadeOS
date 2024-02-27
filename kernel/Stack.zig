@@ -21,15 +21,15 @@ var stacks_range_allocator: kernel.heap.RangeAllocator = undefined;
 var stacks_range_allocator_lock: kernel.SpinLock = .{};
 
 /// The entire virtual range including the guard page.
-range: kernel.VirtualRange,
+range: core.VirtualRange,
 
 /// The usable range excluding the guard page.
-usable_range: kernel.VirtualRange,
+usable_range: core.VirtualRange,
 
 /// The current stack pointer.
-stack_pointer: kernel.VirtualAddress,
+stack_pointer: core.VirtualAddress,
 
-pub fn fromRangeNoGuard(range: kernel.VirtualRange) Stack {
+pub fn fromRangeNoGuard(range: core.VirtualRange) Stack {
     return Stack{
         .range = range,
         .usable_range = range,
@@ -37,7 +37,7 @@ pub fn fromRangeNoGuard(range: kernel.VirtualRange) Stack {
     };
 }
 
-pub fn fromRangeWithGuard(range: kernel.VirtualRange, usable_range: kernel.VirtualRange) Stack {
+pub fn fromRangeWithGuard(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
     core.debugAssert(range.containsRange(usable_range));
 
     return Stack{
@@ -77,7 +77,7 @@ pub fn create(push_null_return_value: bool) !Stack {
     var stack = fromRangeWithGuard(virtual_range, usable_range);
 
     if (push_null_return_value) {
-        try stack.pushReturnAddress(kernel.VirtualAddress.zero);
+        try stack.pushReturnAddress(core.VirtualAddress.zero);
     }
 
     return stack;
@@ -97,7 +97,7 @@ pub fn destroy(stack: Stack) void {
 pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
     const T = @TypeOf(value);
 
-    const new_stack_pointer: kernel.VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
+    const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
     stack.stack_pointer = new_stack_pointer;
@@ -108,7 +108,7 @@ pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
 
 /// Aligns the stack pointer to the given alignment.
 pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
-    const new_stack_pointer: kernel.VirtualAddress = stack.stack_pointer.alignBackward(alignment);
+    const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.alignBackward(alignment);
 
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
@@ -118,7 +118,7 @@ pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
 const RETURN_ADDRESS_ALIGNMENT = core.Size.from(16, .byte);
 
 /// Pushes a return address to the stack.
-pub fn pushReturnAddress(stack: *Stack, return_address: kernel.VirtualAddress) error{StackOverflow}!void {
+pub fn pushReturnAddress(stack: *Stack, return_address: core.VirtualAddress) error{StackOverflow}!void {
     const old_stack_pointer = stack.stack_pointer;
 
     try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?
@@ -132,8 +132,8 @@ pub fn pushReturnAddress(stack: *Stack, return_address: kernel.VirtualAddress) e
 /// Returns the stack pointer with the return address pushed.
 pub fn pushReturnAddressWithoutChangingPointer(
     stack: *Stack,
-    return_address: kernel.VirtualAddress,
-) error{StackOverflow}!kernel.VirtualAddress {
+    return_address: core.VirtualAddress,
+) error{StackOverflow}!core.VirtualAddress {
     const old_stack_pointer = stack.stack_pointer;
     defer stack.stack_pointer = old_stack_pointer;
 
@@ -144,7 +144,7 @@ pub fn pushReturnAddressWithoutChangingPointer(
 }
 
 pub const init = struct {
-    pub fn initStacks(kernel_stacks_range: kernel.VirtualRange) linksection(kernel.info.init_code) !void {
+    pub fn initStacks(kernel_stacks_range: core.VirtualRange) linksection(kernel.info.init_code) !void {
         stacks_range_allocator = try kernel.heap.RangeAllocator.init(kernel_stacks_range);
     }
 };

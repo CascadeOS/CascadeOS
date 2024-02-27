@@ -75,8 +75,8 @@ const PageAllocator = struct {
         const unallocated_size = old_aligned_size.subtract(new_aligned_size);
         core.debugAssert(unallocated_size.isAligned(kernel.arch.paging.standard_page_size));
 
-        const unallocated_range = kernel.VirtualRange.fromAddr(
-            kernel.VirtualAddress.fromPtr(buf.ptr)
+        const unallocated_range = core.VirtualRange.fromAddr(
+            core.VirtualAddress.fromPtr(buf.ptr)
                 .moveForward(old_aligned_size)
                 .moveBackward(unallocated_size),
             unallocated_size,
@@ -88,13 +88,13 @@ const PageAllocator = struct {
     }
 
     fn free(_: *anyopaque, buf: []u8, _: u8, _: usize) void {
-        var allocated_range = kernel.VirtualRange.fromSlice(u8, buf);
+        var allocated_range = core.VirtualRange.fromSlice(u8, buf);
         allocated_range.size = allocated_range.size.alignForward(kernel.arch.paging.standard_page_size);
 
         freeImpl(allocated_range);
     }
 
-    fn freeImpl(range: kernel.VirtualRange) void {
+    fn freeImpl(range: core.VirtualRange) void {
         {
             const held = address_space_lock.lock();
             defer held.unlock();
@@ -109,7 +109,7 @@ const PageAllocator = struct {
 };
 
 pub const init = struct {
-    pub fn initHeap(kernel_heap_range: kernel.VirtualRange) linksection(kernel.info.init_code) !void {
+    pub fn initHeap(kernel_heap_range: core.VirtualRange) linksection(kernel.info.init_code) !void {
         address_space = try AddressSpace.init(kernel_heap_range);
     }
 };

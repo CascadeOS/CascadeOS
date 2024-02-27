@@ -34,9 +34,9 @@ comptime {
 }
 
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
-pub fn rsdp() linksection(kernel.info.init_code) ?kernel.VirtualAddress {
+pub fn rsdp() linksection(kernel.info.init_code) ?core.VirtualAddress {
     if (limine_requests.rsdp.response) |resp| {
-        return kernel.VirtualAddress.fromPtr(resp.address);
+        return core.VirtualAddress.fromPtr(resp.address);
     }
     return null;
 }
@@ -65,10 +65,10 @@ pub fn kernelBaseAddress() linksection(kernel.info.init_code) ?KernelBaseAddress
     return null;
 }
 
-/// Returns the kernel file contents as a kernel.VirtualRange, if provided by the bootloader.
-pub fn kernelFile() linksection(kernel.info.init_code) ?kernel.VirtualRange {
+/// Returns the kernel file contents as a core.VirtualRange, if provided by the bootloader.
+pub fn kernelFile() linksection(kernel.info.init_code) ?core.VirtualRange {
     if (limine_requests.kernel_file.response) |resp| {
-        return kernel.VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
+        return core.VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
     }
     return null;
 }
@@ -212,7 +212,7 @@ pub const MemoryMapIterator = union(enum) {
 
 /// An entry in the memory map provided by the bootloader.
 pub const MemoryMapEntry = struct {
-    range: kernel.PhysicalRange,
+    range: core.PhysicalRange,
     type: Type,
 
     pub const Type = enum {
@@ -287,8 +287,8 @@ const LimineMemoryMapIterator = struct {
         };
 
         return .{
-            .range = kernel.PhysicalRange.fromAddr(
-                kernel.PhysicalAddress.fromInt(limine_entry.base),
+            .range = core.PhysicalRange.fromAddr(
+                core.PhysicalAddress.fromInt(limine_entry.base),
                 core.Size.from(limine_entry.length, .byte),
             ),
             .type = switch (limine_entry.type) {

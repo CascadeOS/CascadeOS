@@ -95,7 +95,7 @@ fn switchToIdle(processor: *kernel.Processor, opt_current_thread: ?*Thread) nore
     log.debug("no threads to run, switching to idle", .{});
 
     const idle_stack_pointer = processor.idle_stack.pushReturnAddressWithoutChangingPointer(
-        kernel.VirtualAddress.fromPtr(&idle),
+        core.VirtualAddress.fromPtr(&idle),
     ) catch unreachable; // the idle stack is always big enough to hold a return address
 
     processor.current_thread = null;

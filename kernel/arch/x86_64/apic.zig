@@ -70,9 +70,8 @@ pub const init = struct {
         } else {
             log.debug("xapic mode", .{});
 
-            lapic_ptr = kernel.PhysicalAddress
-                .fromInt(madt.local_interrupt_controller_address)
-                .toNonCachedDirectMap()
+            lapic_ptr =
+                kernel.physicalToNonCachedDirectMap(core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address))
                 .toPtr([*]volatile u8);
             log.debug("lapic address: {*}", .{lapic_ptr});
         }

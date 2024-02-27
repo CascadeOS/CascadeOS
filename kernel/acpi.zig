@@ -23,8 +23,8 @@ pub const init = struct {
         log.debug("validating rsdp", .{});
         if (!rsdp.isValid()) core.panic("invalid RSDP");
 
-        const sdt_physical_address = kernel.PhysicalAddress.fromInt(rsdp.sdtAddress());
-        sdt_header = sdt_physical_address.toDirectMap().toPtr(*const acpi.SharedHeader);
+        const sdt_physical_address = core.PhysicalAddress.fromInt(rsdp.sdtAddress());
+        sdt_header = kernel.physicalToDirectMap(sdt_physical_address).toPtr(*const acpi.SharedHeader);
 
         log.debug("validating sdt", .{});
         if (!sdt_header.isValid()) core.panic("invalid SDT");
@@ -35,7 +35,7 @@ pub const init = struct {
             log.debug("ACPI tables:", .{});
 
             while (iterator.next()) |physical_address| {
-                const table = kernel.PhysicalAddress
+                const table = core.PhysicalAddress
                     .fromInt(physical_address)
                     .toDirectMap()
                     .toPtr(*const acpi.SharedHeader);
@@ -54,9 +54,8 @@ pub const init = struct {
         var iter = acpi.tableIterator(sdt_header);
 
         while (iter.next()) |physical_address| {
-            const table = kernel.PhysicalAddress
-                .fromInt(physical_address)
-                .toDirectMap()
+            const table =
+                kernel.physicalToDirectMap(core.PhysicalAddress.fromInt(physical_address))
                 .toPtr(*const acpi.SharedHeader);
 
             if (!table.signatureIs(T.SIGNATURE_STRING)) continue;

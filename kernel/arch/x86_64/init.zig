@@ -32,11 +32,11 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksec
     bootstrap_processor.arch = .{
         .lapic_id = 0,
 
-        .double_fault_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
+        .double_fault_stack = kernel.Stack.fromRangeNoGuard(core.VirtualRange.fromSlice(
             u8,
             @as([]u8, &bootstrap_double_fault_stack),
         )),
-        .non_maskable_interrupt_stack = kernel.Stack.fromRangeNoGuard(kernel.VirtualRange.fromSlice(
+        .non_maskable_interrupt_stack = kernel.Stack.fromRangeNoGuard(core.VirtualRange.fromSlice(
             u8,
             @as([]u8, &bootstrap_non_maskable_interrupt_stack),
         )),

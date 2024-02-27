@@ -2,41 +2,30 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
 
 pub const PhysicalAddress = extern struct {
-    value: usize,
+    value: u64,
 
     const name = "PhysicalAddress";
 
-    pub inline fn fromInt(value: usize) PhysicalAddress {
+    pub inline fn fromInt(value: u64) PhysicalAddress {
         return .{ .value = value };
-    }
-
-    /// Returns the virtual address corresponding to this physical address in the direct map.
-    pub inline fn toDirectMap(self: PhysicalAddress) VirtualAddress {
-        return .{ .value = self.value + kernel.info.direct_map.address.value };
-    }
-
-    /// Returns the virtual address corresponding to this physical address in the non-cached direct map.
-    pub inline fn toNonCachedDirectMap(self: PhysicalAddress) VirtualAddress {
-        return .{ .value = self.value + kernel.info.non_cached_direct_map.address.value };
     }
 
     pub usingnamespace AddrMixin(@This());
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(u64));
     }
 };
 
 pub const VirtualAddress = extern struct {
-    value: usize,
+    value: u64,
 
     const name = "VirtualAddress";
 
-    pub inline fn fromInt(value: usize) VirtualAddress {
+    pub inline fn fromInt(value: u64) VirtualAddress {
         return .{ .value = value };
     }
 
@@ -44,32 +33,17 @@ pub const VirtualAddress = extern struct {
         return fromInt(@intFromPtr(ptr));
     }
 
+    /// Interprets the address as a pointer.
+    ///
+    /// It is the caller's responsibility to ensure that the address is valid in the current address space.
     pub inline fn toPtr(self: VirtualAddress, comptime PtrT: type) PtrT {
         return @ptrFromInt(self.value);
-    }
-
-    /// Returns the physical address of the given direct map virtual address.
-    ///
-    /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
-    pub fn unsafeToPhysicalFromDirectMap(self: VirtualAddress) PhysicalAddress {
-        return .{ .value = self.value -% kernel.info.direct_map.address.value };
-    }
-
-    /// Returns the physical address of the given virtual address if it is in one of the direct maps.
-    pub fn toPhysicalFromDirectMap(self: VirtualAddress) error{AddressNotInAnyDirectMap}!PhysicalAddress {
-        if (kernel.info.direct_map.contains(self)) {
-            return .{ .value = self.value -% kernel.info.direct_map.address.value };
-        }
-        if (kernel.info.non_cached_direct_map.contains(self)) {
-            return .{ .value = self.value -% kernel.info.non_cached_direct_map.address.value };
-        }
-        return error.AddressNotInAnyDirectMap;
     }
 
     pub usingnamespace AddrMixin(@This());
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(usize));
+        core.testing.expectSize(@This(), @sizeOf(u64));
     }
 };
 
@@ -85,14 +59,14 @@ fn AddrMixin(comptime Self: type) type {
         ///
         /// `alignment` must be a power of two.
         pub inline fn alignForward(self: Self, alignment: core.Size) Self {
-            return .{ .value = std.mem.alignForward(usize, self.value, alignment.value) };
+            return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
         }
 
         /// Returns the address rounded down to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
         pub inline fn alignBackward(self: Self, alignment: core.Size) Self {
-            return .{ .value = std.mem.alignBackward(usize, self.value, alignment.value) };
+            return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
         }
 
         pub inline fn moveForward(self: Self, size: core.Size) Self {
@@ -162,14 +136,6 @@ pub const PhysicalRange = extern struct {
 
     const name = "PhysicalRange";
 
-    /// Returns a virtual range corresponding to this physical range in the direct map.
-    pub inline fn toDirectMap(self: PhysicalRange) VirtualRange {
-        return .{
-            .address = self.address.toDirectMap(),
-            .size = self.size,
-        };
-    }
-
     pub usingnamespace RangeMixin(@This());
 };
 
@@ -188,11 +154,16 @@ pub const VirtualRange = extern struct {
     }
 
     /// Returns a slice of type `T` corresponding to this virtual range.
+    ///
+    /// It is the caller's responsibility to ensure that the range is valid in the current address space.
     pub fn toSlice(self: VirtualRange, comptime T: type) ![]T {
-        const len = try std.math.divExact(usize, self.size.value, @sizeOf(T));
+        const len = try std.math.divExact(u64, self.size.value, @sizeOf(T));
         return self.address.toPtr([*]T)[0..len];
     }
 
+    /// Returns a byte slice of the memory corresponding to this virtual range.
+    ///
+    /// It is the caller's responsibility to ensure that the range is valid in the current address space.
     pub inline fn toByteSlice(self: VirtualRange) []u8 {
         return self.address.toPtr([*]u8)[0..self.size.value];
     }
@@ -275,4 +246,29 @@ fn RangeMixin(comptime Self: type) type {
             return print(value, writer);
         }
     };
+}
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .Struct => |info| info.decls,
+        .Enum => |info| info.decls,
+        .Union => |info| info.decls,
+        .Opaque => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
 }

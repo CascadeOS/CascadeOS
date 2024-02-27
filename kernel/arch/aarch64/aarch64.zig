@@ -58,7 +58,7 @@ pub const paging = struct {
 
     pub const standard_page_size = small_page_size;
 
-    pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
+    pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 
     pub const PageTable = struct {};
 

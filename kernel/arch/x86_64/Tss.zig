@@ -11,12 +11,12 @@ pub const Tss = extern struct {
     _reserved_1: u32 align(1) = 0,
 
     /// Stack pointers (RSP) for privilege levels 0-2.
-    privilege_stack_table: [3]kernel.VirtualAddress align(1) = [_]kernel.VirtualAddress{kernel.VirtualAddress.zero} ** 3,
+    privilege_stack_table: [3]core.VirtualAddress align(1) = [_]core.VirtualAddress{core.VirtualAddress.zero} ** 3,
 
     _reserved_2: u64 align(1) = 0,
 
     /// Interrupt stack table (IST) pointers.
-    interrupt_stack_table: [7]kernel.VirtualAddress align(1) = [_]kernel.VirtualAddress{kernel.VirtualAddress.zero} ** 7,
+    interrupt_stack_table: [7]core.VirtualAddress align(1) = [_]core.VirtualAddress{core.VirtualAddress.zero} ** 7,
 
     _reserved_3: u64 align(1) = 0,
 

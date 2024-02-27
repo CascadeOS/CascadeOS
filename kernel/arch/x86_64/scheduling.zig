@@ -9,7 +9,7 @@ const x86_64 = @import("x86_64.zig");
 /// Switches to the provided stack and returns.
 ///
 /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub fn changeStackAndReturn(stack_pointer: kernel.VirtualAddress) noreturn {
+pub fn changeStackAndReturn(stack_pointer: core.VirtualAddress) noreturn {
     asm volatile (
         \\  mov %[stack], %%rsp
         \\  ret
@@ -28,13 +28,13 @@ pub fn prepareStackForNewThread(
     const old_stack_pointer = thread.kernel_stack.stack_pointer;
     errdefer thread.kernel_stack.stack_pointer = old_stack_pointer;
 
-    try thread.kernel_stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
+    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
 
-    try thread.kernel_stack.push(kernel.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
     try thread.kernel_stack.push(context);
-    try thread.kernel_stack.push(kernel.VirtualAddress.fromPtr(thread));
+    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(thread));
 
-    try thread.kernel_stack.pushReturnAddress(kernel.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
+    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
 
     // general purpose registers
     for (0..6) |_| thread.kernel_stack.push(@as(u64, 0)) catch unreachable;
@@ -72,7 +72,7 @@ pub fn switchToThreadFromThread(processor: *kernel.Processor, old_thread: *kerne
 }
 
 /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub fn switchToIdle(processor: *kernel.Processor, stack_pointer: kernel.VirtualAddress, opt_old_thread: ?*kernel.scheduler.Thread) noreturn {
+pub fn switchToIdle(processor: *kernel.Processor, stack_pointer: core.VirtualAddress, opt_old_thread: ?*kernel.scheduler.Thread) noreturn {
     const old_thread = opt_old_thread orelse {
         // we were already idle
         changeStackAndReturn(stack_pointer);
@@ -109,10 +109,10 @@ fn startNewThread(
 extern fn _startNewThread() callconv(.C) noreturn;
 
 // Implemented in 'x86_64/asm/switchToThreadFromIdleImpl.S'
-extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: kernel.VirtualAddress) callconv(.C) noreturn;
+extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
 
 // Implemented in 'x86_64/asm/switchToThreadFromThreadImpl.S'
-extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: kernel.VirtualAddress, previous_kernel_stack_pointer: *kernel.VirtualAddress) callconv(.C) void;
+extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
 
 // Implemented in 'x86_64/asm/switchToIdleImpl.S'
-extern fn _switchToIdleImpl(new_kernel_stack_pointer: kernel.VirtualAddress, previous_kernel_stack_pointer: *kernel.VirtualAddress) callconv(.C) noreturn;
+extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) noreturn;

@@ -24,7 +24,7 @@ pub inline fn largestPageSize() core.Size {
     return medium_page_size;
 }
 
-pub const higher_half = kernel.VirtualAddress.fromInt(0xffff800000000000);
+pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 
 pub const PageTable = @import("PageTable.zig").PageTable;
 
@@ -33,7 +33,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     const range = kernel.memory.physical.allocatePage() orelse return error.PageAllocationFailed;
     core.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
-    const page_table = range.toDirectMap().address.toPtr(*PageTable);
+    const page_table = kernel.physicalToDirectMap(range.address).toPtr(*PageTable);
     page_table.zero();
 
     return page_table;
@@ -42,7 +42,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
 /// Switches to the given page table.
 pub fn switchToPageTable(page_table: *const PageTable) void {
     x86_64.registers.Cr3.writeAddress(
-        kernel.VirtualAddress.fromPtr(page_table).unsafeToPhysicalFromDirectMap(),
+        kernel.unsafeDirectMapToPhysical(core.VirtualAddress.fromPtr(page_table)),
     );
 }
 
@@ -53,8 +53,8 @@ const MapError = kernel.arch.paging.MapError;
 /// This function will only use the architecture's `standard_page_size`.
 pub fn mapToPhysicalRange(
     page_table: *PageTable,
-    virtual_range: kernel.VirtualRange,
-    physical_range: kernel.PhysicalRange,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
     log.debug("mapStandardRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
@@ -90,7 +90,7 @@ pub fn mapToPhysicalRange(
 /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
 pub fn unmap(
     page_table: *PageTable,
-    virtual_range: kernel.VirtualRange,
+    virtual_range: core.VirtualRange,
 ) void {
     log.debug("unmapRange - {}", .{virtual_range});
 
@@ -109,8 +109,8 @@ pub fn unmap(
 /// This function is allowed to use all page sizes available to the architecture.
 pub fn mapToPhysicalRangeAllPageSizes(
     page_table: *PageTable,
-    virtual_range: kernel.VirtualRange,
-    physical_range: kernel.PhysicalRange,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
     log.debug("mapRangeUseAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
@@ -198,8 +198,8 @@ pub fn mapToPhysicalRangeAllPageSizes(
 /// Maps a 4 KiB page.
 fn mapTo4KiB(
     level4_table: *PageTable,
-    virtual_address: kernel.VirtualAddress,
-    physical_address: kernel.PhysicalAddress,
+    virtual_address: core.VirtualAddress,
+    physical_address: core.PhysicalAddress,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
     core.debugAssert(virtual_address.isAligned(small_page_size));
@@ -230,8 +230,8 @@ fn mapTo4KiB(
 /// Maps a 2 MiB page.
 fn mapTo2MiB(
     level4_table: *PageTable,
-    virtual_address: kernel.VirtualAddress,
-    physical_address: kernel.PhysicalAddress,
+    virtual_address: core.VirtualAddress,
+    physical_address: core.PhysicalAddress,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
     core.debugAssert(virtual_address.isAligned(medium_page_size));
@@ -259,8 +259,8 @@ fn mapTo2MiB(
 /// Maps a 1 GiB page.
 fn mapTo1GiB(
     level4_table: *PageTable,
-    virtual_address: kernel.VirtualAddress,
-    physical_address: kernel.PhysicalAddress,
+    virtual_address: core.VirtualAddress,
+    physical_address: core.PhysicalAddress,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
     core.debugAssert(x86_64.arch_info.gib_pages);
@@ -284,7 +284,7 @@ fn mapTo1GiB(
 /// Unmaps a 4 KiB page.
 fn unmap4KiB(
     level4_table: *PageTable,
-    virtual_address: kernel.VirtualAddress,
+    virtual_address: core.VirtualAddress,
 ) void {
     core.debugAssert(virtual_address.isAligned(small_page_size));
 
@@ -304,7 +304,7 @@ fn unmap4KiB(
     if (!level2_entry.present.read()) return;
 
     kernel.memory.physical.deallocatePage(
-        kernel.PhysicalRange.fromAddr(level1_entry.getAddress4kib(), kernel.arch.paging.standard_page_size),
+        core.PhysicalRange.fromAddr(level1_entry.getAddress4kib(), kernel.arch.paging.standard_page_size),
     );
 
     level1_entry.zero();
@@ -342,14 +342,14 @@ fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: kernel.memory.virtual.MapType,
 ) error{ AllocationFailed, Unexpected }!*PageTable {
-    var opt_range: ?kernel.PhysicalRange = null;
+    var opt_range: ?core.PhysicalRange = null;
 
     if (!self.present.read()) {
         opt_range = kernel.memory.physical.allocatePage() orelse return error.AllocationFailed;
         self.setAddress4kib(opt_range.?.address);
     }
     errdefer if (opt_range) |range| {
-        self.setAddress4kib(kernel.PhysicalAddress.zero);
+        self.setAddress4kib(core.PhysicalAddress.zero);
         kernel.memory.physical.deallocatePage(range);
     };
 
@@ -370,8 +370,8 @@ pub const init = struct {
     ///   1. search the high half of the *top level* of the given page table for a free entry
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
-    ///   4. return the `kernel.VirtualRange` representing the entire virtual range that entry covers
-    pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) linksection(kernel.info.init_code) kernel.arch.paging.MapError!kernel.VirtualRange {
+    ///   4. return the `core.VirtualRange` representing the entire virtual range that entry covers
+    pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) linksection(kernel.info.init_code) kernel.arch.paging.MapError!core.VirtualRange {
         var table_index: usize = PageTable.p4Index(higher_half);
 
         while (table_index < PageTable.number_of_entries) : (table_index += 1) {
@@ -382,7 +382,7 @@ pub const init = struct {
 
             _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
 
-            return kernel.VirtualRange.fromAddr(
+            return core.VirtualRange.fromAddr(
                 PageTable.indexToAddr(
                     @truncate(table_index),
                     0,
