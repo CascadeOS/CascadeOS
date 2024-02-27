@@ -37,19 +37,19 @@ pub const TableIterator = struct {
     /// Returns the physical address of header of the next table in the System Description Table.
     ///
     /// No validation of the table is performed.
-    pub fn next(self: *TableIterator) ?u64 {
+    pub fn next(self: *TableIterator) ?core.PhysicalAddress {
         if (self.is_xsdt) return self.nextImpl(u64);
         return self.nextImpl(u32);
     }
 
-    fn nextImpl(self: *TableIterator, comptime T: type) ?u64 {
+    fn nextImpl(self: *TableIterator, comptime T: type) ?core.PhysicalAddress {
         if (@intFromPtr(self.ptr) + @sizeOf(T) >= @intFromPtr(self.end_ptr)) return null;
 
         const physical_address = std.mem.readInt(T, @ptrCast(self.ptr), .little);
 
         self.ptr += @sizeOf(T);
 
-        return physical_address;
+        return core.PhysicalAddress.fromInt(physical_address);
     }
 };
 

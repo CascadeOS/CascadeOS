@@ -46,7 +46,7 @@ pub const RSDP = extern struct {
     /// 64 bit physical address of the XSDT.
     ///
     /// This field is not available in the ACPI version 1.0 RSDP Structure.
-    xsdt_addr: u64 align(1),
+    xsdt_addr: core.PhysicalAddress align(1),
 
     /// This is a checksum of the entire table, including both checksum fields.
     ///
@@ -57,9 +57,9 @@ pub const RSDP = extern struct {
 
     const BYTES_IN_ACPI_1_STRUCTURE = 20;
 
-    pub fn sdtAddress(self: *const RSDP) u64 {
+    pub fn sdtAddress(self: *const RSDP) core.PhysicalAddress {
         return switch (self.revision) {
-            0 => self.rsdt_addr,
+            0 => core.PhysicalAddress.fromInt(self.rsdt_addr),
             2 => self.xsdt_addr,
             else => core.panicFmt("unknown ACPI revision: {d}", .{self.revision}),
         };

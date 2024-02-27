@@ -304,7 +304,7 @@ pub const MADT = extern struct {
             /// Processor Interrupt Block.
             ///
             /// See the Intel® ItaniumTM Architecture Software Developer's Manual for more information.
-            local_apic_address: u64 align(1),
+            local_apic_address: core.PhysicalAddress align(1),
 
             comptime {
                 core.testing.expectSize(@This(), 10);
@@ -334,10 +334,10 @@ pub const MADT = extern struct {
             /// The number of interrupt inputs is determined by the I/O SAPIC's Max Redir Entry register.
             global_system_interrupt_base: u32 align(1),
 
-            /// The 32-bit physical address to access this I/O SAPIC.
+            /// The 64-bit physical address to access this I/O SAPIC.
             ///
             /// Each I/O SAPIC resides at a unique address.
-            iosapic_address: u64 align(1),
+            iosapic_address: core.PhysicalAddress align(1),
 
             comptime {
                 core.testing.expectSize(@This(), 14);
@@ -606,23 +606,23 @@ pub const MADT = extern struct {
             performance_interrupt_gsiv: u32 align(1),
 
             /// The 64-bit physical address of the processor's Parking Protocol mailbox.
-            parked_address: u64 align(1),
+            parked_address: core.PhysicalAddress align(1),
 
             /// On GICv1/v2 systems and GICv3/4 systems in GICv2 compatibility mode, this field holds the 64-bit
             /// physical address at which the processor can access this GIC CPU Interface.
             ///
             /// If provided here, the "Local Interrupt Controller Address" field in the MADT must be ignored by the OSPM.
-            physical_base_address: u64 align(1),
+            physical_base_address: core.PhysicalAddress align(1),
 
             /// Address of the GIC virtual CPU interface registers.
             ///
             /// If the platform is not presenting a GICv2 with virtualization extensions this field can be 0.
-            gicv: u64 align(1),
+            gicv: core.PhysicalAddress align(1),
 
             /// Address of the GIC virtual interface control block registers.
             ///
             /// If the platform is not presenting a GICv2 with virtualization extensions this field can be 0.
-            gich: u64 align(1),
+            gich: core.PhysicalAddress align(1),
 
             /// GSIV for Virtual GIC maintenance interrupt
             vgic_maintenance_interrupt: u32 align(1),
@@ -634,7 +634,7 @@ pub const MADT = extern struct {
             /// describe the Redistributors instead, and this field must be set to 0.
             ///
             /// If a GICR structure is present in the MADT then this field must be ignored by the OSPM.
-            gicr_base_address: u64 align(1),
+            gicr_base_address: core.PhysicalAddress align(1),
 
             /// This fields follows the MPIDR formatting of ARM architecture.
             ///
@@ -733,7 +733,7 @@ pub const MADT = extern struct {
             gic_id: u32 align(1),
 
             /// The 64-bit physical address for this Distributor
-            physical_base_address: u64 align(1),
+            physical_base_address: core.PhysicalAddress align(1),
 
             /// Reserved - Must be zero
             system_vector_base: u32 align(1),
@@ -786,7 +786,7 @@ pub const MADT = extern struct {
             gic_msi_frame_id: u32 align(1),
 
             /// The 64-bit physical address for this MSI Frame.
-            physical_base_address: u64 align(1),
+            physical_base_address: core.PhysicalAddress align(1),
 
             /// Reserved - Must be zero
             flags: u32 align(1),
@@ -837,7 +837,7 @@ pub const MADT = extern struct {
             _reserved: u16 align(1),
 
             /// The 64-bit physical address of a page range containing all GIC Redistributors.
-            discovery_range_base_address: u64 align(1),
+            discovery_range_base_address: core.PhysicalAddress align(1),
 
             /// Length of the GIC Redistributor Discovery page range.
             discovery_range_length: u32 align(1),
@@ -859,7 +859,7 @@ pub const MADT = extern struct {
             gic_its_id: u32 align(1),
 
             /// The 64-bit physical address for the Interrupt Translation Service.
-            physical_base_address: u64 align(1),
+            physical_base_address: core.PhysicalAddress align(1),
 
             _reserved2: u32 align(1),
 
@@ -918,7 +918,7 @@ pub const MADT = extern struct {
             /// It must be in ACPINvs.
             ///
             /// It must also be 4K bytes aligned.
-            mailbox_address: u64 align(1),
+            mailbox_address: core.PhysicalAddress align(1),
 
             comptime {
                 core.testing.expectSize(@This(), 14);
@@ -979,7 +979,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of LIO PIC registers.
-            base_address: u64 align(1),
+            base_address: core.PhysicalAddress align(1),
 
             /// The register space size of LIO PIC.
             size: u16 align(1),
@@ -989,7 +989,7 @@ pub const MADT = extern struct {
 
             /// This field described the vectors of LIO PIC routed to the related vector of parent specified by Cascade
             /// vector field.
-            cascade_vector_mapping: u64 align(1),
+            cascade_vector_mapping: core.PhysicalAddress align(1),
 
             pub const Version = enum(u8) {
                 invalid = 0,
@@ -1011,13 +1011,13 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of HT PIC registers.
-            base_address: u64 align(1),
+            base_address: core.PhysicalAddress align(1),
 
             /// The register space size of HT PIC.
             size: u16 align(1),
 
             /// This field described routed vectors on LIO PIC from HT PIC vectors.
-            cascade_vector: u64 align(1),
+            cascade_vector: core.PhysicalAddress align(1),
 
             pub const Version = enum(u8) {
                 invalid = 0,
@@ -1067,7 +1067,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The physical address for MSI.
-            message_address: u64 align(1),
+            message_address: core.PhysicalAddress align(1),
 
             /// The start vector allocated for MSI from global vectors of HT PIC or EIO PIC.
             start: u32 align(1),
@@ -1094,7 +1094,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of BIO PIC registers.
-            base_address: u64 align(1),
+            base_address: core.PhysicalAddress align(1),
 
             /// The register space size of BIO PIC.
             size: u16 align(1),
@@ -1127,7 +1127,7 @@ pub const MADT = extern struct {
             version: Version,
 
             /// The base address of LPC PIC registers.
-            base_address: u64 align(1),
+            base_address: core.PhysicalAddress align(1),
 
             /// The register space size of LPC PIC.
             size: u16 align(1),

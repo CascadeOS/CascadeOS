@@ -4,6 +4,8 @@
 const core = @import("core");
 const std = @import("std");
 
+// TODO: Support u32 sized addresses
+
 pub const PhysicalAddress = extern struct {
     value: u64,
 

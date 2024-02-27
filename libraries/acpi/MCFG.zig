@@ -27,7 +27,7 @@ pub const MCFG = extern struct {
     pub const SIGNATURE_STRING = "MCFG";
 
     pub const BaseAllocation = extern struct {
-        base_address: u64 align(1),
+        base_address: core.PhysicalAddress align(1),
 
         segment_group: u16 align(1),
 

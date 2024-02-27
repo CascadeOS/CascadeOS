@@ -371,13 +371,13 @@ pub const FADT = extern struct {
     ///
     /// If `fixed_feature_flags.HARDWARE_REDUCED_ACPI` flag is set, and both this field and the `FIRMWARE_CTRL` field
     /// are zero, there is no FACS available
-    X_FIRMWARE_CTRL: u64 align(1),
+    X_FIRMWARE_CTRL: core.PhysicalAddress align(1),
 
     /// Extended physical address of the DSDT.
     ///
     /// If this field contains a nonzero value which can be used by the OSPM, then the `DSDT` field must be ignored
     /// by the OSPM.
-    X_DSDT: u64 align(1),
+    X_DSDT: core.PhysicalAddress align(1),
 
     /// Extended address of the PM1a Event Register Block.
     ///
