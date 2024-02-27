@@ -20,7 +20,7 @@
             "targetCreateCommands": ["target create ${workspaceFolder}/zig-out/${input:arch}/kernel"],
             "processCreateCommands": [
                 "breakpoint set --name init.kernelInitStage1 --hardware --one-shot true",
-                // "process handle SIGTRAP -p false -s false -n false", // this is nice for TCG but not good for KVM
+                "process handle SIGTRAP -p false -s false -n false",
                 "settings set target.require-hardware-breakpoint true",
                 "gdb-remote 1234"
             ]

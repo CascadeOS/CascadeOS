@@ -94,19 +94,19 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     const build_for_host = b.option(
         bool,
         "build_for_host",
-        "Library tests are built for the host and execution is attempted",
+        "Library tests are built for the host and execution is attempted (defaults to false)",
     ) orelse false;
 
     const qemu_monitor = b.option(
         bool,
         "monitor",
-        "Enable qemu monitor",
+        "Enable qemu monitor (defaults to false)",
     ) orelse false;
 
     const qemu_remote_debug = b.option(
         bool,
         "debug",
-        "Enable qemu remote debug",
+        "Enable qemu remote debug (disables acceleration) (defaults to false)",
     ) orelse false;
 
     const no_display = b.option(
@@ -118,19 +118,19 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     const interrupt_details = b.option(
         bool,
         "interrupts",
-        "Show detailed qemu interrupt details (disables acceleration)",
+        "Show detailed qemu interrupt details (disables acceleration) (defaults to false)",
     ) orelse false;
 
     const uefi = b.option(
         bool,
         "uefi",
-        "Force qemu to run in UEFI mode",
+        "Force qemu to run in UEFI mode (defaults to false)",
     ) orelse false;
 
     const number_of_cores = b.option(
         usize,
         "cores",
-        "Number of cores (default 1)",
+        "Number of cores (defaults to 1)",
     ) orelse 1;
 
     if (number_of_cores == 0) {
@@ -139,12 +139,13 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     }
 
     const no_acceleration = blk: {
-        if (b.option(bool, "no_acceleration", "Disable usage of QEMU accelerators")) |value| {
+        if (b.option(bool, "no_acceleration", "Disable usage of QEMU accelerators (defaults to false)")) |value| {
             if (value) break :blk true else {
                 if (interrupt_details) std.debug.panic("cannot enable QEMU accelerators and show qemu interrupt details", .{});
+                if (qemu_remote_debug) std.debug.panic("cannot enable QEMU accelerators and qemu remote debug", .{});
             }
         }
-        break :blk interrupt_details;
+        break :blk interrupt_details or qemu_remote_debug;
     };
 
     const memory: usize = b.option(
