@@ -19,7 +19,7 @@ pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 ///
 /// Used as:
 ///   - The name of the module provided by `@import("{name}");`
-///   - To build the root file path `libraries/{name}/{name}.zig`
+///   - To build the root file path `lib/{name}/{name}.zig`
 ///   - In any build steps created for the library
 name: []const u8,
 
@@ -40,7 +40,7 @@ non_cascade_module_for_host: ?*std.Build.Module,
 
 /// Resolves all libraries and their dependencies.
 ///
-/// Resolves each library in `libraries/listing.zig` and all of their dependencies.
+/// Resolves each library in `lib/listing.zig` and all of their dependencies.
 ///
 /// Libraries are resolved recursively until all dependencies have been resolved.
 ///
@@ -51,7 +51,7 @@ pub fn getLibraries(
     options: Options,
     targets: []const CascadeTarget,
 ) !Collection {
-    const all_library_descriptions: []const LibraryDescription = @import("../libraries/listing.zig").libraries;
+    const all_library_descriptions: []const LibraryDescription = @import("../lib/listing.zig").libraries;
 
     var resolved_libraries: Collection = .{};
     try resolved_libraries.ensureTotalCapacity(b.allocator, all_library_descriptions.len);
@@ -131,7 +131,7 @@ fn resolveLibrary(
     };
 
     const directory_path = helpers.pathJoinFromRoot(b, &.{
-        "libraries",
+        "lib",
         library_description.name,
     });
 
