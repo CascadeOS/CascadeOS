@@ -36,13 +36,11 @@ qemu_remote_debug: bool,
 /// Defaults to false.
 no_display: bool,
 
-/// Disable usage of any virtualization accelerators.
+/// Disable usage of any virtualization acceleration.
 ///
 /// Defaults to false.
 ///
-/// Forced to true if any of the below are true:
-///  - `interrupt_details`
-///  - `qemu_remote_debug`
+/// Forced to true if `interrupt_details` is true.
 no_acceleration: bool,
 
 /// Show detailed QEMU interrupt details.
@@ -100,31 +98,31 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     const qemu_monitor = b.option(
         bool,
         "monitor",
-        "Enable qemu monitor (defaults to false)",
+        "Enable QEMU monitor (defaults to false)",
     ) orelse false;
 
     const qemu_remote_debug = b.option(
         bool,
         "debug",
-        "Enable qemu remote debug (disables acceleration) (defaults to false)",
+        "Enable QEMU remote debug (disables acceleration) (defaults to false)",
     ) orelse false;
 
     const no_display = b.option(
         bool,
         "no_display",
-        "Disable qemu graphical display (defaults to true)",
+        "Disable QEMU graphical display (defaults to true)",
     ) orelse true;
 
     const interrupt_details = b.option(
         bool,
         "interrupts",
-        "Show detailed qemu interrupt details (disables acceleration) (defaults to false)",
+        "Show detailed QEMU interrupt details (disables acceleration) (defaults to false)",
     ) orelse false;
 
     const uefi = b.option(
         bool,
         "uefi",
-        "Force qemu to run in UEFI mode (defaults to false)",
+        "Force QEMU to run in UEFI mode (defaults to false)",
     ) orelse false;
 
     const number_of_cores = b.option(
@@ -139,19 +137,32 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     }
 
     const no_acceleration = blk: {
-        if (b.option(bool, "no_acceleration", "Disable usage of QEMU accelerators (defaults to false)")) |value| {
-            if (value) break :blk true else {
-                if (interrupt_details) std.debug.panic("cannot enable QEMU accelerators and show qemu interrupt details", .{});
-                if (qemu_remote_debug) std.debug.panic("cannot enable QEMU accelerators and qemu remote debug", .{});
+        if (b.option(bool, "no_acceleration", "Disable usage of QEMU acceleration (defaults to false)")) |value| {
+            if (value) {
+                // user has explicitly requested acceleration to be **disabled**
+                break :blk true;
             }
+
+            // user has explicitly requested acceleration to be **enabled**
+
+            if (interrupt_details) {
+                std.debug.print("ERROR: cannot enable QEMU acceleration and show QEMU interrupt details\n", .{});
+                std.process.exit(1);
+            }
+
+            if (qemu_remote_debug)
+                std.debug.print("WARNING: QEMU remote debug is buggy when enabling QEMU acceleration\n", .{});
+
+            break :blk false;
         }
+
         break :blk interrupt_details or qemu_remote_debug;
     };
 
     const memory: usize = b.option(
         usize,
         "memory",
-        "How much memory (in MB) to request from qemu (defaults to 256 for UEFI and 128 otherwise)",
+        "How much memory (in MB) to request from QEMU (defaults to 256 for UEFI and 128 otherwise)",
     ) orelse if (uefi) 256 else 128;
 
     const kernel_force_debug_log = b.option(
