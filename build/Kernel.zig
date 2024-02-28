@@ -104,7 +104,9 @@ fn create(
         const library = libraries.get(dependency) orelse
             std.debug.panic("kernel depends on non-existant library '{s}'", .{dependency});
 
-        const library_module = library.cascade_modules.get(target) orelse continue;
+        const library_module = library.cascade_modules.get(target) orelse
+            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ library.name, @tagName(target) });
+
         kernel_exe.root_module.addImport(library.name, library_module);
         dependencies.appendAssumeCapacity(library);
     }
