@@ -14,6 +14,8 @@ const StepCollection = @import("StepCollection.zig");
 
 const Kernel = @This();
 
+const kernel_dependencies = @import("../kernel/dependencies.zig");
+
 b: *std.Build,
 
 target: CascadeTarget,
@@ -43,8 +45,6 @@ pub fn getKernels(
     var kernels: Collection = .{};
     try kernels.ensureTotalCapacity(b.allocator, @intCast(targets.len));
 
-    const source_file_modules = try getSourceFileModules(b, options, libraries);
-
     const sdf_builder = tools.get("sdf_builder").?;
 
     for (targets) |target| {
@@ -54,7 +54,6 @@ pub fn getKernels(
             libraries,
             sdf_builder,
             options,
-            source_file_modules,
         );
         kernels.putAssumeCapacityNoClobber(target, kernel);
         step_collection.registerKernel(
@@ -73,7 +72,6 @@ fn create(
     libraries: Library.Collection,
     sdf_builder: Tool,
     options: Options,
-    source_file_modules: []const SourceFileModule,
 ) !Kernel {
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
@@ -85,10 +83,6 @@ fn create(
     kernel_exe.setLinkerScriptPath(.{ .path = target.linkerScriptPath(b) });
     kernel_exe.entry = .disabled;
 
-    const declared_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
-    var dependencies = try std.ArrayListUnmanaged(*const Library).initCapacity(b.allocator, declared_dependencies.len);
-    defer dependencies.deinit(b.allocator);
-
     // self reference
     kernel_exe.root_module.addImport("kernel", &kernel_exe.root_module);
 
@@ -98,21 +92,47 @@ fn create(
     // kernel options
     kernel_exe.root_module.addImport("kernel_options", options.kernel_option_module);
 
-    // dependencies
+    const dependencies = blk: {
+        var dependencies = std.ArrayList(*const Library).init(b.allocator);
+        defer dependencies.deinit();
 
-    for (declared_dependencies) |dependency| {
-        const library = libraries.get(dependency) orelse
-            std.debug.panic("kernel depends on non-existant library '{s}'", .{dependency});
+        // core dependencies
+        for (kernel_dependencies.core_dependencies) |dependency| {
+            const library = libraries.get(dependency) orelse
+                std.debug.panic("kernel depends on non-existant library '{s}'", .{dependency});
 
-        const library_module = library.cascade_modules.get(target) orelse
-            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ library.name, @tagName(target) });
+            const library_module = library.cascade_modules.get(target) orelse
+                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ library.name, @tagName(target) });
 
-        kernel_exe.root_module.addImport(library.name, library_module);
-        dependencies.appendAssumeCapacity(library);
-    }
+            kernel_exe.root_module.addImport(library.name, library_module);
+            try dependencies.append(library);
+        }
+
+        // target specific dependencies
+        switch (target) {
+            inline else => |tag| {
+                const decl_name = comptime @tagName(tag) ++ "_dependencies";
+
+                if (@hasDecl(kernel_dependencies, decl_name)) {
+                    for (@field(kernel_dependencies, decl_name)) |dependency| {
+                        const library = libraries.get(dependency) orelse
+                            std.debug.panic("kernel depends on non-existant library '{s}'", .{dependency});
+
+                        const library_module = library.cascade_modules.get(target) orelse
+                            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ library.name, @tagName(target) });
+
+                        kernel_exe.root_module.addImport(library.name, library_module);
+                        try dependencies.append(library);
+                    }
+                }
+            },
+        }
+
+        break :blk try dependencies.toOwnedSlice();
+    };
 
     // source file modules
-    for (source_file_modules) |module| {
+    for (try getSourceFileModules(b, options, dependencies)) |module| {
         kernel_exe.root_module.addImport(module.name, module.module);
     }
 
@@ -194,7 +214,7 @@ fn create(
         .install_final_kernel_binary = &install_final_kernel_binary.step,
         .install_seperated_debug_step = &install_seperated_debug.step,
 
-        .dependencies = try dependencies.toOwnedSlice(b.allocator),
+        .dependencies = dependencies,
     };
 }
 
@@ -212,7 +232,7 @@ const SourceFileModule = struct {
 ///
 /// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
 /// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
-fn getSourceFileModules(b: *std.Build, options: Options, libraries: Library.Collection) ![]const SourceFileModule {
+fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []*const Library) ![]const SourceFileModule {
     var modules = std.ArrayList(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
 
@@ -223,14 +243,9 @@ fn getSourceFileModules(b: *std.Build, options: Options, libraries: Library.Coll
     try addFilesRecursive(b, &modules, &file_paths, options.root_path, helpers.pathJoinFromRoot(b, &.{"kernel"}));
 
     // add each dependencies files
-    const kernel_dependencies: []const []const u8 = @import("../kernel/dependencies.zig").dependencies;
-    var processed_libraries = std.AutoHashMap(*Library, void).init(b.allocator);
-
-    for (kernel_dependencies) |library_name| {
-        const library: *Library = libraries.get(library_name) orelse
-            std.debug.panic("kernel depends on non-existant library '{s}'", .{library_name});
-
-        try addFilesFromLibrary(b, &modules, &file_paths, options.root_path, libraries, library, &processed_libraries);
+    var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
+    for (dependencies) |library| {
+        try addFilesFromLibrary(b, &modules, &file_paths, options.root_path, library, &processed_libraries);
     }
 
     const files_option = b.addOptions();
@@ -240,14 +255,22 @@ fn getSourceFileModules(b: *std.Build, options: Options, libraries: Library.Coll
     return try modules.toOwnedSlice();
 }
 
+const DependencyIterator = struct {
+    current_state: union(enum) {
+        core: struct {
+            dependencies: []const []const u8,
+            index: usize,
+        },
+    },
+};
+
 fn addFilesFromLibrary(
     b: *std.Build,
     modules: *std.ArrayList(SourceFileModule),
     file_paths: *std.ArrayList([]const u8),
     root_path: []const u8,
-    libraries: Library.Collection,
-    library: *Library,
-    processed_libraries: *std.AutoHashMap(*Library, void),
+    library: *const Library,
+    processed_libraries: *std.AutoHashMap(*const Library, void),
 ) !void {
     if (processed_libraries.contains(library)) return;
 
@@ -256,7 +279,7 @@ fn addFilesFromLibrary(
     try processed_libraries.put(library, {});
 
     for (library.dependencies) |dep| {
-        try addFilesFromLibrary(b, modules, file_paths, root_path, libraries, dep, processed_libraries);
+        try addFilesFromLibrary(b, modules, file_paths, root_path, dep, processed_libraries);
     }
 }
 
