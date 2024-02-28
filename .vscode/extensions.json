@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-
 {
     "recommendations": [
         "ziglang.vscode-zig",
         "zixuanwang.linkerscript",
-        "basdp.language-gas-x86",
-        "vadimcn.vscode-lldb"
+        "basdp.language-gas-x86"
     ]
 }

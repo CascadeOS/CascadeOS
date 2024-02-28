@@ -1,29 +1,53 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-
 {
     "version": "0.2.0",
     "inputs": [
         {
             "id": "arch",
             "type": "pickString",
-            "options": ["aarch64", "x86_64"],
+            "options": [
+                "aarch64",
+                "x86_64"
+            ],
             "default": "x86_64",
             "description": "Architecture that is being debugged."
         }
     ],
     "configurations": [
-        {
-            "name": "QEMU remote",
+        { // Requires extension CodeLLDB (vadimcn.vscode-lldb)
+            "name": "QEMU remote - LLDB",
             "type": "lldb",
             "request": "custom",
-            "targetCreateCommands": ["target create ${workspaceFolder}/zig-out/${input:arch}/kernel"],
+            "targetCreateCommands": [
+                "target create ${workspaceFolder}/zig-out/${input:arch}/kernel"
+            ],
             "processCreateCommands": [
-                "breakpoint set --name init.kernelInitStage1 --hardware --one-shot true",
+                // "breakpoint set --name init.kernelInitStage1 --hardware --one-shot true",
                 "process handle SIGTRAP -p false -s false -n false",
                 "settings set target.require-hardware-breakpoint true",
                 "gdb-remote 1234"
-            ]
+            ],
+            "presentation": {
+                "hidden": false,
+                "group": "QEMU remote",
+                "order": 1
+            }
+        },
+        { // Requires extension Native Debug (webfreak.debug)
+            "name": "QEMU remote - GDB",
+            "type": "gdb",
+            "request": "attach",
+            "executable": "${workspaceFolder}/zig-out/${input:arch}/kernel",
+            "target": ":1234",
+            "remote": true,
+            "cwd": "${workspaceRoot}",
+            "valuesFormatting": "parseText",
+            "presentation": {
+                "hidden": false,
+                "group": "QEMU remote",
+                "order": 2
+            }
         }
     ]
 }
