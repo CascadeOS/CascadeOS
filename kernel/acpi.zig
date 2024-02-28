@@ -50,21 +50,26 @@ pub const init = struct {
     ///
     /// If the table is not valid, returns `null`.
     pub fn getTable(comptime T: type) linksection(kernel.info.init_code) ?*const T {
-        var iter = acpi.tableIterator(sdt_header);
+        const helper = struct {
+            fn physicalToValidVirtualAddress(phys_addr: core.PhysicalAddress) core.VirtualAddress {
+                return kernel.physicalToDirectMap(phys_addr);
+            }
+        };
 
-        while (iter.next()) |physical_address| {
-            const table =
-                kernel.physicalToDirectMap(physical_address)
-                .toPtr(*const acpi.SharedHeader);
+        var iter = acpi.tableIterator(
+            sdt_header,
+            helper.physicalToValidVirtualAddress,
+        );
 
-            if (!table.signatureIs(T.SIGNATURE_STRING)) continue;
+        while (iter.next()) |header| {
+            if (!header.signatureIs(T.SIGNATURE_STRING)) continue;
 
-            if (!table.isValid()) {
-                log.warn("invalid table: {s}", .{table.signatureAsString()});
+            if (!header.isValid()) {
+                log.warn("invalid table: {s}", .{header.signatureAsString()});
                 return null;
             }
 
-            return @ptrCast(table);
+            return @ptrCast(header);
         }
 
         return null;
