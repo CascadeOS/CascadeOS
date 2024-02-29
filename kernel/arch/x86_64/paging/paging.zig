@@ -33,7 +33,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
     const range = kernel.memory.physical.allocatePage() orelse return error.PageAllocationFailed;
     core.assert(range.size.greaterThanOrEqual(core.Size.of(PageTable)));
 
-    const page_table = kernel.physicalToDirectMap(range.address).toPtr(*PageTable);
+    const page_table = kernel.directMapFromPhysical(range.address).toPtr(*PageTable);
     page_table.zero();
 
     return page_table;
@@ -42,7 +42,7 @@ pub fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
 /// Switches to the given page table.
 pub fn switchToPageTable(page_table: *const PageTable) void {
     x86_64.registers.Cr3.writeAddress(
-        kernel.unsafeDirectMapToPhysical(core.VirtualAddress.fromPtr(page_table)),
+        kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(page_table)),
     );
 }
 

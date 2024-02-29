@@ -39,7 +39,7 @@ pub fn allocatePage() ?core.PhysicalRange {
             .AcqRel,
         );
 
-        const physical_address = kernel.directMapToPhysical(core.VirtualAddress.fromPtr(first_free_page)) catch unreachable;
+        const physical_address = kernel.physicalFromDirectMap(core.VirtualAddress.fromPtr(first_free_page)) catch unreachable;
         const allocated_range = core.PhysicalRange.fromAddr(physical_address, kernel.arch.paging.standard_page_size);
 
         log.debug("allocated page: {}", .{allocated_range});
@@ -60,7 +60,7 @@ pub fn deallocateRange(range: core.PhysicalRange) void {
     core.debugAssert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(range.size.isAligned(kernel.arch.paging.standard_page_size));
 
-    const first_page_node = kernel.physicalToDirectMap(range.address).toPtr(*PhysPageNode);
+    const first_page_node = kernel.directMapFromPhysical(range.address).toPtr(*PhysPageNode);
 
     if (range.size.equal(kernel.arch.paging.standard_page_size)) {
         deallocateImpl(first_page_node, first_page_node, kernel.arch.paging.standard_page_size);
@@ -69,8 +69,8 @@ pub fn deallocateRange(range: core.PhysicalRange) void {
 
     // build up linked list
     const last_page_node = blk: {
-        var current_virtual_address = kernel.physicalToDirectMap(range.address);
-        const end_virtual_address: core.VirtualAddress = kernel.physicalToDirectMap(range.end());
+        var current_virtual_address = kernel.directMapFromPhysical(range.address);
+        const end_virtual_address: core.VirtualAddress = kernel.directMapFromPhysical(range.end());
 
         var previous: *PhysPageNode = first_page_node;
 
@@ -98,7 +98,7 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
     core.debugAssert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(range.size.equal(kernel.arch.paging.standard_page_size));
 
-    const page_node = kernel.physicalToDirectMap(range.address).toPtr(*PhysPageNode);
+    const page_node = kernel.directMapFromPhysical(range.address).toPtr(*PhysPageNode);
 
     deallocateImpl(page_node, page_node, kernel.arch.paging.standard_page_size);
 }
@@ -186,7 +186,7 @@ pub const init = struct {
             core.panicFmt("memory map entry size is not aligned to page size: {}", .{memory_map_entry});
         }
 
-        const virtual_range = kernel.physicalRangeToDirectMap(memory_map_entry.range);
+        const virtual_range = kernel.directMapFromPhysicalRange(memory_map_entry.range);
 
         var current_virtual_address = virtual_range.address;
         const end_virtual_address = virtual_range.end();

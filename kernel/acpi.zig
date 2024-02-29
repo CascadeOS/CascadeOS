@@ -23,7 +23,7 @@ pub const init = struct {
         log.debug("validating rsdp", .{});
         if (!rsdp.isValid()) core.panic("invalid RSDP");
 
-        sdt_header = kernel.physicalToDirectMap(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
+        sdt_header = kernel.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
 
         log.debug("validating sdt", .{});
         if (!sdt_header.isValid()) core.panic("invalid SDT");
@@ -31,7 +31,7 @@ pub const init = struct {
         if (kernel.debug.log.loggingEnabledFor(.acpi, .debug)) {
             var iter = acpi.tableIterator(
                 sdt_header,
-                kernel.physicalToDirectMap,
+                kernel.directMapFromPhysical,
             );
 
             log.debug("ACPI tables:", .{});
@@ -54,7 +54,7 @@ pub const init = struct {
     pub fn getTable(comptime T: type) linksection(kernel.info.init_code) ?*const T {
         var iter = acpi.tableIterator(
             sdt_header,
-            kernel.physicalToDirectMap,
+            kernel.directMapFromPhysical,
         );
 
         while (iter.next()) |header| {

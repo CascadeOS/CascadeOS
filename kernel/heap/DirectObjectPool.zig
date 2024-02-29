@@ -130,7 +130,7 @@ pub fn DirectObjectPool(
 
         fn getMoreObjects(self: *Self) error{OutOfMemory}!void {
             const page = kernel.memory.physical.allocatePage() orelse return error.OutOfMemory;
-            const direct_map_range = kernel.physicalRangeToDirectMap(page);
+            const direct_map_range = kernel.directMapFromPhysicalRange(page);
 
             const objects = direct_map_range.address.toPtr([*]Object)[0..objects_per_page];
 

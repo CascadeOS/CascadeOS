@@ -19,17 +19,17 @@ pub const Stack = @import("Stack.zig");
 pub const time = @import("time.zig");
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
-pub fn physicalToDirectMap(self: core.PhysicalAddress) core.VirtualAddress {
+pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
     return .{ .value = self.value + info.direct_map.address.value };
 }
 
 /// Returns the virtual address corresponding to this physical address in the non-cached direct map.
-pub fn physicalToNonCachedDirectMap(self: core.PhysicalAddress) core.VirtualAddress {
+pub fn nonCachedDirectMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
     return .{ .value = self.value + info.non_cached_direct_map.address.value };
 }
 
 /// Returns the physical address of the given virtual address if it is in one of the direct maps.
-pub fn directMapToPhysical(self: core.VirtualAddress) error{AddressNotInAnyDirectMap}!core.PhysicalAddress {
+pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInAnyDirectMap}!core.PhysicalAddress {
     if (info.direct_map.contains(self)) {
         return .{ .value = self.value -% info.direct_map.address.value };
     }
@@ -42,14 +42,14 @@ pub fn directMapToPhysical(self: core.VirtualAddress) error{AddressNotInAnyDirec
 /// Returns the physical address of the given direct map virtual address.
 ///
 /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
-pub fn unsafeDirectMapToPhysical(self: core.VirtualAddress) core.PhysicalAddress {
+pub fn physicalFromDirectMapUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
     return .{ .value = self.value -% info.direct_map.address.value };
 }
 
 /// Returns a virtual range corresponding to this physical range in the direct map.
-pub fn physicalRangeToDirectMap(self: core.PhysicalRange) core.VirtualRange {
+pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
     return .{
-        .address = physicalToDirectMap(self.address),
+        .address = directMapFromPhysical(self.address),
         .size = self.size,
     };
 }
