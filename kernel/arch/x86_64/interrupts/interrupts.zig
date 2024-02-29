@@ -420,12 +420,12 @@ pub const PageFaultErrorCode = packed struct(u64) {
 
 pub const init = struct {
     /// Load the IDT on this core.
-    pub fn loadIdt() linksection(kernel.info.init_code) void {
+    pub fn loadIdt() void {
         idt.load();
     }
 
     /// Initialize the IDT with raw handlers and correct stacks.
-    pub fn initIdt() linksection(kernel.info.init_code) void {
+    pub fn initIdt() void {
         log.debug("mapping idt entries to raw handlers", .{});
         for (raw_handlers, 0..) |raw_handler, i| {
             idt.handlers[i].init(
@@ -441,7 +441,7 @@ pub const init = struct {
         setVectorStack(.non_maskable_interrupt, .non_maskable_interrupt);
     }
 
-    fn setFixedHandlers() linksection(kernel.info.init_code) void {
+    fn setFixedHandlers() void {
         handlers[@intFromEnum(IdtVector.divide)] = fixed_handlers.divideErrorException;
         handlers[@intFromEnum(IdtVector.debug)] = fixed_handlers.debugException;
         handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = fixed_handlers.nonMaskableInterrupt;

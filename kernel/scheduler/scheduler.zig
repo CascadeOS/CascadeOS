@@ -151,7 +151,7 @@ pub const init = struct {
     /// Initializes the scheduler.
     ///
     /// This function will be called on each core.
-    pub fn initScheduler() linksection(kernel.info.init_code) void {
+    pub fn initScheduler() void {
         log.debug("set scheduler interrupt period: {}", .{time_slice});
         kernel.time.per_core_periodic.enableSchedulerInterrupt(time_slice);
     }

@@ -144,7 +144,7 @@ pub fn pushReturnAddressWithoutChangingPointer(
 }
 
 pub const init = struct {
-    pub fn initStacks(kernel_stacks_range: core.VirtualRange) linksection(kernel.info.init_code) !void {
+    pub fn initStacks(kernel_stacks_range: core.VirtualRange) !void {
         stacks_range_allocator = try kernel.heap.RangeAllocator.init(kernel_stacks_range);
     }
 };

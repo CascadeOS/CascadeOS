@@ -91,7 +91,7 @@ pub fn unmap(
 }
 
 pub const init = struct {
-    pub fn initVirtualMemory() linksection(kernel.info.init_code) void {
+    pub fn initVirtualMemory() void {
         log.debug("populating kernel page table", .{});
         kernel.kernel_process.page_table = paging.allocatePageTable() catch
             core.panic("unable to allocate physical page for root page table");
@@ -125,7 +125,7 @@ pub const init = struct {
         }
     }
 
-    fn prepareKernelHeap() linksection(kernel.info.init_code) !void {
+    fn prepareKernelHeap() !void {
         log.debug("preparing kernel heap", .{});
 
         const kernel_heap_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
@@ -139,7 +139,7 @@ pub const init = struct {
         log.debug("kernel heap: {}", .{kernel_heap_range});
     }
 
-    fn prepareKernelStacks() linksection(kernel.info.init_code) !void {
+    fn prepareKernelStacks() !void {
         log.debug("preparing kernel stacks", .{});
 
         const kernel_stacks_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
@@ -159,7 +159,7 @@ pub const init = struct {
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
         map_type: MapType,
-    ) linksection(kernel.info.init_code) !void {
+    ) !void {
         core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
         core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
         core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
@@ -180,7 +180,7 @@ pub const init = struct {
     }
 
     /// Maps the direct maps.
-    fn mapDirectMaps() linksection(kernel.info.init_code) !void {
+    fn mapDirectMaps() !void {
         const direct_map_physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, kernel.info.direct_map.size);
 
         log.debug("mapping the direct map", .{});
@@ -219,23 +219,7 @@ pub const init = struct {
     };
 
     /// Maps the kernel sections.
-    fn mapKernelSections() linksection(kernel.info.init_code) !void {
-        log.debug("mapping .init_text section", .{});
-        try mapSection(
-            @intFromPtr(&linker_symbols.__init_text_start),
-            @intFromPtr(&linker_symbols.__init_text_end),
-            .{ .executable = true },
-            .init_executable_section,
-        );
-
-        log.debug("mapping .init_data section", .{});
-        try mapSection(
-            @intFromPtr(&linker_symbols.__init_data_start),
-            @intFromPtr(&linker_symbols.__init_data_end),
-            .{ .writeable = true },
-            .init_writeable_section,
-        );
-
+    fn mapKernelSections() !void {
         log.debug("mapping .text section", .{});
         try mapSection(
             @intFromPtr(&linker_symbols.__text_start),
@@ -261,22 +245,13 @@ pub const init = struct {
         );
     }
 
-    /// Unmaps the init only kernel sections.
-    pub fn unmapInitOnlyKernelSections() void {
-        log.debug("unmapping .init_text section", .{});
-        unmapSectionType(.init_executable_section);
-
-        log.debug("unmapping .init_data section", .{});
-        unmapSectionType(.init_writeable_section);
-    }
-
     /// Maps a section.
     fn mapSection(
         section_start: usize,
         section_end: usize,
         map_type: MapType,
         region_type: KernelMemoryLayout.KernelMemoryRegion.Type,
-    ) linksection(kernel.info.init_code) !void {
+    ) !void {
         if (section_start == section_end) return;
 
         core.assert(section_end > section_start);

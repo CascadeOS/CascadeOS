@@ -326,7 +326,7 @@ fn printErrorAndCurrentStackTrace(writer: anytype, stack_trace: ?*const std.buil
 }
 
 pub const init = struct {
-    pub fn switchToMainPanicImpl() linksection(kernel.info.init_code) void {
+    pub fn switchToMainPanicImpl() void {
         panic_impl = panicImpl;
     }
 
@@ -335,7 +335,7 @@ pub const init = struct {
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
-    ) linksection(kernel.info.init_code) void {
+    ) void {
         const processor = kernel.arch.earlyGetProcessor() orelse {
             const writer = kernel.arch.init.getEarlyOutputNoLock() orelse return;
 

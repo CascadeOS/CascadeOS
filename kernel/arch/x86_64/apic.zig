@@ -63,7 +63,7 @@ pub const init = struct {
     pub fn captureApicInformation(
         fadt: *const acpi.FADT,
         madt: *const acpi.MADT,
-    ) linksection(kernel.info.init_code) void {
+    ) void {
         x2apic = kernel.boot.x2apicEnabled();
         if (x2apic) {
             log.debug("x2apic mode", .{});
@@ -81,7 +81,7 @@ pub const init = struct {
         }
     }
 
-    pub fn initApicOnProcessor(_: *kernel.Processor) linksection(kernel.info.init_code) void {
+    pub fn initApicOnProcessor(_: *kernel.Processor) void {
         setTaskPriority(.idle);
 
         // TODO: Error interrupt
@@ -93,7 +93,7 @@ pub const init = struct {
         spurious_interrupt_register.write();
     }
 
-    pub fn registerTimeSource() linksection(kernel.info.init_code) void {
+    pub fn registerTimeSource() void {
         kernel.time.init.addTimeSource(.{
             .name = "lapic",
             .priority = 150,
@@ -107,7 +107,7 @@ pub const init = struct {
 
     const divide_configuration: DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer() linksection(kernel.info.init_code) void {
+    fn initializeLapicTimer() void {
         core.debugAssert(x86_64.arch_info.lapic_base_tick_duration_fs != null);
 
         tick_duration_fs = x86_64.arch_info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
@@ -116,7 +116,7 @@ pub const init = struct {
 
     fn initializeLapicTimerCalibrate(
         reference_counter: kernel.time.init.ReferenceCounter,
-    ) linksection(kernel.info.init_code) void {
+    ) void {
         DivideConfigurationRegister.write(divide_configuration);
 
         const timer_register = LVTTimerRegister{
@@ -168,7 +168,7 @@ pub const init = struct {
         log.debug("tick duration (fs) using reference counter: {}", .{tick_duration_fs});
     }
 
-    fn perCorePeriodicEnableSchedulerInterrupt(period: core.Duration) linksection(kernel.info.init_code) void {
+    fn perCorePeriodicEnableSchedulerInterrupt(period: core.Duration) void {
         InitialCountRegister.write(0);
         DivideConfigurationRegister.write(divide_configuration);
         const timer_register = LVTTimerRegister{
@@ -204,7 +204,7 @@ pub const init = struct {
 
         _reserved2: u7,
 
-        pub fn read() linksection(kernel.info.init_code) VersionRegister {
+        pub fn read() VersionRegister {
             return @bitCast(readRegister(.version));
         }
     };
@@ -234,11 +234,11 @@ pub const init = struct {
 
         _reserved2: u19 = 0,
 
-        pub fn read() linksection(kernel.info.init_code) SupriousInterruptRegister {
+        pub fn read() SupriousInterruptRegister {
             return @bitCast(readRegister(.spurious_interrupt));
         }
 
-        pub fn write(self: SupriousInterruptRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: SupriousInterruptRegister) void {
             writeRegister(.spurious_interrupt, @bitCast(self));
         }
     };
@@ -331,11 +331,11 @@ pub const init = struct {
             _,
         };
 
-        pub fn read() linksection(kernel.info.init_code) LVTTimerRegister {
+        pub fn read() LVTTimerRegister {
             return @bitCast(readRegister(.lvt_timer));
         }
 
-        pub fn write(self: LVTTimerRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: LVTTimerRegister) void {
             writeRegister(.lvt_timer, @bitCast(self));
         }
     };
@@ -369,11 +369,11 @@ pub const init = struct {
 
         _reserved3: u16 = 0,
 
-        pub fn read() linksection(kernel.info.init_code) LVTErrorRegister {
+        pub fn read() LVTErrorRegister {
             return @bitCast(readRegister(.lvt_error));
         }
 
-        pub fn write(self: LVTErrorRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: LVTErrorRegister) void {
             writeRegister(.lvt_error, @bitCast(self));
         }
     };
@@ -408,11 +408,11 @@ pub const init = struct {
         /// Divide by 1
         @"1" = 0b1011,
 
-        pub fn read() linksection(kernel.info.init_code) DivideConfigurationRegister {
+        pub fn read() DivideConfigurationRegister {
             return @enumFromInt(readRegister(.divide_configuration));
         }
 
-        pub fn write(self: DivideConfigurationRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: DivideConfigurationRegister) void {
             writeRegister(.divide_configuration, @intFromEnum(self));
         }
 
@@ -449,11 +449,11 @@ pub const init = struct {
             logical_apic_id: u32,
         },
 
-        pub fn read() linksection(kernel.info.init_code) LogicalDestinationRegister {
+        pub fn read() LogicalDestinationRegister {
             return @bitCast(readRegister(.logical_destination));
         }
 
-        pub fn write(self: LogicalDestinationRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: LogicalDestinationRegister) void {
             core.debugAssert(!x2apic); // read only in x2APIC mode
             writeRegister(.logical_destination, @bitCast(self));
         }
@@ -530,12 +530,12 @@ pub const init = struct {
             flat = 0b1111,
         };
 
-        pub fn read() linksection(kernel.info.init_code) DestinationFormatRegister {
+        pub fn read() DestinationFormatRegister {
             core.debugAssert(!x2apic); // not supported in x2APIC mode
             return @bitCast(readRegister(.logical_destination));
         }
 
-        pub fn write(self: DestinationFormatRegister) linksection(kernel.info.init_code) void {
+        pub fn write(self: DestinationFormatRegister) void {
             core.debugAssert(!x2apic); // not supported in x2APIC mode
             writeRegister(.logical_destination, @bitCast(self));
         }
@@ -584,7 +584,7 @@ const InitialCountRegister = struct {
 };
 
 const CurrentCountRegister = struct {
-    pub fn read() linksection(kernel.info.init_code) u32 {
+    pub fn read() u32 {
         return readRegister(.current_count);
     }
 };

@@ -7,9 +7,9 @@ const std = @import("std");
 
 const log = kernel.debug.log.scoped(.init);
 
-var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
+var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
 
-var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .{
+var bootstrap_processor: kernel.Processor = .{
     .id = .bootstrap,
     .idle_stack = undefined, // initialized at the beginning of `kernelInit`
     .arch = undefined, // initialized by `prepareBootstrapProcessor`
@@ -20,7 +20,7 @@ var bootstrap_processor: kernel.Processor linksection(kernel.info.init_data) = .
 /// Entry point from the bootloader specific code.
 ///
 /// Only the bootstrap processor executes this function.
-pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
+pub fn kernelInitStage1() noreturn {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
@@ -73,7 +73,7 @@ pub fn kernelInitStage1() linksection(kernel.info.init_code) noreturn {
 /// This function is executed by all processors, including the bootstrap processor.
 ///
 /// All processors are using the bootloader provided stack.
-fn kernelInitStage2(processor: *kernel.Processor) linksection(kernel.info.init_code) noreturn {
+fn kernelInitStage2(processor: *kernel.Processor) noreturn {
     kernel.arch.paging.switchToPageTable(kernel.kernel_process.page_table);
     kernel.arch.init.loadProcessor(processor);
 
@@ -109,7 +109,7 @@ fn kernelInitStage3() noreturn {
         copyKernelFileFromBootloaderMemory();
 
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
-        // the init only mappings.
+        // the bootloader reclaimable memory.
         const processor_count = kernel.Processor._all.len;
         while (processors_in_stage3.load(.Acquire) != processor_count) {
             kernel.arch.spinLoopHint();
@@ -121,9 +121,6 @@ fn kernelInitStage3() noreturn {
 
         log.debug("reclaiming bootloader reclaimable memory", .{});
         kernel.memory.physical.init.reclaimBootloaderReclaimableMemory();
-
-        log.debug("unmapping init only kernel sections", .{});
-        kernel.memory.virtual.init.unmapInitOnlyKernelSections();
 
         reload_page_table_gate.store(true, .Release);
     } else {
@@ -145,7 +142,7 @@ fn kernelInitStage3() noreturn {
 }
 
 /// Copy the kernel file from the bootloader provided memory to the kernel kernel.heap.
-fn copyKernelFileFromBootloaderMemory() linksection(kernel.info.init_code) void {
+fn copyKernelFileFromBootloaderMemory() void {
     const bootloader_provided_kernel_file = kernel.info.kernel_file.?;
 
     const kernel_file_buffer = kernel.heap.page_allocator.alloc(
@@ -166,7 +163,7 @@ fn copyKernelFileFromBootloaderMemory() linksection(kernel.info.init_code) void 
 /// Initialize the per processor data structures for all processors including the bootstrap processor.
 ///
 /// Also wakes the non-bootstrap processors and jumps them to `kernelInitStage2`.
-fn initProcessors() linksection(kernel.info.init_code) void {
+fn initProcessors() void {
     var processor_descriptors = kernel.boot.processorDescriptors();
 
     kernel.Processor._all = kernel.heap.page_allocator.alloc(
@@ -202,7 +199,7 @@ fn initProcessors() linksection(kernel.info.init_code) void {
     }
 }
 
-fn captureBootloaderProvidedInformation() linksection(kernel.info.init_code) void {
+fn captureBootloaderProvidedInformation() void {
     kernel.info.kernel_file = kernel.boot.kernelFile() orelse
         core.panic("bootloader did not provide the kernel file");
 
@@ -210,7 +207,7 @@ fn captureBootloaderProvidedInformation() linksection(kernel.info.init_code) voi
     calculateDirectMaps();
 }
 
-fn calculateDirectMaps() linksection(kernel.info.init_code) void {
+fn calculateDirectMaps() void {
     const direct_map_size = calculateLengthOfDirectMap();
 
     kernel.info.direct_map = calculateDirectMapRange(direct_map_size);
@@ -220,7 +217,7 @@ fn calculateDirectMaps() linksection(kernel.info.init_code) void {
     log.debug("non-cached direct map: {}", .{kernel.info.non_cached_direct_map});
 }
 
-fn calculateDirectMapRange(direct_map_size: core.Size) linksection(kernel.info.init_code) core.VirtualRange {
+fn calculateDirectMapRange(direct_map_size: core.Size) core.VirtualRange {
     const direct_map_address = kernel.boot.directMapAddress() orelse
         core.panic("bootloader did not provide the start of the direct map");
 
@@ -234,7 +231,7 @@ fn calculateDirectMapRange(direct_map_size: core.Size) linksection(kernel.info.i
 fn calculateNonCachedDirectMapRange(
     direct_map_size: core.Size,
     direct_map_range: core.VirtualRange,
-) linksection(kernel.info.init_code) core.VirtualRange {
+) core.VirtualRange {
     // try to place the non-cached direct map directly _before_ the direct map
     {
         const candidate_range = direct_map_range.moveBackward(direct_map_size);
@@ -257,7 +254,7 @@ fn calculateNonCachedDirectMapRange(
 }
 
 /// Calculates the length of the direct map.
-fn calculateLengthOfDirectMap() linksection(kernel.info.init_code) core.Size {
+fn calculateLengthOfDirectMap() core.Size {
     var memory_map_iterator = kernel.boot.memoryMap(.backwards);
 
     const last_usable_entry: kernel.boot.MemoryMapEntry = blk: {
@@ -286,7 +283,7 @@ fn calculateLengthOfDirectMap() linksection(kernel.info.init_code) core.Size {
     return aligned_size;
 }
 
-fn calculateKernelOffsets() linksection(kernel.info.init_code) void {
+fn calculateKernelOffsets() void {
     const kernel_base_address = kernel.boot.kernelBaseAddress() orelse
         core.panic("bootloader did not provide the kernel base address");
 

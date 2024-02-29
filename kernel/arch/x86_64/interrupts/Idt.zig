@@ -92,7 +92,7 @@ pub const Entry = extern struct {
     }
 };
 
-pub fn load(self: *const Idt) linksection(kernel.info.init_code) void {
+pub fn load(self: *const Idt) void {
     const Idtr = packed struct {
         limit: u16,
         address: u64,

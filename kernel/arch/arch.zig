@@ -97,14 +97,14 @@ pub const init = struct {
         pub var lock: kernel.SpinLock = .{};
     };
 
-    pub fn getEarlyOutputNoLock() callconv(core.inline_in_non_debug_calling_convention) ?current.init.EarlyOutputWriter { // TODO: Put in init_code section
+    pub fn getEarlyOutputNoLock() callconv(core.inline_in_non_debug_calling_convention) ?current.init.EarlyOutputWriter {
         checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
 
         return current.init.getEarlyOutputWriter();
     }
 
     /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
-    pub fn getEarlyOutput() ?EarlyOutput { // TODO: Put in init_code section
+    pub fn getEarlyOutput() ?EarlyOutput {
         checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
 
         if (current.init.getEarlyOutputWriter()) |early_output_writer| {

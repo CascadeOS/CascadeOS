@@ -29,7 +29,7 @@ pub const Gdt = extern struct {
     const mask_u16: u64 = std.math.maxInt(u16);
     const mask_u24: u64 = std.math.maxInt(u24);
 
-    pub fn setTss(self: *Gdt, tss: *x86_64.Tss) linksection(kernel.info.init_code) void {
+    pub fn setTss(self: *Gdt, tss: *x86_64.Tss) void {
         const tss_ptr = @intFromPtr(tss);
 
         const low_base: u64 = (tss_ptr & mask_u24) << 16;
@@ -53,7 +53,7 @@ pub const Gdt = extern struct {
         );
     }
 
-    pub fn load(self: *Gdt) linksection(kernel.info.init_code) void {
+    pub fn load(self: *Gdt) void {
         const gdt_ptr = Gdtr{
             .limit = @sizeOf(Gdt) - 1,
             .base = @intFromPtr(self),

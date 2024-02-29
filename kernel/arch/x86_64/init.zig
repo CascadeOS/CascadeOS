@@ -14,21 +14,21 @@ const log = kernel.debug.log.scoped(.init_x86_64);
 pub const initLocalInterruptController = x86_64.apic.init.initApicOnProcessor;
 
 pub const EarlyOutputWriter = SerialPort.Writer;
-var early_output_serial_port: ?SerialPort = null; // TODO: Put in init_data section
+var early_output_serial_port: ?SerialPort = null;
 
-pub fn setupEarlyOutput() linksection(kernel.info.init_code) void {
+pub fn setupEarlyOutput() void {
     early_output_serial_port = SerialPort.init(.COM1, .Baud115200);
 }
 
-pub fn getEarlyOutputWriter() ?SerialPort.Writer { // TODO: Put in init_code section
+pub fn getEarlyOutputWriter() ?SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
-var bootstrap_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
-var bootstrap_double_fault_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
-var bootstrap_non_maskable_interrupt_stack align(16) linksection(kernel.info.init_data) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
+var bootstrap_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
+var bootstrap_double_fault_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
+var bootstrap_non_maskable_interrupt_stack align(16) = [_]u8{0} ** kernel.Stack.usable_stack_size.value;
 
-pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksection(kernel.info.init_code) void {
+pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
     bootstrap_processor.arch = .{
         .lapic_id = 0,
 
@@ -48,7 +48,7 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) linksec
 /// Prepares the provided kernel.Processor for use.
 ///
 /// **WARNING**: This function will panic if the processor cannot be prepared.
-pub fn prepareProcessor(processor: *kernel.Processor, processor_descriptor: kernel.boot.ProcessorDescriptor) linksection(kernel.info.init_code) void {
+pub fn prepareProcessor(processor: *kernel.Processor, processor_descriptor: kernel.boot.ProcessorDescriptor) void {
     processor.arch = .{
         .lapic_id = processor_descriptor.lapicId(),
 
@@ -59,7 +59,7 @@ pub fn prepareProcessor(processor: *kernel.Processor, processor_descriptor: kern
     processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);
 }
 
-pub fn loadProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
+pub fn loadProcessor(processor: *kernel.Processor) void {
     const arch: *x86_64.ArchProcessor = &processor.arch;
 
     arch.gdt.load();
@@ -74,13 +74,13 @@ pub fn loadProcessor(processor: *kernel.Processor) linksection(kernel.info.init_
     x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(processor));
 }
 
-pub fn earlyArchInitialization() linksection(kernel.info.init_code) void {
+pub fn earlyArchInitialization() void {
     log.debug("initializing idt", .{});
     x86_64.interrupts.init.initIdt();
 }
 
 /// Captures x86_64 system information.
-pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
+pub fn captureSystemInformation() void {
     log.debug("capturing cpuid information", .{});
     x86_64.cpuid.capture();
 
@@ -97,12 +97,12 @@ pub fn captureSystemInformation() linksection(kernel.info.init_code) void {
     x86_64.apic.init.captureApicInformation(fadt, madt);
 }
 
-fn captureMADTInformation(madt: *const acpi.MADT) linksection(kernel.info.init_code) void {
+fn captureMADTInformation(madt: *const acpi.MADT) void {
     x86_64.arch_info.have_pic = madt.flags.PCAT_COMPAT;
     log.debug("have pic: {}", .{x86_64.arch_info.have_pic});
 }
 
-fn captureFADTInformation(fadt: *const acpi.FADT) linksection(kernel.info.init_code) void {
+fn captureFADTInformation(fadt: *const acpi.FADT) void {
     const flags = fadt.IA_PC_BOOT_ARCH;
 
     x86_64.arch_info.have_ps2_controller = flags.@"8042";
@@ -116,14 +116,14 @@ fn captureFADTInformation(fadt: *const acpi.FADT) linksection(kernel.info.init_c
 }
 
 /// Configures x86_64 system features.
-pub fn configureGlobalSystemFeatures() linksection(kernel.info.init_code) void {
+pub fn configureGlobalSystemFeatures() void {
     if (x86_64.arch_info.have_pic) {
         log.debug("disabling pic", .{});
         disablePic();
     }
 }
 
-pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) linksection(kernel.info.init_code) void {
+pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) void {
     core.debugAssert(processor == x86_64.getProcessor());
 
     if (x86_64.arch_info.rdtscp) {
@@ -160,7 +160,7 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 /// Register any architectural time sources.
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
-pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) void {
+pub fn registerArchitecturalTimeSources() void {
     x86_64.tsc.init.registerTimeSource();
     x86_64.apic.init.registerTimeSource();
     x86_64.hpet.init.registerTimeSource();
@@ -170,7 +170,7 @@ pub fn registerArchitecturalTimeSources() linksection(kernel.info.init_code) voi
 
 const portWriteU8 = x86_64.instructions.portWriteU8;
 
-fn disablePic() linksection(kernel.info.init_code) void {
+fn disablePic() void {
     const PRIMARY_COMMAND_PORT = 0x20;
     const PRIMARY_DATA_PORT = 0x21;
     const SECONDARY_COMMAND_PORT = 0xA0;

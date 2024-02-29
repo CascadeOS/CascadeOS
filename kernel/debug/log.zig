@@ -71,7 +71,7 @@ fn earlyLogFn(
     comptime message_level: Level,
     comptime format: []const u8,
     args: anytype,
-) void { // TODO: Put in init_code section
+) void {
     const early_output = kernel.arch.init.getEarlyOutput() orelse return;
     defer early_output.deinit();
 

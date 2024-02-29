@@ -21,7 +21,7 @@ fn wallClockElapsed(value1: u64, value2: u64) core.Duration {
 }
 
 pub const init = struct {
-    pub fn registerTimeSource() linksection(kernel.info.init_code) void {
+    pub fn registerTimeSource() void {
         if (!shouldUseTsc()) return;
 
         kernel.time.init.addTimeSource(.{
@@ -45,7 +45,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeTsc() linksection(kernel.info.init_code) void {
+    fn initializeTsc() void {
         core.debugAssert(shouldUseTsc());
         core.debugAssert(x86_64.arch_info.tsc_tick_duration_fs != null);
 
@@ -55,7 +55,7 @@ pub const init = struct {
 
     fn initializeTscCalibrate(
         reference_counter: kernel.time.init.ReferenceCounter,
-    ) linksection(kernel.info.init_code) void {
+    ) void {
         core.debugAssert(shouldUseTsc());
 
         // warmup
@@ -98,11 +98,11 @@ pub const init = struct {
         log.debug("tick duration (fs) using reference counter: {}", .{tick_duration_fs});
     }
 
-    fn referenceCounterPrepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn referenceCounterPrepareToWaitFor(duration: core.Duration) void {
         _ = duration;
     }
 
-    fn referenceCounterWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn referenceCounterWaitFor(duration: core.Duration) void {
         const current_value = readTsc();
 
         const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
@@ -112,7 +112,7 @@ pub const init = struct {
         }
     }
 
-    fn shouldUseTsc() linksection(kernel.info.init_code) bool {
+    fn shouldUseTsc() bool {
         return x86_64.arch_info.rdtscp and (x86_64.arch_info.invariant_tsc or kernel.info.hypervisor == .tcg);
     }
 };

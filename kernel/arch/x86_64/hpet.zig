@@ -21,7 +21,7 @@ var tick_duration_fs: u64 = undefined; // Initalized during `initializeHPET`
 var number_of_timers_minus_one: u5 = undefined;
 
 pub const init = struct {
-    pub fn registerTimeSource() linksection(kernel.info.init_code) void {
+    pub fn registerTimeSource() void {
         if (kernel.acpi.init.getTable(acpi.HPET) == null) return;
 
         kernel.time.init.addTimeSource(.{
@@ -35,7 +35,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET() linksection(kernel.info.init_code) void {
+    fn initializeHPET() void {
         base = getHpetBase();
         log.debug("using base address: {*}", .{base});
 
@@ -60,7 +60,7 @@ pub const init = struct {
         CounterRegister.write(0);
     }
 
-    fn referenceCounterPrepareToWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn referenceCounterPrepareToWaitFor(duration: core.Duration) void {
         _ = duration;
 
         var general_configuration = GeneralConfigurationRegister.read();
@@ -73,7 +73,7 @@ pub const init = struct {
         general_configuration.write();
     }
 
-    fn referenceCounterWaitFor(duration: core.Duration) linksection(kernel.info.init_code) void {
+    fn referenceCounterWaitFor(duration: core.Duration) void {
         const current_value = CounterRegister.read();
 
         const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
@@ -83,7 +83,7 @@ pub const init = struct {
         }
     }
 
-    fn getHpetBase() linksection(kernel.info.init_code) [*]volatile u64 {
+    fn getHpetBase() [*]volatile u64 {
         const description_table = kernel.acpi.init.getTable(acpi.HPET) orelse unreachable;
 
         if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped");

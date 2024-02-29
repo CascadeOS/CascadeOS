@@ -11,10 +11,10 @@ const log = kernel.debug.log.scoped(.acpi);
 
 pub const init = struct {
     /// Initialized during `initializeACPITables`.
-    var sdt_header: *const acpi.SharedHeader linksection(kernel.info.init_data) = undefined;
+    var sdt_header: *const acpi.SharedHeader = undefined;
 
     /// Initializes access to the ACPI tables.
-    pub fn initializeACPITables() linksection(kernel.info.init_code) void {
+    pub fn initializeACPITables() void {
         const rsdp_address = kernel.boot.rsdp() orelse core.panic("RSDP not provided by bootloader");
         const rsdp = rsdp_address.toPtr(*const acpi.RSDP);
 
@@ -51,7 +51,7 @@ pub const init = struct {
     /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
     ///
     /// If the table is not valid, returns `null`.
-    pub fn getTable(comptime T: type) linksection(kernel.info.init_code) ?*const T {
+    pub fn getTable(comptime T: type) ?*const T {
         var iter = acpi.tableIterator(
             sdt_header,
             kernel.directMapFromPhysical,

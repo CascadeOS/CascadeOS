@@ -18,13 +18,6 @@ SECTIONS
     /* This must be kept in sync with `kernel.info.kernel_base_address` */
     . = 0xffffffff80000000;
 
-    /* This must be kept in sync with `kernel.info.init_code` */
-    .init_text ALIGN(4K) : {
-        __init_text_start = .;
-        *(.init_text .init_text.*)
-        __init_text_end = .;
-    } :text
-
     .text ALIGN(4K) : {
         __text_start = .;
         *(.text .text.*)
@@ -36,13 +29,6 @@ SECTIONS
         *(.rodata .rodata.*)
         __rodata_end = .;
     } :rodata
-
-    /* This must be kept in sync with `kernel.info.init_data` */
-    .init_data ALIGN(4K) : {
-        __init_data_start = .;
-        *(.init_data .init_data.*)
-        __init_data_end = .;
-    } :data
 
     .data ALIGN(4K) : {
         __data_start = .;

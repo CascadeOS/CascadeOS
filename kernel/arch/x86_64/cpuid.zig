@@ -12,7 +12,7 @@ const arch_info = x86_64.arch_info;
 
 const log = kernel.debug.log.scoped(.cpuid);
 
-pub fn capture() linksection(kernel.info.init_code) void {
+pub fn capture() void {
     if (!isCPUIDAvailable()) core.panic("cpuid is not supported");
 
     const cpuid_leaf_0 = rawCpuid(0x0, 0);
@@ -45,7 +45,7 @@ pub fn capture() linksection(kernel.info.init_code) void {
     determineTscTickDuration(max_standard_leaf, max_hypervisor_leaf);
 }
 
-fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
+fn isCPUIDAvailable() bool {
     const orig_rflags = x86_64.registers.RFlags.read();
     var modified_rflags = orig_rflags;
 
@@ -57,7 +57,7 @@ fn isCPUIDAvailable() linksection(kernel.info.init_code) bool {
     return orig_rflags.id != new_rflags.id;
 }
 
-fn determineHypervisor(hypervisor_info: HypervisorInformation) linksection(kernel.info.init_code) kernel.info.Hypervisor {
+fn determineHypervisor(hypervisor_info: HypervisorInformation) kernel.info.Hypervisor {
     const hypervisor_vendor_id: [12]u8 = blk: {
         var hypervisor_vendor_id = [_]u8{0} ** 12;
         std.mem.copyForwards(u8, hypervisor_vendor_id[0..][0..4], std.mem.asBytes(&hypervisor_info.hypervisor_vendor_id_1));
@@ -80,14 +80,14 @@ fn determineHypervisor(hypervisor_info: HypervisorInformation) linksection(kerne
 }
 
 /// Captures the vendor string from CPUID.00h
-fn captureVendorString(cpuid_leaf_0: Leaf) linksection(kernel.info.init_code) void {
+fn captureVendorString(cpuid_leaf_0: Leaf) void {
     const vendor_string_array = [_]u32{ cpuid_leaf_0.ebx, cpuid_leaf_0.edx, cpuid_leaf_0.ecx };
     std.mem.copyForwards(u8, &arch_info.cpu_vendor_string, std.mem.sliceAsBytes(&vendor_string_array));
     log.debug("cpu vendor string: {s}", .{arch_info.cpu_vendor_string});
 }
 
 /// Captures the brand string from CPUID.80000002h - CPUID.80000004h
-fn captureBrandString(max_extended_leaf: u32) linksection(kernel.info.init_code) void {
+fn captureBrandString(max_extended_leaf: u32) void {
     if (max_extended_leaf < 0x80000004) {
         log.debug("processor brand string is not available", .{});
         return;
@@ -255,7 +255,7 @@ const HypervisorTimingInformation = struct {
     }
 };
 
-const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.init_data) = &.{
+const simple_leaf_handlers: []const SimpleLeafHandler = &.{
     .{
         .leaf = .{ .type = .standard, .leaf = 0x01 },
         .handlers = &.{
@@ -446,7 +446,7 @@ const simple_leaf_handlers: []const SimpleLeafHandler linksection(kernel.info.in
 /// Handles simple CPUID leaves.
 ///
 /// Loops through the `simple_leaf_handlers` performing the declared actions for each handler.
-fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) linksection(kernel.info.init_code) void {
+fn handleSimpleLeafs(max_standard_leaf: u32, max_extended_leaf: u32) void {
     inline for (simple_leaf_handlers) |leaf_handler| blk: {
         if (leaf_handler.leaf.type == .standard and leaf_handler.leaf.leaf > max_standard_leaf) {
             // leaf is out of range of available standard functions

@@ -371,7 +371,7 @@ pub const init = struct {
     ///   2. allocate a backing frame for it
     ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
     ///   4. return the `core.VirtualRange` representing the entire virtual range that entry covers
-    pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) linksection(kernel.info.init_code) kernel.arch.paging.MapError!core.VirtualRange {
+    pub fn getTopLevelRangeAndFillFirstLevel(page_table: *PageTable) kernel.arch.paging.MapError!core.VirtualRange {
         var table_index: usize = PageTable.p4Index(higher_half);
 
         while (table_index < PageTable.number_of_entries) : (table_index += 1) {

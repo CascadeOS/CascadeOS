@@ -145,7 +145,7 @@ const PhysPageNode = extern struct {
 pub const init = struct {
     const indent = "  ";
 
-    pub fn initPhysicalMemory() linksection(kernel.info.init_code) void {
+    pub fn initPhysicalMemory() void {
         var memory_map_iterator = kernel.boot.memoryMap(.forwards);
 
         while (memory_map_iterator.next()) |memory_map_entry| {
@@ -168,7 +168,7 @@ pub const init = struct {
         );
     }
 
-    pub fn reclaimBootloaderReclaimableMemory() linksection(kernel.info.init_code) void {
+    pub fn reclaimBootloaderReclaimableMemory() void {
         var memory_map_iterator = kernel.boot.memoryMap(.forwards);
         while (memory_map_iterator.next()) |memory_map_entry| {
             if (memory_map_entry.type != .reclaimable) continue;
@@ -178,7 +178,7 @@ pub const init = struct {
     }
 
     /// Adds a memory map entry to the physical page allocator.
-    fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) linksection(kernel.info.init_code) void {
+    fn addMemoryMapEntryToAllocator(memory_map_entry: kernel.boot.MemoryMapEntry) void {
         if (!memory_map_entry.range.address.isAligned(kernel.arch.paging.standard_page_size)) {
             core.panicFmt("memory map entry address is not aligned to page size: {}", .{memory_map_entry});
         }

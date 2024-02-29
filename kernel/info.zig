@@ -13,12 +13,6 @@ pub const arch = target_options.arch;
 pub const version = kernel_options.cascade_version;
 pub const root_path = kernel_options.root_path;
 
-/// Code in this section is only used during kernel initialization and is unmapped afterwards.
-pub const init_code = ".init_text"; // This must be kept in sync with the linker scripts.
-
-/// Data in this section is only used during kernel initialization and is unmapped afterwards.
-pub const init_data = ".init_data"; // This must be kept in sync with the linker scripts.
-
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address = core.VirtualAddress.fromInt(0xffffffff80000000);
 

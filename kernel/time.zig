@@ -36,13 +36,13 @@ pub const per_core_periodic = struct {
     var enableSchedulerInterruptFn: *const fn (period: core.Duration) void = undefined;
 
     /// Enables a per-core scheduler interrupt to be delivered every `period`.
-    pub inline fn enableSchedulerInterrupt(period: core.Duration) linksection(kernel.info.init_code) void {
+    pub inline fn enableSchedulerInterrupt(period: core.Duration) void {
         return enableSchedulerInterruptFn(period);
     }
 };
 
 pub const init = struct {
-    pub fn initTime() linksection(kernel.info.init_code) void {
+    pub fn initTime() void {
         log.debug("registering architectural time sources", .{});
         kernel.arch.init.registerArchitecturalTimeSources();
 
@@ -52,7 +52,7 @@ pub const init = struct {
         configurePerCorePeriodicTimeSource(reference_counter);
     }
 
-    var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) linksection(kernel.info.init_data) = .{};
+    var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) = .{};
 
     pub const CandidateTimeSource = struct {
         name: []const u8,
@@ -83,7 +83,7 @@ pub const init = struct {
         fn initialize(
             self: *CandidateTimeSource,
             reference_counter: ReferenceCounter,
-        ) linksection(kernel.info.init_code) void {
+        ) void {
             if (self.initialized) return;
             switch (self.initialization) {
                 .none => {},
@@ -129,7 +129,7 @@ pub const init = struct {
         };
     };
 
-    pub fn addTimeSource(time_source: CandidateTimeSource) linksection(kernel.info.init_code) void {
+    pub fn addTimeSource(time_source: CandidateTimeSource) void {
         if (time_source.reference_counter != null) {
             if (time_source.initialization == .calibration_required) {
                 core.panic("reference counter cannot require calibratation");
@@ -159,7 +159,7 @@ pub const init = struct {
         per_core_periodic: bool = false,
     };
 
-    fn findAndInitializeTimeSource(query: TimeSourceQuery, reference_counter: ReferenceCounter) linksection(kernel.info.init_code) ?*CandidateTimeSource {
+    fn findAndInitializeTimeSource(query: TimeSourceQuery, reference_counter: ReferenceCounter) ?*CandidateTimeSource {
         var opt_best_candidate: ?*CandidateTimeSource = null;
 
         for (candidate_time_sources.slice()) |*time_source| {
@@ -183,7 +183,7 @@ pub const init = struct {
         return opt_best_candidate;
     }
 
-    fn getReferenceCounter() linksection(kernel.info.init_code) ReferenceCounter {
+    fn getReferenceCounter() ReferenceCounter {
         const time_source = findAndInitializeTimeSource(.{
             .pre_calibrated = true,
             .reference_counter = true,
@@ -201,7 +201,7 @@ pub const init = struct {
 
     fn configureWallclockTimeSource(
         reference_counter: ReferenceCounter,
-    ) linksection(kernel.info.init_code) void {
+    ) void {
         const time_source = findAndInitializeTimeSource(.{
             .wallclock = true,
         }, reference_counter) orelse core.panic("no wallclock found");
@@ -216,7 +216,7 @@ pub const init = struct {
 
     fn configurePerCorePeriodicTimeSource(
         reference_counter: ReferenceCounter,
-    ) linksection(kernel.info.init_code) void {
+    ) void {
         const time_source = findAndInitializeTimeSource(.{
             .per_core_periodic = true,
         }, reference_counter) orelse core.panic("no per-core periodic found");
@@ -245,7 +245,7 @@ pub const init = struct {
         pub fn prepareToWaitFor(
             self: ReferenceCounter,
             duration: core.Duration,
-        ) linksection(kernel.info.init_code) callconv(core.inline_in_non_debug_calling_convention) void {
+        ) callconv(core.inline_in_non_debug_calling_convention) void {
             self._prepareToWaitForFn(duration);
         }
 
@@ -255,7 +255,7 @@ pub const init = struct {
         pub fn waitFor(
             self: ReferenceCounter,
             duration: core.Duration,
-        ) linksection(kernel.info.init_code) callconv(core.inline_in_non_debug_calling_convention) void {
+        ) callconv(core.inline_in_non_debug_calling_convention) void {
             self._waitForFn(duration);
         }
     };
