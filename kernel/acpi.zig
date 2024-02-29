@@ -29,17 +29,19 @@ pub const init = struct {
         if (!sdt_header.isValid()) core.panic("invalid SDT");
 
         if (kernel.debug.log.loggingEnabledFor(.acpi, .debug)) {
-            var iterator = acpi.tableIterator(sdt_header);
+            var iter = acpi.tableIterator(
+                sdt_header,
+                kernel.physicalToDirectMap,
+            );
 
             log.debug("ACPI tables:", .{});
 
-            while (iterator.next()) |physical_address| {
-                const table = core.PhysicalAddress
-                    .fromInt(physical_address)
-                    .toDirectMap()
-                    .toPtr(*const acpi.SharedHeader);
-
-                log.debug("  {s}", .{table.signatureAsString()});
+            while (iter.next()) |table| {
+                if (table.isValid()) {
+                    log.debug("  {s}", .{table.signatureAsString()});
+                } else {
+                    log.debug("  {s} - invalid", .{table.signatureAsString()});
+                }
             }
         }
     }
@@ -50,15 +52,9 @@ pub const init = struct {
     ///
     /// If the table is not valid, returns `null`.
     pub fn getTable(comptime T: type) linksection(kernel.info.init_code) ?*const T {
-        const helper = struct {
-            fn physicalToValidVirtualAddress(phys_addr: core.PhysicalAddress) core.VirtualAddress {
-                return kernel.physicalToDirectMap(phys_addr);
-            }
-        };
-
         var iter = acpi.tableIterator(
             sdt_header,
-            helper.physicalToValidVirtualAddress,
+            kernel.physicalToDirectMap,
         );
 
         while (iter.next()) |header| {
