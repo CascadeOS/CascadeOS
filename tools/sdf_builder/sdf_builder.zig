@@ -671,6 +671,7 @@ fn createSdfDebugInfo(
         const header_writer = header_stream.writer();
 
         try sdf.Header.write(.{
+            .total_size_of_sdf_data = output_buffer.items.len,
             .string_table_offset = string_table_offset,
             .string_table_length = string_table_length,
             .file_table_offset = file_table_offset,

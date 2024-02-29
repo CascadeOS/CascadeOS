@@ -42,6 +42,9 @@ pub const Header = extern struct {
     /// Reserved for future use.
     _reserved: [7]u8 = [_]u8{0} ** 7,
 
+    /// The total size of the SDF data in bytes from the start of the header.
+    total_size_of_sdf_data: u64,
+
     /// The byte offset from the start of the header to the string table.
     ///
     /// Valid from version `1`.
@@ -156,6 +159,7 @@ pub const Header = extern struct {
 
     test Header {
         var orig_header: Header = .{
+            .total_size_of_sdf_data = 1,
             .string_table_offset = 12,
             .string_table_length = 23,
             .file_table_offset = 34,
@@ -179,7 +183,7 @@ pub const Header = extern struct {
     }
 
     comptime {
-        std.debug.assert(@sizeOf(Header) == 88);
+        std.debug.assert(@sizeOf(Header) == 96);
         std.debug.assert(@alignOf(Header) == 8);
     }
 };

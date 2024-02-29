@@ -25,15 +25,16 @@ Due to the offsets contained in this header being unsigned the header must proce
 |0|`identifier`|`[8]u8`|Magic bytes to identify the data as SDF. Must equal "SDFSDFSD".
 |8|`version`|`u8`|Version of the SDF format. This document specifies version `1`.
 |9|_reserved_|`[7]u8`|
-|16|`string_table_offset`|`leu64`|The byte offset from the start of the header to the string table.
-|24|`string_table_length`|`leu64`|The length of the string table in bytes.
-|32|`file_table_offset`|`leu64`|The byte offset from the start of the header to the file table.
-|40|`file_table_entries`|`leu64`|The number of entries in the file table.
-|48|`location_lookup_offset`|`leu64`|The byte offset from the start of the header to the location lookup.
-|56|`location_program_states_offset`|`leu64`|The byte offset from the start of the header to the location program states.
-|64|`location_lookup_entries`|`leu64`|The number of entries in the location lookup and location program states.
-|72|`location_program_offset`|`leu64`|The byte offset from the start of the header to the location program.
-|80|`location_program_length`|`leu64`|The length of the location program in bytes.
+|16|`total_size_of_sdf_data`|`leu64`|The total size of the SDF data in bytes from the start of the header.
+|24|`string_table_offset`|`leu64`|The byte offset from the start of the header to the string table.
+|32|`string_table_length`|`leu64`|The length of the string table in bytes.
+|40|`file_table_offset`|`leu64`|The byte offset from the start of the header to the file table.
+|48|`file_table_entries`|`leu64`|The number of entries in the file table.
+|56|`location_lookup_offset`|`leu64`|The byte offset from the start of the header to the location lookup.
+|64|`location_program_states_offset`|`leu64`|The byte offset from the start of the header to the location program states.
+|72|`location_lookup_entries`|`leu64`|The number of entries in the location lookup and location program states.
+|80|`location_program_offset`|`leu64`|The byte offset from the start of the header to the location program.
+|88|`location_program_length`|`leu64`|The length of the location program in bytes.
 
 ## String Table
 
