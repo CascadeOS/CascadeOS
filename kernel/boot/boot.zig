@@ -20,7 +20,6 @@ export fn limineEntryPoint() callconv(.C) noreturn {
 const limine_requests = struct {
     // TODO: setting this to 1 causes aarch64 to hang at "limine: Loading kernel `boot:///kernel`..."
     export var limine_revison: limine.BaseRevison = .{ .revison = 0 };
-    export var kernel_file: limine.KernelFile = .{};
     export var hhdm: limine.HHDM = .{};
     export var kernel_address: limine.KernelAddress = .{};
     export var memmap: limine.Memmap = .{};
@@ -61,14 +60,6 @@ pub fn kernelBaseAddress() ?KernelBaseAddress {
             .virtual = resp.virtual_base,
             .physical = resp.physical_base,
         };
-    }
-    return null;
-}
-
-/// Returns the kernel file contents as a core.VirtualRange, if provided by the bootloader.
-pub fn kernelFile() ?core.VirtualRange {
-    if (limine_requests.kernel_file.response) |resp| {
-        return core.VirtualRange.fromSlice(u8, resp.kernel_file.getContents());
     }
     return null;
 }

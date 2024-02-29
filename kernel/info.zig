@@ -40,11 +40,6 @@ pub var direct_map: core.VirtualRange = undefined;
 /// Initialized during `initKernelStage1`.
 pub var non_cached_direct_map: core.VirtualRange = undefined;
 
-/// This is the kernel's ELF file.
-///
-/// Initialized during `initKernelStage1`.
-pub var kernel_file: ?core.VirtualRange = null;
-
 /// The hypervisor we are running on or null if we are not running on a hypervisor.
 pub var hypervisor: ?Hypervisor = null;
 

@@ -105,9 +105,6 @@ fn kernelInitStage3() noreturn {
     const processor = kernel.arch.getProcessor();
 
     if (processor.id == .bootstrap) {
-        log.debug("copying kernel file from bootloader memory", .{});
-        copyKernelFileFromBootloaderMemory();
-
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
         // the bootloader reclaimable memory.
         const processor_count = kernel.Processor._all.len;
@@ -139,25 +136,6 @@ fn kernelInitStage3() noreturn {
     _ = kernel.scheduler.lock.lock();
     kernel.scheduler.schedule(false);
     unreachable;
-}
-
-/// Copy the kernel file from the bootloader provided memory to the kernel kernel.heap.
-fn copyKernelFileFromBootloaderMemory() void {
-    const bootloader_provided_kernel_file = kernel.info.kernel_file.?;
-
-    const kernel_file_buffer = kernel.heap.page_allocator.alloc(
-        u8,
-        bootloader_provided_kernel_file.size.value,
-    ) catch {
-        core.panic("Failed to allocate memory for kernel file buffer");
-    };
-
-    @memcpy(
-        kernel_file_buffer[0..bootloader_provided_kernel_file.size.value],
-        bootloader_provided_kernel_file.toByteSlice(),
-    );
-
-    kernel.info.kernel_file.?.address = core.VirtualAddress.fromPtr(kernel_file_buffer.ptr);
 }
 
 /// Initialize the per processor data structures for all processors including the bootstrap processor.
@@ -200,9 +178,6 @@ fn initProcessors() void {
 }
 
 fn captureBootloaderProvidedInformation() void {
-    kernel.info.kernel_file = kernel.boot.kernelFile() orelse
-        core.panic("bootloader did not provide the kernel file");
-
     calculateKernelOffsets();
     calculateDirectMaps();
 }
