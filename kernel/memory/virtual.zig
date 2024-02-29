@@ -205,11 +205,6 @@ pub const init = struct {
     }
 
     const linker_symbols = struct {
-        extern const __init_text_start: u8;
-        extern const __init_text_end: u8;
-        extern const __init_data_start: u8;
-        extern const __init_data_end: u8;
-
         extern const __text_start: u8;
         extern const __text_end: u8;
         extern const __rodata_start: u8;
