@@ -23,7 +23,7 @@ pub fn main() !void {
 
     switch (arguments) {
         .generate => |generate_arguments| try generate(allocator, generate_arguments),
-        .embed => |embed_arguments| try embed(allocator, embed_arguments),
+        .embed => |embed_arguments| try embed(embed_arguments),
     }
 }
 
@@ -59,7 +59,7 @@ fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.Generate
     try output_file.writeAll(created_debug_info);
 }
 
-fn embed(allocator: std.mem.Allocator, embed_arguments: Arguments.EmbedArguments) !void {
+fn embed(embed_arguments: Arguments.EmbedArguments) !void {
     var atomic_output_file = blk: {
         const binary_input_file = try std.fs.cwd().openFile(embed_arguments.binary_input_path, .{});
         defer binary_input_file.close();
@@ -78,13 +78,11 @@ fn embed(allocator: std.mem.Allocator, embed_arguments: Arguments.EmbedArguments
     };
     defer atomic_output_file.deinit();
 
-    const output_file = atomic_output_file.file;
-
     // ensure sdf data is 8 byte aligned
     const sdf_pos = blk: {
-        const end_pos = try output_file.getEndPos();
+        const end_pos = try atomic_output_file.file.getEndPos();
         const aligned_end_pos = std.mem.alignForward(u64, end_pos, 8);
-        if (end_pos != aligned_end_pos) try output_file.setEndPos(aligned_end_pos);
+        if (end_pos != aligned_end_pos) try atomic_output_file.file.setEndPos(aligned_end_pos);
         break :blk aligned_end_pos;
     };
 
@@ -95,143 +93,100 @@ fn embed(allocator: std.mem.Allocator, embed_arguments: Arguments.EmbedArguments
 
         const sdf_stat = try sdf_input_file.stat();
 
-        _ = try sdf_input_file.copyRangeAll(0, output_file, sdf_pos, sdf_stat.size);
+        _ = try sdf_input_file.copyRangeAll(0, atomic_output_file.file, sdf_pos, sdf_stat.size);
 
         break :blk sdf_stat.size;
     };
 
-    // add new section to the elf file
-    {
-        // read the elf header into a buffer
-        var elf_header_backing_buffer: [@sizeOf(std.elf.Elf64_Ehdr)]u8 align(@alignOf(std.elf.Elf64_Ehdr)) = undefined;
-        try output_file.seekTo(0);
-        const elf_header_buffer = elf_header_backing_buffer[0..try output_file.readAll(&elf_header_backing_buffer)];
+    const stat = try atomic_output_file.file.stat();
 
-        const elf_header_elf32: *std.elf.Elf32_Ehdr = std.mem.bytesAsValue(std.elf.Elf32_Ehdr, elf_header_buffer);
+    const elf_mem = try std.os.mmap(
+        null,
+        stat.size,
+        std.os.PROT.READ | std.os.PROT.WRITE,
+        .{ .TYPE = .SHARED },
+        atomic_output_file.file.handle,
+        0,
+    );
+    defer std.os.munmap(elf_mem);
 
-        if (!std.mem.eql(u8, elf_header_elf32.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
-        if (elf_header_elf32.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
-
-        if (elf_header_elf32.e_ident[std.elf.EI_DATA] != std.elf.ELFDATA2LSB) return error.BigEndianElf; // TODO: Support big endian
-
-        const is_64: bool = switch (elf_header_elf32.e_ident[std.elf.EI_CLASS]) {
-            std.elf.ELFCLASS32 => false,
-            std.elf.ELFCLASS64 => true,
-            else => return error.InvalidElfClass,
-        };
-
-        const elf_header_elf64: *std.elf.Elf64_Ehdr = std.mem.bytesAsValue(std.elf.Elf64_Ehdr, elf_header_buffer);
-
-        const old_section_table_offset: u64, const old_number_of_sections, const section_entry_size, const section_string_index =
-            if (is_64)
-            .{ elf_header_elf64.e_shoff, elf_header_elf64.e_shnum, elf_header_elf64.e_shentsize, elf_header_elf64.e_shstrndx }
-        else
-            .{ elf_header_elf32.e_shoff, elf_header_elf32.e_shnum, elf_header_elf32.e_shentsize, elf_header_elf32.e_shstrndx };
-        std.debug.assert(section_entry_size == @as(u16, if (is_64) @sizeOf(std.elf.Elf64_Shdr) else @sizeOf(std.elf.Elf32_Shdr)));
-
-        const old_section_table_size = old_number_of_sections * section_entry_size;
-
-        // allocate a buffer for building the new section table with enough space for one extra entry
-        const section_table_buffer = try allocator.alloc(u8, old_section_table_size + section_entry_size);
-        defer allocator.free(section_table_buffer);
-
-        // read the old section table into `section_table_buffer`
-        try output_file.seekTo(old_section_table_offset);
-        std.debug.assert(try output_file.readAll(section_table_buffer[0..old_section_table_size]) == old_section_table_size);
-
-        const section_string_entry_buffer = section_table_buffer[section_entry_size * section_string_index ..][0..section_entry_size];
-
-        const old_section_string_offset: u64, const old_section_string_size: u64 =
-            if (is_64)
-        blk: {
-            const section_header = std.mem.bytesAsValue(std.elf.Elf64_Shdr, section_string_entry_buffer);
-            break :blk .{ section_header.sh_offset, section_header.sh_size };
-        } else blk: {
-            const section_header = std.mem.bytesAsValue(std.elf.Elf32_Shdr, section_string_entry_buffer);
-            break :blk .{ section_header.sh_offset, section_header.sh_size };
-        };
-
-        // copy the old section header string section to the end of the elf file
-        const section_string_offset = try output_file.getEndPos();
-        std.debug.assert(try output_file.copyRangeAll(
-            old_section_string_offset,
-            output_file,
-            section_string_offset,
-            old_section_string_size,
-        ) == old_section_string_size);
-
-        const sdf_section_name = ".sdf\x00";
-
-        // add the string for the sdf section's header to end of the new section header name section
-        const sdf_section_name_file_offset = try output_file.getEndPos();
-        const sdf_section_name_offset: u32 = @intCast(sdf_section_name_file_offset - section_string_offset);
-
-        try output_file.seekTo(sdf_section_name_file_offset);
-        try output_file.writeAll(sdf_section_name);
-
-        // update the section header string section's offset and size
-        if (is_64) {
-            const section_header = std.mem.bytesAsValue(std.elf.Elf64_Shdr, section_string_entry_buffer);
-            section_header.sh_offset = section_string_offset;
-            section_header.sh_size = old_section_string_size + sdf_section_name.len;
-        } else {
-            const section_header = std.mem.bytesAsValue(std.elf.Elf32_Shdr, section_string_entry_buffer);
-            section_header.sh_offset = @intCast(section_string_offset);
-            section_header.sh_size = @intCast(old_section_string_size + sdf_section_name.len);
-        }
-
-        // fill in the new section header entry (last entry in the table) with the sdf section's data
-        if (is_64) {
-            const sdf_section_header = std.mem.bytesAsValue(std.elf.Elf64_Shdr, section_table_buffer[old_section_table_size..]);
-            sdf_section_header.* = .{
-                .sh_name = sdf_section_name_offset,
-                .sh_type = std.elf.SHT_LOUSER,
-                .sh_flags = std.elf.SHF_ALLOC,
-                .sh_addr = 0,
-                .sh_offset = sdf_pos,
-                .sh_size = sdf_size,
-                .sh_link = 0,
-                .sh_info = 0,
-                .sh_addralign = 8,
-                .sh_entsize = 0,
-            };
-        } else {
-            const sdf_section_header = std.mem.bytesAsValue(std.elf.Elf32_Shdr, section_table_buffer[old_section_table_size..]);
-            sdf_section_header.* = .{
-                .sh_name = sdf_section_name_offset,
-                .sh_type = std.elf.SHT_LOUSER,
-                .sh_flags = std.elf.SHF_ALLOC,
-                .sh_addr = 0,
-                .sh_offset = @intCast(sdf_pos),
-                .sh_size = @intCast(sdf_size),
-                .sh_link = 0,
-                .sh_info = 0,
-                .sh_addralign = 8,
-                .sh_entsize = 0,
-            };
-        }
-
-        // write the new section table to the end of the elf file
-        const section_table_offset = try output_file.getEndPos();
-        try output_file.seekTo(section_table_offset);
-        try output_file.writeAll(section_table_buffer);
-
-        // update the in memory elf header
-        if (is_64) {
-            elf_header_elf64.e_shoff = section_table_offset;
-            elf_header_elf64.e_shnum = old_number_of_sections + 1;
-        } else {
-            elf_header_elf32.e_shoff = @intCast(section_table_offset);
-            elf_header_elf32.e_shnum = old_number_of_sections + 1;
-        }
-
-        // overwrite the file's elf header with the in memory one
-        try output_file.seekTo(0);
-        try output_file.writeAll(elf_header_buffer);
-    }
+    try updateElf(elf_mem, sdf_pos, sdf_size);
 
     std.fs.cwd().deleteFile(embed_arguments.binary_output_path) catch {};
     try atomic_output_file.finish();
+}
+
+fn updateElfSpecific(
+    comptime is_64: bool,
+    elf_mem: []align(std.mem.page_size) u8,
+    sdf_pos: u64,
+    sdf_size: u64,
+) !void {
+    const HeaderT = if (is_64) std.elf.Elf64_Ehdr else std.elf.Elf32_Ehdr;
+    const SectionHeaderT = if (is_64) std.elf.Elf64_Shdr else std.elf.Elf32_Shdr;
+    const ProgramHeaderT = if (is_64) std.elf.Elf64_Phdr else std.elf.Elf32_Phdr;
+
+    const elf_header: *const HeaderT = std.mem.bytesAsValue(HeaderT, elf_mem);
+    std.debug.assert(elf_header.e_shentsize == @as(u16, @sizeOf(SectionHeaderT)));
+    std.debug.assert(elf_header.e_phentsize == @as(u16, @sizeOf(ProgramHeaderT)));
+
+    const section_table: []align(1) SectionHeaderT = std.mem.bytesAsSlice(
+        SectionHeaderT,
+        elf_mem[elf_header.e_shoff..][0 .. elf_header.e_shnum * @sizeOf(SectionHeaderT)],
+    );
+
+    const section_header_strings = blk: {
+        const section_string_table = section_table[elf_header.e_shstrndx];
+        break :blk elf_mem[section_string_table.sh_offset..][0..section_string_table.sh_size];
+    };
+
+    const program_header_table: []align(1) ProgramHeaderT = std.mem.bytesAsSlice(
+        ProgramHeaderT,
+        elf_mem[elf_header.e_phoff..][0 .. elf_header.e_phnum * @sizeOf(ProgramHeaderT)],
+    );
+
+    // update section header
+    for (section_table) |*section| {
+        const name = std.mem.sliceTo(section_header_strings[section.sh_name..], 0);
+
+        if (std.mem.eql(u8, name, ".sdf")) {
+            section.sh_offset = @intCast(sdf_pos);
+            section.sh_size = @intCast(sdf_size);
+            section.sh_flags = std.elf.SHF_ALLOC;
+
+            break;
+        }
+    } else return error.NoSDFSection;
+
+    // update program header
+    const sdf_program_header = &program_header_table[program_header_table.len - 1];
+    sdf_program_header.p_offset = @intCast(sdf_pos);
+    sdf_program_header.p_filesz = @intCast(sdf_size);
+    sdf_program_header.p_memsz = @intCast(sdf_size);
+}
+
+fn updateElf(
+    elf_mem: []align(std.mem.page_size) u8,
+    sdf_pos: u64,
+    sdf_size: u64,
+) !void {
+    const elf_header_elf32: *const std.elf.Elf32_Ehdr = std.mem.bytesAsValue(std.elf.Elf32_Ehdr, elf_mem);
+
+    if (!std.mem.eql(u8, elf_header_elf32.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
+    if (elf_header_elf32.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
+
+    if (elf_header_elf32.e_ident[std.elf.EI_DATA] != std.elf.ELFDATA2LSB) return error.BigEndianElf; // TODO: Support big endian
+
+    const is_64: bool = switch (elf_header_elf32.e_ident[std.elf.EI_CLASS]) {
+        std.elf.ELFCLASS32 => false,
+        std.elf.ELFCLASS64 => true,
+        else => return error.InvalidElfClass,
+    };
+
+    if (is_64)
+        try updateElfSpecific(true, elf_mem, sdf_pos, sdf_size)
+    else
+        try updateElfSpecific(false, elf_mem, sdf_pos, sdf_size);
 }
 
 const Action = enum {

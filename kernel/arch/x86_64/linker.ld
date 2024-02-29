@@ -11,6 +11,8 @@ PHDRS
     rodata       PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
     data         PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
     dynamic      PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ; /* Dynamic */
+
+    sdf          PT_LOAD    FLAGS((1 << 2)) ;            /* Read only - assumed to be the last program header by sdf_builder */
 }
 
 SECTIONS
@@ -44,6 +46,11 @@ SECTIONS
         *(.bss .bss.*)
         __data_end = .;
     } :data
+
+    .sdf ALIGN(4K) : { /* sdf_builder embeds the SDF data into this section */
+        __sdf_start = .;
+        . += 0x1000;
+    } :sdf
 
     /DISCARD/ : {
         *(.eh_frame)

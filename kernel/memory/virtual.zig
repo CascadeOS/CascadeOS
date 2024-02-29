@@ -238,6 +238,15 @@ pub const init = struct {
             .{ .writeable = true, .global = true },
             .writeable_section,
         );
+
+        const sdf_slice = kernel.info.sdfSlice();
+        log.debug("mapping .sdf section", .{});
+        try mapSection(
+            @intFromPtr(sdf_slice.ptr),
+            @intFromPtr(sdf_slice.ptr) + sdf_slice.len,
+            .{ .global = true },
+            .sdf_section,
+        );
     }
 
     /// Maps a section.
