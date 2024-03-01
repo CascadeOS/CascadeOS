@@ -21,12 +21,12 @@ pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 /// Supports both XSDT and RSDT.
 pub fn tableIterator(
     sdt_header: *const SharedHeader,
-    comptime physicalToValidVirtualAddress: fn (core.PhysicalAddress) core.VirtualAddress,
-) TableIterator(physicalToValidVirtualAddress) {
+    comptime validVirtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
+) TableIterator(validVirtualFromPhysical) {
     return .{ .raw_iterator = rawTableIterator(sdt_header) };
 }
 
-pub fn TableIterator(comptime physicalToValidVirtualAddress: fn (core.PhysicalAddress) core.VirtualAddress) type {
+pub fn TableIterator(comptime validVirtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress) type {
     return struct {
         raw_iterator: RawTableIterator,
 
@@ -35,7 +35,7 @@ pub fn TableIterator(comptime physicalToValidVirtualAddress: fn (core.PhysicalAd
         /// No validation of the table is performed.
         pub fn next(self: *@This()) ?*const SharedHeader {
             const phys_addr = self.raw_iterator.next() orelse return null;
-            return physicalToValidVirtualAddress(phys_addr).toPtr(*const SharedHeader);
+            return validVirtualFromPhysical(phys_addr).toPtr(*const SharedHeader);
         }
     };
 }
