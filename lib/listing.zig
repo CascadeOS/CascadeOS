@@ -3,7 +3,7 @@
 
 const LibraryDescription = @import("../build/LibraryDescription.zig");
 
-pub const libraries: []const LibraryDescription = &.{
+pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{ .name = "acpi", .dependencies = &.{"core"} },
     .{ .name = "bitjuggle" },
     .{ .name = "containers", .dependencies = &.{ "core", "bitjuggle" } },

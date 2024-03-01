@@ -3,7 +3,7 @@
 
 const ToolDescription = @import("../build/ToolDescription.zig");
 
-pub const tools: []const ToolDescription = &.{
+pub const tools: []const ToolDescription = &[_]ToolDescription{
     .{ .name = "image_builder", .dependencies = &.{ "core", "fs", "uuid" } },
     .{
         .name = "sdf_builder",
