@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
-const x86_64 = @import("x86_64.zig");
+
+const x86_64 = @import("x86_64");
 
 /// The Global Descriptor Table for x86_64.
 pub const Gdt = extern struct {
@@ -14,7 +14,7 @@ pub const Gdt = extern struct {
         0x0000920000000000, // 64 bit data
         0x00A09A0000000000 | (3 << 45), // Userspace 64 bit code
         0x0000920000000000 | (3 << 45), // Userspace 64 bit data
-        0, // TSS
+        0, // TSS - set by `setTss`
         0,
     },
 
@@ -95,3 +95,28 @@ pub const Gdt = extern struct {
         base: u64,
     };
 };
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .Struct => |info| info.decls,
+        .Enum => |info| info.decls,
+        .Union => |info| info.decls,
+        .Opaque => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}

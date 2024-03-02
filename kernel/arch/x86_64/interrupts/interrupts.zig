@@ -6,7 +6,8 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("../x86_64.zig");
 
-const Idt = @import("Idt.zig");
+const Idt = x86_64.Idt;
+
 const fixed_handlers = @import("fixed_handlers.zig");
 
 pub const number_of_handlers = Idt.number_of_handlers;
@@ -20,8 +21,8 @@ var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** number_
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
 /// Sets the interrupt stack for the given interrupt vector.
-fn setVectorStack(vector: IdtVector, stack_selector: InterruptStackSelector) void {
-    idt.handlers[@intFromEnum(vector)].setStack(@intFromEnum(stack_selector));
+fn setVectorStack(interrupt: Interrupt, stack_selector: InterruptStackSelector) void {
+    idt.handlers[@intFromEnum(interrupt)].setStack(@intFromEnum(stack_selector));
 }
 
 pub const InterruptStackSelector = enum(u3) {
@@ -36,11 +37,11 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
     comptime var i = 0;
     inline while (i < number_of_handlers) : (i += 1) {
         const vector_number: u8 = @intCast(i);
-        const idt_vector: IdtVector = @enumFromInt(vector_number);
+        const interrupt: Interrupt = @enumFromInt(vector_number);
 
         // if the cpu does not push an error code, we push a dummy error code to ensure the stack
         // is always aligned in the same way for every vector
-        const error_code_asm = if (comptime !idt_vector.hasErrorCode()) "push $0\n" else "";
+        const error_code_asm = if (comptime !interrupt.hasErrorCode()) "push $0\n" else "";
         const vector_number_asm = std.fmt.comptimePrint("push ${d}", .{vector_number});
         const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{x86_64.Gdt.kernel_data_selector});
 
@@ -125,12 +126,12 @@ pub const InterruptFrame = extern struct {
     error_code: u64,
     rip: u64,
     cs: u64,
-    rflags: x86_64.registers.RFlags,
+    rflags: x86_64.RFlags,
     rsp: u64,
     ss: u64,
 
     /// Gets the interrupt vector for this interrupt frame.
-    pub fn getIdtVector(self: *const InterruptFrame) IdtVector {
+    pub fn getInterrupt(self: *const InterruptFrame) Interrupt {
         return @enumFromInt(@as(u8, @intCast(self.padded_vector_number)));
     }
 
@@ -198,10 +199,10 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
-    disableInterrupts();
+    x86_64.disableInterrupts();
 }
 
-pub const IdtVector = enum(u8) {
+pub const Interrupt = enum(u8) {
     divide = 0,
     debug = 1,
     non_maskable_interrupt = 2,
@@ -258,163 +259,16 @@ pub const IdtVector = enum(u8) {
 
     _,
 
-    /// Checks if the given interrupt vector is an exception.
-    pub fn isException(self: IdtVector) bool {
-        if (@intFromEnum(self) <= @intFromEnum(IdtVector._reserved8)) {
-            return self != IdtVector.non_maskable_interrupt;
-        }
-        return false;
+    pub inline fn toInterruptVector(self: Interrupt) x86_64.InterruptVector {
+        return @enumFromInt(@intFromEnum(self));
     }
 
-    /// Checks if the given interrupt vector pushes an error code.
-    pub fn hasErrorCode(self: IdtVector) bool {
-        return switch (@intFromEnum(self)) {
-            // Exceptions
-            0x00...0x07 => false,
-            0x08 => true,
-            0x09 => false,
-            0x0A...0x0E => true,
-            0x0F...0x10 => false,
-            0x11 => true,
-            0x12...0x14 => false,
-            //0x15 ... 0x1D => unreachable,
-            0x1E => true,
-            //0x1F          => unreachable,
-
-            // Other interrupts
-            else => false,
-        };
-    }
-};
-
-/// Are interrupts enabled?
-pub inline fn interruptsEnabled() bool {
-    return x86_64.registers.RFlags.read().interrupt;
-}
-
-/// Enable interrupts.
-pub inline fn enableInterrupts() void {
-    asm volatile ("sti");
-}
-
-/// Disable interrupts.
-pub inline fn disableInterrupts() void {
-    asm volatile ("cli");
-}
-
-/// Disable interrupts and put the CPU to sleep.
-pub fn disableInterruptsAndHalt() noreturn {
-    while (true) {
-        asm volatile ("cli; hlt");
-    }
-}
-
-pub const setTaskPriority = x86_64.apic.setTaskPriority;
-pub const panicInterruptOtherCores = x86_64.apic.panicInterruptOtherCores;
-
-pub const PageFaultErrorCode = packed struct(u64) {
-    /// When set, the page fault was caused by a page-protection violation.
-    ///
-    /// When not set, it was caused by a non-present page.
-    present: bool,
-
-    /// When set, the page fault was caused by a write access.
-    ///
-    /// When not set, it was caused by a read access.
-    write: bool,
-
-    /// When set, the page fault was caused while CPL = 3.
-    user: bool,
-
-    /// When set, one or more page directory entries contain reserved bits which are set to 1.
-    ///
-    /// This only applies when the PSE or PAE flags in CR4 are set to 1.
-    reserved_write: bool,
-
-    /// When set, the page fault was caused by an instruction fetch.
-    ///
-    /// This only applies when the No-Execute bit is supported and enabled.
-    instruction_fetch: bool,
-
-    /// When set, the page fault was caused by a protection-key violation.
-    ///
-    /// The PKRU register (for user-mode accesses) or PKRS MSR (for supervisor-mode accesses) specifies the protection
-    /// key rights.
-    protection_key: bool,
-
-    /// When set, the page fault was caused by a shadow stack access.
-    shadow_stack: bool,
-
-    /// When set there is no translation for the linear address using HLAT paging.
-    hlat: bool,
-
-    _reserved1: u7,
-
-    /// When set, the fault was due to an SGX violation.
-    software_guard_exception: bool,
-
-    _reserved2: u48,
-
-    pub inline fn fromErrorCode(error_code: u64) PageFaultErrorCode {
-        return @bitCast(error_code);
+    pub inline fn hasErrorCode(self: Interrupt) bool {
+        return self.toInterruptVector().hasErrorCode();
     }
 
-    pub fn print(self: PageFaultErrorCode, writer: anytype) !void {
-        try writer.writeAll("PageFaultErrorCode{ ");
-
-        if (!self.present) {
-            try writer.writeAll("Not Present }");
-            return;
-        }
-
-        if (self.user) {
-            try writer.writeAll("User - ");
-        } else {
-            try writer.writeAll("Kernel - ");
-        }
-
-        if (self.write) {
-            try writer.writeAll("Write");
-        } else {
-            try writer.writeAll("Read");
-        }
-
-        if (self.reserved_write) {
-            try writer.writeAll("- Reserved Bit Set");
-        }
-
-        if (self.instruction_fetch) {
-            try writer.writeAll("- No Execute");
-        }
-
-        if (self.instruction_fetch) {
-            try writer.writeAll("- Protection Key");
-        }
-
-        if (self.instruction_fetch) {
-            try writer.writeAll("- Shadow Stack");
-        }
-
-        if (self.hlat) {
-            try writer.writeAll("- Hypervisor Linear Address Translation");
-        }
-
-        if (self.instruction_fetch) {
-            try writer.writeAll("- Software Guard Extension");
-        }
-
-        try writer.writeAll(" }");
-    }
-
-    pub inline fn format(
-        self: PageFaultErrorCode,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-        return print(self, writer);
+    pub inline fn isException(self: Interrupt) bool {
+        return self.toInterruptVector().isException();
     }
 };
 
@@ -442,30 +296,30 @@ pub const init = struct {
     }
 
     fn setFixedHandlers() void {
-        handlers[@intFromEnum(IdtVector.divide)] = fixed_handlers.divideErrorException;
-        handlers[@intFromEnum(IdtVector.debug)] = fixed_handlers.debugException;
-        handlers[@intFromEnum(IdtVector.non_maskable_interrupt)] = fixed_handlers.nonMaskableInterrupt;
-        handlers[@intFromEnum(IdtVector.breakpoint)] = fixed_handlers.breakpointException;
-        handlers[@intFromEnum(IdtVector.overflow)] = fixed_handlers.overflowException;
-        handlers[@intFromEnum(IdtVector.bound_range)] = fixed_handlers.boundRangeExceededException;
-        handlers[@intFromEnum(IdtVector.invalid_opcode)] = fixed_handlers.invalidOpcodeException;
-        handlers[@intFromEnum(IdtVector.device_not_available)] = fixed_handlers.deviceNotAvailableException;
-        handlers[@intFromEnum(IdtVector.double_fault)] = fixed_handlers.doubleFaultException;
-        handlers[@intFromEnum(IdtVector.invalid_tss)] = fixed_handlers.invalidTSSException;
-        handlers[@intFromEnum(IdtVector.segment_not_present)] = fixed_handlers.segmentNotPresentException;
-        handlers[@intFromEnum(IdtVector.stack_fault)] = fixed_handlers.stackFaultException;
-        handlers[@intFromEnum(IdtVector.general_protection)] = fixed_handlers.generalProtectionException;
-        handlers[@intFromEnum(IdtVector.page_fault)] = fixed_handlers.pageFaultException;
-        handlers[@intFromEnum(IdtVector.x87_floating_point)] = fixed_handlers.x87FPUFloatingPointException;
-        handlers[@intFromEnum(IdtVector.alignment_check)] = fixed_handlers.alignmentCheckException;
-        handlers[@intFromEnum(IdtVector.machine_check)] = fixed_handlers.machineCheckException;
-        handlers[@intFromEnum(IdtVector.simd_floating_point)] = fixed_handlers.simdFloatingPointException;
-        handlers[@intFromEnum(IdtVector.virtualization)] = fixed_handlers.virtualizationException;
-        handlers[@intFromEnum(IdtVector.control_protection)] = fixed_handlers.controlProtectionException;
-        handlers[@intFromEnum(IdtVector.hypervisor_injection)] = fixed_handlers.hypervisorInjectionException;
-        handlers[@intFromEnum(IdtVector.vmm_communication)] = fixed_handlers.vmmCommunicationException;
-        handlers[@intFromEnum(IdtVector.security)] = fixed_handlers.securityException;
+        handlers[@intFromEnum(Interrupt.divide)] = fixed_handlers.divideErrorException;
+        handlers[@intFromEnum(Interrupt.debug)] = fixed_handlers.debugException;
+        handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = fixed_handlers.nonMaskableInterrupt;
+        handlers[@intFromEnum(Interrupt.breakpoint)] = fixed_handlers.breakpointException;
+        handlers[@intFromEnum(Interrupt.overflow)] = fixed_handlers.overflowException;
+        handlers[@intFromEnum(Interrupt.bound_range)] = fixed_handlers.boundRangeExceededException;
+        handlers[@intFromEnum(Interrupt.invalid_opcode)] = fixed_handlers.invalidOpcodeException;
+        handlers[@intFromEnum(Interrupt.device_not_available)] = fixed_handlers.deviceNotAvailableException;
+        handlers[@intFromEnum(Interrupt.double_fault)] = fixed_handlers.doubleFaultException;
+        handlers[@intFromEnum(Interrupt.invalid_tss)] = fixed_handlers.invalidTSSException;
+        handlers[@intFromEnum(Interrupt.segment_not_present)] = fixed_handlers.segmentNotPresentException;
+        handlers[@intFromEnum(Interrupt.stack_fault)] = fixed_handlers.stackFaultException;
+        handlers[@intFromEnum(Interrupt.general_protection)] = fixed_handlers.generalProtectionException;
+        handlers[@intFromEnum(Interrupt.page_fault)] = fixed_handlers.pageFaultException;
+        handlers[@intFromEnum(Interrupt.x87_floating_point)] = fixed_handlers.x87FPUFloatingPointException;
+        handlers[@intFromEnum(Interrupt.alignment_check)] = fixed_handlers.alignmentCheckException;
+        handlers[@intFromEnum(Interrupt.machine_check)] = fixed_handlers.machineCheckException;
+        handlers[@intFromEnum(Interrupt.simd_floating_point)] = fixed_handlers.simdFloatingPointException;
+        handlers[@intFromEnum(Interrupt.virtualization)] = fixed_handlers.virtualizationException;
+        handlers[@intFromEnum(Interrupt.control_protection)] = fixed_handlers.controlProtectionException;
+        handlers[@intFromEnum(Interrupt.hypervisor_injection)] = fixed_handlers.hypervisorInjectionException;
+        handlers[@intFromEnum(Interrupt.vmm_communication)] = fixed_handlers.vmmCommunicationException;
+        handlers[@intFromEnum(Interrupt.security)] = fixed_handlers.securityException;
 
-        handlers[@intFromEnum(IdtVector.scheduler)] = fixed_handlers.scheduler;
+        handlers[@intFromEnum(Interrupt.scheduler)] = fixed_handlers.scheduler;
     }
 };

@@ -3,9 +3,12 @@
 
 pub const core_dependencies: []const []const u8 = &.{
     "acpi",
-    "bitjuggle",
     "containers",
     "core",
     "limine",
     "sdf",
+};
+
+pub const x86_64_dependencies: []const []const u8 = &.{
+    "x86_64",
 };

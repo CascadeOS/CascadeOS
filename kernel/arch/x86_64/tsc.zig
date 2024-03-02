@@ -6,14 +6,12 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 
+const readTsc = x86_64.readTsc;
+
 const log = kernel.debug.log.scoped(.tsc);
 
 /// The duration of a tick in femptoseconds.
 var tick_duration_fs: u64 = undefined; // Initalized during `initializeTsc[Calibrate]`
-
-fn wallClockRead() u64 {
-    return readTsc();
-}
 
 fn wallClockElapsed(value1: u64, value2: u64) core.Duration {
     const number_of_ticks = value2 - value1;
@@ -39,7 +37,7 @@ pub const init = struct {
             else
                 null,
             .wallclock = .{
-                .readFn = wallClockRead,
+                .readFn = readTsc,
                 .elapsedFn = wallClockElapsed,
             },
         });
@@ -113,18 +111,6 @@ pub const init = struct {
     }
 
     fn shouldUseTsc() bool {
-        return x86_64.arch_info.rdtscp and (x86_64.arch_info.invariant_tsc or kernel.info.hypervisor == .tcg);
+        return x86_64.arch_info.invariant_tsc or kernel.info.hypervisor == .tcg;
     }
 };
-
-inline fn readTsc() u64 {
-    var low: u32 = undefined;
-    var high: u32 = undefined;
-    asm volatile ("rdtscp"
-        : [_] "={eax}" (low),
-          [_] "={edx}" (high),
-        :
-        : "ecx"
-    );
-    return (@as(u64, high) << 32) | @as(u64, low);
-}

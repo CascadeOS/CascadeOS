@@ -180,8 +180,8 @@ pub fn generalProtectionException(interrupt_frame: *const x86_64.interrupts.Inte
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn pageFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
     if (interrupt_frame.isKernel()) {
-        const faulting_address = x86_64.registers.Cr2.readAddress();
-        const fault = x86_64.interrupts.PageFaultErrorCode.fromErrorCode(interrupt_frame.error_code);
+        const faulting_address = x86_64.Cr2.readAddress();
+        const fault = x86_64.PageFaultErrorCode.fromErrorCode(interrupt_frame.error_code);
 
         core.panicFmt("kernel page fault @ {} - {}", .{ faulting_address, fault });
     }
@@ -308,9 +308,9 @@ pub fn scheduler(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void 
 
 /// Handles unhandled interrupts by printing the vector and then panicking.
 pub fn unhandledInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
-    const idt_vector = interrupt_frame.getIdtVector();
+    const interrupt = interrupt_frame.getInterrupt();
 
-    core.assert(!idt_vector.isException());
+    core.assert(!interrupt.isException());
 
-    core.panicFmt("interrupt {d}", .{@intFromEnum(idt_vector)}) catch unreachable;
+    core.panicFmt("interrupt: {}", .{interrupt}) catch unreachable;
 }

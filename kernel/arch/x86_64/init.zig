@@ -6,12 +6,9 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x86_64 = @import("x86_64.zig");
 const SerialPort = @import("SerialPort.zig");
-
 const acpi = @import("acpi");
 
 const log = kernel.debug.log.scoped(.init_x86_64);
-
-pub const initLocalInterruptController = x86_64.apic.init.initApicOnProcessor;
 
 pub const EarlyOutputWriter = SerialPort.Writer;
 var early_output_serial_port: ?SerialPort = null;
@@ -42,7 +39,10 @@ pub fn prepareBootstrapProcessor(bootstrap_processor: *kernel.Processor) void {
         )),
     };
 
-    bootstrap_processor.arch.tss.setPrivilegeStack(.kernel, bootstrap_processor.idle_stack);
+    bootstrap_processor.arch.tss.setPrivilegeStack(
+        .ring0,
+        bootstrap_processor.idle_stack.stack_pointer,
+    );
 }
 
 /// Prepares the provided kernel.Processor for use.
@@ -56,7 +56,10 @@ pub fn prepareProcessor(processor: *kernel.Processor, processor_descriptor: kern
         .non_maskable_interrupt_stack = kernel.Stack.create(true) catch core.panic("unable to create non-mackable interrupt stack"),
     };
 
-    processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);
+    processor.arch.tss.setPrivilegeStack(
+        .ring0,
+        processor.idle_stack.stack_pointer,
+    );
 }
 
 pub fn loadProcessor(processor: *kernel.Processor) void {
@@ -64,14 +67,20 @@ pub fn loadProcessor(processor: *kernel.Processor) void {
 
     arch.gdt.load();
 
-    arch.tss.setInterruptStack(.double_fault, arch.double_fault_stack);
-    arch.tss.setInterruptStack(.non_maskable_interrupt, arch.non_maskable_interrupt_stack);
+    arch.tss.setInterruptStack(
+        @intFromEnum(x86_64.interrupts.InterruptStackSelector.double_fault),
+        arch.double_fault_stack.stack_pointer,
+    );
+    arch.tss.setInterruptStack(
+        @intFromEnum(x86_64.interrupts.InterruptStackSelector.non_maskable_interrupt),
+        arch.non_maskable_interrupt_stack.stack_pointer,
+    );
 
     arch.gdt.setTss(&arch.tss);
 
     x86_64.interrupts.init.loadIdt();
 
-    x86_64.registers.KERNEL_GS_BASE.write(@intFromPtr(processor));
+    x86_64.KERNEL_GS_BASE.write(@intFromPtr(processor));
 }
 
 pub fn earlyArchInitialization() void {
@@ -119,7 +128,7 @@ fn captureFADTInformation(fadt: *const acpi.FADT) void {
 pub fn configureGlobalSystemFeatures() void {
     if (x86_64.arch_info.have_pic) {
         log.debug("disabling pic", .{});
-        disablePic();
+        x86_64.disablePic();
     }
 }
 
@@ -127,12 +136,12 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
     core.debugAssert(processor == x86_64.getProcessor());
 
     if (x86_64.arch_info.rdtscp) {
-        x86_64.registers.IA32_TSC_AUX.write(@intFromEnum(processor.id));
+        x86_64.IA32_TSC_AUX.write(@intFromEnum(processor.id));
     }
 
     // CR0
     {
-        var cr0 = x86_64.registers.Cr0.read();
+        var cr0 = x86_64.Cr0.read();
 
         if (!cr0.paging) core.panic("paging not enabled");
 
@@ -144,7 +153,7 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 
     // EFER
     {
-        var efer = x86_64.registers.EFER.read();
+        var efer = x86_64.EFER.read();
 
         if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
 
@@ -166,48 +175,4 @@ pub fn registerArchitecturalTimeSources() void {
     x86_64.hpet.init.registerTimeSource();
 
     // TODO: PIT, KVMCLOCK
-}
-
-const portWriteU8 = x86_64.instructions.portWriteU8;
-
-fn disablePic() void {
-    const PRIMARY_COMMAND_PORT = 0x20;
-    const PRIMARY_DATA_PORT = 0x21;
-    const SECONDARY_COMMAND_PORT = 0xA0;
-    const SECONDARY_DATA_PORT = 0xA1;
-
-    const CMD_INIT = 0x11;
-    const MODE_8086: u8 = 0x01;
-
-    // Tell each PIC that we're going to send it a three-byte initialization sequence on its data port.
-    portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
-    portWriteU8(0x80, 0); // wait
-
-    // Remap master PIC to 0x20
-    portWriteU8(PRIMARY_DATA_PORT, 0x20);
-    portWriteU8(0x80, 0); // wait
-
-    // Remap slave PIC to 0x28
-    portWriteU8(SECONDARY_DATA_PORT, 0x28);
-    portWriteU8(0x80, 0); // wait
-
-    // Configure chaining between master and slave
-    portWriteU8(PRIMARY_DATA_PORT, 4);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_DATA_PORT, 2);
-    portWriteU8(0x80, 0); // wait
-
-    // Set our mode.
-    portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
-    portWriteU8(0x80, 0); // wait
-
-    // Mask all x86_64.interrupts
-    portWriteU8(PRIMARY_DATA_PORT, 0xFF);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_DATA_PORT, 0xFF);
-    portWriteU8(0x80, 0); // wait
 }

@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
-const x86_64 = @import("../x86_64.zig");
+
+const x86_64 = @import("x86_64");
 
 const Idt = @This();
 
@@ -43,7 +43,7 @@ pub const Entry = extern struct {
         /// Defines the privilege levels which are allowed to access this interrupt via the INT instruction.
         ///
         /// Hardware interrupts ignore this mechanism.
-        privilege_level: x86_64.PrivilegeLevel = .kernel,
+        privilege_level: x86_64.PrivilegeLevel = .ring0,
 
         present: bool,
     };
@@ -108,4 +108,29 @@ pub fn load(self: *const Idt) void {
         :
         : [idtr_address] "r" (&idtr),
     );
+}
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .Struct => |info| info.decls,
+        .Enum => |info| info.decls,
+        .Union => |info| info.decls,
+        .Opaque => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
 }

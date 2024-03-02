@@ -6,8 +6,8 @@ const kernel = @import("kernel");
 const std = @import("std");
 
 const current = switch (kernel.info.arch) {
-    .x86_64 => @import("x86_64/x86_64.zig"),
-    .aarch64 => @import("aarch64/aarch64.zig"),
+    .x86_64 => @import("x86_64/interface.zig"),
+    .aarch64 => @import("aarch64/interface.zig"),
 };
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.

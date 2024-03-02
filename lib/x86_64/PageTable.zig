@@ -2,16 +2,19 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 const core = @import("core");
-const kernel = @import("kernel");
 const std = @import("std");
-const x86_64 = @import("../x86_64.zig");
 const bitjuggle = @import("bitjuggle");
+
+const x86_64 = @import("x86_64");
 
 /// A page table for x86_64.
 pub const PageTable = extern struct {
-    entries: [number_of_entries]Entry align(x86_64.paging.small_page_size.value),
+    entries: [number_of_entries]Entry align(small_page_size.value),
 
     pub const number_of_entries = 512;
+    pub const small_page_size = core.Size.from(4, .kib);
+    pub const medium_page_size = core.Size.from(2, .mib);
+    pub const large_page_size = core.Size.from(1, .gib);
 
     pub fn zero(self: *PageTable) void {
         const bytes = std.mem.asBytes(self);
@@ -308,7 +311,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress4kib(self: *Entry, address: core.PhysicalAddress) void {
-            core.debugAssert(address.isAligned(x86_64.paging.small_page_size));
+            core.debugAssert(address.isAligned(small_page_size));
             self.address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -317,7 +320,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress2mib(self: *Entry, address: core.PhysicalAddress) void {
-            core.debugAssert(address.isAligned(x86_64.paging.medium_page_size));
+            core.debugAssert(address.isAligned(medium_page_size));
             self.address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -326,7 +329,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress1gib(self: *Entry, address: core.PhysicalAddress) void {
-            core.debugAssert(address.isAligned(x86_64.paging.large_page_size));
+            core.debugAssert(address.isAligned(large_page_size));
             self.address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -337,10 +340,13 @@ pub const PageTable = extern struct {
         /// - The entry points to a huge page.
         ///
         /// Otherwise returns a pointer to the next page table level.
-        pub fn getNextLevel(self: Entry) !*PageTable {
+        pub fn getNextLevel(
+            self: Entry,
+            comptime validVirtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
+        ) !*PageTable {
             if (!self.present.read()) return error.NotPresent;
             if (self.huge.read()) return error.HugePage;
-            return kernel.directMapFromPhysical(self.getAddress4kib()).toPtr(*PageTable);
+            return validVirtualFromPhysical(self.getAddress4kib()).toPtr(*PageTable);
         }
 
         fn printSmallEntryFlags(self: Entry, writer: anytype) !void {
@@ -500,3 +506,28 @@ const type_of_1gib = std.meta.Int(
     .unsigned,
     maximum_physical_address_bit - level_3_shift,
 );
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .Struct => |info| info.decls,
+        .Enum => |info| info.decls,
+        .Union => |info| info.decls,
+        .Opaque => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}

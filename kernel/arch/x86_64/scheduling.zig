@@ -48,7 +48,10 @@ pub fn switchToThreadFromIdle(processor: *kernel.Processor, thread: *kernel.sche
 
         x86_64.paging.switchToPageTable(process.page_table);
 
-        processor.arch.tss.setPrivilegeStack(.kernel, thread.kernel_stack);
+        processor.arch.tss.setPrivilegeStack(
+            .ring0,
+            thread.kernel_stack.stack_pointer,
+        );
     }
 
     _switchToThreadFromIdleImpl(thread.kernel_stack.stack_pointer);
@@ -63,7 +66,10 @@ pub fn switchToThreadFromThread(processor: *kernel.Processor, old_thread: *kerne
         x86_64.paging.switchToPageTable(new_process.page_table);
     }
 
-    processor.arch.tss.setPrivilegeStack(.kernel, new_thread.kernel_stack);
+    processor.arch.tss.setPrivilegeStack(
+        .ring0,
+        new_thread.kernel_stack.stack_pointer,
+    );
 
     _switchToThreadFromThreadImpl(
         new_thread.kernel_stack.stack_pointer,
@@ -84,7 +90,10 @@ pub fn switchToIdle(processor: *kernel.Processor, stack_pointer: core.VirtualAdd
         x86_64.paging.switchToPageTable(kernel.kernel_process.page_table);
     }
 
-    processor.arch.tss.setPrivilegeStack(.kernel, processor.idle_stack);
+    processor.arch.tss.setPrivilegeStack(
+        .ring0,
+        processor.idle_stack.stack_pointer,
+    );
 
     _switchToIdleImpl(
         stack_pointer,

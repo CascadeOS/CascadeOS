@@ -46,13 +46,13 @@ pub fn capture() void {
 }
 
 fn isCPUIDAvailable() bool {
-    const orig_rflags = x86_64.registers.RFlags.read();
+    const orig_rflags = x86_64.RFlags.read();
     var modified_rflags = orig_rflags;
 
     modified_rflags.id = !modified_rflags.id;
     modified_rflags.write();
 
-    const new_rflags = x86_64.registers.RFlags.read();
+    const new_rflags = x86_64.RFlags.read();
 
     return orig_rflags.id != new_rflags.id;
 }

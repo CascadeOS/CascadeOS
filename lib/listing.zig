@@ -12,4 +12,9 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{ .name = "limine", .dependencies = &.{"core"} },
     .{ .name = "sdf" },
     .{ .name = "uuid", .dependencies = &.{"core"} },
+    .{
+        .name = "x86_64",
+        .dependencies = &.{ "core", "bitjuggle" },
+        .supported_targets = &.{.x86_64},
+    },
 };
