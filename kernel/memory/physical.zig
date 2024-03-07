@@ -192,7 +192,7 @@ pub const init = struct {
         const end_virtual_address = virtual_range.end();
 
         log.debug(comptime indent ** 2 ++ "marking {} pages available from {} to {}", .{
-            memory_map_entry.range.size.divide(kernel.arch.paging.standard_page_size),
+            memory_map_entry.range.size.divide(kernel.arch.paging.standard_page_size).value,
             current_virtual_address,
             end_virtual_address,
         });
