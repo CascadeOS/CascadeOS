@@ -6,6 +6,7 @@ const core = @import("core");
 
 /// Represents a duration.
 pub const Duration = extern struct {
+    /// The duration in nanoseconds.
     value: u64,
 
     pub usingnamespace core.ValueTypeMixin(@This());
