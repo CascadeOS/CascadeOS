@@ -76,7 +76,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     try std.fs.cwd().makePath(self.edk2_dir);
 
-    try fetch(step, self.target.uefiFirmwareUrl(), self.firmware_path);
+    try fetch(step.owner.allocator, self.target.uefiFirmwareUrl(), self.firmware_path);
 
     self.firmware.path = self.firmware_path;
 
@@ -115,54 +115,28 @@ fn updateTimestampFile(self: *EDK2Step) !void {
 }
 
 /// Fetches a file from a URL.
-fn fetch(step: *Step, url: []const u8, destination_path: []const u8) !void {
-    const allocator = step.owner.allocator;
+fn fetch(allocator: std.mem.Allocator, url: []const u8, destination_path: []const u8) !void {
+    const content = blk: {
+        var http_client: std.http.Client = .{ .allocator = allocator };
+        defer http_client.deinit();
 
-    const uri = try std.Uri.parse(url);
+        var result = std.ArrayList(u8).init(allocator);
+        defer result.deinit();
 
-    var http_client: std.http.Client = .{ .allocator = allocator };
-    defer http_client.deinit();
+        const fetch_result = try http_client.fetch(.{
+            .location = .{ .url = url },
+            .response_storage = .{ .dynamic = &result },
+            .max_append_size = std.math.maxInt(usize),
+        });
 
-    var server_header_buffer: [4 * 1024]u8 = undefined;
+        if (fetch_result.status != .ok) return error.ResponseNotOk;
 
-    var request = try http_client.open(.GET, uri, .{
-        .server_header_buffer = &server_header_buffer,
-    });
-    defer request.deinit();
+        break :blk try result.toOwnedSlice();
+    };
+    defer allocator.free(content);
 
-    if (request.response.status != .ok) return error.ResponseNotOk;
-
-    const file = try std.fs.cwd().createFile(destination_path, .{ .read = true });
+    const file = try std.fs.cwd().createFile(destination_path, .{});
     defer file.close();
 
-    if (request.response.content_length) |content_length| {
-        // Content length is known, so we can ensure the file is the correct length then mmap it.
-
-        try file.setEndPos(content_length);
-
-        const file_contents = try std.os.mmap(
-            null,
-            content_length,
-            std.os.PROT.WRITE,
-            .{ .TYPE = .SHARED },
-            file.handle,
-            0,
-        );
-        defer std.os.munmap(file_contents);
-
-        const read = try request.readAll(file_contents);
-        std.debug.assert(read == content_length);
-    } else {
-        // Unkown content length, so we have to use an intermediate buffer.
-
-        var buffer: [std.mem.page_size]u8 = undefined;
-
-        const reader = request.reader();
-
-        while (true) {
-            const bytes_read = try reader.read(&buffer);
-            if (bytes_read == 0) break;
-            try file.writeAll(buffer[0..bytes_read]);
-        }
-    }
+    try file.writeAll(content);
 }
