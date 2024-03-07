@@ -25,10 +25,12 @@ pub const init = struct {
         kernel.time.init.addTimeSource(.{
             .name = "tsc",
             .priority = 200,
+
             .initialization = if (x86_64.arch_info.tsc_tick_duration_fs != null)
                 .{ .simple = initializeTsc }
             else
                 .{ .calibration_required = initializeTscCalibrate },
+
             .reference_counter = if (x86_64.arch_info.tsc_tick_duration_fs != null)
                 .{
                     .prepareToWaitForFn = referenceCounterPrepareToWaitFor,
@@ -36,6 +38,7 @@ pub const init = struct {
                 }
             else
                 null,
+
             .wallclock = .{
                 .readFn = readTsc,
                 .elapsedFn = wallClockElapsed,
