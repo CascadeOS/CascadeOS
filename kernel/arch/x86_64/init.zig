@@ -91,7 +91,7 @@ pub fn earlyArchInitialization() void {
 /// Captures x86_64 system information.
 pub fn captureSystemInformation() void {
     log.debug("capturing cpuid information", .{});
-    x86_64.cpuid.capture();
+    captureCPUIDInformation();
 
     const madt = kernel.acpi.init.getTable(acpi.MADT) orelse core.panic("unable to get MADT");
     const fadt = kernel.acpi.init.getTable(acpi.FADT) orelse core.panic("unable to get FADT");
@@ -104,6 +104,18 @@ pub fn captureSystemInformation() void {
 
     log.debug("capturing APIC information", .{});
     x86_64.apic.init.captureApicInformation(fadt, madt);
+}
+
+fn captureCPUIDInformation() void {
+    x86_64.cpu_id.capture() catch core.panic("cpuid is not supported");
+
+    if (x86_64.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
+        x86_64.arch_info.lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
+    }
+
+    if (x86_64.cpu_id.determineTscFrequency()) |tsc_frequency| {
+        x86_64.arch_info.tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
+    }
 }
 
 fn captureMADTInformation(madt: *const acpi.MADT) void {
@@ -135,7 +147,7 @@ pub fn configureGlobalSystemFeatures() void {
 pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) void {
     core.debugAssert(processor == x86_64.getProcessor());
 
-    if (x86_64.arch_info.rdtscp) {
+    if (x86_64.arch_info.cpu_id.rdtscp) {
         x86_64.IA32_TSC_AUX.write(@intFromEnum(processor.id));
     }
 
@@ -157,8 +169,8 @@ pub fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) 
 
         if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
 
-        if (x86_64.arch_info.syscall) efer.syscall_enable = true;
-        if (x86_64.arch_info.execute_disable) efer.no_execute_enable = true;
+        if (x86_64.arch_info.cpu_id.syscall_sysret) efer.syscall_enable = true;
+        if (x86_64.arch_info.cpu_id.execute_disable) efer.no_execute_enable = true;
 
         efer.write();
 

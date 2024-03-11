@@ -114,6 +114,6 @@ pub const init = struct {
     }
 
     fn shouldUseTsc() bool {
-        return x86_64.arch_info.invariant_tsc or kernel.info.hypervisor == .tcg;
+        return x86_64.arch_info.cpu_id.invariant_tsc or x86_64.cpu_id.hypervisor == .tcg;
     }
 };

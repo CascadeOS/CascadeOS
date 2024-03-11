@@ -17,7 +17,7 @@ pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
 
 pub inline fn largestPageSize() core.Size {
-    if (x86_64.arch_info.gib_pages) return x86_64.PageTable.large_page_size;
+    if (x86_64.arch_info.cpu_id.gbyte_pages) return x86_64.PageTable.large_page_size;
     return x86_64.PageTable.medium_page_size;
 }
 
@@ -118,7 +118,7 @@ pub fn mapToPhysicalRangeAllPageSizes(
     var kib_page_mappings: usize = 0;
 
     while (current_virtual_address.lessThan(end_virtual_address)) {
-        const map_1gib = x86_64.arch_info.gib_pages and
+        const map_1gib = x86_64.arch_info.cpu_id.gbyte_pages and
             size_remaining.greaterThanOrEqual(x86_64.PageTable.large_page_size) and
             current_virtual_address.isAligned(x86_64.PageTable.large_page_size) and
             current_physical_address.isAligned(x86_64.PageTable.large_page_size);
@@ -256,7 +256,7 @@ fn mapTo1GiB(
     physical_address: core.PhysicalAddress,
     map_type: kernel.memory.virtual.MapType,
 ) MapError!void {
-    core.debugAssert(x86_64.arch_info.gib_pages);
+    core.debugAssert(x86_64.arch_info.cpu_id.gbyte_pages);
     core.debugAssert(virtual_address.isAligned(x86_64.PageTable.large_page_size));
     core.debugAssert(physical_address.isAligned(x86_64.PageTable.large_page_size));
 
@@ -314,7 +314,7 @@ fn applyMapType(map_type: kernel.memory.virtual.MapType, entry: *x86_64.PageTabl
         entry.global.write(true);
     }
 
-    if (!map_type.executable and x86_64.arch_info.execute_disable) entry.no_execute.write(true);
+    if (!map_type.executable and x86_64.arch_info.cpu_id.execute_disable) entry.no_execute.write(true);
 
     if (map_type.writeable) entry.writeable.write(true);
 

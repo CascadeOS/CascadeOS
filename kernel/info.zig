@@ -40,17 +40,6 @@ pub var direct_map: core.VirtualRange = undefined;
 /// Initialized during `initKernelStage1`.
 pub var non_cached_direct_map: core.VirtualRange = undefined;
 
-/// The hypervisor we are running on or null if we are not running on a hypervisor.
-pub var hypervisor: ?Hypervisor = null;
-
-pub const Hypervisor = enum {
-    kvm,
-    tcg,
-    hyperv,
-    vmware,
-    unknown,
-};
-
 pub fn sdfSlice() []const u8 {
     const static = struct {
         const sdf = @import("sdf");

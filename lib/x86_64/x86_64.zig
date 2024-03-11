@@ -9,6 +9,7 @@ const x86_64 = @This();
 pub usingnamespace @import("instructions.zig");
 pub usingnamespace @import("registers.zig");
 
+pub const cpu_id = @import("cpu_id.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const Hpet = @import("Hpet.zig");
 pub const Idt = @import("Idt.zig");

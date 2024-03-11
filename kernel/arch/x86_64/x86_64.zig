@@ -16,7 +16,6 @@ comptime {
 pub const apic = @import("apic.zig");
 pub const arch_info = @import("arch_info.zig");
 pub const ArchProcessor = @import("ArchProcessor.zig");
-pub const cpuid = @import("cpuid.zig");
 pub const hpet = @import("hpet.zig");
 pub const init = @import("init.zig");
 pub const interrupts = @import("interrupts/interrupts.zig");
