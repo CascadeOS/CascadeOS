@@ -99,8 +99,8 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
         const kernel_name = try std.fmt.allocPrint(self.b.allocator, "{s}_kernel", .{@tagName(kernel.key_ptr.*)});
         try writer.print("{s}: {{class: binary}}\n", .{kernel_name});
 
-        for (kernel.value_ptr.dependencies) |library| {
-            try writer.print("{s} -> {s}\n", .{ kernel_name, library.name });
+        for (kernel.value_ptr.dependencies) |dep| {
+            try writer.print("{s} -> {s}\n", .{ kernel_name, dep.library.name });
         }
 
         node.completeOne();
