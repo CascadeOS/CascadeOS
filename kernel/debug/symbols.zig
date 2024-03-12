@@ -22,7 +22,7 @@ var sdf_location_lookup: sdf.LocationLookup = undefined;
 var sdf_location_program: sdf.LocationProgram = undefined;
 
 pub fn loadSymbols() void {
-    if (@atomicLoad(bool, &symbols_loaded, .Acquire)) return;
+    if (@atomicLoad(bool, &symbols_loaded, .acquire)) return;
 
     const sdf_slice = kernel.info.sdfSlice();
 
@@ -35,7 +35,7 @@ pub fn loadSymbols() void {
     sdf_location_lookup = header.locationLookup(sdf_slice);
     sdf_location_program = header.locationProgram(sdf_slice);
 
-    @atomicStore(bool, &symbols_loaded, true, .Release);
+    @atomicStore(bool, &symbols_loaded, true, .release);
 }
 
 pub fn getSymbol(address: usize) ?Symbol {

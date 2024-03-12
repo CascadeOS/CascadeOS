@@ -8,7 +8,7 @@
     .version = "0.0.1",
 
     // Ensure this is kept in sync with `build.zig` and `README.md`
-    .minimum_zig_version = "0.12.0-dev.2811+3cafb9655",
+    .minimum_zig_version = "0.12.0-dev.3247+26e895e3d",
 
     .dependencies = .{
         .libdwarf = .{

@@ -15,7 +15,7 @@ var free_memory: core.Size = core.Size.zero;
 
 /// Allocates a physical page.
 pub fn allocatePage() ?core.PhysicalRange {
-    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Acquire);
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
 
     while (first_free_page_opt) |first_free_page| {
         if (@cmpxchgWeak(
@@ -23,8 +23,8 @@ pub fn allocatePage() ?core.PhysicalRange {
             &first_free_physical_page,
             first_free_page,
             first_free_page.next,
-            .AcqRel,
-            .Acquire,
+            .acq_rel,
+            .acquire,
         )) |new_first_free_page| {
             first_free_page_opt = new_first_free_page;
             continue;
@@ -36,7 +36,7 @@ pub fn allocatePage() ?core.PhysicalRange {
             &free_memory.value,
             .Sub,
             kernel.arch.paging.standard_page_size.value,
-            .AcqRel,
+            .acq_rel,
         );
 
         const physical_address = kernel.physicalFromDirectMap(core.VirtualAddress.fromPtr(first_free_page)) catch unreachable;
@@ -104,7 +104,7 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
 }
 
 fn deallocateImpl(first_page_node: *PhysPageNode, last_page_node: *PhysPageNode, size: core.Size) void {
-    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .Acquire);
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
 
     while (true) {
         last_page_node.next = first_free_page_opt;
@@ -114,8 +114,8 @@ fn deallocateImpl(first_page_node: *PhysPageNode, last_page_node: *PhysPageNode,
             &first_free_physical_page,
             first_free_page_opt,
             first_page_node,
-            .AcqRel,
-            .Acquire,
+            .acq_rel,
+            .acquire,
         )) |new_first_free_page| {
             first_free_page_opt = new_first_free_page;
             continue;
@@ -130,7 +130,7 @@ fn deallocateImpl(first_page_node: *PhysPageNode, last_page_node: *PhysPageNode,
         &free_memory.value,
         .Add,
         size.value,
-        .AcqRel,
+        .acq_rel,
     );
 }
 

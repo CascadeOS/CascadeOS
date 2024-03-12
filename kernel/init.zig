@@ -100,7 +100,7 @@ var reload_page_table_gate = std.atomic.Value(bool).init(false);
 
 /// Stage 3 of kernel initialization.
 fn kernelInitStage3() noreturn {
-    _ = processors_in_stage3.fetchAdd(1, .AcqRel);
+    _ = processors_in_stage3.fetchAdd(1, .acq_rel);
 
     const processor = kernel.arch.getProcessor();
 
@@ -108,7 +108,7 @@ fn kernelInitStage3() noreturn {
         // We are the bootstrap processor, we need to wait for all other processors to enter stage 3 before we unmap
         // the bootloader reclaimable memory.
         const processor_count = kernel.Processor._all.len;
-        while (processors_in_stage3.load(.Acquire) != processor_count) {
+        while (processors_in_stage3.load(.acquire) != processor_count) {
             kernel.arch.spinLoopHint();
         }
 
@@ -119,12 +119,12 @@ fn kernelInitStage3() noreturn {
         log.debug("reclaiming bootloader reclaimable memory", .{});
         kernel.memory.physical.init.reclaimBootloaderReclaimableMemory();
 
-        reload_page_table_gate.store(true, .Release);
+        reload_page_table_gate.store(true, .release);
     } else {
         // We are not the bootstrap processor, we need to wait for the bootstrap processor to
         // unmap the init only mappings before we can continue.
 
-        while (!reload_page_table_gate.load(.Acquire)) {
+        while (!reload_page_table_gate.load(.acquire)) {
             kernel.arch.spinLoopHint();
         }
     }

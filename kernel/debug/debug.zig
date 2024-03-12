@@ -13,7 +13,7 @@ var panicked_processor = std.atomic.Value(kernel.Processor.Id).init(.none);
 var panic_impl: *const fn ([]const u8, ?*const std.builtin.StackTrace, usize) void = init.earlyPanicImpl;
 
 pub fn hasAProcessorPanicked() bool {
-    return panicked_processor.load(.Acquire) != .none;
+    return panicked_processor.load(.acquire) != .none;
 }
 
 /// Entry point from the Zig language upon a panic.
@@ -43,8 +43,8 @@ fn panicImpl(
     if (panicked_processor.cmpxchgStrong(
         .none,
         processor.id,
-        .AcqRel,
-        .Acquire,
+        .acq_rel,
+        .acquire,
     )) |unexpected_processor| {
         if (unexpected_processor != processor.id) return;
 
@@ -351,8 +351,8 @@ pub const init = struct {
         if (panicked_processor.cmpxchgStrong(
             .none,
             processor.id,
-            .AcqRel,
-            .Acquire,
+            .acq_rel,
+            .acquire,
         )) |unexpected_processor| {
             if (unexpected_processor != processor.id) return;
 

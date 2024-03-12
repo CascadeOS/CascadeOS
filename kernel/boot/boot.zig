@@ -102,14 +102,14 @@ pub const ProcessorDescriptor = struct {
                     usize,
                     &limine_info.extra_argument,
                     @intFromPtr(processor),
-                    .Release,
+                    .release,
                 );
 
                 @atomicStore(
                     ?*const fn (*const limine.SMP.Response.SMPInfo) callconv(.C) noreturn,
                     &limine_info.goto_address,
                     &trampolineFn,
-                    .Release,
+                    .release,
                 );
             },
         }

@@ -18,21 +18,21 @@ pub const Held = struct {
     pub fn unlock(self: Held) void {
         core.debugAssert(kernel.arch.getProcessor().id == self.spinlock._processor_id);
 
-        @atomicStore(kernel.Processor.Id, &self.spinlock._processor_id, .none, .Release);
+        @atomicStore(kernel.Processor.Id, &self.spinlock._processor_id, .none, .release);
         if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
     }
 };
 
 pub fn isLocked(self: SpinLock) bool {
-    return @atomicLoad(kernel.Processor.Id, &self._processor_id, .Acquire) != .none;
+    return @atomicLoad(kernel.Processor.Id, &self._processor_id, .acquire) != .none;
 }
 
 pub fn isLockedByCurrent(self: SpinLock) bool {
-    return @atomicLoad(kernel.Processor.Id, &self._processor_id, .Acquire) == kernel.arch.getProcessor().id;
+    return @atomicLoad(kernel.Processor.Id, &self._processor_id, .acquire) == kernel.arch.getProcessor().id;
 }
 
 pub fn unsafeUnlock(self: *SpinLock) void {
-    @atomicStore(kernel.Processor.Id, &self._processor_id, .none, .Release);
+    @atomicStore(kernel.Processor.Id, &self._processor_id, .none, .release);
 }
 
 pub fn lock(self: *SpinLock) Held {
@@ -49,8 +49,8 @@ pub fn lock(self: *SpinLock) Held {
             &self._processor_id,
             .none,
             processor_id,
-            .AcqRel,
-            .Acquire,
+            .acq_rel,
+            .acquire,
         )) |_| {
             kernel.arch.spinLoopHint();
             continue;

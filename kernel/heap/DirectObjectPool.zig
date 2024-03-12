@@ -30,7 +30,7 @@ pub fn DirectObjectPool(
 
         /// Get an object from the pool.
         pub fn get(self: *Self) error{OutOfMemory}!*T {
-            var opt_first_free = @atomicLoad(?*Object, &self.first_free, .Acquire);
+            var opt_first_free = @atomicLoad(?*Object, &self.first_free, .acquire);
 
             while (true) {
                 const first_free: *Object = opt_first_free orelse {
@@ -45,10 +45,10 @@ pub fn DirectObjectPool(
                         &self.acquire_in_progress,
                         false,
                         true,
-                        .AcqRel,
-                        .Acquire,
+                        .acq_rel,
+                        .acquire,
                     ) != null) {
-                        opt_first_free = @atomicLoad(?*Object, &self.first_free, .Acquire);
+                        opt_first_free = @atomicLoad(?*Object, &self.first_free, .acquire);
                         if (opt_first_free != null) continue;
 
                         // we are responsible for allocating more objects
@@ -56,7 +56,7 @@ pub fn DirectObjectPool(
                         _ = try self.getMoreObjects();
                     }
 
-                    opt_first_free = @atomicLoad(?*Object, &self.first_free, .Acquire);
+                    opt_first_free = @atomicLoad(?*Object, &self.first_free, .acquire);
                     continue;
                 };
 
@@ -67,15 +67,15 @@ pub fn DirectObjectPool(
                     &self.first_free,
                     opt_first_free,
                     next_free,
-                    .AcqRel,
-                    .Acquire,
+                    .acq_rel,
+                    .acquire,
                 )) |new_first_free| {
                     opt_first_free = new_first_free;
                     continue;
                 }
 
                 // Decrement `number_of_free_objects`
-                const number_free = @atomicRmw(usize, &self.number_of_free_objects, .Sub, 1, .AcqRel) - 1;
+                const number_free = @atomicRmw(usize, &self.number_of_free_objects, .Sub, 1, .acq_rel) - 1;
 
                 log.debug("given object - amount free: {}", .{number_free});
                 return @as(*T, @ptrCast(first_free));
@@ -92,7 +92,7 @@ pub fn DirectObjectPool(
         }
 
         fn giveImpl(self: *Self, first_obj: *Object, last_obj: *Object, count: usize) void {
-            var first_free = @atomicLoad(?*Object, &self.first_free, .Acquire);
+            var first_free = @atomicLoad(?*Object, &self.first_free, .acquire);
 
             while (true) {
                 last_obj.chunk = .{ .ptr = first_free };
@@ -102,8 +102,8 @@ pub fn DirectObjectPool(
                     &self.first_free,
                     first_free,
                     first_obj,
-                    .AcqRel,
-                    .Acquire,
+                    .acq_rel,
+                    .acquire,
                 )) |new_first_free| {
                     first_free = new_first_free;
                     continue;
@@ -115,7 +115,7 @@ pub fn DirectObjectPool(
                     &self.number_of_free_objects,
                     .Add,
                     count,
-                    .AcqRel,
+                    .acq_rel,
                 ) + count;
 
                 if (count > 1) {
