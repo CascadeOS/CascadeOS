@@ -5,38 +5,152 @@
     // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
+        // Kernel
         {
-            "label": "zig build test",
+            "label": "kernels",
             "type": "process",
             "command": "zig",
-            "isBuildCommand": true,
+            "args": [
+                "build",
+                "kernels",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
+            "label": "kernel_aarch64",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "kernel_aarch64",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
+            "label": "kernel_x86_64",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "kernel_x86_64",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+
+        // Build
+        {
+            "label": "tools_build",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "tools_build",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+
+
+        // Test
+        {
+            "label": "test",
+            "type": "process",
+            "command": "zig",
             "args": [
                 "build",
                 "test"
             ],
             "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "presentation": {
-                "reveal": "silent",
-                "showReuseMessage": false,
-                "clear": true,
-                "revealProblems": "onProblem"
-            },
-            "problemMatcher": {
-                "applyTo": "allDocuments",
-                "fileLocation": "autoDetect",
-                "owner": "zig",
-                "pattern": {
-                    "regexp": "^(.*?):(\\d+):(\\d+):.*?(error):?\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "column": 3,
-                    "severity": 4,
-                    "message": 5
-                },
+                "kind": "test"
             }
-        }
-    ]
+        },
+        {
+            "label": "libraries",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "libraries"
+            ],
+            "group": {
+                "kind": "test"
+            }
+        },
+        {
+            "label": "tools",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "tools"
+            ],
+            "group": {
+                "kind": "test"
+            }
+        },
+
+        // Images
+        {
+            "label": "images",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "images",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
+            "label": "image_aarch64",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "image_aarch64",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        {
+            "label": "image_x86_64",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "image_x86_64",
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+    ],
+    "presentation": {
+        "reveal": "silent",
+        "showReuseMessage": false,
+        "clear": true,
+        "revealProblems": "onProblem"
+    },
+    "problemMatcher": {
+        "applyTo": "allDocuments",
+        "fileLocation": "autoDetect",
+        "owner": "zig",
+        "pattern": {
+            "regexp": "^(.*?):(\\d+):(\\d+):.*?(error):?\\s+(.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "severity": 4,
+            "message": 5
+        },
+    }
 }
