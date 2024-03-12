@@ -126,7 +126,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
         try writer.print("{s}: {{class: library}}\n", .{library_name});
 
         for (library.value_ptr.*.dependencies) |dep_library| {
-            try writer.print("{s} -> {s}\n", .{ library_name, dep_library.name });
+            try writer.print("{s} -> {s}\n", .{ library_name, dep_library.library.name });
         }
 
         node.completeOne();

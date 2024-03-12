@@ -18,7 +18,7 @@ pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 /// The name of the library.
 ///
 /// Used as:
-///   - The name of the module provided by `@import("{name}");`
+///   - The name of the module provided by `@import("{name}");` (unless overridden with `LibraryDependency.import_name`)
 ///   - To build the root file path `lib/{name}/{name}.zig`
 ///   - In any build steps created for the library
 name: []const u8,
@@ -26,8 +26,8 @@ name: []const u8,
 /// The path to the directory containing this library.
 directory_path: []const u8,
 
-/// The list of library dependencies.
-dependencies: []const *Library,
+/// The list of dependencies.
+dependencies: []const Dependency,
 
 /// The modules for each supported Cascade target.
 cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
@@ -37,6 +37,11 @@ non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 
 /// If this library supports the hosts architecture the native module from `non_cascade_modules` will be stored here.
 non_cascade_module_for_host: ?*std.Build.Module,
+
+pub const Dependency = struct {
+    import_name: []const u8,
+    library: *Library,
+};
 
 /// Resolves all libraries and their dependencies.
 ///
@@ -106,20 +111,23 @@ fn resolveLibrary(
     all_library_descriptions: []const LibraryDescription,
 ) !?*Library {
     const dependencies = blk: {
-        var dependencies = try std.ArrayList(*Library).initCapacity(b.allocator, library_description.dependencies.len);
+        var dependencies = try std.ArrayList(Dependency).initCapacity(b.allocator, library_description.dependencies.len);
         defer dependencies.deinit();
 
         for (library_description.dependencies) |dep| {
-            if (resolved_libraries.get(dep)) |dep_library| {
-                dependencies.appendAssumeCapacity(dep_library);
+            if (resolved_libraries.get(dep.name)) |dep_library| {
+                dependencies.appendAssumeCapacity(.{
+                    .import_name = dep.import_name orelse dep.name,
+                    .library = dep_library,
+                });
             } else {
                 // check if the dependency is a library that actually exists
                 for (all_library_descriptions) |desc| {
-                    if (std.mem.eql(u8, dep, desc.name)) break;
+                    if (std.mem.eql(u8, dep.name, desc.name)) break;
                 } else {
                     std.debug.panic(
                         "library '{s}' depends on non-existant library '{s}'",
-                        .{ library_description.name, dep },
+                        .{ library_description.name, dep.name },
                     );
                 }
 
@@ -225,7 +233,7 @@ fn cascadeTestExecutableAndModule(
     lazy_path: std.Build.LazyPath,
     options: Options,
     target: CascadeTarget,
-    dependencies: []*Library,
+    dependencies: []Dependency,
     all_build_and_run_step: *std.Build.Step,
     step_collection: StepCollection,
     cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
@@ -292,7 +300,7 @@ fn hostTestExecutableAndModule(
     lazy_path: std.Build.LazyPath,
     options: Options,
     target: CascadeTarget,
-    dependencies: []*Library,
+    dependencies: []Dependency,
     all_build_and_run_step: *std.Build.Step,
     step_collection: StepCollection,
     non_cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
@@ -369,7 +377,7 @@ fn createTestExe(
     lazy_path: std.Build.LazyPath,
     options: Options,
     target: CascadeTarget,
-    dependencies: []const *Library,
+    dependencies: []const Dependency,
     build_for_cascade: bool,
 ) !*Step.Compile {
     const test_exe = b.addTest(.{
@@ -398,7 +406,7 @@ fn createModule(
     lazy_path: std.Build.LazyPath,
     options: Options,
     target: CascadeTarget,
-    dependencies: []const *Library,
+    dependencies: []const Dependency,
     build_for_cascade: bool,
 ) !*std.Build.Module {
     const module = b.createModule(.{
@@ -422,7 +430,7 @@ fn addDependenciesToModule(
     library_description: LibraryDescription,
     options: Options,
     target: CascadeTarget,
-    dependencies: []const *Library,
+    dependencies: []const Dependency,
     build_for_cascade: bool,
 ) void {
     // self reference
@@ -436,10 +444,10 @@ fn addDependenciesToModule(
 
     for (dependencies) |dependency| {
         const dependency_module = if (build_for_cascade)
-            dependency.cascade_modules.get(target) orelse continue
+            dependency.library.cascade_modules.get(target) orelse continue
         else
-            dependency.non_cascade_modules.get(target) orelse continue;
+            dependency.library.non_cascade_modules.get(target) orelse continue;
 
-        module.addImport(dependency.name, dependency_module);
+        module.addImport(dependency.import_name, dependency_module);
     }
 }

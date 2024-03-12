@@ -4,17 +4,32 @@
 const LibraryDescription = @import("../build/LibraryDescription.zig");
 
 pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
-    .{ .name = "acpi", .dependencies = &.{"core"} },
+    .{
+        .name = "acpi",
+        .dependencies = &.{.{ .name = "core" }},
+    },
     .{ .name = "bitjuggle" },
-    .{ .name = "containers", .dependencies = &.{ "core", "bitjuggle" } },
+    .{
+        .name = "containers",
+        .dependencies = &.{ .{ .name = "core" }, .{ .name = "bitjuggle" } },
+    },
     .{ .name = "core" },
-    .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
-    .{ .name = "limine", .dependencies = &.{"core"} },
+    .{
+        .name = "fs",
+        .dependencies = &.{ .{ .name = "core" }, .{ .name = "uuid" } },
+    },
+    .{
+        .name = "limine",
+        .dependencies = &.{.{ .name = "core" }},
+    },
     .{ .name = "sdf" },
-    .{ .name = "uuid", .dependencies = &.{"core"} },
+    .{
+        .name = "uuid",
+        .dependencies = &.{.{ .name = "core" }},
+    },
     .{
         .name = "x86_64",
-        .dependencies = &.{ "core", "bitjuggle" },
+        .dependencies = &.{ .{ .name = "core" }, .{ .name = "bitjuggle" } },
         .supported_targets = &.{.x86_64},
     },
 };

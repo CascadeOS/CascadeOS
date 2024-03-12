@@ -4,17 +4,16 @@
 const std = @import("std");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const LibraryDependency = @import("LibraryDependency.zig");
 
 /// The name of the library:
-///   - used as the name of the module provided `@import("{name}");`
+///   - used as the name of the module provided `@import("{name}");` (unless overridden with `LibraryDependency.import_name`)
 ///   - used to build the root file path `libraries/{name}/{name}.zig`
 ///   - used in any build steps created for the library
 name: []const u8,
 
 /// The library's dependencies.
-///
-/// Specified as an array of the names of the dependant libraries.
-dependencies: []const []const u8 = &.{},
+dependencies: []const LibraryDependency = &.{},
 
 /// The targets supported by the library.
 ///

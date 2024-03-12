@@ -349,7 +349,7 @@ fn addFilesFromLibrary(
     try processed_libraries.put(library, {});
 
     for (library.dependencies) |dep| {
-        try addFilesFromLibrary(b, modules, file_paths, root_path, dep, processed_libraries);
+        try addFilesFromLibrary(b, modules, file_paths, root_path, dep.library, processed_libraries);
     }
 }
 
