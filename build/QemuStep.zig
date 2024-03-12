@@ -56,7 +56,7 @@ pub fn registerQemuSteps(
 }
 
 fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, options: Options) !*QemuStep {
-    const uefi = options.uefi or target.needsUefi();
+    const uefi = options.uefi or needsUefi(target);
 
     const edk2_step: ?*EDK2Step = if (uefi) try EDK2Step.create(b, target) else null;
 
@@ -92,11 +92,19 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, optio
     return self;
 }
 
+/// Returns true if the target needs UEFI to boot.
+fn needsUefi(self: CascadeTarget) bool {
+    return switch (self) {
+        .aarch64 => true,
+        .x86_64 => false,
+    };
+}
+
 fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     const b = step.owner;
     const self = @fieldParentPtr(QemuStep, "step", step);
 
-    const run_qemu = b.addSystemCommand(&.{self.target.qemuExecutable()});
+    const run_qemu = b.addSystemCommand(&.{qemuExecutable(self.target)});
 
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
@@ -165,10 +173,16 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     }
 
     // set target cpu
-    self.target.setQemuCpu(run_qemu);
+    switch (self.target) {
+        .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "max" }),
+        .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no,+invtsc" }),
+    }
 
     // set target machine
-    self.target.setQemuMachine(run_qemu);
+    switch (self.target) {
+        .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
+        .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
+    }
 
     // qemu acceleration
     const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
@@ -197,6 +211,14 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     try run_qemu.step.make(prog_node);
 
     step.result_duration_ns = timer.read();
+}
+
+/// Returns the name of the QEMU system executable for the given target.
+fn qemuExecutable(self: CascadeTarget) []const u8 {
+    return switch (self) {
+        .aarch64 => "qemu-system-aarch64",
+        .x86_64 => "qemu-system-x86_64",
+    };
 }
 
 fn ensureCurrentStdoutLineIsEmpty() !void {

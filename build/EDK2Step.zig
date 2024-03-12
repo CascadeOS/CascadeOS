@@ -76,13 +76,21 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     try std.fs.cwd().makePath(self.edk2_dir);
 
-    try fetch(step.owner.allocator, self.target.uefiFirmwareUrl(), self.firmware_path);
+    try fetch(step.owner.allocator, uefiFirmwareUrl(self.target), self.firmware_path);
 
     self.firmware.path = self.firmware_path;
 
     try self.updateTimestampFile();
 
     step.result_duration_ns = timer.read();
+}
+
+/// Returns the URL to download the UEFI firmware for the given target.
+fn uefiFirmwareUrl(self: CascadeTarget) []const u8 {
+    return switch (self) {
+        .aarch64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd",
+        .x86_64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd",
+    };
 }
 
 // 24 hours
