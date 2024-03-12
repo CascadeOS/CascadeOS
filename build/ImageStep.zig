@@ -46,6 +46,7 @@ pub fn registerImageSteps(
         .name = "limine",
         .link_libc = true,
         .target = b.host,
+        .optimize = .ReleaseSafe,
     });
     limine_exe.addIncludePath(limine_dep.path(""));
     limine_exe.addCSourceFile(.{
