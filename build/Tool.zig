@@ -31,7 +31,7 @@ test_compile_step: *Step.Compile,
 compile_step_install_step: *Step,
 
 /// only used for generating a dependency graph
-dependencies: []const *const Library,
+dependencies: []const Library.Dependency,
 
 /// Resolves all tools and their dependencies.
 pub fn getTools(
@@ -61,14 +61,17 @@ fn resolveTool(
     optimize_mode: std.builtin.OptimizeMode,
 ) !Tool {
     const dependencies = blk: {
-        var dependencies = try std.ArrayList(*Library).initCapacity(b.allocator, tool_description.dependencies.len);
+        var dependencies = try std.ArrayList(Library.Dependency).initCapacity(b.allocator, tool_description.dependencies.len);
         defer dependencies.deinit();
 
         for (tool_description.dependencies) |dep| {
-            if (libraries.get(dep)) |dep_library| {
-                dependencies.appendAssumeCapacity(dep_library);
+            if (libraries.get(dep.name)) |dep_library| {
+                dependencies.appendAssumeCapacity(.{
+                    .import_name = dep.import_name orelse dep.name,
+                    .library = dep_library,
+                });
             } else {
-                std.debug.panic("tool '{s}' has unresolvable dependency: {s}\n", .{ tool_description.name, dep });
+                std.debug.panic("tool '{s}' has unresolvable dependency: {s}\n", .{ tool_description.name, dep.name });
             }
         }
 
@@ -208,7 +211,7 @@ fn createExe(
     b: *std.Build,
     tool_description: ToolDescription,
     lazy_path: std.Build.LazyPath,
-    dependencies: []const *Library,
+    dependencies: []const Library.Dependency,
     optimize_mode: std.builtin.OptimizeMode,
 ) !*Step.Compile {
     const exe = b.addExecutable(.{
@@ -229,7 +232,7 @@ fn createTestExe(
     b: *std.Build,
     tool_description: ToolDescription,
     lazy_path: std.Build.LazyPath,
-    dependencies: []const *Library,
+    dependencies: []const Library.Dependency,
 ) !*Step.Compile {
     const test_exe = b.addTest(.{
         .name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_test" }),
@@ -246,18 +249,18 @@ fn createTestExe(
 fn addDependenciesToModule(
     module: *std.Build.Module,
     tool_description: ToolDescription,
-    dependencies: []const *Library,
+    dependencies: []const Library.Dependency,
 ) void {
     // self reference
     module.addImport(tool_description.name, module);
 
     for (dependencies) |dep| {
-        const dep_module = dep.non_cascade_module_for_host orelse {
+        const dep_module = dep.library.non_cascade_module_for_host orelse {
             std.debug.panic(
                 "tool '{s}' depends on '{s}' that does not support the host architecture.\n",
-                .{ tool_description.name, dep.name },
+                .{ tool_description.name, dep.library.name },
             );
         };
-        module.addImport(dep.name, dep_module);
+        module.addImport(dep.import_name, dep_module);
     }
 }

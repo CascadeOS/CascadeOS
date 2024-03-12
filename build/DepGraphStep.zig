@@ -112,8 +112,8 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
         const tool_name = tool.key_ptr.*;
         try writer.print("{s}: {{class: binary}}\n", .{tool_name});
 
-        for (tool.value_ptr.dependencies) |library| {
-            try writer.print("{s} -> {s}\n", .{ tool_name, library.name });
+        for (tool.value_ptr.dependencies) |dep| {
+            try writer.print("{s} -> {s}\n", .{ tool_name, dep.library.name });
         }
 
         node.completeOne();

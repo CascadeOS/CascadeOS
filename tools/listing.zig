@@ -4,10 +4,13 @@
 const ToolDescription = @import("../build/ToolDescription.zig");
 
 pub const tools: []const ToolDescription = &[_]ToolDescription{
-    .{ .name = "image_builder", .dependencies = &.{ "core", "fs", "uuid" } },
+    .{
+        .name = "image_builder",
+        .dependencies = &.{ .{ .name = "core" }, .{ .name = "fs" }, .{ .name = "uuid" } },
+    },
     .{
         .name = "sdf_builder",
-        .dependencies = &.{ "core", "sdf" },
+        .dependencies = &.{ .{ .name = "core" }, .{ .name = "sdf" } },
         .custom_configuration = @import("sdf_builder/custom_configuration.zig").customConfiguration,
     },
 };
