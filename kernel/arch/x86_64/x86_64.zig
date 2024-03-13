@@ -5,7 +5,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x86_64 = @import("lib_x86_64");
 pub usingnamespace x86_64;
 
 comptime {
