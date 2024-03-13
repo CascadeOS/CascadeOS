@@ -33,5 +33,5 @@ pub fn prepareProcessor(
 }
 
 pub fn loadProcessor(processor: *kernel.Processor) void {
-    aarch64.registers.TPIDR_EL1.write(@intFromPtr(processor));
+    aarch64.TPIDR_EL1.write(@intFromPtr(processor));
 }

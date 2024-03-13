@@ -11,7 +11,7 @@ pub const ArchProcessor = aarch64.ArchProcessor;
 
 pub const getProcessor = aarch64.getProcessor;
 pub const earlyGetProcessor = aarch64.earlyGetProcessor;
-pub const spinLoopHint = aarch64.spinLoopHint;
+pub const spinLoopHint = aarch64.isb;
 
 pub const init = struct {
     pub const EarlyOutputWriter = aarch64.init.EarlyOutputWriter;
@@ -34,10 +34,10 @@ pub const paging = struct {
 };
 
 pub const interrupts = struct {
-    pub const interruptsEnabled = aarch64.interrupts.interruptsEnabled;
-    pub const enableInterrupts = aarch64.interrupts.enableInterrupts;
-    pub const disableInterrupts = aarch64.interrupts.disableInterrupts;
-    pub const disableInterruptsAndHalt = aarch64.interrupts.disableInterruptsAndHalt;
+    pub const interruptsEnabled = aarch64.interruptsEnabled;
+    pub const enableInterrupts = aarch64.enableInterrupts;
+    pub const disableInterrupts = aarch64.disableInterrupts;
+    pub const disableInterruptsAndHalt = aarch64.disableInterruptsAndHalt;
 };
 
 pub const scheduling = struct {};
