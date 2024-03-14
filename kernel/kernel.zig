@@ -5,6 +5,7 @@ const std = @import("std");
 const core = @import("core");
 
 pub const arch = @import("arch/arch.zig");
+pub const global = @import("global.zig");
 pub const log = @import("log.zig");
 
 export fn _start() callconv(.C) noreturn {
@@ -23,12 +24,6 @@ pub fn panic(
     stack_trace: ?*const std.builtin.StackTrace,
     return_address_opt: ?usize,
 ) noreturn {
-    _ = msg;
-    _ = stack_trace;
-    _ = return_address_opt;
-
     @setCold(true);
-    while (true) {
-        arch.spinLoopHint();
-    }
+    global.panic_impl(msg, stack_trace, return_address_opt);
 }
