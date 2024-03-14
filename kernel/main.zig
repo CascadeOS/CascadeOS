@@ -5,6 +5,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const aarch64 = @import("aarch64.zig");
-
-pub const spinLoopHint = aarch64.isb;
+/// Entry point from the bootloader specific code.
+///
+/// Only the bootstrap cpu executes this function.
+pub fn kmain() void {}
