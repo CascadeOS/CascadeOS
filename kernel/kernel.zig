@@ -5,12 +5,12 @@ const std = @import("std");
 const core = @import("core");
 
 pub const arch = @import("arch/arch.zig");
+pub const boot = @import("boot.zig");
 pub const global = @import("global.zig");
 pub const log = @import("log.zig");
 
-export fn _start() callconv(.C) noreturn {
-    @call(.never_inline, @import("main.zig").kmain, .{});
-    core.panic("kmain returned");
+comptime {
+    _ = &boot; // ensure any entry points or bootloader required symbols are referenced
 }
 
 pub const std_options: std.Options = .{
