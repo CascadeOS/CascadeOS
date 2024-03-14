@@ -6,6 +6,7 @@ const core = @import("core");
 
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot.zig");
+pub const Cpu = @import("Cpu.zig");
 pub const global = @import("global.zig");
 pub const log = @import("log.zig");
 
