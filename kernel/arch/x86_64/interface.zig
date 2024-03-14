@@ -10,5 +10,8 @@ const x86_64 = @import("x86_64.zig");
 pub const spinLoopHint = x86_64.pause;
 
 pub const init = struct {
-    pub const EarlyOutputWriter = struct {};
+    pub const EarlyOutputWriter = x86_64.SerialPort.Writer;
+
+    pub const setupEarlyOutput = x86_64.init.setupEarlyOutput;
+    pub const getEarlyOutput = x86_64.init.getEarlyOutput;
 };
