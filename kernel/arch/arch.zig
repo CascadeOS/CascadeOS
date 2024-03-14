@@ -27,6 +27,29 @@ pub const init = struct {
 
         current.init.setupEarlyOutput();
     }
+
+    /// Acquire a writer for the early output setup by `setupEarlyOutput`.
+    pub fn getEarlyOutput() callconv(core.inline_in_non_debug_calling_convention) ?current.init.EarlyOutputWriter {
+        checkSupport(current.init, "getEarlyOutput", fn () ?current.init.EarlyOutputWriter);
+
+        return current.init.getEarlyOutput();
+    }
+
+    /// Prepares the provided `Cpu` for the bootstrap processor.
+    pub fn prepareBootstrapCpu(
+        bootstrap_cpu: *kernel.Cpu,
+    ) callconv(core.inline_in_non_debug_calling_convention) void {
+        checkSupport(current.init, "prepareBootstrapCpu", fn (*kernel.Cpu) void);
+
+        current.init.prepareBootstrapCpu(bootstrap_cpu);
+    }
+
+    /// Load the provided `Cpu` as the current CPU.
+    pub fn loadCpu(cpu: *kernel.Cpu) callconv(core.inline_in_non_debug_calling_convention) void {
+        checkSupport(current.init, "loadCpu", fn (*kernel.Cpu) void);
+
+        current.init.loadCpu(cpu);
+    }
 };
 
 /// Checks if the current architecture implements the given function.
