@@ -93,8 +93,8 @@ pub fn captureSystemInformation() void {
     log.debug("capturing cpuid information", .{});
     captureCPUIDInformation();
 
-    const madt = kernel.acpi.init.getTable(acpi.MADT) orelse core.panic("unable to get MADT");
-    const fadt = kernel.acpi.init.getTable(acpi.FADT) orelse core.panic("unable to get FADT");
+    const madt = kernel.acpi.init.getTable(acpi.MADT, 0) orelse core.panic("unable to get MADT");
+    const fadt = kernel.acpi.init.getTable(acpi.FADT, 0) orelse core.panic("unable to get FADT");
 
     log.debug("capturing FADT information", .{});
     captureFADTInformation(fadt);

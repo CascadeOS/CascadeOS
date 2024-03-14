@@ -23,7 +23,7 @@ var number_of_timers_minus_one: u5 = undefined;
 
 pub const init = struct {
     pub fn registerTimeSource() void {
-        if (kernel.acpi.init.getTable(acpi.HPET) == null) return;
+        if (kernel.acpi.init.getTable(acpi.HPET, 0) == null) return;
 
         kernel.time.init.addTimeSource(.{
             .name = "hpet",
@@ -85,7 +85,8 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        const description_table = kernel.acpi.init.getTable(acpi.HPET) orelse unreachable;
+        // unreachable: the table is known to exist as it is checked in `registerTimeSource`
+        const description_table = kernel.acpi.init.getTable(acpi.HPET, 0) orelse unreachable;
 
         if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped");
 

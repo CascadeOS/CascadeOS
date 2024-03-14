@@ -46,19 +46,24 @@ pub const init = struct {
         }
     }
 
-    /// Get the ACPI table if present.
+    /// Get the `n`th matching ACPI table if present.
     ///
     /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
     ///
     /// If the table is not valid, returns `null`.
-    pub fn getTable(comptime T: type) ?*const T {
+    pub fn getTable(comptime T: type, n: usize) ?*const T {
         var iter = acpi.tableIterator(
             sdt_header,
             kernel.directMapFromPhysical,
         );
 
+        var i: usize = 0;
+
         while (iter.next()) |header| {
             if (!header.signatureIs(T.SIGNATURE_STRING)) continue;
+
+            if (i != n) continue;
+            i += 1;
 
             if (!header.isValid()) {
                 log.warn("invalid table: {s}", .{header.signatureAsString()});
