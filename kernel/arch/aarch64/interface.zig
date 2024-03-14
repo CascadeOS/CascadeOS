@@ -9,4 +9,6 @@ const aarch64 = @import("aarch64.zig");
 
 pub const spinLoopHint = aarch64.isb;
 
-pub const init = struct {};
+pub const init = struct {
+    pub const EarlyOutputWriter = struct {};
+};

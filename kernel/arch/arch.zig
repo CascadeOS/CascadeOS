@@ -21,6 +21,8 @@ pub inline fn spinLoopHint() void {
 
 /// Functionality that is used during kernel initialization only.
 pub const init = struct {
+    pub const EarlyOutputWriter = current.init.EarlyOutputWriter;
+
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
         checkSupport(current.init, "setupEarlyOutput", fn () void);
