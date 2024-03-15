@@ -6,10 +6,11 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 const x86_64 = @import("x86_64.zig");
+const fixed_handlers = @import("fixed_handlers.zig");
 
 var idt: x86_64.Idt = .{};
 const raw_handlers = init.makeRawHandlers();
-var handlers = [_]InterruptHandler{unhandledInterrupt} ** x86_64.Idt.number_of_handlers;
+var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x86_64.Idt.number_of_handlers;
 
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
@@ -206,6 +207,36 @@ pub const init = struct {
                 raw_handler,
             );
         }
+
+        setFixedHandlers();
+
+        // TODO: set stack for double fault and nmi
+    }
+
+    fn setFixedHandlers() void {
+        handlers[@intFromEnum(Interrupt.divide)] = fixed_handlers.divideErrorException;
+        handlers[@intFromEnum(Interrupt.debug)] = fixed_handlers.debugException;
+        handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = fixed_handlers.nonMaskableInterrupt;
+        handlers[@intFromEnum(Interrupt.breakpoint)] = fixed_handlers.breakpointException;
+        handlers[@intFromEnum(Interrupt.overflow)] = fixed_handlers.overflowException;
+        handlers[@intFromEnum(Interrupt.bound_range)] = fixed_handlers.boundRangeExceededException;
+        handlers[@intFromEnum(Interrupt.invalid_opcode)] = fixed_handlers.invalidOpcodeException;
+        handlers[@intFromEnum(Interrupt.device_not_available)] = fixed_handlers.deviceNotAvailableException;
+        handlers[@intFromEnum(Interrupt.double_fault)] = fixed_handlers.doubleFaultException;
+        handlers[@intFromEnum(Interrupt.invalid_tss)] = fixed_handlers.invalidTSSException;
+        handlers[@intFromEnum(Interrupt.segment_not_present)] = fixed_handlers.segmentNotPresentException;
+        handlers[@intFromEnum(Interrupt.stack_fault)] = fixed_handlers.stackFaultException;
+        handlers[@intFromEnum(Interrupt.general_protection)] = fixed_handlers.generalProtectionException;
+        handlers[@intFromEnum(Interrupt.page_fault)] = fixed_handlers.pageFaultException;
+        handlers[@intFromEnum(Interrupt.x87_floating_point)] = fixed_handlers.x87FPUFloatingPointException;
+        handlers[@intFromEnum(Interrupt.alignment_check)] = fixed_handlers.alignmentCheckException;
+        handlers[@intFromEnum(Interrupt.machine_check)] = fixed_handlers.machineCheckException;
+        handlers[@intFromEnum(Interrupt.simd_floating_point)] = fixed_handlers.simdFloatingPointException;
+        handlers[@intFromEnum(Interrupt.virtualization)] = fixed_handlers.virtualizationException;
+        handlers[@intFromEnum(Interrupt.control_protection)] = fixed_handlers.controlProtectionException;
+        handlers[@intFromEnum(Interrupt.hypervisor_injection)] = fixed_handlers.hypervisorInjectionException;
+        handlers[@intFromEnum(Interrupt.vmm_communication)] = fixed_handlers.vmmCommunicationException;
+        handlers[@intFromEnum(Interrupt.security)] = fixed_handlers.securityException;
     }
 
     /// Creates an array of raw interrupt handlers, one for each vector.
