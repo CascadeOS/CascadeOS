@@ -18,6 +18,7 @@ pub fn kmain() void {
     kernel.arch.init.setupEarlyOutput();
 
     // we need to get the current cpu loaded early as the panic handler and logging use it
+    kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
     // now that early output and the bootstrap cpu are loaded, we can switch to the init panic
