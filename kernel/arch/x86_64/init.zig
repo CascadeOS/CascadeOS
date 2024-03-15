@@ -18,3 +18,10 @@ pub fn setupEarlyOutput() callconv(core.inline_in_non_debug_calling_convention) 
 pub fn getEarlyOutput() callconv(core.inline_in_non_debug_calling_convention) ?x86_64.SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
+
+/// Load the provided `Cpu` as the current CPU.
+pub fn loadCpu(cpu: *kernel.Cpu) callconv(core.inline_in_non_debug_calling_convention) void {
+    // TODO: GDT, TSS, IDT
+
+    x86_64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
+}
