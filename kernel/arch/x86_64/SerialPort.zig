@@ -17,7 +17,7 @@ const OUTPUT_READY: u8 = 1 << 5;
 _data_port: u16,
 _line_status_port: u16,
 
-/// Initialize the serial port at `com_port` with the baud rate `baud_rate`
+/// Init the serial port at `com_port` with the baud rate `baud_rate`
 pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
     const data_port_number = com_port.toPort();
 

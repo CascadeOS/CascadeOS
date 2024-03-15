@@ -13,7 +13,7 @@ pub const SerialPort = @import("SerialPort.zig");
 
 /// Get the current CPU.
 ///
-/// Assumes the CPU has been initialized.
+/// Assumes that `init.loadCpu()` has been called on the currently running CPU.
 ///
 /// Asserts that interrupts are disabled.
 pub inline fn getCpu() *kernel.Cpu {

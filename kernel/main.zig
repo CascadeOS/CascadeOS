@@ -5,7 +5,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-/// Used to represent the bootstrap cpu during initialization.
+/// Represents the bootstrap cpu during init.
 var bootstrap_cpu: kernel.Cpu = .{
     .id = @enumFromInt(0),
 };
@@ -20,8 +20,8 @@ pub fn kmain() void {
     // we need to get the current cpu loaded early as the panic handler and logging use it
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
-    // now that early output and the bootstrap cpu are loaded, we can switch to the initialization panic
-    kernel.debug.init.loadInitializationPanic();
+    // now that early output and the bootstrap cpu are loaded, we can switch to the init panic
+    kernel.debug.init.loadInitPanic();
 
     // print starting message
     if (kernel.arch.init.getEarlyOutput()) |early_output| {

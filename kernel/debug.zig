@@ -54,12 +54,12 @@ pub fn zigPanic(
 }
 
 pub const init = struct {
-    pub fn loadInitializationPanic() void {
-        panic_impl = initializationPanic;
+    pub fn loadInitPanic() void {
+        panic_impl = initPanicImpl;
     }
 
-    /// Panic handler during kernel initialization.
-    fn initializationPanic(
+    /// Panic handler during kernel init.
+    fn initPanicImpl(
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
