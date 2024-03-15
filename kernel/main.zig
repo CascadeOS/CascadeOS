@@ -20,6 +20,9 @@ pub fn kmain() void {
     // we need to get the current cpu loaded early as the panic handler and logging use it
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
+    // now that early output and the bootstrap cpu are loaded, we can switch to the initialization panic
+    kernel.debug.init.loadInitializationPanic();
+
     // print starting message
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
         early_output.writeAll(comptime "starting CascadeOS " ++ @import("kernel_options").cascade_version ++ "\n") catch {};
