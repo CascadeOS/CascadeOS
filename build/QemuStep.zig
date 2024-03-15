@@ -109,10 +109,10 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     run_qemu.stdio = .inherit;
 
     // no reboot
-    if (self.options.qemu_remote_debug) run_qemu.addArg("-no-reboot");
+    run_qemu.addArg("-no-reboot");
 
     // no shutdown
-    if (self.options.qemu_remote_debug) run_qemu.addArg("-no-shutdown");
+    run_qemu.addArg("-no-shutdown");
 
     run_qemu.addArgs(&.{ "-boot", "menu=off" });
 
