@@ -88,7 +88,6 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 /// Returns the URL to download the UEFI firmware for the given target.
 fn uefiFirmwareUrl(self: CascadeTarget) []const u8 {
     return switch (self) {
-        .aarch64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEAARCH64_QEMU_EFI.fd",
         .x86_64 => "https://retrage.github.io/edk2-nightly/bin/RELEASEX64_OVMF.fd",
     };
 }

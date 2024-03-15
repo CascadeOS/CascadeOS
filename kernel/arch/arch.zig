@@ -8,7 +8,6 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 const current = switch (@import("cascade_target").arch) {
-    .aarch64 => @import("aarch64/interface.zig"),
     .x86_64 => @import("x86_64/interface.zig"),
 };
 

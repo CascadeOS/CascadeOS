@@ -8,11 +8,6 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
         .name = "acpi",
         .dependencies = &.{.{ .name = "core" }},
     },
-    .{
-        .name = "aarch64",
-        .dependencies = &.{ .{ .name = "core" }, .{ .name = "bitjuggle" } },
-        .supported_targets = &.{.aarch64},
-    },
     .{ .name = "bitjuggle" },
     .{
         .name = "containers",

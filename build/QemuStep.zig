@@ -95,7 +95,6 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, optio
 /// Returns true if the target needs UEFI to boot.
 fn needsUefi(self: CascadeTarget) bool {
     return switch (self) {
-        .aarch64 => true,
         .x86_64 => false,
     };
 }
@@ -174,13 +173,11 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 
     // set target cpu
     switch (self.target) {
-        .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-cpu", "max" }),
         .x86_64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no,+invtsc" }),
     }
 
     // set target machine
     switch (self.target) {
-        .aarch64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
         .x86_64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
     }
 
@@ -216,7 +213,6 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
 /// Returns the name of the QEMU system executable for the given target.
 fn qemuExecutable(self: CascadeTarget) []const u8 {
     return switch (self) {
-        .aarch64 => "qemu-system-aarch64",
         .x86_64 => "qemu-system-x86_64",
     };
 }

@@ -19,18 +19,6 @@
             }
         },
         {
-            "label": "kernel_aarch64",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "kernel_aarch64",
-            ],
-            "group": {
-                "kind": "build"
-            }
-        },
-        {
             "label": "kernel_x86_64",
             "type": "process",
             "command": "zig",
@@ -104,18 +92,6 @@
             "args": [
                 "build",
                 "images",
-            ],
-            "group": {
-                "kind": "build"
-            }
-        },
-        {
-            "label": "image_aarch64",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "image_aarch64",
             ],
             "group": {
                 "kind": "build"

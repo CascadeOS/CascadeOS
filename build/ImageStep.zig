@@ -177,12 +177,6 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
     });
 
     switch (self.target) {
-        .aarch64 => {
-            try efi_partition.addFile(.{
-                .destination_path = "/EFI/BOOT/BOOTAA64.EFI",
-                .source_path = self.limine_dep.path("BOOTAA64.EFI").getPath2(self.b, &self.step),
-            });
-        },
         .x86_64 => {
             try efi_partition.addFile(.{
                 .destination_path = "/limine-bios.sys",
