@@ -27,6 +27,8 @@ pub fn kernelInit() void {
     // now that early output and the bootstrap cpu are loaded, we can switch to the init panic
     kernel.debug.init.loadInitPanic();
 
+    kernel.arch.init.initInterrupts();
+
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
         early_output.writeAll(starting_message) catch {};
     }
