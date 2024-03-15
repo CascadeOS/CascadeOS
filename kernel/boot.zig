@@ -6,6 +6,6 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 export fn _start() callconv(.C) noreturn {
-    @call(.never_inline, @import("main.zig").kmain, .{});
-    core.panic("kmain returned");
+    @call(.never_inline, @import("init.zig").kernelInit, .{});
+    core.panic("`init.kernelInit` returned");
 }

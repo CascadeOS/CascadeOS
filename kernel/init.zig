@@ -16,7 +16,7 @@ const starting_message = "starting CascadeOS " ++ @import("kernel_options").casc
 /// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap cpu executes this function.
-pub fn kmain() void {
+pub fn kernelInit() void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
