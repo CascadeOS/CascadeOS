@@ -8,7 +8,6 @@ pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot.zig");
 pub const Cpu = @import("Cpu.zig");
 pub const debug = @import("debug.zig");
-pub const global = @import("global.zig");
 pub const log = @import("log.zig");
 
 comptime {
@@ -20,12 +19,4 @@ pub const std_options: std.Options = .{
     .logFn = log.stdLogImpl,
 };
 
-/// Entry point from the Zig language upon a panic.
-pub fn panic(
-    msg: []const u8,
-    stack_trace: ?*const std.builtin.StackTrace,
-    return_address_opt: ?usize,
-) noreturn {
-    @setCold(true);
-    global.panic_impl(msg, stack_trace, return_address_opt);
-}
+pub const panic = debug.zigPanic;
