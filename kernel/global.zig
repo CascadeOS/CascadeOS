@@ -23,6 +23,6 @@ fn noOpPanic(
     _ = return_address_opt;
 
     while (true) {
-        kernel.arch.spinLoopHint();
+        kernel.arch.interrupts.disableInterruptsAndHalt();
     }
 }
