@@ -11,7 +11,9 @@ var bootstrap_cpu: kernel.Cpu = .{
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
-/// Entry point from the bootloader specific code.
+const starting_message = "starting CascadeOS " ++ @import("kernel_options").cascade_version ++ "\n";
+
+/// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap cpu executes this function.
 pub fn kmain() void {
@@ -25,8 +27,7 @@ pub fn kmain() void {
     // now that early output and the bootstrap cpu are loaded, we can switch to the init panic
     kernel.debug.init.loadInitPanic();
 
-    // print starting message
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
-        early_output.writeAll(comptime "starting CascadeOS " ++ @import("kernel_options").cascade_version ++ "\n") catch {};
+        early_output.writeAll(starting_message) catch {};
     }
 }
