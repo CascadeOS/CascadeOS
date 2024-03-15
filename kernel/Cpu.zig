@@ -10,8 +10,6 @@ const kernel = @import("kernel");
 id: Id,
 
 pub const Id = enum(u64) {
-    bootstrap = 0,
-
     none = std.math.maxInt(u64),
 
     _,

@@ -5,9 +5,9 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-/// Used to represent the bootstrap cpu during initalization.
+/// Used to represent the bootstrap cpu during initialization.
 var bootstrap_cpu: kernel.Cpu = .{
-    .id = .bootstrap,
+    .id = @enumFromInt(0),
 };
 
 /// Entry point from the bootloader specific code.
