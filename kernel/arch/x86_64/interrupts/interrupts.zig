@@ -43,7 +43,7 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
         // is always aligned in the same way for every vector
         const error_code_asm = if (comptime !interrupt.hasErrorCode()) "push $0\n" else "";
         const vector_number_asm = std.fmt.comptimePrint("push ${d}", .{vector_number});
-        const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{x86_64.Gdt.kernel_data_selector});
+        const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{@intFromEnum(x86_64.Gdt.Selector.kernel_data)});
 
         const rawInterruptHandler = struct {
             fn rawInterruptHandler() callconv(.Naked) void {
@@ -105,8 +105,14 @@ fn makeRawHandlers() [number_of_handlers](*const fn () callconv(.Naked) void) {
 }
 
 pub const InterruptFrame = extern struct {
-    es: u64,
-    ds: u64,
+    es: extern union {
+        full: u64,
+        selector: x86_64.Gdt.Selector,
+    },
+    ds: extern union {
+        full: u64,
+        selector: x86_64.Gdt.Selector,
+    },
     r15: u64,
     r14: u64,
     r13: u64,
@@ -122,27 +128,31 @@ pub const InterruptFrame = extern struct {
     rcx: u64,
     rbx: u64,
     rax: u64,
-    padded_vector_number: u64,
+    vector_number: extern union {
+        full: u64,
+        interrupt: Interrupt,
+    },
     error_code: u64,
     rip: u64,
-    cs: u64,
+    cs: extern union {
+        full: u64,
+        selector: x86_64.Gdt.Selector,
+    },
     rflags: x86_64.RFlags,
     rsp: u64,
-    ss: u64,
-
-    /// Gets the interrupt vector for this interrupt frame.
-    pub fn getInterrupt(self: *const InterruptFrame) Interrupt {
-        return @enumFromInt(@as(u8, @intCast(self.padded_vector_number)));
-    }
+    ss: extern union {
+        full: u64,
+        selector: x86_64.Gdt.Selector,
+    },
 
     /// Checks if this interrupt occurred in kernel mode.
     pub inline fn isKernel(self: *const InterruptFrame) bool {
-        return self.cs == x86_64.Gdt.kernel_code_selector;
+        return self.cs.selector == .kernel_code;
     }
 
     /// Checks if this interrupt occurred in user mode.
     pub inline fn isUser(self: *const InterruptFrame) bool {
-        return self.cs == x86_64.Gdt.user_code_selector;
+        return self.cs.selector == .user_code;
     }
 
     pub fn print(
@@ -153,13 +163,13 @@ pub const InterruptFrame = extern struct {
 
         try writer.writeAll("InterruptFrame{\n");
 
-        try writer.print(comptime padding ++ "Error Code: {},\n", .{value.error_code});
-        try writer.print(comptime padding ++ "Vector Number: {},\n", .{value.vector_number});
+        try writer.print(comptime padding ++ "interrupt: {},\n", .{value.vector_number.interrupt});
+        try writer.print(comptime padding ++ "error code: {},\n", .{value.error_code});
 
-        try writer.print(comptime padding ++ "cs: {},\n", .{value.cs});
-        try writer.print(comptime padding ++ "ss: {},\n", .{value.ss});
-        try writer.print(comptime padding ++ "ds: {},\n", .{value.ds});
-        try writer.print(comptime padding ++ "es: {},\n", .{value.es});
+        try writer.print(comptime padding ++ "cs: {s},\n", .{@tagName(value.cs.selector)});
+        try writer.print(comptime padding ++ "ss: {s},\n", .{@tagName(value.ss.selector)});
+        try writer.print(comptime padding ++ "ds: {s},\n", .{@tagName(value.ds.selector)});
+        try writer.print(comptime padding ++ "es: {s},\n", .{@tagName(value.es.selector)});
         try writer.print(comptime padding ++ "rsp: 0x{x},\n", .{value.rsp});
         try writer.print(comptime padding ++ "rip: 0x{x},\n", .{value.rip});
         try writer.print(comptime padding ++ "rax: 0x{x},\n", .{value.rax});
@@ -196,7 +206,7 @@ pub const InterruptFrame = extern struct {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
+    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
     x86_64.disableInterrupts();
@@ -283,7 +293,7 @@ pub const init = struct {
         log.debug("mapping idt entries to raw handlers", .{});
         for (raw_handlers, 0..) |raw_handler, i| {
             idt.handlers[i].init(
-                x86_64.Gdt.kernel_code_selector,
+                .kernel_code,
                 .interrupt,
                 raw_handler,
             );

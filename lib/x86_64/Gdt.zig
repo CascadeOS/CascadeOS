@@ -18,12 +18,14 @@ pub const Gdt = extern struct {
         0,
     },
 
-    pub const null_selector: u16 = 0x00;
-    pub const kernel_code_selector: u16 = 0x08;
-    pub const kernel_data_selector: u16 = 0x10;
-    pub const user_code_selector: u16 = 0x18 | 3;
-    pub const user_data_selector: u16 = 0x20 | 3;
-    pub const tss_selector: u16 = 0x28;
+    pub const Selector = enum(u16) {
+        null = 0x00,
+        kernel_code = 0x08,
+        kernel_data = 0x10,
+        user_code = 0x18 | 3,
+        user_data = 0x20 | 3,
+        tss = 0x28,
+    };
 
     const mask_u8: u64 = std.math.maxInt(u8);
     const mask_u16: u64 = std.math.maxInt(u16);
@@ -49,7 +51,7 @@ pub const Gdt = extern struct {
         asm volatile (
             \\  ltr %[ts_sel]
             :
-            : [ts_sel] "rm" (tss_selector),
+            : [ts_sel] "rm" (@intFromEnum(Selector.tss)),
         );
     }
 
@@ -74,7 +76,7 @@ pub const Gdt = extern struct {
             \\  mov %[dsel], %%es
             \\  mov %[dsel], %%ss
             :
-            : [dsel] "rm" (kernel_data_selector),
+            : [dsel] "rm" (@intFromEnum(Selector.kernel_data)),
         );
 
         // Use the code selector
@@ -85,7 +87,7 @@ pub const Gdt = extern struct {
             \\ .byte 0x48, 0xCB // Far return
             \\ 1:
             :
-            : [csel] "i" (kernel_code_selector),
+            : [csel] "i" (@intFromEnum(Selector.kernel_code)),
             : "rax"
         );
     }

@@ -308,7 +308,7 @@ pub fn scheduler(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void 
 
 /// Handles unhandled interrupts by printing the vector and then panicking.
 pub fn unhandledInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
-    const interrupt = interrupt_frame.getInterrupt();
+    const interrupt = interrupt_frame.vector_number.interrupt;
 
     core.assert(!interrupt.isException());
 

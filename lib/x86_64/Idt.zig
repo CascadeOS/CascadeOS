@@ -18,7 +18,7 @@ pub const Entry = extern struct {
     pointer_low: u16,
 
     /// The code selector to switch to when the interrupt is recieved.
-    code_selector: u16,
+    code_selector: x86_64.Gdt.Selector,
 
     options: Options,
 
@@ -57,7 +57,7 @@ pub const Entry = extern struct {
 
     pub fn init(
         self: *Entry,
-        code_selector: u16,
+        code_selector: x86_64.Gdt.Selector,
         gate_type: GateType,
         handler: *const fn () callconv(.Naked) void,
     ) void {
