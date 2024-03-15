@@ -64,10 +64,10 @@ pub const init = struct {
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void {
-        if (kernel.arch.init.getEarlyOutput()) |early_output| {
-            printUserPanicMessage(early_output, msg);
-            printErrorAndCurrentStackTrace(early_output, stack_trace, return_address);
-        }
+        const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+
+        printUserPanicMessage(early_output, msg);
+        printErrorAndCurrentStackTrace(early_output, stack_trace, return_address);
     }
 
     fn noOpPanic(
