@@ -27,10 +27,12 @@ pub fn prepareBootstrapCpu(
 }
 
 /// Load the provided `Cpu` as the current CPU.
-pub fn loadCpu(cpu: *kernel.Cpu) void { // TODO: TSS, IDT
+pub fn loadCpu(cpu: *kernel.Cpu) void { // TODO: IDT
     const arch = &cpu.arch;
 
     arch.gdt.load();
+
+    arch.gdt.setTss(&arch.tss);
 
     x86_64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
 }

@@ -8,3 +8,4 @@ const kernel = @import("kernel");
 const x86_64 = @import("x86_64.zig");
 
 gdt: x86_64.Gdt = .{},
+tss: x86_64.Tss = .{},
