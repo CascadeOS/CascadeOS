@@ -9,6 +9,8 @@ const kernel = @import("kernel");
 
 id: Id,
 
+arch: kernel.arch.ArchCpu,
+
 pub const Id = enum(u64) {
     none = std.math.maxInt(u64),
 

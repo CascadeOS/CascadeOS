@@ -11,6 +11,9 @@ const current = switch (@import("cascade_target").arch) {
     .x86_64 => @import("x86_64/interface.zig"),
 };
 
+/// Architecture specific per-cpu information.
+pub const ArchCpu = current.ArchCpu;
+
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
     checkSupport(current, "spinLoopHint", fn () void);

@@ -8,6 +8,7 @@ const kernel = @import("kernel");
 /// Represents the bootstrap cpu during init.
 var bootstrap_cpu: kernel.Cpu = .{
     .id = @enumFromInt(0),
+    .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
 /// Entry point from the bootloader specific code.
