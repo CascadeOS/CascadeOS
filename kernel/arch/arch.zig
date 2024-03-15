@@ -18,6 +18,17 @@ pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }
 
+/// Get the current CPU.
+///
+/// Assumes the CPU has been initialized.
+///
+/// Asserts that interrupts are disabled.
+pub fn getCpu() callconv(core.inline_in_non_debug_calling_convention) *kernel.Cpu {
+    checkSupport(current, "getCpu", fn () *kernel.Cpu);
+
+    return current.getCpu();
+}
+
 /// Functionality that is used during kernel initialization only.
 pub const init = struct {
     pub const EarlyOutputWriter = current.init.EarlyOutputWriter;
