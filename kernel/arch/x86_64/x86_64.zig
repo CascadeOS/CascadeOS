@@ -5,10 +5,21 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-pub usingnamespace @import("lib_x86_64");
+const lib_x86_64 = @import("lib_x86_64");
+pub usingnamespace lib_x86_64;
 
 pub const init = @import("init.zig");
 pub const SerialPort = @import("SerialPort.zig");
+
+/// Get the current CPU.
+///
+/// Assumes the CPU has been initialized.
+///
+/// Asserts that interrupts are disabled.
+pub inline fn getCpu() *kernel.Cpu {
+    core.debugAssert(!lib_x86_64.interruptsEnabled());
+    return @ptrFromInt(lib_x86_64.KERNEL_GS_BASE.read());
+}
 
 comptime {
     if (@import("cascade_target").arch != .x86_64) {
