@@ -37,7 +37,10 @@ pub const InterruptFrame = extern struct {
     rcx: u64,
     rbx: u64,
     rax: u64,
-    padded_vector_number: u64,
+    vector_number: extern union {
+        full: u64,
+        interrupt: Interrupt,
+    },
     error_code: u64,
     rip: u64,
     cs: extern union {
@@ -50,11 +53,6 @@ pub const InterruptFrame = extern struct {
         full: u64,
         selector: x86_64.Gdt.Selector,
     },
-
-    /// Gets the interrupt vector for this interrupt frame.
-    pub inline fn getInterrupt(self: *const InterruptFrame) Interrupt {
-        return @enumFromInt(@as(u8, @intCast(self.padded_vector_number)));
-    }
 
     /// Checks if this interrupt occurred in kernel mode.
     pub inline fn isKernel(self: *const InterruptFrame) bool {
@@ -183,16 +181,14 @@ pub const Interrupt = enum(u8) {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    handlers[@as(u8, @intCast(interrupt_frame.padded_vector_number))](interrupt_frame);
+    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
     x86_64.disableInterrupts();
 }
 
 fn unhandledInterrupt(interrupt_frame: *InterruptFrame) void {
-    const interrupt = interrupt_frame.getInterrupt();
-
-    core.panicFmt("unhandled interrupt: {}", .{interrupt});
+    core.panicFmt("unhandled interrupt: {}", .{interrupt_frame});
 }
 
 pub const init = struct {
