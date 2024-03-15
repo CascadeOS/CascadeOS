@@ -18,3 +18,8 @@ pub const init = struct {
     pub const getEarlyOutput = x86_64.init.getEarlyOutput;
     pub const loadCpu = x86_64.init.loadCpu;
 };
+
+pub const interrupts = struct {
+    pub const disableInterruptsAndHalt = x86_64.disableInterruptsAndHalt;
+    pub const disableInterrupts = x86_64.disableInterrupts;
+};

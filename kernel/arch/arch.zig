@@ -64,6 +64,22 @@ pub const init = struct {
     }
 };
 
+pub const interrupts = struct {
+    /// Disable interrupts and put the CPU to sleep.
+    pub fn disableInterruptsAndHalt() callconv(core.inline_in_non_debug_calling_convention) noreturn {
+        checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);
+
+        current.interrupts.disableInterruptsAndHalt();
+    }
+
+    /// Disable interrupts.
+    pub fn disableInterrupts() callconv(core.inline_in_non_debug_calling_convention) void {
+        checkSupport(current.interrupts, "disableInterrupts", fn () void);
+
+        current.interrupts.disableInterrupts();
+    }
+};
+
 /// Checks if the current architecture implements the given function.
 ///
 /// If it is unimplemented, this function will panic at runtime.
@@ -73,8 +89,8 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        core.panic("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
-        // @compileError("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
+        // core.panic("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
+        @compileError("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));
