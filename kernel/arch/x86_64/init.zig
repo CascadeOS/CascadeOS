@@ -19,9 +19,18 @@ pub fn getEarlyOutput() callconv(core.inline_in_non_debug_calling_convention) ?x
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
+/// Prepares the provided `Cpu` for the bootstrap CPU.
+pub fn prepareBootstrapCpu(
+    bootstrap_cpu: *kernel.Cpu,
+) callconv(core.inline_in_non_debug_calling_convention) void {
+    bootstrap_cpu.arch = .{};
+}
+
 /// Load the provided `Cpu` as the current CPU.
-pub fn loadCpu(cpu: *kernel.Cpu) callconv(core.inline_in_non_debug_calling_convention) void {
-    // TODO: GDT, TSS, IDT
+pub fn loadCpu(cpu: *kernel.Cpu) callconv(core.inline_in_non_debug_calling_convention) void { // TODO: TSS, IDT
+    const arch = &cpu.arch;
+
+    arch.gdt.load();
 
     x86_64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
 }

@@ -8,6 +8,7 @@ const kernel = @import("kernel");
 const lib_x86_64 = @import("lib_x86_64");
 pub usingnamespace lib_x86_64;
 
+pub const ArchCpu = @import("ArchCpu.zig");
 pub const init = @import("init.zig");
 pub const SerialPort = @import("SerialPort.zig");
 
