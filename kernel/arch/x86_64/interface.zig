@@ -29,3 +29,12 @@ pub const interrupts = struct {
     pub const disableInterruptsAndHalt = x86_64.disableInterruptsAndHalt;
     pub const disableInterrupts = x86_64.disableInterrupts;
 };
+
+pub const paging = struct {
+    pub const standard_page_size = x86_64.PageTable.small_page_size;
+    pub const all_page_sizes = &.{
+        x86_64.PageTable.small_page_size,
+        x86_64.PageTable.medium_page_size,
+        x86_64.PageTable.large_page_size,
+    };
+};
