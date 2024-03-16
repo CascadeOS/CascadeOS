@@ -8,7 +8,9 @@ const kernel = @import("kernel");
 const limine = @import("limine");
 
 export fn _start() callconv(.C) noreturn {
-    @call(.never_inline, @import("init.zig").kernelInit, .{});
+    @call(.never_inline, @import("init.zig").kernelInit, .{}) catch |err| {
+        core.panicFmt("unhandled error: {s}", .{@errorName(err)});
+    };
     core.panic("`init.kernelInit` returned");
 }
 
