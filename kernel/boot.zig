@@ -14,6 +14,14 @@ export fn _start() callconv(.C) noreturn {
     core.panic("`init.kernelInit` returned");
 }
 
+/// Returns the direct map address provided by the bootloader, if any.
+pub fn directMapAddress() ?core.VirtualAddress {
+    if (limine_requests.hhdm.response) |resp| {
+        return resp.offset;
+    }
+    return null;
+}
+
 /// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMap(direction: Direction) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
@@ -117,6 +125,7 @@ const LimineMemoryMapIterator = struct {
 const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 1 };
     export var memmap: limine.Memmap = .{};
+    export var hhdm: limine.HHDM = .{};
 };
 
 comptime {
