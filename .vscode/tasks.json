@@ -7,18 +7,6 @@
     "tasks": [
         // Kernel
         {
-            "label": "kernels",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "kernels",
-            ],
-            "group": {
-                "kind": "build"
-            }
-        },
-        {
             "label": "kernel_x86_64",
             "type": "process",
             "command": "zig",
@@ -31,9 +19,9 @@
             }
         },
 
-        // Build
+        // Tools
         {
-            "label": "tools_build",
+            "label": "build all tools",
             "type": "process",
             "command": "zig",
             "args": [
@@ -45,10 +33,24 @@
             }
         },
 
+        // Applications
+        {
+            "label": "build all applications",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "apps_build"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+
 
         // Test
         {
-            "label": "test",
+            "label": "all tests",
             "type": "process",
             "command": "zig",
             "args": [
@@ -60,7 +62,7 @@
             }
         },
         {
-            "label": "libraries",
+            "label": "library tests",
             "type": "process",
             "command": "zig",
             "args": [
@@ -72,7 +74,7 @@
             }
         },
         {
-            "label": "tools",
+            "label": "tool tests",
             "type": "process",
             "command": "zig",
             "args": [
@@ -81,32 +83,6 @@
             ],
             "group": {
                 "kind": "test"
-            }
-        },
-
-        // Images
-        {
-            "label": "images",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "images",
-            ],
-            "group": {
-                "kind": "build"
-            }
-        },
-        {
-            "label": "image_x86_64",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "image_x86_64",
-            ],
-            "group": {
-                "kind": "build"
             }
         },
     ],
