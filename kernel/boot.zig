@@ -42,27 +42,10 @@ pub const MemoryMapEntry = struct {
         reclaimable,
     };
 
-    /// The length of the longest tag name in the `MemoryMapEntry.Type` enum.
-    const length_of_longest_tag_name = blk: {
-        var longest_so_far = 0;
-        for (std.meta.tags(Type)) |tag| {
-            const length = @tagName(tag).len;
-            if (length > longest_so_far) longest_so_far = length;
-        }
-        break :blk longest_so_far;
-    };
-
     pub fn print(entry: MemoryMapEntry, writer: anytype) !void {
         try writer.writeAll("MemoryMapEntry - ");
 
-        try std.fmt.formatBuf(
-            @tagName(entry.type),
-            .{
-                .alignment = .left,
-                .width = length_of_longest_tag_name,
-            },
-            writer,
-        );
+        try writer.writeAll(@tagName(entry.type));
 
         try writer.writeAll(" - ");
 
