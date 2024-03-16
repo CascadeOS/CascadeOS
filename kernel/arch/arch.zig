@@ -96,6 +96,9 @@ pub const paging = struct {
 
     /// All the page sizes supported by the architecture in order of smallest to largest.
     pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
+
+    /// The virtual address of the higher half.
+    pub const higher_half: core.VirtualAddress = current.paging.higher_half;
 };
 
 /// Checks if the current architecture implements the given function.

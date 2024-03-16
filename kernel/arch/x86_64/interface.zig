@@ -37,4 +37,6 @@ pub const paging = struct {
         x86_64.PageTable.medium_page_size,
         x86_64.PageTable.large_page_size,
     };
+
+    pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 };
