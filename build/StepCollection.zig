@@ -15,8 +15,8 @@ kernel_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 /// A map from targets to their image build steps.
 image_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
-/// A map from targets to their Cascade library build steps.
-cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+// /// A map from targets to their Cascade library build steps.
+// cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
 /// A map from targets to their non-Cascade library test steps.
 non_cascade_library_test_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
@@ -99,19 +99,19 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
     );
     all_test_step.dependOn(all_library_step);
 
-    const all_library_cascade_test_step = b.step(
-        "libraries_cascade",
-        "Build all the library tests targeting cascade",
-    );
-    all_library_step.dependOn(all_library_cascade_test_step);
+    // const all_library_cascade_test_step = b.step(
+    //     "libraries_cascade",
+    //     "Build all the library tests targeting cascade",
+    // );
+    // all_library_step.dependOn(all_library_cascade_test_step);
 
-    const cascade_library_build_steps_per_target = try buildPerTargetSteps(
-        b,
-        targets,
-        all_library_cascade_test_step,
-        "libraries_cascade_{s}",
-        "Build all the library tests for {s} targeting cascade",
-    );
+    // const cascade_library_build_steps_per_target = try buildPerTargetSteps(
+    //     b,
+    //     targets,
+    //     all_library_cascade_test_step,
+    //     "libraries_cascade_{s}",
+    //     "Build all the library tests for {s} targeting cascade",
+    // );
 
     const all_library_host_test_step = b.step(
         "libraries_host",
@@ -151,7 +151,7 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
 
         .image_build_steps_per_target = image_build_steps_per_target,
 
-        .cascade_library_build_steps_per_target = cascade_library_build_steps_per_target,
+        // .cascade_library_build_steps_per_target = cascade_library_build_steps_per_target,
 
         .non_cascade_library_test_steps_per_target = non_cascade_library_test_steps_per_target,
 

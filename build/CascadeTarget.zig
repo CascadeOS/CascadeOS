@@ -9,8 +9,8 @@ const helpers = @import("helpers.zig");
 pub const CascadeTarget = enum {
     x86_64,
 
-    /// Returns a CrossTarget for building tests targeting the host system.
-    pub fn getNonCascadeTestCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
+    /// Returns a CrossTarget for building targeting the host system.
+    pub fn getNonCascadeCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         const target_query: std.Target.Query = switch (self) {
             .x86_64 => .{ .cpu_arch = .x86_64 },
         };
@@ -18,11 +18,10 @@ pub const CascadeTarget = enum {
         return b.resolveTargetQuery(target_query);
     }
 
-    /// Returns a CrossTarget for building tests targeting cascade.
-    pub fn getCascadeTestCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
-        // TODO: os_tag should be other
+    /// Returns a CrossTarget for building targeting cascade.
+    pub fn getCascadeCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         const target_query: std.Target.Query = switch (self) {
-            .x86_64 => .{ .cpu_arch = .x86_64 },
+            .x86_64 => .{ .cpu_arch = .x86_64, .os_tag = .other },
         };
 
         return b.resolveTargetQuery(target_query);

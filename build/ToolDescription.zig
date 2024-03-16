@@ -8,7 +8,7 @@ const LibraryDependency = @import("LibraryDependency.zig");
 const ToolDescription = @This();
 
 /// The name of the tool:
-///   - used for the path to the root file path `tools/{name}/{name}.zig`
+///   - used for the path to the root file `tools/{name}/{name}.zig`
 ///   - used in any build steps created for the tool
 name: []const u8,
 

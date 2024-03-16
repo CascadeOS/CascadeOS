@@ -191,8 +191,8 @@ fn resolveLibrary(
             options,
             target,
             dependencies,
-            all_build_and_run_step,
-            step_collection,
+            // all_build_and_run_step,
+            // step_collection,
             &cascade_modules,
         );
 
@@ -234,52 +234,52 @@ fn cascadeTestExecutableAndModule(
     options: Options,
     target: CascadeTarget,
     dependencies: []Dependency,
-    all_build_and_run_step: *std.Build.Step,
-    step_collection: StepCollection,
+    // all_build_and_run_step: *std.Build.Step,
+    // step_collection: StepCollection,
     cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 ) !void {
-    const test_exe = try createTestExe(
-        b,
-        library_description,
-        lazy_path,
-        options,
-        target,
-        dependencies,
-        true,
-    );
+    // const test_exe = try createTestExe(
+    //     b,
+    //     library_description,
+    //     lazy_path,
+    //     options,
+    //     target,
+    //     dependencies,
+    //     true,
+    // );
 
-    const install_step = b.addInstallArtifact(
-        test_exe,
-        .{
-            .dest_dir = .{
-                .override = .{
-                    .custom = b.pathJoin(&.{
-                        @tagName(target),
-                        "tests",
-                        "cascade",
-                    }),
-                },
-            },
-        },
-    );
+    // const install_step = b.addInstallArtifact(
+    //     test_exe,
+    //     .{
+    //         .dest_dir = .{
+    //             .override = .{
+    //                 .custom = b.pathJoin(&.{
+    //                     @tagName(target),
+    //                     "tests",
+    //                     "cascade",
+    //                 }),
+    //             },
+    //         },
+    //     },
+    // );
 
-    const build_step_name = try std.fmt.allocPrint(
-        b.allocator,
-        "{s}_cascade_{s}",
-        .{ library_description.name, @tagName(target) },
-    );
+    // const build_step_name = try std.fmt.allocPrint(
+    //     b.allocator,
+    //     "{s}_cascade_{s}",
+    //     .{ library_description.name, @tagName(target) },
+    // );
 
-    const build_step_description = try std.fmt.allocPrint(
-        b.allocator,
-        "Build the tests for {s} on {s} targeting cascade",
-        .{ library_description.name, @tagName(target) },
-    );
+    // const build_step_description = try std.fmt.allocPrint(
+    //     b.allocator,
+    //     "Build the tests for {s} on {s} targeting cascade",
+    //     .{ library_description.name, @tagName(target) },
+    // );
 
-    const build_step = b.step(build_step_name, build_step_description);
-    build_step.dependOn(&install_step.step);
+    // const build_step = b.step(build_step_name, build_step_description);
+    // build_step.dependOn(&install_step.step);
 
-    all_build_and_run_step.dependOn(build_step);
-    step_collection.registerCascadeLibrary(target, build_step);
+    // all_build_and_run_step.dependOn(build_step);
+    // step_collection.registerCascadeLibrary(target, build_step);
 
     const module = try createModule(
         b,
@@ -384,7 +384,7 @@ fn createTestExe(
         .name = library_description.name,
         .root_source_file = lazy_path,
         .optimize = options.optimize,
-        .target = if (build_for_cascade) target.getCascadeTestCrossTarget(b) else target.getNonCascadeTestCrossTarget(b),
+        .target = if (build_for_cascade) target.getCascadeCrossTarget(b) else target.getNonCascadeCrossTarget(b),
     });
 
     addDependenciesToModule(
