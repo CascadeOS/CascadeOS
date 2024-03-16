@@ -5,6 +5,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 const Step = std.Build.Step;
 
+const Application = @import("build/Application.zig");
 const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
 const DepGraphStep = @import("build/DepGraphStep.zig");
 const ImageStep = @import("build/ImageStep.zig");
@@ -57,6 +58,14 @@ pub fn build(b: *std.Build) !void {
         options.optimize,
     );
 
+    const applications = try Application.getApplications(
+        b,
+        step_collection,
+        libraries,
+        options.optimize,
+        all_targets,
+    );
+
     const kernels = try Kernel.getKernels(
         b,
         step_collection,
@@ -76,7 +85,7 @@ pub fn build(b: *std.Build) !void {
 
     try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
 
-    try DepGraphStep.register(b, kernels, libraries, tools);
+    try DepGraphStep.register(b, kernels, libraries, tools, applications);
 }
 
 fn disableUnsupportedSteps(b: *std.Build) !void {
