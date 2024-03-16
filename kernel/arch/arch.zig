@@ -26,7 +26,7 @@ pub inline fn spinLoopHint() void {
 /// Assumes that `init.loadCpu()` has been called on the currently running CPU.
 ///
 /// Asserts that interrupts are disabled.
-pub fn getCpu() callconv(core.inline_in_non_debug_calling_convention) *kernel.Cpu {
+pub inline fn getCpu() *kernel.Cpu {
     checkSupport(current, "getCpu", fn () *kernel.Cpu);
 
     return current.getCpu();
@@ -44,30 +44,30 @@ pub const init = struct {
     }
 
     /// Acquire a writer for the early output setup by `setupEarlyOutput`.
-    pub fn getEarlyOutput() callconv(core.inline_in_non_debug_calling_convention) ?current.init.EarlyOutputWriter {
+    pub inline fn getEarlyOutput() ?current.init.EarlyOutputWriter {
         checkSupport(current.init, "getEarlyOutput", fn () ?current.init.EarlyOutputWriter);
 
         return current.init.getEarlyOutput();
     }
 
     /// Ensure that any exceptions/faults that occur are handled.
-    pub fn initInterrupts() callconv(core.inline_in_non_debug_calling_convention) void {
+    pub inline fn initInterrupts() void {
         checkSupport(current.init, "initInterrupts", fn () void);
 
         current.init.initInterrupts();
     }
 
     /// Prepares the provided `Cpu` for the bootstrap processor.
-    pub fn prepareBootstrapCpu(
+    pub inline fn prepareBootstrapCpu(
         bootstrap_cpu: *kernel.Cpu,
-    ) callconv(core.inline_in_non_debug_calling_convention) void {
+    ) void {
         checkSupport(current.init, "prepareBootstrapCpu", fn (*kernel.Cpu) void);
 
         current.init.prepareBootstrapCpu(bootstrap_cpu);
     }
 
     /// Load the provided `Cpu` as the current CPU.
-    pub fn loadCpu(cpu: *kernel.Cpu) callconv(core.inline_in_non_debug_calling_convention) void {
+    pub inline fn loadCpu(cpu: *kernel.Cpu) void {
         checkSupport(current.init, "loadCpu", fn (*kernel.Cpu) void);
 
         current.init.loadCpu(cpu);
@@ -76,14 +76,14 @@ pub const init = struct {
 
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
-    pub fn disableInterruptsAndHalt() callconv(core.inline_in_non_debug_calling_convention) noreturn {
+    pub inline fn disableInterruptsAndHalt() noreturn {
         checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);
 
         current.interrupts.disableInterruptsAndHalt();
     }
 
     /// Disable interrupts.
-    pub fn disableInterrupts() callconv(core.inline_in_non_debug_calling_convention) void {
+    pub inline fn disableInterrupts() void {
         checkSupport(current.interrupts, "disableInterrupts", fn () void);
 
         current.interrupts.disableInterrupts();
