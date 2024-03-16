@@ -22,6 +22,22 @@ pub fn directMapAddress() ?core.VirtualAddress {
     return null;
 }
 
+pub const KernelBaseAddress = struct {
+    virtual: core.VirtualAddress,
+    physical: core.PhysicalAddress,
+};
+
+/// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
+pub fn kernelBaseAddress() ?KernelBaseAddress {
+    if (limine_requests.kernel_address.response) |resp| {
+        return .{
+            .virtual = resp.virtual_base,
+            .physical = resp.physical_base,
+        };
+    }
+    return null;
+}
+
 /// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMap(direction: Direction) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
@@ -126,6 +142,7 @@ const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 1 };
     export var memmap: limine.Memmap = .{};
     export var hhdm: limine.HHDM = .{};
+    export var kernel_address: limine.KernelAddress = .{};
 };
 
 comptime {
