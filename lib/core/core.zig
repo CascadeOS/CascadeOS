@@ -23,13 +23,19 @@ pub const VirtualRange = address.VirtualRange;
 pub const testing = @import("testing.zig");
 
 pub inline fn assert(ok: bool) void {
-    if (comptime @inComptime() or safety)
-        if (!ok) unreachable;
+    if (!ok) unreachable;
 }
 
 pub inline fn debugAssert(ok: bool) void {
-    if (comptime @inComptime() or debug)
+    if (builtin.mode == .ReleaseSafe) {
+        @setRuntimeSafety(false);
+
         if (!ok) unreachable;
+
+        return;
+    }
+
+    if (!ok) unreachable;
 }
 
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
