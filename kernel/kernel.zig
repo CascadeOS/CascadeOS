@@ -15,7 +15,7 @@ comptime {
 }
 
 pub const std_options: std.Options = .{
-    .log_level = log.std_log_level,
+    .log_level = log.log_level,
     .logFn = log.stdLogImpl,
 };
 
