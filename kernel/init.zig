@@ -20,7 +20,7 @@ pub fn kernelInit() void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
-    // we need to get the current cpu loaded early as the panic handler and logging use it
+    // we need to get the current cpu loaded early as most code assumes it is available
     kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
