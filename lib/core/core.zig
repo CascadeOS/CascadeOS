@@ -22,15 +22,12 @@ pub const VirtualRange = address.VirtualRange;
 
 pub const testing = @import("testing.zig");
 
-/// Using `.Unspecified` prevents stack frames being lost due to inlining in debug mode.
-pub const inline_in_non_debug_calling_convention: std.builtin.CallingConvention = if (debug) .Unspecified else .Inline;
-
-pub fn assert(ok: bool) callconv(inline_in_non_debug_calling_convention) void {
+pub inline fn assert(ok: bool) void {
     if (comptime @inComptime() or safety)
         if (!ok) unreachable;
 }
 
-pub fn debugAssert(ok: bool) callconv(inline_in_non_debug_calling_convention) void {
+pub inline fn debugAssert(ok: bool) void {
     if (comptime @inComptime() or debug)
         if (!ok) unreachable;
 }

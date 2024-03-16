@@ -242,20 +242,20 @@ pub const init = struct {
         /// Prepares the counter to wait for `duration`.
         ///
         /// Must be called before `waitFor` is called.
-        pub fn prepareToWaitFor(
+        pub inline fn prepareToWaitFor(
             self: ReferenceCounter,
             duration: core.Duration,
-        ) callconv(core.inline_in_non_debug_calling_convention) void {
+        ) void {
             self._prepareToWaitForFn(duration);
         }
 
         /// Waits for `duration`.
         ///
         /// Must be called after `prepareToWaitFor` is called.
-        pub fn waitFor(
+        pub inline fn waitFor(
             self: ReferenceCounter,
             duration: core.Duration,
-        ) callconv(core.inline_in_non_debug_calling_convention) void {
+        ) void {
             self._waitForFn(duration);
         }
     };
