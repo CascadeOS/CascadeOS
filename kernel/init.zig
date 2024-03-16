@@ -11,8 +11,6 @@ var bootstrap_cpu: kernel.Cpu = .{
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
-const starting_message = "starting CascadeOS " ++ @import("kernel_options").cascade_version ++ "\n";
-
 /// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap cpu executes this function.
@@ -24,12 +22,14 @@ pub fn kernelInit() void {
     kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
+    // ensure any interrupts are handled
+    kernel.arch.init.initInterrupts();
+
     // now that early output and the bootstrap cpu are loaded, we can switch to the init panic
     kernel.debug.init.loadInitPanic();
 
-    kernel.arch.init.initInterrupts();
-
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
+        const starting_message = comptime "starting CascadeOS " ++ @import("kernel_options").cascade_version ++ "\n";
         early_output.writeAll(starting_message) catch {};
     }
 }
