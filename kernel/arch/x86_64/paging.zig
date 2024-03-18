@@ -205,7 +205,7 @@ fn mapTo4KiB(
 fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: MapType,
-) error{ OutOfMemory, Unexpected }!*PageTable {
+) error{ PhysicalMemoryExhausted, Unexpected }!*PageTable {
     var opt_range: ?core.PhysicalRange = null;
 
     if (!self.present.read()) {

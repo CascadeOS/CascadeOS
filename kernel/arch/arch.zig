@@ -121,7 +121,7 @@ pub const paging = struct {
 
     pub const MapError = error{
         AlreadyMapped,
-        OutOfMemory,
+        PhysicalMemoryExhausted,
         Unexpected,
     };
 

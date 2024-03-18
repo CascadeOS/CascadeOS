@@ -12,7 +12,7 @@ const log = kernel.log.scoped(.pmm);
 var first_free_physical_page: ?*PhysPageNode = null;
 
 /// Allocates a physical page.
-pub fn allocatePage() !core.PhysicalRange {
+pub fn allocatePage() error{PhysicalMemoryExhausted}!core.PhysicalRange {
     var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
 
     while (first_free_page_opt) |first_free_page| {
@@ -31,6 +31,7 @@ pub fn allocatePage() !core.PhysicalRange {
         const physical_address = kernel.physicalFromDirectMap(
             core.VirtualAddress.fromPtr(first_free_page),
         ) catch unreachable;
+
         const allocated_range = core.PhysicalRange.fromAddr(
             physical_address,
             kernel.arch.paging.standard_page_size,
@@ -42,7 +43,7 @@ pub fn allocatePage() !core.PhysicalRange {
     }
 
     log.warn("PAGE ALLOCATION FAILED", .{});
-    return error.OutOfMemory;
+    return error.PhysicalMemoryExhausted;
 }
 
 /// Deallocates a physical page.
