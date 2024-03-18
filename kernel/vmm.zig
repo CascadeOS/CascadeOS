@@ -12,6 +12,14 @@ const log = kernel.log.scoped(.vmm);
 var kernel_page_table: kernel.arch.paging.PageTable = .{};
 var memory_layout: KernelMemoryLayout = .{};
 
+pub fn loadKernelPageTable() void {
+    kernel.arch.paging.switchToPageTable(
+        kernel.physicalFromKernelSectionUnsafe(
+            core.VirtualAddress.fromPtr(&kernel_page_table),
+        ),
+    );
+}
+
 pub const init = struct {
     pub fn buildKernelPageTableAndSwitch() !void {
         log.debug("building kernel page table", .{});
@@ -36,14 +44,6 @@ pub const init = struct {
                 log.debug("\t{}", .{region});
             }
         }
-    }
-
-    pub fn loadKernelPageTable() void {
-        kernel.arch.paging.switchToPageTable(
-            kernel.physicalFromKernelSectionUnsafe(
-                core.VirtualAddress.fromPtr(&kernel_page_table),
-            ),
-        );
     }
 
     /// Maps the direct maps in the kernel page table and registers them in the memory layout.
