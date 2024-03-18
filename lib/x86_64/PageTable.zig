@@ -9,7 +9,7 @@ const x86_64 = @import("x86_64");
 
 /// A page table for x86_64.
 pub const PageTable = extern struct {
-    entries: [number_of_entries]Entry align(small_page_size.value),
+    entries: [number_of_entries]Entry align(small_page_size.value) = [_]Entry{Entry.empty} ** number_of_entries,
 
     pub const number_of_entries = 512;
     pub const small_page_size = core.Size.from(4, .kib);
@@ -301,6 +301,8 @@ pub const PageTable = extern struct {
         _backing: u64,
 
         const ADDRESS_MASK: u64 = 0x000f_ffff_ffff_f000;
+
+        pub const empty: Entry = .{ ._backing = 0 };
 
         pub fn zero(self: *Entry) void {
             self._backing = 0;
