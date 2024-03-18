@@ -15,6 +15,10 @@ pub const PhysicalAddress = extern struct {
         return .{ .value = value };
     }
 
+    pub inline fn toRange(self: PhysicalAddress, size: core.Size) PhysicalRange {
+        return .{ .address = self, .size = size };
+    }
+
     pub usingnamespace AddrMixin(@This());
 
     comptime {
@@ -40,6 +44,10 @@ pub const VirtualAddress = extern struct {
     /// It is the caller's responsibility to ensure that the address is valid in the current address space.
     pub inline fn toPtr(self: VirtualAddress, comptime PtrT: type) PtrT {
         return @ptrFromInt(self.value);
+    }
+
+    pub inline fn toRange(self: VirtualAddress, size: core.Size) VirtualRange {
+        return .{ .address = self, .size = size };
     }
 
     pub usingnamespace AddrMixin(@This());
