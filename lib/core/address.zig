@@ -72,11 +72,25 @@ fn AddrMixin(comptime Self: type) type {
             return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
         }
 
+        /// Rounds up the address to the nearest multiple of the given alignment.
+        ///
+        /// `alignment` must be a power of two.
+        pub inline fn alignForwardInPlace(self: *Self, alignment: core.Size) void {
+            self.value = std.mem.alignForward(u64, self.value, alignment.value);
+        }
+
         /// Returns the address rounded down to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
         pub inline fn alignBackward(self: Self, alignment: core.Size) Self {
             return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
+        }
+
+        /// Rounds down the address to the nearest multiple of the given alignment.
+        ///
+        /// `alignment` must be a power of two.
+        pub inline fn alignBackwardInPlace(self: *Self, alignment: core.Size) void {
+            self.value = std.mem.alignBackward(u64, self.value, alignment.value);
         }
 
         pub inline fn moveForward(self: Self, size: core.Size) Self {
@@ -187,7 +201,7 @@ fn RangeMixin(comptime Self: type) type {
     return struct {
         pub const AddrType = std.meta.fieldInfo(Self, .address).type;
 
-        pub inline fn fromAddr(address: anytype, size: core.Size) Self {
+        pub inline fn fromAddr(address: AddrType, size: core.Size) Self {
             return .{
                 .address = address,
                 .size = size,
@@ -231,7 +245,7 @@ fn RangeMixin(comptime Self: type) type {
             return true;
         }
 
-        pub fn contains(self: Self, address: anytype) bool {
+        pub fn contains(self: Self, address: AddrType) bool {
             return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
         }
 
