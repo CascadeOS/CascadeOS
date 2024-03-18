@@ -45,6 +45,8 @@ pub fn kernelInit() !void {
 
     log.debug("adding free memory to pmm", .{});
     try addFreeMemoryToPmm();
+
+    try kernel.vmm.init.buildKernelPageTableAndSwitch();
 }
 
 fn captureKernelOffsets() !void {
