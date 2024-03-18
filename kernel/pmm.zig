@@ -45,6 +45,40 @@ pub fn allocatePage() !core.PhysicalRange {
     return error.OutOfMemory;
 }
 
+/// Deallocates a physical page.
+///
+/// **REQUIREMENTS**:
+/// - `range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `range.size` must be *equal* to `kernel.arch.paging.standard_page_size`
+pub fn deallocatePage(range: core.PhysicalRange) void {
+    core.debugAssert(range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(range.size.equal(kernel.arch.paging.standard_page_size));
+
+    const page_node = kernel.directMapFromPhysical(range.address).toPtr(*PhysPageNode);
+
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
+
+    while (true) {
+        page_node.next = first_free_page_opt;
+
+        if (@cmpxchgWeak(
+            ?*PhysPageNode,
+            &first_free_physical_page,
+            first_free_page_opt,
+            page_node,
+            .acq_rel,
+            .acquire,
+        )) |new_first_free_page| {
+            first_free_page_opt = new_first_free_page;
+            continue;
+        }
+
+        log.debug("deallocated page: {}", .{range});
+
+        return;
+    }
+}
+
 const PhysPageNode = extern struct {
     next: ?*PhysPageNode = null,
 
