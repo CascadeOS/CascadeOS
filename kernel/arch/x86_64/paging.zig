@@ -126,10 +126,21 @@ fn mapTo1GiB(
     core.debugAssert(virtual_address.isAligned(PageTable.large_page_size));
     core.debugAssert(physical_address.isAligned(PageTable.large_page_size));
 
-    const level3_table = try ensureNextTable(
-        level4_table.getEntryLevel4(virtual_address),
+    const level4_entry = level4_table.getEntryLevel4(virtual_address);
+
+    const level3_table, const created_level3_table = try ensureNextTable(
+        level4_entry,
         map_type,
     );
+    errdefer {
+        if (created_level3_table) {
+            level4_entry.zero();
+            kernel.pmm.deallocatePage(
+                kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(level3_table))
+                    .toRange(PageTable.small_page_size),
+            );
+        }
+    }
 
     const entry = level3_table.getEntryLevel3(virtual_address);
     if (entry.present.read()) return error.AlreadyMapped;
@@ -150,15 +161,37 @@ fn mapTo2MiB(
     core.debugAssert(virtual_address.isAligned(PageTable.medium_page_size));
     core.debugAssert(physical_address.isAligned(PageTable.medium_page_size));
 
-    const level3_table = try ensureNextTable(
-        level4_table.getEntryLevel4(virtual_address),
-        map_type,
-    );
+    const level4_entry = level4_table.getEntryLevel4(virtual_address);
 
-    const level2_table = try ensureNextTable(
-        level3_table.getEntryLevel3(virtual_address),
+    const level3_table, const created_level3_table = try ensureNextTable(
+        level4_entry,
         map_type,
     );
+    errdefer {
+        if (created_level3_table) {
+            level4_entry.zero();
+            kernel.pmm.deallocatePage(
+                kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(level3_table))
+                    .toRange(PageTable.small_page_size),
+            );
+        }
+    }
+
+    const level3_entry = level3_table.getEntryLevel3(virtual_address);
+
+    const level2_table, const created_level2_table = try ensureNextTable(
+        level3_entry,
+        map_type,
+    );
+    errdefer {
+        if (created_level2_table) {
+            level3_entry.zero();
+            kernel.pmm.deallocatePage(
+                kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(level2_table))
+                    .toRange(PageTable.small_page_size),
+            );
+        }
+    }
 
     const entry = level2_table.getEntryLevel2(virtual_address);
     if (entry.present.read()) return error.AlreadyMapped;
@@ -177,21 +210,55 @@ fn mapTo4KiB(
     map_type: MapType,
 ) MapError!void {
     core.debugAssert(virtual_address.isAligned(PageTable.small_page_size));
+    core.debugAssert(physical_address.isAligned(PageTable.small_page_size));
 
-    const level3_table = try ensureNextTable(
-        level4_table.getEntryLevel4(virtual_address),
+    const level4_entry = level4_table.getEntryLevel4(virtual_address);
+
+    const level3_table, const created_level3_table = try ensureNextTable(
+        level4_entry,
         map_type,
     );
+    errdefer {
+        if (created_level3_table) {
+            level4_entry.zero();
+            kernel.pmm.deallocatePage(
+                kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(level3_table))
+                    .toRange(PageTable.small_page_size),
+            );
+        }
+    }
 
-    const level2_table = try ensureNextTable(
-        level3_table.getEntryLevel3(virtual_address),
+    const level3_entry = level3_table.getEntryLevel3(virtual_address);
+
+    const level2_table, const created_level2_table = try ensureNextTable(
+        level3_entry,
         map_type,
     );
+    errdefer {
+        if (created_level2_table) {
+            level3_entry.zero();
+            kernel.pmm.deallocatePage(
+                kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(level2_table))
+                    .toRange(PageTable.small_page_size),
+            );
+        }
+    }
 
-    const level1_table = try ensureNextTable(
-        level2_table.getEntryLevel2(virtual_address),
+    const level2_entry = level2_table.getEntryLevel2(virtual_address);
+
+    const level1_table, const created_level1_table = try ensureNextTable(
+        level2_entry,
         map_type,
     );
+    errdefer {
+        if (created_level1_table) {
+            level2_entry.zero();
+            kernel.pmm.deallocatePage(
+                kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(level1_table))
+                    .toRange(PageTable.small_page_size),
+            );
+        }
+    }
 
     const entry = level1_table.getEntryLevel1(virtual_address);
     if (entry.present.read()) return error.AlreadyMapped;
@@ -205,7 +272,7 @@ fn mapTo4KiB(
 fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: MapType,
-) error{ PhysicalMemoryExhausted, Unexpected }!*PageTable {
+) error{ PhysicalMemoryExhausted, Unexpected }!struct { *PageTable, bool } {
     var opt_range: ?core.PhysicalRange = null;
 
     if (!self.present.read()) {
@@ -213,7 +280,7 @@ fn ensureNextTable(
         self.setAddress4kib(opt_range.?.address);
     }
     errdefer if (opt_range) |range| {
-        self.setAddress4kib(core.PhysicalAddress.zero);
+        self.zero();
         kernel.pmm.deallocatePage(range);
     };
 
@@ -226,7 +293,7 @@ fn ensureNextTable(
 
     if (opt_range != null) next_level.zero();
 
-    return next_level;
+    return .{ next_level, opt_range != null };
 }
 
 fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
