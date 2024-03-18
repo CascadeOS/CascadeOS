@@ -35,6 +35,7 @@ pub fn kernelInit() !void {
         early_output.writeAll(starting_message) catch {};
     }
 
+    log.debug("capturing kernel offsets", .{});
     try captureKernelOffsets();
 
     log.debug("capturing direct maps", .{});
@@ -46,7 +47,22 @@ pub fn kernelInit() !void {
     log.debug("adding free memory to pmm", .{});
     try addFreeMemoryToPmm();
 
+    log.debug("building and switching to kernel page table", .{});
     try kernel.vmm.init.buildKernelPageTableAndSwitch();
+
+    kernelInitStage2(&bootstrap_cpu);
+}
+
+/// Stage 2 of kernel initialization.
+///
+/// This function is executed by all cpus, including the bootstrap cpu.
+///
+/// All cpus are using the bootloader provided stack.
+fn kernelInitStage2(cpu: *kernel.Cpu) noreturn {
+    kernel.vmm.loadKernelPageTable();
+    kernel.arch.init.loadCpu(cpu);
+
+    unreachable; // UNIMPLEMENTED
 }
 
 fn captureKernelOffsets() !void {
