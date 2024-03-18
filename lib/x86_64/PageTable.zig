@@ -69,6 +69,7 @@ pub const PageTable = extern struct {
         self: *const PageTable,
         writer: anytype,
         comptime print_detailed_level1: bool,
+        comptime validVirtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
     ) !void {
         for (self.entries, 0..) |level4_entry, level4_index| {
             if (!level4_entry.present.read()) continue;
@@ -82,7 +83,7 @@ pub const PageTable = extern struct {
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
-            const level3_table = try level4_entry.getNextLevel();
+            const level3_table = try level4_entry.getNextLevel(validVirtualFromPhysical);
             for (level3_table.entries, 0..) |level3_entry, level3_index| {
                 if (!level3_entry.present.read()) continue;
 
@@ -101,7 +102,7 @@ pub const PageTable = extern struct {
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
-                const level2_table = try level3_entry.getNextLevel();
+                const level2_table = try level3_entry.getNextLevel(validVirtualFromPhysical);
                 for (level2_table.entries, 0..) |level2_entry, level2_index| {
                     if (!level2_entry.present.read()) continue;
 
@@ -123,7 +124,7 @@ pub const PageTable = extern struct {
                     // use only when `print_detailed_level1` is false
                     var level1_present_entries: usize = 0;
 
-                    const level1_table = try level2_entry.getNextLevel();
+                    const level1_table = try level2_entry.getNextLevel(validVirtualFromPhysical);
                     for (level1_table.entries, 0..) |level1_entry, level1_index| {
                         if (!level1_entry.present.read()) continue;
 
