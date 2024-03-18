@@ -36,8 +36,14 @@ pub fn kernelInit() !void {
     }
 
     try captureKernelOffsets();
+
+    log.debug("capturing direct maps", .{});
     try captureDirectMaps();
 
+    log.debug("capturing system information", .{});
+    kernel.arch.init.captureSystemInformation();
+
+    log.debug("adding free memory to pmm", .{});
     try addFreeMemoryToPmm();
 }
 
@@ -59,8 +65,6 @@ fn captureKernelOffsets() !void {
 }
 
 fn captureDirectMaps() !void {
-    log.debug("capturing direct maps", .{});
-
     const direct_map_size = try calculateLengthOfDirectMap();
 
     kernel.info.direct_map = try calculateDirectMapRange(direct_map_size);
@@ -138,8 +142,6 @@ fn calculateNonCachedDirectMapRange(
 }
 
 fn addFreeMemoryToPmm() !void {
-    log.debug("adding free memory to pmm", .{});
-
     var size = core.Size.zero;
 
     var memory_map_iterator = kernel.boot.memoryMap(.forwards);

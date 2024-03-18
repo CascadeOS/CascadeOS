@@ -23,6 +23,8 @@ pub const init = struct {
 
     pub const prepareBootstrapCpu = x86_64.init.prepareBootstrapCpu;
     pub const loadCpu = x86_64.init.loadCpu;
+
+    pub const captureSystemInformation = x86_64.init.captureSystemInformation;
 };
 
 pub const interrupts = struct {

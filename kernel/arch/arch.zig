@@ -72,6 +72,15 @@ pub const init = struct {
 
         current.init.loadCpu(cpu);
     }
+
+    /// Capture any system information that is required for the architecture.
+    ///
+    /// For example, on x86_64 this should capture the CPUID information.
+    pub inline fn captureSystemInformation() void {
+        checkSupport(current.init, "captureSystemInformation", fn () void);
+
+        current.init.captureSystemInformation();
+    }
 };
 
 pub const interrupts = struct {

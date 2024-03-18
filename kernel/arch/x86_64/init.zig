@@ -5,6 +5,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+const log = kernel.log.scoped(.init_x86_64);
+
 const x86_64 = @import("x86_64.zig");
 
 var early_output_serial_port: ?x86_64.SerialPort = null;
@@ -37,4 +39,12 @@ pub fn loadCpu(cpu: *kernel.Cpu) void {
     x86_64.interrupts.init.loadIdt();
 
     x86_64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
+}
+
+/// Capture any system information that is required for the architecture.
+///
+/// For example, on x86_64 this should capture the CPUID information.
+pub fn captureSystemInformation() void {
+    log.debug("capturing cpuid information", .{});
+    x86_64.info.cpu_id.capture() catch core.panic("cpuid is not supported");
 }
