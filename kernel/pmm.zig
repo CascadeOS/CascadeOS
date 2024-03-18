@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-//! PMM (Physical Memory Manager)
-//!
-//! Manages the physical memory of the system.
+//! Physical memory management.
 
 const std = @import("std");
 const core = @import("core");
@@ -12,6 +10,40 @@ const kernel = @import("kernel");
 const log = kernel.log.scoped(.pmm);
 
 var first_free_physical_page: ?*PhysPageNode = null;
+
+/// Allocates a physical page.
+pub fn allocatePage() !core.PhysicalRange {
+    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
+
+    while (first_free_page_opt) |first_free_page| {
+        if (@cmpxchgWeak(
+            ?*PhysPageNode,
+            &first_free_physical_page,
+            first_free_page,
+            first_free_page.next,
+            .acq_rel,
+            .acquire,
+        )) |new_first_free_page| {
+            first_free_page_opt = new_first_free_page;
+            continue;
+        }
+
+        const physical_address = kernel.physicalFromDirectMap(
+            core.VirtualAddress.fromPtr(first_free_page),
+        ) catch unreachable;
+        const allocated_range = core.PhysicalRange.fromAddr(
+            physical_address,
+            kernel.arch.paging.standard_page_size,
+        );
+
+        log.debug("allocated page: {}", .{allocated_range});
+
+        return allocated_range;
+    }
+
+    log.warn("PAGE ALLOCATION FAILED", .{});
+    return error.OutOfMemory;
+}
 
 const PhysPageNode = extern struct {
     next: ?*PhysPageNode = null,
