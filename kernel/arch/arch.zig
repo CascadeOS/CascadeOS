@@ -112,6 +112,13 @@ pub const paging = struct {
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
+    /// Switches to the page table given by `page_table_address`.
+    pub inline fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
+        checkSupport(current.paging, "switchToPageTable", fn (core.PhysicalAddress) void);
+
+        current.paging.switchToPageTable(page_table_address);
+    }
+
     pub const MapError = error{
         AlreadyMapped,
         OutOfMemory,

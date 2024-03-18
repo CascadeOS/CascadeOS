@@ -43,5 +43,6 @@ pub const paging = struct {
     pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 
     pub const PageTable = x86_64.PageTable;
+    pub const switchToPageTable = x86_64.Cr3.writeAddress;
     pub const mapToPhysicalRangeAllPageSizes = x86_64.paging.mapToPhysicalRangeAllPageSizes;
 };
