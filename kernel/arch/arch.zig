@@ -108,6 +108,9 @@ pub const paging = struct {
 
     /// The virtual address of the higher half.
     pub const higher_half: core.VirtualAddress = current.paging.higher_half;
+
+    /// The page table type for the architecture.
+    pub const PageTable: type = current.paging.PageTable;
 };
 
 /// Checks if the current architecture implements the given function.

@@ -41,4 +41,6 @@ pub const paging = struct {
     };
 
     pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
+
+    pub const PageTable = x86_64.PageTable;
 };
