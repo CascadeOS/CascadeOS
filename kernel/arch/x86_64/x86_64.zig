@@ -12,6 +12,7 @@ pub const ArchCpu = @import("ArchCpu.zig");
 pub const info = @import("info.zig");
 pub const init = @import("init.zig");
 pub const interrupts = @import("interrupts.zig");
+pub const paging = @import("paging.zig");
 pub const SerialPort = @import("SerialPort.zig");
 
 /// Get the current CPU.

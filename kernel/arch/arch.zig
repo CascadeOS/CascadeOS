@@ -111,6 +111,36 @@ pub const paging = struct {
 
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
+
+    pub const MapError = error{
+        AlreadyMapped,
+        OutOfMemory,
+        Unexpected,
+    };
+
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///
+    /// This function is allowed to use all page sizes available to the architecture.
+    pub inline fn mapToPhysicalRangeAllPageSizes(
+        page_table: *PageTable,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
+        map_type: kernel.vmm.MapType,
+    ) MapError!void {
+        checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
+            *PageTable,
+            core.VirtualRange,
+            core.PhysicalRange,
+            kernel.vmm.MapType,
+        ) MapError!void);
+
+        return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
+    }
 };
 
 /// Checks if the current architecture implements the given function.
