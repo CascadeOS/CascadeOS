@@ -44,6 +44,13 @@ pub fn physicalFromDirectMapUnsafe(self: core.VirtualAddress) core.PhysicalAddre
     return .{ .value = self.value -% info.direct_map.address.value };
 }
 
+/// Returns the physical address of the given kernel ELF section virtual address.
+///
+/// It is the caller's responsibility to ensure that the given virtual address is in the kernel ELF sections.
+pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
+    return .{ .value = self.value -% info.kernel_physical_to_virtual_offset.value };
+}
+
 /// Returns a virtual range corresponding to this physical range in the direct map.
 pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
     return .{
