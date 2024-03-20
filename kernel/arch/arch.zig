@@ -122,7 +122,9 @@ pub const paging = struct {
     pub const MapError = error{
         AlreadyMapped,
         PhysicalMemoryExhausted,
-        Unexpected,
+
+        /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+        MappingNotValid,
     };
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.

@@ -39,8 +39,6 @@ pub fn mapToPhysicalRangeAllPageSizes(
     core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(virtual_range.size.equal(virtual_range.size));
 
-    log.debug("mapToPhysicalRangeAllPageSizes - {} - {} - {}", .{ virtual_range, physical_range, map_type });
-
     var current_virtual_address = virtual_range.address;
     const end_virtual_address = virtual_range.end();
     var current_physical_address = physical_range.address;
@@ -239,6 +237,8 @@ fn mapTo1GiB(
 
     entry.huge.write(true);
     applyMapType(map_type, entry);
+
+    entry.present.write(true);
 }
 
 /// Maps a 2 MiB page.
@@ -286,6 +286,8 @@ fn mapTo2MiB(
 
     entry.huge.write(true);
     applyMapType(map_type, entry);
+
+    entry.present.write(true);
 }
 
 /// Maps a 4 KiB page.
@@ -346,39 +348,53 @@ fn mapTo4KiB(
     entry.setAddress4kib(physical_address);
 
     applyMapType(map_type, entry);
+
+    entry.present.write(true);
 }
 
 /// Ensures the next page table level exists.
 fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: MapType,
-) error{ PhysicalMemoryExhausted, Unexpected }!struct { *PageTable, bool } {
-    var opt_range: ?core.PhysicalRange = null;
+) error{ PhysicalMemoryExhausted, MappingNotValid }!struct { *PageTable, bool } {
+    var opt_backing_range: ?core.PhysicalRange = null;
 
-    if (!self.present.read()) {
-        opt_range = try kernel.pmm.allocatePage();
-        self.setAddress4kib(opt_range.?.address);
-    }
-    errdefer if (opt_range) |range| {
+    const next_level_phys_address = if (self.present.read()) blk: {
+        if (self.huge.read()) return error.MappingNotValid;
+
+        break :blk self.getAddress4kib();
+    } else blk: {
+        // ensure there are no stray bits set
         self.zero();
-        kernel.pmm.deallocatePage(range);
+
+        const backing_range = try kernel.pmm.allocatePage();
+
+        opt_backing_range = backing_range;
+
+        break :blk backing_range.address;
     };
+    errdefer {
+        self.zero();
+
+        if (opt_backing_range) |backing_range| {
+            kernel.pmm.deallocatePage(backing_range);
+        }
+    }
 
     applyParentMapType(map_type, self);
 
-    const next_level = self.getNextLevel(kernel.directMapFromPhysical) catch |err| switch (err) {
-        error.HugePage => return error.Unexpected,
-        error.NotPresent => unreachable, // we ensure it is present above
-    };
+    const next_level = kernel.directMapFromPhysical(next_level_phys_address).toPtr(*PageTable);
 
-    if (opt_range != null) next_level.zero();
+    if (opt_backing_range) |backing_range| {
+        next_level.zero();
+        self.setAddress4kib(backing_range.address);
+        self.present.write(true);
+    }
 
-    return .{ next_level, opt_range != null };
+    return .{ next_level, opt_backing_range != null };
 }
 
 fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
-    entry.present.write(true);
-
     if (map_type.user) {
         entry.user_accessible.write(true);
     }
@@ -398,7 +414,6 @@ fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
 }
 
 fn applyParentMapType(map_type: MapType, entry: *PageTable.Entry) void {
-    entry.present.write(true);
     entry.writeable.write(true);
     if (map_type.user) entry.user_accessible.write(true);
 }
