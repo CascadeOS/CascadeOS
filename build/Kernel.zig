@@ -80,6 +80,9 @@ fn create(
         .optimize = options.optimize,
     });
 
+    // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
+    kernel_exe.root_module.strip = false;
+
     kernel_exe.setLinkerScriptPath(.{
         .path = helpers.pathJoinFromRoot(b, &.{
             "kernel",
