@@ -62,7 +62,7 @@ fn kernelInitStage2(cpu: *kernel.Cpu) noreturn {
     kernel.vmm.loadKernelPageTable();
     kernel.arch.init.loadCpu(cpu);
 
-    unreachable; // UNIMPLEMENTED
+    core.panic("UNIMPLEMENTED");
 }
 
 fn captureKernelOffsets() !void {
