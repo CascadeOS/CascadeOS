@@ -67,7 +67,7 @@ fn createDiskImage(allocator: std.mem.Allocator, image_description: ImageDescrip
     };
 
     const disk_image = try createAndMapDiskImage(disk_image_path, disk_size);
-    defer std.os.munmap(disk_image);
+    defer std.posix.munmap(disk_image);
 
     const gpt_partitions = try allocator.alloc(GptPartition, image_description.partitions.len);
     defer allocator.free(gpt_partitions);
@@ -660,10 +660,10 @@ fn createAndMapDiskImage(disk_image_path: []const u8, disk_size: core.Size) ![]a
 
     try file.setEndPos(disk_size.value);
 
-    return std.os.mmap(
+    return std.posix.mmap(
         null,
         disk_size.value,
-        std.os.PROT.READ | std.os.PROT.WRITE,
+        std.posix.PROT.READ | std.posix.PROT.WRITE,
         .{ .TYPE = .SHARED },
         file.handle,
         0,

@@ -100,15 +100,15 @@ fn embed(embed_arguments: Arguments.EmbedArguments) !void {
 
     const stat = try atomic_output_file.file.stat();
 
-    const elf_mem = try std.os.mmap(
+    const elf_mem = try std.posix.mmap(
         null,
         stat.size,
-        std.os.PROT.READ | std.os.PROT.WRITE,
+        std.posix.PROT.READ | std.posix.PROT.WRITE,
         .{ .TYPE = .SHARED },
         atomic_output_file.file.handle,
         0,
     );
-    defer std.os.munmap(elf_mem);
+    defer std.posix.munmap(elf_mem);
 
     try updateElf(elf_mem, sdf_pos, sdf_size);
 
