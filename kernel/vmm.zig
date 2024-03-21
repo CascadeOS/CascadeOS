@@ -52,7 +52,7 @@ pub const init = struct {
 
         log.debug("mapping the direct map", .{});
 
-        try unsafeMapToPhysicalRangeAllPageSizes(
+        try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
             &kernel_page_table,
             kernel.info.direct_map,
             direct_map_physical_range,
@@ -62,7 +62,7 @@ pub const init = struct {
 
         log.debug("mapping the non-cached direct map", .{});
 
-        try unsafeMapToPhysicalRangeAllPageSizes(
+        try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
             &kernel_page_table,
             kernel.info.non_cached_direct_map,
             direct_map_physical_range,
@@ -143,47 +143,13 @@ pub const init = struct {
 
         const physical_range = core.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
-        try unsafeMapToPhysicalRangeAllPageSizes(
+        try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
             &kernel_page_table,
             virtual_range,
             physical_range,
             map_type,
         );
-
         memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
-    }
-
-    /// Maps a virtual address range to a physical address range using all available page sizes.
-    ///
-    /// Caller must ensure:
-    ///  - the virtual range address and size are aligned to the standard page size
-    ///  - the physical range address and size are aligned to the standard page size
-    ///  - the virtual range size is equal to the physical range size
-    ///
-    /// No TLB flushing is performed.
-    fn unsafeMapToPhysicalRangeAllPageSizes(
-        page_table: *kernel.arch.paging.PageTable,
-        virtual_range: core.VirtualRange,
-        physical_range: core.PhysicalRange,
-        map_type: MapType,
-    ) !void {
-        core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(virtual_range.size.equal(virtual_range.size));
-
-        log.debug(
-            "mapping {} to {} with type {} using all page sizes",
-            .{ virtual_range, physical_range, map_type },
-        );
-
-        return kernel.arch.paging.mapToPhysicalRangeAllPageSizes(
-            page_table,
-            virtual_range,
-            physical_range,
-            map_type,
-        );
     }
 };
 

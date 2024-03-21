@@ -127,29 +127,35 @@ pub const paging = struct {
         MappingNotValid,
     };
 
-    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
-    ///
-    /// Caller must ensure:
-    ///  - the virtual range address and size are aligned to the standard page size
-    ///  - the physical range address and size are aligned to the standard page size
-    ///  - the virtual range size is equal to the physical range size
-    ///
-    /// This function is allowed to use all page sizes available to the architecture.
-    pub inline fn mapToPhysicalRangeAllPageSizes(
-        page_table: *PageTable,
-        virtual_range: core.VirtualRange,
-        physical_range: core.PhysicalRange,
-        map_type: kernel.vmm.MapType,
-    ) MapError!void {
-        checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
-            *PageTable,
-            core.VirtualRange,
-            core.PhysicalRange,
-            kernel.vmm.MapType,
-        ) MapError!void);
+    pub const init = struct {
+        /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual range address and size are aligned to the standard page size
+        ///  - the physical range address and size are aligned to the standard page size
+        ///  - the virtual range size is equal to the physical range size
+        ///  - the virtual range is not already mapped
+        ///
+        /// This function:
+        ///  - uses all page sizes available to the architecture
+        ///  - does not flush the TLB
+        ///  - on error is not required roll back any modifications to the page tables
+        pub inline fn mapToPhysicalRangeAllPageSizes(
+            page_table: *PageTable,
+            virtual_range: core.VirtualRange,
+            physical_range: core.PhysicalRange,
+            map_type: kernel.vmm.MapType,
+        ) MapError!void {
+            checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
+                *PageTable,
+                core.VirtualRange,
+                core.PhysicalRange,
+                kernel.vmm.MapType,
+            ) MapError!void);
 
-        return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
-    }
+            return current.paging.init.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
+        }
+    };
 };
 
 /// Checks if the current architecture implements the given function.
