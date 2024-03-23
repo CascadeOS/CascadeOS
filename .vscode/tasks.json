@@ -5,9 +5,23 @@
     // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
+        // All
+        {
+            "label": "test - all",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "test"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        
         // Kernel
         {
-            "label": "kernel_x86_64",
+            "label": "build - kernel_x86_64",
             "type": "process",
             "command": "zig",
             "args": [
@@ -18,10 +32,24 @@
                 "kind": "build"
             }
         },
+        
+        // Libraries
+        {
+            "label": "test - libs",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "libraries"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
 
         // Tools
         {
-            "label": "build all tools",
+            "label": "build - tools",
             "type": "process",
             "command": "zig",
             "args": [
@@ -32,10 +60,22 @@
                 "kind": "build"
             }
         },
+        {
+            "label": "test - tools",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "tools"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
 
         // Applications
         {
-            "label": "build all applications",
+            "label": "build - apps",
             "type": "process",
             "command": "zig",
             "args": [
@@ -46,45 +86,6 @@
                 "kind": "build"
             }
         },
-
-
-        // Test
-        {
-            "label": "all tests",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "test"
-            ],
-            "group": {
-                "kind": "test"
-            }
-        },
-        {
-            "label": "library tests",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "libraries"
-            ],
-            "group": {
-                "kind": "test"
-            }
-        },
-        {
-            "label": "tool tests",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "tools"
-            ],
-            "group": {
-                "kind": "test"
-            }
-        },
     ],
     "presentation": {
         "reveal": "silent",
@@ -92,7 +93,7 @@
         "clear": true,
         "revealProblems": "onProblem"
     },
-    "problemMatcher": {
+    "problemMatcher": { // TODO: only matches compile errors, not failed tests
         "applyTo": "allDocuments",
         "fileLocation": "autoDetect",
         "owner": "zig",
