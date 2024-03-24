@@ -28,9 +28,9 @@ pub fn allocatePage() error{PhysicalMemoryExhausted}!core.PhysicalRange {
             continue;
         }
 
-        const physical_address = kernel.physicalFromDirectMap(
+        const physical_address = kernel.physicalFromDirectMapUnsafe(
             core.VirtualAddress.fromPtr(first_free_page),
-        ) catch unreachable;
+        );
 
         const allocated_range = core.PhysicalRange.fromAddr(
             physical_address,

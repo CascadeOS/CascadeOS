@@ -28,7 +28,7 @@ pub fn nonCachedDirectMapFromPhysical(self: core.PhysicalAddress) core.VirtualAd
 }
 
 /// Returns the physical address of the given virtual address if it is in one of the direct maps.
-pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInAnyDirectMap}!core.PhysicalAddress {
+pub fn physicalFromDirectMaps(self: core.VirtualAddress) error{AddressNotInAnyDirectMap}!core.PhysicalAddress {
     if (info.direct_map.contains(self)) {
         return .{ .value = self.value -% info.direct_map.address.value };
     }
@@ -38,11 +38,38 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInAnyDir
     return error.AddressNotInAnyDirectMap;
 }
 
+/// Returns the physical range of the given direct map virtual range.
+pub fn physicalRangeFromDirectMaps(self: core.VirtualRange) error{AddressNotInAnyDirectMap}!core.PhysicalRange {
+    if (info.direct_map.containsRange(self)) {
+        return .{
+            .address = core.PhysicalAddress.fromInt(self.address.value -% info.direct_map.address.value),
+            .size = self.size,
+        };
+    }
+    if (info.non_cached_direct_map.containsRange(self)) {
+        return .{
+            .address = core.PhysicalAddress.fromInt(self.address.value -% info.non_cached_direct_map.address.value),
+            .size = self.size,
+        };
+    }
+    return error.AddressNotInAnyDirectMap;
+}
+
 /// Returns the physical address of the given direct map virtual address.
 ///
 /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
 pub fn physicalFromDirectMapUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
     return .{ .value = self.value -% info.direct_map.address.value };
+}
+
+/// Returns the physical range of the given direct map virtual range.
+///
+/// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
+pub fn physicalRangeFromDirectMapUnsafe(self: core.VirtualRange) core.PhysicalRange {
+    return .{
+        .address = core.PhysicalAddress.fromInt(self.address.value -% info.direct_map.address.value),
+        .size = self.size,
+    };
 }
 
 /// Returns the physical address of the given kernel ELF section virtual address.
