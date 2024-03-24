@@ -104,6 +104,13 @@ pub const interrupts = struct {
 
         current.interrupts.disableInterrupts();
     }
+
+    /// Enable interrupts.
+    pub inline fn enableInterrupts() void {
+        checkSupport(current.interrupts, "enableInterrupts", fn () void);
+
+        current.interrupts.enableInterrupts();
+    }
 };
 
 pub const paging = struct {
