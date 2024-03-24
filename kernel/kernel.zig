@@ -15,8 +15,8 @@ pub const debug = @import("debug.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
-pub const vmm = @import("vmm.zig");
 pub const sync = @import("sync/sync.zig");
+pub const vmm = @import("vmm/vmm.zig");
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
