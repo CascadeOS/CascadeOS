@@ -29,6 +29,7 @@ pub const init = struct {
 
 pub const interrupts = struct {
     pub const disableInterruptsAndHalt = x86_64.disableInterruptsAndHalt;
+    pub const interruptsEnabled = x86_64.interruptsEnabled;
     pub const disableInterrupts = x86_64.disableInterrupts;
 };
 

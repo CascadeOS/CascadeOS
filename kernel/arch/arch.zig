@@ -91,6 +91,13 @@ pub const interrupts = struct {
         current.interrupts.disableInterruptsAndHalt();
     }
 
+    /// Are interrupts enabled?
+    pub inline fn interruptsEnabled() bool {
+        checkSupport(current.interrupts, "interruptsEnabled", fn () bool);
+
+        return current.interrupts.interruptsEnabled();
+    }
+
     /// Disable interrupts.
     pub inline fn disableInterrupts() void {
         checkSupport(current.interrupts, "disableInterrupts", fn () void);
