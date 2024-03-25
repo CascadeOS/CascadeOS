@@ -5,14 +5,14 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const SpinLock = @This();
+const TicketSpinLock = @This();
 
 /// The id of the cpu that currently holds the lock.
 _cpu_id: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
     interrupts_enabled: bool,
-    spinlock: *SpinLock,
+    spinlock: *TicketSpinLock,
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
@@ -23,19 +23,19 @@ pub const Held = struct {
     }
 };
 
-pub fn isLocked(self: SpinLock) bool {
+pub fn isLocked(self: TicketSpinLock) bool {
     return @atomicLoad(kernel.Cpu.Id, &self._cpu_id, .acquire) != .none;
 }
 
-pub fn isLockedByCurrent(self: SpinLock) bool {
+pub fn isLockedByCurrent(self: TicketSpinLock) bool {
     return @atomicLoad(kernel.Cpu.Id, &self._cpu_id, .acquire) == kernel.arch.getCpu().id;
 }
 
-pub fn unsafeUnlock(self: *SpinLock) void {
+pub fn unsafeUnlock(self: *TicketSpinLock) void {
     @atomicStore(kernel.Cpu.Id, &self._cpu_id, .none, .release);
 }
 
-pub fn lock(self: *SpinLock) Held {
+pub fn lock(self: *TicketSpinLock) Held {
     const interrupts_enabled = kernel.arch.interrupts.interruptsEnabled();
     if (interrupts_enabled) kernel.arch.interrupts.disableInterrupts();
 

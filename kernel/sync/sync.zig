@@ -6,4 +6,4 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 pub const ReaderWriterSpinLock = @import("ReaderWriterSpinLock.zig");
-pub const SpinLock = @import("SpinLock.zig");
+pub const TicketSpinLock = @import("TicketSpinLock.zig");
