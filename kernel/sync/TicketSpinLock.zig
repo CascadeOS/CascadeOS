@@ -7,8 +7,9 @@ const kernel = @import("kernel");
 
 const TicketSpinLock = @This();
 
-/// The id of the cpu that currently holds the lock.
-_cpu_id: kernel.Cpu.Id = .none,
+current: usize = 0,
+ticket: usize = 0,
+current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
     interrupts_enabled: bool,
@@ -16,47 +17,45 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn unlock(self: Held) void {
-        core.debugAssert(kernel.arch.getCpu().id == self.spinlock._cpu_id);
+        core.debugAssert(self.spinlock.current_holder == kernel.arch.getCpu().id);
 
-        @atomicStore(kernel.Cpu.Id, &self.spinlock._cpu_id, .none, .release);
+        self.spinlock.unsafeUnlock();
         if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
     }
 };
 
 pub fn isLocked(self: TicketSpinLock) bool {
-    return @atomicLoad(kernel.Cpu.Id, &self._cpu_id, .acquire) != .none;
+    return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) != .none;
 }
 
+/// Returns true if the spinlock is locked by the current cpu.
+///
+/// It is the caller's responsibility to ensure that interrupts are disabled.
 pub fn isLockedByCurrent(self: TicketSpinLock) bool {
-    return @atomicLoad(kernel.Cpu.Id, &self._cpu_id, .acquire) == kernel.arch.getCpu().id;
+    return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == kernel.arch.getCpu().id;
 }
 
+/// Unlocks the spinlock.
+///
+/// Intended to be used only when the caller needs to unlock the spinlock on behalf of another thread.
 pub fn unsafeUnlock(self: *TicketSpinLock) void {
-    @atomicStore(kernel.Cpu.Id, &self._cpu_id, .none, .release);
+    @atomicStore(kernel.Cpu.Id, &self.current_holder, .none, .release);
+    _ = @atomicRmw(usize, &self.current, .Add, 1, .acq_rel);
 }
 
 pub fn lock(self: *TicketSpinLock) Held {
     const interrupts_enabled = kernel.arch.interrupts.interruptsEnabled();
     if (interrupts_enabled) kernel.arch.interrupts.disableInterrupts();
 
-    const id = kernel.arch.getCpu().id;
+    const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
 
-    while (true) {
-        if (@cmpxchgWeak(
-            kernel.Cpu.Id,
-            &self._cpu_id,
-            .none,
-            id,
-            .acq_rel,
-            .acquire,
-        )) |_| {
-            kernel.arch.spinLoopHint();
-            continue;
-        }
-
-        return .{
-            .interrupts_enabled = interrupts_enabled,
-            .spinlock = self,
-        };
+    while (@atomicLoad(usize, &self.current, .acquire) != ticket) {
+        kernel.arch.spinLoopHint();
     }
+    @atomicStore(kernel.Cpu.Id, &self.current_holder, kernel.arch.getCpu().id, .release);
+
+    return .{
+        .interrupts_enabled = interrupts_enabled,
+        .spinlock = self,
+    };
 }
