@@ -9,7 +9,7 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.vmm);
 
-pub const Pool = @import("Pool.zig").Pool;
+pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
 
 var kernel_page_table: kernel.arch.paging.PageTable = .{};
 var memory_layout: KernelMemoryLayout = .{};
