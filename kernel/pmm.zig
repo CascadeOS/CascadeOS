@@ -11,8 +11,10 @@ const log = kernel.log.scoped(.pmm);
 
 var first_free_physical_page: ?*PhysPageNode = null;
 
+pub const AllocateError = error{PhysicalMemoryExhausted};
+
 /// Allocates a physical page.
-pub fn allocatePage() error{PhysicalMemoryExhausted}!core.PhysicalRange {
+pub fn allocatePage() AllocateError!core.PhysicalRange {
     var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
 
     while (first_free_page_opt) |first_free_page| {

@@ -7,15 +7,6 @@ const kernel = @import("kernel");
 
 const standard_page_size = kernel.arch.paging.standard_page_size.value;
 
-fn allocPage() !*align(standard_page_size) [standard_page_size]u8 {
-    const page = try kernel.pmm.allocatePage();
-    return kernel.directMapFromPhysical(page.address).toPtr(*align(standard_page_size) [standard_page_size]u8);
-}
-
-fn deallocPage(ptr: []u8) void {
-    kernel.pmm.deallocatePage(kernel.physicalRangeFromDirectMapUnsafe(core.VirtualRange.fromSlice(u8, ptr)));
-}
-
 /// A thread-safe pool of objects that are mapped using the direct map.
 ///
 /// As this pool utilizes the direct map it does not need address space management, meaning it can be used in the
@@ -41,15 +32,15 @@ pub fn DirectMapPool(
 
         const Self = @This();
 
-        pub fn get(self: *Self) !*T {
+        pub const GetError = kernel.pmm.AllocateError || error{BucketGroupsExhausted};
+
+        pub fn get(self: *Self) GetError!*T {
             const held = self.lock.lock();
             defer held.unlock();
 
             if (self.available_buckets) |candidate_bucket| {
-                const item = self.getItemFromBucket(candidate_bucket) orelse
+                return self.getItemFromBucket(candidate_bucket) orelse
                     unreachable; // empty bucket in available list
-
-                return item;
             }
 
             // no buckets available, allocate a new one
@@ -82,7 +73,7 @@ pub fn DirectMapPool(
             }
 
             if (bitsetAllSet(&bucket_header.bitset)) {
-                // bucket it empty
+                // bucket is empty
                 self.deallocateBucket(bucket_header);
             }
         }
@@ -105,7 +96,7 @@ pub fn DirectMapPool(
             return &bucket.bucket.?.items[index];
         }
 
-        fn allocateNewBucket(self: *Self) !*BucketHeader {
+        fn allocateNewBucket(self: *Self) GetError!*BucketHeader {
             const bucket_group, const new_bucket_group = blk: {
                 if (self.bucket_group_table.len != 0) {
                     const last_bucket_group = self.bucket_group_table.buffer[self.bucket_group_table.len - 1];
@@ -327,4 +318,13 @@ pub fn DirectMapPool(
             }
         };
     };
+}
+
+fn allocPage() kernel.pmm.AllocateError!*align(standard_page_size) [standard_page_size]u8 {
+    const page = try kernel.pmm.allocatePage();
+    return kernel.directMapFromPhysical(page.address).toPtr(*align(standard_page_size) [standard_page_size]u8);
+}
+
+fn deallocPage(ptr: []u8) void {
+    kernel.pmm.deallocatePage(kernel.physicalRangeFromDirectMapUnsafe(core.VirtualRange.fromSlice(u8, ptr)));
 }
