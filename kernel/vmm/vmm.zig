@@ -23,6 +23,42 @@ pub fn loadKernelPageTable() void {
     );
 }
 
+/// Maps a virtual range using the standard page size.
+///
+/// Physical pages are allocated for each page in the virtual range.
+pub fn mapRange(page_table: *kernel.arch.paging.PageTable, virtual_range: core.VirtualRange, map_type: MapType) !void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    const virtual_range_end = virtual_range.end();
+    var current_virtual_range = core.VirtualRange.fromAddr(
+        virtual_range.address,
+        kernel.arch.paging.standard_page_size,
+    );
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
+            unmapRange(page_table, current_virtual_range);
+            current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
+        }
+    }
+
+    // Map all pages that were allocated.
+    while (!current_virtual_range.address.equal(virtual_range_end)) {
+        const physical_range = try kernel.pmm.allocatePage();
+
+        try mapToPhysicalRange(
+            page_table,
+            current_virtual_range,
+            physical_range,
+            map_type,
+        );
+
+        current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+}
+
 /// Maps a virtual address range to a physical range using the standard page size.
 pub fn mapToPhysicalRange(
     page_table: *kernel.arch.paging.PageTable,
