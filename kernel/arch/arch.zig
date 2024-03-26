@@ -169,6 +169,19 @@ pub const paging = struct {
 
             return current.paging.init.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
         }
+
+        /// This function is only called during kernel init, it is required to:
+        ///   1. search the higher half of the *top level* of the given page table for a free entry
+        ///   2. allocate a backing frame for it
+        ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
+        ///   4. return the `core.VirtualRange` representing the entire virtual range that entry covers
+        pub inline fn getTopLevelRangeAndFillFirstLevel(
+            page_table: *PageTable,
+        ) MapError!core.VirtualRange {
+            checkSupport(current.paging.init, "getTopLevelRangeAndFillFirstLevel", fn (*PageTable) MapError!core.VirtualRange);
+
+            return current.paging.init.getTopLevelRangeAndFillFirstLevel(page_table);
+        }
     };
 };
 

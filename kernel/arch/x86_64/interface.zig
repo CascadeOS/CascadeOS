@@ -49,5 +49,6 @@ pub const paging = struct {
 
     pub const init = struct {
         pub const mapToPhysicalRangeAllPageSizes = x86_64.paging.init.mapToPhysicalRangeAllPageSizes;
+        pub const getTopLevelRangeAndFillFirstLevel = x86_64.paging.init.getTopLevelRangeAndFillFirstLevel;
     };
 };

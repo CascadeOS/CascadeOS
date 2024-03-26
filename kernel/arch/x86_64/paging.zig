@@ -248,6 +248,43 @@ pub const init = struct {
         );
     }
 
+    /// This is the total size of the virtual address space that one entry in the top level of the page table covers.
+    ///
+    /// This is only valid for 4-level paging.
+    const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
+
+    /// This function is only called during kernel init, it is required to:
+    ///   1. search the higher half of the *top level* of the given page table for a free entry
+    ///   2. allocate a backing frame for it
+    ///   3. map the free entry to the fresh backing frame and ensure it is zeroed
+    ///   4. return the `core.VirtualRange` representing the entire virtual range that entry covers
+    pub fn getTopLevelRangeAndFillFirstLevel(
+        page_table: *PageTable,
+    ) MapError!core.VirtualRange {
+        var table_index: usize = x86_64.PageTable.p4Index(higher_half);
+
+        while (table_index < x86_64.PageTable.number_of_entries) : (table_index += 1) {
+            const entry = &page_table.entries[table_index];
+            if (entry._backing != 0) continue;
+
+            log.debug("found free top level entry for at table_index {}", .{table_index});
+
+            _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
+
+            return core.VirtualRange.fromAddr(
+                x86_64.PageTable.indexToAddr(
+                    @truncate(table_index),
+                    0,
+                    0,
+                    0,
+                ),
+                size_of_top_level_entry,
+            );
+        }
+
+        core.panic("unable to find unused entry in top level of page table");
+    }
+
     /// Maps a 1 GiB page.
     ///
     /// Only kernel init maps 1 GiB pages.
