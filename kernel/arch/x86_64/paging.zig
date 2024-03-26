@@ -15,6 +15,52 @@ const MapError = kernel.arch.paging.MapError;
 
 pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 
+/// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+///
+/// Caller must ensure:
+///  - the virtual range address and size are aligned to the standard page size
+///  - the physical range address and size are aligned to the standard page size
+///  - the virtual range size is equal to the physical range size
+///  - the virtual range is not already mapped
+///
+/// This function:
+///  - uses only the standard page size for the architecture
+///  - does not flush the TLB
+///  - on error is not required roll back any modifications to the page tables
+pub fn mapToPhysicalRange(
+    page_table: *PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: kernel.vmm.MapType,
+) MapError!void {
+    log.debug("mapToPhysicalRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+
+    var current_virtual_address = virtual_range.address;
+    const end_virtual_address = virtual_range.end();
+    var current_physical_address = physical_range.address;
+
+    var kib_page_mappings: usize = 0;
+
+    while (current_virtual_address.lessThan(end_virtual_address)) {
+        mapTo4KiB(
+            page_table,
+            current_virtual_address,
+            current_physical_address,
+            map_type,
+        ) catch |err| {
+            // TODO: roll back any modifications to the page tables
+            log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
+            return err;
+        };
+
+        kib_page_mappings += 1;
+
+        current_virtual_address.moveForwardInPlace(x86_64.PageTable.small_page_size);
+        current_physical_address.moveForwardInPlace(x86_64.PageTable.small_page_size);
+    }
+
+    log.debug("mapToPhysicalRange - satified using {} 4KiB pages", .{kib_page_mappings});
+}
 /// Maps a 4 KiB page.
 fn mapTo4KiB(
     level4_table: *PageTable,
