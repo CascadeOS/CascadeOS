@@ -23,6 +23,23 @@ pub fn loadKernelPageTable() void {
     );
 }
 
+/// Unmaps a virtual range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
+pub fn unmapRange(
+    page_table: *kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+) void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    log.debug("unmapping: {}", .{virtual_range});
+
+    return kernel.arch.paging.unmapRange(page_table, virtual_range);
+}
+
 pub const init = struct {
     pub fn buildKernelPageTableAndSwitch() !void {
         log.debug("building kernel page table", .{});
