@@ -12,7 +12,7 @@ const log = kernel.log.scoped(.vmm);
 pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
 pub const VirtualRangeAllocator = @import("VirtualRangeAllocator.zig");
 
-var kernel_page_table: kernel.arch.paging.PageTable = .{};
+pub var kernel_page_table: kernel.arch.paging.PageTable = .{};
 var memory_layout: KernelMemoryLayout = .{};
 
 pub fn loadKernelPageTable() void {
