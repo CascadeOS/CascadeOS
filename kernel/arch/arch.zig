@@ -231,6 +231,19 @@ pub const paging = struct {
     };
 };
 
+pub const scheduling = struct {
+    /// Switches to the provided stack and returns.
+    ///
+    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
+    pub inline fn changeStackAndReturn(
+        stack_pointer: core.VirtualAddress,
+    ) noreturn {
+        checkSupport(current.scheduling, "changeStackAndReturn", fn (core.VirtualAddress) noreturn);
+
+        try current.scheduling.changeStackAndReturn(stack_pointer);
+    }
+};
+
 /// Checks if the current architecture implements the given function.
 ///
 /// If it is unimplemented, this function will panic at runtime.

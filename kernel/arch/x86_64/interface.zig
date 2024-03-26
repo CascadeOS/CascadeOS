@@ -54,3 +54,7 @@ pub const paging = struct {
         pub const getTopLevelRangeAndFillFirstLevel = x86_64.paging.init.getTopLevelRangeAndFillFirstLevel;
     };
 };
+
+pub const scheduling = struct {
+    pub const changeStackAndReturn = x86_64.scheduling.changeStackAndReturn;
+};
