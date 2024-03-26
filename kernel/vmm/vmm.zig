@@ -23,6 +23,32 @@ pub fn loadKernelPageTable() void {
     );
 }
 
+/// Maps a virtual address range to a physical range using the standard page size.
+pub fn mapToPhysicalRange(
+    page_table: *kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: MapType,
+) !void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.equal(virtual_range.size));
+
+    log.debug(
+        "mapping: {} to {} with type: {}",
+        .{ virtual_range, physical_range, map_type },
+    );
+
+    return kernel.arch.paging.mapToPhysicalRange(
+        page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+    );
+}
+
 /// Unmaps a virtual range.
 ///
 /// **REQUIREMENTS**:
