@@ -13,6 +13,8 @@ const PageTable = x86_64.PageTable;
 const MapType = kernel.vmm.MapType;
 const MapError = kernel.arch.paging.MapError;
 
+pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
+
 /// Maps a 4 KiB page.
 fn mapTo4KiB(
     level4_table: *PageTable,
