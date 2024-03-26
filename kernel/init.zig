@@ -69,6 +69,21 @@ fn kernelInitStage2(cpu: *kernel.Cpu) noreturn {
     kernel.vmm.loadKernelPageTable();
     kernel.arch.init.loadCpu(cpu);
 
+    const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
+        core.VirtualAddress.fromPtr(&kernelInitStage3),
+    ) catch unreachable; // the idle stack is always big enough to hold a return address
+
+    log.debug("leaving bootloader provided stack", .{});
+    kernel.arch.scheduling.changeStackAndReturn(idle_stack_pointer);
+    unreachable;
+}
+
+/// Stage 3 of kernel initialization.
+///
+/// This function is executed by all cpus, including the bootstrap cpu.
+///
+/// All cpus are using a normal kernel stack.
+fn kernelInitStage3() noreturn {
     core.panic("UNIMPLEMENTED");
 }
 
