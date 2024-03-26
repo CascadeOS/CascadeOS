@@ -169,6 +169,24 @@ pub const paging = struct {
         return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
     }
 
+    /// Unmaps the `virtual_range`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the virtual range is mapped
+    ///  - the virtual range is mapped using only the standard page size for the architecture
+    ///
+    /// This function:
+    ///  - does not flush the TLB
+    pub inline fn unmapRange(
+        page_table: *PageTable,
+        virtual_range: core.VirtualRange,
+    ) void {
+        checkSupport(current.paging, "unmapRange", fn (*PageTable, core.VirtualRange) void);
+
+        current.paging.unmapRange(page_table, virtual_range);
+    }
+
     pub const init = struct {
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
         ///

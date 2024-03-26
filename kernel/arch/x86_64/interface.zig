@@ -47,6 +47,7 @@ pub const paging = struct {
     pub const PageTable = x86_64.PageTable;
     pub const switchToPageTable = x86_64.Cr3.writeAddress;
     pub const mapToPhysicalRange = x86_64.paging.mapToPhysicalRange;
+    pub const unmapRange = x86_64.paging.unmapRange;
 
     pub const init = struct {
         pub const mapToPhysicalRangeAllPageSizes = x86_64.paging.init.mapToPhysicalRangeAllPageSizes;
