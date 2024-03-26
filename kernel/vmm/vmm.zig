@@ -116,6 +116,10 @@ pub const init = struct {
             return err;
         };
 
+        prepareKernelStacks() catch |err| {
+            core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
+        };
+
         log.debug("switching to kernel page table", .{});
         loadKernelPageTable();
 
@@ -196,6 +200,18 @@ pub const init = struct {
             .{ .global = true },
             .sdf_section,
         );
+    }
+
+    fn prepareKernelStacks() !void {
+        log.debug("preparing the kernel stacks area", .{});
+
+        const kernel_stacks_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
+            &kernel_page_table,
+        );
+
+        try kernel.Stack.init.initStacks(kernel_stacks_range);
+
+        memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .kernel_stacks });
     }
 
     /// Maps a kernel section.
@@ -314,8 +330,11 @@ const KernelMemoryLayout = struct {
             readonly_section,
             executable_section,
             sdf_section,
+
             direct_map,
             non_cached_direct_map,
+
+            kernel_stacks,
         };
 
         pub fn print(region: KernelMemoryRegion, writer: anytype) !void {
