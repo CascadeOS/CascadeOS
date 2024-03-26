@@ -10,8 +10,11 @@ const log = kernel.log.scoped(.init);
 /// Represents the bootstrap cpu during init.
 var bootstrap_cpu: kernel.Cpu = .{
     .id = @enumFromInt(0),
+    .idle_stack = undefined, // set at the beginning of `kernelInit`,
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
+
+var bootstrap_idle_stack: [kernel.Stack.usable_stack_size.value]u8 = undefined;
 
 /// Entry point from bootloader specific code.
 ///
@@ -21,6 +24,10 @@ pub fn kernelInit() !void {
     kernel.arch.init.setupEarlyOutput();
 
     // we need to get the current cpu loaded early as most code assumes it is available
+    bootstrap_cpu.idle_stack = kernel.Stack.fromRange(
+        core.VirtualRange.fromSlice(u8, &bootstrap_idle_stack),
+        core.VirtualRange.fromSlice(u8, &bootstrap_idle_stack),
+    );
     kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
