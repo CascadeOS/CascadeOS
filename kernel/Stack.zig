@@ -125,6 +125,22 @@ pub fn pushReturnAddress(stack: *Stack, return_address: core.VirtualAddress) err
     try stack.push(return_address.value);
 }
 
+/// Pushes a return address to the stack without changing the stack pointer.
+///
+/// Returns the stack pointer with the return address pushed.
+pub fn pushReturnAddressWithoutChangingPointer(
+    stack: *Stack,
+    return_address: core.VirtualAddress,
+) error{StackOverflow}!core.VirtualAddress {
+    const old_stack_pointer = stack.stack_pointer;
+    defer stack.stack_pointer = old_stack_pointer;
+
+    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?
+    try stack.push(return_address.value);
+
+    return stack.stack_pointer;
+}
+
 pub const init = struct {
     pub fn initStacks(kernel_stacks_range: core.VirtualRange) !void {
         const range = blk: {
