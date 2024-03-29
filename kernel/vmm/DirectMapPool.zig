@@ -245,7 +245,7 @@ pub fn DirectMapPool(
         }
 
         const BucketGroup = struct {
-            headers: std.BoundedArray(BucketHeader, number_of_buckets) align(standard_page_size) = std.BoundedArray(BucketHeader, number_of_buckets).init(0) catch unreachable,
+            headers: std.BoundedArray(BucketHeader, number_of_buckets) align(standard_page_size) = .{},
 
             pub const number_of_buckets = (standard_page_size - @sizeOf(u8)) / @sizeOf(BucketHeader);
 
