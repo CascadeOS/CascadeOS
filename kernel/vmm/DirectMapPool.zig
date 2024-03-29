@@ -21,9 +21,6 @@ pub fn DirectMapPool(
 
         bucket_group_table: std.BoundedArray(*BucketGroup, number_of_bucket_groups) = .{},
 
-        /// Linked list of full buckets.
-        full_buckets: ?*BucketHeader = null,
-
         /// Linked list of buckets with available objects.
         available_buckets: ?*BucketHeader = null,
 
@@ -62,33 +59,31 @@ pub fn DirectMapPool(
             bucket_header.bitset.set(bit_index);
             log.debug("added item at index {} in {*} to the pool", .{ bit_index, bucket_header.bucket });
 
-            if (bucket_header.in_full_list) {
-                // bucket was previously full, move it to the available list
+            if (bucket_header.empty) {
+                // bucket was previously empty, move it to the available list
 
-                self.moveFromFullToAvailable(bucket_header);
+                self.addBucketToAvailableBuckets(bucket_header);
 
-                log.debug("moved previously full {*} to available list", .{bucket_header.bucket});
+                log.debug("moved previously empty {*} to available list", .{bucket_header.bucket});
 
                 return;
             }
 
             if (bitsetAllSet(&bucket_header.bitset)) {
-                // bucket is empty
+                // bucket is full, no items are in use
                 self.deallocateBucket(bucket_header);
             }
         }
 
         fn getItemFromBucket(self: *Self, bucket: *BucketHeader) ?*T {
-            core.debugAssert(!bucket.in_full_list);
-
             const index = bucket.bitset.toggleFirstSet() orelse return null;
 
             if (bitsetAllUnset(&bucket.bitset)) {
-                // the bucket is full so we move it from the available list to the full list
+                // the bucket is empty so we remove it from the available list
 
-                self.moveFromAvailableToFull(bucket);
+                self.removeBucketFromAvailableBuckets(bucket);
 
-                log.debug("moved full bucket {*} to full list", .{bucket.bucket});
+                log.debug("removed empty bucket {*} from available list", .{bucket.bucket});
             }
 
             log.debug("provided item at index {} in {*}", .{ index, bucket.bucket });
@@ -137,7 +132,7 @@ pub fn DirectMapPool(
                 .bucket = bucket,
             };
 
-            addBucketTo(bucket_header, &self.available_buckets);
+            self.addBucketToAvailableBuckets(bucket_header);
 
             if (new_bucket_group) {
                 log.debug("allocated a new bucket {*} in a new group {*}", .{ bucket, bucket_group });
@@ -149,20 +144,19 @@ pub fn DirectMapPool(
         }
 
         fn deallocateBucket(self: *Self, bucket: *BucketHeader) void {
-            core.debugAssert(!bucket.in_full_list);
+            core.debugAssert(!bucket.empty);
 
-            removeBucketFrom(bucket, &self.available_buckets);
+            self.removeBucketFromAvailableBuckets(bucket);
 
-            log.debug("deallocated now empty bucket {*}", .{bucket.bucket});
+            log.debug("deallocating bucket {*}", .{bucket.bucket});
 
             bucket.bucket.?.destroy();
             bucket.bucket = null;
 
             const this_bucket_group = bucket.bucket_group;
             for (this_bucket_group.headers.constSlice()) |*header| {
-                if (header.bucket != null) return; // non-empty bucket in this group
+                if (header.bucket != null) return; // bucket still in use in this group
             }
-            // all buckets in this group are empty
 
             const bucket_group_index = for (self.bucket_group_table.constSlice(), 0..) |candidate_bucket_group, i| {
                 if (candidate_bucket_group == this_bucket_group) break i;
@@ -170,47 +164,16 @@ pub fn DirectMapPool(
 
             _ = self.bucket_group_table.swapRemove(bucket_group_index);
 
-            log.debug("deallocated now empty bucket group {*}", .{this_bucket_group});
+            log.debug("deallocated bucket group {*}", .{this_bucket_group});
 
             this_bucket_group.destroy();
         }
 
-        /// Move a bucket from the available list to the full list.
+        /// Add a bucket to the available list.
         ///
         /// The caller must have the write lock.
-        fn moveFromAvailableToFull(self: *Self, bucket: *BucketHeader) void {
-            core.debugAssert(!bucket.in_full_list);
-
-            removeBucketFrom(bucket, &self.available_buckets);
-            addBucketTo(bucket, &self.full_buckets);
-            bucket.in_full_list = true;
-        }
-
-        /// Move a bucket from the full list to the available list.
-        ///
-        /// The caller must have the write lock.
-        fn moveFromFullToAvailable(self: *Self, bucket: *BucketHeader) void {
-            core.debugAssert(bucket.in_full_list);
-
-            removeBucketFrom(bucket, &self.full_buckets);
-            addBucketTo(bucket, &self.available_buckets);
-            bucket.in_full_list = false;
-        }
-
-        /// Remove a bucket from the available list.
-        ///
-        /// The caller must have the write lock.
-        fn removeBucketFrom(bucket: *BucketHeader, target_list: *?*BucketHeader) void {
-            if (bucket.next) |next| next.previous = bucket.previous;
-            if (bucket.previous) |previous| previous.next = bucket.next;
-            if (target_list.* == bucket) target_list.* = bucket.next;
-        }
-
-        /// Add a bucket to the full list.
-        ///
-        /// The caller must have the write lock.
-        fn addBucketTo(bucket: *BucketHeader, target_list: *?*BucketHeader) void {
-            if (target_list.*) |head| {
+        fn addBucketToAvailableBuckets(self: *Self, bucket: *BucketHeader) void {
+            if (self.available_buckets) |head| {
                 head.previous = bucket;
                 bucket.next = head;
             } else {
@@ -219,7 +182,22 @@ pub fn DirectMapPool(
 
             bucket.previous = null;
 
-            target_list.* = bucket;
+            self.available_buckets = bucket;
+
+            bucket.empty = false;
+        }
+
+        /// Remove a bucket from the available list.
+        ///
+        /// The caller must have the write lock.
+        fn removeBucketFromAvailableBuckets(self: *Self, bucket: *BucketHeader) void {
+            core.debugAssert(!bucket.empty);
+
+            if (bucket.next) |next| next.previous = bucket.previous;
+            if (bucket.previous) |previous| previous.next = bucket.next;
+            if (self.available_buckets == bucket) self.available_buckets = bucket.next;
+
+            bucket.empty = true;
         }
 
         fn bitsetAllUnset(bitset: *const BucketBitSet) bool {
@@ -273,7 +251,8 @@ pub fn DirectMapPool(
             previous: ?*BucketHeader = null,
             bitset: BucketBitSet = BucketBitSet.initFull(),
 
-            in_full_list: bool = false,
+            /// If this is true then all items in this bucket are in use.
+            empty: bool = false,
 
             /// Returns the index of the given item in the bucket.
             ///
