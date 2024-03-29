@@ -317,6 +317,11 @@ pub fn DirectMapPool(
                 core.assert(@alignOf(@This()) == standard_page_size);
             }
         };
+
+        comptime {
+            core.assert(@sizeOf(T) <= standard_page_size);
+            core.assert(@alignOf(T) <= standard_page_size);
+        }
     };
 }
 
