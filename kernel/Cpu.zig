@@ -16,8 +16,8 @@ idle_stack: kernel.Stack,
 
 arch: kernel.arch.ArchCpu,
 
-pub const Id = enum(u64) {
-    none = std.math.maxInt(u64),
+pub const Id = enum(u32) {
+    none = std.math.maxInt(u32),
 
     _,
 };
