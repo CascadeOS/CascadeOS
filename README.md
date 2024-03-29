@@ -5,12 +5,12 @@
 Cascade is a general purpose operating system targeting standard desktops and laptops.
 
 ## Short Term Goals
-- Good enough x86-64 support for QEMU (virtio drivers)
+- Good enough x64 support for QEMU (virtio drivers)
 - Userspace, no GUI
 - ext2 on NVMe
 
 ## Planned Features
-- x86_64, AArch64 and RISC-V
+- x64, ARM64 and RISC-V
 - First class Zig support
 - Userspace with GUI
 - All functionality implemented in Zig either in repo or as a package, allowances might be made for things like [ACPICA](https://acpica.org/).
@@ -20,9 +20,9 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - zig master (0.12.0-dev.3247+26e895e3d)
 - qemu (optional; used for running and host testing)
 
-Run the x86_64 kernel in QEMU:
+Run the x64 kernel in QEMU:
 ```sh
-zig build run_x86_64
+zig build run_x64
 ```
 
 List all available build targets:

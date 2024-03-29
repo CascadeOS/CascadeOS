@@ -31,10 +31,10 @@ It is possible for these links or the text regarding versions to become out of d
   * [Generic ABI (gABI) updates](https://www.sco.com/developers/gabi/) updates to chapter 4 and 5 of the above. Latest at time of writing: DRAFT 10 June 2013 (under the "Latest (in progress) snapshot" link)
   * [AArch64 psABI](https://github.com/ARM-software/abi-aa)
   * [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc)
-  * [x86-64 psABI](https://gitlab.com/x86-psABIs/x86-64-ABI)
+  * [x64 psABI](https://gitlab.com/x86-psABIs/x86-64-ABI)
 * UUID - [RFC 4122](https://datatracker.ietf.org/doc/html/rfc4122)
 * VirtIO - [VirtIO Specs](https://docs.oasis-open.org/virtio/virtio/)
-* x86-64
+* x64
   * [AMD](https://www.amd.com/en/search/documentation/hub.html#q=AMD64%20Architecture%20Programmer's%20Manual&f-amd_document_type=Programmer%20References) link is to a search as AMD don't provide an always up to date link to the documents
   * [HPET](http://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
   * [Intel](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)

@@ -4,11 +4,11 @@
 const core = @import("core");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 /// Are interrupts enabled?
 pub inline fn interruptsEnabled() bool {
-    return @import("x86_64").RFlags.read().interrupt;
+    return x64.RFlags.read().interrupt;
 }
 
 /// Enable interrupts.

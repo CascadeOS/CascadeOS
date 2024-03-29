@@ -21,12 +21,12 @@
         
         // Kernel
         {
-            "label": "build - kernel_x86_64",
+            "label": "build - kernel_x64",
             "type": "process",
             "command": "zig",
             "args": [
                 "build",
-                "kernel_x86_64",
+                "kernel_x64",
             ],
             "group": {
                 "kind": "build"

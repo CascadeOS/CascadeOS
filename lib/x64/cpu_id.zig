@@ -56,19 +56,19 @@ const std = @import("std");
 const core = @import("core");
 const bitjuggle = @import("bitjuggle");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 /// Returns true if CPUID is available.
 ///
-/// Utilizes the `x86_64.RFlags.id` field to detect support for CPUID.
+/// Utilizes the `x64.RFlags.id` field to detect support for CPUID.
 pub fn isAvailable() bool {
-    const orig_rflags = x86_64.RFlags.read();
+    const orig_rflags = x64.RFlags.read();
     var modified_rflags = orig_rflags;
 
     modified_rflags.id = !modified_rflags.id;
     modified_rflags.write();
 
-    const new_rflags = x86_64.RFlags.read();
+    const new_rflags = x64.RFlags.read();
 
     return orig_rflags.id != new_rflags.id;
 }

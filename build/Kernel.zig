@@ -156,7 +156,7 @@ fn create(
 
     // apply target-specific configuration to the kernel
     switch (target) {
-        .x86_64 => {
+        .x64 => {
             kernel_exe.root_module.code_model = .kernel;
             kernel_exe.root_module.red_zone = false;
         },
@@ -241,7 +241,7 @@ fn create(
 /// Returns a CrossTarget for building the kernel for the given target.
 fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
     switch (self) {
-        .x86_64 => {
+        .x64 => {
             const features = std.Target.x86.Feature;
             var target_query = std.Target.Query{
                 .cpu_arch = .x86_64,

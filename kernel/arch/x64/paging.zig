@@ -5,11 +5,11 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 
-const log = kernel.log.scoped(.paging_x86_64);
+const log = kernel.log.scoped(.paging_x64);
 
-const PageTable = x86_64.PageTable;
+const PageTable = x64.PageTable;
 const MapType = kernel.vmm.MapType;
 const MapError = kernel.arch.paging.MapError;
 
@@ -55,8 +55,8 @@ pub fn mapToPhysicalRange(
 
         kib_page_mappings += 1;
 
-        current_virtual_address.moveForwardInPlace(x86_64.PageTable.small_page_size);
-        current_physical_address.moveForwardInPlace(x86_64.PageTable.small_page_size);
+        current_virtual_address.moveForwardInPlace(x64.PageTable.small_page_size);
+        current_physical_address.moveForwardInPlace(x64.PageTable.small_page_size);
     }
 
     log.debug("mapToPhysicalRange - satified using {} 4KiB pages", .{kib_page_mappings});
@@ -83,7 +83,7 @@ pub fn unmapRange(
     while (current_virtual_address.lessThan(end_virtual_address)) {
         unmap4KiB(page_table, current_virtual_address);
 
-        current_virtual_address.moveForwardInPlace(x86_64.PageTable.small_page_size);
+        current_virtual_address.moveForwardInPlace(x64.PageTable.small_page_size);
     }
 }
 
@@ -151,10 +151,10 @@ fn mapTo4KiB(
 
 /// Unmaps a 4 KiB page.
 fn unmap4KiB(
-    level4_table: *x86_64.PageTable,
+    level4_table: *x64.PageTable,
     virtual_address: core.VirtualAddress,
 ) void {
-    core.debugAssert(virtual_address.isAligned(x86_64.PageTable.small_page_size));
+    core.debugAssert(virtual_address.isAligned(x64.PageTable.small_page_size));
 
     const level4_entry = level4_table.getEntryLevel4(virtual_address);
     if (!level4_entry.present.read() or level4_entry.huge.read()) return;
@@ -181,7 +181,7 @@ fn unmap4KiB(
     if (!level2_entry.present.read()) return;
 
     kernel.pmm.deallocatePage(
-        core.PhysicalRange.fromAddr(level1_entry.getAddress4kib(), x86_64.PageTable.small_page_size),
+        core.PhysicalRange.fromAddr(level1_entry.getAddress4kib(), x64.PageTable.small_page_size),
     );
 
     level1_entry.zero();
@@ -238,7 +238,7 @@ fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
         entry.global.write(true);
     }
 
-    if (!map_type.executable and x86_64.info.cpu_id.execute_disable) entry.no_execute.write(true);
+    if (!map_type.executable and x64.info.cpu_id.execute_disable) entry.no_execute.write(true);
 
     if (map_type.writeable) entry.writeable.write(true);
 
@@ -288,7 +288,7 @@ pub const init = struct {
         var kib_page_mappings: usize = 0;
 
         while (current_virtual_address.lessThan(end_virtual_address)) {
-            const map_1gib = x86_64.info.cpu_id.gbyte_pages and
+            const map_1gib = x64.info.cpu_id.gbyte_pages and
                 size_remaining.greaterThanOrEqual(PageTable.large_page_size) and
                 current_virtual_address.isAligned(PageTable.large_page_size) and
                 current_physical_address.isAligned(PageTable.large_page_size);
@@ -371,9 +371,9 @@ pub const init = struct {
     pub fn getTopLevelRangeAndFillFirstLevel(
         page_table: *PageTable,
     ) MapError!core.VirtualRange {
-        var table_index: usize = x86_64.PageTable.p4Index(higher_half);
+        var table_index: usize = x64.PageTable.p4Index(higher_half);
 
-        while (table_index < x86_64.PageTable.number_of_entries) : (table_index += 1) {
+        while (table_index < x64.PageTable.number_of_entries) : (table_index += 1) {
             const entry = &page_table.entries[table_index];
             if (entry._backing != 0) continue;
 
@@ -382,7 +382,7 @@ pub const init = struct {
             _ = try ensureNextTable(entry, .{ .global = true, .writeable = true });
 
             return core.VirtualRange.fromAddr(
-                x86_64.PageTable.indexToAddr(
+                x64.PageTable.indexToAddr(
                     @truncate(table_index),
                     0,
                     0,
@@ -404,7 +404,7 @@ pub const init = struct {
         physical_address: core.PhysicalAddress,
         map_type: MapType,
     ) MapError!void {
-        core.debugAssert(x86_64.info.cpu_id.gbyte_pages);
+        core.debugAssert(x64.info.cpu_id.gbyte_pages);
         core.debugAssert(virtual_address.isAligned(PageTable.large_page_size));
         core.debugAssert(physical_address.isAligned(PageTable.large_page_size));
 

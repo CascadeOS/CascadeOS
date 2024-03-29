@@ -28,8 +28,8 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
         .dependencies = &.{.{ .name = "core" }},
     },
     .{
-        .name = "x86_64",
+        .name = "x64",
         .dependencies = &.{ .{ .name = "core" }, .{ .name = "bitjuggle" } },
-        .supported_targets = &.{.x86_64},
+        .supported_targets = &.{.x64},
     },
 };

@@ -4,7 +4,7 @@
 const core = @import("core");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 pub const RFlags = packed struct(u64) {
     /// Set by hardware if last arithmetic operation generated a carry out of the most-significant bit of the result.

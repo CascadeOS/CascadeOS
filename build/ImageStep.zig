@@ -177,7 +177,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
     });
 
     switch (self.target) {
-        .x86_64 => {
+        .x64 => {
             try efi_partition.addFile(.{
                 .destination_path = "/limine-bios.sys",
                 .source_path = self.limine_dep.path("limine-bios.sys").getPath2(self.b, &self.step),

@@ -7,6 +7,6 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 
-pub const cpu_id = x86_64.cpu_id;
+pub const cpu_id = x64.cpu_id;

@@ -5,13 +5,13 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 
 /// Occurs when dividing any number by 0 using the DIV or IDIV instruction, or when the division result is too
 /// large to be represented in the destination.
 ///
 /// The saved instruction pointer points to the DIV or IDIV instruction which caused the exception.
-pub fn divideErrorException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn divideErrorException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("divide error exception\n{}", .{interrupt_frame});
 }
 
@@ -31,7 +31,7 @@ pub fn divideErrorException(interrupt_frame: *const x86_64.interrupts.InterruptF
 ///
 /// When the exception is a trap, the saved instruction pointer points to the instruction after the instruction
 /// which caused the exception.
-pub fn debugException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn debugException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("debug exception\n{}", .{interrupt_frame});
 }
 
@@ -39,21 +39,21 @@ pub fn debugException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) 
 /// request set by the I/O APIC to the local APIC. This interrupt causes the NMI interrupt handler to be called.
 ///
 /// TODO: When a core panics it sends a NMI IPI to all other cores.
-pub fn nonMaskableInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn nonMaskableInterrupt(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("non-maskable interrupt\n{}", .{interrupt_frame});
 }
 
 /// Occurs at the execution of the INT3 instruction.
 ///
 /// The saved instruction pointer points to the byte after the INT3 instruction.
-pub fn breakpointException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn breakpointException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("breakpoint exception\n{}", .{interrupt_frame});
 }
 
 /// Raised when the INTO instruction is executed while the overflow bit in RFLAGS is set to 1.
 ///
 /// The saved instruction pointer points to the instruction after the INTO instruction.
-pub fn overflowException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn overflowException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("overflow exception\n{}", .{interrupt_frame});
 }
 
@@ -64,7 +64,7 @@ pub fn overflowException(interrupt_frame: *const x86_64.interrupts.InterruptFram
 /// When the index is out of bounds, the Bound Range Exceeded exception occurs.
 ///
 /// The saved instruction pointer points to the BOUND instruction which caused the exception.
-pub fn boundRangeExceededException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn boundRangeExceededException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("bound range exceeded exception\n{}", .{interrupt_frame});
 }
 
@@ -77,14 +77,14 @@ pub fn boundRangeExceededException(interrupt_frame: *const x86_64.interrupts.Int
 /// - The UD instruction is executed.
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
-pub fn invalidOpcodeException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn invalidOpcodeException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("invalid opcode exception\n{}", .{interrupt_frame});
 }
 
 /// Occurs when an FPU instruction is attempted but there is no FPU.
 ///
 /// The saved instruction pointer points to the instruction that caused the exception.
-pub fn deviceNotAvailableException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn deviceNotAvailableException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("device not available exception\n{}", .{interrupt_frame});
 }
 
@@ -93,21 +93,21 @@ pub fn deviceNotAvailableException(interrupt_frame: *const x86_64.interrupts.Int
 ///
 /// The saved instruction pointer is undefined. A double fault cannot be recovered. The faulting process must be
 /// terminated.
-pub fn doubleFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) noreturn {
+pub fn doubleFaultException(interrupt_frame: *const x64.interrupts.InterruptFrame) noreturn {
     core.panicFmt("double fault exception\n{}", .{interrupt_frame});
 }
 
 /// Occurs when an invalid segment selector is referenced as part of a task switch, or as a result of a control
 /// transfer through a gate descriptor, which results in an invalid stack-segment reference using an SS selector in
 /// the TSS.
-pub fn invalidTSSException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn invalidTSSException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("invalid tss exception\n{}", .{interrupt_frame});
 }
 
 /// Occurs when trying to load a segment or gate which has its `Present` bit set to 0.
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
-pub fn segmentNotPresentException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn segmentNotPresentException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("segment not present exception\n{}", .{interrupt_frame});
 }
 
@@ -120,7 +120,7 @@ pub fn segmentNotPresentException(interrupt_frame: *const x86_64.interrupts.Inte
 /// The saved instruction pointer points to the instruction which caused the exception, unless the fault occurred
 /// because of loading a non-present stack segment during a hardware task switch, in which case it points to the
 /// next instruction of the new task.
-pub fn stackFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn stackFaultException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("stack fault exception\n{}", .{interrupt_frame});
 }
 
@@ -133,7 +133,7 @@ pub fn stackFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFr
 /// - Referencing or accessing a null-descriptor.
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
-pub fn generalProtectionException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn generalProtectionException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("general protection exception\n{}", .{interrupt_frame});
 }
 
@@ -145,10 +145,10 @@ pub fn generalProtectionException(interrupt_frame: *const x86_64.interrupts.Inte
 /// - A reserved bit in the page directory or table entries is set to 1.
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
-pub fn pageFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn pageFaultException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     if (interrupt_frame.isKernel()) {
-        const faulting_address = x86_64.Cr2.readAddress();
-        const fault = x86_64.PageFaultErrorCode.fromErrorCode(interrupt_frame.error_code);
+        const faulting_address = x64.Cr2.readAddress();
+        const fault = x64.PageFaultErrorCode.fromErrorCode(interrupt_frame.error_code);
 
         core.panicFmt("kernel page fault @ {} - {}\n{}", .{ faulting_address, fault, interrupt_frame });
     }
@@ -166,7 +166,7 @@ pub fn pageFaultException(interrupt_frame: *const x86_64.interrupts.InterruptFra
 /// occurred.
 ///
 /// The x87 instruction pointer register contains the address of the last instruction which caused the exception.
-pub fn x87FPUFloatingPointException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn x87FPUFloatingPointException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("x87 FPU floating point exception\n{}", .{interrupt_frame});
 }
 
@@ -177,7 +177,7 @@ pub fn x87FPUFloatingPointException(interrupt_frame: *const x86_64.interrupts.In
 /// Alignment checking is disabled by default. To enable it, set the CR0.AM and RFLAGS.AC bits both to 1.
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
-pub fn alignmentCheckException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn alignmentCheckException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("alignment check exception\n{}", .{interrupt_frame});
 }
 
@@ -191,7 +191,7 @@ pub fn alignmentCheckException(interrupt_frame: *const x86_64.interrupts.Interru
 /// cache errors, etc.
 ///
 /// The value of the saved instruction pointer depends on the implementation and the exception.
-pub fn machineCheckException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) noreturn {
+pub fn machineCheckException(interrupt_frame: *const x64.interrupts.InterruptFrame) noreturn {
     core.panicFmt("machine check exception\n{}", .{interrupt_frame});
 }
 
@@ -201,14 +201,14 @@ pub fn machineCheckException(interrupt_frame: *const x86_64.interrupts.Interrupt
 /// instead of this.
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
-pub fn simdFloatingPointException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn simdFloatingPointException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("SIMD floating point exception\n{}", .{interrupt_frame});
 }
 
 /// Virtualization Exception
 ///
 /// Intel Only
-pub fn virtualizationException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn virtualizationException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("virtualization exception\n{}", .{interrupt_frame});
 }
 
@@ -219,7 +219,7 @@ pub fn virtualizationException(interrupt_frame: *const x86_64.interrupts.Interru
 /// - For inter-privilege RET and IRET instructions, the SSP is not 8-byte aligned, or the previous SSP from shadow
 /// stack is not 4-byte aligned or, in legacy or compatibility mode, is not less than 4GB.
 /// - A task switch initiated by IRET where the incoming SSP is not aligned to 4 bytes or is not less than 4GB.
-pub fn controlProtectionException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn controlProtectionException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("control protection exception\n{}", .{interrupt_frame});
 }
 
@@ -227,25 +227,25 @@ pub fn controlProtectionException(interrupt_frame: *const x86_64.interrupts.Inte
 /// pending events.
 ///
 /// AMD Only.
-pub fn hypervisorInjectionException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn hypervisorInjectionException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("hypervisor injection exception\n{}", .{interrupt_frame});
 }
 
 /// The VMM communication exception is generated when certain events occur inside a secure guest VM.
 ///
 /// AMD Only.
-pub fn vmmCommunicationException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn vmmCommunicationException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("vmm communication exception\n{}", .{interrupt_frame});
 }
 
 /// The security exception is generated by security-sensitive events under SVM.
 ///
 /// AMD Only.
-pub fn securityException(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn securityException(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     core.panicFmt("security exception\n{}", .{interrupt_frame});
 }
 
-pub fn unhandledInterrupt(interrupt_frame: *const x86_64.interrupts.InterruptFrame) void {
+pub fn unhandledInterrupt(interrupt_frame: *const x64.interrupts.InterruptFrame) void {
     // core.assert(!interrupt.isException());
 
     core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame});

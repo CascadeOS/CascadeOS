@@ -4,7 +4,7 @@
 const std = @import("std");
 const core = @import("core");
 
-const x86_64 = @This();
+const x64 = @This();
 
 pub usingnamespace @import("instructions.zig");
 pub usingnamespace @import("registers.zig");
@@ -37,36 +37,36 @@ pub fn disablePic() void {
     const MODE_8086: u8 = 0x01;
 
     // Tell each PIC that we're going to send it a three-byte initialization sequence on its data port.
-    x86_64.portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
-    x86_64.portWriteU8(0x80, 0); // wait
-    x86_64.portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
-    x86_64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
+    x64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
+    x64.portWriteU8(0x80, 0); // wait
 
     // Remap master PIC to 0x20
-    x86_64.portWriteU8(PRIMARY_DATA_PORT, 0x20);
-    x86_64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(PRIMARY_DATA_PORT, 0x20);
+    x64.portWriteU8(0x80, 0); // wait
 
     // Remap slave PIC to 0x28
-    x86_64.portWriteU8(SECONDARY_DATA_PORT, 0x28);
-    x86_64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(SECONDARY_DATA_PORT, 0x28);
+    x64.portWriteU8(0x80, 0); // wait
 
     // Configure chaining between master and slave
-    x86_64.portWriteU8(PRIMARY_DATA_PORT, 4);
-    x86_64.portWriteU8(0x80, 0); // wait
-    x86_64.portWriteU8(SECONDARY_DATA_PORT, 2);
-    x86_64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(PRIMARY_DATA_PORT, 4);
+    x64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(SECONDARY_DATA_PORT, 2);
+    x64.portWriteU8(0x80, 0); // wait
 
     // Set our mode.
-    x86_64.portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
-    x86_64.portWriteU8(0x80, 0); // wait
-    x86_64.portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
-    x86_64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
+    x64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
+    x64.portWriteU8(0x80, 0); // wait
 
     // Mask all interrupts
-    x86_64.portWriteU8(PRIMARY_DATA_PORT, 0xFF);
-    x86_64.portWriteU8(0x80, 0); // wait
-    x86_64.portWriteU8(SECONDARY_DATA_PORT, 0xFF);
-    x86_64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(PRIMARY_DATA_PORT, 0xFF);
+    x64.portWriteU8(0x80, 0); // wait
+    x64.portWriteU8(SECONDARY_DATA_PORT, 0xFF);
+    x64.portWriteU8(0x80, 0); // wait
 }
 
 comptime {

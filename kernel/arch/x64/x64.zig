@@ -5,8 +5,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const lib_x86_64 = @import("lib_x86_64");
-pub usingnamespace lib_x86_64;
+const lib_x64 = @import("lib_x64");
+pub usingnamespace lib_x64;
 
 pub const ArchCpu = @import("ArchCpu.zig");
 pub const info = @import("info.zig");
@@ -22,12 +22,12 @@ pub const SerialPort = @import("SerialPort.zig");
 ///
 /// Asserts that interrupts are disabled.
 pub inline fn getCpu() *kernel.Cpu {
-    core.debugAssert(!lib_x86_64.interruptsEnabled());
-    return @ptrFromInt(lib_x86_64.KERNEL_GS_BASE.read());
+    core.debugAssert(!lib_x64.interruptsEnabled());
+    return @ptrFromInt(lib_x64.KERNEL_GS_BASE.read());
 }
 
 comptime {
-    if (@import("cascade_target").arch != .x86_64) {
-        @compileError("x86_64 implementation has been referenced when building " ++ @tagName(@import("cascade_target").arch));
+    if (@import("cascade_target").arch != .x64) {
+        @compileError("x64 implementation has been referenced when building " ++ @tagName(@import("cascade_target").arch));
     }
 }

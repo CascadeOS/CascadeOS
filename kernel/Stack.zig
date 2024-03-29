@@ -119,7 +119,7 @@ const RETURN_ADDRESS_ALIGNMENT = core.Size.from(16, .byte);
 pub fn pushReturnAddress(stack: *Stack, return_address: core.VirtualAddress) error{StackOverflow}!void {
     const old_stack_pointer = stack.stack_pointer;
 
-    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?
+    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x64?
     errdefer stack.stack_pointer = old_stack_pointer;
 
     try stack.push(return_address.value);
@@ -135,7 +135,7 @@ pub fn pushReturnAddressWithoutChangingPointer(
     const old_stack_pointer = stack.stack_pointer;
     defer stack.stack_pointer = old_stack_pointer;
 
-    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x86?
+    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT); // TODO: Is this correct on non-x64?
     try stack.push(return_address.value);
 
     return stack.stack_pointer;

@@ -4,7 +4,7 @@
 const std = @import("std");
 const core = @import("core");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 pub const LAPIC = union(enum) {
     xapic: [*]volatile u8,
@@ -50,7 +50,7 @@ pub const LAPIC = union(enum) {
     /// Spurious-Interrupt Vector Register
     pub const SupriousInterruptRegister = packed struct(u32) {
         /// The vector number to be delivered to the processor when the local APIC generates a spurious vector.
-        spurious_vector: x86_64.InterruptVector,
+        spurious_vector: x64.InterruptVector,
 
         /// Indicates whether the local APIC is enabled.
         apic_enable: bool,
@@ -97,7 +97,7 @@ pub const LAPIC = union(enum) {
     /// initial-count value.
     pub const LVTTimerRegister = packed struct(u32) {
         /// Interrupt vector number.
-        vector: x86_64.InterruptVector,
+        vector: x64.InterruptVector,
 
         _reserved1: u4 = 0,
 
@@ -181,7 +181,7 @@ pub const LAPIC = union(enum) {
     /// LVT Error Register
     pub const LVTErrorRegister = packed struct(u32) {
         /// Interrupt vector number.
-        vector: x86_64.InterruptVector,
+        vector: x64.InterruptVector,
 
         /// Specifies the type of interrupt to be sent to the processor.
         ///
@@ -443,7 +443,7 @@ pub const LAPIC = union(enum) {
     /// The act of writing to the low doubleword of the ICR causes the IPI to be sent.
     pub const InterruptCommandRegister = packed struct(u64) {
         /// The vector number of the interrupt being sent.
-        vector: x86_64.InterruptVector,
+        vector: x64.InterruptVector,
 
         /// Specifies the type of IPI to be sent.
         delivery_mode: DeliveryMode,
@@ -552,7 +552,7 @@ pub const LAPIC = union(enum) {
             },
             .x2apic => {
                 return @bitCast(
-                    x86_64.readMSR(u64, Register.interrupt_command_0_31.x2apicRegister()),
+                    x64.readMSR(u64, Register.interrupt_command_0_31.x2apicRegister()),
                 );
             },
         }
@@ -568,7 +568,7 @@ pub const LAPIC = union(enum) {
                 self.writeRegister(.interrupt_command_0_31, @truncate(value));
             },
             .x2apic => {
-                x86_64.writeMSR(
+                x64.writeMSR(
                     u64,
                     Register.interrupt_command_0_31.x2apicRegister(),
                     @bitCast(register),
@@ -767,7 +767,7 @@ pub const LAPIC = union(enum) {
                 core.debugAssert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register");
 
-                return x86_64.readMSR(u32, register.x2apicRegister());
+                return x64.readMSR(u32, register.x2apicRegister());
             },
         }
     }
@@ -787,7 +787,7 @@ pub const LAPIC = union(enum) {
                 core.debugAssert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register");
 
-                x86_64.writeMSR(u32, register.x2apicRegister(), value);
+                x64.writeMSR(u32, register.x2apicRegister(), value);
             },
         }
     }

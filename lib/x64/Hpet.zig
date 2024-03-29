@@ -8,7 +8,7 @@
 const core = @import("core");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 const Hpet = @This();
 

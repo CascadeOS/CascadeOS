@@ -6,12 +6,12 @@
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 
 const SerialPort = @This();
 
-const portReadU8 = x86_64.portReadU8;
-const portWriteU8 = x86_64.portWriteU8;
+const portReadU8 = x64.portReadU8;
+const portWriteU8 = x64.portWriteU8;
 const OUTPUT_READY: u8 = 1 << 5;
 
 _data_port: u16,
@@ -49,7 +49,7 @@ pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
 
 fn waitForOutputReady(self: SerialPort) void {
     while (portReadU8(self._line_status_port) & OUTPUT_READY == 0) {
-        x86_64.pause();
+        x64.pause();
     }
 }
 

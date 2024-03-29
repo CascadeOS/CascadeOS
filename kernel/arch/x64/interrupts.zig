@@ -5,23 +5,23 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 const fixed_handlers = @import("fixed_handlers.zig");
 
-var idt: x86_64.Idt = .{};
+var idt: x64.Idt = .{};
 const raw_handlers = init.makeRawHandlers();
-var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x86_64.Idt.number_of_handlers;
+var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
 pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
 
 pub const InterruptFrame = extern struct {
     es: extern union {
         full: u64,
-        selector: x86_64.Gdt.Selector,
+        selector: x64.Gdt.Selector,
     },
     ds: extern union {
         full: u64,
-        selector: x86_64.Gdt.Selector,
+        selector: x64.Gdt.Selector,
     },
     r15: u64,
     r14: u64,
@@ -46,13 +46,13 @@ pub const InterruptFrame = extern struct {
     rip: u64,
     cs: extern union {
         full: u64,
-        selector: x86_64.Gdt.Selector,
+        selector: x64.Gdt.Selector,
     },
-    rflags: x86_64.RFlags,
+    rflags: x64.RFlags,
     rsp: u64,
     ss: extern union {
         full: u64,
-        selector: x86_64.Gdt.Selector,
+        selector: x64.Gdt.Selector,
     },
 
     /// Checks if this interrupt occurred in kernel mode.
@@ -168,7 +168,7 @@ pub const Interrupt = enum(u8) {
 
     _,
 
-    pub inline fn toInterruptVector(self: Interrupt) x86_64.InterruptVector {
+    pub inline fn toInterruptVector(self: Interrupt) x64.InterruptVector {
         return @enumFromInt(@intFromEnum(self));
     }
 
@@ -185,7 +185,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
-    x86_64.disableInterrupts();
+    x64.disableInterrupts();
 }
 
 fn unhandledInterrupt(interrupt_frame: *InterruptFrame) void {
@@ -240,11 +240,11 @@ pub const init = struct {
     }
 
     /// Creates an array of raw interrupt handlers, one for each vector.
-    fn makeRawHandlers() [x86_64.Idt.number_of_handlers](*const fn () callconv(.Naked) void) {
-        var raw_handlers_temp: [x86_64.Idt.number_of_handlers](*const fn () callconv(.Naked) void) = undefined;
+    fn makeRawHandlers() [x64.Idt.number_of_handlers](*const fn () callconv(.Naked) void) {
+        var raw_handlers_temp: [x64.Idt.number_of_handlers](*const fn () callconv(.Naked) void) = undefined;
 
         comptime var i = 0;
-        inline while (i < x86_64.Idt.number_of_handlers) : (i += 1) {
+        inline while (i < x64.Idt.number_of_handlers) : (i += 1) {
             const vector_number: u8 = @intCast(i);
             const interrupt: Interrupt = @enumFromInt(vector_number);
 
@@ -252,7 +252,7 @@ pub const init = struct {
             // is always aligned in the same way for every vector
             const error_code_asm = if (comptime !interrupt.hasErrorCode()) "push $0\n" else "";
             const vector_number_asm = std.fmt.comptimePrint("push ${d}", .{vector_number});
-            const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{@intFromEnum(x86_64.Gdt.Selector.kernel_data)});
+            const data_selector_asm = std.fmt.comptimePrint("mov ${d}, %%ax", .{@intFromEnum(x64.Gdt.Selector.kernel_data)});
 
             const rawInterruptHandler = struct {
                 fn rawInterruptHandler() callconv(.Naked) void {

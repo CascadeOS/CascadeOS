@@ -5,9 +5,9 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 
-const log = kernel.log.scoped(.scheduling_x86_64);
+const log = kernel.log.scoped(.scheduling_x64);
 
 /// Switches to the provided stack and returns.
 ///

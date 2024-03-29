@@ -4,7 +4,7 @@
 const core = @import("core");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 const Idt = @This();
 
@@ -18,7 +18,7 @@ pub const Entry = extern struct {
     pointer_low: u16,
 
     /// The code selector to switch to when the interrupt is recieved.
-    code_selector: x86_64.Gdt.Selector,
+    code_selector: x64.Gdt.Selector,
 
     options: Options,
 
@@ -43,7 +43,7 @@ pub const Entry = extern struct {
         /// Defines the privilege levels which are allowed to access this interrupt via the INT instruction.
         ///
         /// Hardware interrupts ignore this mechanism.
-        privilege_level: x86_64.PrivilegeLevel = .ring0,
+        privilege_level: x64.PrivilegeLevel = .ring0,
 
         present: bool,
     };
@@ -57,7 +57,7 @@ pub const Entry = extern struct {
 
     pub fn init(
         self: *Entry,
-        code_selector: x86_64.Gdt.Selector,
+        code_selector: x64.Gdt.Selector,
         gate_type: GateType,
         handler: *const fn () callconv(.Naked) void,
     ) void {

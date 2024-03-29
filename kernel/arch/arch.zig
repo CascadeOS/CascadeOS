@@ -8,7 +8,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 const current = switch (@import("cascade_target").arch) {
-    .x86_64 => @import("x86_64/interface.zig"),
+    .x64 => @import("x64/interface.zig"),
 };
 
 /// Architecture specific per-cpu information.
@@ -75,7 +75,7 @@ pub const init = struct {
 
     /// Capture any system information that is required for the architecture.
     ///
-    /// For example, on x86_64 this should capture the CPUID information.
+    /// For example, on x64 this should capture the CPUID information.
     pub inline fn captureSystemInformation() void {
         checkSupport(current.init, "captureSystemInformation", fn () void);
 

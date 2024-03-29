@@ -5,9 +5,9 @@ const core = @import("core");
 const std = @import("std");
 const bitjuggle = @import("bitjuggle");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
-/// A page table for x86_64.
+/// A page table for x64.
 pub const PageTable = extern struct {
     entries: [number_of_entries]Entry align(small_page_size.value) = [_]Entry{Entry.empty} ** number_of_entries,
 

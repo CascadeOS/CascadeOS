@@ -5,7 +5,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const x86_64 = @import("x86_64.zig");
+const x64 = @import("x64.zig");
 
-gdt: x86_64.Gdt = .{},
-tss: x86_64.Tss = .{},
+gdt: x64.Gdt = .{},
+tss: x64.Tss = .{},

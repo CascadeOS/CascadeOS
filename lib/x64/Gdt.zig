@@ -4,9 +4,9 @@
 const core = @import("core");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
-/// The Global Descriptor Table for x86_64.
+/// The Global Descriptor Table for x64.
 pub const Gdt = extern struct {
     descriptors: [7]u64 = [7]u64{
         0x0000000000000000, // Null
@@ -31,7 +31,7 @@ pub const Gdt = extern struct {
     const mask_u16: u64 = std.math.maxInt(u16);
     const mask_u24: u64 = std.math.maxInt(u24);
 
-    pub fn setTss(self: *Gdt, tss: *x86_64.Tss) void {
+    pub fn setTss(self: *Gdt, tss: *x64.Tss) void {
         const tss_ptr = @intFromPtr(tss);
 
         const low_base: u64 = (tss_ptr & mask_u24) << 16;
@@ -43,7 +43,7 @@ pub const Gdt = extern struct {
 
         const available_64_bit_tss: u64 = 0b1001 << 40;
 
-        const limit: u64 = (@sizeOf(x86_64.Tss) - 1) & mask_u16;
+        const limit: u64 = (@sizeOf(x64.Tss) - 1) & mask_u16;
 
         self.descriptors[5] = low_base | mid_base | limit | present | available_64_bit_tss;
         self.descriptors[6] = high_base;

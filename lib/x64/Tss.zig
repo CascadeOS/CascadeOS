@@ -4,7 +4,7 @@
 const core = @import("core");
 const std = @import("std");
 
-const x86_64 = @import("x86_64");
+const x64 = @import("x64");
 
 /// The Task State Segment structure.
 pub const Tss = extern struct {
@@ -37,7 +37,7 @@ pub const Tss = extern struct {
     /// Sets the stack for the given privilege level.
     pub fn setPrivilegeStack(
         self: *Tss,
-        privilege_level: x86_64.PrivilegeLevel,
+        privilege_level: x64.PrivilegeLevel,
         stack_pointer: core.VirtualAddress,
     ) void {
         core.assert(privilege_level != .ring3);
