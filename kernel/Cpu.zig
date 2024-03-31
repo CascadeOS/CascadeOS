@@ -21,6 +21,9 @@ interrupt_disable_count: u32,
 /// This allows support for nested disables.
 preemption_disable_count: u32,
 
+/// Tracks the number of times we have not scheduled due to preemption being disabled.
+schedules_skipped: u32 = 0,
+
 /// The stack used for idle.
 ///
 /// Also used during the move from the bootloader provided stack until we start scheduling.

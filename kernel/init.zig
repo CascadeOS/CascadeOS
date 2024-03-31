@@ -11,7 +11,7 @@ const log = kernel.log.scoped(.init);
 var bootstrap_cpu: kernel.Cpu = .{
     .id = @enumFromInt(0),
     .interrupt_disable_count = 1, // interrupts start disabled
-    .preemption_disable_count = 1, // preemption starts disabled
+    .preemption_disable_count = 0,
     .idle_stack = undefined, // set at the beginning of `kernelInit`,
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
@@ -86,7 +86,13 @@ fn kernelInitStage2(cpu: *kernel.Cpu) noreturn {
 ///
 /// All cpus are using a normal kernel stack.
 fn kernelInitStage3() noreturn {
-    core.panic("UNIMPLEMENTED");
+    const cpu = kernel.arch.rawGetCpu(); // we know interrupts are disabled and we are not going to be preempted.
+    core.debugAssert(cpu.interrupt_disable_count == 1);
+    core.debugAssert(cpu.preemption_disable_count == 0);
+
+    log.debug("entering scheduler on {}", .{cpu.id});
+    kernel.scheduler.schedule(false);
+    unreachable;
 }
 
 fn captureKernelOffsets() !void {
