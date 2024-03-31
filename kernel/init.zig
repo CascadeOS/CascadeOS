@@ -40,7 +40,7 @@ pub fn kernelInit() !void {
     kernel.debug.init.loadInitPanic();
 
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
-        const starting_message = comptime "starting CascadeOS " ++ @import("kernel_options").cascade_version ++ "\n";
+        const starting_message = comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n";
         early_output.writeAll(starting_message) catch {};
     }
 
