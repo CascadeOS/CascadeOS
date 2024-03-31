@@ -32,6 +32,13 @@ pub inline fn rawGetCpu() *kernel.Cpu {
     return current.getCpu();
 }
 
+/// Halts the current processor
+pub inline fn halt() void {
+    checkSupport(current, "halt", fn () void);
+
+    current.halt();
+}
+
 /// Functionality that is used during kernel init only.
 pub const init = struct {
     pub const EarlyOutputWriter = current.init.EarlyOutputWriter;

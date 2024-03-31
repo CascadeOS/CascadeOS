@@ -10,8 +10,8 @@ const x64 = @import("x64.zig");
 pub const ArchCpu = x64.ArchCpu;
 
 pub const spinLoopHint = x64.pause;
-
 pub const getCpu = x64.getCpu;
+pub const halt = x64.halt;
 
 pub const init = struct {
     pub const EarlyOutputWriter = x64.SerialPort.Writer;
