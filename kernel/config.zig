@@ -17,3 +17,5 @@ pub const kernel_stack_size = kernel.arch.paging.standard_page_size.multiplyScal
 
 /// The number of bucket groups in the virtual range pool `kernel.vmm.VirtualRangeAllocator.VirtualRangePool`
 pub const number_of_bucket_groups_in_virtual_range_pool = 128;
+
+pub const process_name_length = 32;

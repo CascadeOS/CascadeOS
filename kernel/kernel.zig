@@ -4,6 +4,12 @@
 const std = @import("std");
 const core = @import("core");
 
+/// The kernel process.
+pub var process: Process = .{
+    .id = .kernel,
+    ._name = Process.Name.fromSlice("kernel") catch unreachable,
+};
+
 comptime {
     _ = &boot; // ensure any entry points or bootloader required symbols are referenced
 }
@@ -16,6 +22,7 @@ pub const debug = @import("debug.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
+pub const Process = @import("Process.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const vmm = @import("vmm/vmm.zig");
