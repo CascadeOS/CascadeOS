@@ -256,6 +256,17 @@ pub const scheduling = struct {
 
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
+
+    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
+    pub inline fn switchToIdle(
+        cpu: *kernel.Cpu,
+        stack_pointer: core.VirtualAddress,
+        opt_old_thread: ?*kernel.Thread,
+    ) noreturn {
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Thread) noreturn);
+
+        current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_thread);
+    }
 };
 
 /// Checks if the current architecture implements the given function.
