@@ -22,11 +22,11 @@ pub const VirtualRange = address.VirtualRange;
 
 pub const testing = @import("testing.zig");
 
-pub inline fn assert(ok: bool) void {
+pub fn assert(ok: bool) void { // TODO: mark inline once that does not remove debug stack frames
     if (!ok) unreachable;
 }
 
-pub inline fn debugAssert(ok: bool) void {
+pub fn debugAssert(ok: bool) void { // TODO: mark inline once that does not remove debug stack frames
     if (builtin.mode == .ReleaseSafe) {
         @setRuntimeSafety(false);
 
