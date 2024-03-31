@@ -26,6 +26,7 @@ pub const pmm = @import("pmm.zig");
 pub const Process = @import("Process.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
+pub const Thread = @import("Thread.zig");
 pub const vmm = @import("vmm/vmm.zig");
 
 pub const getCpuAndExclude = sync.getCpuAndExclude;

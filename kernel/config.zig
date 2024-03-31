@@ -19,3 +19,4 @@ pub const kernel_stack_size = kernel.arch.paging.standard_page_size.multiplyScal
 pub const number_of_bucket_groups_in_virtual_range_pool = 128;
 
 pub const process_name_length = 32;
+pub const thread_name_length = 32;
