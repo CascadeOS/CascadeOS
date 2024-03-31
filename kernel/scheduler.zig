@@ -123,18 +123,27 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
     kernel.arch.scheduling.switchToThreadFromThread(cpu, current_thread, new_thread);
 }
 
-pub fn unlockScheduler() void {
+/// Unlocks the scheduler and produces a `HeldExclusion`.
+///
+/// Intended to only be called in idle or a new thread.
+pub fn unlockScheduler() kernel.sync.HeldExclusion {
+    core.debugAssert(lock.isLocked());
+
+    const cpu = kernel.arch.rawGetCpu();
+
+    cpu.preemption_disable_count = 1;
+    cpu.interrupt_disable_count = 1;
+
     lock.unsafeUnlock();
+
+    return .{
+        .cpu = cpu,
+        .exclusion = .preemption_and_interrupt,
+    };
 }
 
 fn idle() noreturn {
-    unlockScheduler();
-    {
-        const cpu = kernel.arch.rawGetCpu();
-        cpu.interrupt_disable_count = 0;
-        cpu.preemption_disable_count = 0;
-    }
-    kernel.arch.interrupts.enableInterrupts();
+    unlockScheduler().release();
 
     log.debug("entering idle", .{});
 
