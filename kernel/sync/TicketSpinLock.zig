@@ -12,15 +12,15 @@ ticket: usize = 0,
 current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
-    interrupts_enabled: bool,
+    held_exclusion: kernel.sync.HeldExclusion,
     spinlock: *TicketSpinLock,
 
     /// Unlocks the spinlock.
-    pub fn unlock(self: Held) void {
-        core.debugAssert(self.spinlock.current_holder == kernel.arch.getCpu().id);
+    pub fn release(self: Held) void {
+        core.debugAssert(self.spinlock.current_holder == self.held_exclusion.cpu.id);
 
         self.spinlock.unsafeUnlock();
-        if (self.interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
+        self.held_exclusion.release();
     }
 };
 
@@ -32,7 +32,10 @@ pub fn isLocked(self: TicketSpinLock) bool {
 ///
 /// It is the caller's responsibility to ensure that interrupts are disabled.
 pub fn isLockedByCurrent(self: TicketSpinLock) bool {
-    return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == kernel.arch.getCpu().id;
+    const held = kernel.getCpuAndExclude(.preemption);
+    defer held.release();
+
+    return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == held.cpu.id;
 }
 
 /// Unlocks the spinlock.
@@ -44,18 +47,17 @@ pub fn unsafeUnlock(self: *TicketSpinLock) void {
 }
 
 pub fn lock(self: *TicketSpinLock) Held {
-    const interrupts_enabled = kernel.arch.interrupts.interruptsEnabled();
-    if (interrupts_enabled) kernel.arch.interrupts.disableInterrupts();
+    const held_exclusion = kernel.getCpuAndExclude(.preemption_and_interrupt);
 
     const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
 
     while (@atomicLoad(usize, &self.current, .acquire) != ticket) {
         kernel.arch.spinLoopHint();
     }
-    @atomicStore(kernel.Cpu.Id, &self.current_holder, kernel.arch.getCpu().id, .release);
+    @atomicStore(kernel.Cpu.Id, &self.current_holder, held_exclusion.cpu.id, .release);
 
     return .{
-        .interrupts_enabled = interrupts_enabled,
+        .held_exclusion = held_exclusion,
         .spinlock = self,
     };
 }

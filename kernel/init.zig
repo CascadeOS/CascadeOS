@@ -10,6 +10,8 @@ const log = kernel.log.scoped(.init);
 /// Represents the bootstrap cpu during init.
 var bootstrap_cpu: kernel.Cpu = .{
     .id = @enumFromInt(0),
+    .interrupt_disable_count = 1, // interrupts start disabled
+    .preemption_disable_count = 1, // preemption starts disabled
     .idle_stack = undefined, // set at the beginning of `kernelInit`,
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };

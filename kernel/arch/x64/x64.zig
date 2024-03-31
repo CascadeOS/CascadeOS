@@ -22,7 +22,6 @@ pub const SerialPort = @import("SerialPort.zig");
 ///
 /// Asserts that interrupts are disabled.
 pub inline fn getCpu() *kernel.Cpu {
-    core.debugAssert(!lib_x64.interruptsEnabled());
     return @ptrFromInt(lib_x64.KERNEL_GS_BASE.read());
 }
 

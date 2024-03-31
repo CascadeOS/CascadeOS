@@ -19,6 +19,8 @@ pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const vmm = @import("vmm/vmm.zig");
 
+pub const getCpuAndExclude = sync.getCpuAndExclude;
+
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
     return .{ .value = self.value + info.direct_map.address.value };

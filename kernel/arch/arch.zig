@@ -25,8 +25,8 @@ pub inline fn spinLoopHint() void {
 ///
 /// Assumes that `init.loadCpu()` has been called on the currently running CPU.
 ///
-/// Asserts that interrupts are disabled.
-pub inline fn getCpu() *kernel.Cpu {
+/// It is the callers responsibility to ensure that the current thread is not re-scheduled on to another CPU.
+pub inline fn rawGetCpu() *kernel.Cpu {
     checkSupport(current, "getCpu", fn () *kernel.Cpu);
 
     return current.getCpu();

@@ -33,7 +33,7 @@ pub fn DirectMapPool(
 
         pub fn get(self: *Self) GetError!*T {
             const held = self.lock.lock();
-            defer held.unlock();
+            defer held.release();
 
             if (self.available_buckets) |candidate_bucket| {
                 return self.getItemFromBucket(candidate_bucket) orelse

@@ -6,6 +6,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 var panic_impl: *const fn (
+    cpu: *kernel.Cpu,
     msg: []const u8,
     stack_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
@@ -19,9 +20,9 @@ pub fn zigPanic(
 ) noreturn {
     @setCold(true);
 
-    kernel.arch.interrupts.disableInterrupts();
+    const held = kernel.getCpuAndExclude(.preemption_and_interrupt);
 
-    panic_impl(msg, stack_trace, return_address_opt orelse @returnAddress());
+    panic_impl(held.cpu, msg, stack_trace, return_address_opt orelse @returnAddress());
 
     while (true) {
         kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -363,10 +364,13 @@ pub const init = struct {
 
     /// Panic handler during kernel init.
     fn initPanicImpl(
+        cpu: *kernel.Cpu,
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void {
+        _ = cpu;
+
         const early_output = kernel.arch.init.getEarlyOutput() orelse return;
 
         printUserPanicMessage(early_output, msg);
@@ -374,10 +378,12 @@ pub const init = struct {
     }
 
     fn noOpPanic(
+        cpu: *kernel.Cpu,
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void {
+        _ = cpu;
         _ = msg;
         _ = stack_trace;
         _ = return_address;
