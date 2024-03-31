@@ -73,8 +73,35 @@ pub fn switchToThreadFromIdle(
     _switchToThreadFromIdleImpl(thread.kernel_stack.stack_pointer);
     unreachable;
 }
+
+pub fn switchToThreadFromThread(
+    cpu: *kernel.Cpu,
+    old_thread: *kernel.Thread,
+    new_thread: *kernel.Thread,
+) void {
+    const new_process = new_thread.process;
+
+    // If the process is changing we need to switch the page table.
+    if (old_thread.process != new_process) {
+        x64.paging.switchToPageTable(new_process.page_table);
+    }
+
+    cpu.arch.tss.setPrivilegeStack(
+        .ring0,
+        new_thread.kernel_stack.stack_pointer,
+    );
+
+    _switchToThreadFromThreadImpl(
+        new_thread.kernel_stack.stack_pointer,
+        &old_thread.kernel_stack.stack_pointer,
+    );
+}
+
 // Implemented in 'x64/asm/switchToIdleImpl.S'
 extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) noreturn;
 
 // Implemented in 'x64/asm/switchToThreadFromIdleImpl.S'
 extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
+
+// Implemented in 'x64/asm/switchToThreadFromThreadImpl.S'
+extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;

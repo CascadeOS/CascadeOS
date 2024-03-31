@@ -276,6 +276,16 @@ pub const scheduling = struct {
 
         current.scheduling.switchToThreadFromIdle(cpu, thread);
     }
+
+    pub inline fn switchToThreadFromThread(
+        cpu: *kernel.Cpu,
+        old_thread: *kernel.Thread,
+        new_thread: *kernel.Thread,
+    ) void {
+        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Cpu, *kernel.Thread, *kernel.Thread) void);
+
+        current.scheduling.switchToThreadFromThread(cpu, old_thread, new_thread);
+    }
 };
 
 /// Checks if the current architecture implements the given function.
