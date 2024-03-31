@@ -53,5 +53,28 @@ pub fn switchToIdle(
     );
 }
 
+pub fn switchToThreadFromIdle(
+    cpu: *kernel.Cpu,
+    thread: *kernel.Thread,
+) noreturn {
+    const process = thread.process;
+
+    if (!process.isKernel()) {
+        // If the process is not the kernel we need to switch the page table and privilege stack.
+
+        x64.paging.switchToPageTable(process.page_table);
+
+        cpu.arch.tss.setPrivilegeStack(
+            .ring0,
+            thread.kernel_stack.stack_pointer,
+        );
+    }
+
+    _switchToThreadFromIdleImpl(thread.kernel_stack.stack_pointer);
+    unreachable;
+}
 // Implemented in 'x64/asm/switchToIdleImpl.S'
 extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) noreturn;
+
+// Implemented in 'x64/asm/switchToThreadFromIdleImpl.S'
+extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
