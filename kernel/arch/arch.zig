@@ -126,11 +126,18 @@ pub const paging = struct {
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
-    /// Switches to the page table given by `page_table_address`.
-    pub inline fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
-        checkSupport(current.paging, "switchToPageTable", fn (core.PhysicalAddress) void);
+    /// Allocates a new page table.
+    pub inline fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
+        checkSupport(current.paging, "allocatePageTable", fn () kernel.pmm.AllocateError!*PageTable);
 
-        current.paging.switchToPageTable(page_table_address);
+        return current.paging.allocatePageTable();
+    }
+
+    /// Switches to the given page table.
+    pub inline fn switchToPageTable(page_table: *PageTable) void {
+        checkSupport(current.paging, "switchToPageTable", fn (*PageTable) void);
+
+        current.paging.switchToPageTable(page_table);
     }
 
     pub const MapError = error{

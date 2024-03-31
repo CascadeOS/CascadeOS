@@ -12,16 +12,7 @@ const log = kernel.log.scoped(.vmm);
 pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
 pub const VirtualRangeAllocator = @import("VirtualRangeAllocator.zig");
 
-pub var kernel_page_table: kernel.arch.paging.PageTable = .{};
 var memory_layout: KernelMemoryLayout = .{};
-
-pub fn loadKernelPageTable() void {
-    kernel.arch.paging.switchToPageTable(
-        kernel.physicalFromKernelSectionUnsafe(
-            core.VirtualAddress.fromPtr(&kernel_page_table),
-        ),
-    );
-}
 
 /// Maps a virtual range using the standard page size.
 ///
@@ -105,6 +96,8 @@ pub fn unmapRange(
 pub const init = struct {
     pub fn buildKernelPageTableAndSwitch() !void {
         log.debug("building kernel page table", .{});
+        kernel.process.page_table = kernel.arch.paging.allocatePageTable() catch
+            core.panic("unable to allocate physical page for root page table");
 
         mapDirectMaps() catch |err| {
             log.err("failed to map direct maps: {s}", .{@errorName(err)});
@@ -121,7 +114,7 @@ pub const init = struct {
         };
 
         log.debug("switching to kernel page table", .{});
-        loadKernelPageTable();
+        kernel.arch.paging.switchToPageTable(kernel.process.page_table);
 
         if (log.levelEnabled(.debug)) {
             log.debug("kernel memory regions:", .{});
@@ -139,7 +132,7 @@ pub const init = struct {
         log.debug("mapping the direct map", .{});
 
         try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
-            &kernel_page_table,
+            kernel.process.page_table,
             kernel.info.direct_map,
             direct_map_physical_range,
             .{ .writeable = true, .global = true },
@@ -149,7 +142,7 @@ pub const init = struct {
         log.debug("mapping the non-cached direct map", .{});
 
         try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
-            &kernel_page_table,
+            kernel.process.page_table,
             kernel.info.non_cached_direct_map,
             direct_map_physical_range,
             .{ .writeable = true, .no_cache = true, .global = true },
@@ -206,7 +199,7 @@ pub const init = struct {
         log.debug("preparing the kernel stacks area", .{});
 
         const kernel_stacks_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
-            &kernel_page_table,
+            kernel.process.page_table,
         );
 
         try kernel.Stack.init.initStacks(kernel_stacks_range);
@@ -242,7 +235,7 @@ pub const init = struct {
         const physical_range = core.PhysicalRange.fromAddr(phys_address, virtual_range.size);
 
         try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
-            &kernel_page_table,
+            kernel.process.page_table,
             virtual_range,
             physical_range,
             map_type,

@@ -8,6 +8,7 @@ const core = @import("core");
 pub var process: Process = .{
     .id = .kernel,
     ._name = Process.Name.fromSlice("kernel") catch unreachable,
+    .page_table = undefined, // initialized in `vmm.init.buildKernelPageTableAndSwitch`
 };
 
 comptime {

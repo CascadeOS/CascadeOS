@@ -10,6 +10,8 @@ const Process = @This();
 id: Id,
 _name: Name,
 
+page_table: *kernel.arch.paging.PageTable,
+
 pub fn name(self: *const Process) []const u8 {
     return self._name.constSlice();
 }
