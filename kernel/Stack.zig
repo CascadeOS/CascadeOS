@@ -9,14 +9,12 @@ const std = @import("std");
 
 const Stack = @This();
 
-pub const usable_stack_size = kernel.arch.paging.standard_page_size.multiplyScalar(16);
-
 /// The size of the stack including the guard page.
 ///
 /// Only one guard page is used and it is placed at the bottom of the stack to catch overflows.
 /// The guard page for the next stack in memory is immediately after our stack top so acts as our guard page to catch
 /// underflows.
-const stack_size_with_guard_page = usable_stack_size.add(kernel.arch.paging.standard_page_size);
+const stack_size_with_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 
 var stacks_range_allocator: kernel.vmm.VirtualRangeAllocator = undefined;
 var stacks_range_allocator_lock: kernel.sync.TicketSpinLock = .{};

@@ -16,7 +16,7 @@ var bootstrap_cpu: kernel.Cpu = .{
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
-var bootstrap_idle_stack: [kernel.Stack.usable_stack_size.value]u8 = undefined;
+var bootstrap_idle_stack: [kernel.config.kernel_stack_size.value]u8 = undefined;
 
 /// Entry point from bootloader specific code.
 ///
