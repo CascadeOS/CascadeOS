@@ -16,13 +16,14 @@ var ready_to_run_end: ?*kernel.Thread = null;
 /// If `requeue_current_thread` is set to true, the current thread will be requeued before the next thread is found.
 pub fn schedule(requeue_current_thread: bool) void {
     const held = lock.lock();
+    defer held.release();
+
     const cpu = held.held_exclusion.cpu;
 
     if (cpu.preemption_disable_count > 1) {
         // we have to check for a disable count greater than 1 because grabbing the lock earlier in the function
         // increments the disable count.
         cpu.schedules_skipped += 1;
-        held.release();
         return;
     }
     cpu.schedules_skipped = 0;
