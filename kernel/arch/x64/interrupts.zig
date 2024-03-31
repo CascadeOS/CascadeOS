@@ -12,7 +12,7 @@ var idt: x64.Idt = .{};
 const raw_handlers = init.makeRawHandlers();
 var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
-pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
+pub const InterruptHandler = *const fn (held: kernel.sync.HeldExclusion, interrupt_frame: *InterruptFrame) void;
 
 pub const InterruptFrame = extern struct {
     es: extern union {
@@ -182,13 +182,23 @@ pub const Interrupt = enum(u8) {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame);
+    const cpu = kernel.arch.rawGetCpu();
+    core.debugAssert(cpu.interrupt_disable_count == 0);
+    cpu.interrupt_disable_count = 1;
+    cpu.preemption_disable_count += 1;
+
+    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](.{
+        .cpu = cpu,
+        .exclusion = .preemption_and_interrupt,
+    }, interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
     x64.disableInterrupts();
 }
 
-fn unhandledInterrupt(interrupt_frame: *InterruptFrame) void {
+fn unhandledInterrupt(held: kernel.sync.HeldExclusion, interrupt_frame: *InterruptFrame) void {
+    defer held.release();
+
     core.panicFmt("unhandled interrupt: {}", .{interrupt_frame});
 }
 
