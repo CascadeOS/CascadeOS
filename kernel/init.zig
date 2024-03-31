@@ -100,7 +100,7 @@ fn captureKernelOffsets() !void {
     log.debug("kernel virtual base address: {}", .{kernel.info.kernel_virtual_base_address});
     log.debug("kernel physical base address: {}", .{kernel.info.kernel_physical_base_address});
 
-    kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual.value - kernel.info.kernel_base_address.value, .byte);
+    kernel.info.kernel_virtual_slide = core.Size.from(kernel_virtual.value - kernel.config.kernel_base_address.value, .byte);
     kernel.info.kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual.value - kernel_physical.value, .byte);
     log.debug("kernel virtual slide: 0x{x}", .{kernel.info.kernel_virtual_slide.?.value});
     log.debug("kernel physical to virtual offset: 0x{x}", .{kernel.info.kernel_physical_to_virtual_offset.value});
