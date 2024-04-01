@@ -14,6 +14,11 @@ var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x64.Idt
 
 pub const InterruptHandler = *const fn (held: kernel.sync.HeldExclusion, interrupt_frame: *InterruptFrame) void;
 
+pub const InterruptStackSelector = enum(u3) {
+    double_fault,
+    non_maskable_interrupt,
+};
+
 pub const InterruptFrame = extern struct {
     es: extern union {
         full: u64,
@@ -220,7 +225,11 @@ pub const init = struct {
 
         setFixedHandlers();
 
-        // TODO: set stack for double fault and nmi
+        idt.handlers[@intFromEnum(Interrupt.double_fault)]
+            .setStack(@intFromEnum(InterruptStackSelector.double_fault));
+
+        idt.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)]
+            .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
     }
 
     fn setFixedHandlers() void {
