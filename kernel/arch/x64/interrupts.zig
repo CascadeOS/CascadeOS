@@ -188,8 +188,7 @@ pub const Interrupt = enum(u8) {
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     const cpu = kernel.arch.rawGetCpu();
-    core.debugAssert(cpu.interrupt_disable_count == 0);
-    cpu.interrupt_disable_count = 1;
+    cpu.interrupt_disable_count += 1;
     cpu.preemption_disable_count += 1;
 
     handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](.{
