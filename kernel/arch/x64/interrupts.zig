@@ -241,6 +241,10 @@ pub const Interrupt = enum(u8) {
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     const cpu = kernel.arch.rawGetCpu();
+
+    const old_interrupt_disable_count = cpu.interrupt_disable_count;
+    const old_preemption_disable_count = cpu.preemption_disable_count;
+
     cpu.interrupt_disable_count += 1;
     cpu.preemption_disable_count += 1;
 
@@ -251,6 +255,9 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
 
     // ensure interrupts are disabled when restoring the state before iret
     x64.disableInterrupts();
+
+    core.debugAssert(old_interrupt_disable_count == cpu.interrupt_disable_count);
+    core.debugAssert(old_preemption_disable_count == cpu.preemption_disable_count);
 }
 
 fn unhandledInterrupt(held: kernel.sync.HeldExclusion, interrupt_frame: *InterruptFrame) void {
