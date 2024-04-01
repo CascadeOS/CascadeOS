@@ -73,38 +73,87 @@ pub const InterruptFrame = extern struct {
     pub fn print(
         value: *const InterruptFrame,
         writer: anytype,
+        indent: usize,
     ) !void {
-        const padding = "  ";
+        const new_indent = indent + 2;
 
         try writer.writeAll("InterruptFrame{\n");
 
-        try writer.print(comptime padding ++ "interrupt: {},\n", .{value.vector_number.interrupt});
-        try writer.print(comptime padding ++ "error code: {},\n", .{value.error_code});
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("interrupt: {s},\n", .{@tagName(value.vector_number.interrupt)});
 
-        try writer.print(comptime padding ++ "cs: {s},\n", .{@tagName(value.cs.selector)});
-        try writer.print(comptime padding ++ "ss: {s},\n", .{@tagName(value.ss.selector)});
-        try writer.print(comptime padding ++ "ds: {s},\n", .{@tagName(value.ds.selector)});
-        try writer.print(comptime padding ++ "es: {s},\n", .{@tagName(value.es.selector)});
-        try writer.print(comptime padding ++ "rsp: 0x{x},\n", .{value.rsp});
-        try writer.print(comptime padding ++ "rip: 0x{x},\n", .{value.rip});
-        try writer.print(comptime padding ++ "rax: 0x{x},\n", .{value.rax});
-        try writer.print(comptime padding ++ "rbx: 0x{x},\n", .{value.rbx});
-        try writer.print(comptime padding ++ "rcx: 0x{x},\n", .{value.rcx});
-        try writer.print(comptime padding ++ "rdx: 0x{x},\n", .{value.rdx});
-        try writer.print(comptime padding ++ "rbp: 0x{x},\n", .{value.rbp});
-        try writer.print(comptime padding ++ "rsi: 0x{x},\n", .{value.rsi});
-        try writer.print(comptime padding ++ "rdi: 0x{x},\n", .{value.rdi});
-        try writer.print(comptime padding ++ "r8: 0x{x},\n", .{value.r8});
-        try writer.print(comptime padding ++ "r9: 0x{x},\n", .{value.r9});
-        try writer.print(comptime padding ++ "r10: 0x{x},\n", .{value.r10});
-        try writer.print(comptime padding ++ "r11: 0x{x},\n", .{value.r11});
-        try writer.print(comptime padding ++ "r12: 0x{x},\n", .{value.r12});
-        try writer.print(comptime padding ++ "r13: 0x{x},\n", .{value.r13});
-        try writer.print(comptime padding ++ "r14: 0x{x},\n", .{value.r14});
-        try writer.print(comptime padding ++ "r15: 0x{x},\n", .{value.r15});
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("error code: {},\n", .{value.error_code});
 
-        try writer.print(comptime padding ++ "{},\n", .{value.rflags});
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("cs: {s},\n", .{@tagName(value.cs.selector)});
 
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("ss: {s},\n", .{@tagName(value.ss.selector)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("ds: {s},\n", .{@tagName(value.ds.selector)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("es: {s},\n", .{@tagName(value.es.selector)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rsp: 0x{x},\n", .{value.rsp});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rip: 0x{x},\n", .{value.rip});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rax: 0x{x},\n", .{value.rax});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rbx: 0x{x},\n", .{value.rbx});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rcx: 0x{x},\n", .{value.rcx});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rdx: 0x{x},\n", .{value.rdx});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rbp: 0x{x},\n", .{value.rbp});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rsi: 0x{x},\n", .{value.rsi});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("rdi: 0x{x},\n", .{value.rdi});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r8: 0x{x},\n", .{value.r8});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r9: 0x{x},\n", .{value.r9});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r10: 0x{x},\n", .{value.r10});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r11: 0x{x},\n", .{value.r11});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r12: 0x{x},\n", .{value.r12});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r13: 0x{x},\n", .{value.r13});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r14: 0x{x},\n", .{value.r14});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("r15: 0x{x},\n", .{value.r15});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.writeAll("rflags: ");
+        try value.rflags.print(writer, new_indent);
+        try writer.writeAll(",\n");
+
+        try writer.writeByteNTimes(' ', indent);
         try writer.writeAll("}");
     }
 
@@ -116,7 +165,11 @@ pub const InterruptFrame = extern struct {
     ) !void {
         _ = fmt;
         _ = options;
-        return print(value, writer);
+        return print(value, writer, 0);
+    }
+
+    fn __helpZls() void {
+        InterruptFrame.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 };
 

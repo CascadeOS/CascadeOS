@@ -51,7 +51,9 @@ pub const PageFaultErrorCode = packed struct(u64) {
         return @bitCast(error_code);
     }
 
-    pub fn print(self: PageFaultErrorCode, writer: anytype) !void {
+    pub fn print(self: PageFaultErrorCode, writer: anytype, indent: usize) !void {
+        _ = indent;
+
         try writer.writeAll("PageFaultErrorCode{ ");
 
         if (!self.present) {
@@ -106,7 +108,11 @@ pub const PageFaultErrorCode = packed struct(u64) {
     ) !void {
         _ = fmt;
         _ = options;
-        return print(self, writer);
+        return print(self, writer, 0);
+    }
+
+    fn __helpZls() void {
+        PageFaultErrorCode.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 };
 

@@ -66,14 +66,14 @@ pub const MemoryMapEntry = struct {
         reclaimable,
     };
 
-    pub fn print(entry: MemoryMapEntry, writer: anytype) !void {
+    pub fn print(entry: MemoryMapEntry, writer: anytype, indent: usize) !void {
         try writer.writeAll("MemoryMapEntry - ");
 
         try writer.writeAll(@tagName(entry.type));
 
         try writer.writeAll(" - ");
 
-        try entry.range.print(writer);
+        try entry.range.print(writer, indent);
     }
 
     pub inline fn format(
@@ -84,7 +84,11 @@ pub const MemoryMapEntry = struct {
     ) !void {
         _ = options;
         _ = fmt;
-        return print(entry, writer);
+        return print(entry, writer, 0);
+    }
+
+    fn __helpZls() void {
+        MemoryMapEntry.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 };
 

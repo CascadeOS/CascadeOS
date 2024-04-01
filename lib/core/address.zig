@@ -135,7 +135,9 @@ fn AddrMixin(comptime Self: type) type {
             return .match;
         }
 
-        pub fn print(self: Self, writer: anytype) !void {
+        pub fn print(self: Self, writer: anytype, indent: usize) !void {
+            _ = indent;
+
             try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
             try writer.writeAll(" }");
@@ -149,7 +151,11 @@ fn AddrMixin(comptime Self: type) type {
         ) !void {
             _ = fmt;
             _ = options;
-            return print(self, writer);
+            return print(self, writer, 0);
+        }
+
+        fn __helpZls() void {
+            Self.print(undefined, @as(std.fs.File.Writer, undefined), 0);
         }
     };
 }
@@ -249,7 +255,7 @@ fn RangeMixin(comptime Self: type) type {
             return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
         }
 
-        pub fn print(value: Self, writer: anytype) !void {
+        pub fn print(value: Self, writer: anytype, indent: usize) !void {
             try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
 
@@ -257,7 +263,7 @@ fn RangeMixin(comptime Self: type) type {
             try std.fmt.formatInt(value.end().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
             try writer.writeAll(" - ");
 
-            try value.size.print(writer);
+            try value.size.print(writer, indent);
             try writer.writeAll(" }");
         }
 
@@ -269,7 +275,11 @@ fn RangeMixin(comptime Self: type) type {
         ) !void {
             _ = fmt;
             _ = options;
-            return print(value, writer);
+            return print(value, writer, 0);
+        }
+
+        fn __helpZls() void {
+            Self.print(undefined, @as(std.fs.File.Writer, undefined), 0);
         }
     };
 }

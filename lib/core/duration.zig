@@ -38,7 +38,9 @@ pub const Duration = extern struct {
         .{ .value = @intFromEnum(Unit.nanosecond), .name = "ns" },
     };
 
-    pub fn print(duration: Duration, writer: anytype) !void {
+    pub fn print(duration: Duration, writer: anytype, indent: usize) !void {
+        _ = indent;
+
         var any_output = false;
         var value = duration.value;
 
@@ -91,7 +93,11 @@ pub const Duration = extern struct {
     ) !void {
         _ = fmt;
         _ = options;
-        return print(duration, writer);
+        return print(duration, writer, 0);
+    }
+
+    fn __helpZls() void {
+        Duration.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 
     comptime {

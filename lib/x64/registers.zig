@@ -42,7 +42,7 @@ pub const RFlags = packed struct(u64) {
     overflow: bool,
 
     /// Specifies the privilege level required for executing I/O address-space instructions.
-    iopl: u2,
+    iopl: x64.PrivilegeLevel,
 
     /// Used by `iret` in hardware task switch mode to determine if current task is nested.
     nested: bool,
@@ -93,6 +93,81 @@ pub const RFlags = packed struct(u64) {
             : [val] "r" (@as(u64, @bitCast(self))),
             : "flags"
         );
+    }
+
+    pub fn print(self: RFlags, writer: anytype, indent: usize) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("RFlags{\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("carry: {},\n", .{self.carry});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("parity: {},\n", .{self.parity});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("auxiliary_carry: {},\n", .{self.auxiliary_carry});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("zero: {},\n", .{self.zero});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("sign: {},\n", .{self.sign});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("trap: {},\n", .{self.trap});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("interrupt: {},\n", .{self.interrupt});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("direction: {},\n", .{self.direction});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("overflow: {},\n", .{self.overflow});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("iopl: {s},\n", .{@tagName(self.iopl)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("nested: {},\n", .{self.nested});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("resume: {},\n", .{self.@"resume"});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("virtual_8086: {},\n", .{self.virtual_8086});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("alignment_check: {},\n", .{self.alignment_check});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("virtual_interrupt: {},\n", .{self.virtual_interrupt});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("virtual_interrupt_pending: {},\n", .{self.virtual_interrupt_pending});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("id: {},\n", .{self.id});
+
+        try writer.writeByteNTimes(' ', indent);
+        try writer.writeAll("}");
+    }
+
+    pub inline fn format(
+        self: RFlags,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        return print(self, writer);
+    }
+
+    fn __helpZls() void {
+        RFlags.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 
     comptime {
