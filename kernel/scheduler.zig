@@ -128,9 +128,9 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
 ///
 /// Intended to only be called in idle or a new thread.
 pub fn unlockScheduler() kernel.sync.CpuLock {
-    core.debugAssert(lock.isLocked());
-
     const cpu = kernel.arch.rawGetCpu();
+
+    core.debugAssert(lock.isLockedBy(cpu.id));
 
     cpu.preemption_disable_count = 1;
     cpu.interrupt_disable_count = 1;
