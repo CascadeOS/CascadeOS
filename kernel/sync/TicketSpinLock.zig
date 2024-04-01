@@ -24,18 +24,20 @@ pub const Held = struct {
     }
 };
 
-pub fn isLocked(self: TicketSpinLock) bool {
+pub fn isLocked(self: *const TicketSpinLock) bool {
     return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) != .none;
 }
 
 /// Returns true if the spinlock is locked by the current cpu.
-///
-/// It is the caller's responsibility to ensure that interrupts are disabled.
-pub fn isLockedByCurrent(self: TicketSpinLock) bool {
-    const held = kernel.getCpuAndExclude(.preemption);
-    defer held.release();
+pub fn isLockedByCurrent(self: *const TicketSpinLock) bool {
+    const cpu_lock = kernel.getLockedCpu(.preemption);
+    defer cpu_lock.release();
 
-    return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == held.cpu.id;
+    return self.isLockedBy(cpu_lock.cpu.id);
+}
+
+pub fn isLockedBy(self: *const TicketSpinLock, cpu_id: kernel.Cpu.Id) bool {
+    return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == cpu_id;
 }
 
 /// Unlocks the spinlock.
