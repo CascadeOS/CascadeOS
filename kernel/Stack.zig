@@ -28,8 +28,14 @@ usable_range: core.VirtualRange,
 /// The current stack pointer.
 stack_pointer: core.VirtualAddress,
 
+/// Creates a stack from a range.
+///
+/// Requirements:
+/// - `range` must be aligned to 16 bytes.
+/// - `range` must fully contain `usable_range`.
 pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
     core.debugAssert(range.containsRange(usable_range));
+    core.debugAssert(range.address.isAligned(core.Size.from(16, .byte)));
 
     return Stack{
         .range = range,
