@@ -14,11 +14,13 @@ pub const Exclusion = enum {
 
 const log = kernel.log.scoped(.sync);
 
-pub const HeldExclusion = struct {
+pub const CpuLock = struct {
     cpu: *kernel.Cpu,
     exclusion: Exclusion,
 
-    pub fn release(self: HeldExclusion) void {
+    pub fn release(self: CpuLock) void {
+        const schedules_skipped = self.cpu.schedules_skipped;
+
         const old_preemption_disable_count = self.cpu.preemption_disable_count;
         core.debugAssert(old_preemption_disable_count != 0);
 
@@ -33,11 +35,13 @@ pub const HeldExclusion = struct {
             if (old_interrupt_disable_count == 1) kernel.arch.interrupts.enableInterrupts();
         }
 
-        // TODO: if (old_preemption_disable_count == 1) maybe reschedule?
+        if (old_preemption_disable_count == 1 and schedules_skipped != 0) {
+            kernel.scheduler.schedule(true);
+        }
     }
 };
 
-pub fn getCpuAndExclude(exclusion: Exclusion) HeldExclusion {
+pub fn getLockedCpu(exclusion: Exclusion) CpuLock {
     kernel.arch.interrupts.disableInterrupts();
 
     const cpu = kernel.arch.rawGetCpu();

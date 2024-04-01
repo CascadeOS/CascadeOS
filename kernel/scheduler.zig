@@ -18,7 +18,7 @@ pub fn schedule(requeue_current_thread: bool) void {
     const held = lock.lock();
     defer held.release();
 
-    const cpu = held.held_exclusion.cpu;
+    const cpu = held.cpu_lock.cpu;
 
     if (cpu.preemption_disable_count > 1) {
         // we have to check for a disable count greater than 1 because grabbing the lock earlier in the function
@@ -124,10 +124,10 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
     kernel.arch.scheduling.switchToThreadFromThread(cpu, current_thread, new_thread);
 }
 
-/// Unlocks the scheduler and produces a `HeldExclusion`.
+/// Unlocks the scheduler and produces a `CpuLock`.
 ///
 /// Intended to only be called in idle or a new thread.
-pub fn unlockScheduler() kernel.sync.HeldExclusion {
+pub fn unlockScheduler() kernel.sync.CpuLock {
     core.debugAssert(lock.isLocked());
 
     const cpu = kernel.arch.rawGetCpu();

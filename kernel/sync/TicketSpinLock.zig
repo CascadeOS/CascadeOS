@@ -12,15 +12,15 @@ ticket: usize = 0,
 current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
-    held_exclusion: kernel.sync.HeldExclusion,
+    cpu_lock: kernel.sync.CpuLock,
     spinlock: *TicketSpinLock,
 
     /// Unlocks the spinlock.
     pub fn release(self: Held) void {
-        core.debugAssert(self.spinlock.current_holder == self.held_exclusion.cpu.id);
+        core.debugAssert(self.spinlock.current_holder == self.cpu_lock.cpu.id);
 
         self.spinlock.unsafeUnlock();
-        self.held_exclusion.release();
+        self.cpu_lock.release();
     }
 };
 
@@ -47,17 +47,17 @@ pub fn unsafeUnlock(self: *TicketSpinLock) void {
 }
 
 pub fn lock(self: *TicketSpinLock) Held {
-    const held_exclusion = kernel.getCpuAndExclude(.preemption_and_interrupt);
+    const cpu_lock = kernel.getLockedCpu(.preemption_and_interrupt);
 
     const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
 
     while (@atomicLoad(usize, &self.current, .acquire) != ticket) {
         kernel.arch.spinLoopHint();
     }
-    @atomicStore(kernel.Cpu.Id, &self.current_holder, held_exclusion.cpu.id, .release);
+    @atomicStore(kernel.Cpu.Id, &self.current_holder, cpu_lock.cpu.id, .release);
 
     return .{
-        .held_exclusion = held_exclusion,
+        .cpu_lock = cpu_lock,
         .spinlock = self,
     };
 }

@@ -20,7 +20,7 @@ pub fn zigPanic(
 ) noreturn {
     @setCold(true);
 
-    const held = kernel.getCpuAndExclude(.preemption_and_interrupt);
+    const held = kernel.getLockedCpu(.preemption_and_interrupt);
 
     panic_impl(held.cpu, msg, stack_trace, return_address_opt orelse @returnAddress());
 

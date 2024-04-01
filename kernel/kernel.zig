@@ -30,7 +30,7 @@ pub const sync = @import("sync/sync.zig");
 pub const Thread = @import("Thread.zig");
 pub const vmm = @import("vmm/vmm.zig");
 
-pub const getCpuAndExclude = sync.getCpuAndExclude;
+pub const getLockedCpu = sync.getLockedCpu;
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {

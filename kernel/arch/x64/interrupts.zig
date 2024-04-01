@@ -12,7 +12,7 @@ var idt: x64.Idt = .{};
 const raw_handlers = init.makeRawHandlers();
 var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
-pub const InterruptHandler = *const fn (held: kernel.sync.HeldExclusion, interrupt_frame: *InterruptFrame) void;
+pub const InterruptHandler = *const fn (cpu_lock: kernel.sync.CpuLock, interrupt_frame: *InterruptFrame) void;
 
 pub const InterruptStackSelector = enum(u3) {
     double_fault,
