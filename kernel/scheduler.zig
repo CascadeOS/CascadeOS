@@ -14,15 +14,16 @@ var ready_to_run_end: ?*kernel.Thread = null;
 /// Performs a round robin scheduling of the ready threads.
 ///
 /// If `requeue_current_thread` is set to true, the current thread will be requeued before the next thread is found.
-pub fn schedule(requeue_current_thread: bool) void {
-    const held = lock.lock();
-    defer held.release();
+///
+/// This function must be called with the lock held (see `lockScheduler`).
+pub fn schedule(held: kernel.sync.TicketSpinLock.Held, requeue_current_thread: bool) void {
+    core.debugAssert(held.spinlock == &lock);
 
     const cpu = held.cpu_lock.cpu;
 
     if (cpu.preemption_disable_count > 1) {
-        // we have to check for a disable count greater than 1 because grabbing the lock earlier in the function
-        // increments the disable count.
+        // we have to check for a disable count greater than 1 because grabbing the scheduler lock increments the
+        // disable count
         cpu.schedules_skipped += 1;
         return;
     }
@@ -34,7 +35,7 @@ pub fn schedule(requeue_current_thread: bool) void {
     // in case the current thread is the last thread in the ready queue.
     if (requeue_current_thread) {
         if (opt_current_thread) |current_thread| {
-            queueThreadImpl(current_thread, held);
+            queueThread(held, current_thread);
         }
     }
 
@@ -64,18 +65,11 @@ pub fn schedule(requeue_current_thread: bool) void {
 
     switchToThreadFromThread(cpu, current_thread, new_thread);
 }
-
 /// Queues a thread to be run by the scheduler.
-pub fn queueThread(thread: *kernel.Thread) void {
-    const held = lock.lock();
-    defer held.release();
-
-    queueThreadImpl(thread, held);
-}
-
-fn queueThreadImpl(thread: *kernel.Thread, held: kernel.sync.TicketSpinLock.Held) void {
-    _ = held;
-
+///
+/// This function must be called with the lock held (see `lockScheduler`).
+pub fn queueThread(held: kernel.sync.TicketSpinLock.Held, thread: *kernel.Thread) void {
+    core.debugAssert(held.spinlock == &lock);
     core.debugAssert(thread.next_thread == null);
 
     thread.state = .ready;
@@ -124,6 +118,13 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
     kernel.arch.scheduling.switchToThreadFromThread(cpu, current_thread, new_thread);
 }
 
+/// Locks the scheduler and produces a `TicketSpinLock.Held`.
+///
+/// It is the caller's responsibility to call `TicketSpinLock.Held.release()` when done.
+pub fn lockScheduler() kernel.sync.TicketSpinLock.Held {
+    return lock.lock();
+}
+
 /// Unlocks the scheduler and produces a `CpuLock`.
 ///
 /// Intended to only be called in idle or a new thread.
@@ -131,9 +132,6 @@ pub fn unlockScheduler() kernel.sync.CpuLock {
     const cpu = kernel.arch.rawGetCpu();
 
     core.debugAssert(lock.isLockedBy(cpu.id));
-
-    cpu.preemption_disable_count = 1;
-    cpu.interrupt_disable_count = 1;
 
     lock.unsafeUnlock();
 
@@ -149,7 +147,11 @@ fn idle() noreturn {
     log.debug("entering idle", .{});
 
     while (true) {
-        if (ready_to_run_start != null) schedule(false);
+        if (ready_to_run_start != null) {
+            const held = kernel.scheduler.lockScheduler();
+            defer held.release();
+            schedule(held, false);
+        }
         kernel.arch.halt();
     }
 }

@@ -87,11 +87,15 @@ fn kernelInitStage2(cpu: *kernel.Cpu) noreturn {
 /// All cpus are using a normal kernel stack.
 fn kernelInitStage3() noreturn {
     const cpu = kernel.arch.rawGetCpu(); // we know interrupts are disabled and we are not going to be preempted.
+
     core.debugAssert(cpu.interrupt_disable_count == 1);
-    core.debugAssert(cpu.preemption_disable_count == 0);
+    core.debugAssert(cpu.preemption_disable_count == 0); // this must be zero when entering the scheduler
 
     log.debug("entering scheduler on {}", .{cpu.id});
-    kernel.scheduler.schedule(false);
+    kernel.scheduler.schedule(
+        kernel.scheduler.lockScheduler(),
+        false,
+    );
     unreachable;
 }
 

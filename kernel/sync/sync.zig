@@ -36,7 +36,9 @@ pub const CpuLock = struct {
         }
 
         if (old_preemption_disable_count == 1 and schedules_skipped != 0) {
-            kernel.scheduler.schedule(true);
+            const held = kernel.scheduler.lockScheduler();
+            defer held.release();
+            kernel.scheduler.schedule(held, true);
         }
     }
 };
