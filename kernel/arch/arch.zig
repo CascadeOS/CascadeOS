@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+//! Defines the interface of the architecture specific code.
+
+const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const std = @import("std");
 
-const current = switch (kernel.info.arch) {
-    .x86_64 => @import("x86_64/interface.zig"),
-    .aarch64 => @import("aarch64/interface.zig"),
+const current = switch (@import("cascade_target").arch) {
+    .x64 => @import("x64/interface.zig"),
 };
+
+/// Architecture specific per-cpu information.
+pub const ArchCpu = current.ArchCpu;
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
@@ -17,29 +21,15 @@ pub inline fn spinLoopHint() void {
     current.spinLoopHint();
 }
 
-/// Architecture specific processor information.
-pub const ArchProcessor = current.ArchProcessor;
-
-/// Get the current processor.
+/// Get the current CPU.
 ///
-/// Panics if interrupts are enabled.
-pub inline fn getProcessor() *kernel.Processor {
-    checkSupport(current, "getProcessor", fn () *kernel.Processor);
-
-    core.debugAssert(!interrupts.interruptsEnabled());
-
-    return current.getProcessor();
-}
-
-/// Get the current processor, supports returning null for early boot before the processor is set.
+/// Assumes that `init.loadCpu()` has been called on the currently running CPU.
 ///
-/// Panics if interrupts are enabled.
-pub inline fn earlyGetProcessor() ?*kernel.Processor {
-    checkSupport(current, "earlyGetProcessor", fn () ?*kernel.Processor);
+/// It is the callers responsibility to ensure that the current thread is not re-scheduled on to another CPU.
+pub inline fn rawGetCpu() *kernel.Cpu {
+    checkSupport(current, "getCpu", fn () *kernel.Cpu);
 
-    core.debugAssert(!interrupts.interruptsEnabled());
-
-    return current.earlyGetProcessor();
+    return current.getCpu();
 }
 
 /// Halts the current processor
@@ -49,35 +39,9 @@ pub inline fn halt() void {
     current.halt();
 }
 
-/// Functionality that is intended to be used during kernel init only.
+/// Functionality that is used during kernel init only.
 pub const init = struct {
-    /// Prepares the provided kernel.Processor for the bootstrap processor.
-    pub inline fn prepareBootstrapProcessor(
-        bootstrap_processor: *kernel.Processor,
-    ) void {
-        checkSupport(current.init, "prepareBootstrapProcessor", fn (*kernel.Processor) void);
-
-        current.init.prepareBootstrapProcessor(bootstrap_processor);
-    }
-
-    /// Prepares the provided kernel.Processor for use.
-    ///
-    /// **WARNING**: This function will panic if the processor cannot be prepared.
-    pub inline fn prepareProcessor(
-        processor: *kernel.Processor,
-        processor_descriptor: kernel.boot.ProcessorDescriptor,
-    ) void {
-        checkSupport(current.init, "prepareProcessor", fn (*kernel.Processor, kernel.boot.ProcessorDescriptor) void);
-
-        current.init.prepareProcessor(processor, processor_descriptor);
-    }
-
-    /// Performs any actions required to load the provided kernel.Processor for the current execution context.
-    pub inline fn loadProcessor(processor: *kernel.Processor) void {
-        checkSupport(current.init, "loadProcessor", fn (*kernel.Processor) void);
-
-        current.init.loadProcessor(processor);
-    }
+    pub const EarlyOutputWriter = current.init.EarlyOutputWriter;
 
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
@@ -86,105 +50,59 @@ pub const init = struct {
         current.init.setupEarlyOutput();
     }
 
-    pub const EarlyOutput = struct {
-        writer: current.init.EarlyOutputWriter,
-        held: kernel.SpinLock.Held,
+    /// Acquire a writer for the early output setup by `setupEarlyOutput`.
+    pub inline fn getEarlyOutput() ?current.init.EarlyOutputWriter {
+        checkSupport(current.init, "getEarlyOutput", fn () ?current.init.EarlyOutputWriter);
 
-        pub inline fn deinit(self: EarlyOutput) void {
-            self.held.unlock();
-        }
-
-        pub var lock: kernel.SpinLock = .{};
-    };
-
-    pub inline fn getEarlyOutputNoLock() ?current.init.EarlyOutputWriter {
-        checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
-
-        return current.init.getEarlyOutputWriter();
+        return current.init.getEarlyOutput();
     }
 
-    /// Acquire a `std.io.Writer` for the early output setup by `setupEarlyOutput`.
-    pub fn getEarlyOutput() ?EarlyOutput {
-        checkSupport(current.init, "getEarlyOutputWriter", fn () ?current.init.EarlyOutputWriter);
+    /// Ensure that any exceptions/faults that occur are handled.
+    pub inline fn initInterrupts() void {
+        checkSupport(current.init, "initInterrupts", fn () void);
 
-        if (current.init.getEarlyOutputWriter()) |early_output_writer| {
-            const held = EarlyOutput.lock.lock();
-
-            return .{
-                .writer = early_output_writer,
-                .held = held,
-            };
-        }
-
-        return null;
+        current.init.initInterrupts();
     }
 
-    /// Initialize the architecture specific registers and structures into the state required for early kernel init.
-    ///
-    /// One of the requirements of this function is to ensure that any exceptions/faults that occur are correctly handled.
-    ///
-    /// For example, on x86_64 after this function has completed a GDT, TSS and an IDT with a simple handler on every vector
-    /// should be in place.
-    pub inline fn earlyArchInitialization() void {
-        checkSupport(current.init, "earlyArchInitialization", fn () void);
+    /// Prepares the provided `Cpu` for the bootstrap processor.
+    pub inline fn prepareBootstrapCpu(
+        bootstrap_cpu: *kernel.Cpu,
+    ) void {
+        checkSupport(current.init, "prepareBootstrapCpu", fn (*kernel.Cpu) void);
 
-        current.init.earlyArchInitialization();
+        current.init.prepareBootstrapCpu(bootstrap_cpu);
+    }
+
+    /// Load the provided `Cpu` as the current CPU.
+    pub inline fn loadCpu(cpu: *kernel.Cpu) void {
+        checkSupport(current.init, "loadCpu", fn (*kernel.Cpu) void);
+
+        current.init.loadCpu(cpu);
     }
 
     /// Capture any system information that is required for the architecture.
     ///
-    /// For example, on x86_64 this should capture the CPUID information.
+    /// For example, on x64 this should capture the CPUID information.
     pub inline fn captureSystemInformation() void {
         checkSupport(current.init, "captureSystemInformation", fn () void);
 
         current.init.captureSystemInformation();
     }
-
-    /// Configure any global system features.
-    pub inline fn configureGlobalSystemFeatures() void {
-        checkSupport(current.init, "configureGlobalSystemFeatures", fn () void);
-
-        current.init.configureGlobalSystemFeatures();
-    }
-
-    /// Configure any processor local system features.
-    pub inline fn configureSystemFeaturesForCurrentProcessor(processor: *kernel.Processor) void {
-        checkSupport(current.init, "configureSystemFeaturesForCurrentProcessor", fn (*kernel.Processor) void);
-
-        current.init.configureSystemFeaturesForCurrentProcessor(processor);
-    }
-
-    /// Register any architectural time sources.
-    ///
-    /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
-    pub inline fn registerArchitecturalTimeSources() void {
-        checkSupport(current.init, "registerArchitecturalTimeSources", fn () void);
-
-        current.init.registerArchitecturalTimeSources();
-    }
-
-    /// Initialize the local interrupt controller for the provided processor.
-    ///
-    /// For example, on x86_64 this should initialize the APIC.
-    pub inline fn initLocalInterruptController(processor: *kernel.Processor) void {
-        checkSupport(current.init, "initLocalInterruptController", fn (*kernel.Processor) void);
-
-        current.init.initLocalInterruptController(processor);
-    }
 };
 
 pub const interrupts = struct {
-    pub inline fn panicInterruptOtherCores() void {
-        checkSupport(current.interrupts, "panicInterruptOtherCores", fn () void);
-
-        current.interrupts.panicInterruptOtherCores();
-    }
-
     /// Disable interrupts and put the CPU to sleep.
     pub inline fn disableInterruptsAndHalt() noreturn {
         checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);
 
         current.interrupts.disableInterruptsAndHalt();
+    }
+
+    /// Are interrupts enabled?
+    pub inline fn interruptsEnabled() bool {
+        checkSupport(current.interrupts, "interruptsEnabled", fn () bool);
+
+        return current.interrupts.interruptsEnabled();
     }
 
     /// Disable interrupts.
@@ -200,49 +118,14 @@ pub const interrupts = struct {
 
         current.interrupts.enableInterrupts();
     }
-
-    /// Are interrupts enabled?
-    pub inline fn interruptsEnabled() bool {
-        checkSupport(current.interrupts, "interruptsEnabled", fn () bool);
-
-        return current.interrupts.interruptsEnabled();
-    }
-
-    pub inline fn setTaskPriority(priority: kernel.scheduler.Priority) void {
-        checkSupport(current.interrupts, "setTaskPriority", fn (kernel.scheduler.Priority) void);
-
-        current.interrupts.setTaskPriority(priority);
-    }
-
-    pub const InterruptGuard = struct {
-        enable_interrupts: bool,
-
-        pub inline fn release(self: InterruptGuard) void {
-            if (self.enable_interrupts) enableInterrupts();
-        }
-    };
-
-    pub fn interruptGuard() InterruptGuard {
-        const interrupts_enabled = interruptsEnabled();
-
-        if (interrupts_enabled) disableInterrupts();
-
-        return .{
-            .enable_interrupts = interrupts_enabled,
-        };
-    }
 };
 
 pub const paging = struct {
     /// The standard page size for the architecture.
     pub const standard_page_size: core.Size = current.paging.standard_page_size;
 
-    /// Returns the largest page size supported by the architecture.
-    pub inline fn largestPageSize() core.Size {
-        checkSupport(current.paging, "largestPageSize", fn () core.Size);
-
-        return current.paging.largestPageSize();
-    }
+    /// All the page sizes supported by the architecture in order of smallest to largest.
+    pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
 
     /// The virtual address of the higher half.
     pub const higher_half: core.VirtualAddress = current.paging.higher_half;
@@ -251,32 +134,50 @@ pub const paging = struct {
     pub const PageTable: type = current.paging.PageTable;
 
     /// Allocates a new page table.
-    pub inline fn allocatePageTable() error{PageAllocationFailed}!*PageTable {
-        checkSupport(current.paging, "allocatePageTable", fn () error{PageAllocationFailed}!*PageTable);
+    pub inline fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
+        checkSupport(current.paging, "allocatePageTable", fn () kernel.pmm.AllocateError!*PageTable);
 
         return current.paging.allocatePageTable();
     }
 
+    /// Switches to the given page table.
+    pub inline fn switchToPageTable(page_table: *PageTable) void {
+        checkSupport(current.paging, "switchToPageTable", fn (*PageTable) void);
+
+        current.paging.switchToPageTable(page_table);
+    }
+
     pub const MapError = error{
         AlreadyMapped,
-        AllocationFailed,
-        Unexpected,
+        PhysicalMemoryExhausted,
+
+        /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+        MappingNotValid,
     };
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
-    /// This function will only use the architecture's `standard_page_size`.
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///  - the virtual range is not already mapped
+    ///
+    /// This function:
+    ///  - uses only the standard page size for the architecture
+    ///  - does not flush the TLB
+    ///  - on error is not required roll back any modifications to the page tables
     pub inline fn mapToPhysicalRange(
         page_table: *PageTable,
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
-        map_type: kernel.memory.virtual.MapType,
+        map_type: kernel.vmm.MapType,
     ) MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *PageTable,
             core.VirtualRange,
             core.PhysicalRange,
-            kernel.memory.virtual.MapType,
+            kernel.vmm.MapType,
         ) MapError!void);
 
         return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
@@ -284,43 +185,51 @@ pub const paging = struct {
 
     /// Unmaps the `virtual_range`.
     ///
-    /// This function assumes only the architecture's `standard_page_size` is used for the mapping.
-    pub inline fn unmap(
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the virtual range is mapped
+    ///  - the virtual range is mapped using only the standard page size for the architecture
+    ///
+    /// This function:
+    ///  - does not flush the TLB
+    pub inline fn unmapRange(
         page_table: *PageTable,
         virtual_range: core.VirtualRange,
     ) void {
-        checkSupport(current.paging, "unmap", fn (*PageTable, core.VirtualRange) void);
+        checkSupport(current.paging, "unmapRange", fn (*PageTable, core.VirtualRange) void);
 
-        current.paging.unmap(page_table, virtual_range);
-    }
-
-    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
-    ///
-    /// This function is allowed to use all page sizes available to the architecture.
-    pub inline fn mapToPhysicalRangeAllPageSizes(
-        page_table: *PageTable,
-        virtual_range: core.VirtualRange,
-        physical_range: core.PhysicalRange,
-        map_type: kernel.memory.virtual.MapType,
-    ) MapError!void {
-        checkSupport(current.paging, "mapToPhysicalRangeAllPageSizes", fn (
-            *PageTable,
-            core.VirtualRange,
-            core.PhysicalRange,
-            kernel.memory.virtual.MapType,
-        ) MapError!void);
-
-        return current.paging.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
-    }
-
-    /// Switches to the given page table.
-    pub inline fn switchToPageTable(page_table: *const PageTable) void {
-        checkSupport(current.paging, "switchToPageTable", fn (*const PageTable) void);
-
-        current.paging.switchToPageTable(page_table);
+        current.paging.unmapRange(page_table, virtual_range);
     }
 
     pub const init = struct {
+        /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual range address and size are aligned to the standard page size
+        ///  - the physical range address and size are aligned to the standard page size
+        ///  - the virtual range size is equal to the physical range size
+        ///  - the virtual range is not already mapped
+        ///
+        /// This function:
+        ///  - uses all page sizes available to the architecture
+        ///  - does not flush the TLB
+        ///  - on error is not required roll back any modifications to the page tables
+        pub inline fn mapToPhysicalRangeAllPageSizes(
+            page_table: *PageTable,
+            virtual_range: core.VirtualRange,
+            physical_range: core.PhysicalRange,
+            map_type: kernel.vmm.MapType,
+        ) MapError!void {
+            checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
+                *PageTable,
+                core.VirtualRange,
+                core.PhysicalRange,
+                kernel.vmm.MapType,
+            ) MapError!void);
+
+            return current.paging.init.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
+        }
+
         /// This function is only called during kernel init, it is required to:
         ///   1. search the higher half of the *top level* of the given page table for a free entry
         ///   2. allocate a backing frame for it
@@ -348,48 +257,34 @@ pub const scheduling = struct {
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
 
-    pub inline fn switchToThreadFromIdle(
-        processor: *kernel.Processor,
-        thread: *kernel.scheduler.Thread,
+    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
+    pub inline fn switchToIdle(
+        cpu: *kernel.Cpu,
+        stack_pointer: core.VirtualAddress,
+        opt_old_thread: ?*kernel.Thread,
     ) noreturn {
-        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*kernel.Processor, *kernel.scheduler.Thread) noreturn);
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Thread) noreturn);
 
-        current.scheduling.switchToThreadFromIdle(processor, thread);
+        current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_thread);
+    }
+
+    pub inline fn switchToThreadFromIdle(
+        cpu: *kernel.Cpu,
+        thread: *kernel.Thread,
+    ) noreturn {
+        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*kernel.Cpu, *kernel.Thread) noreturn);
+
+        current.scheduling.switchToThreadFromIdle(cpu, thread);
     }
 
     pub inline fn switchToThreadFromThread(
-        processor: *kernel.Processor,
-        old_thread: *kernel.scheduler.Thread,
-        new_thread: *kernel.scheduler.Thread,
+        cpu: *kernel.Cpu,
+        old_thread: *kernel.Thread,
+        new_thread: *kernel.Thread,
     ) void {
-        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Processor, *kernel.scheduler.Thread, *kernel.scheduler.Thread) void);
+        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Cpu, *kernel.Thread, *kernel.Thread) void);
 
-        current.scheduling.switchToThreadFromThread(processor, old_thread, new_thread);
-    }
-
-    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn switchToIdle(
-        processor: *kernel.Processor,
-        stack_pointer: core.VirtualAddress,
-        opt_old_thread: ?*kernel.scheduler.Thread,
-    ) noreturn {
-        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Processor, core.VirtualAddress, ?*kernel.scheduler.Thread) noreturn);
-
-        current.scheduling.switchToIdle(processor, stack_pointer, opt_old_thread);
-    }
-
-    pub inline fn prepareStackForNewThread(
-        thread: *kernel.scheduler.Thread,
-        context: u64,
-        target_function: *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
-    ) error{StackOverflow}!void {
-        checkSupport(current.scheduling, "prepareStackForNewThread", fn (
-            *kernel.scheduler.Thread,
-            u64,
-            *const fn (thread: *kernel.scheduler.Thread, context: u64) noreturn,
-        ) error{StackOverflow}!void);
-
-        return current.scheduling.prepareStackForNewThread(thread, context, target_function);
+        current.scheduling.switchToThreadFromThread(cpu, old_thread, new_thread);
     }
 };
 
@@ -402,7 +297,8 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        core.panic("`" ++ @tagName(kernel.info.arch) ++ "` does not implement `" ++ name ++ "`");
+        // core.panic("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
+        @compileError("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));

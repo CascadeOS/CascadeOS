@@ -94,7 +94,9 @@ pub const Size = extern struct {
         .{ .value = @intFromEnum(Unit.byte), .name = "B" },
     };
 
-    pub fn print(size: Size, writer: anytype) !void {
+    pub fn print(size: Size, writer: anytype, indent: usize) !void {
+        _ = indent;
+
         var value = size.value;
 
         if (value == 0) {
@@ -127,7 +129,11 @@ pub const Size = extern struct {
     ) !void {
         _ = fmt;
         _ = options;
-        return print(size, writer);
+        return print(size, writer, 0);
+    }
+
+    fn __helpZls() void {
+        Size.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 
     comptime {

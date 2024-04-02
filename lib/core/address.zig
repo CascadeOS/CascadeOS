@@ -15,6 +15,10 @@ pub const PhysicalAddress = extern struct {
         return .{ .value = value };
     }
 
+    pub inline fn toRange(self: PhysicalAddress, size: core.Size) PhysicalRange {
+        return .{ .address = self, .size = size };
+    }
+
     pub usingnamespace AddrMixin(@This());
 
     comptime {
@@ -42,6 +46,10 @@ pub const VirtualAddress = extern struct {
         return @ptrFromInt(self.value);
     }
 
+    pub inline fn toRange(self: VirtualAddress, size: core.Size) VirtualRange {
+        return .{ .address = self, .size = size };
+    }
+
     pub usingnamespace AddrMixin(@This());
 
     comptime {
@@ -64,11 +72,25 @@ fn AddrMixin(comptime Self: type) type {
             return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
         }
 
+        /// Rounds up the address to the nearest multiple of the given alignment.
+        ///
+        /// `alignment` must be a power of two.
+        pub inline fn alignForwardInPlace(self: *Self, alignment: core.Size) void {
+            self.value = std.mem.alignForward(u64, self.value, alignment.value);
+        }
+
         /// Returns the address rounded down to the nearest multiple of the given alignment.
         ///
         /// `alignment` must be a power of two.
         pub inline fn alignBackward(self: Self, alignment: core.Size) Self {
             return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
+        }
+
+        /// Rounds down the address to the nearest multiple of the given alignment.
+        ///
+        /// `alignment` must be a power of two.
+        pub inline fn alignBackwardInPlace(self: *Self, alignment: core.Size) void {
+            self.value = std.mem.alignBackward(u64, self.value, alignment.value);
         }
 
         pub inline fn moveForward(self: Self, size: core.Size) Self {
@@ -113,7 +135,9 @@ fn AddrMixin(comptime Self: type) type {
             return .match;
         }
 
-        pub fn print(self: Self, writer: anytype) !void {
+        pub fn print(self: Self, writer: anytype, indent: usize) !void {
+            _ = indent;
+
             try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
             try writer.writeAll(" }");
@@ -127,7 +151,11 @@ fn AddrMixin(comptime Self: type) type {
         ) !void {
             _ = fmt;
             _ = options;
-            return print(self, writer);
+            return print(self, writer, 0);
+        }
+
+        fn __helpZls() void {
+            Self.print(undefined, @as(std.fs.File.Writer, undefined), 0);
         }
     };
 }
@@ -179,7 +207,7 @@ fn RangeMixin(comptime Self: type) type {
     return struct {
         pub const AddrType = std.meta.fieldInfo(Self, .address).type;
 
-        pub inline fn fromAddr(address: anytype, size: core.Size) Self {
+        pub inline fn fromAddr(address: AddrType, size: core.Size) Self {
             return .{
                 .address = address,
                 .size = size,
@@ -223,11 +251,11 @@ fn RangeMixin(comptime Self: type) type {
             return true;
         }
 
-        pub fn contains(self: Self, address: anytype) bool {
+        pub fn contains(self: Self, address: AddrType) bool {
             return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
         }
 
-        pub fn print(value: Self, writer: anytype) !void {
+        pub fn print(value: Self, writer: anytype, indent: usize) !void {
             try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
 
@@ -235,7 +263,7 @@ fn RangeMixin(comptime Self: type) type {
             try std.fmt.formatInt(value.end().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
             try writer.writeAll(" - ");
 
-            try value.size.print(writer);
+            try value.size.print(writer, indent);
             try writer.writeAll(" }");
         }
 
@@ -247,7 +275,11 @@ fn RangeMixin(comptime Self: type) type {
         ) !void {
             _ = fmt;
             _ = options;
-            return print(value, writer);
+            return print(value, writer, 0);
+        }
+
+        fn __helpZls() void {
+            Self.print(undefined, @as(std.fs.File.Writer, undefined), 0);
         }
     };
 }

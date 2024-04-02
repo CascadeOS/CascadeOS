@@ -7,10 +7,9 @@
             "id": "arch",
             "type": "pickString",
             "options": [
-                "aarch64",
-                "x86_64"
+                "x64"
             ],
-            "default": "x86_64",
+            "default": "x64",
             "description": "Architecture that is being debugged."
         }
     ],
