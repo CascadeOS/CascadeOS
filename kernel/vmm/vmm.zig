@@ -337,10 +337,8 @@ const KernelMemoryLayout = struct {
         };
 
         pub fn print(region: KernelMemoryRegion, writer: anytype, indent: usize) !void {
-            _ = indent;
-
             try writer.writeAll("KernelMemoryRegion{ ");
-            try region.range.print(writer);
+            try region.range.print(writer, indent);
             try writer.writeAll(" - ");
             try writer.writeAll(@tagName(region.type));
             try writer.writeAll(" }");
