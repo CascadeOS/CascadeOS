@@ -70,7 +70,7 @@ fn create(
 }
 
 fn make(step: *Step, progress_node: *std.Progress.Node) !void {
-    const self = @fieldParentPtr(DepGraphStep, "step", step);
+    const self: *DepGraphStep = @fieldParentPtr("step", step);
 
     var node = progress_node.start(
         step.name,

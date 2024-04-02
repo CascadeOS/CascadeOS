@@ -129,7 +129,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     progress_node.activate();
 
-    const self = @fieldParentPtr(ImageStep, "step", step);
+    const self: *ImageStep = @fieldParentPtr("step", step);
 
     // TODO: use cache system
 

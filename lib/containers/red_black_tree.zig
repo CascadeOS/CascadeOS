@@ -740,7 +740,7 @@ test Tree {
         var i: usize = 0;
 
         while (iterator.next()) |node| : (i += 1) {
-            const item = @fieldParentPtr(Item, "node", node);
+            const item: *Item = @fieldParentPtr("node", node);
             try std.testing.expectEqual(ordered_items[i].value, item.value);
         }
     }
@@ -770,7 +770,7 @@ test Tree {
             Item.findFirstLessThanEqualNode,
         );
         try std.testing.expect(less_than_node != null);
-        var less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
+        var less_than_item: *Item = @fieldParentPtr("node", less_than_node.?);
         try std.testing.expectEqual(@as(usize, 12), less_than_item.value);
 
         tree.remove(less_than_node.?);
@@ -780,7 +780,7 @@ test Tree {
             Item.findFirstLessThanEqualNode,
         );
         try std.testing.expect(less_than_node != null);
-        less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
+        less_than_item = @fieldParentPtr("node", less_than_node.?);
         try std.testing.expectEqual(@as(usize, 0), less_than_item.value);
     }
 
@@ -791,7 +791,7 @@ test Tree {
             Item.findLastLessThanEqualNode,
         );
         try std.testing.expect(less_than_node != null);
-        var less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
+        var less_than_item: *Item = @fieldParentPtr("node", less_than_node.?);
         try std.testing.expectEqual(@as(usize, 0), less_than_item.value);
 
         tree.remove(less_than_node.?);
@@ -801,7 +801,7 @@ test Tree {
             Item.findLastLessThanEqualNode,
         );
         try std.testing.expect(less_than_node != null);
-        less_than_item = @fieldParentPtr(Item, "node", less_than_node.?);
+        less_than_item = @fieldParentPtr("node", less_than_node.?);
         try std.testing.expectEqual(@as(usize, 17), less_than_item.value);
     }
 }
@@ -823,7 +823,7 @@ const Item = struct {
     node: Node = .{},
 
     fn findEqlNode(context: usize, other_node: *const Node) core.OrderedComparison {
-        const other_item = @fieldParentPtr(Item, "node", other_node);
+        const other_item: *const Item = @fieldParentPtr("node", other_node);
 
         return if (context < other_item.value)
             core.OrderedComparison.less
@@ -834,7 +834,7 @@ const Item = struct {
     }
 
     fn findFirstLessThanEqualNode(context: usize, other_node: *const Node) core.OrderedComparison {
-        const other_item = @fieldParentPtr(Item, "node", other_node);
+        const other_item: *const Item = @fieldParentPtr("node", other_node);
 
         if (other_item.value <= context) return .match;
 
@@ -842,7 +842,7 @@ const Item = struct {
     }
 
     fn findLastLessThanEqualNode(context: usize, other_node: *const Node) ComparisonAndMatch {
-        const other_item = @fieldParentPtr(Item, "node", other_node);
+        const other_item: *const Item = @fieldParentPtr("node", other_node);
 
         const less_than_or_equal = other_item.value <= context;
 
@@ -853,8 +853,8 @@ const Item = struct {
     }
 
     fn compareNodes(node: *const Node, other_node: *const Node) core.OrderedComparison {
-        const item = @fieldParentPtr(Item, "node", node);
-        const other = @fieldParentPtr(Item, "node", other_node);
+        const item: *const Item = @fieldParentPtr("node", node);
+        const other: *const Item = @fieldParentPtr("node", other_node);
 
         return if (item.value < other.value)
             .less

@@ -64,7 +64,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     progress_node.activate();
 
-    const self = @fieldParentPtr(EDK2Step, "step", step);
+    const self: *EDK2Step = @fieldParentPtr("step", step);
 
     if (!try self.firmwareNeedsUpdate()) {
         self.firmware.path = self.firmware_path;

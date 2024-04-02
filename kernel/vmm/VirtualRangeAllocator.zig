@@ -194,19 +194,19 @@ const RangeWithNodes = struct {
     size_ordered_node: RedBlack.Node = .{},
 
     inline fn fromAddressNode(node: *RedBlack.Node) *RangeWithNodes {
-        return @fieldParentPtr(RangeWithNodes, "address_ordered_node", node);
+        return @fieldParentPtr("address_ordered_node", node);
     }
 
     inline fn fromAddressNodeConst(node: *const RedBlack.Node) *const RangeWithNodes {
-        return @fieldParentPtr(RangeWithNodes, "address_ordered_node", node);
+        return @fieldParentPtr("address_ordered_node", node);
     }
 
     inline fn fromSizeNode(node: *RedBlack.Node) *RangeWithNodes {
-        return @fieldParentPtr(RangeWithNodes, "size_ordered_node", node);
+        return @fieldParentPtr("size_ordered_node", node);
     }
 
     inline fn fromSizeNodeConst(node: *const RedBlack.Node) *const RangeWithNodes {
-        return @fieldParentPtr(RangeWithNodes, "size_ordered_node", node);
+        return @fieldParentPtr("size_ordered_node", node);
     }
 };
 

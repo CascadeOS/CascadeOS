@@ -101,7 +101,7 @@ fn needsUefi(self: CascadeTarget) bool {
 
 fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     const b = step.owner;
-    const self = @fieldParentPtr(QemuStep, "step", step);
+    const self: *QemuStep = @fieldParentPtr("step", step);
 
     const run_qemu = b.addSystemCommand(&.{qemuExecutable(self.target)});
 
