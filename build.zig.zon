@@ -5,10 +5,10 @@
     .name = "CascadeOS",
 
     // Ensure this is kept in sync with `build.zig`
-    .version = "0.0.1",
+    .version = "0.0.2",
 
     // Ensure this is kept in sync with `build.zig` and `README.md`
-    .minimum_zig_version = "0.12.0-dev.3247+26e895e3d",
+    .minimum_zig_version = "0.12.0-dev.3518+d2be725e4",
 
     .dependencies = .{
         .libdwarf = .{

@@ -17,7 +17,7 @@ const StepCollection = @import("build/StepCollection.zig");
 const Tool = @import("build/Tool.zig");
 
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
-const min_zig_version = "0.12.0-dev.3247+26e895e3d";
+const min_zig_version = "0.12.0-dev.3518+d2be725e4";
 
 comptime {
     const current_zig = builtin.zig_version;
@@ -31,7 +31,7 @@ comptime {
 }
 
 // Ensure this is kept in sync with `build.zig.zon`
-const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 1 };
+const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 2 };
 
 const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
