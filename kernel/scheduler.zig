@@ -150,7 +150,7 @@ fn idle() noreturn {
         if (ready_to_run_start != null) {
             const held = kernel.scheduler.lockScheduler();
             defer held.release();
-            schedule(held, false);
+            if (ready_to_run_start != null) schedule(held, false);
         }
         kernel.arch.halt();
     }
