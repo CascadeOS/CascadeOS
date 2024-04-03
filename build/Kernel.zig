@@ -80,9 +80,6 @@ fn create(
         .optimize = options.optimize,
     });
 
-    // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
-    kernel_exe.root_module.strip = false;
-
     kernel_exe.setLinkerScriptPath(.{
         .path = helpers.pathJoinFromRoot(b, &.{
             "kernel",
@@ -91,7 +88,6 @@ fn create(
             "linker.ld",
         }),
     });
-    kernel_exe.entry = .disabled;
 
     // self reference
     kernel_exe.root_module.addImport("kernel", &kernel_exe.root_module);
@@ -150,9 +146,13 @@ fn create(
         kernel_exe.root_module.addImport(module.name, module.module);
     }
 
-    kernel_exe.want_lto = false;
-    kernel_exe.pie = true;
+    // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
+    kernel_exe.root_module.strip = false;
     kernel_exe.root_module.omit_frame_pointer = false;
+    kernel_exe.entry = .disabled;
+    kernel_exe.want_lto = false;
+    kernel_exe.pie = false;
+    kernel_exe.linkage = .static;
 
     // apply target-specific configuration to the kernel
     switch (target) {
