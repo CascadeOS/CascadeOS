@@ -1,19 +1,26 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-//! This module contains the definitions of the Limine protocol as of 2024-01-23.
+//! This module contains the definitions of the Limine protocol as of 2024-03-13.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/cc579a8da24fcbdd95467d374a89496f03106156/PROTOCOL.md)
-//!
-//! Unimplemented features:
-//!   - Terminal Feature: deprecated and not used by Cascade
-//!   - 5-Level Paging Feature: deprecated in favour of Paging Mode Feature
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/1d45bf541e360a7a3ecc9630312cccaca94cf806/PROTOCOL.md)
 //!
 
 const core = @import("core");
 const std = @import("std");
 
 const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
+
+/// Placing this "requests delimiter" on an 8-byte aligned boundary tells the bootloader to stop searching for requests
+/// (including base revision tags) in an executable.
+///
+/// The requests delimiter is a _hint_.
+///
+/// The bootloader can still search for requests and base revision tags past this point if it doesn't support the hint.
+/// When it comes to the Limine bootloader, this means versions starting from 7.1.x support it, while older ones do not.
+pub const RequestsDelimiter = extern struct {
+    id: [2]u64 = [_]u64{ 0xadc0e0531bb10d03, 0x9572709f31764c62 },
+};
 
 const Arch = enum {
     aarch64,
