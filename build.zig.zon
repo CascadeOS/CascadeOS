@@ -11,6 +11,11 @@
     .minimum_zig_version = "0.12.0-dev.3518+d2be725e4",
 
     .dependencies = .{
+        .edk2 = .{
+            .url = "https://github.com/rust-osdev/ovmf-prebuilt/releases/download/edk2-stable202402-r1/edk2-stable202402-r1-bin.tar.xz",
+            .hash = "1220ee590fecc1b496ee1fd1d074e09f6861439f365c7718daca6f47492a5b1b581a",
+        },
+
         .libdwarf = .{
             .url = "git+https://github.com/davea42/libdwarf-code.git#v0.9.1",
             .hash = "12206c399d5c7a46305adca48531db49df15f729d465b63d76953d0794e534f72545",
