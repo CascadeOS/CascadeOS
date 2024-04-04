@@ -17,7 +17,7 @@ var ready_to_run_end: ?*kernel.Thread = null;
 ///
 /// This function must be called with the lock held (see `lockScheduler`).
 pub fn schedule(held: kernel.sync.TicketSpinLock.Held, requeue_current_thread: bool) void {
-    core.debugAssert(held.spinlock == &lock);
+    validateLock(held);
 
     const cpu = held.cpu_lock.cpu;
 
@@ -69,7 +69,7 @@ pub fn schedule(held: kernel.sync.TicketSpinLock.Held, requeue_current_thread: b
 ///
 /// This function must be called with the lock held (see `lockScheduler`).
 pub fn queueThread(held: kernel.sync.TicketSpinLock.Held, thread: *kernel.Thread) void {
-    core.debugAssert(held.spinlock == &lock);
+    validateLock(held);
     core.debugAssert(thread.next_thread == null);
 
     thread.state = .ready;
@@ -116,6 +116,12 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
     // TODO: handle priority
 
     kernel.arch.scheduling.switchToThreadFromThread(cpu, current_thread, new_thread);
+}
+
+inline fn validateLock(held: kernel.sync.TicketSpinLock.Held) void {
+    core.debugAssert(held.spinlock == &lock);
+    core.debugAssert(lock.isLockedByCurrent());
+    core.debugAssert(held.cpu_lock.exclusion == .preemption_and_interrupt);
 }
 
 /// Locks the scheduler and produces a `TicketSpinLock.Held`.
