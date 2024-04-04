@@ -18,6 +18,7 @@ pub const Held = struct {
     /// Unlocks the spinlock.
     pub fn release(self: Held) void {
         core.debugAssert(self.spinlock.current_holder == self.cpu_lock.cpu.id);
+        core.debugAssert(self.cpu_lock.exclusion == .preemption_and_interrupt);
 
         self.spinlock.unsafeUnlock();
         self.cpu_lock.release();
