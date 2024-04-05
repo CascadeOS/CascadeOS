@@ -286,6 +286,26 @@ pub const scheduling = struct {
 
         current.scheduling.switchToThreadFromThread(cpu, old_thread, new_thread);
     }
+
+    pub const NewThreadFunction = *const fn (
+        preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+        thread: *kernel.Thread,
+        context: u64,
+    ) noreturn;
+
+    pub inline fn prepareNewThread(
+        thread: *kernel.Thread,
+        context: u64,
+        target_function: NewThreadFunction,
+    ) error{StackOverflow}!void {
+        checkSupport(current.scheduling, "prepareNewThread", fn (
+            *kernel.Thread,
+            u64,
+            NewThreadFunction,
+        ) error{StackOverflow}!void);
+
+        return current.scheduling.prepareNewThread(thread, context, target_function);
+    }
 };
 
 /// Checks if the current architecture implements the given function.

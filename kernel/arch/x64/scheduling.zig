@@ -97,6 +97,42 @@ pub fn switchToThreadFromThread(
     );
 }
 
+pub fn prepareNewThread(
+    thread: *kernel.Thread,
+    context: u64,
+    target_function: kernel.arch.scheduling.NewThreadFunction,
+) error{StackOverflow}!void {
+    const old_stack_pointer = thread.kernel_stack.stack_pointer;
+    errdefer thread.kernel_stack.stack_pointer = old_stack_pointer;
+
+    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
+
+    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try thread.kernel_stack.push(context);
+    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(thread));
+
+    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
+
+    // general purpose registers
+    for (0..6) |_| thread.kernel_stack.push(@as(u64, 0)) catch unreachable;
+}
+
+fn startNewThread(
+    thread: *kernel.Thread,
+    context: u64,
+    target_function_addr: *const anyopaque,
+) callconv(.C) noreturn {
+    const preemption_interrupt_halt = kernel.scheduler.unlockScheduler();
+
+    const target_function: kernel.arch.scheduling.NewThreadFunction = @ptrCast(target_function_addr);
+
+    target_function(preemption_interrupt_halt, thread, context);
+    unreachable;
+}
+
+// Implemented in 'x64/asm/startNewThread.S'
+extern fn _startNewThread() callconv(.C) noreturn;
+
 // Implemented in 'x64/asm/switchToIdleImpl.S'
 extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) noreturn;
 
