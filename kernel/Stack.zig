@@ -47,13 +47,13 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
 pub fn create(push_null_return_value: bool) !Stack {
     const virtual_range = blk: {
         const held = stacks_range_allocator_lock.lock();
-        defer held.unlock();
+        defer held.release();
 
         break :blk try stacks_range_allocator.allocateRange(stack_size_with_guard_page);
     };
     errdefer {
         const held = stacks_range_allocator_lock.lock();
-        defer held.unlock();
+        defer held.release();
 
         stacks_range_allocator.deallocateRange(virtual_range) catch {
             core.panic("deallocateRange failed"); // FIXME
@@ -65,11 +65,11 @@ pub fn create(push_null_return_value: bool) !Stack {
     usable_range.size.subtractInPlace(kernel.arch.paging.standard_page_size);
 
     try kernel.vmm.mapRange(
-        &kernel.vmm.kernel_page_table,
+        kernel.process.page_table,
         usable_range,
         .{ .global = true, .writeable = true },
     );
-    errdefer kernel.vmm.unmapRange(&kernel.vmm.kernel_page_table, usable_range);
+    errdefer kernel.vmm.unmapRange(kernel.process.page_table, usable_range);
 
     var stack = fromRange(virtual_range, usable_range);
 
@@ -86,11 +86,11 @@ pub fn create(push_null_return_value: bool) !Stack {
 /// - `stack` must have been created with `create`.
 pub fn destroy(stack: Stack) !void {
     const held = stacks_range_allocator_lock.lock();
-    defer held.unlock();
+    defer held.release();
 
     try stacks_range_allocator.deallocateRange(stack.range);
 
-    kernel.vmm.unmapRange(&kernel.vmm.kernel_page_table, stack.usable_range);
+    kernel.vmm.unmapRange(kernel.process.page_table, stack.usable_range);
 
     // TODO: cache needs to be flushed on this core and others.
 }
