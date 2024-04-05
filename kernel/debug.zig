@@ -20,9 +20,14 @@ pub fn zigPanic(
 ) noreturn {
     @setCold(true);
 
-    const held = kernel.getLockedCpu(.preemption_and_interrupt);
+    const preemption_interrupt_halt = kernel.sync.getCpuPreemptionAndInterruptHalt();
 
-    panic_impl(held.cpu, msg, stack_trace, return_address_opt orelse @returnAddress());
+    panic_impl(
+        preemption_interrupt_halt.cpu,
+        msg,
+        stack_trace,
+        return_address_opt orelse @returnAddress(),
+    );
 
     while (true) {
         kernel.arch.interrupts.disableInterruptsAndHalt();

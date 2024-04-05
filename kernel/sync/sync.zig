@@ -7,35 +7,18 @@ const kernel = @import("kernel");
 
 pub const TicketSpinLock = @import("TicketSpinLock.zig");
 
-pub const Exclusion = enum {
-    preemption,
-    preemption_and_interrupt,
-};
-
 const log = kernel.log.scoped(.sync);
 
-pub const CpuLock = struct {
+pub const PreemptionHalt = struct {
     cpu: *kernel.Cpu,
-    exclusion: Exclusion,
 
-    pub fn release(self: CpuLock) void {
-        const schedules_skipped = self.cpu.schedules_skipped;
+    pub fn release(self: PreemptionHalt) void {
+        // interrupts could be enabled
 
-        const old_preemption_disable_count = self.cpu.preemption_disable_count;
+        const old_preemption_disable_count = @atomicRmw(u32, &self.cpu.preemption_disable_count, .Sub, 1, .acq_rel);
         core.debugAssert(old_preemption_disable_count != 0);
 
-        self.cpu.preemption_disable_count = old_preemption_disable_count - 1;
-
-        if (self.exclusion == .preemption_and_interrupt) {
-            const old_interrupt_disable_count = self.cpu.interrupt_disable_count;
-            core.debugAssert(old_interrupt_disable_count != 0);
-
-            self.cpu.interrupt_disable_count = old_interrupt_disable_count - 1;
-
-            if (old_interrupt_disable_count == 1) kernel.arch.interrupts.enableInterrupts();
-        }
-
-        if (old_preemption_disable_count == 1 and schedules_skipped != 0) {
+        if (old_preemption_disable_count == 1 and @atomicLoad(u32, &self.cpu.schedules_skipped, .acquire) != 0) {
             const held = kernel.scheduler.lockScheduler();
             defer held.release();
             kernel.scheduler.schedule(held, true);
@@ -43,18 +26,49 @@ pub const CpuLock = struct {
     }
 };
 
-pub fn getLockedCpu(exclusion: Exclusion) CpuLock {
+pub const PreemptionAndInterruptHalt = struct {
+    cpu: *kernel.Cpu,
+
+    /// Enables interrupts leaving preemption disabled and returns a `PreemptionHalt`.
+    ///
+    /// __WARNING__
+    ///
+    /// The `PreemptionAndInterruptHalt` passed to this function must *not* have `release` called on it.
+    pub fn downgrade(self: PreemptionAndInterruptHalt) PreemptionHalt {
+        const old_interrupt_disable_count = self.cpu.interrupt_disable_count;
+        core.debugAssert(old_interrupt_disable_count != 0);
+
+        self.cpu.interrupt_disable_count -= 1;
+
+        if (old_interrupt_disable_count == 1) kernel.arch.interrupts.enableInterrupts();
+
+        return .{ .cpu = self.cpu };
+    }
+
+    pub inline fn release(self: PreemptionAndInterruptHalt) void {
+        self.downgrade().release();
+    }
+};
+
+pub fn getCpuPreemptionHalt() PreemptionHalt {
     kernel.arch.interrupts.disableInterrupts();
 
     const cpu = kernel.arch.rawGetCpu();
 
     cpu.preemption_disable_count += 1;
 
-    if (exclusion == .preemption_and_interrupt) {
-        cpu.interrupt_disable_count += 1;
-    } else {
-        if (cpu.interrupt_disable_count == 0) kernel.arch.interrupts.enableInterrupts();
-    }
+    if (cpu.interrupt_disable_count == 0) kernel.arch.interrupts.enableInterrupts();
 
-    return .{ .cpu = cpu, .exclusion = exclusion };
+    return .{ .cpu = cpu };
+}
+
+pub fn getCpuPreemptionAndInterruptHalt() PreemptionAndInterruptHalt {
+    kernel.arch.interrupts.disableInterrupts();
+
+    const cpu = kernel.arch.rawGetCpu();
+
+    cpu.preemption_disable_count += 1;
+    cpu.interrupt_disable_count += 1;
+
+    return .{ .cpu = cpu };
 }

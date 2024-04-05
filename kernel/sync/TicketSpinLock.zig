@@ -12,16 +12,15 @@ ticket: usize = 0,
 current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
-    cpu_lock: kernel.sync.CpuLock,
+    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
     spinlock: *TicketSpinLock,
 
     /// Unlocks the spinlock.
     pub fn release(self: Held) void {
-        core.debugAssert(self.spinlock.current_holder == self.cpu_lock.cpu.id);
-        core.debugAssert(self.cpu_lock.exclusion == .preemption_and_interrupt);
+        core.debugAssert(self.spinlock.current_holder == self.preemption_interrupt_halt.cpu.id);
 
         self.spinlock.unsafeUnlock();
-        self.cpu_lock.release();
+        self.preemption_interrupt_halt.release();
     }
 };
 
@@ -31,10 +30,10 @@ pub fn isLocked(self: *const TicketSpinLock) bool {
 
 /// Returns true if the spinlock is locked by the current cpu.
 pub fn isLockedByCurrent(self: *const TicketSpinLock) bool {
-    const cpu_lock = kernel.getLockedCpu(.preemption);
-    defer cpu_lock.release();
+    const preemption_halt = kernel.sync.getCpuPreemptionHalt();
+    defer preemption_halt.release();
 
-    return self.isLockedBy(cpu_lock.cpu.id);
+    return self.isLockedBy(preemption_halt.cpu.id);
 }
 
 pub fn isLockedBy(self: *const TicketSpinLock, cpu_id: kernel.Cpu.Id) bool {
@@ -50,17 +49,17 @@ pub fn unsafeUnlock(self: *TicketSpinLock) void {
 }
 
 pub fn lock(self: *TicketSpinLock) Held {
-    const cpu_lock = kernel.getLockedCpu(.preemption_and_interrupt);
+    const preemption_interrupt_halt = kernel.sync.getCpuPreemptionAndInterruptHalt();
 
     const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
 
     while (@atomicLoad(usize, &self.current, .acquire) != ticket) {
         kernel.arch.spinLoopHint();
     }
-    @atomicStore(kernel.Cpu.Id, &self.current_holder, cpu_lock.cpu.id, .release);
+    @atomicStore(kernel.Cpu.Id, &self.current_holder, preemption_interrupt_halt.cpu.id, .release);
 
     return .{
-        .cpu_lock = cpu_lock,
+        .preemption_interrupt_halt = preemption_interrupt_halt,
         .spinlock = self,
     };
 }

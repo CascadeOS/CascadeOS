@@ -19,7 +19,7 @@ var ready_to_run_end: ?*kernel.Thread = null;
 pub fn schedule(held: kernel.sync.TicketSpinLock.Held, requeue_current_thread: bool) void {
     validateLock(held);
 
-    const cpu = held.cpu_lock.cpu;
+    const cpu = held.preemption_interrupt_halt.cpu;
 
     if (cpu.preemption_disable_count > 1) {
         // we have to check for a disable count greater than 1 because grabbing the scheduler lock increments the
@@ -121,7 +121,6 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
 inline fn validateLock(held: kernel.sync.TicketSpinLock.Held) void {
     core.debugAssert(held.spinlock == &lock);
     core.debugAssert(lock.isLockedByCurrent());
-    core.debugAssert(held.cpu_lock.exclusion == .preemption_and_interrupt);
 }
 
 /// Locks the scheduler and produces a `TicketSpinLock.Held`.
@@ -131,20 +130,19 @@ pub fn lockScheduler() kernel.sync.TicketSpinLock.Held {
     return lock.lock();
 }
 
-/// Unlocks the scheduler and produces a `CpuLock`.
+/// Unlocks the scheduler and produces a `kernel.sync.PreemptionAndInterruptHalt`.
 ///
 /// Intended to only be called in idle or a new thread.
-pub fn unlockScheduler() kernel.sync.CpuLock {
+pub fn unlockScheduler() kernel.sync.PreemptionAndInterruptHalt {
     const cpu = kernel.arch.rawGetCpu();
 
     core.debugAssert(lock.isLockedBy(cpu.id));
+    core.debugAssert(cpu.interrupt_disable_count != 0);
+    core.debugAssert(cpu.preemption_disable_count != 0);
 
     lock.unsafeUnlock();
 
-    return .{
-        .cpu = cpu,
-        .exclusion = .preemption_and_interrupt,
-    };
+    return .{ .cpu = cpu };
 }
 
 fn idle() noreturn {

@@ -12,7 +12,10 @@ var idt: x64.Idt = .{};
 const raw_handlers = init.makeRawHandlers();
 var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
-pub const InterruptHandler = *const fn (cpu_lock: kernel.sync.CpuLock, interrupt_frame: *InterruptFrame) void;
+pub const InterruptHandler = *const fn (
+    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    interrupt_frame: *InterruptFrame,
+) void;
 
 pub const InterruptStackSelector = enum(u3) {
     double_fault,
@@ -248,10 +251,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     cpu.interrupt_disable_count += 1;
     cpu.preemption_disable_count += 1;
 
-    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](.{
-        .cpu = cpu,
-        .exclusion = .preemption_and_interrupt,
-    }, interrupt_frame);
+    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](.{ .cpu = cpu }, interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
     x64.disableInterrupts();
