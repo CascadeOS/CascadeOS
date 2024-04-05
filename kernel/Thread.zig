@@ -18,8 +18,33 @@ kernel_stack: kernel.Stack,
 
 next_thread: ?*Thread = null,
 
+pub fn name(self: *const Thread) []const u8 {
+    return self._name.constSlice();
+}
+
 pub inline fn isKernel(self: *const Thread) bool {
     return self.process == &kernel.process;
+}
+
+pub fn print(thread: *const Thread, writer: anytype, indent: usize) !void {
+    // Process(process.name)::Thread(thread.name)
+
+    try thread.process.print(writer, indent);
+
+    try writer.writeAll("::Thread(");
+    try writer.writeAll(thread.name());
+    try writer.writeByte(')');
+}
+
+pub inline fn format(
+    thread: *const Thread,
+    comptime fmt: []const u8,
+    options: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    _ = options;
+    _ = fmt;
+    return print(thread, writer, 0);
 }
 
 pub const State = enum {
@@ -31,3 +56,7 @@ pub const Name = std.BoundedArray(u8, kernel.config.thread_name_length);
 pub const Id = enum(u64) {
     _,
 };
+
+fn __helpZls() void {
+    Thread.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+}
