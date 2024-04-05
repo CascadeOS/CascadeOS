@@ -15,7 +15,8 @@
                 "test"
             ],
             "group": {
-                "kind": "build"
+                "kind": "build",
+                "isDefault": true
             }
         },
         
@@ -26,7 +27,7 @@
             "command": "zig",
             "args": [
                 "build",
-                "kernel_x64",
+                "kernel_x64"
             ],
             "group": {
                 "kind": "build"
@@ -54,7 +55,7 @@
             "command": "zig",
             "args": [
                 "build",
-                "tools_build",
+                "tools_build"
             ],
             "group": {
                 "kind": "build"
@@ -85,7 +86,7 @@
             "group": {
                 "kind": "build"
             }
-        },
+        }
     ],
     "presentation": {
         "reveal": "silent",
