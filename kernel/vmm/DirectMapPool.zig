@@ -54,7 +54,7 @@ pub fn DirectMapPool(
             const bit_index = bucket_header.getIndex(item);
 
             const held = self.lock.lock();
-            defer held.unlock();
+            defer held.release();
 
             bucket_header.bitset.set(bit_index);
             log.debug("added item at index {} in {*} to the pool", .{ bit_index, bucket_header.bucket });
