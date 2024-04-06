@@ -92,10 +92,7 @@ fn kernelInitStage3() noreturn {
     core.debugAssert(cpu.preemption_disable_count == 0); // this must be zero when entering the scheduler
 
     log.debug("entering scheduler on {}", .{cpu.id});
-    kernel.scheduler.schedule(
-        kernel.scheduler.lockScheduler(),
-        false,
-    );
+    kernel.scheduler.schedule(kernel.scheduler.lockScheduler());
     unreachable;
 }
 

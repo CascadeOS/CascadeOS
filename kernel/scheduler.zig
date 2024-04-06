@@ -13,10 +13,8 @@ var ready_to_run_end: ?*kernel.Thread = null;
 
 /// Performs a round robin scheduling of the ready threads.
 ///
-/// If `requeue_current_thread` is set to true, the current thread will be requeued before the next thread is found.
-///
 /// This function must be called with the lock held (see `lockScheduler`).
-pub fn schedule(held: kernel.sync.TicketSpinLock.Held, requeue_current_thread: bool) void {
+pub fn schedule(held: kernel.sync.TicketSpinLock.Held) void {
     validateLock(held);
 
     const cpu = held.preemption_interrupt_halt.cpu;
@@ -30,14 +28,6 @@ pub fn schedule(held: kernel.sync.TicketSpinLock.Held, requeue_current_thread: b
     cpu.schedules_skipped = 0;
 
     const opt_current_thread = cpu.current_thread;
-
-    // We need to requeue the current thread before we find the next thread to run,
-    // in case the current thread is the last thread in the ready queue.
-    if (requeue_current_thread) {
-        if (opt_current_thread) |current_thread| {
-            queueThread(held, current_thread);
-        }
-    }
 
     const new_thread = ready_to_run_start orelse {
         // no thread to run
@@ -154,7 +144,7 @@ fn idle() noreturn {
         if (ready_to_run_start != null) {
             const held = kernel.scheduler.lockScheduler();
             defer held.release();
-            if (ready_to_run_start != null) schedule(held, false);
+            if (ready_to_run_start != null) schedule(held);
         }
         kernel.arch.halt();
     }

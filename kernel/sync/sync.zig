@@ -21,7 +21,8 @@ pub const PreemptionHalt = struct {
         if (old_preemption_disable_count == 1 and @atomicLoad(u32, &self.cpu.schedules_skipped, .acquire) != 0) {
             const held = kernel.scheduler.lockScheduler();
             defer held.release();
-            kernel.scheduler.schedule(held, true);
+            kernel.scheduler.queueThread(held, self.cpu.current_thread.?);
+            kernel.scheduler.schedule(held);
         }
     }
 };
