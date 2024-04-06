@@ -37,9 +37,9 @@ pub fn switchToIdle(
         unreachable;
     };
 
-    if (!old_thread.process.isKernel()) {
+    if (!old_thread.isKernel()) {
         // the process was not the kernel so we need to switch to the kernel page table
-        x64.paging.switchToPageTable(kernel.process.page_table);
+        kernel.vmm.switchToKernelPageTable();
     }
 
     cpu.arch.tss.setPrivilegeStack(
@@ -57,12 +57,10 @@ pub fn switchToThreadFromIdle(
     cpu: *kernel.Cpu,
     thread: *kernel.Thread,
 ) noreturn {
-    const process = thread.process;
-
-    if (!process.isKernel()) {
+    if (thread.process) |process| {
         // If the process is not the kernel we need to switch the page table and privilege stack.
 
-        x64.paging.switchToPageTable(process.page_table);
+        process.loadPageTable();
 
         cpu.arch.tss.setPrivilegeStack(
             .ring0,
@@ -79,11 +77,14 @@ pub fn switchToThreadFromThread(
     old_thread: *kernel.Thread,
     new_thread: *kernel.Thread,
 ) void {
-    const new_process = new_thread.process;
 
     // If the process is changing we need to switch the page table.
-    if (old_thread.process != new_process) {
-        x64.paging.switchToPageTable(new_process.page_table);
+    if (old_thread.process != new_thread.process) {
+        if (new_thread.process) |new_process| {
+            new_process.loadPageTable();
+        } else {
+            kernel.vmm.switchToKernelPageTable();
+        }
     }
 
     cpu.arch.tss.setPrivilegeStack(

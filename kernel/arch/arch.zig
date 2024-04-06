@@ -141,10 +141,10 @@ pub const paging = struct {
     }
 
     /// Switches to the given page table.
-    pub inline fn switchToPageTable(page_table: *PageTable) void {
-        checkSupport(current.paging, "switchToPageTable", fn (*PageTable) void);
+    pub inline fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
+        checkSupport(current.paging, "switchToPageTable", fn (core.PhysicalAddress) void);
 
-        current.paging.switchToPageTable(page_table);
+        current.paging.switchToPageTable(page_table_address);
     }
 
     pub const MapError = error{

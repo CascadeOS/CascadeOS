@@ -16,8 +16,12 @@ pub fn name(self: *const Process) []const u8 {
     return self._name.constSlice();
 }
 
-pub inline fn isKernel(self: *const Process) bool {
-    return self.id == .kernel;
+pub fn loadPageTable(self: *const Process) void {
+    kernel.arch.paging.switchToPageTable(
+        kernel.physicalFromDirectMapUnsafe(
+            core.VirtualAddress.fromPtr(self.page_table),
+        ),
+    );
 }
 
 pub fn print(process: *const Process, writer: anytype, indent: usize) !void {

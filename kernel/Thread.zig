@@ -12,7 +12,10 @@ _name: Name,
 
 state: State = .ready,
 
-process: *kernel.Process,
+/// The process that this thread belongs to.
+///
+/// `null` if this is a kernel thread.
+process: ?*kernel.Process,
 
 kernel_stack: kernel.Stack,
 
@@ -23,13 +26,17 @@ pub fn name(self: *const Thread) []const u8 {
 }
 
 pub inline fn isKernel(self: *const Thread) bool {
-    return self.process == &kernel.process;
+    return self.process == null;
 }
 
 pub fn print(thread: *const Thread, writer: anytype, indent: usize) !void {
-    // Process(process.name)::Thread(thread.name)
+    // Process(process.name)::Thread(thread.name) or Kernel::Thread(thread.name)
 
-    try thread.process.print(writer, indent);
+    if (thread.process) |process| {
+        try process.print(writer, indent);
+    } else {
+        try writer.writeAll("Kernel");
+    }
 
     try writer.writeAll("::Thread(");
     try writer.writeAll(thread.name());

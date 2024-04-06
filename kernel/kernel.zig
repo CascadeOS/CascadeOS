@@ -4,13 +4,6 @@
 const std = @import("std");
 const core = @import("core");
 
-/// The kernel process.
-pub var process: Process = .{
-    .id = .kernel,
-    ._name = Process.Name.fromSlice("kernel") catch unreachable,
-    .page_table = undefined, // initialized in `vmm.init.buildKernelPageTableAndSwitch`
-};
-
 comptime {
     _ = &boot; // ensure any entry points or bootloader required symbols are referenced
 }

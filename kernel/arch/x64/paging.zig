@@ -27,8 +27,8 @@ pub fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
 }
 
 /// Switches to the given page table.
-pub fn switchToPageTable(page_table: *PageTable) void {
-    x64.Cr3.writeAddress(kernel.physicalFromDirectMapUnsafe(core.VirtualAddress.fromPtr(page_table)));
+pub fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
+    x64.Cr3.writeAddress(page_table_address);
 }
 
 /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
