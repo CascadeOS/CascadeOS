@@ -38,7 +38,7 @@ pub const Duration = extern struct {
         .{ .value = @intFromEnum(Unit.nanosecond), .name = "ns" },
     };
 
-    pub fn print(duration: Duration, writer: anytype, indent: usize) !void {
+    pub fn print(duration: Duration, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
         var any_output = false;
@@ -91,9 +91,12 @@ pub const Duration = extern struct {
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
         _ = options;
-        return print(duration, writer, 0);
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(duration, writer, 0)
+        else
+            print(duration, writer.any(), 0);
     }
 
     fn __helpZls() void {

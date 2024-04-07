@@ -95,7 +95,7 @@ pub const RFlags = packed struct(u64) {
         );
     }
 
-    pub fn print(self: RFlags, writer: anytype, indent: usize) !void {
+    pub fn print(self: RFlags, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("RFlags{\n");
@@ -161,9 +161,12 @@ pub const RFlags = packed struct(u64) {
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
         _ = options;
-        return print(self, writer);
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(self, writer, 0)
+        else
+            print(self, writer.any(), 0);
     }
 
     fn __helpZls() void {

@@ -94,7 +94,7 @@ pub const Size = extern struct {
         .{ .value = @intFromEnum(Unit.byte), .name = "B" },
     };
 
-    pub fn print(size: Size, writer: anytype, indent: usize) !void {
+    pub fn print(size: Size, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
         var value = size.value;
@@ -127,9 +127,12 @@ pub const Size = extern struct {
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
         _ = options;
-        return print(size, writer, 0);
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(size, writer, 0)
+        else
+            print(size, writer.any(), 0);
     }
 
     fn __helpZls() void {

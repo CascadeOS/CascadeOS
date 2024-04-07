@@ -66,7 +66,7 @@ pub const MemoryMapEntry = struct {
         reclaimable,
     };
 
-    pub fn print(entry: MemoryMapEntry, writer: anytype, indent: usize) !void {
+    pub fn print(entry: MemoryMapEntry, writer: std.io.AnyWriter, indent: usize) !void {
         try writer.writeAll("MemoryMapEntry - ");
 
         try writer.writeAll(@tagName(entry.type));
@@ -77,14 +77,17 @@ pub const MemoryMapEntry = struct {
     }
 
     pub inline fn format(
-        entry: MemoryMapEntry,
+        value: MemoryMapEntry,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
         _ = options;
         _ = fmt;
-        return print(entry, writer, 0);
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(value, writer, 0)
+        else
+            print(value, writer.any(), 0);
     }
 
     fn __helpZls() void {

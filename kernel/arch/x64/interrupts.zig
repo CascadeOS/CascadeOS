@@ -75,7 +75,7 @@ pub const InterruptFrame = extern struct {
 
     pub fn print(
         value: *const InterruptFrame,
-        writer: anytype,
+        writer: std.io.AnyWriter,
         indent: usize,
     ) !void {
         const new_indent = indent + 2;
@@ -166,9 +166,12 @@ pub const InterruptFrame = extern struct {
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        _ = fmt;
         _ = options;
-        return print(value, writer, 0);
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(value, writer, 0)
+        else
+            print(value, writer.any(), 0);
     }
 
     fn __helpZls() void {

@@ -34,7 +34,7 @@ pub fn zigPanic(
     }
 }
 
-fn printUserPanicMessage(writer: anytype, msg: []const u8) void {
+fn printUserPanicMessage(writer: std.io.AnyWriter, msg: []const u8) void {
     if (msg.len != 0) {
         writer.writeAll("\nPANIC - ") catch unreachable;
 
@@ -49,7 +49,7 @@ fn printUserPanicMessage(writer: anytype, msg: []const u8) void {
 }
 
 fn printErrorAndCurrentStackTrace(
-    writer: anytype,
+    writer: std.io.AnyWriter,
     stack_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
 ) void {
@@ -66,7 +66,7 @@ fn printErrorAndCurrentStackTrace(
 }
 
 fn printCurrentBackTrace(
-    writer: anytype,
+    writer: std.io.AnyWriter,
     return_address: usize,
     symbol_source: ?SymbolSource,
 ) void {
@@ -78,7 +78,7 @@ fn printCurrentBackTrace(
 }
 
 fn printStackTrace(
-    writer: anytype,
+    writer: std.io.AnyWriter,
     stack_trace: *const std.builtin.StackTrace,
     symbol_source: ?SymbolSource,
 ) void {
@@ -99,7 +99,7 @@ fn printStackTrace(
 
 const indent = "  ";
 
-fn printSourceAtAddress(writer: anytype, address: usize, opt_symbol_source: ?SymbolSource) void {
+fn printSourceAtAddress(writer: std.io.AnyWriter, address: usize, opt_symbol_source: ?SymbolSource) void {
     if (address == 0) return;
 
     if (address < kernel.arch.paging.higher_half.value) {
@@ -149,7 +149,7 @@ fn printSourceAtAddress(writer: anytype, address: usize, opt_symbol_source: ?Sym
     printSymbol(writer, symbol, kernel_virtual_slide_is_null);
 }
 
-fn printSymbol(writer: anytype, symbol: SymbolSource.Symbol, kernel_virtual_slide_is_null: bool) void {
+fn printSymbol(writer: std.io.AnyWriter, symbol: SymbolSource.Symbol, kernel_virtual_slide_is_null: bool) void {
     writer.writeAll(indent) catch unreachable;
 
     // kernel/setup.zig:43:15 in setup

@@ -29,7 +29,7 @@ pub inline fn isKernel(self: *const Thread) bool {
     return self.process == null;
 }
 
-pub fn print(thread: *const Thread, writer: anytype, indent: usize) !void {
+pub fn print(thread: *const Thread, writer: std.io.AnyWriter, indent: usize) !void {
     // Process(process.name)::Thread(thread.name) or Kernel::Thread(thread.name)
 
     if (thread.process) |process| {
@@ -51,7 +51,10 @@ pub inline fn format(
 ) !void {
     _ = options;
     _ = fmt;
-    return print(thread, writer, 0);
+    return if (@TypeOf(writer) == std.io.AnyWriter)
+        print(thread, writer, 0)
+    else
+        print(thread, writer.any(), 0);
 }
 
 pub const State = enum {

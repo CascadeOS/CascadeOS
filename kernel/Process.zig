@@ -24,7 +24,7 @@ pub fn loadPageTable(self: *const Process) void {
     );
 }
 
-pub fn print(process: *const Process, writer: anytype, indent: usize) !void {
+pub fn print(process: *const Process, writer: std.io.AnyWriter, indent: usize) !void {
     // Process(process.name)
 
     _ = indent;
@@ -42,7 +42,10 @@ pub inline fn format(
 ) !void {
     _ = options;
     _ = fmt;
-    return print(process, writer, 0);
+    return if (@TypeOf(writer) == std.io.AnyWriter)
+        print(process, writer, 0)
+    else
+        print(process, writer.any(), 0);
 }
 
 pub const Name = std.BoundedArray(u8, kernel.config.process_name_length);

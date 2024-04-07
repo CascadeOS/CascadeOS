@@ -67,7 +67,7 @@ pub const PageTable = extern struct {
 
     pub fn printPageTable(
         self: *const PageTable,
-        writer: anytype,
+        writer: std.io.AnyWriter,
         comptime print_detailed_level1: bool,
         comptime validVirtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
     ) !void {
@@ -352,7 +352,7 @@ pub const PageTable = extern struct {
             return validVirtualFromPhysical(self.getAddress4kib()).toPtr(*PageTable);
         }
 
-        fn printSmallEntryFlags(self: Entry, writer: anytype) !void {
+        fn printSmallEntryFlags(self: Entry, writer: std.io.AnyWriter) !void {
             core.debugAssert(!self.huge.read());
 
             if (self.present.read()) {
@@ -398,7 +398,7 @@ pub const PageTable = extern struct {
             }
         }
 
-        fn printHugeEntryFlags(self: Entry, writer: anytype) !void {
+        fn printHugeEntryFlags(self: Entry, writer: std.io.AnyWriter) !void {
             core.debugAssert(self.huge.read());
 
             if (self.present.read()) {
@@ -444,7 +444,7 @@ pub const PageTable = extern struct {
             }
         }
 
-        fn printDirectoryEntryFlags(self: Entry, writer: anytype) !void {
+        fn printDirectoryEntryFlags(self: Entry, writer: std.io.AnyWriter) !void {
             if (self.present.read()) {
                 try writer.writeAll("Present ");
             } else {

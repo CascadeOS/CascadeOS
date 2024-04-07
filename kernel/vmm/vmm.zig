@@ -284,7 +284,7 @@ pub const MapType = struct {
             a.no_cache == b.no_cache;
     }
 
-    pub fn print(value: MapType, writer: anytype, indent: usize) !void {
+    pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("Type{ ");
@@ -309,7 +309,10 @@ pub const MapType = struct {
     ) !void {
         _ = options;
         _ = fmt;
-        return print(region, writer, 0);
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(region, writer, 0)
+        else
+            print(region, writer.any(), 0);
     }
 
     fn __helpZls() void {
@@ -352,7 +355,7 @@ const KernelMemoryLayout = struct {
             kernel_stacks,
         };
 
-        pub fn print(region: KernelMemoryRegion, writer: anytype, indent: usize) !void {
+        pub fn print(region: KernelMemoryRegion, writer: std.io.AnyWriter, indent: usize) !void {
             try writer.writeAll("KernelMemoryRegion{ ");
             try region.range.print(writer, indent);
             try writer.writeAll(" - ");
@@ -368,9 +371,11 @@ const KernelMemoryLayout = struct {
         ) !void {
             _ = options;
             _ = fmt;
-            return print(region, writer, 0);
+            return if (@TypeOf(writer) == std.io.AnyWriter)
+                print(region, writer, 0)
+            else
+                print(region, writer.any(), 0);
         }
-
         fn __helpZls() void {
             KernelMemoryRegion.print(undefined, @as(std.fs.File.Writer, undefined), 0);
         }

@@ -135,7 +135,7 @@ fn AddrMixin(comptime Self: type) type {
             return .match;
         }
 
-        pub fn print(self: Self, writer: anytype, indent: usize) !void {
+        pub fn print(self: Self, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
             try writer.writeAll(comptime Self.name ++ "{ 0x");
@@ -149,9 +149,12 @@ fn AddrMixin(comptime Self: type) type {
             options: std.fmt.FormatOptions,
             writer: anytype,
         ) !void {
-            _ = fmt;
             _ = options;
-            return print(self, writer, 0);
+            _ = fmt;
+            return if (@TypeOf(writer) == std.io.AnyWriter)
+                print(self, writer, 0)
+            else
+                print(self, writer.any(), 0);
         }
 
         fn __helpZls() void {
@@ -255,7 +258,7 @@ fn RangeMixin(comptime Self: type) type {
             return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
         }
 
-        pub fn print(value: Self, writer: anytype, indent: usize) !void {
+        pub fn print(value: Self, writer: std.io.AnyWriter, indent: usize) !void {
             try writer.writeAll(comptime Self.name ++ "{ 0x");
             try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
 
@@ -273,9 +276,12 @@ fn RangeMixin(comptime Self: type) type {
             options: std.fmt.FormatOptions,
             writer: anytype,
         ) !void {
-            _ = fmt;
             _ = options;
-            return print(value, writer, 0);
+            _ = fmt;
+            return if (@TypeOf(writer) == std.io.AnyWriter)
+                print(value, writer, 0)
+            else
+                print(value, writer.any(), 0);
         }
 
         fn __helpZls() void {

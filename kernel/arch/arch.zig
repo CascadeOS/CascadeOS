@@ -41,8 +41,6 @@ pub inline fn halt() void {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
-    pub const EarlyOutputWriter = current.init.EarlyOutputWriter;
-
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
         checkSupport(current.init, "setupEarlyOutput", fn () void);
@@ -51,10 +49,10 @@ pub const init = struct {
     }
 
     /// Acquire a writer for the early output setup by `setupEarlyOutput`.
-    pub inline fn getEarlyOutput() ?current.init.EarlyOutputWriter {
+    pub inline fn getEarlyOutput() ?std.io.AnyWriter {
         checkSupport(current.init, "getEarlyOutput", fn () ?current.init.EarlyOutputWriter);
 
-        return current.init.getEarlyOutput();
+        return if (current.init.getEarlyOutput()) |writer| writer.any() else null;
     }
 
     /// Ensure that any exceptions/faults that occur are handled.
