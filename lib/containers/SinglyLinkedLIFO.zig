@@ -1,35 +1,40 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+//! Singly linked LIFO (last in first out).
+
 const std = @import("std");
 const core = @import("core");
+const containers = @import("containers");
 
-/// A node with a single next pointer. Mainly used for singly linked lists.
-///
-/// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
-pub const SingleNode = extern struct {
-    next: ?*SingleNode = null,
-};
+const SingleNode = containers.SingleNode;
 
-/// A node with a next and previous pointers. Mainly used for doubly linked lists.
-///
-/// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
-pub const DoubleNode = extern struct {
-    next: SingleNode = .{},
-    previous: SingleNode = .{},
-};
+const SinglyLinkedLIFO = @This();
 
-pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
-pub const SinglyLinkedLIFO = @import("SinglyLinkedLIFO.zig");
+start_node: ?*SingleNode = null,
 
-pub const RedBlack = struct {
-    const red_black_tree = @import("red_black_tree.zig");
+pub fn isEmpty(self: SinglyLinkedLIFO) bool {
+    return self.start_node == null;
+}
 
-    pub const Tree = red_black_tree.Tree;
-    pub const Node = red_black_tree.Node;
-    pub const Iterator = red_black_tree.Iterator;
-    pub const ComparisonAndMatch = red_black_tree.ComparisonAndMatch;
-};
+pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
+    core.debugAssert(node.next == null);
+
+    if (self.start_node) |start| {
+        node.next = start;
+        self.start_node = node;
+    } else {
+        self.start_node = node;
+    }
+}
+
+pub fn pop(self: *SinglyLinkedLIFO) ?*SingleNode {
+    const node = self.start_node orelse return null;
+
+    self.start_node = node.next;
+
+    return node;
+}
 
 comptime {
     refAllDeclsRecursive(@This());
