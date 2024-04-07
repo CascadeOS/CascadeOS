@@ -59,8 +59,6 @@ pub fn kernelInit() !void {
     log.debug("building and switching to kernel page table", .{});
     try kernel.vmm.init.buildKernelPageTableAndSwitch();
 
-    try makeDumbThreads();
-
     kernelInitStage2(&bootstrap_cpu);
 }
 
@@ -96,62 +94,6 @@ fn kernelInitStage3() noreturn {
     log.debug("entering scheduler on {}", .{cpu.id});
     kernel.scheduler.schedule(kernel.scheduler.lockScheduler());
     unreachable;
-}
-
-fn makeDumbThreads() !void {
-    const held = kernel.scheduler.lockScheduler();
-    defer held.release();
-
-    const number_of_dumb_threads = 2;
-
-    for (0..number_of_dumb_threads) |i| {
-        const stack = try kernel.Stack.create(true);
-        // leak stack
-
-        const page = try kernel.pmm.allocatePage();
-
-        const thread = kernel.directMapFromPhysical(page.address).toPtr(*kernel.Thread);
-        thread.* = .{
-            ._name = try kernel.Thread.Name.fromSlice("dumb thread"),
-            .id = @enumFromInt(i),
-            .kernel_stack = stack,
-            .process = null,
-        };
-
-        try thread._name.writer().print(" {d}", .{i});
-
-        try kernel.arch.scheduling.prepareNewThread(thread, i, dumbThread);
-
-        kernel.scheduler.queueThread(held, thread);
-    }
-}
-
-fn dumbThread(
-    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
-    thread: *kernel.Thread,
-    context: u64,
-) noreturn {
-    preemption_interrupt_halt.release();
-
-    var i: usize = 0;
-
-    while (i < 2) : (i += 1) {
-        const held = kernel.scheduler.lockScheduler();
-        defer held.release();
-
-        log.info("hello from {} with context {} with i {}", .{ thread, context, i });
-
-        kernel.scheduler.queueThread(held, thread);
-        kernel.scheduler.schedule(held);
-    }
-
-    // dont requeue this thread
-    {
-        const held = kernel.scheduler.lockScheduler();
-        defer held.release();
-        kernel.scheduler.schedule(held);
-        unreachable;
-    }
 }
 
 fn captureKernelOffsets() !void {
