@@ -17,7 +17,7 @@ const Stack = @This();
 const stack_size_with_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 
 var stacks_range_allocator: kernel.vmm.VirtualRangeAllocator = undefined;
-var stacks_range_allocator_lock: kernel.sync.TicketSpinLock = .{};
+var stacks_range_allocator_mutex: kernel.sync.Mutex = .{};
 
 /// The entire virtual range including the guard page.
 range: core.VirtualRange,
@@ -46,13 +46,13 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
 
 pub fn create(push_null_return_value: bool) !Stack {
     const virtual_range = blk: {
-        const held = stacks_range_allocator_lock.acquire();
+        const held = stacks_range_allocator_mutex.acquire();
         defer held.release();
 
         break :blk try stacks_range_allocator.allocateRange(stack_size_with_guard_page);
     };
     errdefer {
-        const held = stacks_range_allocator_lock.acquire();
+        const held = stacks_range_allocator_mutex.acquire();
         defer held.release();
 
         stacks_range_allocator.deallocateRange(virtual_range) catch {
@@ -85,10 +85,12 @@ pub fn create(push_null_return_value: bool) !Stack {
 /// **REQUIREMENTS**:
 /// - `stack` must have been created with `create`.
 pub fn destroy(stack: Stack) !void {
-    const held = stacks_range_allocator_lock.lock();
-    defer held.release();
+    {
+        const held = stacks_range_allocator_mutex.acquire();
+        defer held.release();
 
-    try stacks_range_allocator.deallocateRange(stack.range);
+        try stacks_range_allocator.deallocateRange(stack.range);
+    }
 
     kernel.vmm.unmapRange(kernel.process.page_table, stack.usable_range);
 
