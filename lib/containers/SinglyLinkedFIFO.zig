@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-//! Singly linked list that tracks both the start and end node
+//! Singly linked FIFO (first in first out).
 
 const std = @import("std");
 const core = @import("core");
