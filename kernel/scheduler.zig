@@ -22,10 +22,10 @@ pub fn schedule(held: kernel.sync.TicketSpinLock.Held) void {
     if (cpu.preemption_disable_count > 1) {
         // we have to check for a disable count greater than 1 because grabbing the scheduler lock increments the
         // disable count
-        cpu.schedules_skipped += 1;
+        cpu.schedule_skipped = true;
         return;
     }
-    cpu.schedules_skipped = 0;
+    cpu.schedule_skipped = false;
 
     const opt_current_thread = cpu.current_thread;
 

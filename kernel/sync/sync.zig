@@ -18,10 +18,12 @@ pub const PreemptionHalt = struct {
         const old_preemption_disable_count = @atomicRmw(u32, &self.cpu.preemption_disable_count, .Sub, 1, .acq_rel);
         core.debugAssert(old_preemption_disable_count != 0);
 
-        if (old_preemption_disable_count == 1 and @atomicLoad(u32, &self.cpu.schedules_skipped, .acquire) != 0) {
+        const current_thread = self.cpu.current_thread orelse return;
+
+        if (old_preemption_disable_count == 1 and @atomicLoad(bool, &self.cpu.schedule_skipped, .acquire)) {
             const held = kernel.scheduler.lockScheduler();
             defer held.release();
-            kernel.scheduler.queueThread(held, self.cpu.current_thread.?);
+            kernel.scheduler.queueThread(held, current_thread);
             kernel.scheduler.schedule(held);
         }
     }
