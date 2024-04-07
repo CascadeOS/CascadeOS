@@ -260,12 +260,6 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     core.debugAssert(old_preemption_disable_count == cpu.preemption_disable_count);
 }
 
-fn unhandledInterrupt(held: kernel.sync.HeldExclusion, interrupt_frame: *InterruptFrame) void {
-    defer held.release();
-
-    core.panicFmt("unhandled interrupt: {}", .{interrupt_frame});
-}
-
 pub const init = struct {
     /// Load the IDT on this cpu.
     pub fn loadIdt() void {
