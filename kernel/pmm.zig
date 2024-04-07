@@ -9,43 +9,42 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.pmm);
 
+var lock: kernel.sync.TicketSpinLock = .{};
 var first_free_physical_page: ?*PhysPageNode = null;
 
-pub const AllocateError = error{PhysicalMemoryExhausted};
+pub const AllocateError = error{OutOfPhysicalMemory};
 
 /// Allocates a physical page.
 pub fn allocatePage() AllocateError!core.PhysicalRange {
-    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
+    const free_page_node = blk: {
+        const held = lock.lock();
 
-    while (first_free_page_opt) |first_free_page| {
-        if (@cmpxchgWeak(
-            ?*PhysPageNode,
-            &first_free_physical_page,
-            first_free_page,
-            first_free_page.next,
-            .acq_rel,
-            .acquire,
-        )) |new_first_free_page| {
-            first_free_page_opt = new_first_free_page;
-            continue;
-        }
+        const free_page_node = first_free_physical_page orelse {
+            held.release();
 
-        const physical_address = kernel.physicalFromDirectMapUnsafe(
-            core.VirtualAddress.fromPtr(first_free_page),
-        );
+            log.warn("PAGE ALLOCATION FAILED", .{});
+            return error.OutOfPhysicalMemory;
+        };
 
-        const allocated_range = core.PhysicalRange.fromAddr(
-            physical_address,
-            kernel.arch.paging.standard_page_size,
-        );
+        first_free_physical_page = free_page_node.next;
 
-        log.debug("allocated page: {}", .{allocated_range});
+        held.release();
 
-        return allocated_range;
-    }
+        break :blk free_page_node;
+    };
 
-    log.warn("PAGE ALLOCATION FAILED", .{});
-    return error.PhysicalMemoryExhausted;
+    const physical_address = kernel.physicalFromDirectMapUnsafe(
+        core.VirtualAddress.fromPtr(free_page_node),
+    );
+
+    const allocated_range = core.PhysicalRange.fromAddr(
+        physical_address,
+        kernel.arch.paging.standard_page_size,
+    );
+
+    log.debug("allocated page: {}", .{allocated_range});
+
+    return allocated_range;
 }
 
 /// Deallocates a physical page.
@@ -59,27 +58,15 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
 
     const page_node = kernel.directMapFromPhysical(range.address).toPtr(*PhysPageNode);
 
-    var first_free_page_opt = @atomicLoad(?*PhysPageNode, &first_free_physical_page, .acquire);
+    {
+        const held = lock.lock();
+        defer held.release();
 
-    while (true) {
-        page_node.next = first_free_page_opt;
-
-        if (@cmpxchgWeak(
-            ?*PhysPageNode,
-            &first_free_physical_page,
-            first_free_page_opt,
-            page_node,
-            .acq_rel,
-            .acquire,
-        )) |new_first_free_page| {
-            first_free_page_opt = new_first_free_page;
-            continue;
-        }
-
-        log.debug("deallocated page: {}", .{range});
-
-        return;
+        page_node.next = first_free_physical_page;
+        first_free_physical_page = page_node;
     }
+
+    log.debug("deallocated page: {}", .{range});
 }
 
 const PhysPageNode = extern struct {
