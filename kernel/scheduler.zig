@@ -78,6 +78,8 @@ fn switchToIdle(cpu: *kernel.Cpu, opt_current_thread: ?*kernel.Thread) noreturn 
 fn switchToThreadFromIdle(cpu: *kernel.Cpu, new_thread: *kernel.Thread) noreturn {
     log.debug("switching to {} from idle", .{new_thread});
 
+    core.debugAssert(new_thread.next_thread_node.next == null);
+
     cpu.current_thread = new_thread;
     new_thread.state = .running;
     // TODO: handle priority
@@ -88,6 +90,8 @@ fn switchToThreadFromIdle(cpu: *kernel.Cpu, new_thread: *kernel.Thread) noreturn
 
 fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, new_thread: *kernel.Thread) void {
     log.debug("switching to {} from {}", .{ new_thread, current_thread });
+
+    core.debugAssert(new_thread.next_thread_node.next == null);
 
     cpu.current_thread = new_thread;
     new_thread.state = .running;
