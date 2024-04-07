@@ -4,6 +4,7 @@
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
+const containers = @import("containers");
 
 const Thread = @This();
 
@@ -19,7 +20,10 @@ process: ?*kernel.Process,
 
 kernel_stack: kernel.Stack,
 
-next_thread: ?*Thread = null,
+/// Used to track the next thread in any linked list.
+///
+/// Used in the ready queue.
+next_thread_node: containers.SingleNode = .{},
 
 pub fn name(self: *const Thread) []const u8 {
     return self._name.constSlice();
@@ -27,6 +31,10 @@ pub fn name(self: *const Thread) []const u8 {
 
 pub inline fn isKernel(self: *const Thread) bool {
     return self.process == null;
+}
+
+pub inline fn fromNode(node: *containers.SingleNode) *Thread {
+    return @fieldParentPtr("next_thread_node", node);
 }
 
 pub fn print(thread: *const Thread, writer: std.io.AnyWriter, indent: usize) !void {
