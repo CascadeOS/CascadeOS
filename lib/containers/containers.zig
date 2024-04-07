@@ -4,6 +4,23 @@
 const std = @import("std");
 const core = @import("core");
 
+/// A node with a single next pointer. Mainly used for singly linked lists.
+///
+/// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
+pub const SingleNode = extern struct {
+    next: ?*SingleNode = null,
+};
+
+/// A node with a next and previous pointers. Mainly used for doubly linked lists.
+///
+/// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
+pub const DoubleNode = extern struct {
+    next: SingleNode = .{},
+    previous: SingleNode = .{},
+};
+
+pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
+
 pub const RedBlack = struct {
     const red_black_tree = @import("red_black_tree.zig");
 
