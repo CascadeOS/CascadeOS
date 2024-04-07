@@ -22,7 +22,7 @@ kernel_stack: kernel.Stack,
 
 /// Used to track the next thread in any linked list.
 ///
-/// Used in the ready queue.
+/// Used in the ready queue, wait lists, etc.
 next_thread_node: containers.SingleNode = .{},
 
 pub fn name(self: *const Thread) []const u8 {
@@ -68,6 +68,7 @@ pub inline fn format(
 pub const State = enum {
     ready,
     running,
+    waiting,
 };
 
 pub const Name = std.BoundedArray(u8, kernel.config.thread_name_length);
