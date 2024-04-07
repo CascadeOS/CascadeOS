@@ -15,10 +15,11 @@ pub const SingleNode = extern struct {
 ///
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const DoubleNode = extern struct {
-    next: SingleNode = .{},
-    previous: SingleNode = .{},
+    next: ?*DoubleNode = null,
+    previous: ?*DoubleNode = null,
 };
 
+pub const DoublyLinkedLIFO = @import("DoublyLinkedLIFO.zig");
 pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
 pub const SinglyLinkedLIFO = @import("SinglyLinkedLIFO.zig");
 
