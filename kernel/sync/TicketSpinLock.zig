@@ -17,7 +17,7 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn release(self: Held) void {
-        core.debugAssert(self.spinlock.current_holder == self.preemption_interrupt_halt.cpu.id);
+        core.debugAssert(self.spinlock.isLockedBy(self.preemption_interrupt_halt.cpu.id));
 
         self.spinlock.unsafeUnlock();
         self.preemption_interrupt_halt.release();
@@ -50,6 +50,8 @@ pub fn unsafeUnlock(self: *TicketSpinLock) void {
 
 pub fn lock(self: *TicketSpinLock) Held {
     const preemption_interrupt_halt = kernel.sync.getCpuPreemptionInterruptHalt();
+
+    core.debugAssert(!self.isLockedBy(preemption_interrupt_halt.cpu.id));
 
     const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
 
