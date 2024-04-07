@@ -123,7 +123,7 @@ fn startNewThread(
     context: u64,
     target_function_addr: *const anyopaque,
 ) callconv(.C) noreturn {
-    const preemption_interrupt_halt = kernel.scheduler.unlockScheduler();
+    const preemption_interrupt_halt = kernel.scheduler.releaseScheduler();
 
     const target_function: kernel.arch.scheduling.NewThreadFunction = @ptrCast(target_function_addr);
 

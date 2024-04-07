@@ -22,7 +22,7 @@ pub const PreemptionHalt = struct {
         const current_thread = self.cpu.current_thread orelse return;
 
         if (old_preemption_disable_count == 1 and @atomicLoad(bool, &self.cpu.schedule_skipped, .acquire)) {
-            const held = kernel.scheduler.lockScheduler();
+            const held = kernel.scheduler.acquireScheduler();
             defer held.release();
             kernel.scheduler.queueThread(held, current_thread);
             kernel.scheduler.schedule(held);

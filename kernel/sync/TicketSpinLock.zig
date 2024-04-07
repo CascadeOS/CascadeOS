@@ -19,7 +19,7 @@ pub const Held = struct {
     pub fn release(self: Held) void {
         core.debugAssert(self.spinlock.isLockedBy(self.preemption_interrupt_halt.cpu.id));
 
-        self.spinlock.unsafeUnlock();
+        self.spinlock.unsafeRelease();
         self.preemption_interrupt_halt.release();
     }
 };
@@ -40,15 +40,15 @@ pub fn isLockedBy(self: *const TicketSpinLock, cpu_id: kernel.Cpu.Id) bool {
     return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == cpu_id;
 }
 
-/// Unlocks the spinlock.
+/// Releases the spinlock.
 ///
 /// Intended to be used only when the caller needs to unlock the spinlock on behalf of another thread.
-pub fn unsafeUnlock(self: *TicketSpinLock) void {
+pub fn unsafeRelease(self: *TicketSpinLock) void {
     @atomicStore(kernel.Cpu.Id, &self.current_holder, .none, .release);
     _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);
 }
 
-pub fn lock(self: *TicketSpinLock) Held {
+pub fn acquire(self: *TicketSpinLock) Held {
     const preemption_interrupt_halt = kernel.sync.getCpuPreemptionInterruptHalt();
 
     core.debugAssert(!self.isLockedBy(preemption_interrupt_halt.cpu.id));

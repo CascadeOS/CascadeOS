@@ -46,13 +46,13 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
 
 pub fn create(push_null_return_value: bool) !Stack {
     const virtual_range = blk: {
-        const held = stacks_range_allocator_lock.lock();
+        const held = stacks_range_allocator_lock.acquire();
         defer held.release();
 
         break :blk try stacks_range_allocator.allocateRange(stack_size_with_guard_page);
     };
     errdefer {
-        const held = stacks_range_allocator_lock.lock();
+        const held = stacks_range_allocator_lock.acquire();
         defer held.release();
 
         stacks_range_allocator.deallocateRange(virtual_range) catch {

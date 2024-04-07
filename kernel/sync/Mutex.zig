@@ -25,7 +25,7 @@ pub const Held = struct {
         core.debugAssert(mutex.locked_by == current_thread);
 
         const opt_thread_to_wake_node = blk: {
-            const held = mutex.spinlock.lock();
+            const held = mutex.spinlock.acquire();
             defer held.release();
 
             mutex.locked_by = null;
@@ -39,7 +39,7 @@ pub const Held = struct {
 
             log.debug("{} released mutex and waking {}", .{ current_thread, thread_to_wake });
 
-            const held = kernel.scheduler.lockScheduler();
+            const held = kernel.scheduler.acquireScheduler();
             self.preemption_halt.release();
             defer held.release();
 
@@ -53,7 +53,7 @@ pub const Held = struct {
 
 pub fn acquire(self: *Mutex) Held {
     while (true) {
-        const mutex_lock = self.spinlock.lock();
+        const mutex_lock = self.spinlock.acquire();
 
         const current_thread = mutex_lock.preemption_interrupt_halt.cpu.current_thread.?; // idle should never acquire a mutex
 
@@ -79,7 +79,7 @@ pub fn acquire(self: *Mutex) Held {
         current_thread.next_thread_node = .{};
         self.waiting_threads.push(&current_thread.next_thread_node);
 
-        const scheduler_held = kernel.scheduler.lockScheduler();
+        const scheduler_held = kernel.scheduler.acquireScheduler();
         mutex_lock.release();
         kernel.scheduler.schedule(scheduler_held);
         scheduler_held.release();

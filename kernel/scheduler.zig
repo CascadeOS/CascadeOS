@@ -13,7 +13,7 @@ var ready_to_run: containers.SinglyLinkedFIFO = .{};
 
 /// Performs a round robin scheduling of the ready threads.
 ///
-/// This function must be called with the lock held (see `lockScheduler`).
+/// This function must be called with the lock held (see `acquireScheduler`).
 pub fn schedule(held: kernel.sync.TicketSpinLock.Held) void {
     validateLock(held);
 
@@ -52,7 +52,7 @@ pub fn schedule(held: kernel.sync.TicketSpinLock.Held) void {
 }
 /// Queues a thread to be run by the scheduler.
 ///
-/// This function must be called with the lock held (see `lockScheduler`).
+/// This function must be called with the lock held (see `acquireScheduler`).
 pub fn queueThread(held: kernel.sync.TicketSpinLock.Held, thread: *kernel.Thread) void {
     validateLock(held);
     core.debugAssert(thread.next_thread_node.next == null);
@@ -105,36 +105,36 @@ inline fn validateLock(held: kernel.sync.TicketSpinLock.Held) void {
     core.debugAssert(lock.isLockedByCurrent());
 }
 
-/// Locks the scheduler and produces a `TicketSpinLock.Held`.
+/// Acquires the scheduler and produces a `TicketSpinLock.Held`.
 ///
 /// It is the caller's responsibility to call `TicketSpinLock.Held.release()` when done.
-pub fn lockScheduler() kernel.sync.TicketSpinLock.Held {
-    return lock.lock();
+pub fn acquireScheduler() kernel.sync.TicketSpinLock.Held {
+    return lock.acquire();
 }
 
-/// Unlocks the scheduler and produces a `kernel.sync.PreemptionInterruptHalt`.
+/// Releases the scheduler and produces a `kernel.sync.PreemptionInterruptHalt`.
 ///
 /// Intended to only be called in idle or a new thread.
-pub fn unlockScheduler() kernel.sync.PreemptionInterruptHalt {
+pub fn releaseScheduler() kernel.sync.PreemptionInterruptHalt {
     const cpu = kernel.arch.rawGetCpu();
 
     core.debugAssert(lock.isLockedBy(cpu.id));
     core.debugAssert(cpu.interrupt_disable_count != 0);
     core.debugAssert(cpu.preemption_disable_count != 0);
 
-    lock.unsafeUnlock();
+    lock.unsafeRelease();
 
     return .{ .cpu = cpu };
 }
 
 fn idle() noreturn {
-    unlockScheduler().release();
+    releaseScheduler().release();
 
     log.debug("entering idle", .{});
 
     while (true) {
         if (!ready_to_run.isEmpty()) {
-            const held = kernel.scheduler.lockScheduler();
+            const held = kernel.scheduler.acquireScheduler();
             defer held.release();
             if (!ready_to_run.isEmpty()) schedule(held);
         }

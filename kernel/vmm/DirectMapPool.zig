@@ -32,7 +32,7 @@ pub fn DirectMapPool(
         pub const GetError = kernel.pmm.AllocateError || error{BucketGroupsExhausted};
 
         pub fn get(self: *Self) GetError!*T {
-            const held = self.lock.lock();
+            const held = self.lock.acquire();
             defer held.release();
 
             if (self.available_buckets.peek()) |candidate_bucket_node| {
@@ -54,7 +54,7 @@ pub fn DirectMapPool(
             const bucket_header = Bucket.getHeader(item);
             const bit_index = bucket_header.getIndex(item);
 
-            const held = self.lock.lock();
+            const held = self.lock.acquire();
             defer held.release();
 
             bucket_header.bitset.set(bit_index);

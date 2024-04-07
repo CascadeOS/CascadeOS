@@ -24,7 +24,7 @@ pub const AllocateError = error{OutOfPhysicalMemory};
 /// Allocates a physical page.
 pub fn allocatePage() AllocateError!core.PhysicalRange {
     const free_page_node: *PageNode = blk: {
-        const held = lock.lock();
+        const held = lock.acquire();
 
         const free_page_node = free_pages.pop() orelse {
             held.release();
@@ -65,7 +65,7 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
     page_node.* = .{};
 
     {
-        const held = lock.lock();
+        const held = lock.acquire();
         defer held.release();
 
         free_pages.push(page_node);
