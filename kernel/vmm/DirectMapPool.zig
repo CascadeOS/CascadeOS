@@ -18,7 +18,7 @@ pub fn DirectMapPool(
     comptime log_scope: @Type(.EnumLiteral),
 ) type {
     return struct {
-        lock: kernel.sync.TicketSpinLock = .{},
+        mutex: kernel.sync.Mutex = .{},
 
         bucket_group_table: std.BoundedArray(*BucketGroup, number_of_bucket_groups) = .{},
 
@@ -32,7 +32,7 @@ pub fn DirectMapPool(
         pub const GetError = kernel.pmm.AllocateError || error{BucketGroupsExhausted};
 
         pub fn get(self: *Self) GetError!*T {
-            const held = self.lock.acquire();
+            const held = self.mutex.acquire();
             defer held.release();
 
             if (self.available_buckets.peek()) |candidate_bucket_node| {
@@ -54,7 +54,7 @@ pub fn DirectMapPool(
             const bucket_header = Bucket.getHeader(item);
             const bit_index = bucket_header.getIndex(item);
 
-            const held = self.lock.acquire();
+            const held = self.mutex.acquire();
             defer held.release();
 
             bucket_header.bitset.set(bit_index);
