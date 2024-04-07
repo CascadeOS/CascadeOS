@@ -106,7 +106,7 @@ pub const init = struct {
         var current_virtual_address = virtual_range.address;
         const end_virtual_address = virtual_range.end();
 
-        log.debug(comptime indent ** 2 ++ "marking {} pages available from {} to {}", .{
+        log.debug("adding {} available pages from {} to {}", .{
             physical_range.size.divide(kernel.arch.paging.standard_page_size).value,
             current_virtual_address,
             end_virtual_address,
