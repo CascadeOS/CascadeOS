@@ -6,27 +6,32 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const containers = @import("containers");
+
+const PageNode = containers.SingleNode;
 
 const log = kernel.log.scoped(.pmm);
 
 var lock: kernel.sync.TicketSpinLock = .{};
-var first_free_physical_page: ?*PhysPageNode = null;
+var free_pages: containers.SinglyLinkedLIFO = .{};
+
+comptime {
+    core.assert(core.Size.of(PageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
+}
 
 pub const AllocateError = error{OutOfPhysicalMemory};
 
 /// Allocates a physical page.
 pub fn allocatePage() AllocateError!core.PhysicalRange {
-    const free_page_node = blk: {
+    const free_page_node: *PageNode = blk: {
         const held = lock.lock();
 
-        const free_page_node = first_free_physical_page orelse {
+        const free_page_node = free_pages.pop() orelse {
             held.release();
 
             log.warn("PAGE ALLOCATION FAILED", .{});
             return error.OutOfPhysicalMemory;
         };
-
-        first_free_physical_page = free_page_node.next;
 
         held.release();
 
@@ -56,26 +61,18 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
     core.debugAssert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(range.size.equal(kernel.arch.paging.standard_page_size));
 
-    const page_node = kernel.directMapFromPhysical(range.address).toPtr(*PhysPageNode);
+    const page_node = kernel.directMapFromPhysical(range.address).toPtr(*PageNode);
+    page_node.* = .{};
 
     {
         const held = lock.lock();
         defer held.release();
 
-        page_node.next = first_free_physical_page;
-        first_free_physical_page = page_node;
+        free_pages.push(page_node);
     }
 
     log.debug("deallocated page: {}", .{range});
 }
-
-const PhysPageNode = extern struct {
-    next: ?*PhysPageNode = null,
-
-    comptime {
-        core.assert(core.Size.of(PhysPageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
-    }
-};
 
 pub const init = struct {
     pub fn addRange(physical_range: core.PhysicalRange) !void {
@@ -99,28 +96,13 @@ pub const init = struct {
             end_virtual_address,
         });
 
-        var first_page_opt: ?*PhysPageNode = null;
-        var previous_page_opt: ?*PhysPageNode = null;
-
         while (current_virtual_address.lessThan(end_virtual_address)) : ({
             current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
         }) {
-            const page = current_virtual_address.toPtr(*PhysPageNode);
-            page.next = null;
-            if (first_page_opt == null) {
-                first_page_opt = page;
-            }
-            if (previous_page_opt) |previous_page| {
-                previous_page.next = page;
-            }
-            previous_page_opt = page;
+            const page_node = current_virtual_address.toPtr(*PageNode);
+            page_node.* = .{};
+            free_pages.push(page_node);
         }
-
-        const first_page = first_page_opt orelse return error.InvalidPages;
-        const previous_page = previous_page_opt orelse return error.InvalidPages;
-
-        previous_page.next = first_free_physical_page;
-        first_free_physical_page = first_page;
     }
 };
 
