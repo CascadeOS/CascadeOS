@@ -207,7 +207,7 @@ fn unmap4KiB(
 fn ensureNextTable(
     self: *PageTable.Entry,
     map_type: MapType,
-) error{ PhysicalMemoryExhausted, MappingNotValid }!struct { *PageTable, bool } {
+) !struct { *PageTable, bool } {
     var opt_backing_range: ?core.PhysicalRange = null;
 
     const next_level_phys_address = if (self.present.read()) blk: {
