@@ -7,8 +7,8 @@ const kernel = @import("kernel");
 
 const TicketSpinLock = @This();
 
-current: usize = 0,
-ticket: usize = 0,
+current: u32 = 0,
+ticket: u32 = 0,
 current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
@@ -45,7 +45,7 @@ pub fn isLockedBy(self: *const TicketSpinLock, cpu_id: kernel.Cpu.Id) bool {
 /// Intended to be used only when the caller needs to unlock the spinlock on behalf of another thread.
 pub fn unsafeUnlock(self: *TicketSpinLock) void {
     @atomicStore(kernel.Cpu.Id, &self.current_holder, .none, .release);
-    _ = @atomicRmw(usize, &self.current, .Add, 1, .acq_rel);
+    _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);
 }
 
 pub fn lock(self: *TicketSpinLock) Held {
@@ -53,9 +53,9 @@ pub fn lock(self: *TicketSpinLock) Held {
 
     core.debugAssert(!self.isLockedBy(preemption_interrupt_halt.cpu.id));
 
-    const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
+    const ticket = @atomicRmw(u32, &self.ticket, .Add, 1, .acq_rel);
 
-    while (@atomicLoad(usize, &self.current, .acquire) != ticket) {
+    while (@atomicLoad(u32, &self.current, .acquire) != ticket) {
         kernel.arch.spinLoopHint();
     }
     @atomicStore(kernel.Cpu.Id, &self.current_holder, preemption_interrupt_halt.cpu.id, .release);
