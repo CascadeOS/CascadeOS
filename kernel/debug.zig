@@ -20,7 +20,7 @@ pub fn zigPanic(
 ) noreturn {
     @setCold(true);
 
-    const preemption_interrupt_halt = kernel.sync.getCpuPreemptionAndInterruptHalt();
+    const preemption_interrupt_halt = kernel.sync.getCpuPreemptionInterruptHalt();
 
     panic_impl(
         preemption_interrupt_halt.cpu,

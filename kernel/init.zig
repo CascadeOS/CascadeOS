@@ -127,7 +127,7 @@ fn makeDumbThreads() !void {
 }
 
 fn dumbThread(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     thread: *kernel.Thread,
     context: u64,
 ) noreturn {

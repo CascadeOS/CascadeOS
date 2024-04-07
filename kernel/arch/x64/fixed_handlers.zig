@@ -12,7 +12,7 @@ const x64 = @import("x64.zig");
 ///
 /// The saved instruction pointer points to the DIV or IDIV instruction which caused the exception.
 pub fn divideErrorException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -37,7 +37,7 @@ pub fn divideErrorException(
 /// When the exception is a trap, the saved instruction pointer points to the instruction after the instruction
 /// which caused the exception.
 pub fn debugException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -50,7 +50,7 @@ pub fn debugException(
 ///
 /// TODO: When a core panics it sends a NMI IPI to all other cores.
 pub fn nonMaskableInterrupt(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -62,7 +62,7 @@ pub fn nonMaskableInterrupt(
 ///
 /// The saved instruction pointer points to the byte after the INT3 instruction.
 pub fn breakpointException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -74,7 +74,7 @@ pub fn breakpointException(
 ///
 /// The saved instruction pointer points to the instruction after the INTO instruction.
 pub fn overflowException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -90,7 +90,7 @@ pub fn overflowException(
 ///
 /// The saved instruction pointer points to the BOUND instruction which caused the exception.
 pub fn boundRangeExceededException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -108,7 +108,7 @@ pub fn boundRangeExceededException(
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn invalidOpcodeException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -120,7 +120,7 @@ pub fn invalidOpcodeException(
 ///
 /// The saved instruction pointer points to the instruction that caused the exception.
 pub fn deviceNotAvailableException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -134,7 +134,7 @@ pub fn deviceNotAvailableException(
 /// The saved instruction pointer is undefined. A double fault cannot be recovered. The faulting process must be
 /// terminated.
 pub fn doubleFaultException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) noreturn {
     defer preemption_interrupt_halt.release();
@@ -146,7 +146,7 @@ pub fn doubleFaultException(
 /// transfer through a gate descriptor, which results in an invalid stack-segment reference using an SS selector in
 /// the TSS.
 pub fn invalidTSSException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -158,7 +158,7 @@ pub fn invalidTSSException(
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn segmentNotPresentException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -176,7 +176,7 @@ pub fn segmentNotPresentException(
 /// because of loading a non-present stack segment during a hardware task switch, in which case it points to the
 /// next instruction of the new task.
 pub fn stackFaultException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -194,7 +194,7 @@ pub fn stackFaultException(
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn generalProtectionException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -211,7 +211,7 @@ pub fn generalProtectionException(
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn pageFaultException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -237,7 +237,7 @@ pub fn pageFaultException(
 ///
 /// The x87 instruction pointer register contains the address of the last instruction which caused the exception.
 pub fn x87FPUFloatingPointException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -253,7 +253,7 @@ pub fn x87FPUFloatingPointException(
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn alignmentCheckException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -272,7 +272,7 @@ pub fn alignmentCheckException(
 ///
 /// The value of the saved instruction pointer depends on the implementation and the exception.
 pub fn machineCheckException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) noreturn {
     defer preemption_interrupt_halt.release();
@@ -287,7 +287,7 @@ pub fn machineCheckException(
 ///
 /// The saved instruction pointer points to the instruction which caused the exception.
 pub fn simdFloatingPointException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -299,7 +299,7 @@ pub fn simdFloatingPointException(
 ///
 /// Intel Only
 pub fn virtualizationException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -315,7 +315,7 @@ pub fn virtualizationException(
 /// stack is not 4-byte aligned or, in legacy or compatibility mode, is not less than 4GB.
 /// - A task switch initiated by IRET where the incoming SSP is not aligned to 4 bytes or is not less than 4GB.
 pub fn controlProtectionException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -328,7 +328,7 @@ pub fn controlProtectionException(
 ///
 /// AMD Only.
 pub fn hypervisorInjectionException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -340,7 +340,7 @@ pub fn hypervisorInjectionException(
 ///
 /// AMD Only.
 pub fn vmmCommunicationException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -352,7 +352,7 @@ pub fn vmmCommunicationException(
 ///
 /// AMD Only.
 pub fn securityException(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();
@@ -361,7 +361,7 @@ pub fn securityException(
 }
 
 pub fn unhandledInterrupt(
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     defer preemption_interrupt_halt.release();

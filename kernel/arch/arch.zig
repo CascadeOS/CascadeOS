@@ -288,7 +288,7 @@ pub const scheduling = struct {
     }
 
     pub const NewThreadFunction = *const fn (
-        preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+        preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
         thread: *kernel.Thread,
         context: u64,
     ) noreturn;

@@ -120,10 +120,10 @@ pub fn lockScheduler() kernel.sync.TicketSpinLock.Held {
     return lock.lock();
 }
 
-/// Unlocks the scheduler and produces a `kernel.sync.PreemptionAndInterruptHalt`.
+/// Unlocks the scheduler and produces a `kernel.sync.PreemptionInterruptHalt`.
 ///
 /// Intended to only be called in idle or a new thread.
-pub fn unlockScheduler() kernel.sync.PreemptionAndInterruptHalt {
+pub fn unlockScheduler() kernel.sync.PreemptionInterruptHalt {
     const cpu = kernel.arch.rawGetCpu();
 
     core.debugAssert(lock.isLockedBy(cpu.id));

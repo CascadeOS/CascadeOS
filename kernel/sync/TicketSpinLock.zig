@@ -12,7 +12,7 @@ ticket: usize = 0,
 current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     spinlock: *TicketSpinLock,
 
     /// Unlocks the spinlock.
@@ -49,7 +49,7 @@ pub fn unsafeUnlock(self: *TicketSpinLock) void {
 }
 
 pub fn lock(self: *TicketSpinLock) Held {
-    const preemption_interrupt_halt = kernel.sync.getCpuPreemptionAndInterruptHalt();
+    const preemption_interrupt_halt = kernel.sync.getCpuPreemptionInterruptHalt();
 
     const ticket = @atomicRmw(usize, &self.ticket, .Add, 1, .acq_rel);
 

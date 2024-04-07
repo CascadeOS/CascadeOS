@@ -27,15 +27,15 @@ pub const PreemptionHalt = struct {
     }
 };
 
-pub const PreemptionAndInterruptHalt = struct {
+pub const PreemptionInterruptHalt = struct {
     cpu: *kernel.Cpu,
 
     /// Enables interrupts leaving preemption disabled and returns a `PreemptionHalt`.
     ///
     /// __WARNING__
     ///
-    /// The `PreemptionAndInterruptHalt` passed to this function must *not* have `release` called on it.
-    pub fn downgrade(self: PreemptionAndInterruptHalt) PreemptionHalt {
+    /// The `PreemptionInterruptHalt` passed to this function must *not* have `release` called on it.
+    pub fn downgrade(self: PreemptionInterruptHalt) PreemptionHalt {
         const old_interrupt_disable_count = self.cpu.interrupt_disable_count;
         core.debugAssert(old_interrupt_disable_count != 0);
 
@@ -46,7 +46,7 @@ pub const PreemptionAndInterruptHalt = struct {
         return .{ .cpu = self.cpu };
     }
 
-    pub inline fn release(self: PreemptionAndInterruptHalt) void {
+    pub inline fn release(self: PreemptionInterruptHalt) void {
         self.downgrade().release();
     }
 };
@@ -63,7 +63,7 @@ pub fn getCpuPreemptionHalt() PreemptionHalt {
     return .{ .cpu = cpu };
 }
 
-pub fn getCpuPreemptionAndInterruptHalt() PreemptionAndInterruptHalt {
+pub fn getCpuPreemptionInterruptHalt() PreemptionInterruptHalt {
     kernel.arch.interrupts.disableInterrupts();
 
     const cpu = kernel.arch.rawGetCpu();

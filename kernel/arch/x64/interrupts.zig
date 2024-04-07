@@ -13,7 +13,7 @@ const raw_handlers = init.makeRawHandlers();
 var handlers = [_]InterruptHandler{fixed_handlers.unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
 pub const InterruptHandler = *const fn (
-    preemption_interrupt_halt: kernel.sync.PreemptionAndInterruptHalt,
+    preemption_interrupt_halt: kernel.sync.PreemptionInterruptHalt,
     interrupt_frame: *InterruptFrame,
 ) void;
 
