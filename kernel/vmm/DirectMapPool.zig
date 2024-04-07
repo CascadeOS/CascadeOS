@@ -4,6 +4,7 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const containers = @import("containers");
 
 const standard_page_size = kernel.arch.paging.standard_page_size.value;
 
@@ -21,8 +22,7 @@ pub fn DirectMapPool(
 
         bucket_group_table: std.BoundedArray(*BucketGroup, number_of_bucket_groups) = .{},
 
-        /// Linked list of buckets with available objects.
-        available_buckets: ?*BucketHeader = null,
+        available_buckets: containers.DoublyLinkedLIFO = .{},
 
         const log = kernel.log.scoped(log_scope);
         const BucketBitSet = std.bit_set.ArrayBitSet(usize, Bucket.number_of_items);
@@ -35,7 +35,8 @@ pub fn DirectMapPool(
             const held = self.lock.lock();
             defer held.release();
 
-            if (self.available_buckets) |candidate_bucket| {
+            if (self.available_buckets.peek()) |candidate_bucket_node| {
+                const candidate_bucket = BucketHeader.fromNode(candidate_bucket_node);
                 return self.getItemFromBucket(candidate_bucket) orelse
                     unreachable; // empty bucket in available list
             }
@@ -173,17 +174,7 @@ pub fn DirectMapPool(
         ///
         /// The caller must have the write lock.
         fn addBucketToAvailableBuckets(self: *Self, bucket: *BucketHeader) void {
-            if (self.available_buckets) |head| {
-                head.previous = bucket;
-                bucket.next = head;
-            } else {
-                bucket.next = null;
-            }
-
-            bucket.previous = null;
-
-            self.available_buckets = bucket;
-
+            self.available_buckets.push(&bucket.node);
             bucket.empty = false;
         }
 
@@ -192,11 +183,7 @@ pub fn DirectMapPool(
         /// The caller must have the write lock.
         fn removeBucketFromAvailableBuckets(self: *Self, bucket: *BucketHeader) void {
             core.debugAssert(!bucket.empty);
-
-            if (bucket.next) |next| next.previous = bucket.previous;
-            if (bucket.previous) |previous| previous.next = bucket.next;
-            if (self.available_buckets == bucket) self.available_buckets = bucket.next;
-
+            self.available_buckets.remove(&bucket.node);
             bucket.empty = true;
         }
 
@@ -247,9 +234,9 @@ pub fn DirectMapPool(
             bucket_group: *BucketGroup,
 
             bucket: ?*Bucket = null,
-            next: ?*BucketHeader = null,
-            previous: ?*BucketHeader = null,
             bitset: BucketBitSet = BucketBitSet.initFull(),
+
+            node: containers.DoubleNode = .{},
 
             /// If this is true then all items in this bucket are in use.
             empty: bool = false,
@@ -259,6 +246,10 @@ pub fn DirectMapPool(
             /// It is the caller's responsibility to ensure that the pointer is in this bucket.
             pub fn getIndex(self: *const BucketHeader, item: *T) usize {
                 return @divExact(@intFromPtr(item) - @intFromPtr(&self.bucket.?.items), @sizeOf(T));
+            }
+
+            inline fn fromNode(node: *containers.DoubleNode) *BucketHeader {
+                return @fieldParentPtr("node", node);
             }
         };
 
