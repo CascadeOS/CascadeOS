@@ -6,8 +6,6 @@ const core = @import("core");
 const kernel = @import("kernel");
 const containers = @import("containers");
 
-const log = kernel.log.scoped(.mutex);
-
 const Mutex = @This();
 
 spinlock: kernel.sync.TicketSpinLock = .{},
@@ -23,8 +21,8 @@ pub const Held = struct {
     pub fn release(self: Held) void {
         const mutex = self.mutex;
 
-        const opt_current_thread = self.preemption_halt.cpu.current_thread;
-        core.debugAssert(mutex.locked_by == opt_current_thread);
+        core.debugAssert(mutex.locked);
+        core.debugAssert(mutex.locked_by == self.preemption_halt.cpu.current_thread);
 
         const opt_thread_to_wake_node = blk: {
             const held = mutex.spinlock.acquire();
@@ -40,13 +38,6 @@ pub const Held = struct {
             const thread_to_wake = kernel.Thread.fromNode(thread_to_wake_node);
             thread_to_wake_node.* = .{};
 
-            if (opt_current_thread) |current_thread| {
-                log.debug("{} released mutex and waking {}", .{ current_thread, thread_to_wake });
-            } else {
-                // TODO: this is why kernel init should happen in a thread instead of "idle"
-                core.panic("kernel init attempting to wake another thread?");
-            }
-
             const held = kernel.scheduler.acquireScheduler();
             self.preemption_halt.release();
             defer held.release();
@@ -54,12 +45,6 @@ pub const Held = struct {
             kernel.scheduler.queueThread(held, thread_to_wake);
         } else {
             self.preemption_halt.release();
-            if (opt_current_thread) |current_thread| {
-                log.debug("{} released mutex", .{current_thread});
-            } else {
-                // TODO: this is why kernel init should happen in a thread instead of "idle"
-                log.debug("kernel init released mutex", .{});
-            }
         }
     }
 };
@@ -78,13 +63,6 @@ pub fn acquire(self: *Mutex) Held {
 
             mutex_lock.release();
 
-            if (opt_current_thread) |current_thread| {
-                log.debug("{} acquired mutex", .{current_thread});
-            } else {
-                // TODO: this is why kernel init should happen in a thread instead of "idle"
-                log.debug("kernel init acquired mutex", .{});
-            }
-
             return .{
                 .mutex = self,
                 .preemption_halt = preemption_halt,
@@ -93,11 +71,8 @@ pub fn acquire(self: *Mutex) Held {
         core.debugAssert(self.locked_by != opt_current_thread);
 
         const current_thread = opt_current_thread orelse {
-            // TODO: this is why kernel init should happen in a thread instead of "idle"
             core.panic("blocked on mutex with no thread (maybe during init?)");
         };
-
-        log.debug("{} now waiting for mutex", .{current_thread});
 
         current_thread.state = .waiting;
         current_thread.next_thread_node = .{};
