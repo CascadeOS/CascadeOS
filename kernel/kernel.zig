@@ -8,6 +8,7 @@ comptime {
     _ = &boot; // ensure any entry points or bootloader required symbols are referenced
 }
 
+pub const acpi = @import("acpi.zig");
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot.zig");
 pub const config = @import("config.zig");

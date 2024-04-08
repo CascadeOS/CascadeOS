@@ -49,6 +49,9 @@ pub fn kernelInit() !void {
     log.debug("capturing direct maps", .{});
     try captureDirectMaps();
 
+    log.debug("initializing ACPI tables", .{});
+    kernel.acpi.init.initializeACPITables();
+
     log.debug("capturing system information", .{});
     kernel.arch.init.captureSystemInformation();
 
