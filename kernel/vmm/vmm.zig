@@ -15,9 +15,6 @@ pub const VirtualRangeAllocator = @import("VirtualRangeAllocator.zig");
 
 var memory_layout: KernelMemoryLayout = .{};
 
-var heap_address_space_mutex: kernel.sync.Mutex = .{};
-var heap_address_space: AddressSpace = undefined; // Initialised in `prepareKernelHeap`
-
 pub inline fn kernelPageTable() *kernel.arch.paging.PageTable {
     const static = struct {
         var kernel_page_table: kernel.arch.paging.PageTable = .{};
@@ -330,7 +327,7 @@ pub const init = struct {
             kernelPageTable(),
         );
 
-        heap_address_space = try AddressSpace.init(kernel_heap_range);
+        try kernel.heap.init.initHeap(kernel_heap_range);
 
         memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .kernel_heap });
     }
