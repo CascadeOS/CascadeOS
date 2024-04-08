@@ -9,6 +9,7 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.vmm);
 
+pub const AddressSpace = @import("AddressSpace.zig");
 pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
 pub const VirtualRangeAllocator = @import("VirtualRangeAllocator.zig");
 
