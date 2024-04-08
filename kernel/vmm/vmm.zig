@@ -15,6 +15,9 @@ pub const VirtualRangeAllocator = @import("VirtualRangeAllocator.zig");
 
 var memory_layout: KernelMemoryLayout = .{};
 
+var heap_address_space_mutex: kernel.sync.Mutex = .{};
+var heap_address_space: AddressSpace = undefined; // Initialised in `prepareKernelHeap`
+
 pub inline fn kernelPageTable() *kernel.arch.paging.PageTable {
     const static = struct {
         var kernel_page_table: kernel.arch.paging.PageTable = .{};
@@ -207,8 +210,6 @@ pub const MemoryRegion = struct {
 pub const init = struct {
     pub fn buildKernelPageTableAndSwitch() !void {
         log.debug("building kernel page table", .{});
-        // kernelPageTable() = kernel.arch.paging.allocatePageTable() catch
-        //     core.panic("unable to allocate physical page for root page table");
 
         mapDirectMaps() catch |err| {
             log.err("failed to map direct maps: {s}", .{@errorName(err)});
@@ -222,6 +223,10 @@ pub const init = struct {
 
         prepareKernelStacks() catch |err| {
             core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
+        };
+
+        prepareKernelHeap() catch |err| {
+            core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
         };
 
         log.debug("switching to kernel page table", .{});
@@ -318,6 +323,18 @@ pub const init = struct {
         memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .kernel_stacks });
     }
 
+    fn prepareKernelHeap() !void {
+        log.debug("preparing kernel heap", .{});
+
+        const kernel_heap_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
+            kernelPageTable(),
+        );
+
+        heap_address_space = try AddressSpace.init(kernel_heap_range);
+
+        memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .kernel_heap });
+    }
+
     /// Maps a kernel section.
     fn mapSection(
         section_start: usize,
@@ -388,6 +405,7 @@ const KernelMemoryLayout = struct {
             non_cached_direct_map,
 
             kernel_stacks,
+            kernel_heap,
         };
 
         pub fn print(region: KernelMemoryRegion, writer: std.io.AnyWriter, indent: usize) !void {
