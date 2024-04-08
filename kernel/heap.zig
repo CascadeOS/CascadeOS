@@ -8,6 +8,119 @@ const kernel = @import("kernel");
 var heap_address_space_mutex: kernel.sync.Mutex = .{};
 var heap_address_space: kernel.vmm.AddressSpace = undefined; // Initialized in `initHeap`
 
+pub const page_allocator = std.mem.Allocator{
+    .ptr = undefined,
+    .vtable = &.{
+        .alloc = PageAllocator.alloc,
+        .resize = PageAllocator.resize,
+        .free = PageAllocator.free,
+    },
+};
+
+const PageAllocator = struct {
+    const log = kernel.log.scoped(.page_allocator);
+
+    const heap_map_type: kernel.vmm.MapType = .{ .global = true, .writeable = true };
+
+    fn alloc(_: *anyopaque, len: usize, _: u8, _: usize) ?[*]u8 {
+        core.debugAssert(len != 0);
+
+        blk: {
+            const opt_range = allocImpl(len) catch break :blk;
+            const range = opt_range orelse break :blk;
+            log.debug("allocated - {}", .{range});
+            return range.address.toPtr([*]u8);
+        }
+
+        log.warn("failed to allocate - length {}", .{len});
+        return null;
+    }
+
+    // A seperate function is used to allow for the usage of `errdefer`.
+    inline fn allocImpl(len: usize) !?core.VirtualRange {
+        const aligned_size = core.Size.from(len, .byte)
+            .alignForward(kernel.arch.paging.standard_page_size);
+
+        const allocated_range = blk: {
+            const held = heap_address_space_mutex.acquire();
+            defer held.release();
+
+            break :blk heap_address_space.allocate(
+                aligned_size,
+                heap_map_type,
+            ) catch return null;
+        };
+        errdefer {
+            const held = heap_address_space_mutex.acquire();
+            defer held.release();
+            heap_address_space.deallocate(allocated_range);
+        }
+
+        try kernel.vmm.mapRange(
+            kernel.vmm.kernelPageTable(),
+            allocated_range,
+            heap_map_type,
+        );
+
+        return allocated_range;
+    }
+
+    fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
+        const old_aligned_size = core.Size.from(buf.len, .byte)
+            .alignForward(kernel.arch.paging.standard_page_size);
+
+        const new_aligned_size = core.Size.from(new_len, .byte)
+            .alignForward(kernel.arch.paging.standard_page_size);
+
+        // If the new size is the same as the old size after alignment, then we can just return.
+        if (new_aligned_size.equal(old_aligned_size)) return true;
+
+        // If the new size is larger than the old size after alignment then a resize in place is not possible.
+        if (new_aligned_size.greaterThan(old_aligned_size)) return false;
+
+        // If the new size is smaller than the old size after alignment then we need to unmap the extra pages.
+        const unallocated_size = old_aligned_size.subtract(new_aligned_size);
+        core.debugAssert(unallocated_size.isAligned(kernel.arch.paging.standard_page_size));
+
+        const unallocated_range = core.VirtualRange.fromAddr(
+            core.VirtualAddress.fromPtr(buf.ptr)
+                .moveForward(old_aligned_size)
+                .moveBackward(unallocated_size),
+            unallocated_size,
+        );
+
+        freeImpl(unallocated_range);
+
+        log.debug("resized allocation from {} to {}", .{ old_aligned_size, new_aligned_size });
+
+        return true;
+    }
+
+    fn free(_: *anyopaque, buf: []u8, _: u8, _: usize) void {
+        var allocated_range = core.VirtualRange.fromSlice(u8, buf);
+        core.debugAssert(allocated_range.address.isAligned(kernel.arch.paging.standard_page_size));
+
+        allocated_range.size = allocated_range.size.alignForward(kernel.arch.paging.standard_page_size);
+
+        freeImpl(allocated_range);
+
+        log.debug("freed allocation {}", .{allocated_range});
+    }
+
+    fn freeImpl(range: core.VirtualRange) void {
+        {
+            const held = heap_address_space_mutex.acquire();
+            defer held.release();
+
+            heap_address_space.deallocate(range);
+        }
+
+        kernel.vmm.unmapRange(kernel.vmm.kernelPageTable(), range);
+
+        // TODO: Cache needs to be flushed on this core and others.
+    }
+};
+
 pub const init = struct {
     pub fn initHeap(kernel_heap_range: core.VirtualRange) !void {
         heap_address_space = try kernel.vmm.AddressSpace.init(kernel_heap_range);
