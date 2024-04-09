@@ -280,7 +280,7 @@ fn addEnumType(options: *Step.Options, name: []const u8, comptime EnumT: type) v
     out.print("pub const {} = enum {{\n", .{std.zig.fmtId(name)}) catch unreachable;
 
     for (std.meta.tags(EnumT)) |tag| {
-        out.print("    {s},\n", .{std.zig.fmtId(@tagName(tag))}) catch unreachable;
+        out.print("    {},\n", .{std.zig.fmtId(@tagName(tag))}) catch unreachable;
     }
 
     out.writeAll("};\n") catch unreachable;
@@ -292,7 +292,7 @@ fn addTargetOptions(options: *Step.Options, target: CascadeTarget) void {
 
     const out = options.contents.writer();
 
-    out.print("pub const arch: Arch = .{s};\n", .{std.zig.fmtId(@tagName(target))}) catch unreachable;
+    out.print("pub const arch: Arch = .{};\n", .{std.zig.fmtId(@tagName(target))}) catch unreachable;
 }
 
 /// Gets the version string.
