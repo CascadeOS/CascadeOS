@@ -38,7 +38,7 @@ pub fn mapRange(page_table: *kernel.arch.paging.PageTable, virtual_range: core.V
     core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
-    const virtual_range_end = virtual_range.end();
+    const last_virtual_address = virtual_range.last();
     var current_virtual_range = core.VirtualRange.fromAddr(
         virtual_range.address,
         kernel.arch.paging.standard_page_size,
@@ -53,7 +53,7 @@ pub fn mapRange(page_table: *kernel.arch.paging.PageTable, virtual_range: core.V
     }
 
     // Map all pages that were allocated.
-    while (!current_virtual_range.address.equal(virtual_range_end)) {
+    while (current_virtual_range.address.lessThanOrEqual(last_virtual_address)) {
         const physical_range = try kernel.pmm.allocatePage();
 
         try mapToPhysicalRange(

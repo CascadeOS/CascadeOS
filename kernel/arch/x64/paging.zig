@@ -52,12 +52,12 @@ pub fn mapToPhysicalRange(
     log.debug("mapToPhysicalRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
     var current_virtual_address = virtual_range.address;
-    const end_virtual_address = virtual_range.end();
+    const last_virtual_address = virtual_range.last();
     var current_physical_address = physical_range.address;
 
     var kib_page_mappings: usize = 0;
 
-    while (current_virtual_address.lessThan(end_virtual_address)) {
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         mapTo4KiB(
             page_table,
             current_virtual_address,
@@ -94,9 +94,9 @@ pub fn unmapRange(
     log.debug("unmapRange - {}", .{virtual_range});
 
     var current_virtual_address = virtual_range.address;
-    const end_virtual_address = virtual_range.end();
+    const last_virtual_address = virtual_range.last();
 
-    while (current_virtual_address.lessThan(end_virtual_address)) {
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         unmap4KiB(page_table, current_virtual_address);
 
         current_virtual_address.moveForwardInPlace(x64.PageTable.small_page_size);
@@ -295,7 +295,7 @@ pub const init = struct {
         core.debugAssert(virtual_range.size.equal(virtual_range.size));
 
         var current_virtual_address = virtual_range.address;
-        const end_virtual_address = virtual_range.end();
+        const last_virtual_address = virtual_range.last();
         var current_physical_address = physical_range.address;
         var size_remaining = virtual_range.size;
 
@@ -303,7 +303,7 @@ pub const init = struct {
         var mib_page_mappings: usize = 0;
         var kib_page_mappings: usize = 0;
 
-        while (current_virtual_address.lessThan(end_virtual_address)) {
+        while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
             const map_1gib = x64.info.cpu_id.gbyte_pages and
                 size_remaining.greaterThanOrEqual(PageTable.large_page_size) and
                 current_virtual_address.isAligned(PageTable.large_page_size) and

@@ -88,15 +88,15 @@ pub const init = struct {
         const virtual_range = kernel.directMapFromPhysicalRange(physical_range);
 
         var current_virtual_address = virtual_range.address;
-        const end_virtual_address = virtual_range.end();
+        const last_virtual_address = virtual_range.last();
 
         log.debug("adding {} available pages from {} to {}", .{
             physical_range.size.divide(kernel.arch.paging.standard_page_size).value,
             current_virtual_address,
-            end_virtual_address,
+            last_virtual_address,
         });
 
-        while (current_virtual_address.lessThan(end_virtual_address)) : ({
+        while (current_virtual_address.lessThanOrEqual(last_virtual_address)) : ({
             current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
         }) {
             const page_node = current_virtual_address.toPtr(*PageNode);

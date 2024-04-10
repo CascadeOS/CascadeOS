@@ -178,7 +178,7 @@ fn deallocateMemoryRegion(self: *AddressSpace, range: core.VirtualRange) MemoryR
     }
 
     // we are at the end
-    if (matching_region.memory_region.range.end().equal(range.end())) {
+    if (matching_region.memory_region.range.last().equal(range.last())) {
         // we are at the end of the memory region, so we can just shorten the memory region's range
 
         matching_region.memory_region.range.size.subtractInPlace(range.size);
@@ -191,7 +191,7 @@ fn deallocateMemoryRegion(self: *AddressSpace, range: core.VirtualRange) MemoryR
         // we are at the beginning of the memory region, so we can adjust the memory region's address and size
         // even though we are modifing the address of the matching range it is still in the correct location in the tree
 
-        matching_region.memory_region.range.address = range.end();
+        matching_region.memory_region.range.address = range.endBound();
         matching_region.memory_region.range.size.subtractInPlace(range.size);
 
         return;
@@ -206,8 +206,8 @@ fn deallocateMemoryRegion(self: *AddressSpace, range: core.VirtualRange) MemoryR
     proceeding_region_with_node.* = .{
         .memory_region = .{
             .range = core.VirtualRange.fromAddr(
-                range.end(),
-                core.Size.from(matching_region.memory_region.range.end().value - range.end().value, .byte),
+                range.endBound(),
+                core.Size.from(matching_region.memory_region.range.last().value - range.last().value, .byte),
             ),
             .map_type = matching_region.memory_region.map_type,
         },
@@ -240,7 +240,7 @@ const MemoryRegionWithNode = struct {
 fn memoryRegionDirectlyFollowsCompare(memory_region: MemoryRegion, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_memory_region = MemoryRegionWithNode.fromNodeConst(other_node).memory_region;
 
-    const other_end = other_memory_region.range.end();
+    const other_end = other_memory_region.range.endBound();
 
     if (memory_region.range.address.equal(other_end) and
         memory_region.map_type.equal(other_memory_region.map_type)) return .match;
@@ -251,7 +251,7 @@ fn memoryRegionDirectlyFollowsCompare(memory_region: MemoryRegion, other_node: *
 fn memoryRegionDirectlyPrecedesCompare(memory_region: MemoryRegion, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_memory_region = MemoryRegionWithNode.fromNodeConst(other_node).memory_region;
 
-    const end = memory_region.range.end();
+    const end = memory_region.range.endBound();
 
     if (other_memory_region.range.address.equal(end) and
         memory_region.map_type.equal(other_memory_region.map_type)) return .match;
@@ -271,7 +271,7 @@ fn memoryRegionContainsRangeCompare(range: core.VirtualRange, other_node: *const
 
     if (range.address.lessThan(other_range.address)) return .less;
 
-    if (range.end().greaterThan(other_range.end())) return .greater;
+    if (range.last().greaterThan(other_range.last())) return .greater;
 
     return .match;
 }

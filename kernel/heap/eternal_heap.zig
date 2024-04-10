@@ -45,7 +45,7 @@ fn alloc(_: *anyopaque, len: usize, log2_ptr_align: u8, _: usize) ?[*]u8 {
 
         new_next_address.moveForwardInPlace(aligned_size);
 
-        if (new_next_address.greaterThanOrEqual(last_address)) {
+        if (new_next_address.greaterThan(last_address)) {
             log.warn("eternal heap unable to allocate - size {} - align {}", .{ aligned_size, ptr_align });
             return null;
         }
@@ -95,6 +95,6 @@ pub const init = struct {
         core.debugAssert(kernel_eternal_heap_range.address.isAligned(kernel.arch.paging.standard_page_size));
 
         next_address = kernel_eternal_heap_range.address;
-        last_address = kernel_eternal_heap_range.end();
+        last_address = kernel_eternal_heap_range.last();
     }
 };

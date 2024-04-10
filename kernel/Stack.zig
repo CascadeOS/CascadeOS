@@ -40,7 +40,7 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
     return Stack{
         .range = range,
         .usable_range = usable_range,
-        .stack_pointer = usable_range.end(),
+        .stack_pointer = usable_range.endBound(),
     };
 }
 

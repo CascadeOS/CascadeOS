@@ -116,7 +116,7 @@ fn captureKernelOffsets() !void {
 }
 
 fn captureDirectMaps() !void {
-    const direct_map_size = try calculateLengthOfDirectMap();
+    const direct_map_size = try calculateSizeOfDirectMap();
 
     kernel.info.direct_map = try calculateDirectMapRange(direct_map_size);
     log.debug("direct map: {}", .{kernel.info.direct_map});
@@ -125,36 +125,25 @@ fn captureDirectMaps() !void {
     log.debug("non-cached direct map: {}", .{kernel.info.non_cached_direct_map});
 }
 
-/// Calculates the length of the direct map.
-fn calculateLengthOfDirectMap() !core.Size {
-    var memory_map_iterator = kernel.boot.memoryMap(.backwards);
-
-    const last_usable_entry: kernel.boot.MemoryMapEntry = blk: {
-        // search from the end of the memory map for the last usable region
-
-        while (memory_map_iterator.next()) |entry| {
-            if (entry.type == .reserved_or_unusable) continue;
-
-            break :blk entry;
-        }
-
-        return error.NoUsableMemoryRegions;
+/// Calculates the size of the direct map.
+fn calculateSizeOfDirectMap() !core.Size {
+    const last_memory_map_entry = blk: {
+        var memory_map_iterator = kernel.boot.memoryMap(.backwards);
+        break :blk memory_map_iterator.next() orelse return error.NoMemoryMapEntries;
     };
 
-    const initial_size = core.Size.from(last_usable_entry.range.end().value, .byte);
+    var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
 
     // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-    var aligned_size = initial_size.alignForward(
-        kernel.arch.paging.all_page_sizes[kernel.arch.paging.all_page_sizes.len - 1],
-    );
+    direct_map_size.alignForwardInPlace(kernel.arch.paging.all_page_sizes[kernel.arch.paging.all_page_sizes.len - 1]);
 
     // We ensure that the lowest 4GiB are always mapped.
     const four_gib = core.Size.from(4, .gib);
-    if (aligned_size.lessThan(four_gib)) aligned_size = four_gib;
+    if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
 
-    log.debug("size of direct map: {}", .{aligned_size});
+    log.debug("size of direct map: {}", .{direct_map_size});
 
-    return aligned_size;
+    return direct_map_size;
 }
 
 fn calculateDirectMapRange(direct_map_size: core.Size) !core.VirtualRange {

@@ -217,8 +217,17 @@ fn RangeMixin(comptime Self: type) type {
             };
         }
 
-        pub inline fn end(self: Self) AddrType {
+        /// Returns the address of the first byte __after__ the range.
+        pub inline fn endBound(self: Self) AddrType {
             return self.address.moveForward(self.size);
+        }
+
+        /// Returns the last address in this range.
+        ///
+        /// If the ranges size is zero, returns the start address of the range.
+        pub fn last(self: Self) AddrType {
+            if (self.size.value == 0) return self.address;
+            return self.address.moveForward(self.size.subtract(core.Size.one));
         }
 
         pub fn equal(self: Self, other: Self) bool {
@@ -249,13 +258,13 @@ fn RangeMixin(comptime Self: type) type {
 
         pub fn containsRange(self: Self, other: Self) bool {
             if (!self.address.lessThanOrEqual(other.address)) return false;
-            if (!self.end().greaterThanOrEqual(other.end())) return false;
+            if (!self.last().greaterThanOrEqual(other.last())) return false;
 
             return true;
         }
 
         pub fn contains(self: Self, address: AddrType) bool {
-            return address.greaterThanOrEqual(self.address) and address.lessThan(self.end());
+            return address.greaterThanOrEqual(self.address) and address.lessThanOrEqual(self.last());
         }
 
         pub fn print(value: Self, writer: std.io.AnyWriter, indent: usize) !void {
@@ -263,7 +272,7 @@ fn RangeMixin(comptime Self: type) type {
             try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
 
             try writer.writeAll(" - 0x");
-            try std.fmt.formatInt(value.end().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
+            try std.fmt.formatInt(value.last().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
             try writer.writeAll(" - ");
 
             try value.size.print(writer, indent);

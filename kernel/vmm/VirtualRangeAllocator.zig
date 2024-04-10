@@ -49,6 +49,8 @@ pub fn init(total_range: core.VirtualRange) VirtualRangePool.GetError!VirtualRan
 pub const AllocateRangeError = error{VirtualRangeAllocatorExhausted};
 
 pub fn allocateRange(self: *VirtualRangeAllocator, size: core.Size) AllocateRangeError!core.VirtualRange {
+    core.debugAssert(size.value != 0);
+
     // we use `findLastMatch` so we don't immediately grab the first large range we see when there are smaller ones
     // available, we prefer to continue searching in hopes of finding a range with an exact size match or as close as possible
     const matching_range_size_ordered_node = self.range_size_tree.findLastMatch(
@@ -64,7 +66,7 @@ pub fn allocateRange(self: *VirtualRangeAllocator, size: core.Size) AllocateRang
 
     // moving back from the end means we don't modify the address of the matching range, meaning it is still in the
     // correct location in the address tree.
-    const address = matching_range_with_nodes.range.end().moveBackward(size);
+    const address = matching_range_with_nodes.range.endBound().moveBackward(size);
 
     // shorten the matching range
     matching_range_with_nodes.range.size.subtractInPlace(size);
@@ -242,7 +244,7 @@ fn rangeSizeEqualOrGreater(size: core.Size, other_node: *const RedBlack.Node) Re
 fn rangeDirectlyFollowsCompare(range: core.VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_range = RangeWithNodes.fromAddressNodeConst(other_node).range;
 
-    const other_end = other_range.end();
+    const other_end = other_range.endBound();
 
     if (range.address.equal(other_end)) return .match;
 
@@ -252,7 +254,7 @@ fn rangeDirectlyFollowsCompare(range: core.VirtualRange, other_node: *const RedB
 fn rangeDirectlyPrecedesCompare(range: core.VirtualRange, other_node: *const RedBlack.Node) core.OrderedComparison {
     const other_range = RangeWithNodes.fromAddressNodeConst(other_node).range;
 
-    const end = range.end();
+    const end = range.endBound();
 
     if (other_range.address.equal(end)) return .match;
 
