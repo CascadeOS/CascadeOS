@@ -9,6 +9,7 @@ pub fn ValueTypeMixin(comptime Self: type) type {
         const FieldT: type = std.meta.fieldInfo(Self, .value).type;
 
         pub const zero: Self = .{ .value = 0 };
+        pub const one: Self = .{ .value = 1 };
 
         pub inline fn equal(self: Self, other: Self) bool {
             return self.value == other.value;
