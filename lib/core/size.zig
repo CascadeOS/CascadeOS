@@ -29,18 +29,38 @@ pub const Size = extern struct {
     }
 
     /// Checks if the `Size` is aligned to the given alignment.
+    ///
+    /// `alignment` must be a power of two.
     pub inline fn isAligned(self: Size, alignment: Size) bool {
         return std.mem.isAligned(self.value, alignment.value);
     }
 
     /// Aligns the `Size` forward to the given alignment.
+    ///
+    /// `alignment` must be a power of two.
     pub inline fn alignForward(self: Size, alignment: Size) Size {
         return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
     }
 
+    /// Aligns the `Size` forward to the given alignment.
+    ///
+    /// `alignment` must be a power of two.
+    pub inline fn alignForwardInPlace(self: *Size, alignment: Size) void {
+        self.value = std.mem.alignForward(u64, self.value, alignment.value);
+    }
+
     /// Aligns the `Size` backward to the given alignment.
+    ///
+    /// `alignment` must be a power of two.
     pub inline fn alignBackward(self: Size, alignment: Size) Size {
         return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
+    }
+
+    /// Aligns the `Size` backward to the given alignment.
+    ///
+    /// `alignment` must be a power of two.
+    pub inline fn alignBackwardInPlace(self: *Size, alignment: core.Size) void {
+        self.value = std.mem.alignBackward(u64, self.value, alignment.value);
     }
 
     /// Returns the amount of `self` sizes needed to cover `target`.
