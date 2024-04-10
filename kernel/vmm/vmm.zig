@@ -222,8 +222,8 @@ pub const init = struct {
             core.panicFmt("failed to prepare kernel stacks: {s}", .{@errorName(err)});
         };
 
-        prepareKernelHeap() catch |err| {
-            core.panicFmt("failed to prepare kernel heap: {s}", .{@errorName(err)});
+        prepareKernelHeaps() catch |err| {
+            core.panicFmt("failed to prepare kernel heaps: {s}", .{@errorName(err)});
         };
 
         log.debug("switching to kernel page table", .{});
@@ -320,16 +320,24 @@ pub const init = struct {
         memory_layout.registerRegion(.{ .range = kernel_stacks_range, .type = .kernel_stacks });
     }
 
-    fn prepareKernelHeap() !void {
-        log.debug("preparing kernel heap", .{});
+    fn prepareKernelHeaps() !void {
+        log.debug("preparing the kernel heaps", .{});
 
-        const kernel_heap_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
+        const kernel_eternal_heap_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
             kernelPageTable(),
         );
 
-        try kernel.heap.init.initHeap(kernel_heap_range);
+        const kernel_page_heap_range = try kernel.arch.paging.init.getTopLevelRangeAndFillFirstLevel(
+            kernelPageTable(),
+        );
 
-        memory_layout.registerRegion(.{ .range = kernel_heap_range, .type = .kernel_heap });
+        try kernel.heap.init.initHeaps(
+            kernel_eternal_heap_range,
+            kernel_page_heap_range,
+        );
+
+        memory_layout.registerRegion(.{ .range = kernel_eternal_heap_range, .type = .eternal_heap });
+        memory_layout.registerRegion(.{ .range = kernel_page_heap_range, .type = .page_heap });
     }
 
     /// Maps a kernel section.
@@ -402,7 +410,8 @@ const KernelMemoryLayout = struct {
             non_cached_direct_map,
 
             kernel_stacks,
-            kernel_heap,
+            eternal_heap,
+            page_heap,
         };
 
         pub fn print(region: KernelMemoryRegion, writer: std.io.AnyWriter, indent: usize) !void {
