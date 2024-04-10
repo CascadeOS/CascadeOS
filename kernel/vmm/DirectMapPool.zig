@@ -29,24 +29,36 @@ pub fn DirectMapPool(
 
         const Self = @This();
 
+        pub fn print(self: *const Self, writer: std.io.AnyWriter) !void {
+            for (self.bucket_group_table.constSlice()) |bucket_group| {
+                try writer.print("BucketGroup {*}: \n", .{bucket_group});
+                for (bucket_group.headers.constSlice()) |*bucket_header| {
+                    try writer.print("  BucketHeader {*} - empty {} - bucket: {*}\n", .{
+                        bucket_header,
+                        bucket_header.empty,
+                        bucket_header.bucket,
+                    });
+                }
+            }
+        }
+
         pub const GetError = kernel.pmm.AllocateError || error{BucketGroupsExhausted};
 
         pub fn get(self: *Self) GetError!*T {
             const held = self.mutex.acquire();
             defer held.release();
 
-            if (self.available_buckets.peek()) |candidate_bucket_node| {
-                const candidate_bucket = BucketHeader.fromNode(candidate_bucket_node);
-                return self.getItemFromBucket(candidate_bucket) orelse
-                    unreachable; // empty bucket in available list
-            }
+            const bucket = blk: {
+                if (self.available_buckets.peek()) |bucket_node|
+                    break :blk BucketHeader.fromNode(bucket_node);
 
-            // no buckets available, allocate a new one
+                // no buckets available, allocate a new one
 
-            const bucket = try self.allocateNewBucket();
+                break :blk try self.allocateNewBucket();
+            };
 
             return self.getItemFromBucket(bucket) orelse
-                unreachable; // freshly allocated bucket is full
+                unreachable; // bucket is either freshly allocated or in available list so there must be a free item
 
         }
 
