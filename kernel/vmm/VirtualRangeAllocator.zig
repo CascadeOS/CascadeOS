@@ -51,6 +51,8 @@ pub const AllocateRangeError = error{VirtualRangeAllocatorExhausted};
 pub fn allocateRange(self: *VirtualRangeAllocator, size: core.Size) AllocateRangeError!core.VirtualRange {
     core.debugAssert(size.value != 0);
 
+    log.debug("allocateRange called with size: {}", .{size});
+
     // we use `findLastMatch` so we don't immediately grab the first large range we see when there are smaller ones
     // available, we prefer to continue searching in hopes of finding a range with an exact size match or as close as possible
     const matching_range_size_ordered_node = self.range_size_tree.findLastMatch(
@@ -90,6 +92,7 @@ pub fn allocateRange(self: *VirtualRangeAllocator, size: core.Size) AllocateRang
 pub const DeallocateRangeError = VirtualRangePool.GetError;
 
 pub fn deallocateRange(self: *VirtualRangeAllocator, range: core.VirtualRange) DeallocateRangeError!void {
+    log.debug("deallocateRange called with: {}", .{range});
     defer log.debug("deallocated: {}", .{range});
 
     // find pre-existing range that directly precedes the new range
