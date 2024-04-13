@@ -7,6 +7,9 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const containers = @import("containers");
+const builtin = @import("builtin");
+
+const is_debug = builtin.mode == .Debug;
 
 const PageNode = containers.SingleNode;
 
@@ -38,18 +41,22 @@ pub fn allocatePage() AllocateError!core.PhysicalRange {
         break :blk free_page_node;
     };
 
-    const physical_address = kernel.physicalFromDirectMapUnsafe(
-        core.VirtualAddress.fromPtr(free_page_node),
+    const physical_range = kernel.physicalRangeFromDirectMapUnsafe(
+        core.VirtualRange.fromAddr(
+            core.VirtualAddress.fromPtr(free_page_node),
+            kernel.arch.paging.standard_page_size,
+        ),
     );
 
-    const allocated_range = core.PhysicalRange.fromAddr(
-        physical_address,
-        kernel.arch.paging.standard_page_size,
-    );
+    if (is_debug) {
+        const virtual_range = kernel.directMapFromPhysicalRange(physical_range);
+        const slice = virtual_range.toSlice(usize) catch unreachable;
+        @memset(slice, undefined);
+    }
 
-    log.debug("allocated page: {}", .{allocated_range});
+    log.debug("allocated: {}", .{physical_range});
 
-    return allocated_range;
+    return physical_range;
 }
 
 /// Deallocates a physical page.
@@ -71,7 +78,7 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
         free_pages.push(page_node);
     }
 
-    log.debug("deallocated page: {}", .{range});
+    log.debug("deallocated: {}", .{range});
 }
 
 pub const init = struct {
