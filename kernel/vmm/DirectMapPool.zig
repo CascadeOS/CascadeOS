@@ -25,22 +25,49 @@ pub fn DirectMapPool(
         available_buckets: containers.DoublyLinkedLIFO = .{},
 
         const log = kernel.log.scoped(log_scope);
-        const BucketBitSet = std.bit_set.ArrayBitSet(usize, Bucket.number_of_items);
+        const BucketBitSet = struct {
+            bitset: ArrayBitSet,
+
+            const ArrayBitSet = std.bit_set.ArrayBitSet(usize, Bucket.number_of_items);
+
+            inline fn set(self: *BucketBitSet, index: usize) void {
+                self.bitset.set(index);
+            }
+
+            inline fn initFull() BucketBitSet {
+                return .{ .bitset = ArrayBitSet.initFull() };
+            }
+
+            inline fn toggleFirstSet(self: *BucketBitSet) ?usize {
+                return self.bitset.toggleFirstSet();
+            }
+
+            fn allUnset(self: *const BucketBitSet) bool {
+                for (&self.bitset.masks) |mask| {
+                    if (mask != 0) return false;
+                }
+
+                return true;
+            }
+
+            fn allSet(self: *const BucketBitSet) bool {
+                const bitset = &self.bitset;
+
+                const num_masks = bitset.masks.len;
+
+                if (num_masks > 1) {
+                    for (bitset.masks[0 .. num_masks - 1]) |mask| {
+                        if (mask != std.math.maxInt(usize)) return false;
+                    }
+                }
+
+                if (bitset.masks[num_masks - 1] != std.math.maxInt(usize) & ArrayBitSet.last_item_mask) return false;
+
+                return true;
+            }
+        };
 
         const Self = @This();
-
-        pub fn print(self: *const Self, writer: std.io.AnyWriter) !void {
-            for (self.bucket_group_table.constSlice()) |bucket_group| {
-                try writer.print("BucketGroup {*}: \n", .{bucket_group});
-                for (bucket_group.headers.constSlice()) |*bucket_header| {
-                    try writer.print("  BucketHeader {*} - empty {} - bucket: {*}\n", .{
-                        bucket_header,
-                        bucket_header.empty,
-                        bucket_header.bucket,
-                    });
-                }
-            }
-        }
 
         pub const GetError = kernel.pmm.AllocateError || error{BucketGroupsExhausted};
 
@@ -48,7 +75,7 @@ pub fn DirectMapPool(
             const held = self.mutex.acquire();
             defer held.release();
 
-            const bucket = blk: {
+            const bucket_header = blk: {
                 if (self.available_buckets.peek()) |bucket_node|
                     break :blk BucketHeader.fromNode(bucket_node);
 
@@ -57,9 +84,8 @@ pub fn DirectMapPool(
                 break :blk try self.allocateNewBucket();
             };
 
-            return self.getItemFromBucket(bucket) orelse
+            return self.getItemFromBucket(bucket_header) orelse
                 unreachable; // bucket is either freshly allocated or in available list so there must be a free item
-
         }
 
         pub fn give(self: *Self, item: *T) void {
@@ -70,47 +96,51 @@ pub fn DirectMapPool(
             defer held.release();
 
             bucket_header.bitset.set(bit_index);
-            log.debug("added item at index {} in {*} to the pool", .{ bit_index, bucket_header.bucket });
+            log.debug("added item at index {} in {} to the pool", .{ bit_index, bucket_header });
 
             if (bucket_header.empty) {
                 // bucket was previously empty, move it to the available list
 
                 self.addBucketToAvailableBuckets(bucket_header);
 
-                log.debug("moved previously empty {*} to available list", .{bucket_header.bucket});
+                log.debug("moved previously empty {} to available list", .{bucket_header});
 
                 return;
             }
 
-            if (bitsetAllSet(&bucket_header.bitset)) {
+            if (bucket_header.bitset.allSet()) {
+                log.debug("deallocating {}", .{bucket_header});
+
                 // bucket is full, no items are in use
                 self.deallocateBucket(bucket_header);
             }
         }
 
-        fn getItemFromBucket(self: *Self, bucket: *BucketHeader) ?*T {
-            const index = bucket.bitset.toggleFirstSet() orelse return null;
+        fn getItemFromBucket(self: *Self, bucket_header: *BucketHeader) ?*T {
+            const index = bucket_header.bitset.toggleFirstSet() orelse return null;
 
-            if (bitsetAllUnset(&bucket.bitset)) {
+            if (bucket_header.bitset.allUnset()) {
                 // the bucket is empty so we remove it from the available list
 
-                self.removeBucketFromAvailableBuckets(bucket);
+                self.removeBucketFromAvailableBuckets(bucket_header);
 
-                log.debug("removed empty bucket {*} from available list", .{bucket.bucket});
+                log.debug("removed empty {} from available list", .{bucket_header});
             }
 
-            log.debug("provided item at index {} in {*}", .{ index, bucket.bucket });
+            log.debug("provided item at index {} in {}", .{ index, bucket_header });
 
-            return &bucket.bucket.?.items[index];
+            return &bucket_header.bucket.?.items[index];
         }
 
         fn allocateNewBucket(self: *Self) GetError!*BucketHeader {
-            const bucket_group, const new_bucket_group = blk: {
+            var is_new_bucket_group = false;
+
+            const bucket_group = blk: {
                 if (self.bucket_group_table.len != 0) {
                     const last_bucket_group = self.bucket_group_table.buffer[self.bucket_group_table.len - 1];
                     if (last_bucket_group.headers.len < last_bucket_group.headers.capacity()) {
                         // the last bucket group in the `bucket_group_table` has room for another bucket
-                        break :blk .{ last_bucket_group, false };
+                        break :blk last_bucket_group;
                     }
                 }
 
@@ -123,9 +153,10 @@ pub fn DirectMapPool(
 
                 new_bucket_group_ptr.* = new_bucket_group;
 
-                break :blk .{ new_bucket_group, true };
+                is_new_bucket_group = true;
+                break :blk new_bucket_group;
             };
-            errdefer if (new_bucket_group) {
+            errdefer if (is_new_bucket_group) {
                 bucket_group.destroy();
                 _ = self.bucket_group_table.pop();
             };
@@ -147,27 +178,25 @@ pub fn DirectMapPool(
 
             self.addBucketToAvailableBuckets(bucket_header);
 
-            if (new_bucket_group) {
-                log.debug("allocated a new bucket {*} in a new group {*}", .{ bucket, bucket_group });
+            if (is_new_bucket_group) {
+                log.debug("allocated {} in a new {}", .{ bucket_header, bucket_group });
             } else {
-                log.debug("allocated a new bucket {*} in group {*}", .{ bucket, bucket_group });
+                log.debug("allocated {} in {}", .{ bucket_header, bucket_group });
             }
 
             return bucket_header;
         }
 
-        fn deallocateBucket(self: *Self, bucket: *BucketHeader) void {
-            core.debugAssert(!bucket.empty);
+        fn deallocateBucket(self: *Self, bucket_header: *BucketHeader) void {
+            core.debugAssert(!bucket_header.empty);
 
-            self.removeBucketFromAvailableBuckets(bucket);
+            self.removeBucketFromAvailableBuckets(bucket_header);
 
-            log.debug("deallocating bucket {*}", .{bucket.bucket});
+            bucket_header.bucket.?.destroy();
+            bucket_header.bucket = null;
 
-            bucket.bucket.?.destroy();
-            bucket.bucket = null;
-
-            const this_bucket_group = bucket.bucket_group;
-            for (this_bucket_group.headers.constSlice()) |*header| {
+            const this_bucket_group = bucket_header.bucket_group;
+            for (this_bucket_group.headers.constSlice()) |header| {
                 if (header.bucket != null) return; // bucket still in use in this group
             }
 
@@ -175,50 +204,26 @@ pub fn DirectMapPool(
                 if (candidate_bucket_group == this_bucket_group) break i;
             } else unreachable; // it is not possible for a bucket group to not be in `bucket_group_table`
 
-            _ = self.bucket_group_table.swapRemove(bucket_group_index);
-
-            log.debug("deallocated bucket group {*}", .{this_bucket_group});
-
             this_bucket_group.destroy();
+
+            _ = self.bucket_group_table.swapRemove(bucket_group_index);
         }
 
         /// Add a bucket to the available list.
         ///
         /// The caller must have the write lock.
-        fn addBucketToAvailableBuckets(self: *Self, bucket: *BucketHeader) void {
-            self.available_buckets.push(&bucket.node);
-            bucket.empty = false;
+        fn addBucketToAvailableBuckets(self: *Self, bucket_header: *BucketHeader) void {
+            self.available_buckets.push(&bucket_header.node);
+            bucket_header.empty = false;
         }
 
         /// Remove a bucket from the available list.
         ///
         /// The caller must have the write lock.
-        fn removeBucketFromAvailableBuckets(self: *Self, bucket: *BucketHeader) void {
-            core.debugAssert(!bucket.empty);
-            self.available_buckets.remove(&bucket.node);
-            bucket.empty = true;
-        }
-
-        fn bitsetAllUnset(bitset: *const BucketBitSet) bool {
-            for (&bitset.masks) |mask| {
-                if (mask != 0) return false;
-            }
-
-            return true;
-        }
-
-        fn bitsetAllSet(bitset: *const BucketBitSet) bool {
-            const num_masks = bitset.masks.len;
-
-            if (num_masks > 1) {
-                for (bitset.masks[0 .. num_masks - 1]) |mask| {
-                    if (mask != std.math.maxInt(usize)) return false;
-                }
-            }
-
-            if (bitset.masks[num_masks - 1] != std.math.maxInt(usize) & BucketBitSet.last_item_mask) return false;
-
-            return true;
+        fn removeBucketFromAvailableBuckets(self: *Self, bucket_header: *BucketHeader) void {
+            core.debugAssert(!bucket_header.empty);
+            self.available_buckets.remove(&bucket_header.node);
+            bucket_header.empty = true;
         }
 
         const BucketGroup = struct {
@@ -234,6 +239,46 @@ pub fn DirectMapPool(
 
             pub fn destroy(self: *BucketGroup) void {
                 deallocPage(std.mem.asBytes(self));
+            }
+
+            pub fn print(bucket_group: *const BucketGroup, writer: std.io.AnyWriter, indent: usize) !void {
+                _ = indent;
+
+                try writer.writeAll("BucketGroup<0x");
+                try std.fmt.formatInt(
+                    @intFromPtr(bucket_group),
+                    16,
+                    .lower,
+                    .{},
+                    writer,
+                );
+                try writer.writeAll(">{ headers: ");
+                try std.fmt.formatInt(
+                    bucket_group.headers.len,
+                    10,
+                    .lower,
+                    .{},
+                    writer,
+                );
+                try writer.writeAll(" }");
+            }
+
+            pub inline fn format(
+                bucket_group: *const BucketGroup,
+                comptime fmt: []const u8,
+                options: std.fmt.FormatOptions,
+                writer: anytype,
+            ) !void {
+                _ = options;
+                _ = fmt;
+                return if (@TypeOf(writer) == std.io.AnyWriter)
+                    print(bucket_group, writer, 0)
+                else
+                    print(bucket_group, writer.any(), 0);
+            }
+
+            fn __helpZls() void {
+                BucketGroup.print(undefined, @as(std.fs.File.Writer, undefined), 0);
             }
 
             comptime {
@@ -262,6 +307,40 @@ pub fn DirectMapPool(
 
             inline fn fromNode(node: *containers.DoubleNode) *BucketHeader {
                 return @fieldParentPtr("node", node);
+            }
+
+            pub fn print(bucket_header: *const BucketHeader, writer: std.io.AnyWriter, indent: usize) !void {
+                _ = indent;
+
+                try writer.writeAll("Bucket<0x");
+                try std.fmt.formatInt(
+                    @intFromPtr(bucket_header),
+                    16,
+                    .lower,
+                    .{},
+                    writer,
+                );
+                try writer.writeAll(">{ empty: ");
+                try writer.print("{}", .{bucket_header.empty});
+                try writer.writeAll(" }");
+            }
+
+            pub inline fn format(
+                bucket_header: *const BucketHeader,
+                comptime fmt: []const u8,
+                options: std.fmt.FormatOptions,
+                writer: anytype,
+            ) !void {
+                _ = options;
+                _ = fmt;
+                return if (@TypeOf(writer) == std.io.AnyWriter)
+                    print(bucket_header, writer, 0)
+                else
+                    print(bucket_header, writer.any(), 0);
+            }
+
+            fn __helpZls() void {
+                BucketHeader.print(undefined, @as(std.fs.File.Writer, undefined), 0);
             }
         };
 
@@ -292,6 +371,10 @@ pub fn DirectMapPool(
                     std.mem.alignBackward(usize, @intFromPtr(ptr), standard_page_size),
                 );
                 return bucket.header;
+            }
+
+            pub inline fn format(_: *Bucket, comptime _: []const u8, _: std.fmt.FormatOptions, _: anytype) !void {
+                @compileError("dont format a bucket, format its header");
             }
 
             comptime {
