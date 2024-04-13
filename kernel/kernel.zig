@@ -67,17 +67,14 @@ pub fn physicalRangeFromDirectMaps(self: core.VirtualRange) error{AddressNotInAn
 ///
 /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
 pub fn physicalFromDirectMapUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
-    return .{ .value = self.value -% info.direct_map.address.value };
+    return physicalFromDirectMaps(self) catch unreachable;
 }
 
 /// Returns the physical range of the given direct map virtual range.
 ///
 /// It is the caller's responsibility to ensure that the given virtual address is in the direct map.
 pub fn physicalRangeFromDirectMapUnsafe(self: core.VirtualRange) core.PhysicalRange {
-    return .{
-        .address = core.PhysicalAddress.fromInt(self.address.value -% info.direct_map.address.value),
-        .size = self.size,
-    };
+    return physicalRangeFromDirectMaps(self) catch unreachable;
 }
 
 /// Returns the physical address of the given kernel ELF section virtual address.
