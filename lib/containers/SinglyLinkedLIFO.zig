@@ -19,20 +19,13 @@ pub fn isEmpty(self: SinglyLinkedLIFO) bool {
 
 pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
     core.debugAssert(node.next == null);
-
-    if (self.start_node) |start| {
-        node.next = start;
-        self.start_node = node;
-    } else {
-        self.start_node = node;
-    }
+    if (self.start_node) |start| node.next = start;
+    self.start_node = node;
 }
 
 pub fn pop(self: *SinglyLinkedLIFO) ?*SingleNode {
     const node = self.start_node orelse return null;
-
     self.start_node = node.next;
-
     return node;
 }
 
