@@ -15,7 +15,7 @@
     ],
     "configurations": [
         { // Requires extension CodeLLDB (vadimcn.vscode-lldb)
-            "name": "QEMU remote - LLDB",
+            "name": "LLDB QEMU remote",
             "type": "lldb",
             "request": "custom",
             "targetCreateCommands": [
@@ -34,7 +34,7 @@
             }
         },
         { // Requires extension Native Debug (webfreak.debug)
-            "name": "QEMU remote - GDB",
+            "name": "GDB QEMU remote",
             "type": "gdb",
             "request": "attach",
             "executable": "${workspaceFolder}/zig-out/${input:arch}/kernel",
