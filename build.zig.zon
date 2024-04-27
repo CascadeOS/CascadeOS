@@ -8,7 +8,7 @@
     .version = "0.0.2",
 
     // Ensure this is kept in sync with `build.zig` and `README.md`
-    .minimum_zig_version = "0.12.0-dev.3518+d2be725e4",
+    .minimum_zig_version = "0.13.0-dev.46+3648d7df1",
 
     .dependencies = .{
         .edk2 = .{

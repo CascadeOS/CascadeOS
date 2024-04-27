@@ -345,7 +345,7 @@ const SymbolSource = struct {
         return null;
     }
 
-    const embedded_source_files = std.ComptimeStringMap([]const u8, embedded_source_files: {
+    const embedded_source_files = std.StaticStringMap([]const u8).initComptime(embedded_source_files: {
         @setEvalBranchQuota(1_000_000);
 
         const embedded_source_files_import = @import("embedded_source_files");
