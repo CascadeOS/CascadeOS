@@ -19,26 +19,15 @@ const Tool = @import("build/Tool.zig");
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
 const min_zig_version = "0.13.0-dev.46+3648d7df1";
 
-comptime {
-    const current_zig = builtin.zig_version;
-    const min_zig = std.SemanticVersion.parse(min_zig_version) catch unreachable;
-    if (current_zig.order(min_zig) == .lt) {
-        @compileError(std.fmt.comptimePrint(
-            "Your Zig version {} does not meet the minimum build requirement of {}",
-            .{ current_zig, min_zig },
-        ));
-    }
-}
-
 // Ensure this is kept in sync with `build.zig.zon`
-const cascade_version = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 2 };
-
-const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
+const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 2 };
 
 pub fn build(b: *std.Build) !void {
     try disableUnsupportedSteps(b);
 
     b.enable_qemu = true;
+
+    const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
 
     const step_collection = try StepCollection.create(b, all_targets);
 
@@ -138,4 +127,15 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
         .name = "default step",
         .owner = b,
     });
+}
+
+comptime {
+    const current_zig = builtin.zig_version;
+    const min_zig = std.SemanticVersion.parse(min_zig_version) catch unreachable;
+    if (current_zig.order(min_zig) == .lt) {
+        @compileError(std.fmt.comptimePrint(
+            "Your Zig version {} does not meet the minimum build requirement of {}",
+            .{ current_zig, min_zig },
+        ));
+    }
 }
