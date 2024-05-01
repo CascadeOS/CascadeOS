@@ -41,18 +41,17 @@ pub fn allocatePage() AllocateError!core.PhysicalRange {
         break :blk free_page_node;
     };
 
-    const physical_range = kernel.physicalRangeFromDirectMapUnsafe(
-        core.VirtualRange.fromAddr(
-            core.VirtualAddress.fromPtr(free_page_node),
-            kernel.arch.paging.standard_page_size,
-        ),
+    const virtual_range = core.VirtualRange.fromAddr(
+        core.VirtualAddress.fromPtr(free_page_node),
+        kernel.arch.paging.standard_page_size,
     );
 
     if (is_debug) {
-        const virtual_range = kernel.directMapFromPhysicalRange(physical_range);
         const slice = virtual_range.toSlice(usize) catch unreachable;
         @memset(slice, undefined);
     }
+
+    const physical_range = kernel.physicalRangeFromDirectMapUnsafe(virtual_range);
 
     log.debug("allocated: {}", .{physical_range});
 
