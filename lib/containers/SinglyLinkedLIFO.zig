@@ -26,6 +26,7 @@ pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
 pub fn pop(self: *SinglyLinkedLIFO) ?*SingleNode {
     const node = self.start_node orelse return null;
     self.start_node = node.next;
+    node.next = null;
     return node;
 }
 
