@@ -4,14 +4,14 @@
 const std = @import("std");
 const core = @import("core");
 
-/// A node with a single next pointer. Mainly used for singly linked lists.
+/// A node with a single next pointer.
 ///
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const SingleNode = extern struct {
     next: ?*SingleNode = null,
 };
 
-/// A node with a next and previous pointers. Mainly used for doubly linked lists.
+/// A node with a next and previous pointers.
 ///
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const DoubleNode = extern struct {

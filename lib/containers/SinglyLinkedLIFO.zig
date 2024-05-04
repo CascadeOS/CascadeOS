@@ -13,21 +13,88 @@ const SinglyLinkedLIFO = @This();
 
 start_node: ?*SingleNode = null,
 
+/// Returns `true` if the list is empty.
+///
+/// This operation is O(1).
 pub fn isEmpty(self: SinglyLinkedLIFO) bool {
     return self.start_node == null;
 }
 
+/// Adds a node to the front of the list.
+///
+/// This operation is O(1).
 pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
     core.debugAssert(node.next == null);
-    if (self.start_node) |start| node.next = start;
+    node.next = self.start_node;
     self.start_node = node;
 }
 
+/// Removes a node from the front of the list and returns it.
+///
+/// This operation is O(1).
 pub fn pop(self: *SinglyLinkedLIFO) ?*SingleNode {
     const node = self.start_node orelse return null;
     self.start_node = node.next;
     node.next = null;
     return node;
+}
+
+/// Returns the number of nodes in the list.
+///
+/// This operation is O(N).
+pub fn len(self: SinglyLinkedLIFO) usize {
+    var result: usize = 0;
+
+    var opt_node = self.start_node;
+    while (opt_node) |node| : (opt_node = node.next) {
+        result += 1;
+    }
+
+    return result;
+}
+
+test SinglyLinkedLIFO {
+    const NODE_COUNT = 10;
+
+    var lifo: SinglyLinkedLIFO = .{};
+
+    // starts empty
+    try std.testing.expect(lifo.isEmpty());
+    try std.testing.expect(lifo.len() == 0);
+
+    var nodes = [_]SingleNode{.{}} ** NODE_COUNT;
+
+    for (&nodes) |*node| {
+        // add node to the front of the list
+        lifo.push(node);
+        try std.testing.expect(!lifo.isEmpty());
+        try std.testing.expect(!lifo.isEmpty());
+
+        // popping the node should return the node just added
+        const first_node = lifo.pop() orelse return error.NonEmptyListHasNoNode;
+        try std.testing.expect(first_node == node);
+
+        // add the popped node back to the list
+        lifo.push(node);
+    }
+
+    // nodes are popped in the opposite order they were pushed
+    var i: usize = NODE_COUNT;
+    while (i > 0) {
+        i -= 1;
+
+        try std.testing.expect(lifo.len() == i + 1);
+
+        const node = lifo.pop() orelse
+            return error.ExpectedNode;
+
+        try std.testing.expect(lifo.len() == i);
+        try std.testing.expect(node == &nodes[i]);
+    }
+
+    // list is empty again
+    try std.testing.expect(lifo.isEmpty());
+    try std.testing.expect(lifo.len() == 0);
 }
 
 comptime {
