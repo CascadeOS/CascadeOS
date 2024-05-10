@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 //! Singly linked FIFO (first in first out).
+//!
+//! Not thread-safe.
 
 const std = @import("std");
 const core = @import("core");

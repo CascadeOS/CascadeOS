@@ -139,6 +139,9 @@ pub const Node = struct {
     }
 };
 
+/// A red-black tree.
+///
+/// Not thread-safe.
 pub fn Tree(
     comptime compareFn: fn (node: *const Node, other_node: *const Node) core.OrderedComparison,
 ) type {
