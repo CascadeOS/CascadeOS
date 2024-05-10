@@ -27,8 +27,23 @@ pub fn isEmpty(self: SinglyLinkedLIFO) bool {
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
     core.debugAssert(node.next == null);
-    node.next = self.start_node;
+    node.* = .{ .next = self.start_node };
     self.start_node = node;
+}
+
+/// Adds a list of nodes to the front of the list.
+///
+/// The list must be a valid linked list.
+///
+/// This operation is O(1).
+pub fn pushList(self: *SinglyLinkedLIFO, first_node: *SingleNode, last_node: *SingleNode) void {
+    core.debugAssert(last_node.next == null);
+
+    if (self.start_node) |start| {
+        last_node.* = .{ .next = start };
+    }
+
+    self.start_node = first_node;
 }
 
 /// Removes a node from the front of the list and returns it.
@@ -37,7 +52,7 @@ pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
 pub fn pop(self: *SinglyLinkedLIFO) ?*SingleNode {
     const node = self.start_node orelse return null;
     self.start_node = node.next;
-    node.next = null;
+    node.* = .{};
     return node;
 }
 

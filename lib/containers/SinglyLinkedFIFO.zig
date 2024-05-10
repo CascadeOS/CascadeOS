@@ -31,7 +31,7 @@ pub fn push(self: *SinglyLinkedFIFO, node: *SingleNode) void {
 
     if (self.end_node) |end| {
         core.debugAssert(self.start_node != null);
-        end.next = node;
+        end.* = .{ .next = node };
     } else {
         self.start_node = node;
     }
@@ -50,7 +50,7 @@ pub fn pop(self: *SinglyLinkedFIFO) ?*SingleNode {
     }
 
     self.start_node = node.next;
-    node.next = null;
+    node.* = .{};
     return node;
 }
 
