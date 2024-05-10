@@ -10,11 +10,7 @@ const RedBlack = containers.RedBlack;
 const RegionAddressRedBlackTree = RedBlack.Tree(rangeAddressCompare);
 const RegionSizeRedBlackTree = RedBlack.Tree(rangeSizeCompare);
 
-const VirtualRangePool = kernel.vmm.DirectMapPool(
-    RangeWithNodes,
-    kernel.config.number_of_bucket_groups_in_virtual_range_pool,
-    .virtual_range_pool,
-);
+const VirtualRangePool = @import("DirectMapPool.zig").DirectMapPool(RangeWithNodes, .virtual_range_pool);
 var virtual_range_pool: VirtualRangePool = .{};
 
 const log = kernel.log.scoped(.virtual_range_allocator);

@@ -10,11 +10,7 @@ const MemoryRegion = kernel.vmm.MemoryRegion;
 const MemoryRegionRedBlackTree = RedBlack.Tree(memoryRegionAddressCompare);
 const RedBlack = containers.RedBlack;
 
-const MemoryRegionPool = kernel.vmm.DirectMapPool(
-    MemoryRegionWithNode,
-    kernel.config.number_of_bucket_groups_in_memory_region_pool,
-    .memory_region_pool,
-);
+const MemoryRegionPool = @import("DirectMapPool.zig").DirectMapPool(MemoryRegionWithNode, .memory_region_pool);
 var memory_region_pool: MemoryRegionPool = .{};
 
 const AddressSpace = @This();
