@@ -29,9 +29,6 @@ pub fn remove(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
     if (node.previous) |previous| previous.next = node.next;
     if (self.start_node == node) self.start_node = node.next;
     if (self.end_node == node) self.end_node = node.previous;
-
-    self.start_node = null;
-    self.end_node = null;
 }
 
 pub fn push(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
