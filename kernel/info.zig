@@ -7,6 +7,11 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+/// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
+///
+/// Initialized during `init.captureKernelOffsets`.
+pub var kernel_virtual_offset: ?core.Size = null;
+
 pub fn sdfSlice() []const u8 {
     const static = struct {
         const sdf = @import("sdf");
