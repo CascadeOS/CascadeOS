@@ -8,10 +8,10 @@ const kernel = @import("kernel");
 const limine = @import("limine");
 
 export fn _start() callconv(.C) noreturn {
-    @call(.never_inline, @import("init.zig").kernelInit, .{}) catch |err| {
+    @call(.never_inline, @import("init.zig").earlyInit, .{}) catch |err| {
         core.panicFmt("unhandled error: {s}", .{@errorName(err)});
     };
-    core.panic("`init.kernelInit` returned");
+    core.panic("`init.earlyInit` returned");
 }
 
 const limine_requests = struct {

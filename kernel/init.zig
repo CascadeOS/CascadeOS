@@ -10,7 +10,7 @@ const log = kernel.log.scoped(.init);
 /// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap cpu executes this function.
-pub fn kernelInit() !void {
+pub fn earlyInit() !void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
