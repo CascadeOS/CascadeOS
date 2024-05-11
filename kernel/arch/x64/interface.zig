@@ -20,3 +20,7 @@ pub const init = struct {
 pub const interrupts = struct {
     pub const disableInterruptsAndHalt = x64.disableInterruptsAndHalt;
 };
+
+pub const paging = struct {
+    pub const higher_half = x64.paging.higher_half;
+};

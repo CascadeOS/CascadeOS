@@ -51,6 +51,11 @@ pub const interrupts = struct {
     }
 };
 
+pub const paging = struct {
+    /// The virtual address of the higher half.
+    pub const higher_half: core.VirtualAddress = current.paging.higher_half;
+};
+
 /// Checks if the current architecture implements the given function.
 ///
 /// If it is unimplemented, this function will panic at runtime.

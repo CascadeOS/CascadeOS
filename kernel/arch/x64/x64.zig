@@ -9,6 +9,7 @@ const lib_x64 = @import("lib_x64");
 pub usingnamespace lib_x64;
 
 pub const init = @import("init.zig");
+pub const paging = @import("paging.zig");
 pub const SerialPort = @import("SerialPort.zig");
 
 comptime {
