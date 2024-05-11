@@ -7,10 +7,20 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+/// The virtual base address that the kernel was loaded at.
+///
+/// Initialized during `init.captureKernelOffsets.
+pub var kernel_virtual_base_address: core.VirtualAddress = undefined;
+
 /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
 ///
 /// Initialized during `init.captureKernelOffsets`.
 pub var kernel_virtual_offset: ?core.Size = null;
+
+/// Offset from the virtual address of kernel sections to the physical address of the section.
+///
+/// Initialized during `init.captureKernelOffsets`.
+pub var kernel_physical_to_virtual_offset: core.Size = undefined;
 
 pub fn sdfSlice() []const u8 {
     const static = struct {
