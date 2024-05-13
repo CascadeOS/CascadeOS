@@ -40,6 +40,13 @@ pub const init = struct {
 
         return if (current.init.getEarlyOutput()) |writer| writer.any() else null;
     }
+
+    /// Load the provided `Cpu` as the current CPU.
+    pub inline fn loadCpu(cpu: *kernel.Cpu) void {
+        checkSupport(current.init, "loadCpu", fn (*kernel.Cpu) void);
+
+        current.init.loadCpu(cpu);
+    }
 };
 
 pub const interrupts = struct {

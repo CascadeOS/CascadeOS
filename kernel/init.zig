@@ -5,6 +5,10 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+var bootstrap_cpu: kernel.Cpu = .{
+    .id = .bootstrap,
+};
+
 const log = kernel.log.scoped(.init);
 
 /// Entry point from bootloader specific code.
@@ -13,6 +17,8 @@ const log = kernel.log.scoped(.init);
 pub fn earlyInit() !void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
+
+    kernel.arch.init.loadCpu(&bootstrap_cpu);
 
     // now that early output is ready, we can switch to the init panic
     kernel.debug.init.loadInitPanic();

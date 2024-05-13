@@ -20,3 +20,8 @@ pub fn setupEarlyOutput() void {
 pub fn getEarlyOutput() ?x64.SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
+
+/// Load the provided `Cpu` as the current CPU.
+pub fn loadCpu(cpu: *kernel.Cpu) void {
+    x64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
+}

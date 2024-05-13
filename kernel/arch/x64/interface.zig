@@ -15,6 +15,7 @@ pub const init = struct {
 
     pub const setupEarlyOutput = x64.init.setupEarlyOutput;
     pub const getEarlyOutput = x64.init.getEarlyOutput;
+    pub const loadCpu = x64.init.loadCpu;
 };
 
 pub const interrupts = struct {
