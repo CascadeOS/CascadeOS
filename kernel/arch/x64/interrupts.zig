@@ -166,6 +166,11 @@ pub const InterruptFrame = extern struct {
     }
 };
 
+pub const InterruptStackSelector = enum(u3) {
+    double_fault,
+    non_maskable_interrupt,
+};
+
 pub const Interrupt = enum(u8) {
     divide = 0,
     debug = 1,
@@ -259,6 +264,12 @@ pub const init = struct {
                 raw_handler,
             );
         }
+
+        idt.handlers[@intFromEnum(Interrupt.double_fault)]
+            .setStack(@intFromEnum(InterruptStackSelector.double_fault));
+
+        idt.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)]
+            .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
     }
 
     /// Load the IDT on this cpu.

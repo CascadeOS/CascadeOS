@@ -21,17 +21,39 @@ pub fn getEarlyOutput() ?x64.SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
+var bootstrap_double_fault_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+
 /// Prepares the provided `Cpu` for the bootstrap CPU.
 pub fn prepareBootstrapCpu(
     bootstrap_cpu: *kernel.Cpu,
 ) void {
-    bootstrap_cpu.arch = .{};
+    bootstrap_cpu.arch = .{
+        .double_fault_stack = kernel.Stack.fromRange(
+            core.VirtualRange.fromSlice(u8, &bootstrap_double_fault_stack),
+            core.VirtualRange.fromSlice(u8, &bootstrap_double_fault_stack),
+        ),
+        .non_maskable_interrupt_stack = kernel.Stack.fromRange(
+            core.VirtualRange.fromSlice(u8, &bootstrap_non_maskable_interrupt_stack),
+            core.VirtualRange.fromSlice(u8, &bootstrap_non_maskable_interrupt_stack),
+        ),
+    };
 }
+
 /// Load the provided `Cpu` as the current CPU.
 pub fn loadCpu(cpu: *kernel.Cpu) void {
     const arch = &cpu.arch;
 
     arch.gdt.load();
+
+    arch.tss.setInterruptStack(
+        @intFromEnum(x64.interrupts.InterruptStackSelector.double_fault),
+        arch.double_fault_stack.stack_pointer,
+    );
+    arch.tss.setInterruptStack(
+        @intFromEnum(x64.interrupts.InterruptStackSelector.non_maskable_interrupt),
+        arch.non_maskable_interrupt_stack.stack_pointer,
+    );
 
     arch.gdt.setTss(&arch.tss);
 
