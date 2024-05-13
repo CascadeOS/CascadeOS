@@ -26,5 +26,6 @@ pub const interrupts = struct {
 };
 
 pub const paging = struct {
+    pub const standard_page_size = x64.PageTable.small_page_size;
     pub const higher_half = x64.paging.higher_half;
 };
