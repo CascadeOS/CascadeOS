@@ -11,6 +11,9 @@ const current = switch (@import("cascade_target").arch) {
     .x64 => @import("x64/interface.zig"),
 };
 
+/// Architecture specific per-cpu information.
+pub const ArchCpu = current.ArchCpu;
+
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
     checkSupport(current, "spinLoopHint", fn () void);
@@ -39,6 +42,15 @@ pub const init = struct {
         checkSupport(current.init, "getEarlyOutput", fn () ?current.init.EarlyOutputWriter);
 
         return if (current.init.getEarlyOutput()) |writer| writer.any() else null;
+    }
+
+    /// Prepares the provided `Cpu` for the bootstrap processor.
+    pub inline fn prepareBootstrapCpu(
+        bootstrap_cpu: *kernel.Cpu,
+    ) void {
+        checkSupport(current.init, "prepareBootstrapCpu", fn (*kernel.Cpu) void);
+
+        current.init.prepareBootstrapCpu(bootstrap_cpu);
     }
 
     /// Load the provided `Cpu` as the current CPU.

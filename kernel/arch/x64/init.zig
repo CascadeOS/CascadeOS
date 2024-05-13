@@ -21,6 +21,12 @@ pub fn getEarlyOutput() ?x64.SerialPort.Writer {
     return if (early_output_serial_port) |output| output.writer() else null;
 }
 
+/// Prepares the provided `Cpu` for the bootstrap CPU.
+pub fn prepareBootstrapCpu(
+    bootstrap_cpu: *kernel.Cpu,
+) void {
+    bootstrap_cpu.arch = .{};
+}
 /// Load the provided `Cpu` as the current CPU.
 pub fn loadCpu(cpu: *kernel.Cpu) void {
     x64.KERNEL_GS_BASE.write(@intFromPtr(cpu));

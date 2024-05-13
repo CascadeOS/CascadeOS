@@ -7,6 +7,8 @@ const kernel = @import("kernel");
 
 const x64 = @import("x64.zig");
 
+pub const ArchCpu = x64.ArchCpu;
+
 pub const spinLoopHint = x64.pause;
 pub const halt = x64.halt;
 
@@ -15,6 +17,7 @@ pub const init = struct {
 
     pub const setupEarlyOutput = x64.init.setupEarlyOutput;
     pub const getEarlyOutput = x64.init.getEarlyOutput;
+    pub const prepareBootstrapCpu = x64.init.prepareBootstrapCpu;
     pub const loadCpu = x64.init.loadCpu;
 };
 

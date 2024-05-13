@@ -7,6 +7,7 @@ const kernel = @import("kernel");
 
 var bootstrap_cpu: kernel.Cpu = .{
     .id = .bootstrap,
+    .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
 const log = kernel.log.scoped(.init);
@@ -18,6 +19,7 @@ pub fn earlyInit() !void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
+    kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
     // now that early output is ready, we can switch to the init panic
