@@ -17,6 +17,7 @@ pub const init = struct {
 
     pub const setupEarlyOutput = x64.init.setupEarlyOutput;
     pub const getEarlyOutput = x64.init.getEarlyOutput;
+    pub const initInterrupts = x64.interrupts.init.initIdt;
     pub const prepareBootstrapCpu = x64.init.prepareBootstrapCpu;
     pub const loadCpu = x64.init.loadCpu;
 };

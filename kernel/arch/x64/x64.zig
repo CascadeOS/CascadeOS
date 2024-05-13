@@ -10,6 +10,7 @@ pub usingnamespace lib_x64;
 
 pub const ArchCpu = @import("ArchCpu.zig");
 pub const init = @import("init.zig");
+pub const interrupts = @import("interrupts.zig");
 pub const paging = @import("paging.zig");
 pub const SerialPort = @import("SerialPort.zig");
 

@@ -44,6 +44,13 @@ pub const init = struct {
         return if (current.init.getEarlyOutput()) |writer| writer.any() else null;
     }
 
+    /// Ensure that any exceptions/faults that occur are handled.
+    pub inline fn initInterrupts() void {
+        checkSupport(current.init, "initInterrupts", fn () void);
+
+        current.init.initInterrupts();
+    }
+
     /// Prepares the provided `Cpu` for the bootstrap processor.
     pub inline fn prepareBootstrapCpu(
         bootstrap_cpu: *kernel.Cpu,

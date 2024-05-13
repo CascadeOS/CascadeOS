@@ -35,5 +35,7 @@ pub fn loadCpu(cpu: *kernel.Cpu) void {
 
     arch.gdt.setTss(&arch.tss);
 
+    x64.interrupts.init.loadIdt();
+
     x64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
 }

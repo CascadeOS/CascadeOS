@@ -22,6 +22,9 @@ pub fn earlyInit() !void {
     kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
+    // ensure any interrupts are handled
+    kernel.arch.init.initInterrupts();
+
     // now that early output is ready, we can switch to the init panic
     kernel.debug.init.loadInitPanic();
 
