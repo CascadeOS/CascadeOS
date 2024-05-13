@@ -6,3 +6,6 @@ const core = @import("core");
 const kernel = @import("kernel");
 
 const x64 = @import("x64.zig");
+
+gdt: x64.Gdt = .{},
+tss: x64.Tss = .{},
