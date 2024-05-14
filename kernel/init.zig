@@ -7,6 +7,7 @@ const kernel = @import("kernel");
 
 var bootstrap_cpu: kernel.Cpu = .{
     .id = .bootstrap,
+    .interrupt_disable_count = 1, // interrupts start disabled
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 

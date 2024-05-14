@@ -16,6 +16,7 @@ pub const debug = @import("debug.zig");
 pub const info = @import("info.zig");
 pub const log = @import("log.zig");
 pub const Stack = @import("Stack.zig");
+pub const sync = @import("sync/sync.zig");
 
 pub const std_options: std.Options = .{
     .log_level = log.log_level,

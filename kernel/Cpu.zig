@@ -9,6 +9,11 @@ const kernel = @import("kernel");
 
 id: Id,
 
+/// Tracks the number of times we have disabled interrupts.
+///
+/// This allows support for nested disables.
+interrupt_disable_count: u32,
+
 arch: kernel.arch.ArchCpu,
 
 pub const Id = enum(u32) {
