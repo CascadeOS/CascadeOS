@@ -14,6 +14,17 @@ const current = switch (@import("cascade_target").arch) {
 /// Architecture specific per-cpu information.
 pub const ArchCpu = current.ArchCpu;
 
+/// Get the current CPU.
+///
+/// Assumes that `init.loadCpu()` has been called on the currently running CPU.
+///
+/// It is the callers responsibility to ensure that the current thread is not re-scheduled on to another CPU.
+pub inline fn rawGetCpu() *kernel.Cpu {
+    checkSupport(current, "getCpu", fn () *kernel.Cpu);
+
+    return current.getCpu();
+}
+
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
     checkSupport(current, "spinLoopHint", fn () void);
