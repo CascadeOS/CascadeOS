@@ -5,9 +5,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();
 
-pub const debug = builtin.mode == .Debug;
-pub const safety = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
-
 pub const ValueTypeMixin = @import("value_type_mixin.zig").ValueTypeMixin;
 
 pub const Duration = @import("duration.zig").Duration;
