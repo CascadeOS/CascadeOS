@@ -5,6 +5,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+pub const TicketSpinLock = @import("TicketSpinLock.zig");
+
 pub fn getInterruptExclusion() Exclusion {
     kernel.arch.interrupts.disableInterrupts();
 
