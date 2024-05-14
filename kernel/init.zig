@@ -38,6 +38,9 @@ pub fn earlyInit() !void {
 
     log.debug("capturing direct map", .{});
     try captureBootloaderDirectMap();
+
+    log.debug("adding free memory to pmm", .{});
+    try addFreeMemoryToPmm();
 }
 
 fn captureKernelOffsets() !void {
@@ -102,4 +105,23 @@ fn calculateDirectMapRange(direct_map_size: core.Size) !core.VirtualRange {
     }
 
     return core.VirtualRange.fromAddr(direct_map_address, direct_map_size);
+}
+
+fn addFreeMemoryToPmm() !void {
+    var size = core.Size.zero;
+
+    var memory_map_iterator = kernel.boot.memoryMap(.forwards);
+
+    while (memory_map_iterator.next()) |memory_map_entry| {
+        if (memory_map_entry.type != .free) continue;
+
+        kernel.pmm.init.addRange(memory_map_entry.range) catch |err| {
+            log.err("failed to add {} to pmm", .{memory_map_entry});
+            return err;
+        };
+
+        size.addInPlace(memory_map_entry.range.size);
+    }
+
+    log.debug("added {} of memory to pmm", .{size});
 }
