@@ -18,6 +18,30 @@ pub const log = @import("log.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 
+/// Returns the virtual address corresponding to this physical address in the direct map.
+pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + info.direct_map.address.value };
+}
+
+/// Returns a virtual range corresponding to this physical range in the direct map.
+pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
+    return .{
+        .address = directMapFromPhysical(self.address),
+        .size = self.size,
+    };
+}
+
+/// Returns the physical range of the given direct map virtual range.
+pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDirectMap}!core.PhysicalRange {
+    if (info.direct_map.containsRange(self)) {
+        return .{
+            .address = core.PhysicalAddress.fromInt(self.address.value -% info.direct_map.address.value),
+            .size = self.size,
+        };
+    }
+    return error.AddressNotInDirectMap;
+}
+
 pub const std_options: std.Options = .{
     .log_level = log.log_level,
     .logFn = log.stdLogImpl,
