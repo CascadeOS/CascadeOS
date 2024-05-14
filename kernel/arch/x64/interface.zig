@@ -25,6 +25,9 @@ pub const init = struct {
 
 pub const interrupts = struct {
     pub const disableInterruptsAndHalt = x64.disableInterruptsAndHalt;
+    pub const interruptsEnabled = x64.interruptsEnabled;
+    pub const disableInterrupts = x64.disableInterrupts;
+    pub const enableInterrupts = x64.enableInterrupts;
 };
 
 pub const paging = struct {
