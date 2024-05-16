@@ -19,24 +19,48 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const parsed = try getImageDescription(allocator);
-    defer parsed.deinit();
+    const arguments = try getArguments(allocator);
+    defer arguments.deinit(allocator);
 
     var rand = std.rand.DefaultPrng.init(std.crypto.random.int(u64));
     const random = rand.random();
 
-    try createDiskImage(allocator, parsed.image_description, random);
+    try createDiskImage(allocator, arguments, random);
 }
 
-fn getImageDescription(allocator: std.mem.Allocator) !ImageDescription.Parsed {
+const Arguments = struct {
+    output_path: []const u8,
+    image_description: *ImageDescription.Parsed,
+
+    pub fn deinit(self: Arguments, allocator: std.mem.Allocator) void {
+        allocator.free(self.output_path);
+        self.image_description.deinit();
+        allocator.destroy(self.image_description);
+    }
+};
+
+fn usageError(err_msg: []const u8) noreturn {
+    const usage =
+        \\Usage: image_builder [image_description_path|-] output_path
+        \\
+    ;
+
+    std.debug.print(comptime "{s}\n\n" ++ usage, .{err_msg});
+    std.process.exit(1);
+}
+
+fn getArguments(allocator: std.mem.Allocator) !Arguments {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len < 1) {
-        core.panic("no image description file given");
+    if (args.len != 3) { // first argument is the executable name
+        usageError("incorrect number of arguments given");
     }
 
-    const contents = blk: {
+    const output_path = try allocator.dupe(u8, args[2]);
+    errdefer allocator.free(output_path);
+
+    const image_description_contents = blk: {
         if (std.mem.eql(u8, args[1], "-")) {
             break :blk try std.io.getStdIn().readToEndAlloc(allocator, std.math.maxInt(usize));
         }
@@ -46,18 +70,20 @@ fn getImageDescription(allocator: std.mem.Allocator) !ImageDescription.Parsed {
 
         break :blk try image_description_file.readToEndAlloc(allocator, std.math.maxInt(usize));
     };
-    defer allocator.free(contents);
+    defer allocator.free(image_description_contents);
 
-    return try ImageDescription.parse(allocator, contents);
+    const image_description = try allocator.create(ImageDescription.Parsed);
+    errdefer allocator.destroy(image_description);
+    image_description.* = try ImageDescription.parse(allocator, image_description_contents);
+
+    return .{
+        .output_path = output_path,
+        .image_description = image_description,
+    };
 }
 
-fn createDiskImage(allocator: std.mem.Allocator, image_description: ImageDescription, random: std.rand.Random) !void {
-    const disk_image_path = blk: {
-        if (!std.fs.path.isAbsolute(image_description.output_path)) {
-            core.panic("ERROR: image output path is not absolute\n");
-        }
-        break :blk image_description.output_path;
-    };
+fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: std.rand.Random) !void {
+    const image_description = arguments.image_description.image_description;
 
     const disk_size = blk: {
         if (!std.mem.isAligned(image_description.size, disk_block_size.value)) {
@@ -66,7 +92,7 @@ fn createDiskImage(allocator: std.mem.Allocator, image_description: ImageDescrip
         break :blk core.Size.from(image_description.size, .byte);
     };
 
-    const disk_image = try createAndMapDiskImage(disk_image_path, disk_size);
+    const disk_image = try createAndMapDiskImage(arguments.output_path, disk_size);
     defer std.posix.munmap(disk_image);
 
     const gpt_partitions = try allocator.alloc(GptPartition, image_description.partitions.len);

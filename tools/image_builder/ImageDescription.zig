@@ -7,11 +7,6 @@ const std = @import("std");
 
 const ImageDescription = @This();
 
-/// The output path the image will be written too.
-///
-/// Must be absolute.
-output_path: []const u8,
-
 /// Total size of the image.
 ///
 /// Must be a multiple of 512 bytes.
@@ -94,17 +89,15 @@ pub fn parse(allocator: std.mem.Allocator, slice: []const u8) !Parsed {
 pub const Builder = struct {
     allocator: std.mem.Allocator,
 
-    output_path: []const u8,
     size: u64,
 
     used_size: u64 = 0,
 
     partition_builders: std.ArrayListUnmanaged(*PartitionBuilder) = .{},
 
-    pub fn create(allocator: std.mem.Allocator, output_path: []const u8, size: u64) Builder {
+    pub fn create(allocator: std.mem.Allocator, size: u64) Builder {
         return .{
             .allocator = allocator,
-            .output_path = output_path,
             .size = size,
         };
     }
@@ -166,7 +159,6 @@ pub const Builder = struct {
         defer self.allocator.free(partitions);
 
         const image_description = ImageDescription{
-            .output_path = self.output_path,
             .size = self.size,
             .partitions = partitions,
         };

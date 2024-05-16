@@ -34,7 +34,7 @@ pub fn registerQemuSteps(
     for (targets) |target| {
         const image_step = image_steps.get(target).?;
 
-        const qemu_step = try QemuStep.create(b, target, image_step.image_lazy_path, options);
+        const qemu_step = try QemuStep.create(b, target, image_step.image_file, options);
 
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
