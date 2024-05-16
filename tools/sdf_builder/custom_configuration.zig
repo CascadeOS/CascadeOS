@@ -16,12 +16,12 @@ pub fn customConfiguration(
 
     const lib_dwarf = b.dependency("libdwarf", .{});
 
-    const own_directory_path = helpers.pathJoinFromRoot(b, &.{
+    const own_directory_path = b.pathJoin(&.{
         "tools",
         tool_description.name,
     });
 
-    exe.addIncludePath(.{ .path = own_directory_path });
+    exe.addIncludePath(b.path(own_directory_path));
 
     exe.addIncludePath(lib_dwarf.path("src/lib/libdwarf"));
 

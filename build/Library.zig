@@ -138,7 +138,7 @@ fn resolveLibrary(
         break :blk try dependencies.toOwnedSlice();
     };
 
-    const directory_path = helpers.pathJoinFromRoot(b, &.{
+    const directory_path = b.pathJoin(&.{
         "lib",
         library_description.name,
     });
@@ -146,12 +146,10 @@ fn resolveLibrary(
     const root_file_name = library_description.root_file_name orelse
         try std.fmt.allocPrint(b.allocator, "{s}.zig", .{library_description.name});
 
-    const root_file_path = helpers.pathJoinFromRoot(b, &.{
+    const lazy_path = b.path(b.pathJoin(&.{
         directory_path,
         root_file_name,
-    });
-
-    const lazy_path: std.Build.LazyPath = .{ .path = root_file_path };
+    }));
 
     const supported_targets = library_description.supported_targets orelse targets;
 

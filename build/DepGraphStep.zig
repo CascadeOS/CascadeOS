@@ -64,7 +64,7 @@ fn create(
         .applications = applications,
     };
     self.dep_file = .{ .step = &self.step };
-    self.dep_lazy_path = .{ .generated = &self.dep_file };
+    self.dep_lazy_path = .{ .generated = .{ .file = &self.dep_file } };
 
     return self;
 }
@@ -81,7 +81,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     var timer = try std.time.Timer.start();
 
-    const dep_grap_file_path = helpers.pathJoinFromRoot(self.b, &.{ "zig-out", "dependency_graph.d2" });
+    const dep_grap_file_path = self.b.pathJoin(&.{ "zig-out", "dependency_graph.d2" });
     try std.fs.cwd().makePath(std.fs.path.dirname(dep_grap_file_path).?);
 
     var output_file = try std.fs.cwd().createFile(dep_grap_file_path, .{});

@@ -75,19 +75,19 @@ fn create(
 ) !Kernel {
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
-        .root_source_file = .{ .path = helpers.pathJoinFromRoot(b, &.{ "kernel", "kernel.zig" }) },
+        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
         .target = getKernelCrossTarget(target, b),
         .optimize = options.optimize,
     });
 
-    kernel_exe.setLinkerScriptPath(.{
-        .path = helpers.pathJoinFromRoot(b, &.{
+    kernel_exe.setLinkerScriptPath(b.path(
+        b.pathJoin(&.{
             "kernel",
             "arch",
             @tagName(target),
             "linker.ld",
         }),
-    });
+    ));
 
     // self reference
     kernel_exe.root_module.addImport("kernel", &kernel_exe.root_module);
@@ -164,7 +164,7 @@ fn create(
 
     // Add assembly files
     assembly_files_blk: {
-        const assembly_files_dir_path = helpers.pathJoinFromRoot(b, &.{
+        const assembly_files_dir_path = b.pathJoin(&.{
             "kernel",
             "arch",
             @tagName(target),
@@ -184,7 +184,7 @@ fn create(
             }
 
             const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
-            kernel_exe.addAssemblyFile(.{ .path = file_path });
+            kernel_exe.addAssemblyFile(b.path(file_path));
         }
     }
 
@@ -300,7 +300,7 @@ fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []Library
     defer file_paths.deinit();
 
     // add the kernel's files
-    try addFilesRecursive(b, &modules, &file_paths, options.root_path, helpers.pathJoinFromRoot(b, &.{"kernel"}));
+    try addFilesRecursive(b, &modules, &file_paths, options.root_path, b.pathJoin(&.{"kernel"}));
 
     // add each dependencies files
     var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
@@ -366,16 +366,11 @@ fn addFilesRecursive(
                 if (std.mem.eql(u8, extension, ".zig")) {
                     const path = b.pathJoin(&.{ target_path, file.name });
 
-                    if (removeRootPrefixFromPath(path, root_path)) |name| {
-                        try files.append(name);
-                        const module = b.createModule(.{
-                            .root_source_file = .{ .path = path },
-                        });
-                        try modules.append(.{ .name = name, .module = module });
-                    } else {
-                        // If the file does not start with the root path, what does that even mean?
-                        std.debug.panic("file is not in root path: '{s}'", .{path});
-                    }
+                    try files.append(path);
+                    const module = b.createModule(.{
+                        .root_source_file = b.path(path),
+                    });
+                    try modules.append(.{ .name = path, .module = module });
                 }
             },
             .directory => {
@@ -387,12 +382,4 @@ fn addFilesRecursive(
             else => {},
         }
     }
-}
-
-/// Returns the path without the root prefix, or `null` if the path did not start with the root prefix.
-fn removeRootPrefixFromPath(path: []const u8, root_prefix: []const u8) ?[]const u8 {
-    if (std.mem.startsWith(u8, path, root_prefix)) {
-        return path[(root_prefix.len)..];
-    }
-    return null;
 }

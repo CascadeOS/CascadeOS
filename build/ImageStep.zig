@@ -113,7 +113,7 @@ fn create(
         .image_builder_tool = image_builder_tool,
     };
     self.image_file = .{ .step = &self.step };
-    self.image_lazy_path = .{ .generated = &self.image_file };
+    self.image_lazy_path = .{ .generated = .{ .file = &self.image_file } };
 
     limine_exe.getEmittedBin().addStepDependencies(&self.step);
     image_builder_tool.release_safe_compile_step.getEmittedBin().addStepDependencies(&self.step);
@@ -135,7 +135,7 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
 
     var timer = try std.time.Timer.start();
 
-    const image_file_path = helpers.pathJoinFromRoot(self.b, &.{
+    const image_file_path = self.b.pathJoin(&.{
         "zig-out",
         @tagName(self.target),
         try std.fmt.allocPrint(
@@ -170,7 +170,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
 
     try efi_partition.addFile(.{
         .destination_path = "/limine.cfg",
-        .source_path = helpers.pathJoinFromRoot(self.b, &.{
+        .source_path = self.b.pathJoin(&.{
             "build",
             "limine.cfg",
         }),
@@ -205,7 +205,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
         run_image_builder.has_side_effects = true;
 
         // TODO: This is ugly, but this is the only way to get the below `setStdIn` to work
-        run_image_builder.stdio = .{ .check = std.ArrayList(Step.Run.StdIo.Check).init(self.b.allocator) };
+        run_image_builder.stdio = .{ .check = .{} };
         run_image_builder.setStdIn(.{ .bytes = image_description_buffer.items });
 
         try run_image_builder.step.make(progress_node);
@@ -219,7 +219,7 @@ fn generateImage(self: *ImageStep, image_path: []const u8, progress_node: *std.P
     run_limine.addArg(image_path);
 
     // TODO: This is ugly, but this is the only way to suppress stdout/stderr
-    run_limine.stdio = .{ .check = std.ArrayList(Step.Run.StdIo.Check).init(self.b.allocator) };
+    run_limine.stdio = .{ .check = .{} };
     run_limine.has_side_effects = true;
 
     try run_limine.step.make(progress_node);

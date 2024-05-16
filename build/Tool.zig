@@ -80,13 +80,11 @@ fn resolveTool(
 
     const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{tool_description.name});
 
-    const root_file_path = helpers.pathJoinFromRoot(b, &.{
+    const lazy_path = b.path(b.pathJoin(&.{
         "tools",
         tool_description.name,
         root_file_name,
-    });
-
-    const lazy_path: std.Build.LazyPath = .{ .path = root_file_path };
+    }));
 
     const compile_step = try createExe(
         b,
