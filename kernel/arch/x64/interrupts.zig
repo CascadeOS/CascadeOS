@@ -7,7 +7,10 @@ const kernel = @import("kernel");
 
 const x64 = @import("x64.zig");
 
-pub const InterruptHandler = *const fn (interrupt_frame: *InterruptFrame) void;
+pub const InterruptHandler = *const fn (
+    interrupt_exclusion: kernel.sync.InterruptExclusion,
+    interrupt_frame: *InterruptFrame,
+) void;
 
 pub const InterruptFrame = extern struct {
     es: extern union {
@@ -242,13 +245,18 @@ const raw_handlers = init.makeRawHandlers();
 var handlers = [_]InterruptHandler{unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
 fn unhandledInterrupt(
+    interrupt_exclusion: kernel.sync.InterruptExclusion,
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
+    _ = interrupt_exclusion;
+
     core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame});
 }
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame);
+    const interrupt_exclusion = kernel.sync.assertInterruptExclusion();
+
+    handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_exclusion, interrupt_frame);
 
     // ensure interrupts are disabled when restoring the state before iret
     x64.disableInterrupts();

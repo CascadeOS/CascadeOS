@@ -7,7 +7,8 @@ const kernel = @import("kernel");
 
 pub const TicketSpinLock = @import("TicketSpinLock.zig");
 
-pub fn getInterruptExclusion() Exclusion {
+/// Acquire interrupt exclusion.
+pub fn getInterruptExclusion() InterruptExclusion {
     kernel.arch.interrupts.disableInterrupts();
 
     const cpu = kernel.arch.rawGetCpu();
@@ -17,10 +18,24 @@ pub fn getInterruptExclusion() Exclusion {
     return .{ .cpu = cpu };
 }
 
-pub const Exclusion = struct {
+/// Asserts that interrupts are excluded.
+///
+/// Intended to be used at entry points like interrupt handlers.
+pub fn assertInterruptExclusion() InterruptExclusion {
+    core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());
+
+    const cpu = kernel.arch.rawGetCpu();
+    core.debugAssert(cpu.interrupt_disable_count == 0);
+
+    cpu.interrupt_disable_count = 1;
+
+    return .{ .cpu = cpu };
+}
+
+pub const InterruptExclusion = struct {
     cpu: *kernel.Cpu,
 
-    pub fn release(self: Exclusion) void {
+    pub fn release(self: InterruptExclusion) void {
         core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());
 
         const old_interrupt_disable_count = self.cpu.interrupt_disable_count;
