@@ -106,7 +106,7 @@ fn printSourceAtAddress(writer: std.io.AnyWriter, address: usize, opt_symbol_sou
     }
 
     var kernel_virtual_offset_is_null: bool = false;
-    const kernel_virtual_offset = if (kernel.info.kernel_virtual_offset) |offset| offset.value else blk: {
+    const kernel_virtual_offset = if (kernel.vmm.kernel_virtual_offset) |offset| offset.value else blk: {
         kernel_virtual_offset_is_null = true;
         break :blk 0;
     };
@@ -237,6 +237,27 @@ fn printSymbol(writer: std.io.AnyWriter, symbol: SymbolSource.Symbol, kernel_vir
     writer.writeAll("^\n") catch unreachable;
 }
 
+pub fn sdfSlice() []const u8 {
+    const static = struct {
+        const sdf = @import("sdf");
+
+        var opt_sdf_slice: ?[]const u8 = null;
+        extern const __sdf_start: u8;
+    };
+
+    if (static.opt_sdf_slice) |s| return s;
+
+    const ptr: [*]const u8 = @ptrCast(&static.__sdf_start);
+    var fbs = std.io.fixedBufferStream(ptr[0..@sizeOf(static.sdf.Header)]);
+
+    const header = static.sdf.Header.read(fbs.reader()) catch core.panic("SDF data is invalid");
+
+    const slice = ptr[0..header.total_size_of_sdf_data];
+
+    static.opt_sdf_slice = slice;
+    return slice;
+}
+
 const SymbolSource = struct {
     const sdf = @import("sdf");
 
@@ -246,7 +267,7 @@ const SymbolSource = struct {
     location_program: sdf.LocationProgram,
 
     pub fn load() ?SymbolSource {
-        const sdf_slice = kernel.info.sdfSlice();
+        const sdf_slice = sdfSlice();
 
         var sdf_fbs = std.io.fixedBufferStream(sdf_slice);
 

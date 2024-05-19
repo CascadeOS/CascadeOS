@@ -81,7 +81,31 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
 }
 
 pub const init = struct {
-    pub fn addRange(physical_range: core.PhysicalRange) !void {
+    pub fn initPmm() !void {
+        log.debug("adding free memory to pmm", .{});
+        try addFreeMemoryToPmm();
+    }
+
+    fn addFreeMemoryToPmm() !void {
+        var size = core.Size.zero;
+
+        var memory_map_iterator = kernel.boot.memoryMap(.forwards);
+
+        while (memory_map_iterator.next()) |memory_map_entry| {
+            if (memory_map_entry.type != .free) continue;
+
+            kernel.pmm.init.addRange(memory_map_entry.range) catch |err| {
+                log.err("failed to add {} to pmm", .{memory_map_entry});
+                return err;
+            };
+
+            size.addInPlace(memory_map_entry.range.size);
+        }
+
+        log.debug("added {} of memory to pmm", .{size});
+    }
+
+    fn addRange(physical_range: core.PhysicalRange) !void {
         if (!physical_range.address.isAligned(kernel.arch.paging.standard_page_size)) {
             log.err("range address {} is not aligned to page size", .{physical_range.address});
             return error.InvalidRange;
@@ -91,7 +115,7 @@ pub const init = struct {
             return error.InvalidRange;
         }
 
-        const virtual_range = kernel.directMapFromPhysicalRange(physical_range);
+        const virtual_range = kernel.vmm.directMapFromPhysicalRange(physical_range);
 
         var current_virtual_address = virtual_range.address;
         const last_virtual_address = virtual_range.last();
