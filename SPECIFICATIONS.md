@@ -10,6 +10,7 @@ It is possible for these links or the text regarding versions to become out of d
   * [Specifications](https://uefi.org/specifications) (GPT is specified in the UEFI spec) 
   * [ACPI related documents](https://uefi.org/acpi)
   * [UEFI Related documents](https://uefi.org/uefi)
+  * [UEFI Demystified](https://kovmir.eu/posts/uefi_demystified.html)
 * DWARF - [DWARF Version 5](https://dwarfstd.org/dwarf5std.html)
 * Ext
   * [ext2-doc](https://www.nongnu.org/ext2-doc/)
