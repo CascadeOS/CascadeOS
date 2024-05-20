@@ -14,10 +14,26 @@ const log = kernel.log.scoped(.vmm);
 /// Initialized during `init.buildMemoryLayout`.
 var memory_layout: MemoryLayout = undefined;
 
+pub inline fn kernelPageTable() *kernel.arch.paging.PageTable {
+    const static = struct {
+        var kernel_page_table: kernel.arch.paging.PageTable = .{};
+    };
+
+    return &static.kernel_page_table;
+}
+
+pub fn switchToKernelPageTable() void {
+    kernel.arch.paging.switchToPageTable(
+        physicalFromKernelSectionUnsafe(core.VirtualAddress.fromPtr(
+            kernelPageTable(),
+        )),
+    );
+}
+
 /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
 ///
 /// This is optional due to the small window on start up where the panic handler can run before this is set.
-pub fn virtualOffset() ?core.Size {
+pub inline fn virtualOffset() ?core.Size {
     return memory_layout.virtual_offset;
 }
 
@@ -50,9 +66,76 @@ pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDir
     return error.AddressNotInDirectMap;
 }
 
+/// Returns the physical address of the given kernel ELF section virtual address.
+///
+/// It is the caller's responsibility to ensure that the given virtual address is in the kernel ELF sections.
+pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
+    return .{ .value = self.value -% memory_layout.physical_to_virtual_offset.value };
+}
+
+pub const MapType = struct {
+    /// Accessible from userspace.
+    user: bool = false,
+
+    /// A global mapping that is not flushed on context switch.
+    global: bool = false,
+
+    /// Writeable.
+    writeable: bool = false,
+
+    /// Executable.
+    executable: bool = false,
+
+    /// Uncached.
+    no_cache: bool = false,
+
+    pub fn equal(a: MapType, b: MapType) bool {
+        return a.user == b.user and
+            a.global == b.global and
+            a.writeable == b.writeable and
+            a.executable == b.executable and
+            a.no_cache == b.no_cache;
+    }
+
+    pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
+        _ = indent;
+
+        try writer.writeAll("Type{ ");
+
+        const buffer: []const u8 = &[_]u8{
+            if (value.user) 'U' else 'K',
+            if (value.writeable) 'W' else 'R',
+            if (value.executable) 'X' else '-',
+            if (value.global) 'G' else '-',
+            if (value.no_cache) 'C' else '-',
+        };
+
+        try writer.writeAll(buffer);
+        try writer.writeAll(" }");
+    }
+
+    pub inline fn format(
+        region: MapType,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(region, writer, 0)
+        else
+            print(region, writer.any(), 0);
+    }
+
+    fn __helpZls() void {
+        MapType.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+    }
+};
+
 pub const init = struct {
-    pub fn buildEarlyMemoryLayout() !void {
-        log.debug("building early kernel memory layout", .{});
+    pub fn buildMemoryLayout() !void {
+        log.debug("building kernel memory layout", .{});
 
         const base_address = kernel.boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
 
@@ -77,7 +160,7 @@ pub const init = struct {
         memory_layout.sortMemoryLayout();
 
         if (log.levelEnabled(.debug)) {
-            log.debug("early kernel memory layout:", .{});
+            log.debug("kernel memory layout:", .{});
 
             for (memory_layout.layout.constSlice()) |region| {
                 log.debug("\t{}", .{region});
@@ -85,6 +168,39 @@ pub const init = struct {
         }
     }
 
+    pub fn initVmm() !void {
+        log.debug("building kernel page table", .{});
+
+        for (memory_layout.layout.constSlice()) |region| {
+            log.debug("mapping region: {}", .{region});
+
+            const physical_range = switch (region.type) {
+                .direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+                .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
+                    core.PhysicalAddress.fromInt(
+                        region.range.address.value - memory_layout.physical_to_virtual_offset.value,
+                    ),
+                    region.range.size,
+                ),
+            };
+
+            const map_type: MapType = switch (region.type) {
+                .executable_section => .{ .executable = true, .global = true },
+                .readonly_section, .sdf_section => .{ .global = true },
+                .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+            };
+
+            try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                kernelPageTable(),
+                region.range,
+                physical_range,
+                map_type,
+            );
+        }
+
+        log.debug("switching to kernel page table", .{});
+        kernel.vmm.switchToKernelPageTable();
+    }
 
     /// Registers the kernel sections in the memory layout.
     fn registerKernelSections() !void {

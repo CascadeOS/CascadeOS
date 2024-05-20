@@ -40,4 +40,11 @@ pub const paging = struct {
         x64.PageTable.medium_page_size,
         x64.PageTable.large_page_size,
     };
+    pub const PageTable = x64.PageTable;
+
+    pub const switchToPageTable = x64.paging.switchToPageTable;
+
+    pub const init = struct {
+        pub const mapToPhysicalRangeAllPageSizes = x64.paging.init.mapToPhysicalRangeAllPageSizes;
+    };
 };

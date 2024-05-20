@@ -12,7 +12,7 @@ ticket: u32 = 0,
 current_holder: kernel.Cpu.Id = .none,
 
 pub const Held = struct {
-    exclusion: kernel.sync.Exclusion,
+    exclusion: kernel.sync.InterruptExclusion,
     spinlock: *TicketSpinLock,
 
     /// Unlocks the spinlock.

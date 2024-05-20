@@ -33,8 +33,13 @@ pub fn earlyInit() !void {
         early_output.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n") catch {};
     }
 
-    try kernel.vmm.init.buildEarlyMemoryLayout();
+    log.debug("capturing system information", .{});
+    try kernel.vmm.init.buildMemoryLayout();
     try kernel.arch.init.captureSystemInformation();
 
+    log.debug("preparing physical memory management", .{});
     try kernel.pmm.init.initPmm();
+
+    log.debug("preparing virtual memory management", .{});
+    try kernel.vmm.init.initVmm();
 }

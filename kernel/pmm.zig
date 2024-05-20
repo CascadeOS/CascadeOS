@@ -51,7 +51,7 @@ pub fn allocatePage() AllocateError!core.PhysicalRange {
         @memset(slice, undefined);
     }
 
-    const physical_range = kernel.physicalRangeFromDirectMap(virtual_range) catch unreachable;
+    const physical_range = kernel.vmm.physicalRangeFromDirectMap(virtual_range) catch unreachable;
 
     log.debug("allocated: {}", .{physical_range});
 
@@ -67,7 +67,7 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
     core.debugAssert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     core.debugAssert(range.size.equal(kernel.arch.paging.standard_page_size));
 
-    const page_node = kernel.directMapFromPhysical(range.address).toPtr(*PageNode);
+    const page_node = kernel.vmm.directMapFromPhysical(range.address).toPtr(*PageNode);
     page_node.* = .{};
 
     {

@@ -127,6 +127,53 @@ pub const paging = struct {
 
     /// All the page sizes supported by the architecture in order of smallest to largest.
     pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
+
+    /// The page table type for the architecture.
+    pub const PageTable: type = current.paging.PageTable;
+
+    /// Switches to the given page table.
+    pub inline fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
+        checkSupport(current.paging, "switchToPageTable", fn (core.PhysicalAddress) void);
+
+        current.paging.switchToPageTable(page_table_address);
+    }
+
+    pub const MapError = error{
+        AlreadyMapped,
+
+        /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+        MappingNotValid,
+    } || kernel.pmm.AllocateError;
+
+    pub const init = struct {
+        /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual range address and size are aligned to the standard page size
+        ///  - the physical range address and size are aligned to the standard page size
+        ///  - the virtual range size is equal to the physical range size
+        ///  - the virtual range is not already mapped
+        ///
+        /// This function:
+        ///  - uses all page sizes available to the architecture
+        ///  - does not flush the TLB
+        ///  - on error is not required to roll back any modifications to the page tables
+        pub inline fn mapToPhysicalRangeAllPageSizes(
+            page_table: *PageTable,
+            virtual_range: core.VirtualRange,
+            physical_range: core.PhysicalRange,
+            map_type: kernel.vmm.MapType,
+        ) MapError!void {
+            checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
+                *PageTable,
+                core.VirtualRange,
+                core.PhysicalRange,
+                kernel.vmm.MapType,
+            ) MapError!void);
+
+            return current.paging.init.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
+        }
+    };
 };
 
 /// Checks if the current architecture implements the given function.
@@ -151,7 +198,25 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     const decl_type_info = @typeInfo(DeclT).Fn;
     const target_type_info = @typeInfo(TargetT).Fn;
 
-    if (decl_type_info.return_type != target_type_info.return_type) @compileError(mismatch_type_msg);
+    if (decl_type_info.return_type != target_type_info.return_type) {
+        const DeclReturnT = decl_type_info.return_type.?;
+        const TargetReturnT = target_type_info.return_type.?;
+
+        const target_return_type_info = @typeInfo(TargetReturnT);
+        if (target_return_type_info != .ErrorUnion) @compileError(mismatch_type_msg);
+
+        const target_return_error_union = target_return_type_info.ErrorUnion;
+        if (target_return_error_union.error_set != anyerror) @compileError(mismatch_type_msg);
+
+        // the target return type is an error union with anyerror, so the decl return type just needs to be an
+        // error union with the right child type.
+
+        const decl_return_type_info = @typeInfo(DeclReturnT);
+        if (decl_return_type_info != .ErrorUnion) @compileError(mismatch_type_msg);
+
+        const decl_return_error_union = decl_return_type_info.ErrorUnion;
+        if (decl_return_error_union.payload != target_return_error_union.payload) @compileError(mismatch_type_msg);
+    }
 
     if (decl_type_info.params.len != target_type_info.params.len) @compileError(mismatch_type_msg);
 
