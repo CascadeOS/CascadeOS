@@ -48,3 +48,7 @@ pub const paging = struct {
         pub const mapToPhysicalRangeAllPageSizes = x64.paging.init.mapToPhysicalRangeAllPageSizes;
     };
 };
+
+pub const scheduling = struct {
+    pub const changeStackAndReturn = x64.scheduling.changeStackAndReturn;
+};
