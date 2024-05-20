@@ -8,7 +8,7 @@ const kernel = @import("kernel");
 var bootstrap_cpu: kernel.Cpu = .{
     .id = .bootstrap,
     .interrupt_disable_count = 1, // interrupts start disabled
-    .idle_stack = undefined, // set at the beginning of `earlyInit`
+    .idle_stack = undefined, // set at the beginning of `initStage1`
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
@@ -19,7 +19,7 @@ const log = kernel.log.scoped(.init);
 /// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap cpu executes this function.
-pub fn earlyInit() !void {
+pub fn initStage1() !void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
@@ -49,4 +49,36 @@ pub fn earlyInit() !void {
 
     log.debug("preparing virtual memory management", .{});
     try kernel.vmm.init.initVmm();
+
+    initStage2(&bootstrap_cpu);
+}
+
+/// Stage 2 of kernel initialization.
+///
+/// This function is executed by all cpus, including the bootstrap cpu.
+///
+/// All cpus are using the bootloader provided stack.
+fn initStage2(cpu: *kernel.Cpu) noreturn {
+    kernel.vmm.switchToKernelPageTable();
+    kernel.arch.init.loadCpu(cpu);
+
+    const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
+        core.VirtualAddress.fromPtr(&initStage3),
+    ) catch unreachable; // the idle stack is big enough to hold one return address
+
+    log.debug("leaving bootloader provided stack", .{});
+    kernel.arch.scheduling.changeStackAndReturn(idle_stack_pointer);
+    unreachable;
+}
+
+/// Stage 3 of kernel initialization.
+///
+/// This function is executed by all cpus, including the bootstrap cpu.
+///
+/// All cpus are using a normal kernel stack.
+fn initStage3() noreturn {
+    const cpu = kernel.arch.rawGetCpu(); // we know interrupts are disabled and we are not going to be preempted
+    core.debugAssert(cpu.interrupt_disable_count == 1);
+
+    core.panic("TODO: enter scheduler");
 }
