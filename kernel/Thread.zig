@@ -10,6 +10,8 @@ const Thread = @This();
 id: Id,
 _name: Name,
 
+state: State = .ready,
+
 /// The process that this thread belongs to.
 ///
 /// `null` if this is a kernel thread.
@@ -24,6 +26,12 @@ pub fn name(self: *const Thread) []const u8 {
 pub inline fn isKernel(self: *const Thread) bool {
     return self.process == null;
 }
+
+pub const State = enum {
+    ready,
+    running,
+    waiting,
+};
 
 pub const Name = std.BoundedArray(u8, kernel.config.thread_name_length);
 pub const Id = enum(u32) {
