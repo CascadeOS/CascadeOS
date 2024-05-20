@@ -22,6 +22,11 @@ pub fn loadPageTable(self: *const Process) void {
     );
 }
 
+pub const Name = std.BoundedArray(u8, kernel.config.process_name_length);
+pub const Id = enum(u64) {
+    _,
+};
+
 pub fn print(process: *const Process, writer: std.io.AnyWriter, indent: usize) !void {
     // Process(process.name)
 
@@ -45,11 +50,6 @@ pub inline fn format(
     else
         print(process, writer.any(), 0);
 }
-
-pub const Name = std.BoundedArray(u8, kernel.config.process_name_length);
-pub const Id = enum(u64) {
-    _,
-};
 
 fn __helpZls() void {
     Process.print(undefined, @as(std.fs.File.Writer, undefined), 0);

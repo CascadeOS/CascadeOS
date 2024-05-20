@@ -7,6 +7,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+const Cpu = @This();
+
 id: Id,
 
 /// Tracks the number of times we have disabled interrupts.
@@ -32,3 +34,31 @@ pub const Id = enum(u32) {
 
     _,
 };
+
+pub fn print(cpu: *const Cpu, writer: std.io.AnyWriter, indent: usize) !void {
+    // Cpu(id)
+
+    _ = indent;
+
+    try writer.writeAll("Cpu(");
+    try std.fmt.formatInt(@intFromEnum(cpu.id), 10, .lower, .{}, writer);
+    try writer.writeByte(')');
+}
+
+pub inline fn format(
+    cpu: *const Cpu,
+    comptime fmt: []const u8,
+    options: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    _ = options;
+    _ = fmt;
+    return if (@TypeOf(writer) == std.io.AnyWriter)
+        print(cpu, writer, 0)
+    else
+        print(cpu, writer.any(), 0);
+}
+
+fn __helpZls() void {
+    Cpu.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+}
