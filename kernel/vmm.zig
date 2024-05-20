@@ -73,6 +73,14 @@ pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalA
     return .{ .value = self.value -% memory_layout.physical_to_virtual_offset.value };
 }
 
+/// Returns the physical address of the given virtual address if it is in the direct map.
+pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirectMap}!core.PhysicalAddress {
+    if (direct_map_range.contains(self)) {
+        return .{ .value = self.value -% direct_map_range.address.value };
+    }
+    return error.AddressNotInAnyDirectMap;
+}
+
 pub const MapType = struct {
     /// Accessible from userspace.
     user: bool = false,
