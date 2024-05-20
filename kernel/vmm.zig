@@ -9,29 +9,26 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.vmm);
 
-/// The virtual base address that the kernel was loaded at.
+/// The memory layout of the kernel.
 ///
-/// Initialized during `init.captureKernelOffsets.
-pub var kernel_virtual_base_address: core.VirtualAddress = undefined;
+/// Initialized during `init.buildMemoryLayout`.
+var memory_layout: MemoryLayout = undefined;
 
 /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
 ///
-/// Initialized during `init.captureKernelOffsets`.
-pub var kernel_virtual_offset: ?core.Size = null;
+/// This is optional due to the small window on start up where the panic handler can run before this is set.
+pub fn virtualOffset() ?core.Size {
+    return memory_layout.virtual_offset;
+}
 
-/// Offset from the virtual address of kernel sections to the physical address of the section.
+/// Provides an identity mapping between virtual and physical addresses.
 ///
-/// Initialized during `init.captureKernelOffsets`.
-pub var kernel_physical_to_virtual_offset: core.Size = undefined;
-
-/// This direct map provides an identity mapping between virtual and physical addresses.
-///
-/// Initialized during `init.captureBootloaderDirectMap`.
-pub var direct_map: core.VirtualRange = undefined;
+/// Initialized during `init.buildMemoryLayout`.
+var direct_map_range: core.VirtualRange = undefined;
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
-    return .{ .value = self.value + direct_map.address.value };
+    return .{ .value = self.value + direct_map_range.address.value };
 }
 
 /// Returns a virtual range corresponding to this physical range in the direct map.
@@ -44,9 +41,9 @@ pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
 
 /// Returns the physical range of the given direct map virtual range.
 pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDirectMap}!core.PhysicalRange {
-    if (direct_map.containsRange(self)) {
+    if (direct_map_range.containsRange(self)) {
         return .{
-            .address = core.PhysicalAddress.fromInt(self.address.value -% direct_map.address.value),
+            .address = core.PhysicalAddress.fromInt(self.address.value -% direct_map_range.address.value),
             .size = self.size,
         };
     }
@@ -54,35 +51,121 @@ pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDir
 }
 
 pub const init = struct {
-    pub fn earlyVmmInit() !void {
-        log.debug("capturing kernel offsets", .{});
-        try captureKernelOffsets();
+    pub fn buildEarlyMemoryLayout() !void {
+        log.debug("building early kernel memory layout", .{});
 
-        log.debug("capturing direct map", .{});
-        try captureBootloaderDirectMap();
+        const base_address = kernel.boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
+
+        log.debug("kernel virtual base address: {}", .{base_address.virtual});
+        log.debug("kernel physical base address: {}", .{base_address.physical});
+
+        const virtual_offset = core.Size.from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
+        const physical_to_virtual_offset = core.Size.from(base_address.virtual.value - base_address.physical.value, .byte);
+        log.debug("kernel virtual offset: 0x{x}", .{virtual_offset.value});
+        log.debug("kernel physical to virtual offset: 0x{x}", .{physical_to_virtual_offset.value});
+
+        memory_layout = .{
+            .virtual_base_address = base_address.virtual,
+            .virtual_offset = virtual_offset,
+            .physical_to_virtual_offset = physical_to_virtual_offset,
+        };
+
+        try registerKernelSections();
+
+        try calculateAndRegisterDirectMap();
+
+        memory_layout.sortMemoryLayout();
+
+        if (log.levelEnabled(.debug)) {
+            log.debug("early kernel memory layout:", .{});
+
+            for (memory_layout.layout.constSlice()) |region| {
+                log.debug("\t{}", .{region});
+            }
+        }
     }
 
-    fn captureKernelOffsets() !void {
-        const kernel_base_address = kernel.boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
 
-        const kernel_virtual = kernel_base_address.virtual;
-        const kernel_physical = kernel_base_address.physical;
+    /// Registers the kernel sections in the memory layout.
+    fn registerKernelSections() !void {
+        const linker_symbols = struct {
+            extern const __text_start: u8;
+            extern const __text_end: u8;
+            extern const __rodata_start: u8;
+            extern const __rodata_end: u8;
+            extern const __data_start: u8;
+            extern const __data_end: u8;
+        };
 
-        kernel_virtual_base_address = kernel_virtual;
-        log.debug("kernel virtual base address: {}", .{kernel_virtual_base_address});
-        log.debug("kernel physical base address: {}", .{kernel_physical});
+        const sdf_slice = kernel.debug.sdfSlice();
+        const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
 
-        kernel_virtual_offset = core.Size.from(kernel_virtual.value - kernel.config.kernel_base_address.value, .byte);
-        kernel_physical_to_virtual_offset = core.Size.from(kernel_virtual.value - kernel_physical.value, .byte);
-        log.debug("kernel virtual offset: 0x{x}", .{kernel_virtual_offset.?.value});
-        log.debug("kernel physical to virtual offset: 0x{x}", .{kernel_physical_to_virtual_offset.value});
+        const sections: []const struct {
+            core.VirtualAddress,
+            core.VirtualAddress,
+            MemoryLayout.Region.Type,
+        } = &.{
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+                .executable_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+                .readonly_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+                .writeable_section,
+            },
+            .{
+                sdf_range.address,
+                sdf_range.endBound(),
+                .sdf_section,
+            },
+        };
+
+        for (sections) |section| {
+            const start_address = section[0];
+            const end_address = section[1];
+            const region_type = section[2];
+
+            core.assert(end_address.greaterThan(start_address));
+
+            const virtual_range = core.VirtualRange.fromAddr(
+                start_address,
+                core.Size
+                    .from(end_address.value - start_address.value, .byte)
+                    .alignForward(kernel.arch.paging.standard_page_size),
+            );
+
+            memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+        }
     }
 
-    fn captureBootloaderDirectMap() !void {
-        const direct_map_size = try calculateSizeOfDirectMap();
+    fn calculateAndRegisterDirectMap() !void {
+        const candidate_direct_map_range = core.VirtualRange.fromAddr(
+            kernel.boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
+            try calculateSizeOfDirectMap(),
+        );
 
-        direct_map = try calculateDirectMapRange(direct_map_size);
-        log.debug("direct map: {}", .{direct_map});
+        // does the candidate range overlap a pre-existing region?
+        for (memory_layout.layout.constSlice()) |region| {
+            if (region.range.containsRange(candidate_direct_map_range)) {
+                log.err(
+                    \\direct map overlaps a pre-existing memory region:
+                    \\  direct map: {}
+                    \\  other region: {}
+                , .{ candidate_direct_map_range, region });
+
+                return error.DirectMapOverlapsRegion;
+            }
+        }
+
+        direct_map_range = candidate_direct_map_range;
+        memory_layout.registerRegion(.{ .range = candidate_direct_map_range, .type = .direct_map });
     }
 
     /// Calculates the size of the direct map.
@@ -90,9 +173,8 @@ pub const init = struct {
         const last_memory_map_entry = blk: {
             var memory_map_iterator = kernel.boot.memoryMap(.backwards);
             while (memory_map_iterator.next()) |memory_map_entry| {
-                if (memory_map_entry.type == .reserved_or_unusable and
-                    memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000)))
-                {
+                if (memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
+                    log.debug("skipping weird QEMU memory map entry: {}", .{memory_map_entry});
                     // this is a qemu specific hack to not have a 1TiB direct map
                     // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
                     continue;
@@ -111,18 +193,76 @@ pub const init = struct {
         const four_gib = core.Size.from(4, .gib);
         if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
 
-        log.debug("size of direct map: {}", .{direct_map_size});
-
         return direct_map_size;
     }
+};
 
-    fn calculateDirectMapRange(direct_map_size: core.Size) !core.VirtualRange {
-        const direct_map_address = kernel.boot.directMapAddress() orelse return error.DirectMapAddressNotProvided;
+const MemoryLayout = struct {
+    /// The virtual base address that the kernel was loaded at.
+    virtual_base_address: core.VirtualAddress = undefined,
 
-        if (!direct_map_address.isAligned(kernel.arch.paging.standard_page_size)) {
-            return error.DirectMapAddressNotAligned;
+    /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
+    ///
+    /// This is optional due to the small window on start up where the panic handler can run before this is set.
+    virtual_offset: ?core.Size = null,
+
+    /// Offset from the virtual address of kernel sections to the physical address of the section.
+    physical_to_virtual_offset: core.Size = undefined,
+
+    layout: std.BoundedArray(Region, std.meta.tags(Region.Type).len) = .{},
+
+    /// Registers a kernel memory region.
+    pub fn registerRegion(self: *MemoryLayout, region: Region) void {
+        self.layout.append(region) catch unreachable;
+    }
+
+    /// Sorts the kernel memory layout from lowest to highest address.
+    pub fn sortMemoryLayout(self: *MemoryLayout) void {
+        std.mem.sort(Region, self.layout.slice(), {}, struct {
+            fn lessThanFn(context: void, region: Region, other_region: Region) bool {
+                _ = context;
+                return region.range.address.lessThan(other_region.range.address);
+            }
+        }.lessThanFn);
+    }
+
+    pub const Region = struct {
+        range: core.VirtualRange,
+        type: Type,
+
+        pub const Type = enum {
+            writeable_section,
+            readonly_section,
+            executable_section,
+            sdf_section,
+
+            direct_map,
+        };
+
+        pub fn print(region: Region, writer: std.io.AnyWriter, indent: usize) !void {
+            try writer.writeAll("MemoryLayout.Region{ ");
+            try region.range.print(writer, indent);
+            try writer.writeAll(" - ");
+            try writer.writeAll(@tagName(region.type));
+            try writer.writeAll(" }");
         }
 
-        return core.VirtualRange.fromAddr(direct_map_address, direct_map_size);
-    }
+        pub inline fn format(
+            region: Region,
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = options;
+            _ = fmt;
+            return if (@TypeOf(writer) == std.io.AnyWriter)
+                print(region, writer, 0)
+            else
+                print(region, writer.any(), 0);
+        }
+
+        fn __helpZls() void {
+            Region.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+        }
+    };
 };

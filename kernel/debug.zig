@@ -106,7 +106,7 @@ fn printSourceAtAddress(writer: std.io.AnyWriter, address: usize, opt_symbol_sou
     }
 
     var kernel_virtual_offset_is_null: bool = false;
-    const kernel_virtual_offset = if (kernel.vmm.kernel_virtual_offset) |offset| offset.value else blk: {
+    const kernel_virtual_offset = if (kernel.vmm.virtualOffset()) |offset| offset.value else blk: {
         kernel_virtual_offset_is_null = true;
         break :blk 0;
     };
