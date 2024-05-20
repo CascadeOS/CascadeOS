@@ -187,6 +187,36 @@ pub const scheduling = struct {
 
         try current.scheduling.changeStackAndReturn(stack_pointer);
     }
+
+    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
+    pub inline fn switchToIdle(
+        cpu: *kernel.Cpu,
+        stack_pointer: core.VirtualAddress,
+        opt_old_thread: ?*kernel.Thread,
+    ) noreturn {
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Thread) noreturn);
+
+        current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_thread);
+    }
+
+    pub inline fn switchToThreadFromIdle(
+        cpu: *kernel.Cpu,
+        thread: *kernel.Thread,
+    ) noreturn {
+        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*kernel.Cpu, *kernel.Thread) noreturn);
+
+        current.scheduling.switchToThreadFromIdle(cpu, thread);
+    }
+
+    pub inline fn switchToThreadFromThread(
+        cpu: *kernel.Cpu,
+        old_thread: *kernel.Thread,
+        new_thread: *kernel.Thread,
+    ) void {
+        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Cpu, *kernel.Thread, *kernel.Thread) void);
+
+        current.scheduling.switchToThreadFromThread(cpu, old_thread, new_thread);
+    }
 };
 
 /// Checks if the current architecture implements the given function.

@@ -51,4 +51,7 @@ pub const paging = struct {
 
 pub const scheduling = struct {
     pub const changeStackAndReturn = x64.scheduling.changeStackAndReturn;
+    pub const switchToIdle = x64.scheduling.switchToIdle;
+    pub const switchToThreadFromIdle = x64.scheduling.switchToThreadFromIdle;
+    pub const switchToThreadFromThread = x64.scheduling.switchToThreadFromThread;
 };

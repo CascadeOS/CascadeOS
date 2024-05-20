@@ -78,7 +78,7 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirect
     if (direct_map_range.contains(self)) {
         return .{ .value = self.value -% direct_map_range.address.value };
     }
-    return error.AddressNotInAnyDirectMap;
+    return error.AddressNotInDirectMap;
 }
 
 pub const MapType = struct {

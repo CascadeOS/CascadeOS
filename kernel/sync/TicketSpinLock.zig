@@ -28,6 +28,14 @@ pub fn isLockedBy(self: *const TicketSpinLock, cpu_id: kernel.Cpu.Id) bool {
     return @atomicLoad(kernel.Cpu.Id, &self.current_holder, .acquire) == cpu_id;
 }
 
+/// Returns true if the spinlock is locked by the current cpu.
+pub fn isLockedByCurrent(self: *const TicketSpinLock) bool {
+    const interrupt_exclusion = kernel.sync.getInterruptExclusion(); // TODO: could be preemption exclusion
+    defer interrupt_exclusion.release();
+
+    return self.isLockedBy(interrupt_exclusion.cpu.id);
+}
+
 /// Releases the spinlock.
 ///
 /// Intended to be used only when the caller needs to unlock the spinlock on behalf of another thread.

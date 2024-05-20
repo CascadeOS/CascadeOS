@@ -80,5 +80,7 @@ fn initStage3() noreturn {
     const cpu = kernel.arch.rawGetCpu(); // we know interrupts are disabled and we are not going to be preempted
     core.debugAssert(cpu.interrupt_disable_count == 1);
 
-    core.panic("TODO: enter scheduler");
+    log.debug("entering scheduler on {}", .{cpu.id});
+    kernel.scheduler.schedule(kernel.scheduler.acquireScheduler());
+    unreachable;
 }

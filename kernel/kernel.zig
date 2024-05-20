@@ -16,6 +16,7 @@ pub const debug = @import("debug.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
 pub const Process = @import("Process.zig");
+pub const scheduler = @import("scheduler.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Thread = @import("Thread.zig");
