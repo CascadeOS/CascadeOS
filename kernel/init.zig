@@ -8,8 +8,11 @@ const kernel = @import("kernel");
 var bootstrap_cpu: kernel.Cpu = .{
     .id = .bootstrap,
     .interrupt_disable_count = 1, // interrupts start disabled
+    .idle_stack = undefined, // set at the beginning of `earlyInit`
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
+
+var bootstrap_idle_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
 
 const log = kernel.log.scoped(.init);
 
@@ -20,6 +23,10 @@ pub fn earlyInit() !void {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
+    bootstrap_cpu.idle_stack = kernel.Stack.fromRange(
+        core.VirtualRange.fromSlice(u8, &bootstrap_idle_stack),
+        core.VirtualRange.fromSlice(u8, &bootstrap_idle_stack),
+    );
     kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
 
