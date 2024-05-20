@@ -34,6 +34,7 @@ pub fn earlyInit() !void {
     }
 
     try kernel.vmm.init.buildEarlyMemoryLayout();
+    try kernel.arch.init.captureSystemInformation();
 
     try kernel.pmm.init.initPmm();
 }

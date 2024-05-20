@@ -61,3 +61,11 @@ pub fn loadCpu(cpu: *kernel.Cpu) void {
 
     x64.KERNEL_GS_BASE.write(@intFromPtr(cpu));
 }
+
+/// Capture any system information that is required for the architecture.
+///
+/// For example, on x64 this should capture the CPUID information.
+pub fn captureSystemInformation() !void {
+    log.debug("capturing cpuid information", .{});
+    try x64.info.cpu_id.capture();
+}

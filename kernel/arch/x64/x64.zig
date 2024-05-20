@@ -9,6 +9,7 @@ const lib_x64 = @import("lib_x64");
 pub usingnamespace lib_x64;
 
 pub const ArchCpu = @import("ArchCpu.zig");
+pub const info = @import("info.zig");
 pub const init = @import("init.zig");
 pub const interrupts = @import("interrupts.zig");
 pub const paging = @import("paging.zig");
