@@ -254,7 +254,7 @@ fn unhandledInterrupt(
 }
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    const interrupt_exclusion = kernel.sync.assertInterruptExclusion();
+    const interrupt_exclusion = kernel.sync.getInterruptExclusion();
 
     handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_exclusion, interrupt_frame);
 
