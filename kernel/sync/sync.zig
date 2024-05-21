@@ -25,9 +25,8 @@ pub fn assertInterruptExclusion() InterruptExclusion {
     core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());
 
     const cpu = kernel.arch.rawGetCpu();
-    core.debugAssert(cpu.interrupt_disable_count == 0);
 
-    cpu.interrupt_disable_count = 1;
+    cpu.interrupt_disable_count += 1;
 
     return .{ .cpu = cpu };
 }
