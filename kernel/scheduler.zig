@@ -119,7 +119,10 @@ pub fn releaseScheduler() kernel.sync.InterruptExclusion {
 }
 
 fn idle() noreturn {
-    releaseScheduler().release();
+    const interrupt_exclusion = releaseScheduler();
+    core.debugAssert(interrupt_exclusion.cpu.interrupt_disable_count == 1);
+
+    interrupt_exclusion.release();
 
     log.debug("entering idle", .{});
 
