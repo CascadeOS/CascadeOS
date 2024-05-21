@@ -11,7 +11,7 @@ export fn _start() callconv(.C) noreturn {
     @call(.never_inline, @import("init.zig").initStage1, .{}) catch |err| {
         core.panicFmt("unhandled error: {s}", .{@errorName(err)});
     };
-    core.panic("`init.earlyInit` returned");
+    core.panic("`init.initStage1` returned");
 }
 
 pub const KernelBaseAddress = struct {

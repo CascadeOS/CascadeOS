@@ -19,7 +19,7 @@ const log = kernel.log.scoped(.init);
 /// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap cpu executes this function.
-pub fn initStage1() !void {
+pub fn initStage1() !noreturn {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
@@ -51,6 +51,7 @@ pub fn initStage1() !void {
     try kernel.vmm.init.initVmm();
 
     initStage2(&bootstrap_cpu);
+    unreachable;
 }
 
 /// Stage 2 of kernel initialization.
