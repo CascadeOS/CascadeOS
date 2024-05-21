@@ -14,20 +14,20 @@ const log = kernel.log.scoped(.vmm);
 /// Initialized during `init.buildMemoryLayout`.
 var memory_layout: MemoryLayout = undefined;
 
-pub inline fn kernelPageTable() *kernel.arch.paging.PageTable {
-    const static = struct {
-        var kernel_page_table: kernel.arch.paging.PageTable = .{};
-    };
+/// The kernel page table.
+///
+/// Initialized during `init.initVmm`.
+pub var kernel_page_table: *kernel.arch.paging.PageTable = undefined;
 
-    return &static.kernel_page_table;
-}
+/// Switches to the given page table.
+///
+/// The page table must be mapped into the direct map.
+pub fn switchToPageTable(page_table: *const kernel.arch.paging.PageTable) void {
+    const physical_address =
+        physicalFromDirectMap(core.VirtualAddress.fromPtr(page_table)) catch
+        core.panicFmt("page table {*} is not in the direct map", .{page_table});
 
-pub fn switchToKernelPageTable() void {
-    kernel.arch.paging.switchToPageTable(
-        physicalFromKernelSectionUnsafe(core.VirtualAddress.fromPtr(
-            kernelPageTable(),
-        )),
-    );
+    kernel.arch.paging.switchToPageTable(physical_address);
 }
 
 /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
@@ -179,6 +179,8 @@ pub const init = struct {
     pub fn initVmm() !void {
         log.debug("building kernel page table", .{});
 
+        kernel_page_table = try kernel.arch.paging.allocatePageTable();
+
         for (memory_layout.layout.constSlice()) |region| {
             log.debug("mapping region: {}", .{region});
 
@@ -199,7 +201,7 @@ pub const init = struct {
             };
 
             try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                kernelPageTable(),
+                kernel_page_table,
                 region.range,
                 physical_range,
                 map_type,
@@ -207,7 +209,7 @@ pub const init = struct {
         }
 
         log.debug("switching to kernel page table", .{});
-        kernel.vmm.switchToKernelPageTable();
+        kernel.vmm.switchToPageTable(kernel_page_table);
     }
 
     /// Registers the kernel sections in the memory layout.

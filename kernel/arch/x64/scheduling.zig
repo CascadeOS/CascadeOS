@@ -39,7 +39,7 @@ pub fn switchToIdle(
 
     if (!old_thread.isKernel()) {
         // the process was not the kernel so we need to switch to the kernel page table
-        kernel.vmm.switchToKernelPageTable();
+        kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
     }
 
     cpu.arch.tss.setPrivilegeStack(
@@ -89,7 +89,7 @@ pub fn switchToThreadFromThread(
         if (new_thread.process) |new_process| {
             new_process.loadPageTable();
         } else {
-            kernel.vmm.switchToKernelPageTable();
+            kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
         }
     }
 

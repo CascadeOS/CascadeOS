@@ -42,6 +42,7 @@ pub const paging = struct {
     };
     pub const PageTable = x64.PageTable;
 
+    pub const allocatePageTable = x64.paging.allocatePageTable;
     pub const switchToPageTable = x64.paging.switchToPageTable;
 
     pub const init = struct {

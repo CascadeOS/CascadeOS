@@ -17,9 +17,7 @@ pub fn name(self: *const Process) []const u8 {
 }
 
 pub fn loadPageTable(self: *const Process) void {
-    kernel.arch.paging.switchToPageTable(
-        kernel.vmm.physicalFromDirectMap(core.VirtualAddress.fromPtr(self.page_table)) catch unreachable,
-    );
+    kernel.vmm.switchToPageTable(self.page_table);
 }
 
 pub const Name = std.BoundedArray(u8, kernel.config.process_name_length);

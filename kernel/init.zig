@@ -60,7 +60,7 @@ pub fn initStage1() !noreturn {
 ///
 /// All cpus are using the bootloader provided stack.
 fn initStage2(cpu: *kernel.Cpu) noreturn {
-    kernel.vmm.switchToKernelPageTable();
+    kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
     kernel.arch.init.loadCpu(cpu);
 
     const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(

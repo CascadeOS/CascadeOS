@@ -131,6 +131,13 @@ pub const paging = struct {
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
+    /// Allocates a new page table and returns a pointer to it in the direct map.
+    pub inline fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
+        checkSupport(current.paging, "allocatePageTable", fn () kernel.pmm.AllocateError!*PageTable);
+
+        return current.paging.allocatePageTable();
+    }
+
     /// Switches to the given page table.
     pub inline fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
         checkSupport(current.paging, "switchToPageTable", fn (core.PhysicalAddress) void);

@@ -15,6 +15,17 @@ const MapError = kernel.arch.paging.MapError;
 
 pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 
+/// Allocates a new page table and returns a pointer to it in the direct map.
+pub fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
+    const range = try kernel.pmm.allocatePage();
+    core.assert(range.size.greaterThanOrEqual(core.Size.of(x64.PageTable)));
+
+    const page_table = kernel.vmm.directMapFromPhysical(range.address).toPtr(*x64.PageTable);
+    page_table.* = .{};
+
+    return page_table;
+}
+
 /// Switches to the given page table.
 pub fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
     x64.Cr3.writeAddress(page_table_address);
