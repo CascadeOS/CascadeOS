@@ -11,13 +11,21 @@ const log = kernel.log.scoped(.scheduler);
 var lock: kernel.sync.TicketSpinLock = .{};
 var ready_to_run: containers.SinglyLinkedFIFO = .{};
 
+pub const SchedulerLockHeld = struct {
+    held: kernel.sync.TicketSpinLock.Held,
+
+    pub inline fn release(self: SchedulerLockHeld) void {
+        self.held.release();
+    }
+};
+
 /// Performs a round robin scheduling of the ready threads.
 ///
 /// This function must be called with the lock held (see `acquireScheduler`).
-pub fn schedule(held: kernel.sync.TicketSpinLock.Held) void {
+pub fn schedule(held: SchedulerLockHeld) void {
     validateLock(held);
 
-    const cpu = held.exclusion.cpu;
+    const cpu = held.held.exclusion.cpu;
 
     const opt_current_thread = cpu.current_thread;
 
@@ -45,7 +53,7 @@ pub fn schedule(held: kernel.sync.TicketSpinLock.Held) void {
 /// Queues a thread to be run by the scheduler.
 ///
 /// This function must be called with the lock held (see `acquireScheduler`).
-pub fn queueThread(held: kernel.sync.TicketSpinLock.Held, thread: *kernel.Thread) void {
+pub fn queueThread(held: SchedulerLockHeld, thread: *kernel.Thread) void {
     validateLock(held);
     core.debugAssert(thread.next_thread_node.next == null);
 
@@ -92,16 +100,16 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
     kernel.arch.scheduling.switchToThreadFromThread(cpu, current_thread, new_thread);
 }
 
-inline fn validateLock(held: kernel.sync.TicketSpinLock.Held) void {
-    core.debugAssert(held.spinlock == &lock);
+inline fn validateLock(held: SchedulerLockHeld) void {
+    core.debugAssert(held.held.spinlock == &lock);
     core.debugAssert(lock.isLockedByCurrent());
 }
 
-/// Acquires the scheduler and produces a `TicketSpinLock.Held`.
+/// Acquires the scheduler and produces a `SchedulerLockHeld`.
 ///
-/// It is the caller's responsibility to call `TicketSpinLock.Held.release()` when done.
-pub fn acquireScheduler() kernel.sync.TicketSpinLock.Held {
-    return lock.acquire();
+/// It is the caller's responsibility to call `SchedulerLockHeld.Held.release()` when done.
+pub fn acquireScheduler() SchedulerLockHeld {
+    return .{ .held = lock.acquire() };
 }
 
 /// Releases the scheduler and produces a `kernel.sync.InterruptExclusion`.
