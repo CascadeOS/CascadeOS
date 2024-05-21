@@ -5,6 +5,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
+pub const Mutex = @import("Mutex.zig");
 pub const TicketSpinLock = @import("TicketSpinLock.zig");
 
 /// Acquire interrupt exclusion.
