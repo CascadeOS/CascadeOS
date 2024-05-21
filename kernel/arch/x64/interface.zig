@@ -55,4 +55,5 @@ pub const scheduling = struct {
     pub const switchToIdle = x64.scheduling.switchToIdle;
     pub const switchToThreadFromIdle = x64.scheduling.switchToThreadFromIdle;
     pub const switchToThreadFromThread = x64.scheduling.switchToThreadFromThread;
+    pub const prepareNewThread = x64.scheduling.prepareNewThread;
 };

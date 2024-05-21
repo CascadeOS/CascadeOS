@@ -11,9 +11,7 @@ const Cpu = @This();
 
 id: Id,
 
-/// Tracks the number of times we have disabled interrupts.
-///
-/// This allows support for nested disables.
+/// Tracks the depth of nested interrupt disables.
 interrupt_disable_count: u32,
 
 /// The stack used for idle.

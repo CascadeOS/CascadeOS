@@ -105,3 +105,39 @@ pub fn switchToThreadFromThread(
 }
 // Implemented in 'x64/asm/switchToThreadFromThreadImpl.S'
 extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+
+pub fn prepareNewThread(
+    thread: *kernel.Thread,
+    context: u64,
+    target_function: kernel.arch.scheduling.NewThreadFunction,
+) error{StackOverflow}!void {
+    const old_stack_pointer = thread.kernel_stack.stack_pointer;
+    errdefer thread.kernel_stack.stack_pointer = old_stack_pointer;
+
+    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
+
+    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try thread.kernel_stack.push(context);
+    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(thread));
+
+    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
+
+    // general purpose registers
+    for (0..6) |_| thread.kernel_stack.push(@as(u64, 0)) catch unreachable;
+}
+
+// Implemented in 'x64/asm/startNewThread.S'
+extern fn _startNewThread() callconv(.C) noreturn;
+
+fn startNewThread(
+    thread: *kernel.Thread,
+    context: u64,
+    target_function_addr: *const anyopaque,
+) callconv(.C) noreturn {
+    const interrupt_exclusion = kernel.scheduler.releaseScheduler();
+
+    const target_function: kernel.arch.scheduling.NewThreadFunction = @ptrCast(target_function_addr);
+
+    target_function(interrupt_exclusion, thread, context);
+    unreachable;
+}
