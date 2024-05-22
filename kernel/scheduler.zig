@@ -11,10 +11,10 @@ const log = kernel.log.scoped(.scheduler);
 var lock: kernel.sync.TicketSpinLock = .{};
 var ready_to_run: containers.SinglyLinkedFIFO = .{};
 
-pub const SchedulerLockHeld = struct {
+pub const SchedulerHeld = struct {
     held: kernel.sync.TicketSpinLock.Held,
 
-    pub inline fn release(self: SchedulerLockHeld) void {
+    pub inline fn release(self: SchedulerHeld) void {
         self.held.release();
     }
 };
@@ -22,10 +22,10 @@ pub const SchedulerLockHeld = struct {
 /// Performs a round robin scheduling of the ready threads.
 ///
 /// This function must be called with the lock held (see `acquireScheduler`).
-pub fn schedule(held: SchedulerLockHeld) void {
-    validateLock(held);
+pub fn schedule(scheduler_held: SchedulerHeld) void {
+    validateLock(scheduler_held);
 
-    const cpu = held.held.exclusion.cpu;
+    const cpu = scheduler_held.held.exclusion.cpu;
 
     const opt_current_thread = cpu.current_thread;
 
@@ -53,8 +53,8 @@ pub fn schedule(held: SchedulerLockHeld) void {
 /// Queues a thread to be run by the scheduler.
 ///
 /// This function must be called with the lock held (see `acquireScheduler`).
-pub fn queueThread(held: SchedulerLockHeld, thread: *kernel.Thread) void {
-    validateLock(held);
+pub fn queueThread(scheduler_held: SchedulerHeld, thread: *kernel.Thread) void {
+    validateLock(scheduler_held);
     core.debugAssert(thread.next_thread_node.next == null);
 
     thread.state = .ready;
@@ -100,15 +100,15 @@ fn switchToThreadFromThread(cpu: *kernel.Cpu, current_thread: *kernel.Thread, ne
     kernel.arch.scheduling.switchToThreadFromThread(cpu, current_thread, new_thread);
 }
 
-inline fn validateLock(held: SchedulerLockHeld) void {
-    core.debugAssert(held.held.spinlock == &lock);
+inline fn validateLock(scheduler_held: SchedulerHeld) void {
+    core.debugAssert(scheduler_held.held.spinlock == &lock);
     core.debugAssert(lock.isLockedByCurrent());
 }
 
-/// Acquires the scheduler and produces a `SchedulerLockHeld`.
+/// Acquires the scheduler and produces a `SchedulerHeld`.
 ///
-/// It is the caller's responsibility to call `SchedulerLockHeld.Held.release()` when done.
-pub fn acquireScheduler() SchedulerLockHeld {
+/// It is the caller's responsibility to call `SchedulerHeld.Held.release()` when done.
+pub fn acquireScheduler() SchedulerHeld {
     return .{ .held = lock.acquire() };
 }
 
@@ -136,9 +136,9 @@ fn idle() noreturn {
 
     while (true) {
         if (!ready_to_run.isEmpty()) {
-            const held = kernel.scheduler.acquireScheduler();
-            defer held.release();
-            if (!ready_to_run.isEmpty()) schedule(held);
+            const scheduler_held = kernel.scheduler.acquireScheduler();
+            defer scheduler_held.release();
+            if (!ready_to_run.isEmpty()) schedule(scheduler_held);
         }
         kernel.arch.halt();
     }
