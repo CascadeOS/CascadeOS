@@ -254,9 +254,11 @@ fn unhandledInterrupt(
 }
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    const interrupt_exclusion = kernel.sync.getInterruptExclusion();
+    const interrupt_exclusion, const old_interrupt_disable_count = kernel.sync.getInterruptExclusionAndPreviousValue();
 
     handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_exclusion, interrupt_frame);
+
+    interrupt_exclusion.cpu.interrupt_disable_count = old_interrupt_disable_count;
 
     // ensure interrupts are disabled when restoring the state before iret
     x64.disableInterrupts();

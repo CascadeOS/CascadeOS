@@ -19,6 +19,18 @@ pub fn getInterruptExclusion() InterruptExclusion {
     return .{ .cpu = cpu };
 }
 
+/// Acquire interrupt exclusion and the previous value of the disable count.
+pub fn getInterruptExclusionAndPreviousValue() struct { InterruptExclusion, u32 } {
+    kernel.arch.interrupts.disableInterrupts();
+
+    const cpu = kernel.arch.rawGetCpu();
+
+    const old_interrupt_disable_count = cpu.interrupt_disable_count;
+    cpu.interrupt_disable_count = old_interrupt_disable_count + 1;
+
+    return .{ .{ .cpu = cpu }, old_interrupt_disable_count };
+}
+
 /// Asserts that interrupts are excluded with a disable count of one.
 pub fn assertInterruptExclusion() InterruptExclusion {
     core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());

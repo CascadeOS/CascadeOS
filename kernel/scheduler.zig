@@ -26,6 +26,7 @@ pub fn schedule(scheduler_held: SchedulerHeld) void {
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
+    core.debugAssert(cpu.interrupt_disable_count == 1);
 
     const opt_current_thread = cpu.current_thread;
 
@@ -50,6 +51,7 @@ pub fn schedule(scheduler_held: SchedulerHeld) void {
 
     switchToThreadFromThread(cpu, current_thread, new_thread);
 }
+
 /// Queues a thread to be run by the scheduler.
 ///
 /// This function must be called with the lock held (see `acquireScheduler`).
