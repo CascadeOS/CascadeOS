@@ -19,6 +19,17 @@ pub fn getInterruptExclusion() InterruptExclusion {
     return .{ .cpu = cpu };
 }
 
+/// Asserts that interrupts are excluded with a disable count of one.
+pub fn assertInterruptExclusion() InterruptExclusion {
+    core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());
+
+    const cpu = kernel.arch.rawGetCpu();
+
+    core.debugAssert(cpu.interrupt_disable_count == 1);
+
+    return .{ .cpu = cpu };
+}
+
 pub const InterruptExclusion = struct {
     cpu: *kernel.Cpu,
 
