@@ -12,6 +12,8 @@ const Cpu = @This();
 id: Id,
 
 /// Tracks the depth of nested interrupt disables.
+///
+/// Preemption is disabled when interrupts are disabled.
 interrupt_disable_count: u32,
 
 /// The stack used for idle.

@@ -19,37 +19,82 @@ pub const SchedulerHeld = struct {
     }
 };
 
-/// Performs a round robin scheduling of the ready threads.
+/// Acquires the scheduler and produces a `SchedulerHeld`.
 ///
-/// This function must be called with the lock held (see `acquireScheduler`) and the interrupt disable count equal to 1.
-pub fn schedule(scheduler_held: SchedulerHeld) void {
+/// It is the caller's responsibility to call `SchedulerHeld.Held.release()` when done.
+pub fn acquireScheduler() SchedulerHeld {
+    return .{ .held = lock.acquire() };
+}
+
+/// Releases the scheduler and produces a `kernel.sync.InterruptExclusion`.
+///
+/// Intended to only be called in idle or a new thread.
+pub fn releaseScheduler() kernel.sync.InterruptExclusion {
+    const cpu = kernel.arch.rawGetCpu();
+
+    core.debugAssert(lock.isLockedBy(cpu.id));
+    core.debugAssert(cpu.interrupt_disable_count != 0);
+
+    lock.unsafeRelease();
+
+    return .{ .cpu = cpu };
+}
+
+/// Yields the currently running thread.
+pub fn yield(
+    scheduler_held: SchedulerHeld,
+    comptime behaviour: enum { wait, ready },
+) void {
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
+
+    core.debugAssert(cpu.current_thread != null);
     core.debugAssert(cpu.interrupt_disable_count == 1);
 
-    const opt_current_thread = cpu.current_thread;
+    const current_thread = cpu.current_thread.?;
 
     const new_thread_node = ready_to_run.pop() orelse {
-        // no thread to run
-        switchToIdle(cpu, opt_current_thread);
+        // list is empty
+        switch (behaviour) {
+            .ready => {
+                core.debugAssert(current_thread.state == .ready);
+                return;
+            },
+            .wait => {
+                core.debugAssert(current_thread.state == .waiting);
+                switchToIdle(cpu, null);
+                unreachable;
+            },
+        }
+    };
+    const new_thread = kernel.Thread.fromNode(new_thread_node);
+    core.debugAssert(current_thread != new_thread);
+
+    queueThread(scheduler_held, current_thread);
+
+    switchToThreadFromThread(cpu, current_thread, new_thread);
+}
+
+/// Yield execution to the scheduler from a no thread state like idle or init.
+pub fn yieldNoThread(scheduler_held: SchedulerHeld) noreturn {
+    validateLock(scheduler_held);
+
+    const cpu = scheduler_held.held.exclusion.cpu;
+
+    core.debugAssert(cpu.current_thread == null);
+    core.debugAssert(cpu.interrupt_disable_count == 1);
+
+    const new_thread_node = ready_to_run.pop() orelse {
+        // list is empty
+        switchToIdle(cpu, null);
         unreachable;
     };
     const new_thread = kernel.Thread.fromNode(new_thread_node);
 
-    const current_thread = opt_current_thread orelse {
-        // we were previously idle
-        switchToThreadFromIdle(cpu, new_thread);
-        unreachable;
-    };
-
-    // if we are already running the new thread, no switch is required
-    if (new_thread == current_thread) {
-        log.debug("already running new thread", .{});
-        return;
-    }
-
-    switchToThreadFromThread(cpu, current_thread, new_thread);
+    // we were previously idle
+    switchToThreadFromIdle(cpu, new_thread);
+    unreachable;
 }
 
 /// Queues a thread to be run by the scheduler.
@@ -107,27 +152,6 @@ inline fn validateLock(scheduler_held: SchedulerHeld) void {
     core.debugAssert(lock.isLockedByCurrent());
 }
 
-/// Acquires the scheduler and produces a `SchedulerHeld`.
-///
-/// It is the caller's responsibility to call `SchedulerHeld.Held.release()` when done.
-pub fn acquireScheduler() SchedulerHeld {
-    return .{ .held = lock.acquire() };
-}
-
-/// Releases the scheduler and produces a `kernel.sync.InterruptExclusion`.
-///
-/// Intended to only be called in idle or a new thread.
-pub fn releaseScheduler() kernel.sync.InterruptExclusion {
-    const cpu = kernel.arch.rawGetCpu();
-
-    core.debugAssert(lock.isLockedBy(cpu.id));
-    core.debugAssert(cpu.interrupt_disable_count != 0);
-
-    lock.unsafeRelease();
-
-    return .{ .cpu = cpu };
-}
-
 fn idle() noreturn {
     const interrupt_exclusion = releaseScheduler();
     core.debugAssert(interrupt_exclusion.cpu.interrupt_disable_count == 1);
@@ -140,8 +164,9 @@ fn idle() noreturn {
         if (!ready_to_run.isEmpty()) {
             const scheduler_held = kernel.scheduler.acquireScheduler();
             defer scheduler_held.release();
-            if (!ready_to_run.isEmpty()) schedule(scheduler_held);
+            if (!ready_to_run.isEmpty()) yieldNoThread(scheduler_held);
         }
+
         kernel.arch.halt();
     }
 }

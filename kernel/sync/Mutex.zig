@@ -85,6 +85,6 @@ pub fn acquire(mutex: *Mutex) Held {
 
         spinlock_held.release();
 
-        kernel.scheduler.schedule(scheduler_held);
+        kernel.scheduler.yield(scheduler_held, .wait);
     }
 }

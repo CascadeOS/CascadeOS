@@ -85,6 +85,6 @@ fn initStage3() noreturn {
 
     interrupt_exclusion.release();
 
-    kernel.scheduler.schedule(scheduler_held);
+    kernel.scheduler.yieldNoThread(scheduler_held);
     unreachable;
 }

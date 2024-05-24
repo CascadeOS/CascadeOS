@@ -30,10 +30,8 @@ pub fn isLockedBy(self: *const TicketSpinLock, cpu_id: kernel.Cpu.Id) bool {
 
 /// Returns true if the spinlock is locked by the current cpu.
 pub fn isLockedByCurrent(self: *const TicketSpinLock) bool {
-    const interrupt_exclusion = kernel.sync.getInterruptExclusion(); // TODO: could be preemption exclusion
-    defer interrupt_exclusion.release();
-
-    return self.isLockedBy(interrupt_exclusion.cpu.id);
+    const cpu = kernel.arch.rawGetCpu();
+    return self.isLockedBy(cpu.id);
 }
 
 /// Releases the spinlock.
