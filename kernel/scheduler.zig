@@ -21,7 +21,7 @@ pub const SchedulerHeld = struct {
 
 /// Performs a round robin scheduling of the ready threads.
 ///
-/// This function must be called with the lock held (see `acquireScheduler`).
+/// This function must be called with the lock held (see `acquireScheduler`) and the interrupt disable count equal to 1.
 pub fn schedule(scheduler_held: SchedulerHeld) void {
     validateLock(scheduler_held);
 
