@@ -9,6 +9,8 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.vmm);
 
+pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
+
 /// The memory layout of the kernel.
 ///
 /// Initialized during `init.buildMemoryLayout`.
