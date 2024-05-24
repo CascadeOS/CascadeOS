@@ -128,6 +128,9 @@ pub const paging = struct {
     /// All the page sizes supported by the architecture in order of smallest to largest.
     pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
 
+    /// The largest possible higher half virtual address.
+    pub const largest_higher_half_virtual_address: core.VirtualAddress = current.paging.largest_higher_half_virtual_address;
+
     /// The page table type for the architecture.
     pub const PageTable: type = current.paging.PageTable;
 
@@ -151,6 +154,52 @@ pub const paging = struct {
         /// This is used to surface errors from the underlying paging implementation that are architecture specific.
         MappingNotValid,
     } || kernel.pmm.AllocateError;
+
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///  - the virtual range is not already mapped
+    ///
+    /// This function:
+    ///  - uses only the standard page size for the architecture
+    ///  - does not flush the TLB
+    ///  - on error is not required roll back any modifications to the page tables
+    pub inline fn mapToPhysicalRange(
+        page_table: *PageTable,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
+        map_type: kernel.vmm.MapType,
+    ) MapError!void {
+        checkSupport(current.paging, "mapToPhysicalRange", fn (
+            *PageTable,
+            core.VirtualRange,
+            core.PhysicalRange,
+            kernel.vmm.MapType,
+        ) MapError!void);
+
+        return current.paging.mapToPhysicalRange(page_table, virtual_range, physical_range, map_type);
+    }
+
+    /// Unmaps the `virtual_range`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the virtual range is mapped
+    ///  - the virtual range is mapped using only the standard page size for the architecture
+    ///
+    /// This function:
+    ///  - does not flush the TLB
+    pub inline fn unmapRange(
+        page_table: *PageTable,
+        virtual_range: core.VirtualRange,
+    ) void {
+        checkSupport(current.paging, "unmapRange", fn (*PageTable, core.VirtualRange) void);
+
+        current.paging.unmapRange(page_table, virtual_range);
+    }
 
     pub const init = struct {
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -179,6 +228,13 @@ pub const paging = struct {
             ) MapError!void);
 
             return current.paging.init.mapToPhysicalRangeAllPageSizes(page_table, virtual_range, physical_range, map_type);
+        }
+
+        /// The total size of the virtual address space that one entry in the top level of the page table covers.
+        pub inline fn sizeOfTopLevelEntry() core.Size {
+            checkSupport(current.paging.init, "sizeOfTopLevelEntry", fn () core.Size);
+
+            return current.paging.init.sizeOfTopLevelEntry();
         }
     };
 };

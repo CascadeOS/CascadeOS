@@ -40,13 +40,17 @@ pub const paging = struct {
         x64.PageTable.medium_page_size,
         x64.PageTable.large_page_size,
     };
+    pub const largest_higher_half_virtual_address = x64.paging.largest_higher_half_virtual_address;
     pub const PageTable = x64.PageTable;
 
     pub const allocatePageTable = x64.paging.allocatePageTable;
     pub const switchToPageTable = x64.paging.switchToPageTable;
+    pub const mapToPhysicalRange = x64.paging.mapToPhysicalRange;
+    pub const unmapRange = x64.paging.unmapRange;
 
     pub const init = struct {
         pub const mapToPhysicalRangeAllPageSizes = x64.paging.init.mapToPhysicalRangeAllPageSizes;
+        pub const sizeOfTopLevelEntry = x64.paging.init.sizeOfTopLevelEntry;
     };
 };
 

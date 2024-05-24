@@ -15,6 +15,9 @@ const MapError = kernel.arch.paging.MapError;
 
 pub const higher_half = core.VirtualAddress.fromInt(0xffff800000000000);
 
+/// The largest possible higher half virtual address.
+pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
+
 /// Allocates a new page table and returns a pointer to it in the direct map.
 pub fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
     const range = try kernel.pmm.allocatePage();
@@ -29,6 +32,78 @@ pub fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
 /// Switches to the given page table.
 pub fn switchToPageTable(page_table_address: core.PhysicalAddress) void {
     x64.Cr3.writeAddress(page_table_address);
+}
+
+/// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+///
+/// Caller must ensure:
+///  - the virtual range address and size are aligned to the standard page size
+///  - the physical range address and size are aligned to the standard page size
+///  - the virtual range size is equal to the physical range size
+///  - the virtual range is not already mapped
+///
+/// This function:
+///  - uses only the standard page size for the architecture
+///  - does not flush the TLB
+///  - on error is not required roll back any modifications to the page tables
+pub fn mapToPhysicalRange(
+    page_table: *PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: kernel.vmm.MapType,
+) MapError!void {
+    log.debug("mapToPhysicalRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+
+    var current_virtual_address = virtual_range.address;
+    const last_virtual_address = virtual_range.last();
+    var current_physical_address = physical_range.address;
+
+    var kib_page_mappings: usize = 0;
+
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+        mapTo4KiB(
+            page_table,
+            current_virtual_address,
+            current_physical_address,
+            map_type,
+        ) catch |err| {
+            // TODO: roll back any modifications to the page tables
+            log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
+            return err;
+        };
+
+        kib_page_mappings += 1;
+
+        current_virtual_address.moveForwardInPlace(x64.PageTable.small_page_size);
+        current_physical_address.moveForwardInPlace(x64.PageTable.small_page_size);
+    }
+
+    log.debug("mapToPhysicalRange - satified using {} 4KiB pages", .{kib_page_mappings});
+}
+
+/// Unmaps the `virtual_range`.
+///
+/// Caller must ensure:
+///  - the virtual range address and size are aligned to the standard page size
+///  - the virtual range is mapped
+///  - the virtual range is mapped using only the standard page size for the architecture
+///
+/// This function:
+///  - does not flush the TLB
+pub fn unmapRange(
+    page_table: *PageTable,
+    virtual_range: core.VirtualRange,
+) void {
+    log.debug("unmapRange - {}", .{virtual_range});
+
+    var current_virtual_address = virtual_range.address;
+    const last_virtual_address = virtual_range.last();
+
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+        unmap4KiB(page_table, current_virtual_address);
+
+        current_virtual_address.moveForwardInPlace(x64.PageTable.small_page_size);
+    }
 }
 
 /// Maps a 4 KiB page.
@@ -91,6 +166,44 @@ fn mapTo4KiB(
     applyMapType(map_type, entry);
 
     entry.present.write(true);
+}
+
+/// Unmaps a 4 KiB page.
+fn unmap4KiB(
+    level4_table: *x64.PageTable,
+    virtual_address: core.VirtualAddress,
+) void {
+    core.debugAssert(virtual_address.isAligned(x64.PageTable.small_page_size));
+
+    const level4_entry = level4_table.getEntryLevel4(virtual_address);
+    if (!level4_entry.present.read() or level4_entry.huge.read()) return;
+
+    const level3_table = level4_entry.getNextLevel(
+        kernel.vmm.directMapFromPhysical,
+    ) catch unreachable; // checked above
+
+    const level3_entry = level3_table.getEntryLevel3(virtual_address);
+    if (!level3_entry.present.read() or level3_entry.huge.read()) return;
+
+    const level2_table = level3_entry.getNextLevel(
+        kernel.vmm.directMapFromPhysical,
+    ) catch unreachable; // checked above
+
+    const level2_entry = level2_table.getEntryLevel2(virtual_address);
+    if (!level2_entry.present.read() or level2_entry.huge.read()) return;
+
+    const level1_table = level2_entry.getNextLevel(
+        kernel.vmm.directMapFromPhysical,
+    ) catch unreachable; // checked above
+
+    const level1_entry = level1_table.getEntryLevel1(virtual_address);
+    if (!level2_entry.present.read()) return;
+
+    kernel.pmm.deallocatePage(
+        core.PhysicalRange.fromAddr(level1_entry.getAddress4kib(), x64.PageTable.small_page_size),
+    );
+
+    level1_entry.zero();
 }
 
 /// Ensures the next page table level exists.
@@ -160,6 +273,12 @@ fn applyParentMapType(map_type: MapType, entry: *PageTable.Entry) void {
 }
 
 pub const init = struct {
+    /// The total size of the virtual address space that one entry in the top level of the page table covers.
+    pub inline fn sizeOfTopLevelEntry() core.Size {
+        // TODO: Only correct for 4 level paging
+        return core.Size.from(0x8000000000, .byte);
+    }
+
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// Caller must ensure:

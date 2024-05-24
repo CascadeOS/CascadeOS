@@ -14,7 +14,7 @@ pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
 /// The memory layout of the kernel.
 ///
 /// Initialized during `init.buildMemoryLayout`.
-var memory_layout: MemoryLayout = undefined;
+pub var memory_layout: MemoryLayout = undefined;
 
 /// The kernel page table.
 ///
@@ -30,13 +30,6 @@ pub fn switchToPageTable(page_table: *const kernel.arch.paging.PageTable) void {
         core.panicFmt("page table {*} is not in the direct map", .{page_table});
 
     kernel.arch.paging.switchToPageTable(physical_address);
-}
-
-/// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
-///
-/// This is optional due to the small window on start up where the panic handler can run before this is set.
-pub inline fn virtualOffset() ?core.Size {
-    return memory_layout.virtual_offset;
 }
 
 /// Provides an identity mapping between virtual and physical addresses.
@@ -81,6 +74,85 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirect
         return .{ .value = self.value -% direct_map_range.address.value };
     }
     return error.AddressNotInDirectMap;
+}
+
+/// Maps a virtual range using the standard page size.
+///
+/// Physical pages are allocated for each page in the virtual range.
+pub fn mapRange(page_table: *kernel.arch.paging.PageTable, virtual_range: core.VirtualRange, map_type: MapType) !void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_range = core.VirtualRange.fromAddr(
+        virtual_range.address,
+        kernel.arch.paging.standard_page_size,
+    );
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
+            unmapRange(page_table, current_virtual_range);
+            current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
+        }
+    }
+
+    // Map all pages that were allocated.
+    while (current_virtual_range.address.lessThanOrEqual(last_virtual_address)) {
+        const physical_range = try kernel.pmm.allocatePage();
+
+        try mapToPhysicalRange(
+            page_table,
+            current_virtual_range,
+            physical_range,
+            map_type,
+        );
+
+        current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+}
+
+/// Maps a virtual address range to a physical range using the standard page size.
+pub fn mapToPhysicalRange(
+    page_table: *kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: MapType,
+) !void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.equal(virtual_range.size));
+
+    log.debug(
+        "mapping: {} to {} with type: {}",
+        .{ virtual_range, physical_range, map_type },
+    );
+
+    return kernel.arch.paging.mapToPhysicalRange(
+        page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+    );
+}
+
+/// Unmaps a virtual range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `kernel.arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `kernel.arch.paging.standard_page_size`
+pub fn unmapRange(
+    page_table: *kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+) void {
+    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    log.debug("unmapping: {}", .{virtual_range});
+
+    return kernel.arch.paging.unmapRange(page_table, virtual_range);
 }
 
 pub const MapType = struct {
@@ -164,8 +236,8 @@ pub const init = struct {
         };
 
         try registerKernelSections();
-
-        try calculateAndRegisterDirectMap();
+        try registerDirectMap();
+        try registerHeaps();
 
         memory_layout.sortMemoryLayout();
 
@@ -184,7 +256,7 @@ pub const init = struct {
         kernel_page_table = try kernel.arch.paging.allocatePageTable();
 
         for (memory_layout.layout.constSlice()) |region| {
-            log.debug("mapping region: {}", .{region});
+            if (!region.map) continue;
 
             const physical_range = switch (region.type) {
                 .direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
@@ -194,12 +266,14 @@ pub const init = struct {
                     ),
                     region.range.size,
                 ),
+                .eternal_heap => unreachable,
             };
 
             const map_type: MapType = switch (region.type) {
                 .executable_section => .{ .executable = true, .global = true },
                 .readonly_section, .sdf_section => .{ .global = true },
                 .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+                .eternal_heap => unreachable,
             };
 
             try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
@@ -269,11 +343,11 @@ pub const init = struct {
                     .alignForward(kernel.arch.paging.standard_page_size),
             );
 
-            memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+            memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type, .map = true });
         }
     }
 
-    fn calculateAndRegisterDirectMap() !void {
+    fn registerDirectMap() !void {
         const candidate_direct_map_range = core.VirtualRange.fromAddr(
             kernel.boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
             try calculateSizeOfDirectMap(),
@@ -293,7 +367,7 @@ pub const init = struct {
         }
 
         direct_map_range = candidate_direct_map_range;
-        memory_layout.registerRegion(.{ .range = candidate_direct_map_range, .type = .direct_map });
+        memory_layout.registerRegion(.{ .range = candidate_direct_map_range, .type = .direct_map, .map = true });
     }
 
     /// Calculates the size of the direct map.
@@ -323,9 +397,20 @@ pub const init = struct {
 
         return direct_map_size;
     }
+
+    fn registerHeaps() !void {
+        const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
+
+        memory_layout.registerRegion(.{
+            .range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
+                core.panic("no space in kernel memory layout for the eternal heap"),
+            .type = .eternal_heap,
+            .map = false,
+        });
+    }
 };
 
-const MemoryLayout = struct {
+pub const MemoryLayout = struct {
     /// The virtual base address that the kernel was loaded at.
     virtual_base_address: core.VirtualAddress = undefined,
 
@@ -344,6 +429,53 @@ const MemoryLayout = struct {
         self.layout.append(region) catch unreachable;
     }
 
+    pub fn findFreeRange(self: *MemoryLayout, size: core.Size, opt_alignment: ?core.Size) ?core.VirtualRange {
+        self.sortMemoryLayout();
+
+        const regions = self.layout.constSlice();
+
+        var current_address = kernel.arch.paging.higher_half;
+        if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+
+        var i: usize = 0;
+
+        while (true) {
+            const region = if (i < self.layout.len) regions[i] else {
+                const size_of_free_range = core.Size.from(
+                    (kernel.arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                    .byte,
+                );
+
+                if (size_of_free_range.lessThan(size)) return null;
+
+                return core.VirtualRange.fromAddr(current_address, size);
+            };
+
+            const region_address = region.range.address;
+
+            if (region_address.lessThanOrEqual(current_address)) {
+                current_address = region.range.endBound();
+                if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            const size_of_free_range = core.Size.from(
+                (region_address.value - 1) - current_address.value,
+                .byte,
+            );
+
+            if (size_of_free_range.lessThan(size)) {
+                current_address = region.range.endBound();
+                if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            return core.VirtualRange.fromAddr(current_address, size);
+        }
+    }
+
     /// Sorts the kernel memory layout from lowest to highest address.
     pub fn sortMemoryLayout(self: *MemoryLayout) void {
         std.mem.sort(Region, self.layout.slice(), {}, struct {
@@ -358,6 +490,8 @@ const MemoryLayout = struct {
         range: core.VirtualRange,
         type: Type,
 
+        map: bool,
+
         pub const Type = enum {
             writeable_section,
             readonly_section,
@@ -365,6 +499,8 @@ const MemoryLayout = struct {
             sdf_section,
 
             direct_map,
+
+            eternal_heap,
         };
 
         pub fn print(region: Region, writer: std.io.AnyWriter, indent: usize) !void {

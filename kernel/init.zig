@@ -50,6 +50,9 @@ pub fn initStage1() !noreturn {
     log.debug("preparing virtual memory management", .{});
     try kernel.vmm.init.initVmm();
 
+    log.debug("initalizing kernel heaps", .{});
+    try kernel.heap.init.initHeaps();
+
     initStage2(&bootstrap_cpu);
     unreachable;
 }
