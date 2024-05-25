@@ -51,6 +51,7 @@ pub const paging = struct {
     pub const init = struct {
         pub const mapToPhysicalRangeAllPageSizes = x64.paging.init.mapToPhysicalRangeAllPageSizes;
         pub const sizeOfTopLevelEntry = x64.paging.init.sizeOfTopLevelEntry;
+        pub const fillTopLevel = x64.paging.init.fillTopLevel;
     };
 };
 

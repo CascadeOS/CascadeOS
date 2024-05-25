@@ -279,6 +279,26 @@ pub const init = struct {
         return core.Size.from(0x8000000000, .byte);
     }
 
+    /// This function fills in the top level of the page table for the given range.
+    ///
+    /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+    pub inline fn fillTopLevel(
+        page_table: *PageTable,
+        range: core.VirtualRange,
+        map_type: MapType,
+    ) kernel.arch.paging.init.FillTopLevelError!void {
+        const size_of_top_level_entry = sizeOfTopLevelEntry();
+        core.debugAssert(range.size.equal(size_of_top_level_entry));
+        core.debugAssert(range.address.isAligned(size_of_top_level_entry));
+
+        const index = x64.PageTable.p4Index(range.address);
+        const entry = &page_table.entries[index];
+
+        if (entry._backing != 0) return kernel.arch.paging.init.FillTopLevelError.TopLevelPresent;
+
+        _ = try ensureNextTable(entry, map_type);
+    }
+
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// Caller must ensure:

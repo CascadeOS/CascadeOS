@@ -236,6 +236,27 @@ pub const paging = struct {
 
             return current.paging.init.sizeOfTopLevelEntry();
         }
+
+        pub const FillTopLevelError = error{
+            TopLevelPresent,
+        } || MapError;
+
+        /// This function fills in the top level of the page table for the given range.
+        ///
+        /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+        pub inline fn fillTopLevel(
+            page_table: *PageTable,
+            range: core.VirtualRange,
+            map_type: kernel.vmm.MapType,
+        ) FillTopLevelError!void {
+            checkSupport(
+                current.paging.init,
+                "fillTopLevel",
+                fn (*PageTable, core.VirtualRange, kernel.vmm.MapType) FillTopLevelError!void,
+            );
+
+            return current.paging.init.fillTopLevel(page_table, range, map_type);
+        }
     };
 };
 

@@ -256,32 +256,41 @@ pub const init = struct {
         kernel_page_table = try kernel.arch.paging.allocatePageTable();
 
         for (memory_layout.layout.constSlice()) |region| {
-            if (!region.map) continue;
+            switch (region.operation) {
+                .full_map => {
+                    const physical_range = switch (region.type) {
+                        .direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+                        .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
+                            core.PhysicalAddress.fromInt(
+                                region.range.address.value - memory_layout.physical_to_virtual_offset.value,
+                            ),
+                            region.range.size,
+                        ),
+                        .eternal_heap => unreachable,
+                    };
 
-            const physical_range = switch (region.type) {
-                .direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
-                .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
-                    core.PhysicalAddress.fromInt(
-                        region.range.address.value - memory_layout.physical_to_virtual_offset.value,
-                    ),
-                    region.range.size,
-                ),
-                .eternal_heap => unreachable,
-            };
+                    const map_type: MapType = switch (region.type) {
+                        .executable_section => .{ .executable = true, .global = true },
+                        .readonly_section, .sdf_section => .{ .global = true },
+                        .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+                        .eternal_heap => unreachable,
+                    };
 
-            const map_type: MapType = switch (region.type) {
-                .executable_section => .{ .executable = true, .global = true },
-                .readonly_section, .sdf_section => .{ .global = true },
-                .writeable_section, .direct_map => .{ .writeable = true, .global = true },
-                .eternal_heap => unreachable,
-            };
-
-            try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                kernel_page_table,
-                region.range,
-                physical_range,
-                map_type,
-            );
+                    try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                        kernel_page_table,
+                        region.range,
+                        physical_range,
+                        map_type,
+                    );
+                },
+                .top_level_map => {
+                    try kernel.arch.paging.init.fillTopLevel(
+                        kernel_page_table,
+                        region.range,
+                        .{ .global = true, .writeable = true },
+                    );
+                },
+            }
         }
 
         log.debug("switching to kernel page table", .{});
@@ -343,7 +352,7 @@ pub const init = struct {
                     .alignForward(kernel.arch.paging.standard_page_size),
             );
 
-            memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type, .map = true });
+            memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type, .operation = .full_map });
         }
     }
 
@@ -367,7 +376,7 @@ pub const init = struct {
         }
 
         direct_map_range = candidate_direct_map_range;
-        memory_layout.registerRegion(.{ .range = candidate_direct_map_range, .type = .direct_map, .map = true });
+        memory_layout.registerRegion(.{ .range = candidate_direct_map_range, .type = .direct_map, .operation = .full_map });
     }
 
     /// Calculates the size of the direct map.
@@ -405,7 +414,7 @@ pub const init = struct {
             .range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
                 core.panic("no space in kernel memory layout for the eternal heap"),
             .type = .eternal_heap,
-            .map = false,
+            .operation = .top_level_map,
         });
     }
 };
@@ -490,7 +499,7 @@ pub const MemoryLayout = struct {
         range: core.VirtualRange,
         type: Type,
 
-        map: bool,
+        operation: Operation,
 
         pub const Type = enum {
             writeable_section,
@@ -501,6 +510,11 @@ pub const MemoryLayout = struct {
             direct_map,
 
             eternal_heap,
+        };
+
+        pub const Operation = enum {
+            full_map,
+            top_level_map,
         };
 
         pub fn print(region: Region, writer: std.io.AnyWriter, indent: usize) !void {
