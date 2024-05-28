@@ -147,11 +147,20 @@ const LimineMemoryMapIterator = struct {
     }
 };
 
+/// Returns the ACPI RSDP address provided by the bootloader, if any.
+pub fn rsdp() ?core.VirtualAddress {
+    if (limine_requests.rsdp.response) |resp| {
+        return resp.address;
+    }
+    return null;
+}
+
 const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 1 };
     export var kernel_address: limine.KernelAddress = .{};
     export var hhdm: limine.HHDM = .{};
     export var memmap: limine.Memmap = .{};
+    export var rsdp: limine.RSDP = .{};
 };
 
 comptime {

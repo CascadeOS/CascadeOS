@@ -40,8 +40,13 @@ pub fn initStage1() !noreturn {
         early_output.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n") catch {};
     }
 
-    log.debug("capturing system information", .{});
+    log.debug("build kernel memory layout", .{});
     try kernel.vmm.init.buildMemoryLayout();
+
+    log.debug("initializing ACPI tables", .{});
+    kernel.acpi.init.initializeACPITables();
+
+    log.debug("capturing system information", .{});
     try kernel.arch.init.captureSystemInformation();
 
     log.debug("preparing physical memory management", .{});
@@ -50,7 +55,7 @@ pub fn initStage1() !noreturn {
     log.debug("preparing virtual memory management", .{});
     try kernel.vmm.init.initVmm();
 
-    log.debug("initalizing kernel heaps", .{});
+    log.debug("initializing kernel heaps", .{});
     try kernel.heap.init.initHeaps();
 
     initStage2(&bootstrap_cpu);
