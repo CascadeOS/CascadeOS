@@ -60,7 +60,10 @@ pub fn initStage1() !noreturn {
     log.debug("configuring global system features", .{});
     kernel.arch.init.configureGlobalSystemFeatures();
 
-    initStage2(&bootstrap_cpu);
+    log.debug("initializing non-bootstrap cpus", .{});
+    initCpus();
+
+    initStage2(&kernel.cpus[@intFromEnum(kernel.Cpu.Id.bootstrap)]);
     unreachable;
 }
 
@@ -97,4 +100,53 @@ fn initStage3() noreturn {
 
     kernel.scheduler.yieldNoThread(scheduler_held);
     unreachable;
+}
+
+/// Initialize the per cpu data structures for all cpus including the bootstrap processor.
+///
+/// Also wakes the non-bootstrap cpus and jumps them to `initStage2`.
+fn initCpus() void {
+    var cpu_descriptors = kernel.boot.cpuDescriptors();
+
+    kernel.cpus = kernel.heap.eternal_heap_allocator.alloc(
+        kernel.Cpu,
+        cpu_descriptors.count(),
+    ) catch core.panic("failed to allocate cpus");
+
+    var i: u32 = 0;
+
+    while (cpu_descriptors.next()) |cpu_descriptor| : (i += 1) {
+        const cpu_id: kernel.Cpu.Id = @enumFromInt(i);
+        const cpu = &kernel.cpus[i];
+
+        log.debug("initializing cpu {}", .{cpu_id});
+
+        const idle_stack = allocateCpuStack() catch {
+            core.panic("failed to allocate idle stack");
+        };
+
+        cpu.* = .{
+            .id = cpu_id,
+            .idle_stack = idle_stack,
+            .arch = undefined, // initialized by `prepareProcessor`
+        };
+
+        kernel.arch.init.prepareCpu(cpu, cpu_descriptor, allocateCpuStack);
+
+        if (cpu.id != .bootstrap) {
+            log.debug("booting processor {}", .{cpu_id});
+            cpu_descriptor.boot(cpu, initStage2);
+        }
+    }
+}
+
+fn allocateCpuStack() !kernel.Stack {
+    // TODO: use a specialized stack allocator including guard pages
+    const range = core.VirtualRange.fromSlice(
+        u8,
+        try kernel.heap.eternal_heap_allocator.alloc(u8, kernel.config.kernel_stack_size.value),
+    );
+    var stack = kernel.Stack.fromRange(range, range);
+    try stack.pushReturnAddress(core.VirtualAddress.zero);
+    return stack;
 }

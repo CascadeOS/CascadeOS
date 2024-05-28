@@ -20,6 +20,7 @@ pub const init = struct {
     pub const getEarlyOutput = x64.init.getEarlyOutput;
     pub const initInterrupts = x64.interrupts.init.initIdt;
     pub const prepareBootstrapCpu = x64.init.prepareBootstrapCpu;
+    pub const prepareCpu = x64.init.prepareCpu;
     pub const loadCpu = x64.init.loadCpu;
 
     pub const captureSystemInformation = x64.init.captureSystemInformation;

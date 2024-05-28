@@ -48,6 +48,27 @@ pub fn prepareBootstrapCpu(
     );
 }
 
+/// Prepares the provided kernel.Cpu for use.
+///
+/// **WARNING**: This function will panic if the cpu cannot be prepared.
+pub inline fn prepareCpu(
+    cpu: *kernel.Cpu,
+    cpu_descriptor: kernel.boot.CpuDescriptor,
+    allocateCpuStackFn: fn () anyerror!kernel.Stack,
+) void {
+    cpu.arch = .{
+        .lapic_id = cpu_descriptor.lapicId(),
+
+        .double_fault_stack = allocateCpuStackFn() catch core.panic("unable to create double fault stack"),
+        .non_maskable_interrupt_stack = allocateCpuStackFn() catch core.panic("unable to create non-mackable interrupt stack"),
+    };
+
+    cpu.arch.tss.setPrivilegeStack(
+        .ring0,
+        cpu.idle_stack.stack_pointer,
+    );
+}
+
 /// Load the provided `Cpu` as the current CPU.
 pub fn loadCpu(cpu: *kernel.Cpu) void {
     const arch = &cpu.arch;

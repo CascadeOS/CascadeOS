@@ -155,12 +155,115 @@ pub fn rsdp() ?core.VirtualAddress {
     return null;
 }
 
+pub fn cpuDescriptors() CpuDescriptorIterator {
+    const smp_response = limine_requests.smp.response orelse core.panic("no cpu descriptors from the bootloader");
+    const entries = smp_response.cpus();
+    return .{
+        .limine = .{
+            .index = 0,
+            .entries = entries,
+        },
+    };
+}
+
+pub const CpuDescriptor = struct {
+    _raw: Raw,
+
+    pub fn boot(
+        self: CpuDescriptor,
+        cpu: *kernel.Cpu,
+        comptime targetFn: fn (cpu: *kernel.Cpu) noreturn,
+    ) void {
+        switch (self._raw) {
+            .limine => |limine_info| {
+                const trampolineFn = struct {
+                    fn trampolineFn(smp_info: *const limine.SMP.Response.SMPInfo) callconv(.C) noreturn {
+                        targetFn(@ptrFromInt(smp_info.extra_argument));
+                    }
+                }.trampolineFn;
+
+                @atomicStore(
+                    usize,
+                    &limine_info.extra_argument,
+                    @intFromPtr(cpu),
+                    .release,
+                );
+
+                @atomicStore(
+                    ?*const fn (*const limine.SMP.Response.SMPInfo) callconv(.C) noreturn,
+                    &limine_info.goto_address,
+                    &trampolineFn,
+                    .release,
+                );
+            },
+        }
+    }
+
+    pub fn acpiId(self: CpuDescriptor) u32 {
+        return switch (self._raw) {
+            .limine => |limine_info| limine_info.processor_id,
+        };
+    }
+
+    pub fn lapicId(self: CpuDescriptor) u32 {
+        if (kernel.arch.arch != .x64) @compileError("apicId can only be called on x64");
+
+        return switch (self._raw) {
+            .limine => |limine_info| limine_info.lapic_id,
+        };
+    }
+
+    pub const Raw = union(enum) {
+        limine: *limine.SMP.Response.SMPInfo,
+    };
+};
+
+/// An iterator over the cpu descriptors provided by the bootloader.
+pub const CpuDescriptorIterator = union(enum) {
+    limine: LimineCpuDescriptorIterator,
+
+    pub fn count(self: CpuDescriptorIterator) usize {
+        return switch (self) {
+            inline else => |i| i.count(),
+        };
+    }
+
+    /// Returns the next cpu descriptor from the iterator, if any remain.
+    pub fn next(self: *CpuDescriptorIterator) ?CpuDescriptor {
+        return switch (self.*) {
+            inline else => |*i| i.next(),
+        };
+    }
+};
+
+const LimineCpuDescriptorIterator = struct {
+    index: usize,
+    entries: []*limine.SMP.Response.SMPInfo,
+
+    pub fn count(self: LimineCpuDescriptorIterator) usize {
+        return self.entries.len;
+    }
+
+    pub fn next(self: *LimineCpuDescriptorIterator) ?CpuDescriptor {
+        if (self.index >= self.entries.len) return null;
+
+        const smp_info = self.entries[self.index];
+
+        self.index += 1;
+
+        return .{
+            ._raw = .{ .limine = smp_info },
+        };
+    }
+};
+
 const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 1 };
     export var kernel_address: limine.KernelAddress = .{};
     export var hhdm: limine.HHDM = .{};
     export var memmap: limine.Memmap = .{};
     export var rsdp: limine.RSDP = .{};
+    export var smp: limine.SMP = .{ .flags = .{ .x2apic = true } };
 };
 
 comptime {

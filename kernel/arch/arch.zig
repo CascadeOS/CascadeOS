@@ -7,7 +7,9 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 
-const current = switch (@import("cascade_target").arch) {
+pub const arch = @import("cascade_target").arch;
+
+const current = switch (arch) {
     .x64 => @import("x64/interface.zig"),
 };
 
@@ -62,13 +64,30 @@ pub const init = struct {
         current.init.initInterrupts();
     }
 
-    /// Prepares the provided `Cpu` for the bootstrap processor.
+    /// Prepares the provided `Cpu` for the bootstrap cpu.
     pub inline fn prepareBootstrapCpu(
         bootstrap_cpu: *kernel.Cpu,
     ) void {
         checkSupport(current.init, "prepareBootstrapCpu", fn (*kernel.Cpu) void);
 
         current.init.prepareBootstrapCpu(bootstrap_cpu);
+    }
+
+    /// Prepares the provided kernel.Cpu for use.
+    ///
+    /// **WARNING**: This function will panic if the cpu cannot be prepared.
+    pub inline fn prepareCpu(
+        cpu: *kernel.Cpu,
+        cpu_descriptor: kernel.boot.CpuDescriptor,
+        allocateCpuStackFn: fn () anyerror!kernel.Stack,
+    ) void {
+        checkSupport(
+            current.init,
+            "prepareCpu",
+            fn (*kernel.Cpu, kernel.boot.CpuDescriptor, fn () anyerror!kernel.Stack) void,
+        );
+
+        current.init.prepareCpu(cpu, cpu_descriptor, allocateCpuStackFn);
     }
 
     /// Load the provided `Cpu` as the current CPU.
