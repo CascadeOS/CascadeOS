@@ -30,6 +30,8 @@ pub fn prepareBootstrapCpu(
     bootstrap_cpu: *kernel.Cpu,
 ) void {
     bootstrap_cpu.arch = .{
+        .lapic_id = 0,
+
         .double_fault_stack = kernel.Stack.fromRange(
             core.VirtualRange.fromSlice(u8, &bootstrap_double_fault_stack),
             core.VirtualRange.fromSlice(u8, &bootstrap_double_fault_stack),
