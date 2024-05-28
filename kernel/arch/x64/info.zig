@@ -23,3 +23,18 @@ pub var lapic_base_tick_duration_fs: ?u64 = null;
 ///
 /// Assumed to be true until proven otherwise.
 pub var have_pic: bool = true;
+
+/// Do we have a PS/2 controller (Intel 8042)?
+///
+/// Assumed to be true until proven otherwise.
+pub var have_ps2_controller: bool = true;
+
+/// Do we have a CMOS RTC?
+///
+/// Assumed to be true until proven otherwise.
+pub var have_cmos_rtc: bool = true;
+
+/// Are message signaled interrupts (MSI) supported?
+///
+/// Assumed to be true until proven otherwise.
+pub var msi_supported: bool = true;
