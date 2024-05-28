@@ -22,6 +22,7 @@ pub const scheduler = @import("scheduler.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Thread = @import("Thread.zig");
+pub const time = @import("time.zig");
 pub const vmm = @import("vmm/vmm.zig");
 
 pub const std_options: std.Options = .{
