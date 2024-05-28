@@ -102,8 +102,10 @@ pub const init = struct {
         const held = init_log_lock.acquire();
         defer held.release();
 
+        held.exclusion.cpu.print(early_output, 0) catch unreachable;
+
         early_output.writeAll(
-            comptime @tagName(scope) ++ " | " ++ message_level.asText() ++ " | ",
+            comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ",
         ) catch unreachable;
 
         early_output.print(user_fmt, args) catch unreachable;
