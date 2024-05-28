@@ -50,10 +50,10 @@ no_acceleration: bool,
 /// Defaults to false.
 interrupt_details: bool,
 
-/// Number of cores.
+/// Number of cpus.
 ///
 /// Defaults to 1.
-number_of_cores: usize,
+number_of_cpus: usize,
 
 /// Force QEMU to run in UEFI mode.
 ///
@@ -125,14 +125,14 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         "Force QEMU to run in UEFI mode (defaults to false)",
     ) orelse false;
 
-    const number_of_cores = b.option(
+    const number_of_cpus = b.option(
         usize,
-        "cores",
-        "Number of cores (defaults to 1)",
+        "cpus",
+        "Number of cpus (defaults to 1)",
     ) orelse 1;
 
-    if (number_of_cores == 0) {
-        std.debug.print("number of cores must be greater than zero", .{});
+    if (number_of_cpus == 0) {
+        std.debug.print("number of cpus must be greater than zero", .{});
         std.process.exit(1);
     }
 
@@ -195,7 +195,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .no_display = no_display,
         .no_acceleration = no_acceleration,
         .interrupt_details = interrupt_details,
-        .number_of_cores = number_of_cores,
+        .number_of_cpus = number_of_cpus,
         .uefi = uefi,
         .memory = memory,
         .kernel_force_debug_log = kernel_force_debug_log,

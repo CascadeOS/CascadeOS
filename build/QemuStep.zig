@@ -132,7 +132,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         try std.fmt.allocPrint(
             b.allocator,
             "{d}",
-            .{self.options.number_of_cores},
+            .{self.options.number_of_cpus},
         ),
     });
 
