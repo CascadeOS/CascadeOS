@@ -83,6 +83,8 @@ pub fn stdLogImpl(
 }
 
 pub const init = struct {
+    var init_log_lock: kernel.sync.TicketSpinLock = .{};
+
     /// Logging function during kernel init.
     fn initLogFn(
         comptime scope: @Type(.EnumLiteral),
@@ -96,6 +98,9 @@ pub const init = struct {
             format ++ "\n";
 
         const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+
+        const held = init_log_lock.acquire();
+        defer held.release();
 
         early_output.writeAll(
             comptime @tagName(scope) ++ " | " ++ message_level.asText() ++ " | ",
