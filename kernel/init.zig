@@ -79,6 +79,9 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
     log.debug("configuring cpu-local system features", .{});
     kernel.arch.init.configureSystemFeaturesForCurrentCpu(cpu);
 
+    log.debug("configuring local interrupt controller", .{});
+    kernel.arch.init.initLocalInterruptController(cpu);
+
     const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
         core.VirtualAddress.fromPtr(&initStage3),
     ) catch unreachable; // the idle stack is big enough to hold one return address

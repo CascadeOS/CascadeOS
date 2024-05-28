@@ -35,4 +35,14 @@ pub const init = struct {
             core.panic("physical destination mode is forced");
         }
     }
+
+    pub fn initApicOnProcessor(_: *kernel.Cpu) void {
+        // TODO: task priority
+        // TODO: error interrupt
+
+        lapic.writeSupriousInterruptRegister(.{
+            .apic_enable = true,
+            .spurious_vector = x64.interrupts.Interrupt.spurious_interrupt.toInterruptVector(),
+        });
+    }
 };
