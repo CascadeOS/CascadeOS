@@ -113,3 +113,11 @@ fn captureMADTInformation(madt: *const acpi.MADT) void {
     x64.info.have_pic = madt.flags.PCAT_COMPAT;
     log.debug("have pic: {}", .{x64.info.have_pic});
 }
+
+/// Configure any global system features.
+pub fn configureGlobalSystemFeatures() void {
+    if (x64.info.have_pic) {
+        log.debug("disabling pic", .{});
+        x64.disablePic();
+    }
+}

@@ -86,6 +86,13 @@ pub const init = struct {
 
         return current.init.captureSystemInformation();
     }
+
+    /// Configure any global system features.
+    pub inline fn configureGlobalSystemFeatures() void {
+        checkSupport(current.init, "configureGlobalSystemFeatures", fn () void);
+
+        current.init.configureGlobalSystemFeatures();
+    }
 };
 
 pub const interrupts = struct {

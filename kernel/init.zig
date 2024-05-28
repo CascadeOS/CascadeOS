@@ -58,6 +58,9 @@ pub fn initStage1() !noreturn {
     log.debug("initializing kernel heaps", .{});
     try kernel.heap.init.initHeaps();
 
+    log.debug("configuring global system features", .{});
+    kernel.arch.init.configureGlobalSystemFeatures();
+
     initStage2(&bootstrap_cpu);
     unreachable;
 }

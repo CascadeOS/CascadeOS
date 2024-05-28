@@ -23,6 +23,7 @@ pub const init = struct {
     pub const loadCpu = x64.init.loadCpu;
 
     pub const captureSystemInformation = x64.init.captureSystemInformation;
+    pub const configureGlobalSystemFeatures = x64.init.configureGlobalSystemFeatures;
 };
 
 pub const interrupts = struct {
