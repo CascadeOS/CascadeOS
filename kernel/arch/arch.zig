@@ -112,6 +112,13 @@ pub const init = struct {
 
         current.init.configureGlobalSystemFeatures();
     }
+
+    /// Configure any cpu local system features.
+    pub inline fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
+        checkSupport(current.init, "configureSystemFeaturesForCurrentCpu", fn (*kernel.Cpu) void);
+
+        current.init.configureSystemFeaturesForCurrentCpu(cpu);
+    }
 };
 
 pub const interrupts = struct {

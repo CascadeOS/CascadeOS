@@ -76,6 +76,9 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
     kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
     kernel.arch.init.loadCpu(cpu);
 
+    log.debug("configuring cpu-local system features", .{});
+    kernel.arch.init.configureSystemFeaturesForCurrentCpu(cpu);
+
     const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
         core.VirtualAddress.fromPtr(&initStage3),
     ) catch unreachable; // the idle stack is big enough to hold one return address

@@ -149,3 +149,37 @@ pub fn configureGlobalSystemFeatures() void {
         x64.disablePic();
     }
 }
+
+pub fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
+    core.debugAssert(cpu == x64.getCpu());
+
+    if (x64.info.cpu_id.rdtscp) {
+        x64.IA32_TSC_AUX.write(@intFromEnum(cpu.id));
+    }
+
+    // CR0
+    {
+        var cr0 = x64.Cr0.read();
+
+        if (!cr0.paging) core.panic("paging not enabled");
+
+        cr0.write_protect = true;
+
+        cr0.write();
+        log.debug("CR0 set", .{});
+    }
+
+    // EFER
+    {
+        var efer = x64.EFER.read();
+
+        if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
+
+        if (x64.info.cpu_id.syscall_sysret) efer.syscall_enable = true;
+        if (x64.info.cpu_id.execute_disable) efer.no_execute_enable = true;
+
+        efer.write();
+
+        log.debug("EFER set", .{});
+    }
+}
