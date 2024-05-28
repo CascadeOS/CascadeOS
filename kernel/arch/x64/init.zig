@@ -67,5 +67,21 @@ pub fn loadCpu(cpu: *kernel.Cpu) void {
 /// For example, on x64 this should capture the CPUID information.
 pub fn captureSystemInformation() !void {
     log.debug("capturing cpuid information", .{});
+    try captureCPUIDInformation();
+}
+
+fn captureCPUIDInformation() !void {
     try x64.info.cpu_id.capture();
+
+    if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
+        const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
+        x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
+        log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
+    }
+
+    if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
+        const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
+        x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
+        log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
+    }
 }
