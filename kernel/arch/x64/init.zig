@@ -39,6 +39,11 @@ pub fn prepareBootstrapCpu(
             core.VirtualRange.fromSlice(u8, &bootstrap_non_maskable_interrupt_stack),
         ),
     };
+
+    bootstrap_cpu.arch.tss.setPrivilegeStack(
+        .ring0,
+        bootstrap_cpu.idle_stack.stack_pointer,
+    );
 }
 
 /// Load the provided `Cpu` as the current CPU.
