@@ -4,6 +4,7 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const acpi = @import("acpi");
 
 const log = kernel.log.scoped(.init_x64);
 
@@ -68,6 +69,8 @@ pub fn loadCpu(cpu: *kernel.Cpu) void {
 pub fn captureSystemInformation() !void {
     log.debug("capturing cpuid information", .{});
     try captureCPUIDInformation();
+
+    const madt = kernel.acpi.init.getTable(acpi.MADT, 0) orelse core.panic("unable to get MADT");
 }
 
 fn captureCPUIDInformation() !void {
@@ -84,4 +87,9 @@ fn captureCPUIDInformation() !void {
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
         log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
+}
+
+fn captureMADTInformation(madt: *const acpi.MADT) void {
+    x64.info.have_pic = madt.flags.PCAT_COMPAT;
+    log.debug("have pic: {}", .{x64.info.have_pic});
 }
