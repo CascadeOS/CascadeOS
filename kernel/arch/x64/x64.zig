@@ -8,6 +8,7 @@ const kernel = @import("kernel");
 const lib_x64 = @import("lib_x64");
 pub usingnamespace lib_x64;
 
+pub const apic = @import("apic.zig");
 pub const ArchCpu = @import("ArchCpu.zig");
 pub const info = @import("info.zig");
 pub const init = @import("init.zig");

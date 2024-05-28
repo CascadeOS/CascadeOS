@@ -155,6 +155,13 @@ pub fn rsdp() ?core.VirtualAddress {
     return null;
 }
 
+pub fn x2apicEnabled() bool {
+    if (kernel.arch.arch != .x64) @compileError("x2apicEnabled can only be called on x64");
+
+    const smp_response = limine_requests.smp.response orelse return false;
+    return smp_response.flags.x2apic_enabled;
+}
+
 pub fn cpuDescriptors() CpuDescriptorIterator {
     const smp_response = limine_requests.smp.response orelse core.panic("no cpu descriptors from the bootloader");
     const entries = smp_response.cpus();

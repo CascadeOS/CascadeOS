@@ -106,6 +106,9 @@ pub fn captureSystemInformation() !void {
 
     log.debug("capturing MADT information", .{});
     captureMADTInformation(madt);
+
+    log.debug("capturing APIC information", .{});
+    x64.apic.init.captureApicInformation(fadt, madt);
 }
 
 fn captureCPUIDInformation() !void {
