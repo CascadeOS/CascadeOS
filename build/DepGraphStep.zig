@@ -69,7 +69,7 @@ fn create(
     return self;
 }
 
-fn make(step: *Step, progress_node: *std.Progress.Node) !void {
+fn make(step: *Step, progress_node: std.Progress.Node) !void {
     const self: *DepGraphStep = @fieldParentPtr("step", step);
 
     var node = progress_node.start(
@@ -77,7 +77,6 @@ fn make(step: *Step, progress_node: *std.Progress.Node) !void {
         self.kernels.count() + self.libraries.count() + self.tools.count() + self.applications.count(),
     );
     defer node.end();
-    node.activate();
 
     var timer = try std.time.Timer.start();
 

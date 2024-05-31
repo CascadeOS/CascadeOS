@@ -91,7 +91,7 @@ fn needsUefi(self: CascadeTarget) bool {
     };
 }
 
-fn make(step: *Step, prog_node: *std.Progress.Node) !void {
+fn make(step: *Step, prog_node: std.Progress.Node) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 

@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 zig-cache/
+.zig-cache/
 zig-out/
 .gdb_history
 .gdbinit

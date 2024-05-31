@@ -17,7 +17,7 @@ const StepCollection = @import("build/StepCollection.zig");
 const Tool = @import("build/Tool.zig");
 
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
-const min_zig_version = "0.13.0-dev.46+3648d7df1";
+const min_zig_version = "0.13.0-dev.346+e54fcdb5b";
 
 // Ensure this is kept in sync with `build.zig.zon`
 const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 2 };
@@ -79,7 +79,7 @@ pub fn build(b: *std.Build) !void {
 
 fn disableUnsupportedSteps(b: *std.Build) !void {
     const installMakeFn = struct {
-        fn installMakeFn(step: *std.Build.Step, node: *std.Progress.Node) anyerror!void {
+        fn installMakeFn(step: *std.Build.Step, node: std.Progress.Node) anyerror!void {
             _ = step;
             _ = node;
             std.debug.print(
@@ -94,7 +94,7 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
     b.install_tls.step.makeFn = &installMakeFn;
 
     const uninstallMakeFn = struct {
-        fn uninstallMakeFn(step: *std.Build.Step, node: *std.Progress.Node) anyerror!void {
+        fn uninstallMakeFn(step: *std.Build.Step, node: std.Progress.Node) anyerror!void {
             _ = step;
             _ = node;
             std.debug.print(
@@ -109,7 +109,7 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
     b.uninstall_tls.step.makeFn = &uninstallMakeFn;
 
     const defaultMakeFn = struct {
-        fn defaultMakeFn(step: *std.Build.Step, node: *std.Progress.Node) anyerror!void {
+        fn defaultMakeFn(step: *std.Build.Step, node: std.Progress.Node) anyerror!void {
             _ = step;
             _ = node;
             std.debug.print(
