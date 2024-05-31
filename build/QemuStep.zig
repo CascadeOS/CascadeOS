@@ -148,21 +148,26 @@ fn make(step: *Step, prog_node: std.Progress.Node) !void {
         }
     }
 
-    // qemu monitor
-    if (self.options.qemu_monitor) {
-        run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
-    } else {
-        run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
-    }
-
     // gdb remote debug
     if (self.options.qemu_remote_debug) {
         run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
     }
 
-    // no display
-    if (self.options.no_display) {
-        run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
+    switch (self.options.display_mode) {
+        .none => {
+            if (self.options.qemu_monitor) {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
+            } else {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
+            }
+
+            run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
+        },
+        .gtk => run_qemu.addArgs(&[_][]const u8{
+            "-display",
+            "gtk,grab-on-hover=off,show-tabs=on,window-close=on,show-menubar=on",
+        }),
+        .qemu_default => {},
     }
 
     // set target cpu
