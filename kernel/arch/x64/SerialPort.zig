@@ -60,10 +60,49 @@ pub inline fn writer(self: SerialPort) Writer {
 
 /// The impl function driving the `std.io.Writer`
 fn writerImpl(self: SerialPort, bytes: []const u8) error{}!usize {
-    for (bytes) |char| {
+    var i: usize = 0;
+
+    while (i < bytes.len) : (i += 1) {
+        const char = bytes[i];
+
+        switch (char) {
+            '\r' => {
+                if (i + 1 >= bytes.len) break;
+                if (bytes[i + 1] != '\n') break;
+
+                self.waitForOutputReady();
+                portWriteU8(self._data_port, '\r');
+                self.waitForOutputReady();
+                portWriteU8(self._data_port, '\n');
+                i += 1; // skip the '\n' that we have already printed
+
+                continue;
+            },
+            '\n' => {},
+            else => {},
+        }
+
+        if (char == '\n') {
+            // TODO: per branch cold
+            self.waitForOutputReady();
+            portWriteU8(self._data_port, '\r');
+        }
+
         self.waitForOutputReady();
         portWriteU8(self._data_port, char);
+
+        if (char == '\r') blk: {
+            // TODO: per branch cold
+
+            if (i + 1 >= bytes.len) break :blk;
+            if (bytes[i + 1] != '\n') break :blk;
+
+            self.waitForOutputReady();
+            portWriteU8(self._data_port, '\n');
+            i += 1; // skip the '\n' that we have just printed
+        }
     }
+
     return bytes.len;
 }
 
