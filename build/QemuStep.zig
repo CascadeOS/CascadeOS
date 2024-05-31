@@ -92,6 +92,8 @@ fn needsUefi(self: CascadeTarget) bool {
 }
 
 fn make(step: *Step, prog_node: std.Progress.Node) !void {
+    _ = prog_node;
+
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
@@ -215,12 +217,9 @@ fn make(step: *Step, prog_node: std.Progress.Node) !void {
         });
     }
 
-    // This is a hack to stop zig's progress output interfering with qemu's output
-    try ensureCurrentStdoutLineIsEmpty();
-
     var timer = try std.time.Timer.start();
 
-    try run_qemu.step.make(prog_node);
+    try run_qemu.step.make(.{ .index = .none });
 
     step.result_duration_ns = timer.read();
 }
@@ -242,18 +241,4 @@ fn qemuExecutable(self: CascadeTarget) []const u8 {
     return switch (self) {
         .x64 => "qemu-system-x86_64",
     };
-}
-
-fn ensureCurrentStdoutLineIsEmpty() !void {
-    const stdout = std.io.getStdOut();
-    const tty_config = std.io.tty.detectConfig(stdout);
-    switch (tty_config) {
-        .no_color, .windows_api => {
-            try stdout.writeAll("\r\n");
-        },
-        .escape_codes => {
-            // clear the current line and return the cursor to the beginning of the line
-            try stdout.writeAll("\x1b[2K\r");
-        },
-    }
 }
