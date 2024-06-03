@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v7.6.0/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of 2024-03-13.
+//! This module contains the definitions of the Limine protocol as of 860d1b1da2e526d74d2dbe919d06ee645a4354e4 (2024-05-22).
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/1d45bf541e360a7a3ecc9630312cccaca94cf806/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v7.6.0/PROTOCOL.md)
 //!
 
 const core = @import("core");
@@ -11,15 +12,30 @@ const std = @import("std");
 
 const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
 
-/// Placing this "requests delimiter" on an 8-byte aligned boundary tells the bootloader to stop searching for requests
-/// (including base revision tags) in an executable.
+/// The bootloader can be told to start and/or stop searching for requests (including base revision tags) in an
+/// executable's loaded image by placing start and/or end markers, on an 8-byte aligned boundary.
 ///
-/// The requests delimiter is a _hint_.
+/// The bootloader will only accept requests placed between the last start marker found (if there happen to be more
+/// than 1, which there should not, ideally) and the first end marker found.
 ///
-/// The bootloader can still search for requests and base revision tags past this point if it doesn't support the hint.
-/// When it comes to the Limine bootloader, this means versions starting from 7.1.x support it, while older ones do not.
-pub const RequestsDelimiter = extern struct {
-    id: [2]u64 = [_]u64{ 0xadc0e0531bb10d03, 0x9572709f31764c62 },
+/// For base revisions 0 and 1, the requests delimiters are *hints*. The bootloader can still search for requests
+/// and base revision tags outside the delimited area if it doesn't support the hints.
+///
+/// Base revision 2's sole difference compared to base revision 1 is that support for request delimiters has to be
+/// provided and the delimiters must be honoured, if present, rather than them just being a hint.
+pub const RequestDelimiters = struct {
+    pub const start_marker = extern struct {
+        id: [4]u64 = [_]u64{
+            0xf6b8f4b39de7d1ae, 0xfab91a6940fcb9cf,
+            0x785c6ed015d3e316, 0x181e920a7852b9d9,
+        },
+    };
+
+    pub const end_marker = extern struct {
+        id: [2]u64 = [_]u64{
+            0xadc0e0531bb10d03, 0x9572709f31764c62,
+        },
+    };
 };
 
 const Arch = enum {
@@ -41,16 +57,16 @@ const arch: Arch = switch (@import("builtin").cpu.arch) {
 pub const BaseRevison = extern struct {
     id: [2]u64 = [_]u64{ 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc },
 
-    /// The Limine boot protocol comes in several base revisions; so far only 2
-    /// base revisions are specified: 0 and 1.
+    /// The Limine boot protocol comes in several base revisions; so far, 3 base revisions
+    /// are specified: 0, 1, and 2.
     ///
     /// Base protocol revisions change certain behaviours of the Limine boot protocol
     /// outside any specific feature. The specifics are going to be described as
     /// needed throughout this specification.
     ///
-    /// Base revision 0 is considered deprecated, and it is the default base revision
-    /// a kernel is assumed to be requesting and complying to if no base revision tag
-    /// is provided by the kernel, for backwards compatibility.
+    /// Base revision 0 and 1 are considered deprecated. Base revision 0 is the default
+    /// base revision a kernel is assumed to be requesting and complying to if no base
+    /// revision tag is provided by the kernel, for backwards compatibility.
     ///
     /// A base revision tag is a set of 3 64-bit values placed somewhere in the kernel
     /// binary on an 8-byte aligned boundary; the first 2 values are a magic number
