@@ -63,7 +63,7 @@ pub fn initStage1() !noreturn {
     log.debug("initializing non-bootstrap cpus", .{});
     initCpus();
 
-    initStage2(&kernel.cpus[@intFromEnum(kernel.Cpu.Id.bootstrap)]);
+    initStage2(kernel.Cpu.getCpu(.bootstrap));
     unreachable;
 }
 
@@ -114,16 +114,18 @@ fn initStage3() noreturn {
 fn initCpus() void {
     var cpu_descriptors = kernel.boot.cpuDescriptors();
 
-    kernel.cpus = kernel.heap.eternal_heap_allocator.alloc(
-        kernel.Cpu,
-        cpu_descriptors.count(),
-    ) catch core.panic("failed to allocate cpus");
+    kernel.Cpu.init.setCpus(
+        kernel.heap.eternal_heap_allocator.alloc(
+            kernel.Cpu,
+            cpu_descriptors.count(),
+        ) catch core.panic("failed to allocate cpus"),
+    );
 
     var i: u32 = 0;
 
     while (cpu_descriptors.next()) |cpu_descriptor| : (i += 1) {
         const cpu_id: kernel.Cpu.Id = @enumFromInt(i);
-        const cpu = &kernel.cpus[i];
+        const cpu = kernel.Cpu.getCpu(cpu_id);
 
         log.debug("initializing cpu {}", .{cpu_id});
 

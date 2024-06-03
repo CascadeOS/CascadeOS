@@ -4,11 +4,6 @@
 const std = @import("std");
 const core = @import("core");
 
-/// The list of cpus in the system.
-///
-/// Initialized during `init.initStage1`.
-pub var cpus: []Cpu = undefined;
-
 comptime {
     _ = &boot; // ensure any entry points or bootloader required symbols are referenced
 }

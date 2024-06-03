@@ -80,3 +80,23 @@ pub inline fn format(
 fn __helpZls() void {
     Cpu.print(undefined, @as(std.fs.File.Writer, undefined), 0);
 }
+
+/// The list of cpus in the system.
+///
+/// Initialized during `init.initStage1`.
+var cpus: []Cpu = undefined;
+
+/// Fetch a specific cpus `Cpu` struct.
+///
+/// `id` must not be `.none`
+pub fn getCpu(id: Id) *Cpu {
+    core.debugAssert(id != .none);
+
+    return &cpus[@intFromEnum(id)];
+}
+
+pub const init = struct {
+    pub inline fn setCpus(cpu_slice: []Cpu) void {
+        cpus = cpu_slice;
+    }
+};
