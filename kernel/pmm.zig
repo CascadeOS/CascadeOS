@@ -9,8 +9,6 @@ const kernel = @import("kernel");
 const containers = @import("containers");
 const builtin = @import("builtin");
 
-const is_debug = builtin.mode == .Debug;
-
 const PageNode = containers.SingleNode;
 
 const log = kernel.log.scoped(.pmm);
@@ -46,7 +44,7 @@ pub fn allocatePage() AllocateError!core.PhysicalRange {
         kernel.arch.paging.standard_page_size,
     );
 
-    if (is_debug) {
+    if (core.is_debug) {
         const slice = virtual_range.toSlice(usize) catch unreachable;
         @memset(slice, undefined);
     }
