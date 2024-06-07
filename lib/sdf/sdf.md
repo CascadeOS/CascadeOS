@@ -132,7 +132,7 @@ Assuming the header has been found and successfully parsed the procedure to acqu
 8. Seek in the location program to the offset `instruction_offset` as given by the `LocationProgramState` read in step 2.
 9. While the location program register `address` is _less than or equal_ to the target address read the opcode and perform the specified operation.
 
-If the end of the location program is encountered before the `address` register is _less than or equal_ to the target address, then the target address has no location information encoded and the contents of the registers must be ignored.
+If the end of the location program is encountered and the `address` register is _less than_ to the target address, then the target address has no location information encoded and the contents of the registers must be ignored.
 
 The values of the location program registers at termination of the loop in step 9 are the result of the location program for the target address.
 
