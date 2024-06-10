@@ -26,21 +26,21 @@ pub const Held = struct {
 
         const spinlock_held = mutex.spinlock.acquire();
 
-        const current_thread = spinlock_held.exclusion.cpu.current_thread.?;
+        const opt_current_thread = spinlock_held.exclusion.cpu.current_thread;
 
-        core.debugAssert(mutex.locked_by == current_thread);
+        core.debugAssert(mutex.locked_by == opt_current_thread);
 
         mutex.locked = false;
         mutex.locked_by = null;
 
         const thread_to_wake_node = mutex.waiting_threads.pop() orelse {
             spinlock_held.release();
-            log.debug("{} released {*} no waiters", .{ current_thread, mutex });
+            log.debug("{?} released {*} no waiters", .{ opt_current_thread, mutex });
             return;
         };
         const thread_to_wake = kernel.Thread.fromNode(thread_to_wake_node);
 
-        log.debug("{} released {*} and waking {}", .{ current_thread, mutex, thread_to_wake });
+        log.debug("{?} released {*} and waking {}", .{ opt_current_thread, mutex, thread_to_wake });
 
         // acquire the scheduler lock before releasing the spin lock
         const scheduler_held = kernel.scheduler.acquireScheduler();
@@ -56,21 +56,23 @@ pub fn acquire(mutex: *Mutex) Held {
     while (true) {
         const spinlock_held = mutex.spinlock.acquire();
 
-        const current_thread = spinlock_held.exclusion.cpu.current_thread orelse
-            core.panic("Mutex.acquire called with no current thread");
+        const opt_current_thread = spinlock_held.exclusion.cpu.current_thread;
 
         if (!mutex.locked) {
             mutex.locked = true;
-            mutex.locked_by = current_thread;
+            mutex.locked_by = opt_current_thread;
 
             // TODO: disable preemption?
 
             spinlock_held.release();
 
-            log.debug("{} acquired {*}", .{ current_thread, mutex });
+            log.debug("{?} acquired {*}", .{ opt_current_thread, mutex });
 
             return .{ .mutex = mutex };
         }
+
+        const current_thread = opt_current_thread orelse core.panic("Mutex.acquire with no current thread would block");
+
         core.debugAssert(mutex.locked_by != current_thread);
 
         log.debug("{} failed to acquire {*}, waiting", .{ current_thread, mutex });
