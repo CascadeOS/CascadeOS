@@ -266,14 +266,14 @@ pub const init = struct {
                             ),
                             region.range.size,
                         ),
-                        .eternal_heap => unreachable,
+                        .eternal_heap, .kernel_stacks => unreachable, // never full mapped
                     };
 
                     const map_type: MapType = switch (region.type) {
                         .executable_section => .{ .executable = true, .global = true },
                         .readonly_section, .sdf_section => .{ .global = true },
                         .writeable_section, .direct_map => .{ .writeable = true, .global = true },
-                        .eternal_heap => unreachable,
+                        .eternal_heap, .kernel_stacks => unreachable, // never full mapped
                     };
 
                     try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
@@ -416,6 +416,13 @@ pub const init = struct {
             .type = .eternal_heap,
             .operation = .top_level_map,
         });
+
+        memory_layout.registerRegion(.{
+            .range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
+                core.panic("no space in kernel memory layout for the kernel stacks"),
+            .type = .kernel_stacks,
+            .operation = .top_level_map,
+        });
     }
 };
 
@@ -510,6 +517,8 @@ pub const MemoryLayout = struct {
             direct_map,
 
             eternal_heap,
+
+            kernel_stacks,
         };
 
         pub const Operation = enum {
