@@ -18,7 +18,7 @@ const stack_size_with_guard_page = kernel.config.kernel_stack_size.add(kernel.ar
 var stacks_range_allocator: kernel.vmm.RangeAllocator = undefined;
 var stacks_range_allocator_lock: kernel.sync.Mutex = .{};
 
-pub fn create(push_null_return_value: bool) !Stack {
+pub fn create() !Stack {
     const virtual_range = blk: {
         const held = stacks_range_allocator_lock.acquire();
         defer held.release();
@@ -47,9 +47,8 @@ pub fn create(push_null_return_value: bool) !Stack {
 
     var stack = Stack.fromRange(virtual_range, usable_range);
 
-    if (push_null_return_value) {
-        try stack.pushReturnAddress(core.VirtualAddress.zero);
-    }
+    // push a null return value
+    try stack.pushReturnAddress(core.VirtualAddress.zero);
 
     return stack;
 }
