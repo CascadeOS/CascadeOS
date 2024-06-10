@@ -129,7 +129,7 @@ fn initCpus() void {
 
         log.debug("initializing cpu {}", .{cpu_id});
 
-        const idle_stack = allocateCpuStack() catch {
+        const idle_stack = kernel.heap.stack_allocator.create() catch {
             core.panic("failed to allocate idle stack");
         };
 
@@ -139,22 +139,11 @@ fn initCpus() void {
             .arch = undefined, // initialized by `prepareProcessor`
         };
 
-        kernel.arch.init.prepareCpu(cpu, cpu_descriptor, allocateCpuStack);
+        kernel.arch.init.prepareCpu(cpu, cpu_descriptor, kernel.heap.stack_allocator.create);
 
         if (cpu.id != .bootstrap) {
             log.debug("booting processor {}", .{cpu_id});
             cpu_descriptor.boot(cpu, initStage2);
         }
     }
-}
-
-fn allocateCpuStack() !kernel.Stack {
-    // TODO: use a specialized stack allocator including guard pages
-    const range = core.VirtualRange.fromSlice(
-        u8,
-        try kernel.heap.eternal_heap_allocator.alloc(u8, kernel.config.kernel_stack_size.value),
-    );
-    var stack = kernel.Stack.fromRange(range, range);
-    try stack.pushReturnAddress(core.VirtualAddress.zero);
-    return stack;
 }
