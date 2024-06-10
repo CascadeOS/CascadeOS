@@ -9,7 +9,7 @@ const kernel = @import("kernel");
 
 const log = kernel.log.scoped(.vmm);
 
-pub const DirectMapPool = @import("DirectMapPool.zig").DirectMapPool;
+pub const RangeAllocator = @import("RangeAllocator.zig");
 
 /// The memory layout of the kernel.
 ///
