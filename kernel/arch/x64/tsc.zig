@@ -6,14 +6,14 @@ const kernel = @import("kernel");
 const std = @import("std");
 const x64 = @import("x64.zig");
 
-const readTsc = x64.readTsc;
-
 const log = kernel.log.scoped(.tsc);
 
 /// The duration of a tick in femptoseconds.
 var tick_duration_fs: u64 = undefined; // Initalized during `initializeTsc[Calibrate]`
 
 pub const init = struct {
+    const readTsc = x64.readTsc;
+
     pub fn registerTimeSource() void {
         if (!shouldUseTsc()) return;
 
@@ -33,6 +33,11 @@ pub const init = struct {
                 }
             else
                 null,
+
+            .wallclock = .{
+                .readFn = readTsc,
+                .elapsedFn = wallClockElapsed,
+            },
         });
     }
 
@@ -101,6 +106,11 @@ pub const init = struct {
         while (readTsc() < target_value) {
             x64.pause();
         }
+    }
+
+    fn wallClockElapsed(value1: u64, value2: u64) core.Duration {
+        const number_of_ticks = value2 - value1;
+        return core.Duration.from((number_of_ticks * tick_duration_fs) / kernel.time.fs_per_ns, .nanosecond);
     }
 
     fn shouldUseTsc() bool {
