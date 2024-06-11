@@ -113,6 +113,15 @@ pub const init = struct {
         current.init.configureGlobalSystemFeatures();
     }
 
+    /// Register any architectural time sources.
+    ///
+    /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
+    pub inline fn registerArchitecturalTimeSources() void {
+        checkSupport(current.init, "registerArchitecturalTimeSources", fn () void);
+
+        current.init.registerArchitecturalTimeSources();
+    }
+
     /// Configure any cpu local system features.
     pub inline fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
         checkSupport(current.init, "configureSystemFeaturesForCurrentCpu", fn (*kernel.Cpu) void);

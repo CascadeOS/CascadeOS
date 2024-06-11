@@ -25,6 +25,7 @@ pub const init = struct {
 
     pub const captureSystemInformation = x64.init.captureSystemInformation;
     pub const configureGlobalSystemFeatures = x64.init.configureGlobalSystemFeatures;
+    pub const registerArchitecturalTimeSources = x64.init.registerArchitecturalTimeSources;
     pub const configureSystemFeaturesForCurrentCpu = x64.init.configureSystemFeaturesForCurrentCpu;
     pub const initLocalInterruptController = x64.apic.init.initApicOnProcessor;
 };

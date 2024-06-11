@@ -153,6 +153,13 @@ pub fn configureGlobalSystemFeatures() void {
     }
 }
 
+/// Register any architectural time sources.
+///
+/// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
+pub fn registerArchitecturalTimeSources() void {
+    // TODO: TSC, APIC, HPET, PIT, KVMCLOCK
+}
+
 pub fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
     core.debugAssert(cpu == x64.getCpu());
 

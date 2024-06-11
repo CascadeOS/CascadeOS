@@ -60,6 +60,9 @@ pub fn initStage1() !noreturn {
     log.debug("configuring global system features", .{});
     kernel.arch.init.configureGlobalSystemFeatures();
 
+    log.debug("initializing time", .{});
+    kernel.time.init.initTime();
+
     log.debug("initializing non-bootstrap cpus", .{});
     initCpus();
 
