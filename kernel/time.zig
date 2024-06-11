@@ -13,10 +13,49 @@ pub const fs_per_ns = 1000000;
 /// Femptoseconds per second.
 pub const fs_per_s = fs_per_ns * std.time.ns_per_s;
 
+pub const wallclock = struct {
+    var readFn: *const fn () u64 = undefined;
+    var elapsedFn: *const fn (value1: u64, value2: u64) core.Duration = undefined;
+
+    /// Read the wallclock value.
+    ///
+    /// The value returned is an opaque timer tick, to acquire an actual time value, use `elapsed`.
+    pub inline fn read() u64 {
+        return readFn();
+    }
+
+    /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+    ///
+    /// Counter wraparound is assumed to have not occured.
+    pub inline fn elapsed(value1: u64, value2: u64) core.Duration {
+        return elapsedFn(value1, value2);
+    }
+};
+
 pub const init = struct {
     pub fn initTime() void {
         log.debug("registering architectural time sources", .{});
         kernel.arch.init.registerArchitecturalTimeSources();
+
+        const reference_counter = getReferenceCounter();
+
+        configureWallclockTimeSource(reference_counter);
+    }
+
+    fn configureWallclockTimeSource(
+        reference_counter: ReferenceCounter,
+    ) void {
+        const time_source = findAndInitializeTimeSource(.{
+            .wallclock = true,
+        }, reference_counter) orelse core.panic("no wallclock found");
+
+        log.debug("using wallclock: {s}", .{time_source.name});
+
+        const wallclock_impl = time_source.wallclock.?;
+
+        wallclock.readFn = wallclock_impl.readFn;
+        wallclock.elapsedFn = wallclock_impl.elapsedFn;
+    }
 
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) = .{};
 
@@ -33,6 +72,9 @@ pub const init = struct {
         ///
         /// NOTE: The reference counter interface is only used during initialization.
         reference_counter: ?ReferenceCounterOptions = null,
+
+        /// Provided if the time source is usable as a wallclock.
+        wallclock: ?WallclockOptions = null,
 
         initialized: bool = false,
 
@@ -66,6 +108,18 @@ pub const init = struct {
             /// Must be called after `prepareToWaitForFn` is called.
             waitForFn: *const fn (duration: core.Duration) void,
         };
+
+        pub const WallclockOptions = struct {
+            /// Read the wallclock value.
+            ///
+            /// The value returned is an opaque timer tick.
+            readFn: *const fn () u64,
+
+            /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+            ///
+            /// Counter wraparound is assumed to have not occured.
+            elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
+        };
     };
 
     pub fn addTimeSource(time_source: CandidateTimeSource) void {
@@ -81,8 +135,9 @@ pub const init = struct {
 
         log.debug("adding time source: {s}", .{time_source.name});
         log.debug("  priority: {}", .{time_source.priority});
-        log.debug("  reference counter: {}", .{
+        log.debug("  reference counter: {} - wall clock: {}", .{
             time_source.reference_counter != null,
+            time_source.wallclock != null,
         });
     }
 
@@ -122,6 +177,8 @@ pub const init = struct {
         pre_calibrated: bool = false,
 
         reference_counter: bool = false,
+
+        wallclock: bool = false,
     };
 
     fn findAndInitializeTimeSource(query: TimeSourceQuery, reference_counter: ReferenceCounter) ?*CandidateTimeSource {
@@ -131,6 +188,8 @@ pub const init = struct {
             if (query.pre_calibrated and time_source.initialization == .calibration_required) continue;
 
             if (query.reference_counter and time_source.reference_counter == null) continue;
+
+            if (query.wallclock and time_source.wallclock == null) continue;
 
             if (opt_best_candidate) |best_candidate| {
                 if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
