@@ -15,7 +15,7 @@ pub const UUID = extern struct {
     pub const omni: UUID = UUID.parse("ffffffff-ffff-ffff-ffff-ffffffffffff") catch unreachable;
 
     /// Generates a random version 4 UUID.
-    pub fn generateV4(random: std.rand.Random) UUID {
+    pub fn generateV4(random: std.Random) UUID {
         var uuid: UUID = undefined;
 
         random.bytes(&uuid.bytes);

@@ -22,7 +22,7 @@ pub fn main() !void {
     const arguments = try getArguments(allocator);
     defer arguments.deinit(allocator);
 
-    var rand = std.rand.DefaultPrng.init(std.crypto.random.int(u64));
+    var rand = std.Random.DefaultPrng.init(std.crypto.random.int(u64));
     const random = rand.random();
 
     try createDiskImage(allocator, arguments, random);
@@ -82,7 +82,7 @@ fn getArguments(allocator: std.mem.Allocator) !Arguments {
     };
 }
 
-fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: std.rand.Random) !void {
+fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: std.Random) !void {
     const image_description = arguments.image_description.image_description;
 
     const disk_size = blk: {
@@ -701,7 +701,7 @@ const GptPartition = struct {
     block_count: u64,
 };
 
-fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, disk_image: []u8, random: std.rand.Random, gpt_partitions: []GptPartition) !void {
+fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, disk_image: []u8, random: std.Random, gpt_partitions: []GptPartition) !void {
     core.assert(std.mem.isAligned(disk_image.len, disk_block_size.value));
 
     const number_of_blocks = disk_image.len / disk_block_size.value;
@@ -783,7 +783,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
                 .ending_lba = ending_block,
             };
 
-            const encoded_name = try std.unicode.utf8ToUtf16LeWithNull(allocator, partition.name);
+            const encoded_name = try std.unicode.utf8ToUtf16LeAllocZ(allocator, partition.name);
             defer allocator.free(encoded_name);
 
             @memcpy(entries[i].partition_name[0..encoded_name.len], encoded_name);

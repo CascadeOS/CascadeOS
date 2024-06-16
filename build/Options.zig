@@ -273,7 +273,7 @@ fn addStringLiteralSliceOption(options: *Step.Options, name: []const u8, buffer:
 
     out.print("pub const {}: []const []const u8 = &.{{", .{std.zig.fmtId(name)}) catch unreachable;
 
-    var iter = std.mem.split(u8, buffer, ",");
+    var iter = std.mem.splitScalar(u8, buffer, ',');
     while (iter.next()) |value| {
         if (value.len != 0) out.print("\"{s}\",", .{value}) catch unreachable;
     }
@@ -332,7 +332,7 @@ fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion, r
         },
         2 => {
             // Untagged development build (e.g. 0.8.0-684-gbbe2cca1a).
-            var hash_iterator = std.mem.split(u8, git_describe_output, "-");
+            var hash_iterator = std.mem.splitScalar(u8, git_describe_output, '-');
             const tagged_ancestor_version_string = hash_iterator.next() orelse unreachable;
             const commit_height = hash_iterator.next() orelse unreachable;
             const commit_id = hash_iterator.next() orelse unreachable;
