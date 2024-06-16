@@ -37,9 +37,21 @@ pub fn switchToPageTable(page_table: *const kernel.arch.paging.PageTable) void {
 /// Initialized during `init.buildMemoryLayout`.
 var direct_map_range: core.VirtualRange = undefined;
 
+/// Provides an identity mapping between virtual and physical addresses.
+///
+/// Caching is disabled for this mapping.
+///
+/// Initialized during `init.buildMemoryLayout`.
+var non_cached_direct_map_range: core.VirtualRange = undefined;
+
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
     return .{ .value = self.value + direct_map_range.address.value };
+}
+
+/// Returns the virtual address corresponding to this physical address in the non-cached direct map.
+pub fn nonCachedDirectMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + non_cached_direct_map_range.address.value };
 }
 
 /// Returns a virtual range corresponding to this physical range in the direct map.
@@ -236,7 +248,7 @@ pub const init = struct {
         };
 
         try registerKernelSections();
-        try registerDirectMap();
+        try registerDirectMaps();
         try registerHeaps();
 
         memory_layout.sortMemoryLayout();
@@ -259,7 +271,7 @@ pub const init = struct {
             switch (region.operation) {
                 .full_map => {
                     const physical_range = switch (region.type) {
-                        .direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+                        .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
                         .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
                             core.PhysicalAddress.fromInt(
                                 region.range.address.value - memory_layout.physical_to_virtual_offset.value,
@@ -273,6 +285,7 @@ pub const init = struct {
                         .executable_section => .{ .executable = true, .global = true },
                         .readonly_section, .sdf_section => .{ .global = true },
                         .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+                        .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
                         .eternal_heap, .kernel_stacks => unreachable, // never full mapped
                     };
 
@@ -356,27 +369,44 @@ pub const init = struct {
         }
     }
 
-    fn registerDirectMap() !void {
-        const candidate_direct_map_range = core.VirtualRange.fromAddr(
+    fn registerDirectMaps() !void {
+        const direct_map_size = try calculateSizeOfDirectMap();
+
+        const bootloader_direct_map_range = core.VirtualRange.fromAddr(
             kernel.boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
-            try calculateSizeOfDirectMap(),
+            direct_map_size,
         );
 
-        // does the candidate range overlap a pre-existing region?
+        // does the bootloader range overlap a pre-existing region?
         for (memory_layout.layout.constSlice()) |region| {
-            if (region.range.containsRange(candidate_direct_map_range)) {
+            if (region.range.containsRange(bootloader_direct_map_range)) {
                 log.err(
-                    \\direct map overlaps a pre-existing memory region:
+                    \\direct map overlaps another memory region:
                     \\  direct map: {}
                     \\  other region: {}
-                , .{ candidate_direct_map_range, region });
+                , .{ bootloader_direct_map_range, region });
 
                 return error.DirectMapOverlapsRegion;
             }
         }
 
-        direct_map_range = candidate_direct_map_range;
-        memory_layout.registerRegion(.{ .range = candidate_direct_map_range, .type = .direct_map, .operation = .full_map });
+        direct_map_range = bootloader_direct_map_range;
+        memory_layout.registerRegion(.{
+            .range = bootloader_direct_map_range,
+            .type = .direct_map,
+            .operation = .full_map,
+        });
+
+        // TODO: Align to large page?
+        const range = memory_layout.findFreeRange(direct_map_size, null) orelse {
+            core.panic("unable to find free memory region for the non-cached direct map");
+        };
+        non_cached_direct_map_range = range;
+        memory_layout.registerRegion(.{
+            .range = range,
+            .type = .non_cached_direct_map,
+            .operation = .full_map,
+        });
     }
 
     /// Calculates the size of the direct map.
@@ -515,6 +545,7 @@ pub const MemoryLayout = struct {
             sdf_section,
 
             direct_map,
+            non_cached_direct_map,
 
             eternal_heap,
 
