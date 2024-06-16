@@ -10,6 +10,7 @@ pub usingnamespace lib_x64;
 
 pub const apic = @import("apic.zig");
 pub const ArchCpu = @import("ArchCpu.zig");
+pub const hpet = @import("hpet.zig");
 pub const info = @import("info.zig");
 pub const init = @import("init.zig");
 pub const interrupts = @import("interrupts.zig");
