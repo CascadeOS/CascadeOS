@@ -39,6 +39,3 @@ Run `zig build -h` for a listing of the available steps and options.
 
 ## License
 This project follows the [REUSE Specification](https://reuse.software/spec/) for specifying license information.
-
-## Discord Server
-This project has a [Discord server](https://discord.gg/3hnsQmND3c).
