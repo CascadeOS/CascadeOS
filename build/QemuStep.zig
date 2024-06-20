@@ -19,8 +19,12 @@ image: std.Build.LazyPath,
 target: CascadeTarget,
 options: Options,
 
-/// Only non-null if `options.uefi` is true
-edk2: ?*std.Build.Dependency,
+firmware: Firmware,
+
+const Firmware = union(enum) {
+    default,
+    uefi: *std.Build.Dependency, // EDK2 dependency
+};
 
 /// Registers QEMU steps for all targets.
 ///
@@ -55,8 +59,6 @@ pub fn registerQemuSteps(
 fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, options: Options) !*QemuStep {
     const uefi = options.uefi or needsUefi(target);
 
-    const edk2: ?*std.Build.Dependency = if (uefi) b.dependency("edk2", .{}) else null;
-
     const step_name = try std.fmt.allocPrint(
         b.allocator,
         "run qemu with {s} image",
@@ -76,7 +78,7 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, optio
         .image = image,
         .target = target,
         .options = options,
-        .edk2 = edk2,
+        .firmware = if (uefi) .{ .uefi = b.dependency("edk2", .{}) } else .default,
     };
 
     image.addStepDependencies(&self.step);
@@ -194,32 +196,32 @@ fn make(step: *Step, prog_node: std.Progress.Node) !void {
     // always add tcg as the last accelerator
     run_qemu.addArgs(&[_][]const u8{ "-accel", "tcg" });
 
-    // UEFI
-    if (self.edk2) |edk2| {
-        std.debug.assert(self.options.uefi);
+    switch (self.firmware) {
+        .default => {},
+        .uefi => |edk2| {
+            const firmware_code = edk2.path(uefiFirmwareCodeFileName(self.target));
 
-        const firmware_code = edk2.path(uefiFirmwareCodeFileName(self.target));
+            run_qemu.addArgs(&[_][]const u8{
+                "-drive",
+                try std.fmt.allocPrint(
+                    b.allocator,
+                    "if=pflash,format=raw,unit=0,file={s},readonly=on",
+                    .{firmware_code.getPath2(b, step)},
+                ),
+            });
 
-        run_qemu.addArgs(&[_][]const u8{
-            "-drive",
-            try std.fmt.allocPrint(
-                b.allocator,
-                "if=pflash,format=raw,unit=0,file={s},readonly=on",
-                .{firmware_code.getPath2(b, step)},
-            ),
-        });
+            const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
 
-        const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
-
-        // this being readonly is not correct but preventing modifcation of a file in the cache is good
-        run_qemu.addArgs(&[_][]const u8{
-            "-drive",
-            try std.fmt.allocPrint(
-                b.allocator,
-                "if=pflash,format=raw,unit=1,file={s},readonly=on",
-                .{firmware_var.getPath2(b, step)},
-            ),
-        });
+            // this being readonly is not correct but preventing modifcation of a file in the cache is good
+            run_qemu.addArgs(&[_][]const u8{
+                "-drive",
+                try std.fmt.allocPrint(
+                    b.allocator,
+                    "if=pflash,format=raw,unit=1,file={s},readonly=on",
+                    .{firmware_var.getPath2(b, step)},
+                ),
+            });
+        },
     }
 
     var timer = try std.time.Timer.start();
