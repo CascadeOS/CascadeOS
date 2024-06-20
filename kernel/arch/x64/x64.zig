@@ -22,8 +22,6 @@ pub const tsc = @import("tsc.zig");
 /// Get the current CPU.
 ///
 /// Assumes that `init.loadCpu()` has been called on the currently running CPU.
-///
-/// Asserts that interrupts are disabled.
 pub inline fn getCpu() *kernel.Cpu {
     return @ptrFromInt(lib_x64.KERNEL_GS_BASE.read());
 }
