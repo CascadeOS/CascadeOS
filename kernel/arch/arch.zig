@@ -10,6 +10,7 @@ const kernel = @import("kernel");
 pub const arch = @import("cascade_target").arch;
 
 const current = switch (arch) {
+    .arm64 => @import("arm64/interface.zig"),
     .x64 => @import("x64/interface.zig"),
 };
 

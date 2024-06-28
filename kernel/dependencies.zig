@@ -11,6 +11,10 @@ pub const core_dependencies: []const LibraryDependency = &.{
     .{ .name = "sdf" },
 };
 
+pub const arm64_dependencies: []const LibraryDependency = &.{
+    .{ .name = "arm64", .import_name = "lib_arm64" },
+};
+
 pub const x64_dependencies: []const LibraryDependency = &.{
     .{ .name = "x64", .import_name = "lib_x64" },
 };
