@@ -156,6 +156,7 @@ fn create(
 
     // apply target-specific configuration to the kernel
     switch (target) {
+        .arm64 => {},
         .x64 => {
             kernel_exe.root_module.code_model = .kernel;
             kernel_exe.root_module.red_zone = false;
@@ -241,6 +242,22 @@ fn create(
 /// Returns a CrossTarget for building the kernel for the given target.
 fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
     switch (self) {
+        .arm64 => {
+            const features = std.Target.aarch64.Feature;
+            var target_query = std.Target.Query{
+                .cpu_arch = .aarch64,
+                .os_tag = .freestanding,
+                .abi = .none,
+                .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.generic },
+            };
+
+            // Remove neon and fp features
+            target_query.cpu_features_sub.addFeature(@intFromEnum(features.neon));
+            target_query.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
+
+            return b.resolveTargetQuery(target_query);
+        },
+
         .x64 => {
             const features = std.Target.x86.Feature;
             var target_query = std.Target.Query{
