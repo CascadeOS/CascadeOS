@@ -10,6 +10,7 @@ PHDRS
     text         PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
     rodata       PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
     data         PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
+    dynamic      PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read - relocations */
 
     sdf          PT_LOAD    FLAGS((1 << 2)) ;            /* Read only - assumed to be the last program header by sdf_builder */
 }
@@ -19,22 +20,30 @@ SECTIONS
     /* This must be kept in sync with `kernel.config.kernel_base_address` */
     . = 0xffffffff80000000;
 
-    .text ALIGN(4K) : {
+    .text : {
         __text_start = .;
         *(.text .text.*)
         __text_end = .;
     } :text
 
-    .rodata ALIGN(4K) : {
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    .rodata : {
         __rodata_start = .;
         *(.rodata .rodata.*)
         __rodata_end = .;
     } :rodata
 
-    .data ALIGN(4K) : {
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    .data : {
         __data_start = .;
         *(.data .data.*)
     } :data
+
+    .dynamic : {
+        *(.dynamic)
+    } :data :dynamic
 
     .bss : {
         *(COMMON)
@@ -42,7 +51,9 @@ SECTIONS
         __data_end = .;
     } :data
 
-    .sdf ALIGN(4K) : { /* sdf_builder embeds the SDF data into this section */
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+    .sdf : { /* sdf_builder embeds the SDF data into this section */
         __sdf_start = .;
         . += 0x1000;
     } :sdf
