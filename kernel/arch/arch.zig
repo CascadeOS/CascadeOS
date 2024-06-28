@@ -22,21 +22,21 @@ pub const ArchCpu = current.ArchCpu;
 ///
 /// It is the callers responsibility to ensure that the current thread is not re-scheduled on to another CPU.
 pub inline fn rawGetCpu() *kernel.Cpu {
-    checkSupport(current, "getCpu", fn () *kernel.Cpu);
+    // `checkSupport` intentionally not called - mandatory function
 
     return current.getCpu();
 }
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub inline fn spinLoopHint() void {
-    checkSupport(current, "spinLoopHint", fn () void);
+    // `checkSupport` intentionally not called - mandatory function
 
     current.spinLoopHint();
 }
 
 /// Halts the current processor
 pub inline fn halt() void {
-    checkSupport(current, "halt", fn () void);
+    // `checkSupport` intentionally not called - mandatory function
 
     current.halt();
 }
@@ -45,21 +45,21 @@ pub inline fn halt() void {
 pub const init = struct {
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
-        checkSupport(current.init, "setupEarlyOutput", fn () void);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.init.setupEarlyOutput();
     }
 
     /// Acquire a writer for the early output setup by `setupEarlyOutput`.
     pub inline fn getEarlyOutput() ?std.io.AnyWriter {
-        checkSupport(current.init, "getEarlyOutput", fn () ?current.init.EarlyOutputWriter);
+        // `checkSupport` intentionally not called - mandatory function
 
         return if (current.init.getEarlyOutput()) |writer| writer.any() else null;
     }
 
     /// Ensure that any exceptions/faults that occur are handled.
     pub inline fn initInterrupts() void {
-        checkSupport(current.init, "initInterrupts", fn () void);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.init.initInterrupts();
     }
@@ -68,7 +68,7 @@ pub const init = struct {
     pub inline fn prepareBootstrapCpu(
         bootstrap_cpu: *kernel.Cpu,
     ) void {
-        checkSupport(current.init, "prepareBootstrapCpu", fn (*kernel.Cpu) void);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.init.prepareBootstrapCpu(bootstrap_cpu);
     }
@@ -92,7 +92,7 @@ pub const init = struct {
 
     /// Load the provided `Cpu` as the current CPU.
     pub inline fn loadCpu(cpu: *kernel.Cpu) void {
-        checkSupport(current.init, "loadCpu", fn (*kernel.Cpu) void);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.init.loadCpu(cpu);
     }
@@ -142,28 +142,28 @@ pub const init = struct {
 pub const interrupts = struct {
     /// Disable interrupts and put the CPU to sleep.
     pub inline fn disableInterruptsAndHalt() noreturn {
-        checkSupport(current.interrupts, "disableInterruptsAndHalt", fn () noreturn);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.interrupts.disableInterruptsAndHalt();
     }
 
     /// Are interrupts enabled?
     pub inline fn interruptsEnabled() bool {
-        checkSupport(current.interrupts, "interruptsEnabled", fn () bool);
+        // `checkSupport` intentionally not called - mandatory function
 
         return current.interrupts.interruptsEnabled();
     }
 
     /// Disable interrupts.
     pub inline fn disableInterrupts() void {
-        checkSupport(current.interrupts, "disableInterrupts", fn () void);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.interrupts.disableInterrupts();
     }
 
     /// Enable interrupts.
     pub inline fn enableInterrupts() void {
-        checkSupport(current.interrupts, "enableInterrupts", fn () void);
+        // `checkSupport` intentionally not called - mandatory function
 
         current.interrupts.enableInterrupts();
     }
@@ -383,8 +383,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        // core.panic("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
-        @compileError("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
+        core.panic("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));
