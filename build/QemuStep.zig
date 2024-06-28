@@ -89,6 +89,7 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, optio
 /// Returns true if the target needs UEFI to boot.
 fn needsUefi(self: CascadeTarget) bool {
     return switch (self) {
+        .arm64 => true,
         .x64 => false,
     };
 }
@@ -172,13 +173,23 @@ fn make(step: *Step, prog_node: std.Progress.Node) !void {
         .qemu_default => {},
     }
 
+    // add display device
+    if (self.options.display_mode != .none) {
+        switch (self.target) {
+            .arm64 => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .x64 => {},
+        }
+    }
+
     // set target cpu
     switch (self.target) {
+        .arm64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no,+invtsc" }),
     }
 
     // set target machine
     switch (self.target) {
+        .arm64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
         .x64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
     }
 
@@ -233,12 +244,14 @@ fn make(step: *Step, prog_node: std.Progress.Node) !void {
 
 fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
+        .arm64 => "aarch64/code.fd",
         .x64 => "x64/code.fd",
     };
 }
 
 fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
+        .arm64 => "aarch64/vars.fd",
         .x64 => "x64/vars.fd",
     };
 }
@@ -246,6 +259,7 @@ fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
 /// Returns the name of the QEMU system executable for the given target.
 fn qemuExecutable(self: CascadeTarget) []const u8 {
     return switch (self) {
+        .arm64 => "qemu-system-aarch64",
         .x64 => "qemu-system-x86_64",
     };
 }

@@ -67,19 +67,21 @@ pub fn registerImageSteps(
         image_build_step.addFileArg(image_description_step.image_description_file);
         const raw_image = image_build_step.addOutputFileArg(image_file_name);
 
-        const run_limine = b.addRunArtifact(limine_exe);
-
-        run_limine.addArg("bios-install");
-        run_limine.addFileArg(raw_image);
-        run_limine.addArg("--quiet");
-
-        run_limine.has_side_effects = true;
-
         const install_image = b.addInstallFile(
             raw_image,
             b.pathJoin(&.{ @tagName(target), image_file_name }),
         );
-        install_image.step.dependOn(&run_limine.step);
+
+        if (target == .x64) {
+            const run_limine = b.addRunArtifact(limine_exe);
+
+            run_limine.addArg("bios-install");
+            run_limine.addFileArg(raw_image);
+            run_limine.addArg("--quiet");
+
+            run_limine.has_side_effects = true;
+            install_image.step.dependOn(&run_limine.step);
+        }
 
         const step_name = try std.fmt.allocPrint(
             b.allocator,
@@ -273,6 +275,12 @@ const ImageDescriptionStep = struct {
         });
 
         switch (self.target) {
+            .arm64 => {
+                try efi_partition.addFile(.{
+                    .destination_path = "/EFI/BOOT/BOOTAA64.EFI",
+                    .source_path = self.limine_dep.path("BOOTAA64.EFI").getPath2(self.b, &self.step),
+                });
+            },
             .x64 => {
                 try efi_partition.addFile(.{
                     .destination_path = "/limine-bios.sys",
