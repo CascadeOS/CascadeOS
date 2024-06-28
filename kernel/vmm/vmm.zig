@@ -229,8 +229,6 @@ pub const MapType = struct {
 
 pub const init = struct {
     pub fn buildMemoryLayout() !void {
-        log.debug("building kernel memory layout", .{});
-
         const base_address = kernel.boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
 
         log.debug("kernel virtual base address: {}", .{base_address.virtual});
