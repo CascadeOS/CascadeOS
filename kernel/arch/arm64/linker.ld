@@ -10,7 +10,6 @@ PHDRS
     text         PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
     rodata       PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
     data         PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
-    dynamic      PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read - relocations */
 
     sdf          PT_LOAD    FLAGS((1 << 2)) ;            /* Read only - assumed to be the last program header by sdf_builder */
 }
@@ -40,10 +39,6 @@ SECTIONS
         __data_start = .;
         *(.data .data.*)
     } :data
-
-    .dynamic : {
-        *(.dynamic)
-    } :data :dynamic
 
     .bss : {
         *(COMMON)
