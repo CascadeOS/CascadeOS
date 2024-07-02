@@ -40,10 +40,9 @@ pub fn releaseScheduler() kernel.sync.InterruptExclusion {
     return .{ .cpu = cpu };
 }
 
-/// Yields the currently running thread.
-pub fn yield(
+/// Blocks the currently running thread.
+pub fn block(
     scheduler_held: SchedulerHeld,
-    comptime behaviour: enum { wait, ready },
 ) void {
     validateLock(scheduler_held);
 
@@ -54,47 +53,43 @@ pub fn yield(
 
     const current_thread = cpu.current_thread.?;
 
+    current_thread.state = .blocked;
+
     const new_thread_node = ready_to_run.pop() orelse {
         // list is empty
-        switch (behaviour) {
-            .ready => {
-                core.debugAssert(current_thread.state == .ready);
-                return;
-            },
-            .wait => {
-                core.debugAssert(current_thread.state == .waiting);
-                switchToIdle(cpu, null);
-                unreachable;
-            },
-        }
+        switchToIdle(cpu, current_thread);
+        unreachable;
     };
     const new_thread = kernel.Thread.fromNode(new_thread_node);
     core.debugAssert(current_thread != new_thread);
 
-    queueThread(scheduler_held, current_thread);
-
     switchToThreadFromThread(cpu, current_thread, new_thread);
 }
 
-/// Yield execution to the scheduler from a no thread state like idle or init.
-pub fn yieldNoThread(scheduler_held: SchedulerHeld) noreturn {
+/// Yield execution to the scheduler.
+pub fn yield(scheduler_held: SchedulerHeld) void {
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
 
-    core.debugAssert(cpu.current_thread == null);
     core.debugAssert(cpu.interrupt_disable_count == 1);
+
+    const opt_current_thread = cpu.current_thread;
+
+    if (opt_current_thread) |current_thread| queueThread(scheduler_held, current_thread);
 
     const new_thread_node = ready_to_run.pop() orelse {
         // list is empty
-        switchToIdle(cpu, null);
-        unreachable;
+        switchToIdle(cpu, opt_current_thread);
+        return;
     };
+
     const new_thread = kernel.Thread.fromNode(new_thread_node);
 
-    // we were previously idle
-    switchToThreadFromIdle(cpu, new_thread);
-    unreachable;
+    if (opt_current_thread) |current_thread|
+        switchToThreadFromThread(cpu, current_thread, new_thread)
+    else
+        switchToThreadFromIdle(cpu, new_thread);
 }
 
 /// Queues a thread to be run by the scheduler.
@@ -164,7 +159,7 @@ fn idle() noreturn {
         if (!ready_to_run.isEmpty()) {
             const scheduler_held = kernel.scheduler.acquireScheduler();
             defer scheduler_held.release();
-            if (!ready_to_run.isEmpty()) yieldNoThread(scheduler_held);
+            if (!ready_to_run.isEmpty()) yield(scheduler_held);
         }
 
         kernel.arch.halt();

@@ -40,7 +40,7 @@ pub inline fn fromNode(node: *containers.SingleNode) *Thread {
 pub const State = enum {
     ready,
     running,
-    waiting,
+    blocked,
 };
 
 pub const Name = std.BoundedArray(u8, kernel.config.thread_name_length);

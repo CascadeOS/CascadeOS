@@ -77,7 +77,6 @@ pub fn acquire(mutex: *Mutex) Held {
 
         log.debug("{} failed to acquire {*}, waiting", .{ current_thread, mutex });
 
-        current_thread.state = .waiting;
         current_thread.next_thread_node = .{};
         mutex.waiting_threads.push(&current_thread.next_thread_node);
 
@@ -87,6 +86,6 @@ pub fn acquire(mutex: *Mutex) Held {
 
         spinlock_held.release();
 
-        kernel.scheduler.yield(scheduler_held, .wait);
+        kernel.scheduler.block(scheduler_held);
     }
 }
