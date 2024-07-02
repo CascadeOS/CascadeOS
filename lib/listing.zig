@@ -27,6 +27,11 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
         .name = "limine",
         .dependencies = &.{.{ .name = "core" }},
     },
+    .{
+        .name = "riscv",
+        .dependencies = &.{ .{ .name = "core" }, .{ .name = "bitjuggle" } },
+        .supported_targets = &.{.riscv},
+    },
     .{ .name = "sdf" },
     .{
         .name = "uuid",
