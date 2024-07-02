@@ -39,10 +39,10 @@ pub fn registerKernel(
     self: StepCollection,
     target: CascadeTarget,
     install_kernel_step: *Step,
-    install_debug_info_setp: *Step,
+    install_debug_info_step: ?*Step,
 ) void {
     self.kernel_build_steps_per_target.get(target).?.dependOn(install_kernel_step);
-    self.kernel_build_steps_per_target.get(target).?.dependOn(install_debug_info_setp);
+    if (install_debug_info_step) |step| self.kernel_build_steps_per_target.get(target).?.dependOn(step);
 }
 
 /// Registers an image build step for a target.

@@ -133,17 +133,26 @@ fn create(
     // directory_prefixes_to_strip
     generate_sdf.addArg(options.root_path);
 
-    const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
-        .basename = kernel_exe.out_filename,
-        .strip = .debug,
-        .extract_to_separate_file = true,
-    });
+    // TODO: get stripped and seperate debug info working for riscv
+    const opt_stripped_kernel_exe = if (target != .riscv)
+        b.addObjCopy(kernel_exe.getEmittedBin(), .{
+            .basename = kernel_exe.out_filename,
+            .strip = .debug,
+            .extract_to_separate_file = true,
+        })
+    else
+        null;
 
     const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
     // action
     embed_sdf.addArg("embed");
     // binary_input_path
-    embed_sdf.addFileArg(stripped_kernel_exe.getOutput());
+    embed_sdf.addFileArg(
+        if (opt_stripped_kernel_exe) |stripped_kernel_exe|
+            stripped_kernel_exe.getOutput()
+        else
+            kernel_exe.getEmittedBin(),
+    );
     // binary_output_path
     const final_kernel_binary_path = embed_sdf.addOutputFileArg("kernel");
     // sdf_input_path
@@ -154,15 +163,18 @@ fn create(
         b.pathJoin(&.{ @tagName(target), "kernel" }),
     );
 
-    const install_seperated_debug = b.addInstallFile(
-        stripped_kernel_exe.getOutputSeparatedDebug().?,
-        b.pathJoin(&.{ @tagName(target), "kernel.debug" }),
-    );
+    const opt_install_seperated_debug = if (opt_stripped_kernel_exe) |stripped_kernel_exe|
+        b.addInstallFile(
+            stripped_kernel_exe.getOutputSeparatedDebug().?,
+            b.pathJoin(&.{ @tagName(target), "kernel.debug" }),
+        )
+    else
+        null;
 
     step_collection.registerKernel(
         target,
         &install_final_kernel_binary.step,
-        &install_seperated_debug.step,
+        if (opt_install_seperated_debug) |install_seperated_debug| &install_seperated_debug.step else null,
     );
 
     return Kernel{
@@ -233,6 +245,7 @@ fn constructKernelExe(
     // apply target-specific configuration to the kernel
     switch (target) {
         .arm64 => {},
+        .riscv => {},
         .x64 => {
             kernel_exe.root_module.code_model = .kernel;
             kernel_exe.root_module.red_zone = false;
@@ -283,6 +296,26 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
             // Remove neon and fp features
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.neon));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
+
+            return b.resolveTargetQuery(target_query);
+        },
+
+        .riscv => {
+            const features = std.Target.riscv.Feature;
+            var target_query = std.Target.Query{
+                .cpu_arch = .riscv64,
+                .os_tag = .freestanding,
+                .abi = .none,
+                .cpu_model = .{ .explicit = &std.Target.riscv.cpu.generic_rv64 },
+            };
+
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.a));
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.m));
+
+            // The compiler will not emit instructions from the below features but it is better to be explicit.
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.zicsr));
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.zifencei));
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.zihintpause));
 
             return b.resolveTargetQuery(target_query);
         },
