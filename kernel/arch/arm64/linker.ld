@@ -43,6 +43,7 @@ SECTIONS
     .bss : {
         *(COMMON)
         *(.bss .bss.*)
+        *(.sbss .sbss.*)
         __data_end = .;
     } :data
 
