@@ -26,9 +26,6 @@ final_kernel_binary_path: std.Build.LazyPath,
 /// Installs the debug-info stripped kernel with SDF data embedded.
 install_final_kernel_binary: *Step,
 
-/// Installs the kernel debug-info in a seperate file.
-install_seperated_debug_step: *Step,
-
 /// only used for generating a dependency graph
 dependencies: []const Library.Dependency,
 
@@ -54,13 +51,9 @@ pub fn getKernels(
             libraries,
             sdf_builder,
             options,
+            step_collection,
         );
         kernels.putAssumeCapacityNoClobber(target, kernel);
-        step_collection.registerKernel(
-            target,
-            kernel.install_final_kernel_binary,
-            kernel.install_seperated_debug_step,
-        );
     }
 
     return kernels;
@@ -72,7 +65,126 @@ fn create(
     libraries: Library.Collection,
     sdf_builder: Tool,
     options: Options,
+    step_collection: StepCollection,
 ) !Kernel {
+    const dependencies = blk: {
+        var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
+        defer dependencies.deinit();
+
+        // core dependencies
+        for (kernel_dependencies.core_dependencies) |dep| {
+            const library = libraries.get(dep.name) orelse
+                std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
+
+            const import_name = dep.import_name orelse library.name;
+
+            try dependencies.append(.{ .import_name = import_name, .library = library });
+        }
+
+        // target specific dependencies
+        switch (target) {
+            inline else => |tag| {
+                const decl_name = comptime @tagName(tag) ++ "_dependencies";
+
+                if (@hasDecl(kernel_dependencies, decl_name)) {
+                    for (@field(kernel_dependencies, decl_name)) |dep| {
+                        const library = libraries.get(dep.name) orelse
+                            std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
+
+                        const import_name = dep.import_name orelse library.name;
+
+                        try dependencies.append(.{ .import_name = import_name, .library = library });
+                    }
+                }
+            },
+        }
+
+        break :blk try dependencies.toOwnedSlice();
+    };
+
+    const source_file_modules = try getSourceFileModules(b, options, dependencies);
+
+    {
+        const check_kernel_exe = try constructKernelExe(
+            b,
+            target,
+            dependencies,
+            source_file_modules,
+            options,
+        );
+        step_collection.registerCheck(check_kernel_exe);
+    }
+
+    const kernel_exe = try constructKernelExe(
+        b,
+        target,
+        dependencies,
+        source_file_modules,
+        options,
+    );
+
+    const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+    // action
+    generate_sdf.addArg("generate");
+    // binary_input_path
+    generate_sdf.addFileArg(kernel_exe.getEmittedBin());
+    // binary_output_path
+    const sdf_data_path = generate_sdf.addOutputFileArg("sdf.output");
+    // directory_prefixes_to_strip
+    generate_sdf.addArg(options.root_path);
+
+    const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
+        .basename = kernel_exe.out_filename,
+        .strip = .debug,
+        .extract_to_separate_file = true,
+    });
+
+    const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+    // action
+    embed_sdf.addArg("embed");
+    // binary_input_path
+    embed_sdf.addFileArg(stripped_kernel_exe.getOutput());
+    // binary_output_path
+    const final_kernel_binary_path = embed_sdf.addOutputFileArg("kernel");
+    // sdf_input_path
+    embed_sdf.addFileArg(sdf_data_path);
+
+    const install_final_kernel_binary = b.addInstallFile(
+        final_kernel_binary_path,
+        b.pathJoin(&.{ @tagName(target), "kernel" }),
+    );
+
+    const install_seperated_debug = b.addInstallFile(
+        stripped_kernel_exe.getOutputSeparatedDebug().?,
+        b.pathJoin(&.{ @tagName(target), "kernel.debug" }),
+    );
+
+    step_collection.registerKernel(
+        target,
+        &install_final_kernel_binary.step,
+        &install_seperated_debug.step,
+    );
+
+    return Kernel{
+        .b = b,
+        .target = target,
+        .options = options,
+
+        .install_final_kernel_binary = &install_final_kernel_binary.step,
+
+        .final_kernel_binary_path = final_kernel_binary_path,
+
+        .dependencies = dependencies,
+    };
+}
+
+fn constructKernelExe(
+    b: *std.Build,
+    target: CascadeTarget,
+    dependencies: []const Library.Dependency,
+    source_file_modules: []const SourceFileModule,
+    options: Options,
+) !*Step.Compile {
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
@@ -89,6 +201,13 @@ fn create(
         }),
     ));
 
+    for (dependencies) |dep| {
+        const library_module = dep.library.cascade_modules.get(target) orelse
+            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
+
+        kernel_exe.root_module.addImport(dep.import_name, library_module);
+    }
+
     // self reference
     kernel_exe.root_module.addImport("kernel", &kernel_exe.root_module);
 
@@ -98,51 +217,8 @@ fn create(
     // kernel options
     kernel_exe.root_module.addImport("kernel_options", options.kernel_option_module);
 
-    const dependencies = blk: {
-        var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
-        defer dependencies.deinit();
-
-        // core dependencies
-        for (kernel_dependencies.core_dependencies) |dep| {
-            const library = libraries.get(dep.name) orelse
-                std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
-
-            const library_module = library.cascade_modules.get(target) orelse
-                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ library.name, @tagName(target) });
-
-            const import_name = dep.import_name orelse library.name;
-
-            kernel_exe.root_module.addImport(import_name, library_module);
-            try dependencies.append(.{ .import_name = import_name, .library = library });
-        }
-
-        // target specific dependencies
-        switch (target) {
-            inline else => |tag| {
-                const decl_name = comptime @tagName(tag) ++ "_dependencies";
-
-                if (@hasDecl(kernel_dependencies, decl_name)) {
-                    for (@field(kernel_dependencies, decl_name)) |dep| {
-                        const library = libraries.get(dep.name) orelse
-                            std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
-
-                        const library_module = library.cascade_modules.get(target) orelse
-                            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ library.name, @tagName(target) });
-
-                        const import_name = dep.import_name orelse library.name;
-
-                        kernel_exe.root_module.addImport(import_name, library_module);
-                        try dependencies.append(.{ .import_name = import_name, .library = library });
-                    }
-                }
-            },
-        }
-
-        break :blk try dependencies.toOwnedSlice();
-    };
-
     // source file modules
-    for (try getSourceFileModules(b, options, dependencies)) |module| {
+    for (source_file_modules) |module| {
         kernel_exe.root_module.addImport(module.name, module.module);
     }
 
@@ -189,54 +265,7 @@ fn create(
         }
     }
 
-    const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
-    // action
-    generate_sdf.addArg("generate");
-    // binary_input_path
-    generate_sdf.addFileArg(kernel_exe.getEmittedBin());
-    // binary_output_path
-    const sdf_data_path = generate_sdf.addOutputFileArg("sdf.output");
-    // directory_prefixes_to_strip
-    generate_sdf.addArg(options.root_path);
-
-    const stripped_kernel_exe = b.addObjCopy(kernel_exe.getEmittedBin(), .{
-        .basename = kernel_exe.out_filename,
-        .strip = .debug,
-        .extract_to_separate_file = true,
-    });
-
-    const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
-    // action
-    embed_sdf.addArg("embed");
-    // binary_input_path
-    embed_sdf.addFileArg(stripped_kernel_exe.getOutput());
-    // binary_output_path
-    const final_kernel_binary_path = embed_sdf.addOutputFileArg("kernel");
-    // sdf_input_path
-    embed_sdf.addFileArg(sdf_data_path);
-
-    const install_final_kernel_binary = b.addInstallFile(
-        final_kernel_binary_path,
-        b.pathJoin(&.{ @tagName(target), "kernel" }),
-    );
-
-    const install_seperated_debug = b.addInstallFile(
-        stripped_kernel_exe.getOutputSeparatedDebug().?,
-        b.pathJoin(&.{ @tagName(target), "kernel.debug" }),
-    );
-
-    return Kernel{
-        .b = b,
-        .target = target,
-        .options = options,
-
-        .final_kernel_binary_path = final_kernel_binary_path,
-
-        .install_final_kernel_binary = &install_final_kernel_binary.step,
-        .install_seperated_debug_step = &install_seperated_debug.step,
-
-        .dependencies = dependencies,
-    };
+    return kernel_exe;
 }
 
 /// Returns a CrossTarget for building the kernel for the given target.
@@ -309,7 +338,7 @@ const SourceFileModule = struct {
 ///
 /// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
 /// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
-fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []Library.Dependency) ![]const SourceFileModule {
+fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const Library.Dependency) ![]const SourceFileModule {
     var modules = std.ArrayList(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
 

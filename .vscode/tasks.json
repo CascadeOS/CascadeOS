@@ -5,7 +5,22 @@
     // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
-        // All
+        // Check
+        {
+            "label": "check",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "check"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+
+        // All tests
         {
             "label": "test - all",
             "type": "process",
@@ -15,11 +30,10 @@
                 "test"
             ],
             "group": {
-                "kind": "build",
-                "isDefault": true
+                "kind": "build"
             }
         },
-        
+
         // Kernel
         {
             "label": "build - kernel_x64",

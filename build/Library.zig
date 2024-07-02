@@ -236,6 +236,19 @@ fn cascadeTestExecutableAndModule(
     // step_collection: StepCollection,
     cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 ) !void {
+    // {
+    //     const check_test_exe = try createTestExe(
+    //         b,
+    //         library_description,
+    //         lazy_path,
+    //         options,
+    //         target,
+    //         dependencies,
+    //         true,
+    //     );
+    //     step_collection.registerCheck(check_test_exe);
+    // }
+
     // const test_exe = try createTestExe(
     //     b,
     //     library_description,
@@ -303,6 +316,19 @@ fn hostTestExecutableAndModule(
     step_collection: StepCollection,
     non_cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
 ) !?*std.Build.Module {
+    {
+        const check_test_exe = try createTestExe(
+            b,
+            library_description,
+            lazy_path,
+            options,
+            target,
+            dependencies,
+            false,
+        );
+        step_collection.registerCheck(check_test_exe);
+    }
+
     const test_exe = try createTestExe(
         b,
         library_description,

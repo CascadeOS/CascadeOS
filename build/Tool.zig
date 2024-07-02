@@ -86,6 +86,17 @@ fn resolveTool(
         root_file_name,
     }));
 
+    {
+        const check_compile_step = try createExe(
+            b,
+            tool_description,
+            lazy_path,
+            dependencies,
+            optimize_mode,
+        );
+        step_collection.registerCheck(check_compile_step);
+    }
+
     const compile_step = try createExe(
         b,
         tool_description,
@@ -135,7 +146,13 @@ fn resolveTool(
     const build_step = b.step(build_step_name, build_step_description);
     build_step.dependOn(&compile_step_install_step.step);
 
+    {
+        const check_test_compile_step = try createTestExe(b, tool_description, lazy_path, dependencies);
+        step_collection.registerCheck(check_test_compile_step);
+    }
+
     const test_compile_step = try createTestExe(b, tool_description, lazy_path, dependencies);
+
     const test_install_step = b.addInstallArtifact(
         test_compile_step,
         .{

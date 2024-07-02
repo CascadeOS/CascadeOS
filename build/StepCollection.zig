@@ -15,15 +15,18 @@ kernel_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 /// A map from targets to their image build steps.
 image_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
-// /// A map from targets to their Cascade library build steps.
-// cascade_library_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
-
 /// A map from targets to their non-Cascade library test steps.
 non_cascade_library_test_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
 
 tools_build_step: *Step,
 tools_test_step: *Step,
 
+check_step: *Step,
+
+/// Registers a check step.
+pub fn registerCheck(self: StepCollection, exe: *Step.Compile) void {
+    self.check_step.dependOn(&exe.step);
+}
 
 /// Registers a tool.
 pub fn registerTool(self: StepCollection, build_step: *Step, test_step: *Step) void {
@@ -58,6 +61,8 @@ pub fn registerNonCascadeLibrary(self: StepCollection, target: CascadeTarget, ru
 }
 
 pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
+    const check_step = b.step("check", "Build all code with -fno-emit-bin");
+
     const all_test_step = b.step(
         "test",
         "Run all the tests (also builds all code even if they don't have tests)",
@@ -148,6 +153,8 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
     all_tools_step.dependOn(all_tools_test_step);
 
     return .{
+        .check_step = check_step,
+
         .kernel_build_steps_per_target = kernel_build_steps_per_target,
 
         .image_build_steps_per_target = image_build_steps_per_target,
