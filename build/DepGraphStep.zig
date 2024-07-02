@@ -6,7 +6,6 @@ const Step = std.Build.Step;
 
 const helpers = @import("helpers.zig");
 
-const Application = @import("Application.zig");
 const Kernel = @import("Kernel.zig");
 const Library = @import("Library.zig");
 const Tool = @import("Tool.zig");
@@ -23,16 +22,14 @@ dep_lazy_path: std.Build.LazyPath,
 kernels: Kernel.Collection,
 libraries: Library.Collection,
 tools: Tool.Collection,
-applications: Application.Collection,
 
 pub fn register(
     b: *std.Build,
     kernels: Kernel.Collection,
     libraries: Library.Collection,
     tools: Tool.Collection,
-    applications: Application.Collection,
 ) !void {
-    const dep_graph_step = try DepGraphStep.create(b, kernels, libraries, tools, applications);
+    const dep_graph_step = try DepGraphStep.create(b, kernels, libraries, tools);
 
     const run_step = b.step("dep_graph", "Generate the dependency graph");
     run_step.dependOn(&dep_graph_step.step);
@@ -43,7 +40,6 @@ fn create(
     kernels: Kernel.Collection,
     libraries: Library.Collection,
     tools: Tool.Collection,
-    applications: Application.Collection,
 ) !*DepGraphStep {
     const self = try b.allocator.create(DepGraphStep);
 
@@ -61,7 +57,6 @@ fn create(
         .kernels = kernels,
         .libraries = libraries,
         .tools = tools,
-        .applications = applications,
     };
     self.dep_file = .{ .step = &self.step };
     self.dep_lazy_path = .{ .generated = .{ .file = &self.dep_file } };
@@ -74,7 +69,7 @@ fn make(step: *Step, progress_node: std.Progress.Node) !void {
 
     var node = progress_node.start(
         step.name,
-        self.kernels.count() + self.libraries.count() + self.tools.count() + self.applications.count(),
+        self.kernels.count() + self.libraries.count() + self.tools.count(),
     );
     defer node.end();
 
@@ -118,23 +113,6 @@ fn make(step: *Step, progress_node: std.Progress.Node) !void {
 
         for (tool.value_ptr.dependencies) |dep| {
             try writer.print("{s} -> {s}\n", .{ tool_name, dep.library.name });
-        }
-
-        node.completeOne();
-    }
-
-    var application_iterator = self.applications.iterator();
-
-    while (application_iterator.next()) |application| {
-        const application_name = application.key_ptr.*;
-        try writer.print("{s}: {{class: binary}}\n", .{application_name});
-
-        // TODO: Support different dependencies for different targets
-        var iter = application.value_ptr.valueIterator();
-        const app = iter.next().?;
-
-        for (app.dependencies) |dep| {
-            try writer.print("{s} -> {s}\n", .{ application_name, dep.library.name });
         }
 
         node.completeOne();

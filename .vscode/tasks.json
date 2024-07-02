@@ -33,7 +33,7 @@
                 "kind": "build"
             }
         },
-        
+
         // Libraries
         {
             "label": "test - libs",
@@ -73,20 +73,6 @@
                 "kind": "build"
             }
         },
-
-        // Applications
-        {
-            "label": "build - apps",
-            "type": "process",
-            "command": "zig",
-            "args": [
-                "build",
-                "apps_build"
-            ],
-            "group": {
-                "kind": "build"
-            }
-        }
     ],
     "presentation": {
         "reveal": "silent",

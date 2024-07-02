@@ -24,19 +24,11 @@ non_cascade_library_test_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarge
 tools_build_step: *Step,
 tools_test_step: *Step,
 
-applications_build_step: *Step,
-// applications_build_test_step: *Step,
 
 /// Registers a tool.
 pub fn registerTool(self: StepCollection, build_step: *Step, test_step: *Step) void {
     self.tools_build_step.dependOn(build_step);
     self.tools_test_step.dependOn(test_step);
-}
-
-/// Registers an application.
-pub fn registerApplication(self: StepCollection, build_step: *Step) void {
-    self.applications_build_step.dependOn(build_step);
-    // self.applications_build_test_step.dependOn(build_test_step);
 }
 
 /// Registers a kernel build step for a target.
@@ -155,25 +147,6 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
     );
     all_tools_step.dependOn(all_tools_test_step);
 
-    // Applications
-    const all_applications_step = b.step(
-        "apps",
-        "Build all the applications and their tests",
-    );
-    all_test_step.dependOn(all_applications_step);
-
-    const all_applications_build_step = b.step(
-        "apps_build",
-        "Build all the applications",
-    );
-    all_applications_step.dependOn(all_applications_build_step);
-
-    // const all_applications_build_test_step = b.step(
-    //     "apps_test_build",
-    //     "Build all the applications tests",
-    // );
-    // all_applications_step.dependOn(all_applications_build_test_step);
-
     return .{
         .kernel_build_steps_per_target = kernel_build_steps_per_target,
 
@@ -185,9 +158,6 @@ pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {
 
         .tools_build_step = all_tools_build_step,
         .tools_test_step = all_tools_test_step,
-
-        .applications_build_step = all_applications_build_step,
-        // .applications_build_test_step = all_applications_build_test_step,
     };
 }
 
