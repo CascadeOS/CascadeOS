@@ -265,7 +265,7 @@ const LimineCpuDescriptorIterator = struct {
 };
 
 const limine_requests = struct {
-    export var limine_revison: limine.BaseRevison = .{ .revison = 1 };
+    export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
     export var kernel_address: limine.KernelAddress = .{};
     export var hhdm: limine.HHDM = .{};
     export var memmap: limine.Memmap = .{};
