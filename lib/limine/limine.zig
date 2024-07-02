@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v7.6.0/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v7.9.1/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of 860d1b1da2e526d74d2dbe919d06ee645a4354e4 (2024-05-22).
+//! This module contains the definitions of the Limine protocol as of 0a873b53030fcb3f74e04fdd42c689f86b2dbddc (2024-07-02).
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v7.6.0/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v7.9.1/PROTOCOL.md)
 //!
 
 const core = @import("core");
@@ -68,8 +68,8 @@ pub const BaseRevison = extern struct {
     /// base revision a kernel is assumed to be requesting and complying to if no base
     /// revision tag is provided by the kernel, for backwards compatibility.
     ///
-    /// A base revision tag is a set of 3 64-bit values placed somewhere in the kernel
-    /// binary on an 8-byte aligned boundary; the first 2 values are a magic number
+    /// A base revision tag is a set of 3 64-bit values placed somewhere in the loaded kernel
+    /// image on an 8-byte aligned boundary; the first 2 values are a magic number
     /// for the bootloader to be able to identify the tag, and the last value is the
     /// requested base revision number. Lack of base revision tag implies revision 0.
     ///
@@ -179,6 +179,8 @@ pub const Framebuffer = extern struct {
         unused: [7]u8,
 
         _edid_size: core.Size,
+
+        /// Points to the screen's EDID blob, if available, else zero.
         _edid: core.VirtualAddress,
 
         /// Response revision 1 required
@@ -187,7 +189,9 @@ pub const Framebuffer = extern struct {
         /// Response revision 1 required
         _video_modes: [*]const *const VideoMode,
 
-        pub fn edid(self: *const LimineFramebuffer) []const u8 {
+        pub fn edid(self: *const LimineFramebuffer) ?[]const u8 {
+            if (self._edid.value == 0) return null;
+
             return core.VirtualRange.fromAddr(self._edid, self._edid_size).toByteSlice();
         }
 
