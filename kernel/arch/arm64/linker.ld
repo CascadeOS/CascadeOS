@@ -11,7 +11,7 @@ PHDRS
     rodata       PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
     data         PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
 
-    sdf          PT_LOAD    FLAGS((1 << 2)) ;            /* Read only - assumed to be the last program header by sdf_builder */
+    sdf          PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
 }
 
 SECTIONS

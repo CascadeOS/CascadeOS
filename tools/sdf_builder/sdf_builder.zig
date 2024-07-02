@@ -125,6 +125,7 @@ fn updateElfSpecific(
     const HeaderT = if (is_64) std.elf.Elf64_Ehdr else std.elf.Elf32_Ehdr;
     const SectionHeaderT = if (is_64) std.elf.Elf64_Shdr else std.elf.Elf32_Shdr;
     const ProgramHeaderT = if (is_64) std.elf.Elf64_Phdr else std.elf.Elf32_Phdr;
+    const Offset = if (is_64) std.elf.Elf64_Off else std.elf.Elf32_Off;
 
     const elf_header: *const HeaderT = std.mem.bytesAsValue(HeaderT, elf_mem);
     std.debug.assert(elf_header.e_shentsize == @as(u16, @sizeOf(SectionHeaderT)));
@@ -145,11 +146,15 @@ fn updateElfSpecific(
         elf_mem[elf_header.e_phoff..][0 .. elf_header.e_phnum * @sizeOf(ProgramHeaderT)],
     );
 
+    var previous_sdf_section_offset: Offset = undefined;
+
     // update section header
     for (section_table) |*section| {
         const name = std.mem.sliceTo(section_header_strings[section.sh_name..], 0);
 
         if (std.mem.eql(u8, name, ".sdf")) {
+            previous_sdf_section_offset = section.sh_offset;
+
             section.sh_offset = @intCast(sdf_pos);
             section.sh_size = @intCast(sdf_size);
             section.sh_flags = std.elf.SHF_ALLOC;
@@ -159,7 +164,16 @@ fn updateElfSpecific(
     } else return error.NoSDFSection;
 
     // update program header
-    const sdf_program_header = &program_header_table[program_header_table.len - 1];
+    const sdf_program_header = blk: {
+        for (program_header_table) |*program_header| {
+            if (program_header.p_offset == previous_sdf_section_offset) {
+                // this is the sdf sections program header
+                break :blk program_header;
+            }
+        }
+        return error.NoSDFProgramHeader;
+    };
+
     sdf_program_header.p_offset = @intCast(sdf_pos);
     sdf_program_header.p_filesz = @intCast(sdf_size);
     sdf_program_header.p_memsz = @intCast(sdf_size);
