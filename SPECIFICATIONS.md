@@ -24,6 +24,7 @@ It is possible for these links or the text regarding versions to become out of d
   * [FAT Filesystem](http://elm-chan.org/docs/fat_e.html)
 * Limine - [Limine Boot Protocol](https://github.com/limine-bootloader/limine/blob/stable/PROTOCOL.md)
 * RISC-V - [Unprivileged and Privileged ISA](https://github.com/riscv/riscv-isa-manual)
+* SDF - [SDF Spec](lib/sdf/sdf.md)
 * PCI
   * [PCI Express® Base Specification Revision 5.0 Version 1.0 22 May 2019](https://picture.iczhiku.com/resource/eetop/SYkDTqhOLhpUTnMx.pdf)
   * PCI Code and ID Assignment Specification Revision 1.14 17 Nov 2021
