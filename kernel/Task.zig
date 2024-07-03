@@ -6,35 +6,35 @@ const kernel = @import("kernel");
 const std = @import("std");
 const containers = @import("containers");
 
-const Thread = @This();
+const Task = @This();
 
 id: Id,
 _name: Name,
 
 state: State = .ready,
 
-/// The process that this thread belongs to.
+/// The process that this task belongs to.
 ///
-/// `null` if this is a kernel thread.
+/// `null` if this is a kernel task.
 process: ?*kernel.Process,
 
 kernel_stack: kernel.Stack,
 
-/// Used to track the next thread in any linked list.
+/// Used to track the next task in any linked list.
 ///
 /// Used in the ready queue, wait lists, etc.
-next_thread_node: containers.SingleNode = .{},
+next_task_node: containers.SingleNode = .{},
 
-pub fn name(self: *const Thread) []const u8 {
+pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();
 }
 
-pub inline fn isKernel(self: *const Thread) bool {
+pub inline fn isKernel(self: *const Task) bool {
     return self.process == null;
 }
 
-pub inline fn fromNode(node: *containers.SingleNode) *Thread {
-    return @fieldParentPtr("next_thread_node", node);
+pub inline fn fromNode(node: *containers.SingleNode) *Task {
+    return @fieldParentPtr("next_task_node", node);
 }
 
 pub const State = enum {
@@ -43,27 +43,27 @@ pub const State = enum {
     blocked,
 };
 
-pub const Name = std.BoundedArray(u8, kernel.config.thread_name_length);
+pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
 pub const Id = enum(u32) {
     _,
 };
 
-pub fn print(thread: *const Thread, writer: std.io.AnyWriter, indent: usize) !void {
-    // Process(process.name)::Thread(thread.name) or Kernel::Thread(thread.name)
+pub fn print(task: *const Task, writer: std.io.AnyWriter, indent: usize) !void {
+    // Process(process.name)::Task(task.name) or Kernel::Task(task.name)
 
-    if (thread.process) |process| {
+    if (task.process) |process| {
         try process.print(writer, indent);
     } else {
         try writer.writeAll("Kernel");
     }
 
-    try writer.writeAll("::Thread(");
-    try writer.writeAll(thread.name());
+    try writer.writeAll("::Task(");
+    try writer.writeAll(task.name());
     try writer.writeByte(')');
 }
 
 pub inline fn format(
-    thread: *const Thread,
+    task: *const Task,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
@@ -71,11 +71,11 @@ pub inline fn format(
     _ = options;
     _ = fmt;
     return if (@TypeOf(writer) == std.io.AnyWriter)
-        print(thread, writer, 0)
+        print(task, writer, 0)
     else
-        print(thread, writer.any(), 0);
+        print(task, writer.any(), 0);
 }
 
 fn __helpZls() void {
-    Thread.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+    Task.print(undefined, @as(std.fs.File.Writer, undefined), 0);
 }

@@ -22,7 +22,7 @@ pub const scheduler = @import("scheduler.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const system = @import("system.zig");
-pub const Thread = @import("Thread.zig");
+pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 pub const vmm = @import("vmm/vmm.zig");
 

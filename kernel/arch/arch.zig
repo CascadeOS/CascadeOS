@@ -22,7 +22,7 @@ pub const ArchCpu = current.ArchCpu;
 ///
 /// Assumes that `init.loadCpu()` has been called on the currently running CPU.
 ///
-/// It is the callers responsibility to ensure that the current thread is not re-scheduled on to another CPU.
+/// It is the callers responsibility to ensure that the current task is not re-scheduled on to another CPU.
 pub inline fn rawGetCpu() *kernel.Cpu {
     // `checkSupport` intentionally not called - mandatory function
 
@@ -329,50 +329,50 @@ pub const scheduling = struct {
     pub inline fn switchToIdle(
         cpu: *kernel.Cpu,
         stack_pointer: core.VirtualAddress,
-        opt_old_thread: ?*kernel.Thread,
+        opt_old_task: ?*kernel.Task,
     ) noreturn {
-        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Thread) noreturn);
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Task) noreturn);
 
-        current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_thread);
+        current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_task);
     }
 
-    pub inline fn switchToThreadFromIdle(
+    pub inline fn switchToTaskFromIdle(
         cpu: *kernel.Cpu,
-        thread: *kernel.Thread,
+        task: *kernel.Task,
     ) noreturn {
-        checkSupport(current.scheduling, "switchToThreadFromIdle", fn (*kernel.Cpu, *kernel.Thread) noreturn);
+        checkSupport(current.scheduling, "switchToTaskFromIdle", fn (*kernel.Cpu, *kernel.Task) noreturn);
 
-        current.scheduling.switchToThreadFromIdle(cpu, thread);
+        current.scheduling.switchToTaskFromIdle(cpu, task);
     }
 
-    pub inline fn switchToThreadFromThread(
+    pub inline fn switchToTaskFromTask(
         cpu: *kernel.Cpu,
-        old_thread: *kernel.Thread,
-        new_thread: *kernel.Thread,
+        old_task: *kernel.Task,
+        new_task: *kernel.Task,
     ) void {
-        checkSupport(current.scheduling, "switchToThreadFromThread", fn (*kernel.Cpu, *kernel.Thread, *kernel.Thread) void);
+        checkSupport(current.scheduling, "switchToTaskFromTask", fn (*kernel.Cpu, *kernel.Task, *kernel.Task) void);
 
-        current.scheduling.switchToThreadFromThread(cpu, old_thread, new_thread);
+        current.scheduling.switchToTaskFromTask(cpu, old_task, new_task);
     }
 
-    pub const NewThreadFunction = *const fn (
+    pub const NewTaskFunction = *const fn (
         interrupt_exclusion: kernel.sync.InterruptExclusion,
-        thread: *kernel.Thread,
+        task: *kernel.Task,
         context: u64,
     ) noreturn;
 
-    pub inline fn prepareNewThread(
-        thread: *kernel.Thread,
+    pub inline fn prepareNewTask(
+        task: *kernel.Task,
         context: u64,
-        target_function: NewThreadFunction,
+        target_function: NewTaskFunction,
     ) error{StackOverflow}!void {
-        checkSupport(current.scheduling, "prepareNewThread", fn (
-            *kernel.Thread,
+        checkSupport(current.scheduling, "prepareNewTask", fn (
+            *kernel.Task,
             u64,
-            NewThreadFunction,
+            NewTaskFunction,
         ) error{StackOverflow}!void);
 
-        return current.scheduling.prepareNewThread(thread, context, target_function);
+        return current.scheduling.prepareNewTask(task, context, target_function);
     }
 };
 

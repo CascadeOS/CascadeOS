@@ -21,10 +21,10 @@ interrupt_disable_count: u32 = 1, // interrupts start disabled
 /// Also used during the move from the bootloader provided stack until we start scheduling.
 idle_stack: kernel.Stack,
 
-/// The currently running thread.
+/// The currently running task.
 ///
 /// This is set to `null` when the processor is idle and also before we start scheduling.
-current_thread: ?*kernel.Thread = null,
+current_task: ?*kernel.Task = null,
 
 arch: kernel.arch.ArchCpu,
 

@@ -36,7 +36,7 @@ pub fn isLockedByCurrent(self: *const TicketSpinLock) bool {
 
 /// Releases the spinlock.
 ///
-/// Intended to be used only when the caller needs to unlock the spinlock on behalf of another thread.
+/// Intended to be used only when the caller needs to unlock the spinlock on behalf of another task.
 pub fn unsafeRelease(self: *TicketSpinLock) void {
     @atomicStore(kernel.Cpu.Id, &self.current_holder, .none, .release);
     _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);

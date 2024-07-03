@@ -16,4 +16,4 @@ pub const kernel_base_address = core.VirtualAddress.fromInt(0xffffffff80000000);
 pub const kernel_stack_size = kernel.arch.paging.standard_page_size.multiplyScalar(16);
 
 pub const process_name_length = 32;
-pub const thread_name_length = 32;
+pub const task_name_length = 32;

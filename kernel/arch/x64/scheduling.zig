@@ -29,15 +29,15 @@ pub fn changeStackAndReturn(
 pub fn switchToIdle(
     cpu: *kernel.Cpu,
     stack_pointer: core.VirtualAddress,
-    opt_old_thread: ?*kernel.Thread,
+    opt_old_task: ?*kernel.Task,
 ) noreturn {
-    const old_thread = opt_old_thread orelse {
+    const old_task = opt_old_task orelse {
         // we were already idle
         changeStackAndReturn(stack_pointer);
         unreachable;
     };
 
-    if (!old_thread.isKernel()) {
+    if (!old_task.isKernel()) {
         // the process was not the kernel so we need to switch to the kernel page table
         kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
     }
@@ -49,44 +49,44 @@ pub fn switchToIdle(
 
     _switchToIdleImpl(
         stack_pointer,
-        &old_thread.kernel_stack.stack_pointer,
+        &old_task.kernel_stack.stack_pointer,
     );
 }
 
 // Implemented in 'x64/asm/switchToIdleImpl.S'
 extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) noreturn;
 
-pub fn switchToThreadFromIdle(
+pub fn switchToTaskFromIdle(
     cpu: *kernel.Cpu,
-    thread: *kernel.Thread,
+    task: *kernel.Task,
 ) noreturn {
-    if (thread.process) |process| {
+    if (task.process) |process| {
         // If the process is not the kernel we need to switch the page table and privilege stack.
 
         process.loadPageTable();
 
         cpu.arch.tss.setPrivilegeStack(
             .ring0,
-            thread.kernel_stack.stack_pointer,
+            task.kernel_stack.stack_pointer,
         );
     }
 
-    _switchToThreadFromIdleImpl(thread.kernel_stack.stack_pointer);
+    _switchToTaskFromIdleImpl(task.kernel_stack.stack_pointer);
     unreachable;
 }
 
-// Implemented in 'x64/asm/switchToThreadFromIdleImpl.S'
-extern fn _switchToThreadFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
+// Implemented in 'x64/asm/switchToTaskFromIdleImpl.S'
+extern fn _switchToTaskFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
 
-pub fn switchToThreadFromThread(
+pub fn switchToTaskFromTask(
     cpu: *kernel.Cpu,
-    old_thread: *kernel.Thread,
-    new_thread: *kernel.Thread,
+    old_task: *kernel.Task,
+    new_task: *kernel.Task,
 ) void {
 
     // If the process is changing we need to switch the page table.
-    if (old_thread.process != new_thread.process) {
-        if (new_thread.process) |new_process| {
+    if (old_task.process != new_task.process) {
+        if (new_task.process) |new_process| {
             new_process.loadPageTable();
         } else {
             kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
@@ -95,49 +95,49 @@ pub fn switchToThreadFromThread(
 
     cpu.arch.tss.setPrivilegeStack(
         .ring0,
-        new_thread.kernel_stack.stack_pointer,
+        new_task.kernel_stack.stack_pointer,
     );
 
-    _switchToThreadFromThreadImpl(
-        new_thread.kernel_stack.stack_pointer,
-        &old_thread.kernel_stack.stack_pointer,
+    _switchToTaskFromTaskImpl(
+        new_task.kernel_stack.stack_pointer,
+        &old_task.kernel_stack.stack_pointer,
     );
 }
-// Implemented in 'x64/asm/switchToThreadFromThreadImpl.S'
-extern fn _switchToThreadFromThreadImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+// Implemented in 'x64/asm/switchToTaskFromTaskImpl.S'
+extern fn _switchToTaskFromTaskImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
 
-pub fn prepareNewThread(
-    thread: *kernel.Thread,
+pub fn prepareNewTask(
+    task: *kernel.Task,
     context: u64,
-    target_function: kernel.arch.scheduling.NewThreadFunction,
+    target_function: kernel.arch.scheduling.NewTaskFunction,
 ) error{StackOverflow}!void {
-    const old_stack_pointer = thread.kernel_stack.stack_pointer;
-    errdefer thread.kernel_stack.stack_pointer = old_stack_pointer;
+    const old_stack_pointer = task.kernel_stack.stack_pointer;
+    errdefer task.kernel_stack.stack_pointer = old_stack_pointer;
 
-    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&startNewThread)));
+    try task.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&startNewTask)));
 
-    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
-    try thread.kernel_stack.push(context);
-    try thread.kernel_stack.push(core.VirtualAddress.fromPtr(thread));
+    try task.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try task.kernel_stack.push(context);
+    try task.kernel_stack.push(core.VirtualAddress.fromPtr(task));
 
-    try thread.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&_startNewThread)));
+    try task.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&_startNewTask)));
 
     // general purpose registers
-    for (0..6) |_| thread.kernel_stack.push(@as(u64, 0)) catch unreachable;
+    for (0..6) |_| task.kernel_stack.push(@as(u64, 0)) catch unreachable;
 }
 
-// Implemented in 'x64/asm/startNewThread.S'
-extern fn _startNewThread() callconv(.C) noreturn;
+// Implemented in 'x64/asm/startNewTask.S'
+extern fn _startNewTask() callconv(.C) noreturn;
 
-fn startNewThread(
-    thread: *kernel.Thread,
+fn startNewTask(
+    task: *kernel.Task,
     context: u64,
     target_function_addr: *const anyopaque,
 ) callconv(.C) noreturn {
     const interrupt_exclusion = kernel.scheduler.releaseScheduler();
 
-    const target_function: kernel.arch.scheduling.NewThreadFunction = @ptrCast(target_function_addr);
+    const target_function: kernel.arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
 
-    target_function(interrupt_exclusion, thread, context);
+    target_function(interrupt_exclusion, task, context);
     unreachable;
 }

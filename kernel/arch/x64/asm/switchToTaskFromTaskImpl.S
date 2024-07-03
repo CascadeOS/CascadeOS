@@ -2,16 +2,16 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 /*
-extern fn _switchToThreadFromThreadImpl(
+extern fn _switchToTaskFromTaskImpl(
     new_kernel_stack_pointer: core.VirtualAddress, // rdi
     previous_kernel_stack_pointer: *core.VirtualAddress  // rsi
 ) callconv(.C) noreturn;
 */
 
 .section .text
-.global _switchToThreadFromThreadImpl
-.type _switchToThreadFromThreadImpl, @function
-_switchToThreadFromThreadImpl:
+.global _switchToTaskFromTaskImpl
+.type _switchToTaskFromTaskImpl, @function
+_switchToTaskFromTaskImpl:
     // all other registers are saved by the caller due to the calling convention
     push %rbx
     push %rbp
