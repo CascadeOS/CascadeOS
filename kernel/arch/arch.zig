@@ -330,8 +330,8 @@ pub const scheduling = struct {
         cpu: *kernel.Cpu,
         stack_pointer: core.VirtualAddress,
         opt_old_task: ?*kernel.Task,
-    ) noreturn {
-        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Task) noreturn);
+    ) void {
+        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Task) void);
 
         current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_task);
     }

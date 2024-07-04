@@ -30,7 +30,7 @@ pub fn switchToIdle(
     cpu: *kernel.Cpu,
     stack_pointer: core.VirtualAddress,
     opt_old_task: ?*kernel.Task,
-) noreturn {
+) void {
     const old_task = opt_old_task orelse {
         // we were already idle
         changeStackAndReturn(stack_pointer);
@@ -54,7 +54,7 @@ pub fn switchToIdle(
 }
 
 // Implemented in 'x64/asm/switchToIdleImpl.S'
-extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) noreturn;
+extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
 
 pub fn switchToTaskFromIdle(
     cpu: *kernel.Cpu,

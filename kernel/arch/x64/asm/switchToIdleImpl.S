@@ -5,7 +5,7 @@
 extern fn _switchToIdleImpl(
     new_kernel_stack_pointer: core.VirtualAddress // rdi
     previous_kernel_stack_pointer: *core.VirtualAddress // rsi
-) callconv(.C) noreturn;
+) callconv(.C) void;
 */
 
 .section .text

@@ -57,7 +57,7 @@ pub fn block(
 
     const new_task_node = ready_to_run.pop() orelse {
         switchToIdle(cpu, current_task);
-        unreachable;
+        return;
     };
 
     const new_task = kernel.Task.fromNode(new_task_node);
@@ -109,7 +109,7 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     ready_to_run.push(&task.next_task_node);
 }
 
-fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) noreturn {
+fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
     log.debug("no tasks to run, switching to idle", .{});
 
     const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
@@ -120,7 +120,6 @@ fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) noreturn {
     // TODO: handle priority
 
     kernel.arch.scheduling.switchToIdle(cpu, idle_stack_pointer, opt_current_task);
-    unreachable;
 }
 
 fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
