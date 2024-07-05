@@ -157,7 +157,7 @@ const ImageDescriptionStep = struct {
             .image_description_file = .{ .generated = .{ .file = &self.generated_image_description_file } },
         };
 
-        self.step.dependOn(kernel.install_final_kernel_binary);
+        self.step.dependOn(kernel.install_kernel_binaries);
 
         return self;
     }

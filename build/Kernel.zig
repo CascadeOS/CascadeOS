@@ -23,8 +23,8 @@ options: Options,
 
 final_kernel_binary_path: std.Build.LazyPath,
 
-/// Installs the debug-info stripped kernel with SDF data embedded.
-install_final_kernel_binary: *Step,
+/// Installs both the stripped and fat kernel binaries.
+install_kernel_binaries: *Step,
 
 /// only used for generating a dependency graph
 dependencies: []const Library.Dependency,
@@ -133,58 +133,80 @@ fn create(
     // directory_prefixes_to_strip
     generate_sdf.addArg(options.root_path);
 
-    // TODO: get stripped and seperate debug info working for riscv
-    const opt_stripped_kernel_exe = if (target != .riscv)
-        b.addObjCopy(kernel_exe.getEmittedBin(), .{
+    const fat_kernel_with_sdf = blk: {
+        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+        // action
+        embed_sdf.addArg("embed");
+        // binary_input_path
+        embed_sdf.addFileArg(kernel_exe.getEmittedBin());
+        // binary_output_path
+        const kernel_path = embed_sdf.addOutputFileArg("kernel");
+        // sdf_input_path
+        embed_sdf.addFileArg(sdf_data_path);
+
+        break :blk kernel_path;
+    };
+
+    const install_fat_kernel_with_sdf = b.addInstallFile(
+        fat_kernel_with_sdf,
+        b.pathJoin(&.{ @tagName(target), "kernel-dwarf" }),
+    );
+
+    const stripped_kernel = blk: {
+        const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
             .basename = kernel_exe.out_filename,
             .strip = .debug,
-            .extract_to_separate_file = true,
-        })
-    else
-        null;
+        });
+        break :blk copy.getOutput();
+    };
 
-    const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
-    // action
-    embed_sdf.addArg("embed");
-    // binary_input_path
-    embed_sdf.addFileArg(
-        if (opt_stripped_kernel_exe) |stripped_kernel_exe|
-            stripped_kernel_exe.getOutput()
-        else
-            kernel_exe.getEmittedBin(),
-    );
-    // binary_output_path
-    const final_kernel_binary_path = embed_sdf.addOutputFileArg("kernel");
-    // sdf_input_path
-    embed_sdf.addFileArg(sdf_data_path);
+    const stripped_kernel_with_sdf = blk: {
+        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+        // action
+        embed_sdf.addArg("embed");
+        // binary_input_path
+        embed_sdf.addFileArg(stripped_kernel);
+        // binary_output_path
+        const kernel_path = embed_sdf.addOutputFileArg("kernel");
+        // sdf_input_path
+        embed_sdf.addFileArg(sdf_data_path);
 
-    const install_final_kernel_binary = b.addInstallFile(
-        final_kernel_binary_path,
+        break :blk kernel_path;
+    };
+
+    const install_stripped_kernel_with_sdf = b.addInstallFile(
+        stripped_kernel_with_sdf,
         b.pathJoin(&.{ @tagName(target), "kernel" }),
     );
 
-    const opt_install_seperated_debug = if (opt_stripped_kernel_exe) |stripped_kernel_exe|
-        b.addInstallFile(
-            stripped_kernel_exe.getOutputSeparatedDebug().?,
-            b.pathJoin(&.{ @tagName(target), "kernel.debug" }),
-        )
-    else
-        null;
+    // const stripped_kernel = if (target != .riscv) blk: {
+    //     const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
+    //         .basename = kernel_exe.out_filename,
+    //         .strip = .debug,
+    //     });
+    //     break :blk copy.getOutput();
+    // } else kernel_exe.getEmittedBin();
 
-    step_collection.registerKernel(
-        target,
-        &install_final_kernel_binary.step,
-        if (opt_install_seperated_debug) |install_seperated_debug| &install_seperated_debug.step else null,
-    );
+    const install_both_kernel_binaries = try b.allocator.create(Step);
+    install_both_kernel_binaries.* = Step.init(.{
+        .id = .custom,
+        .name = "install_both_kernel_binaries",
+        .owner = b,
+    });
+
+    install_both_kernel_binaries.dependOn(&install_fat_kernel_with_sdf.step);
+    install_both_kernel_binaries.dependOn(&install_stripped_kernel_with_sdf.step);
+
+    step_collection.registerKernel(target, install_both_kernel_binaries);
 
     return Kernel{
         .b = b,
         .target = target,
         .options = options,
 
-        .install_final_kernel_binary = &install_final_kernel_binary.step,
+        .install_kernel_binaries = install_both_kernel_binaries,
 
-        .final_kernel_binary_path = final_kernel_binary_path,
+        .final_kernel_binary_path = stripped_kernel_with_sdf,
 
         .dependencies = dependencies,
     };

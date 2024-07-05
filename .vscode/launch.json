@@ -19,7 +19,7 @@
             "type": "lldb",
             "request": "custom",
             "targetCreateCommands": [
-                "target create ${workspaceFolder}/zig-out/${input:arch}/kernel"
+                "target create ${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf"
             ],
             "processCreateCommands": [
                 // "breakpoint set --name init.kernelInitStage1 --hardware --one-shot true",
@@ -37,7 +37,7 @@
             "name": "GDB QEMU remote",
             "type": "gdb",
             "request": "attach",
-            "executable": "${workspaceFolder}/zig-out/${input:arch}/kernel",
+            "executable": "${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf",
             "target": ":1234",
             "remote": true,
             "cwd": "${workspaceRoot}",
