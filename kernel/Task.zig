@@ -41,6 +41,7 @@ pub const State = enum {
     ready,
     running,
     blocked,
+    dropped,
 };
 
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);

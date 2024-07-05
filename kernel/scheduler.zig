@@ -68,33 +68,42 @@ pub fn block(
 }
 
 /// Yield execution to the scheduler.
-pub fn yield(scheduler_held: SchedulerHeld) void {
+pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop }) void {
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
     core.debugAssert(cpu.interrupt_disable_count == 1);
 
-    const opt_current_task = cpu.current_task;
-
-    if (opt_current_task) |current_task| {
-        core.debugAssert(current_task.state == .running);
-        queueTask(scheduler_held, current_task);
-    }
-
     const new_task_node = ready_to_run.pop() orelse {
-        switchToIdle(cpu, opt_current_task);
-        return;
+        switch (mode) {
+            .requeue => return,
+            .drop => {
+                if (cpu.current_task) |current_task| {
+                    core.debugAssert(current_task.state == .running);
+                    current_task.state = .dropped;
+                }
+                switchToIdle(cpu, cpu.current_task);
+                unreachable;
+            },
+        }
     };
 
     const new_task = kernel.Task.fromNode(new_task_node);
     core.debugAssert(new_task.state == .ready);
 
-    if (opt_current_task) |current_task| {
+    if (cpu.current_task) |current_task| {
         core.debugAssert(current_task != new_task);
+        core.debugAssert(current_task.state == .running);
+
+        switch (mode) {
+            .requeue => queueTask(scheduler_held, current_task),
+            .drop => current_task.state = .dropped,
+        }
 
         switchToTaskFromTask(cpu, current_task, new_task);
     } else {
         switchToTaskFromIdle(cpu, new_task);
+        unreachable;
     }
 }
 
@@ -164,7 +173,7 @@ fn idle() noreturn {
         if (!ready_to_run.isEmpty()) {
             const scheduler_held = kernel.scheduler.acquireScheduler();
             defer scheduler_held.release();
-            if (!ready_to_run.isEmpty()) yield(scheduler_held);
+            if (!ready_to_run.isEmpty()) yield(scheduler_held, .requeue);
         }
 
         kernel.arch.halt();
