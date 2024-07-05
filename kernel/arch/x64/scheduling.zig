@@ -44,7 +44,7 @@ pub fn switchToIdle(
 
     cpu.arch.tss.setPrivilegeStack(
         .ring0,
-        cpu.idle_stack.stack_pointer,
+        cpu.scheduler_stack.stack_pointer,
     );
 
     _switchToIdleImpl(

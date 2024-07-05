@@ -44,7 +44,7 @@ pub fn prepareBootstrapCpu(
 
     bootstrap_cpu.arch.tss.setPrivilegeStack(
         .ring0,
-        bootstrap_cpu.idle_stack.stack_pointer,
+        bootstrap_cpu.scheduler_stack.stack_pointer,
     );
 }
 
@@ -65,7 +65,7 @@ pub inline fn prepareCpu(
 
     cpu.arch.tss.setPrivilegeStack(
         .ring0,
-        cpu.idle_stack.stack_pointer,
+        cpu.scheduler_stack.stack_pointer,
     );
 }
 

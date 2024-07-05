@@ -7,11 +7,11 @@ const kernel = @import("kernel");
 
 var bootstrap_cpu: kernel.Cpu = .{
     .id = .bootstrap,
-    .idle_stack = undefined, // set at the beginning of `initStage1`
+    .scheduler_stack = undefined, // set at the beginning of `initStage1`
     .arch = undefined, // set by `arch.init.prepareBootstrapCpu`
 };
 
-var bootstrap_idle_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+var bootstrap_scheduler_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
 
 const log = kernel.log.scoped(.init);
 
@@ -22,9 +22,9 @@ pub fn initStage1() !noreturn {
     // get output up and running as soon as possible
     kernel.arch.init.setupEarlyOutput();
 
-    bootstrap_cpu.idle_stack = kernel.Stack.fromRange(
-        core.VirtualRange.fromSlice(u8, &bootstrap_idle_stack),
-        core.VirtualRange.fromSlice(u8, &bootstrap_idle_stack),
+    bootstrap_cpu.scheduler_stack = kernel.Stack.fromRange(
+        core.VirtualRange.fromSlice(u8, &bootstrap_scheduler_stack),
+        core.VirtualRange.fromSlice(u8, &bootstrap_scheduler_stack),
     );
     kernel.arch.init.prepareBootstrapCpu(&bootstrap_cpu);
     kernel.arch.init.loadCpu(&bootstrap_cpu);
@@ -85,12 +85,12 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
     log.debug("configuring local interrupt controller", .{});
     kernel.arch.init.initLocalInterruptController(cpu);
 
-    const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
+    const scheduler_stack_pointer = cpu.scheduler_stack.pushReturnAddressWithoutChangingPointer(
         core.VirtualAddress.fromPtr(&initStage3),
-    ) catch unreachable; // the idle stack is big enough to hold one return address
+    ) catch unreachable; // the scheduler stack is big enough to hold one return address
 
     log.debug("leaving bootloader provided stack", .{});
-    kernel.arch.scheduling.changeStackAndReturn(idle_stack_pointer);
+    kernel.arch.scheduling.changeStackAndReturn(scheduler_stack_pointer);
     unreachable;
 }
 

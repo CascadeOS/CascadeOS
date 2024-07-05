@@ -16,10 +16,12 @@ id: Id,
 /// Preemption is disabled when interrupts are disabled.
 interrupt_disable_count: u32 = 1, // interrupts start disabled
 
-/// The stack used for idle.
+/// This stack is used during context switches, idle, and during the move from the bootloader provided stack until we
+/// start scheduling.
 ///
-/// Also used during the move from the bootloader provided stack until we start scheduling.
-idle_stack: kernel.Stack,
+/// The `stack_pointer` of this stack should never be modified in place, any push/pop operations should be done on a
+/// *copy* of this field.
+scheduler_stack: kernel.Stack,
 
 /// The currently running task.
 ///

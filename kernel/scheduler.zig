@@ -121,14 +121,14 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
 fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
     log.debug("no tasks to run, switching to idle", .{});
 
-    const idle_stack_pointer = cpu.idle_stack.pushReturnAddressWithoutChangingPointer(
+    const scheduler_stack_pointer = cpu.scheduler_stack.pushReturnAddressWithoutChangingPointer(
         core.VirtualAddress.fromPtr(&idle),
-    ) catch unreachable; // the idle stack is always big enough to hold a return address
+    ) catch unreachable; // the scheduler stack is always big enough to hold a return address
 
     cpu.current_task = null;
     // TODO: handle priority
 
-    kernel.arch.scheduling.switchToIdle(cpu, idle_stack_pointer, opt_current_task);
+    kernel.arch.scheduling.switchToIdle(cpu, scheduler_stack_pointer, opt_current_task);
 }
 
 fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {

@@ -43,13 +43,13 @@ pub const init = struct {
 
             log.debug("initializing cpu {}", .{cpu_id});
 
-            const idle_stack = kernel.heap.stack_allocator.create() catch {
-                core.panic("failed to allocate idle stack");
+            const scheduler_stack = kernel.heap.stack_allocator.create() catch {
+                core.panic("failed to allocate scheduler stack");
             };
 
             cpu.* = .{
                 .id = cpu_id,
-                .idle_stack = idle_stack,
+                .scheduler_stack = scheduler_stack,
                 .arch = undefined, // initialized by `prepareCpu`
             };
 
