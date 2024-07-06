@@ -81,11 +81,12 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
         switch (mode) {
             .requeue => return,
             .drop => {
-                const current_task = cpu.current_task orelse return; // we are idle
+                if (cpu.current_task) |current_task| {
+                    core.debugAssert(current_task.state == .running);
+                    current_task.state = .dropped;
+                }
 
-                core.debugAssert(current_task.state == .running);
-                current_task.state = .dropped;
-                switchToIdle(cpu, current_task);
+                switchToIdle(cpu, cpu.current_task);
                 return;
             },
         }
@@ -121,14 +122,16 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     ready_to_run.push(&task.next_task_node);
 }
 
-fn switchToIdle(cpu: *kernel.Cpu, current_task: *kernel.Task) void {
+fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
     log.debug("no tasks to run, switching to idle", .{});
 
     cpu.current_task = null;
 
-    kernel.arch.scheduling.changeTaskToIdle(cpu, current_task);
+    if (opt_current_task) |current_task| {
+        kernel.arch.scheduling.changeTaskToIdle(cpu, current_task);
+    }
 
-    kernel.arch.scheduling.callZeroArgs(current_task, cpu.scheduler_stack, idle) catch |err| {
+    kernel.arch.scheduling.callZeroArgs(opt_current_task, cpu.scheduler_stack, idle) catch |err| {
         switch (err) {
             error.StackOverflow => unreachable, // the scheduler stack is big enough
         }
