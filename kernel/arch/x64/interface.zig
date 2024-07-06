@@ -61,9 +61,16 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
-    pub const changeStackAndReturn = x64.scheduling.changeStackAndReturn;
-    pub const switchToIdle = x64.scheduling.switchToIdle;
-    pub const switchToTaskFromIdle = x64.scheduling.switchToTaskFromIdle;
-    pub const switchToTaskFromTask = x64.scheduling.switchToTaskFromTask;
-    pub const prepareNewTask = x64.scheduling.prepareNewTask;
+    pub const changeIdleToTask = x64.scheduling.changeIdleToTask;
+    pub const changeTaskToIdle = x64.scheduling.changeTaskToIdle;
+    pub const changeTaskToTask = x64.scheduling.changeTaskToTask;
+
+    pub const callZeroArgs = x64.scheduling.callZeroArgs;
+    pub const callOneArgs = x64.scheduling.callOneArgs;
+    pub const callTwoArgs = x64.scheduling.callTwoArgs;
+
+    pub const jumpToIdleFromTask = x64.scheduling.jumpToIdleFromTask;
+    pub const jumpToTaskFromIdle = x64.scheduling.jumpToTaskFromIdle;
+    pub const jumpToTaskFromTask = x64.scheduling.jumpToTaskFromTask;
+    pub const prepareStackForNewTask = x64.scheduling.prepareStackForNewTask;
 };

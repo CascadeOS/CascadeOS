@@ -2,15 +2,15 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 /*
-extern fn _switchToTaskFromIdleImpl(
+extern fn _jumpToTaskFromIdleImpl(
     new_kernel_stack_pointer: core.VirtualAddress, // rdi
 ) callconv(.C) noreturn;
 */
 
 .section .text
-.global _switchToTaskFromIdleImpl
-.type _switchToTaskFromIdleImpl, @function
-_switchToTaskFromIdleImpl:
+.global _jumpToTaskFromIdleImpl
+.type _jumpToTaskFromIdleImpl, @function
+_jumpToTaskFromIdleImpl:
     // switch to `new_kernel_stack_pointer`
     mov %rdi, %rsp
 

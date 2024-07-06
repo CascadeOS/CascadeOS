@@ -2,16 +2,16 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 /*
-extern fn _switchToIdleImpl(
+extern fn _jumpToIdleFromTaskImpl(
     new_kernel_stack_pointer: core.VirtualAddress // rdi
     previous_kernel_stack_pointer: *core.VirtualAddress // rsi
 ) callconv(.C) void;
 */
 
 .section .text
-.global _switchToIdleImpl
-.type _switchToIdleImpl, @function
-_switchToIdleImpl:
+.global _jumpToIdleFromTaskImpl
+.type _jumpToIdleFromTaskImpl, @function
+_jumpToIdleFromTaskImpl:
     // all other registers are saved by the caller due to the calling convention
     push %rbx
     push %rbp

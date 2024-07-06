@@ -84,8 +84,6 @@ pub fn acquire(mutex: *Mutex) Held {
         const scheduler_held = kernel.scheduler.acquireScheduler();
         defer scheduler_held.release();
 
-        spinlock_held.release();
-
-        kernel.scheduler.block(scheduler_held);
+        kernel.scheduler.block(scheduler_held, spinlock_held);
     }
 }

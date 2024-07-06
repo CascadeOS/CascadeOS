@@ -314,45 +314,108 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
-    /// Switches to the provided stack and returns.
-    ///
-    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn changeStackAndReturn(
-        stack_pointer: core.VirtualAddress,
-    ) noreturn {
-        checkSupport(current.scheduling, "changeStackAndReturn", fn (core.VirtualAddress) noreturn);
+    pub inline fn changeIdleToTask(cpu: *kernel.Cpu, new_task: *kernel.Task) void {
+        checkSupport(current.scheduling, "changeIdleToTask", fn (
+            *kernel.Cpu,
+            *kernel.Task,
+        ) void);
 
-        try current.scheduling.changeStackAndReturn(stack_pointer);
+        current.scheduling.changeIdleToTask(cpu, new_task);
     }
 
-    /// It is the caller's responsibility to ensure the stack is valid, with a return address.
-    pub inline fn switchToIdle(
-        cpu: *kernel.Cpu,
-        stack_pointer: core.VirtualAddress,
+    pub inline fn changeTaskToIdle(cpu: *kernel.Cpu, old_task: *kernel.Task) void {
+        checkSupport(current.scheduling, "changeTaskToIdle", fn (
+            *kernel.Cpu,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.changeTaskToIdle(cpu, old_task);
+    }
+
+    pub inline fn changeTaskToTask(cpu: *kernel.Cpu, old_task: *kernel.Task, new_task: *kernel.Task) void {
+        checkSupport(current.scheduling, "changeTaskToTask", fn (
+            *kernel.Cpu,
+            *kernel.Task,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.changeTaskToTask(cpu, old_task, new_task);
+    }
+
+    pub const CallError = error{StackOverflow};
+
+    pub inline fn callZeroArgs(
         opt_old_task: ?*kernel.Task,
-    ) void {
-        checkSupport(current.scheduling, "switchToIdle", fn (*kernel.Cpu, core.VirtualAddress, ?*kernel.Task) void);
+        new_stack: kernel.Stack,
+        target_function: *const fn () callconv(.C) noreturn,
+    ) CallError!void {
+        checkSupport(current.scheduling, "callZeroArgs", fn (
+            ?*kernel.Task,
+            kernel.Stack,
+            *const fn () callconv(.C) noreturn,
+        ) CallError!void);
 
-        current.scheduling.switchToIdle(cpu, stack_pointer, opt_old_task);
+        try current.scheduling.callZeroArgs(opt_old_task, new_stack, target_function);
     }
 
-    pub inline fn switchToTaskFromIdle(
+    pub inline fn callOneArgs(
+        opt_old_task: ?*kernel.Task,
+        new_stack: kernel.Stack,
+        target_function: *const fn (usize) callconv(.C) noreturn,
+        arg1: usize,
+    ) CallError!void {
+        checkSupport(current.scheduling, "callOneArgs", fn (
+            ?*kernel.Task,
+            kernel.Stack,
+            *const fn (usize) callconv(.C) noreturn,
+            usize,
+        ) CallError!void);
+
+        try current.scheduling.callOneArgs(opt_old_task, new_stack, target_function, arg1);
+    }
+
+    pub inline fn callTwoArgs(
+        opt_old_task: ?*kernel.Task,
+        new_stack: kernel.Stack,
+        target_function: *const fn (usize, usize) callconv(.C) noreturn,
+        arg1: usize,
+        arg2: usize,
+    ) CallError!void {
+        checkSupport(current.scheduling, "callTwoArgs", fn (
+            ?*kernel.Task,
+            kernel.Stack,
+            *const fn (usize, usize) callconv(.C) noreturn,
+            usize,
+            usize,
+        ) CallError!void);
+
+        try current.scheduling.callTwoArgs(opt_old_task, new_stack, target_function, arg1, arg2);
+    }
+
+    pub inline fn jumpToIdleFromTask(
         cpu: *kernel.Cpu,
+        old_task: *kernel.Task,
+    ) void {
+        checkSupport(current.scheduling, "switchToIdleFromTask", fn (*kernel.Cpu, *kernel.Task) void);
+
+        current.scheduling.jumpToIdleFromTask(cpu, old_task);
+    }
+
+    pub inline fn jumpToTaskFromIdle(
         task: *kernel.Task,
     ) noreturn {
-        checkSupport(current.scheduling, "switchToTaskFromIdle", fn (*kernel.Cpu, *kernel.Task) noreturn);
+        checkSupport(current.scheduling, "jumpToTaskFromIdle", fn (*kernel.Task) noreturn);
 
-        current.scheduling.switchToTaskFromIdle(cpu, task);
+        current.scheduling.jumpToTaskFromIdle(task);
     }
 
-    pub inline fn switchToTaskFromTask(
-        cpu: *kernel.Cpu,
+    pub inline fn jumpToTaskFromTask(
         old_task: *kernel.Task,
         new_task: *kernel.Task,
     ) void {
-        checkSupport(current.scheduling, "switchToTaskFromTask", fn (*kernel.Cpu, *kernel.Task, *kernel.Task) void);
+        checkSupport(current.scheduling, "jumpToTaskFromTask", fn (*kernel.Task, *kernel.Task) void);
 
-        current.scheduling.switchToTaskFromTask(cpu, old_task, new_task);
+        current.scheduling.jumpToTaskFromTask(old_task, new_task);
     }
 
     pub const NewTaskFunction = *const fn (
@@ -361,18 +424,18 @@ pub const scheduling = struct {
         context: u64,
     ) noreturn;
 
-    pub inline fn prepareNewTask(
+    pub inline fn prepareStackForNewTask(
         task: *kernel.Task,
         context: u64,
         target_function: NewTaskFunction,
     ) error{StackOverflow}!void {
-        checkSupport(current.scheduling, "prepareNewTask", fn (
+        checkSupport(current.scheduling, "prepareStackForNewTask", fn (
             *kernel.Task,
             u64,
             NewTaskFunction,
         ) error{StackOverflow}!void);
 
-        return current.scheduling.prepareNewTask(task, context, target_function);
+        return current.scheduling.prepareStackForNewTask(task, context, target_function);
     }
 };
 

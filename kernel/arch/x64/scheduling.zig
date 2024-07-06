@@ -9,85 +9,32 @@ const x64 = @import("x64.zig");
 
 const log = kernel.log.scoped(.scheduling_x64);
 
-/// Switches to the provided stack and returns.
-///
-/// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub fn changeStackAndReturn(
-    stack_pointer: core.VirtualAddress,
-) noreturn {
-    asm volatile (
-        \\  mov %[stack], %%rsp
-        \\  ret
-        :
-        : [stack] "rm" (stack_pointer.value),
-        : "memory", "stack"
-    );
-    unreachable;
-}
+pub fn changeTaskToIdle(cpu: *kernel.Cpu, old_task: *kernel.Task) void {
+    _ = old_task;
 
-/// It is the caller's responsibility to ensure the stack is valid, with a return address.
-pub fn switchToIdle(
-    cpu: *kernel.Cpu,
-    stack_pointer: core.VirtualAddress,
-    opt_old_task: ?*kernel.Task,
-) void {
-    const old_task = opt_old_task orelse {
-        // we were already idle
-        changeStackAndReturn(stack_pointer);
-        unreachable;
-    };
-
-    if (!old_task.isKernel()) {
-        // the process was not the kernel so we need to switch to the kernel page table
-        kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
-    }
+    kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
 
     cpu.arch.tss.setPrivilegeStack(
         .ring0,
         cpu.scheduler_stack.stack_pointer,
     );
+}
 
-    _switchToIdleImpl(
-        stack_pointer,
-        &old_task.kernel_stack.stack_pointer,
+pub fn changeIdleToTask(cpu: *kernel.Cpu, new_task: *kernel.Task) void {
+    if (new_task.process) |new_task_process| {
+        kernel.vmm.switchToPageTable(new_task_process.page_table);
+    }
+
+    cpu.arch.tss.setPrivilegeStack(
+        .ring0,
+        new_task.kernel_stack.stack_pointer,
     );
 }
 
-// Implemented in 'x64/asm/switchToIdleImpl.S'
-extern fn _switchToIdleImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
-
-pub fn switchToTaskFromIdle(
-    cpu: *kernel.Cpu,
-    task: *kernel.Task,
-) noreturn {
-    if (task.process) |process| {
-        // If the process is not the kernel we need to switch the page table and privilege stack.
-
-        process.loadPageTable();
-
-        cpu.arch.tss.setPrivilegeStack(
-            .ring0,
-            task.kernel_stack.stack_pointer,
-        );
-    }
-
-    _switchToTaskFromIdleImpl(task.kernel_stack.stack_pointer);
-    unreachable;
-}
-
-// Implemented in 'x64/asm/switchToTaskFromIdleImpl.S'
-extern fn _switchToTaskFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
-
-pub fn switchToTaskFromTask(
-    cpu: *kernel.Cpu,
-    old_task: *kernel.Task,
-    new_task: *kernel.Task,
-) void {
-
-    // If the process is changing we need to switch the page table.
+pub fn changeTaskToTask(cpu: *kernel.Cpu, old_task: *kernel.Task, new_task: *kernel.Task) void {
     if (old_task.process != new_task.process) {
-        if (new_task.process) |new_process| {
-            new_process.loadPageTable();
+        if (new_task.process) |new_task_process| {
+            kernel.vmm.switchToPageTable(new_task_process.page_table);
         } else {
             kernel.vmm.switchToPageTable(kernel.vmm.kernel_page_table);
         }
@@ -97,23 +44,124 @@ pub fn switchToTaskFromTask(
         .ring0,
         new_task.kernel_stack.stack_pointer,
     );
+}
 
-    _switchToTaskFromTaskImpl(
+pub fn callZeroArgs(
+    opt_old_task: ?*kernel.Task,
+    new_stack: kernel.Stack,
+    target_function: *const fn () callconv(.C) noreturn,
+) kernel.arch.scheduling.CallError!void {
+    var stack = new_stack;
+
+    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+
+    if (opt_old_task) |old_task| {
+        _callZeroArgsImpl(
+            stack.stack_pointer,
+            &old_task.kernel_stack.stack_pointer,
+        );
+    } else {
+        _callZeroArgsNoPreviousImpl(stack.stack_pointer);
+    }
+}
+
+// Implemented in 'x64/asm/callZeroArgsImpl.S'
+extern fn _callZeroArgsImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+extern fn _callZeroArgsNoPreviousImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) void;
+
+pub fn callOneArgs(
+    opt_old_task: ?*kernel.Task,
+    new_stack: kernel.Stack,
+    target_function: *const fn (usize) callconv(.C) noreturn,
+    arg1: usize,
+) kernel.arch.scheduling.CallError!void {
+    var stack = new_stack;
+
+    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(arg1);
+
+    if (opt_old_task) |old_task| {
+        _callOneArgsImpl(
+            stack.stack_pointer,
+            &old_task.kernel_stack.stack_pointer,
+        );
+    } else {
+        _callOneArgsNoPreviousImpl(stack.stack_pointer);
+    }
+}
+
+// Implemented in 'x64/asm/callOneArgsImpl.S'
+extern fn _callOneArgsImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+extern fn _callOneArgsNoPreviousImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) void;
+
+pub fn callTwoArgs(
+    opt_old_task: ?*kernel.Task,
+    new_stack: kernel.Stack,
+    target_function: *const fn (usize, usize) callconv(.C) noreturn,
+    arg1: usize,
+    arg2: usize,
+) kernel.arch.scheduling.CallError!void {
+    var stack = new_stack;
+
+    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(arg2);
+    try stack.push(arg1);
+
+    if (opt_old_task) |old_task| {
+        _callTwoArgsImpl(
+            stack.stack_pointer,
+            &old_task.kernel_stack.stack_pointer,
+        );
+    } else {
+        _callTwoArgsNoPreviousImpl(stack.stack_pointer);
+    }
+}
+
+// Implemented in 'x64/asm/callTwoArgsImpl.S'
+extern fn _callTwoArgsImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+extern fn _callTwoArgsNoPreviousImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) void;
+
+/// It is the caller's responsibility to ensure the stack is valid, with a return address.
+pub inline fn jumpToIdleFromTask(
+    cpu: *kernel.Cpu,
+    old_task: *kernel.Task,
+) void {
+    _jumpToIdleFromTask(
+        cpu.scheduler_stack.stack_pointer,
+        &old_task.kernel_stack.stack_pointer,
+    );
+}
+
+// Implemented in 'x64/asm/jumpToIdleFromTask.S'
+extern fn _jumpToIdleFromTask(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+
+pub inline fn jumpToTaskFromIdle(
+    task: *kernel.Task,
+) noreturn {
+    _jumpToTaskFromIdleImpl(task.kernel_stack.stack_pointer);
+    unreachable;
+}
+
+// Implemented in 'x64/asm/jumpToTaskFromIdleImpl.S'
+extern fn _jumpToTaskFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
+
+pub inline fn jumpToTaskFromTask(
+    old_task: *kernel.Task,
+    new_task: *kernel.Task,
+) void {
+    _jumpToTaskFromTaskImpl(
         new_task.kernel_stack.stack_pointer,
         &old_task.kernel_stack.stack_pointer,
     );
 }
-// Implemented in 'x64/asm/switchToTaskFromTaskImpl.S'
-extern fn _switchToTaskFromTaskImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
+// Implemented in 'x64/asm/jumpToTaskFromTaskImpl.S'
+extern fn _jumpToTaskFromTaskImpl(new_kernel_stack_pointer: core.VirtualAddress, previous_kernel_stack_pointer: *core.VirtualAddress) callconv(.C) void;
 
-pub fn prepareNewTask(
+pub fn prepareStackForNewTask(
     task: *kernel.Task,
     context: u64,
     target_function: kernel.arch.scheduling.NewTaskFunction,
 ) error{StackOverflow}!void {
-    const old_stack_pointer = task.kernel_stack.stack_pointer;
-    errdefer task.kernel_stack.stack_pointer = old_stack_pointer;
-
     try task.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&startNewTask)));
 
     try task.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));

@@ -85,12 +85,9 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
     log.debug("configuring local interrupt controller", .{});
     kernel.arch.init.initLocalInterruptController(cpu);
 
-    const scheduler_stack_pointer = cpu.scheduler_stack.pushReturnAddressWithoutChangingPointer(
-        core.VirtualAddress.fromPtr(&initStage3),
-    ) catch unreachable; // the scheduler stack is big enough to hold one return address
-
-    log.debug("leaving bootloader provided stack", .{});
-    kernel.arch.scheduling.changeStackAndReturn(scheduler_stack_pointer);
+    kernel.arch.scheduling.callZeroArgs(null, cpu.scheduler_stack, initStage3) catch |err| {
+        core.panicFmt("unable to call initStage3: {s}", .{@errorName(err)});
+    };
     unreachable;
 }
 
@@ -99,7 +96,7 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
 /// This function is executed by all cpus, including the bootstrap cpu.
 ///
 /// All cpus are using a normal kernel stack.
-fn initStage3() noreturn {
+fn initStage3() callconv(.C) noreturn {
     const interrupt_exclusion = kernel.sync.assertInterruptExclusion();
 
     log.debug("entering scheduler on {}", .{interrupt_exclusion.cpu});

@@ -41,8 +41,11 @@ pub fn releaseScheduler() kernel.sync.InterruptExclusion {
 }
 
 /// Blocks the currently running task.
+///
+/// The `spinlock_held` is released by this function, the caller is responsible for acquiring it again if necessary.
 pub fn block(
     scheduler_held: SchedulerHeld,
+    spinlock_held: kernel.sync.TicketSpinLock.Held,
 ) void {
     validateLock(scheduler_held);
 
@@ -56,7 +59,7 @@ pub fn block(
     current_task.state = .blocked;
 
     const new_task_node = ready_to_run.pop() orelse {
-        switchToIdle(cpu, current_task);
+        switchToIdleWithLock(cpu, current_task, spinlock_held);
         return;
     };
 
@@ -64,7 +67,7 @@ pub fn block(
     core.debugAssert(current_task != new_task);
     core.debugAssert(new_task.state == .ready);
 
-    switchToTaskFromTask(cpu, current_task, new_task);
+    switchToTaskFromTaskWithLock(cpu, current_task, new_task, spinlock_held);
 }
 
 /// Yield execution to the scheduler.
@@ -78,12 +81,12 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
         switch (mode) {
             .requeue => return,
             .drop => {
-                if (cpu.current_task) |current_task| {
-                    core.debugAssert(current_task.state == .running);
-                    current_task.state = .dropped;
-                }
-                switchToIdle(cpu, cpu.current_task);
-                unreachable;
+                const current_task = cpu.current_task orelse return; // we are idle
+
+                core.debugAssert(current_task.state == .running);
+                current_task.state = .dropped;
+                switchToIdle(cpu, current_task);
+                return;
             },
         }
     };
@@ -118,17 +121,46 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     ready_to_run.push(&task.next_task_node);
 }
 
-fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
+fn switchToIdle(cpu: *kernel.Cpu, current_task: *kernel.Task) void {
     log.debug("no tasks to run, switching to idle", .{});
 
-    const scheduler_stack_pointer = cpu.scheduler_stack.pushReturnAddressWithoutChangingPointer(
-        core.VirtualAddress.fromPtr(&idle),
-    ) catch unreachable; // the scheduler stack is always big enough to hold a return address
+    cpu.current_task = null;
+
+    kernel.arch.scheduling.changeTaskToIdle(cpu, current_task);
+
+    kernel.arch.scheduling.callZeroArgs(current_task, cpu.scheduler_stack, idle) catch |err| {
+        switch (err) {
+            error.StackOverflow => unreachable, // the scheduler stack is big enough
+        }
+    };
+}
+
+fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock_held: kernel.sync.TicketSpinLock.Held) void {
+    const static = struct {
+        fn idleWithLock(spinlock_held_ptr: u64) callconv(.C) noreturn {
+            const held: *const kernel.sync.TicketSpinLock.Held = @ptrFromInt(spinlock_held_ptr);
+            held.release();
+            idle();
+            unreachable;
+        }
+    };
+
+    log.debug("no tasks to run, switching to idle", .{});
 
     cpu.current_task = null;
-    // TODO: handle priority
 
-    kernel.arch.scheduling.switchToIdle(cpu, scheduler_stack_pointer, opt_current_task);
+    kernel.arch.scheduling.changeTaskToIdle(cpu, current_task);
+
+    kernel.arch.scheduling.callOneArgs(
+        current_task,
+        cpu.scheduler_stack,
+        static.idleWithLock,
+        @intFromPtr(&spinlock_held),
+    ) catch |err| {
+        switch (err) {
+            error.StackOverflow => unreachable, // the scheduler stack is big enough
+        }
+    };
 }
 
 fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
@@ -138,9 +170,9 @@ fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
 
     cpu.current_task = new_task;
     new_task.state = .running;
-    // TODO: handle priority
 
-    kernel.arch.scheduling.switchToTaskFromIdle(cpu, new_task);
+    kernel.arch.scheduling.changeIdleToTask(cpu, new_task);
+    kernel.arch.scheduling.jumpToTaskFromIdle(new_task);
     unreachable;
 }
 
@@ -151,9 +183,39 @@ fn switchToTaskFromTask(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: 
 
     cpu.current_task = new_task;
     new_task.state = .running;
-    // TODO: handle priority
 
-    kernel.arch.scheduling.switchToTaskFromTask(cpu, current_task, new_task);
+    kernel.arch.scheduling.changeTaskToTask(cpu, current_task, new_task);
+    kernel.arch.scheduling.jumpToTaskFromTask(current_task, new_task);
+}
+
+fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: *kernel.Task, spinlock_held: kernel.sync.TicketSpinLock.Held) void {
+    const static = struct {
+        fn switchToTaskWithLock(new_task_ptr: u64, spinlock_held_ptr: u64) callconv(.C) noreturn {
+            const held: *const kernel.sync.TicketSpinLock.Held = @ptrFromInt(spinlock_held_ptr);
+            held.release();
+            kernel.arch.scheduling.jumpToTaskFromIdle(@ptrFromInt(new_task_ptr));
+        }
+    };
+
+    log.debug("switching to {} from {}", .{ new_task, current_task });
+
+    core.debugAssert(new_task.next_task_node.next == null);
+
+    cpu.current_task = new_task;
+    new_task.state = .running;
+
+    kernel.arch.scheduling.changeTaskToTask(cpu, current_task, new_task);
+    kernel.arch.scheduling.callTwoArgs(
+        current_task,
+        cpu.scheduler_stack,
+        static.switchToTaskWithLock,
+        @intFromPtr(&spinlock_held),
+        @intFromPtr(new_task),
+    ) catch |err| {
+        switch (err) {
+            error.StackOverflow => unreachable, // the scheduler stack is big enough
+        }
+    };
 }
 
 inline fn validateLock(scheduler_held: SchedulerHeld) void {
@@ -161,7 +223,7 @@ inline fn validateLock(scheduler_held: SchedulerHeld) void {
     core.debugAssert(lock.isLockedByCurrent());
 }
 
-fn idle() noreturn {
+fn idle() callconv(.C) noreturn {
     const interrupt_exclusion = releaseScheduler();
     core.debugAssert(interrupt_exclusion.cpu.interrupt_disable_count == 1);
 
