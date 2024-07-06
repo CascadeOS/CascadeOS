@@ -47,8 +47,15 @@ pub fn create() !Stack {
 
     var stack = Stack.fromRange(virtual_range, usable_range);
 
-    // push a null return value
-    try stack.pushReturnAddress(core.VirtualAddress.zero);
+    const arch = @import("cascade_target").arch;
+
+    if (arch == .x64) {
+        // push a null return value and base pointer
+        try stack.pushReturnAddress(core.VirtualAddress.zero);
+        try stack.push(@as(u64, 0));
+    } else {
+        @compileError("stack creation not implemented for arch " ++ @tagName(arch));
+    }
 
     return stack;
 }
