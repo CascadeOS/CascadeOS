@@ -7,6 +7,7 @@ const kernel = @import("kernel");
 
 pub const Mutex = @import("Mutex.zig");
 pub const TicketSpinLock = @import("TicketSpinLock.zig");
+pub const WaitQueue = @import("WaitQueue.zig");
 
 /// Acquire interrupt exclusion.
 pub fn getInterruptExclusion() InterruptExclusion {

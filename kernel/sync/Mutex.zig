@@ -6,12 +6,10 @@ const core = @import("core");
 const kernel = @import("kernel");
 const containers = @import("containers");
 
-const log = kernel.log.scoped(.mutex);
-
 const Mutex = @This();
 
 spinlock: kernel.sync.TicketSpinLock = .{},
-waiting_tasks: containers.SinglyLinkedFIFO = .{},
+wait_queue: kernel.sync.WaitQueue = .{},
 
 locked: bool = false,
 locked_by: ?*kernel.Task = null,
@@ -25,6 +23,7 @@ pub const Held = struct {
         core.debugAssert(mutex.locked);
 
         const spinlock_held = mutex.spinlock.acquire();
+        defer spinlock_held.release();
 
         const opt_current_task = spinlock_held.exclusion.cpu.current_task;
 
@@ -33,22 +32,7 @@ pub const Held = struct {
         mutex.locked = false;
         mutex.locked_by = null;
 
-        const task_to_wake_node = mutex.waiting_tasks.pop() orelse {
-            spinlock_held.release();
-            log.debug("{?} released {*} no waiters", .{ opt_current_task, mutex });
-            return;
-        };
-        const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
-
-        log.debug("{?} released {*} and waking {}", .{ opt_current_task, mutex, task_to_wake });
-
-        // acquire the scheduler lock before releasing the spin lock
-        const scheduler_held = kernel.scheduler.acquireScheduler();
-        defer scheduler_held.release();
-
-        spinlock_held.release();
-
-        kernel.scheduler.queueTask(scheduler_held, task_to_wake);
+        self.mutex.wait_queue.wakeOne();
     }
 };
 
@@ -66,8 +50,6 @@ pub fn acquire(mutex: *Mutex) Held {
 
             spinlock_held.release();
 
-            log.debug("{?} acquired {*}", .{ opt_current_task, mutex });
-
             return .{ .mutex = mutex };
         }
 
@@ -75,15 +57,6 @@ pub fn acquire(mutex: *Mutex) Held {
 
         core.debugAssert(mutex.locked_by != current_task);
 
-        log.debug("{} failed to acquire {*}, waiting", .{ current_task, mutex });
-
-        current_task.next_task_node = .{};
-        mutex.waiting_tasks.push(&current_task.next_task_node);
-
-        // acquire the scheduler lock before releasing the spin lock
-        const scheduler_held = kernel.scheduler.acquireScheduler();
-        defer scheduler_held.release();
-
-        kernel.scheduler.block(scheduler_held, spinlock_held);
+        mutex.wait_queue.wait(current_task, spinlock_held);
     }
 }
