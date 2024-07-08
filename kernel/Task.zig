@@ -13,12 +13,13 @@ _name: Name,
 
 state: State = .ready,
 
+/// The stack used by this task in kernel mode.
+stack: kernel.Stack,
+
 /// The process that this task belongs to.
 ///
 /// `null` if this is a kernel task.
 process: ?*kernel.Process,
-
-kernel_stack: kernel.Stack,
 
 /// Used to track the next task in any linked list.
 ///

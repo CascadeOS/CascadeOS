@@ -28,7 +28,7 @@ pub fn callZeroArgs(
     if (opt_old_task) |old_task| {
         external._callZeroArgsImpl(
             stack.stack_pointer,
-            &old_task.kernel_stack.stack_pointer,
+            &old_task.stack.stack_pointer,
         );
     } else {
         external._callZeroArgsNoPreviousImpl(stack.stack_pointer);
@@ -56,7 +56,7 @@ pub fn callOneArgs(
     if (opt_old_task) |old_task| {
         external._callOneArgsImpl(
             stack.stack_pointer,
-            &old_task.kernel_stack.stack_pointer,
+            &old_task.stack.stack_pointer,
         );
     } else {
         external._callOneArgsNoPreviousImpl(stack.stack_pointer);
@@ -86,7 +86,7 @@ pub fn callTwoArgs(
     if (opt_old_task) |old_task| {
         external._callTwoArgsImpl(
             stack.stack_pointer,
-            &old_task.kernel_stack.stack_pointer,
+            &old_task.stack.stack_pointer,
         );
     } else {
         external._callTwoArgsNoPreviousImpl(stack.stack_pointer);
@@ -120,7 +120,7 @@ pub inline fn jumpToIdleFromTask(
     };
     external._jumpToIdleFromTask(
         cpu.scheduler_stack.stack_pointer,
-        &old_task.kernel_stack.stack_pointer,
+        &old_task.stack.stack_pointer,
     );
 }
 
@@ -132,7 +132,7 @@ pub fn prepareForJumpToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) vo
 
     cpu.arch.tss.setPrivilegeStack(
         .ring0,
-        new_task.kernel_stack.stack_pointer,
+        new_task.stack.stack_pointer,
     );
 }
 
@@ -149,7 +149,7 @@ pub inline fn jumpToTaskFromIdle(
         extern fn _jumpToTaskFromIdleImpl(new_kernel_stack_pointer: core.VirtualAddress) callconv(.C) noreturn;
     };
 
-    external._jumpToTaskFromIdleImpl(task.kernel_stack.stack_pointer);
+    external._jumpToTaskFromIdleImpl(task.stack.stack_pointer);
     unreachable;
 }
 
@@ -165,7 +165,7 @@ pub fn prepareForJumpToTaskFromTask(cpu: *kernel.Cpu, old_task: *kernel.Task, ne
 
     cpu.arch.tss.setPrivilegeStack(
         .ring0,
-        new_task.kernel_stack.stack_pointer,
+        new_task.stack.stack_pointer,
     );
 }
 
@@ -184,8 +184,8 @@ pub inline fn jumpToTaskFromTask(
     };
 
     external._jumpToTaskFromTaskImpl(
-        new_task.kernel_stack.stack_pointer,
-        &old_task.kernel_stack.stack_pointer,
+        new_task.stack.stack_pointer,
+        &old_task.stack.stack_pointer,
     );
 }
 
@@ -215,14 +215,14 @@ pub fn prepareNewTaskForScheduling(
         }
     };
 
-    try task.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&external.startNewTask)));
+    try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&external.startNewTask)));
 
-    try task.kernel_stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
-    try task.kernel_stack.push(context);
-    try task.kernel_stack.push(core.VirtualAddress.fromPtr(task));
+    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try task.stack.push(context);
+    try task.stack.push(core.VirtualAddress.fromPtr(task));
 
-    try task.kernel_stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&external._startNewTask)));
+    try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&external._startNewTask)));
 
     // general purpose registers
-    for (0..6) |_| task.kernel_stack.push(@as(u64, 0)) catch unreachable;
+    for (0..6) |_| task.stack.push(@as(u64, 0)) catch unreachable;
 }
