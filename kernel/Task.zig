@@ -16,6 +16,9 @@ state: State = .ready,
 /// The stack used by this task in kernel mode.
 stack: kernel.Stack,
 
+/// The priority of this task.
+priority: kernel.scheduler.Priority,
+
 /// The process that this task belongs to.
 ///
 /// `null` if this is a kernel task.

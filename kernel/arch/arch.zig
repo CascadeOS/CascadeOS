@@ -170,6 +170,12 @@ pub const interrupts = struct {
 
         current.interrupts.enableInterrupts();
     }
+
+    pub inline fn setTaskPriority(priority: kernel.scheduler.Priority) void {
+        checkSupport(current.interrupts, "setTaskPriority", fn (kernel.scheduler.Priority) void);
+
+        current.interrupts.setTaskPriority(priority);
+    }
 };
 
 pub const paging = struct {

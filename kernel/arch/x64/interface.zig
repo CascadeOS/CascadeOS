@@ -35,6 +35,8 @@ pub const interrupts = struct {
     pub const interruptsEnabled = x64.interruptsEnabled;
     pub const disableInterrupts = x64.disableInterrupts;
     pub const enableInterrupts = x64.enableInterrupts;
+
+    pub const setTaskPriority = x64.apic.setTaskPriority;
 };
 
 pub const paging = struct {

@@ -11,6 +11,13 @@ const log = kernel.log.scoped(.scheduler);
 var lock: kernel.sync.TicketSpinLock = .{};
 var ready_to_run: containers.SinglyLinkedFIFO = .{};
 
+pub const Priority = enum(u4) {
+    idle = 0,
+    background_kernel = 1,
+    user = 2,
+    normal_kernel = 3,
+};
+
 pub const SchedulerHeld = struct {
     held: kernel.sync.TicketSpinLock.Held,
 
@@ -29,7 +36,7 @@ pub fn acquireScheduler() SchedulerHeld {
 /// Releases the scheduler and produces a `kernel.sync.InterruptExclusion`.
 ///
 /// Intended to only be called in idle or a new task.
-fn releaseScheduler() kernel.sync.InterruptExclusion {
+pub fn releaseScheduler() kernel.sync.InterruptExclusion {
     const cpu = kernel.arch.rawGetCpu();
 
     core.debugAssert(lock.isLockedBy(cpu.id));
@@ -132,6 +139,7 @@ fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
     cpu.current_task = null;
 
     if (opt_current_task) |current_task| {
+        kernel.arch.interrupts.setTaskPriority(.idle);
         kernel.arch.scheduling.prepareForJumpToIdleFromTask(cpu, current_task);
     }
 
@@ -156,6 +164,7 @@ fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock_h
 
     cpu.current_task = null;
 
+    kernel.arch.interrupts.setTaskPriority(.idle);
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(cpu, current_task);
 
     kernel.arch.scheduling.callOneArgs(
@@ -178,6 +187,8 @@ fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
     cpu.current_task = new_task;
     new_task.state = .running;
 
+    kernel.arch.interrupts.setTaskPriority(new_task.priority);
+
     kernel.arch.scheduling.prepareForJumpToTaskFromIdle(cpu, new_task);
     kernel.arch.scheduling.jumpToTaskFromIdle(new_task);
     unreachable;
@@ -190,6 +201,8 @@ fn switchToTaskFromTask(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: 
 
     cpu.current_task = new_task;
     new_task.state = .running;
+
+    kernel.arch.interrupts.setTaskPriority(new_task.priority);
 
     kernel.arch.scheduling.prepareForJumpToTaskFromTask(cpu, current_task, new_task);
     kernel.arch.scheduling.jumpToTaskFromTask(current_task, new_task);
@@ -210,6 +223,8 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
 
     cpu.current_task = new_task;
     new_task.state = .running;
+
+    kernel.arch.interrupts.setTaskPriority(new_task.priority);
 
     kernel.arch.scheduling.prepareForJumpToTaskFromTask(cpu, current_task, new_task);
     kernel.arch.scheduling.callTwoArgs(
