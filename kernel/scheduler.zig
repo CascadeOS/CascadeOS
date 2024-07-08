@@ -29,7 +29,7 @@ pub fn acquireScheduler() SchedulerHeld {
 /// Releases the scheduler and produces a `kernel.sync.InterruptExclusion`.
 ///
 /// Intended to only be called in idle or a new task.
-pub fn releaseScheduler() kernel.sync.InterruptExclusion {
+fn releaseScheduler() kernel.sync.InterruptExclusion {
     const cpu = kernel.arch.rawGetCpu();
 
     core.debugAssert(lock.isLockedBy(cpu.id));
@@ -43,6 +43,8 @@ pub fn releaseScheduler() kernel.sync.InterruptExclusion {
 /// Blocks the currently running task.
 ///
 /// The `spinlock_held` is released by this function, the caller is responsible for acquiring it again if necessary.
+///
+/// This function must be called with the lock held (see `acquireScheduler`).
 pub fn block(
     scheduler_held: SchedulerHeld,
     spinlock_held: kernel.sync.TicketSpinLock.Held,
@@ -71,6 +73,8 @@ pub fn block(
 }
 
 /// Yield execution to the scheduler.
+///
+/// This function must be called with the lock held (see `acquireScheduler`).
 pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop }) void {
     validateLock(scheduler_held);
 
@@ -128,7 +132,7 @@ fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
     cpu.current_task = null;
 
     if (opt_current_task) |current_task| {
-        kernel.arch.scheduling.changeTaskToIdle(cpu, current_task);
+        kernel.arch.scheduling.prepareForJumpToIdleFromTask(cpu, current_task);
     }
 
     kernel.arch.scheduling.callZeroArgs(opt_current_task, cpu.scheduler_stack, idle) catch |err| {
@@ -152,7 +156,7 @@ fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock_h
 
     cpu.current_task = null;
 
-    kernel.arch.scheduling.changeTaskToIdle(cpu, current_task);
+    kernel.arch.scheduling.prepareForJumpToIdleFromTask(cpu, current_task);
 
     kernel.arch.scheduling.callOneArgs(
         current_task,
@@ -174,7 +178,7 @@ fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
     cpu.current_task = new_task;
     new_task.state = .running;
 
-    kernel.arch.scheduling.changeIdleToTask(cpu, new_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromIdle(cpu, new_task);
     kernel.arch.scheduling.jumpToTaskFromIdle(new_task);
     unreachable;
 }
@@ -187,7 +191,7 @@ fn switchToTaskFromTask(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: 
     cpu.current_task = new_task;
     new_task.state = .running;
 
-    kernel.arch.scheduling.changeTaskToTask(cpu, current_task, new_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(cpu, current_task, new_task);
     kernel.arch.scheduling.jumpToTaskFromTask(current_task, new_task);
 }
 
@@ -207,7 +211,7 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
     cpu.current_task = new_task;
     new_task.state = .running;
 
-    kernel.arch.scheduling.changeTaskToTask(cpu, current_task, new_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(cpu, current_task, new_task);
     kernel.arch.scheduling.callTwoArgs(
         current_task,
         cpu.scheduler_stack,

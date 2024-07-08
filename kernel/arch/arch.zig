@@ -10,9 +10,10 @@ const kernel = @import("kernel");
 pub const arch = @import("cascade_target").arch;
 
 const current = switch (arch) {
+    // x64 is first to help zls, atleast while x64 is the main target.
+    .x64 => @import("x64/interface.zig"),
     .arm64 => @import("arm64/interface.zig"),
     .riscv => @import("riscv/interface.zig"),
-    .x64 => @import("x64/interface.zig"),
 };
 
 /// Architecture specific per-cpu information.
@@ -314,36 +315,9 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
-    pub inline fn changeIdleToTask(cpu: *kernel.Cpu, new_task: *kernel.Task) void {
-        checkSupport(current.scheduling, "changeIdleToTask", fn (
-            *kernel.Cpu,
-            *kernel.Task,
-        ) void);
-
-        current.scheduling.changeIdleToTask(cpu, new_task);
-    }
-
-    pub inline fn changeTaskToIdle(cpu: *kernel.Cpu, old_task: *kernel.Task) void {
-        checkSupport(current.scheduling, "changeTaskToIdle", fn (
-            *kernel.Cpu,
-            *kernel.Task,
-        ) void);
-
-        current.scheduling.changeTaskToIdle(cpu, old_task);
-    }
-
-    pub inline fn changeTaskToTask(cpu: *kernel.Cpu, old_task: *kernel.Task, new_task: *kernel.Task) void {
-        checkSupport(current.scheduling, "changeTaskToTask", fn (
-            *kernel.Cpu,
-            *kernel.Task,
-            *kernel.Task,
-        ) void);
-
-        current.scheduling.changeTaskToTask(cpu, old_task, new_task);
-    }
-
     pub const CallError = error{StackOverflow};
 
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub inline fn callZeroArgs(
         opt_old_task: ?*kernel.Task,
         new_stack: kernel.Stack,
@@ -358,6 +332,7 @@ pub const scheduling = struct {
         try current.scheduling.callZeroArgs(opt_old_task, new_stack, target_function);
     }
 
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub inline fn callOneArgs(
         opt_old_task: ?*kernel.Task,
         new_stack: kernel.Stack,
@@ -374,6 +349,7 @@ pub const scheduling = struct {
         try current.scheduling.callOneArgs(opt_old_task, new_stack, target_function, arg1);
     }
 
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub inline fn callTwoArgs(
         opt_old_task: ?*kernel.Task,
         new_stack: kernel.Stack,
@@ -392,6 +368,21 @@ pub const scheduling = struct {
         try current.scheduling.callTwoArgs(opt_old_task, new_stack, target_function, arg1, arg2);
     }
 
+    /// Prepares the CPU for jumping to the idle state.
+    pub inline fn prepareForJumpToIdleFromTask(cpu: *kernel.Cpu, old_task: *kernel.Task) void {
+        checkSupport(current.scheduling, "prepareForJumpToIdleFromTask", fn (
+            *kernel.Cpu,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToIdleFromTask(cpu, old_task);
+    }
+
+    /// Jumps to the idle state.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToIdleFromTask` before calling this function.
     pub inline fn jumpToIdleFromTask(
         cpu: *kernel.Cpu,
         old_task: *kernel.Task,
@@ -401,6 +392,21 @@ pub const scheduling = struct {
         current.scheduling.jumpToIdleFromTask(cpu, old_task);
     }
 
+    /// Prepares the CPU for jumping to the given task from the idle state.
+    pub inline fn prepareForJumpToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) void {
+        checkSupport(current.scheduling, "prepareForJumpToTaskFromIdle", fn (
+            *kernel.Cpu,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToTaskFromIdle(cpu, new_task);
+    }
+
+    /// Jumps to the given task from the idle state.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
     pub inline fn jumpToTaskFromIdle(
         task: *kernel.Task,
     ) noreturn {
@@ -409,6 +415,22 @@ pub const scheduling = struct {
         current.scheduling.jumpToTaskFromIdle(task);
     }
 
+    /// Prepares the CPU for jumping from `old_task` to `new_task`.
+    pub inline fn prepareForJumpToTaskFromTask(cpu: *kernel.Cpu, old_task: *kernel.Task, new_task: *kernel.Task) void {
+        checkSupport(current.scheduling, "prepareForJumpToTaskFromTask", fn (
+            *kernel.Cpu,
+            *kernel.Task,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToTaskFromTask(cpu, old_task, new_task);
+    }
+
+    /// Jumps from `old_task` to `new_task`.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
     pub inline fn jumpToTaskFromTask(
         old_task: *kernel.Task,
         new_task: *kernel.Task,
@@ -424,18 +446,22 @@ pub const scheduling = struct {
         context: u64,
     ) noreturn;
 
-    pub inline fn prepareStackForNewTask(
+    /// Prepares the given task for being scheduled.
+    ///
+    /// Ensures that when the task is scheduled it will release the scheduler then
+    /// call the `target_function` with the given `context`.
+    pub inline fn prepareNewTaskForScheduling(
         task: *kernel.Task,
         context: u64,
         target_function: NewTaskFunction,
     ) error{StackOverflow}!void {
-        checkSupport(current.scheduling, "prepareStackForNewTask", fn (
+        checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
             *kernel.Task,
             u64,
             NewTaskFunction,
         ) error{StackOverflow}!void);
 
-        return current.scheduling.prepareStackForNewTask(task, context, target_function);
+        return current.scheduling.prepareNewTaskForScheduling(task, context, target_function);
     }
 };
 
