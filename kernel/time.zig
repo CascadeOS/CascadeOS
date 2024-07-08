@@ -32,6 +32,15 @@ pub const wallclock = struct {
     }
 };
 
+pub const per_core_periodic = struct {
+    var enableSchedulerInterruptFn: *const fn (period: core.Duration) void = undefined;
+
+    /// Enables a per-core scheduler interrupt to be delivered every `period`.
+    pub inline fn enableSchedulerInterrupt(period: core.Duration) void {
+        return enableSchedulerInterruptFn(period);
+    }
+};
+
 pub const init = struct {
     pub fn initTime() void {
         log.debug("registering architectural time sources", .{});
@@ -40,6 +49,7 @@ pub const init = struct {
         const reference_counter = getReferenceCounter();
 
         configureWallclockTimeSource(reference_counter);
+        configurePerCorePeriodicTimeSource(reference_counter);
     }
 
     fn configureWallclockTimeSource(
@@ -55,6 +65,20 @@ pub const init = struct {
 
         wallclock.readFn = wallclock_impl.readFn;
         wallclock.elapsedFn = wallclock_impl.elapsedFn;
+    }
+
+    fn configurePerCorePeriodicTimeSource(
+        reference_counter: ReferenceCounter,
+    ) void {
+        const time_source = findAndInitializeTimeSource(.{
+            .per_core_periodic = true,
+        }, reference_counter) orelse core.panic("no per-core periodic found");
+
+        log.debug("using per-core periodic: {s}", .{time_source.name});
+
+        const per_core_periodic_impl = time_source.per_core_periodic.?;
+
+        per_core_periodic.enableSchedulerInterruptFn = per_core_periodic_impl.enableSchedulerInterruptFn;
     }
 
     var candidate_time_sources: std.BoundedArray(CandidateTimeSource, 8) = .{};
@@ -75,6 +99,13 @@ pub const init = struct {
 
         /// Provided if the time source is usable as a wallclock.
         wallclock: ?WallclockOptions = null,
+
+        /// Provided if the time source is usable as a per-core periodic interrupt.
+        ///
+        /// If there is only one core then a non-per-core time source is acceptable.
+        ///
+        /// NOTE: The per core period interface is only used during initialization.
+        per_core_periodic: ?PerCorePeriodicOptions = null,
 
         initialized: bool = false,
 
@@ -120,6 +151,11 @@ pub const init = struct {
             /// Counter wraparound is assumed to have not occured.
             elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
         };
+
+        pub const PerCorePeriodicOptions = struct {
+            /// Enables a per-core scheduler interrupt to be delivered every `period`.
+            enableSchedulerInterruptFn: *const fn (period: core.Duration) void,
+        };
     };
 
     pub fn addTimeSource(time_source: CandidateTimeSource) void {
@@ -135,9 +171,10 @@ pub const init = struct {
 
         log.debug("adding time source: {s}", .{time_source.name});
         log.debug("  priority: {}", .{time_source.priority});
-        log.debug("  reference counter: {} - wall clock: {}", .{
+        log.debug("  reference counter: {} - wall clock: {} - per core periodic: {}", .{
             time_source.reference_counter != null,
             time_source.wallclock != null,
+            time_source.per_core_periodic != null,
         });
     }
 
@@ -179,6 +216,8 @@ pub const init = struct {
         reference_counter: bool = false,
 
         wallclock: bool = false,
+
+        per_core_periodic: bool = false,
     };
 
     fn findAndInitializeTimeSource(query: TimeSourceQuery, reference_counter: ReferenceCounter) ?*CandidateTimeSource {
@@ -190,6 +229,8 @@ pub const init = struct {
             if (query.reference_counter and time_source.reference_counter == null) continue;
 
             if (query.wallclock and time_source.wallclock == null) continue;
+
+            if (query.per_core_periodic and time_source.per_core_periodic == null) continue;
 
             if (opt_best_candidate) |best_candidate| {
                 if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
