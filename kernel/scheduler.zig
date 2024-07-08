@@ -11,6 +11,9 @@ const log = kernel.log.scoped(.scheduler);
 var lock: kernel.sync.TicketSpinLock = .{};
 var ready_to_run: containers.SinglyLinkedFIFO = .{};
 
+// TODO: Actually use this value rather than always scheduling the current task out.
+const time_slice = core.Duration.from(5, .millisecond);
+
 pub const Priority = enum(u4) {
     idle = 0,
     background_kernel = 1,
@@ -263,3 +266,13 @@ fn idle() callconv(.C) noreturn {
         kernel.arch.halt();
     }
 }
+
+pub const init = struct {
+    /// Initializes the scheduler.
+    ///
+    /// This function will be called on each core.
+    pub fn initScheduler() void {
+        log.debug("set scheduler interrupt period: {}", .{time_slice});
+        kernel.time.per_core_periodic.enableSchedulerInterrupt(time_slice);
+    }
+};

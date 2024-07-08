@@ -85,6 +85,9 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
     log.debug("configuring local interrupt controller", .{});
     kernel.arch.init.initLocalInterruptController(cpu);
 
+    log.debug("initializing scheduler", .{});
+    kernel.scheduler.init.initScheduler();
+
     kernel.arch.scheduling.callZeroArgs(null, cpu.scheduler_stack, initStage3) catch |err| {
         core.panicFmt("unable to call initStage3: {s}", .{@errorName(err)});
     };
