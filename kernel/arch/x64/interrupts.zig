@@ -7,6 +7,8 @@ const kernel = @import("kernel");
 
 const x64 = @import("x64.zig");
 
+const interrupt_handlers = @import("interrupt_handlers.zig");
+
 pub const InterruptHandler = *const fn (
     interrupt_exclusion: kernel.sync.InterruptExclusion,
     interrupt_frame: *InterruptFrame,
@@ -246,16 +248,7 @@ pub const Interrupt = enum(u8) {
 
 var idt: x64.Idt = .{};
 const raw_handlers = init.makeRawHandlers();
-var handlers = [_]InterruptHandler{unhandledInterrupt} ** x64.Idt.number_of_handlers;
-
-fn unhandledInterrupt(
-    interrupt_exclusion: kernel.sync.InterruptExclusion,
-    interrupt_frame: *const x64.interrupts.InterruptFrame,
-) void {
-    _ = interrupt_exclusion;
-
-    core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame});
-}
+var handlers = [_]InterruptHandler{interrupt_handlers.unhandledInterrupt} ** x64.Idt.number_of_handlers;
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     const interrupt_exclusion_restorer = kernel.sync.getInterruptExclusionRestorer();
@@ -280,6 +273,8 @@ pub const init = struct {
             );
         }
 
+        setFixedHandlers();
+
         idt.handlers[@intFromEnum(Interrupt.double_fault)]
             .setStack(@intFromEnum(InterruptStackSelector.double_fault));
 
@@ -290,6 +285,10 @@ pub const init = struct {
     /// Load the IDT on this cpu.
     pub fn loadIdt() void {
         idt.load();
+    }
+
+    fn setFixedHandlers() void {
+        handlers[@intFromEnum(Interrupt.scheduler)] = interrupt_handlers.scheduler;
     }
 
     /// Creates an array of raw interrupt handlers, one for each vector.
