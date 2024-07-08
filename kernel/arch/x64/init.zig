@@ -158,9 +158,10 @@ pub fn configureGlobalSystemFeatures() void {
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources() void {
     x64.tsc.init.registerTimeSource();
+    x64.apic.init.registerTimeSource();
     x64.hpet.init.registerTimeSource();
 
-    // TODO: APIC, PIT, KVMCLOCK
+    // TODO: PIT, KVMCLOCK
 }
 
 pub fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
