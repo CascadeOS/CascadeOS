@@ -12,8 +12,6 @@ const Cpu = @This();
 id: Id,
 
 /// Tracks the depth of nested interrupt disables.
-///
-/// Preemption is disabled when interrupts are disabled.
 interrupt_disable_count: u32 = 1, // interrupts start disabled
 
 /// This stack is used during context switches, idle, and during the move from the bootloader provided stack until we

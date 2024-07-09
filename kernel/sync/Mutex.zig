@@ -22,17 +22,31 @@ pub const Held = struct {
 
         core.debugAssert(mutex.locked);
 
-        const spinlock_held = mutex.spinlock.acquire();
-        defer spinlock_held.release();
+        const opt_current_task = blk: {
+            const spinlock_held = mutex.spinlock.acquire();
+            defer spinlock_held.release();
 
-        const opt_current_task = spinlock_held.exclusion.cpu.current_task;
+            const opt_current_task = spinlock_held.exclusion.cpu.current_task;
 
-        core.debugAssert(mutex.locked_by == opt_current_task);
+            core.debugAssert(mutex.locked_by == opt_current_task);
 
-        mutex.locked = false;
-        mutex.locked_by = null;
+            mutex.locked = false;
+            mutex.locked_by = null;
 
-        self.mutex.wait_queue.wakeOne();
+            self.mutex.wait_queue.wakeOne();
+
+            break :blk opt_current_task;
+        };
+
+        if (opt_current_task) |current_task| {
+            current_task.preemption_disable_count -= 1;
+            if (current_task.preemption_disable_count == 0 and current_task.preemption_skipped) {
+                const scheduler_held = kernel.scheduler.acquireScheduler();
+                defer scheduler_held.release();
+
+                kernel.scheduler.maybePreempt(scheduler_held);
+            }
+        }
     }
 };
 
@@ -46,7 +60,7 @@ pub fn acquire(mutex: *Mutex) Held {
             mutex.locked = true;
             mutex.locked_by = opt_current_task;
 
-            // TODO: disable preemption?
+            if (opt_current_task) |current_task| current_task.preemption_disable_count += 1;
 
             spinlock_held.release();
 
@@ -57,6 +71,6 @@ pub fn acquire(mutex: *Mutex) Held {
 
         core.debugAssert(mutex.locked_by != current_task);
 
-        mutex.wait_queue.wait(current_task, spinlock_held);
+        mutex.wait_queue.wait(current_task, &mutex.spinlock);
     }
 }

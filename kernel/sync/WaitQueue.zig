@@ -20,11 +20,11 @@ pub fn wakeOne(self: *WaitQueue) void {
     kernel.scheduler.queueTask(scheduler_held, task_to_wake);
 }
 
-pub fn wait(self: *WaitQueue, current_task: *kernel.Task, spinlock_held: kernel.sync.TicketSpinLock.Held) void {
+pub fn wait(self: *WaitQueue, current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
     self.waiting_tasks.push(&current_task.next_task_node);
 
     const scheduler_held = kernel.scheduler.acquireScheduler();
     defer scheduler_held.release();
 
-    kernel.scheduler.block(scheduler_held, spinlock_held);
+    kernel.scheduler.block(scheduler_held, spinlock);
 }

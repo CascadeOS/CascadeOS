@@ -35,5 +35,5 @@ pub fn scheduler(
 
     // TODO: actually implement time slices
 
-    kernel.scheduler.yield(scheduler_held, .requeue);
+    kernel.scheduler.maybePreempt(scheduler_held);
 }

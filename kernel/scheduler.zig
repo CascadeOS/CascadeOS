@@ -50,28 +50,51 @@ pub fn releaseScheduler() kernel.sync.InterruptExclusion {
     return .{ .cpu = cpu };
 }
 
+pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
+    validateLock(scheduler_held);
+
+    const cpu = scheduler_held.held.exclusion.cpu;
+    core.debugAssert(cpu.interrupt_disable_count == 1); // the scheduler lock
+
+    const current_task: *kernel.Task = cpu.current_task orelse {
+        yield(scheduler_held, .requeue);
+        return;
+    };
+
+    if (current_task.preemption_disable_count != 0) {
+        current_task.preemption_skipped = true;
+        return;
+    }
+
+    current_task.preemption_skipped = false;
+
+    yield(scheduler_held, .requeue);
+}
+
 /// Blocks the currently running task.
 ///
-/// The `spinlock_held` is released by this function, the caller is responsible for acquiring it again if necessary.
+/// The `spinlock` is released by this function, the caller is responsible for acquiring it again if necessary.
 ///
 /// This function must be called with the lock held (see `acquireScheduler`).
 pub fn block(
     scheduler_held: SchedulerHeld,
-    spinlock_held: kernel.sync.TicketSpinLock.Held,
+    spinlock: *kernel.sync.TicketSpinLock,
 ) void {
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
     core.debugAssert(cpu.current_task != null);
-    core.debugAssert(cpu.interrupt_disable_count == 1);
+    core.debugAssert(cpu.interrupt_disable_count == 2); // the scheduler lock and the spinlock
 
     const current_task = cpu.current_task.?;
     core.debugAssert(current_task.state == .running);
+    core.debugAssert(current_task.preemption_disable_count == 0);
+    core.debugAssert(current_task.preemption_skipped == false);
 
     current_task.state = .blocked;
 
     const new_task_node = ready_to_run.pop() orelse {
-        switchToIdleWithLock(cpu, current_task, spinlock_held);
+        switchToIdleWithLock(cpu, current_task, spinlock);
         return;
     };
 
@@ -79,7 +102,7 @@ pub fn block(
     core.debugAssert(current_task != new_task);
     core.debugAssert(new_task.state == .ready);
 
-    switchToTaskFromTaskWithLock(cpu, current_task, new_task, spinlock_held);
+    switchToTaskFromTaskWithLock(cpu, current_task, new_task, spinlock);
 }
 
 /// Yield execution to the scheduler.
@@ -112,6 +135,8 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
     if (cpu.current_task) |current_task| {
         core.debugAssert(current_task != new_task);
         core.debugAssert(current_task.state == .running);
+        core.debugAssert(current_task.preemption_disable_count == 0);
+        core.debugAssert(current_task.preemption_skipped == false);
 
         switch (mode) {
             .requeue => queueTask(scheduler_held, current_task),
@@ -153,11 +178,19 @@ fn switchToIdle(cpu: *kernel.Cpu, opt_current_task: ?*kernel.Task) void {
     };
 }
 
-fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock_held: kernel.sync.TicketSpinLock.Held) void {
+fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
     const static = struct {
-        fn idleWithLock(spinlock_held_ptr: u64) callconv(.C) noreturn {
-            const held: *const kernel.sync.TicketSpinLock.Held = @ptrFromInt(spinlock_held_ptr);
-            held.release();
+        fn idleWithLock(spinlock_ptr: u64) callconv(.C) noreturn {
+            const ticket_spin_lock: *kernel.sync.TicketSpinLock = @ptrFromInt(spinlock_ptr);
+            ticket_spin_lock.unsafeRelease();
+
+            const current_cpu = kernel.arch.rawGetCpu();
+
+            const interrupt_exclusion: kernel.sync.InterruptExclusion = .{ .cpu = current_cpu };
+            interrupt_exclusion.release();
+
+            core.debugAssert(current_cpu.interrupt_disable_count == 0);
+
             idle();
             unreachable;
         }
@@ -174,7 +207,7 @@ fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock_h
         current_task,
         cpu.scheduler_stack,
         static.idleWithLock,
-        @intFromPtr(&spinlock_held),
+        @intFromPtr(spinlock),
     ) catch |err| {
         switch (err) {
             error.StackOverflow => unreachable, // the scheduler stack is big enough
@@ -211,12 +244,21 @@ fn switchToTaskFromTask(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: 
     kernel.arch.scheduling.jumpToTaskFromTask(current_task, new_task);
 }
 
-fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: *kernel.Task, spinlock_held: kernel.sync.TicketSpinLock.Held) void {
+fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
     const static = struct {
-        fn switchToTaskWithLock(new_task_ptr: u64, spinlock_held_ptr: u64) callconv(.C) noreturn {
-            const held: *const kernel.sync.TicketSpinLock.Held = @ptrFromInt(spinlock_held_ptr);
-            held.release();
+        fn switchToTaskWithLock(spinlock_ptr: u64, new_task_ptr: u64) callconv(.C) noreturn {
+            const ticket_spin_lock: *kernel.sync.TicketSpinLock = @ptrFromInt(spinlock_ptr);
+            ticket_spin_lock.unsafeRelease();
+
+            const current_cpu = kernel.arch.rawGetCpu();
+
+            const interrupt_exclusion: kernel.sync.InterruptExclusion = .{ .cpu = current_cpu };
+            interrupt_exclusion.release();
+
+            core.debugAssert(current_cpu.interrupt_disable_count == 1); // the scheduler is expected to be unlocked by the resumed task
+
             kernel.arch.scheduling.jumpToTaskFromIdle(@ptrFromInt(new_task_ptr));
+            unreachable;
         }
     };
 
@@ -234,7 +276,7 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
         current_task,
         cpu.scheduler_stack,
         static.switchToTaskWithLock,
-        @intFromPtr(&spinlock_held),
+        @intFromPtr(spinlock),
         @intFromPtr(new_task),
     ) catch |err| {
         switch (err) {
