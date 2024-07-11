@@ -9,6 +9,16 @@ const core = @import("core");
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const SingleNode = extern struct {
     next: ?*SingleNode = null,
+
+    pub const Iterator = struct {
+        current_node: ?*SingleNode,
+
+        pub fn next(self: *Iterator) ?*SingleNode {
+            const current_node = self.current_node orelse return null;
+            self.current_node = current_node.next;
+            return current_node;
+        }
+    };
 };
 
 /// A node with a next and previous pointers.
@@ -17,6 +27,20 @@ pub const SingleNode = extern struct {
 pub const DoubleNode = extern struct {
     next: ?*DoubleNode = null,
     previous: ?*DoubleNode = null,
+
+    pub const Iterator = struct {
+        direction: core.Direction,
+        current_node: ?*DoubleNode,
+
+        pub fn next(self: *Iterator) ?*DoubleNode {
+            const current_node = self.current_node orelse return null;
+            self.current_node = switch (self.direction) {
+                .forward => current_node.next,
+                .backward => current_node.previous,
+            };
+            return current_node;
+        }
+    };
 };
 
 pub const DoublyLinkedLIFO = @import("DoublyLinkedLIFO.zig");

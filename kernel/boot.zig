@@ -39,14 +39,14 @@ pub fn directMapAddress() ?core.VirtualAddress {
 }
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMap(direction: Direction) MemoryMapIterator {
+pub fn memoryMap(direction: core.Direction) MemoryMapIterator {
     const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
     const entries = memmap_response.entries();
     return .{
         .limine = .{
             .index = switch (direction) {
-                .forwards => 0,
-                .backwards => entries.len,
+                .forward => 0,
+                .backward => entries.len,
             },
             .entries = entries,
             .direction = direction,
@@ -108,24 +108,19 @@ pub const MemoryMapIterator = union(enum) {
     }
 };
 
-pub const Direction = enum {
-    forwards,
-    backwards,
-};
-
 const LimineMemoryMapIterator = struct {
     index: usize,
     entries: []const *const limine.Memmap.Entry,
-    direction: Direction,
+    direction: core.Direction,
 
     pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
         const limine_entry = switch (self.direction) {
-            .backwards => blk: {
+            .backward => blk: {
                 if (self.index == 0) return null;
                 self.index -= 1;
                 break :blk self.entries[self.index];
             },
-            .forwards => blk: {
+            .forward => blk: {
                 if (self.index >= self.entries.len) return null;
                 const entry = self.entries[self.index];
                 self.index += 1;

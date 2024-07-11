@@ -410,7 +410,7 @@ pub const init = struct {
     /// Calculates the size of the direct map.
     fn calculateSizeOfDirectMap() !core.Size {
         const last_memory_map_entry = blk: {
-            var memory_map_iterator = kernel.boot.memoryMap(.backwards);
+            var memory_map_iterator = kernel.boot.memoryMap(.backward);
             while (memory_map_iterator.next()) |memory_map_entry| {
                 if (memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
                     log.debug("skipping weird QEMU memory map entry: {}", .{memory_map_entry});

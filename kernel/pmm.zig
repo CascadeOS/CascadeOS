@@ -87,7 +87,7 @@ pub const init = struct {
     fn addFreeMemoryToPmm() !void {
         var size = core.Size.zero;
 
-        var memory_map_iterator = kernel.boot.memoryMap(.forwards);
+        var memory_map_iterator = kernel.boot.memoryMap(.forward);
 
         while (memory_map_iterator.next()) |memory_map_entry| {
             if (memory_map_entry.type != .free) continue;

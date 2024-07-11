@@ -51,6 +51,11 @@ pub fn panicFmt(comptime format: []const u8, args: anytype) noreturn {
     std.debug.panicExtra(null, @returnAddress(), format, args);
 }
 
+pub const Direction = enum {
+    forward,
+    backward,
+};
+
 pub const OrderedComparison = enum {
     less,
     match,
