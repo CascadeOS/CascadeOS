@@ -28,10 +28,10 @@ pub fn scheduler(
 
     x64.apic.eoi();
 
-    interrupt_exclusion.release();
-
     const scheduler_held = kernel.scheduler.acquireScheduler();
     defer scheduler_held.release();
+
+    interrupt_exclusion.release();
 
     // TODO: actually implement time slices
 
