@@ -379,21 +379,63 @@ var panic_impl: *const fn (
     return_address: usize,
 ) void = init.noOpPanic;
 
+var panicked_cpu = std.atomic.Value(kernel.Cpu.Id).init(.none);
+
+pub fn hasACpuPanicked() bool {
+    return panicked_cpu.load(.acquire) != .none;
+}
+
 pub const init = struct {
     pub fn loadInitPanic() void {
         panic_impl = initPanicImpl;
     }
 
     /// Panic handler during kernel init.
+    ///
+    /// As this is set as the panic impl after the bootstrap cpu is loaded, it can use `kerenel.arch.rawGetCpu()` safely.
     fn initPanicImpl(
         msg: []const u8,
         stack_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void {
-        const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+        const cpu = kernel.arch.rawGetCpu();
 
-        printUserPanicMessage(early_output, msg);
-        printErrorAndCurrentStackTrace(early_output, stack_trace, return_address);
+        if (panicked_cpu.cmpxchgStrong(
+            .none,
+            cpu.id,
+            .acq_rel,
+            .acquire,
+        )) |unexpected_cpu| {
+            if (unexpected_cpu != cpu.id) return;
+
+            // we have already panicked on this cpu.
+
+            const have_lock = @atomicLoad(kernel.Cpu.Id, &kernel.arch.init.EarlyOutput.lock.current_holder, .acquire) == cpu.id;
+
+            const opt_held = if (!have_lock) kernel.arch.init.EarlyOutput.lock.acquire() else null;
+            defer if (opt_held) |held| held.release();
+
+            const writer = kernel.arch.init.getEarlyOutputNoLock() orelse return;
+
+            writer.writeAll("\nPANIC IN PANIC on cpu ") catch unreachable;
+
+            cpu.id.print(writer, 0) catch unreachable;
+
+            printUserPanicMessage(writer, msg);
+            printErrorAndCurrentStackTrace(writer, stack_trace, return_address);
+
+            return;
+        }
+
+        const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+        defer early_output.deinit();
+
+        early_output.writer.writeAll("\nPANIC on cpu ") catch unreachable;
+
+        cpu.id.print(early_output.writer, 0) catch unreachable;
+
+        printUserPanicMessage(early_output.writer, msg);
+        printErrorAndCurrentStackTrace(early_output.writer, stack_trace, return_address);
     }
 
     fn noOpPanic(

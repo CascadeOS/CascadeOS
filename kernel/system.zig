@@ -61,4 +61,8 @@ pub const init = struct {
             }
         }
     }
+
+    pub fn numberOfCpus() usize {
+        return cpus.len;
+    }
 };
