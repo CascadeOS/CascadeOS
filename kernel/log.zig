@@ -98,16 +98,19 @@ pub const init = struct {
             format ++ "\n";
 
         const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+        defer early_output.deinit();
+
+        const writer = early_output.writer;
 
         const held = init_log_lock.acquire();
         defer held.release();
 
-        held.exclusion.cpu.print(early_output, 0) catch unreachable;
+        held.exclusion.cpu.print(writer, 0) catch unreachable;
 
-        early_output.writeAll(
+        writer.writeAll(
             comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ",
         ) catch unreachable;
 
-        early_output.print(user_fmt, args) catch unreachable;
+        writer.print(user_fmt, args) catch unreachable;
     }
 };

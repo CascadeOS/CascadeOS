@@ -36,7 +36,8 @@ pub fn initStage1() !noreturn {
     kernel.debug.init.loadInitPanic();
 
     if (kernel.arch.init.getEarlyOutput()) |early_output| {
-        early_output.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n") catch {};
+        defer early_output.deinit();
+        early_output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n") catch {};
     }
 
     log.debug("build kernel memory layout", .{});

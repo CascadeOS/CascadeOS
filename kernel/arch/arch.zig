@@ -53,11 +53,37 @@ pub const init = struct {
         current.init.setupEarlyOutput();
     }
 
+    pub const EarlyOutput = struct {
+        writer: std.io.AnyWriter,
+        held: kernel.sync.TicketSpinLock.Held,
+
+        pub inline fn deinit(self: EarlyOutput) void {
+            self.held.release();
+        }
+
+        pub var lock: kernel.sync.TicketSpinLock = .{};
+    };
+
     /// Acquire a writer for the early output setup by `setupEarlyOutput`.
-    pub inline fn getEarlyOutput() ?std.io.AnyWriter {
+    pub inline fn getEarlyOutput() ?EarlyOutput {
         // `checkSupport` intentionally not called - mandatory function
 
-        return if (current.init.getEarlyOutput()) |writer| writer.any() else null;
+        if (current.init.getEarlyOutput()) |early_output_writer| {
+            const held = EarlyOutput.lock.acquire();
+
+            return .{
+                .writer = early_output_writer.any(),
+                .held = held,
+            };
+        }
+
+        return null;
+    }
+
+    pub inline fn getEarlyOutputNoLock() ?std.io.AnyWriter {
+        // `checkSupport` intentionally not called - mandatory function
+
+        return if (current.init.getEarlyOutput()) |early_output_writer| early_output_writer.any() else null;
     }
 
     /// Ensure that any exceptions/faults that occur are handled.
