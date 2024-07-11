@@ -68,6 +68,10 @@ pub fn pop(self: *DoublyLinkedLIFO) ?*DoubleNode {
     return node;
 }
 
+pub fn iterate(self: DoublyLinkedLIFO, direction: core.Direction) DoubleNode.Iterator {
+    return .{ .direction = direction, .current_node = self.start_node };
+}
+
 comptime {
     refAllDeclsRecursive(@This());
 }

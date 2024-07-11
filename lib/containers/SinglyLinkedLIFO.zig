@@ -70,6 +70,10 @@ pub fn len(self: SinglyLinkedLIFO) usize {
     return result;
 }
 
+pub fn iterate(self: SinglyLinkedLIFO) SingleNode.Iterator {
+    return .{ .current_node = self.start_node };
+}
+
 test SinglyLinkedLIFO {
     const NODE_COUNT = 10;
 

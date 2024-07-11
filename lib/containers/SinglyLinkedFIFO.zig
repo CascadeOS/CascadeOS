@@ -68,6 +68,10 @@ pub fn len(self: SinglyLinkedFIFO) usize {
     return result;
 }
 
+pub fn iterate(self: SinglyLinkedFIFO) SingleNode.Iterator {
+    return .{ .current_node = self.start_node };
+}
+
 test SinglyLinkedFIFO {
     const NODE_COUNT = 10;
 
