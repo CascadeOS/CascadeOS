@@ -63,9 +63,11 @@ pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
 
     if (current_task.preemption_disable_count != 0) {
         current_task.preemption_skipped = true;
+        log.debug("preemption skipped for {}", .{current_task});
         return;
     }
 
+    log.debug("preempting {}", .{current_task});
     current_task.preemption_skipped = false;
 
     yield(scheduler_held, .requeue);
@@ -83,6 +85,7 @@ pub fn block(
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
+
     core.debugAssert(cpu.current_task != null);
     core.debugAssert(cpu.interrupt_disable_count == 2); // the scheduler lock and the spinlock
 
@@ -91,6 +94,7 @@ pub fn block(
     core.debugAssert(current_task.preemption_disable_count == 0);
     core.debugAssert(current_task.preemption_skipped == false);
 
+    log.debug("blocking {}", .{current_task});
     current_task.state = .blocked;
 
     const new_task_node = ready_to_run.pop() orelse {
@@ -116,10 +120,14 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
 
     const new_task_node = ready_to_run.pop() orelse {
         switch (mode) {
-            .requeue => return,
+            .requeue => {
+                log.debug("no tasks to yield too", .{});
+                return;
+            },
             .drop => {
                 if (cpu.current_task) |current_task| {
                     core.debugAssert(current_task.state == .running);
+                    log.debug("dropping {}", .{current_task});
                     current_task.state = .dropped;
                 }
 
@@ -139,8 +147,14 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
         core.debugAssert(current_task.preemption_skipped == false);
 
         switch (mode) {
-            .requeue => queueTask(scheduler_held, current_task),
-            .drop => current_task.state = .dropped,
+            .requeue => {
+                log.debug("yielding {}", .{current_task});
+                queueTask(scheduler_held, current_task);
+            },
+            .drop => {
+                log.debug("dropping {}", .{current_task});
+                current_task.state = .dropped;
+            },
         }
 
         switchToTaskFromTask(cpu, current_task, new_task);
@@ -189,14 +203,14 @@ fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock: 
             const interrupt_exclusion: kernel.sync.InterruptExclusion = .{ .cpu = current_cpu };
             interrupt_exclusion.release();
 
-            core.debugAssert(current_cpu.interrupt_disable_count == 0);
+            core.debugAssert(current_cpu.interrupt_disable_count == 1); // the scheduler lock
 
             idle();
             unreachable;
         }
     };
 
-    log.debug("no tasks to run, switching to idle", .{});
+    log.debug("no tasks to run, switching to idle with a lock", .{});
 
     cpu.current_task = null;
 
@@ -262,7 +276,7 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
         }
     };
 
-    log.debug("switching to {} from {}", .{ new_task, current_task });
+    log.debug("switching to {} from {} with a lock", .{ new_task, current_task });
 
     core.debugAssert(new_task.next_task_node.next == null);
 
