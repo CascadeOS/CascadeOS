@@ -9,9 +9,9 @@ const limine = @import("limine");
 
 export fn _start() callconv(.C) noreturn {
     @call(.never_inline, @import("init.zig").initStage1, .{}) catch |err| {
-        core.panicFmt("unhandled error: {s}", .{@errorName(err)});
+        core.panicFmt("unhandled error: {s}", .{@errorName(err)}, @errorReturnTrace());
     };
-    core.panic("`init.initStage1` returned");
+    core.panic("`init.initStage1` returned", null);
 }
 
 pub const KernelBaseAddress = struct {
@@ -40,7 +40,7 @@ pub fn directMapAddress() ?core.VirtualAddress {
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMap(direction: core.Direction) MemoryMapIterator {
-    const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader");
+    const memmap_response = limine_requests.memmap.response orelse core.panic("no memory map from the bootloader", null);
     const entries = memmap_response.entries();
     return .{
         .limine = .{
@@ -158,7 +158,7 @@ pub fn x2apicEnabled() bool {
 }
 
 pub fn cpuDescriptors() CpuDescriptorIterator {
-    const smp_response = limine_requests.smp.response orelse core.panic("no cpu descriptors from the bootloader");
+    const smp_response = limine_requests.smp.response orelse core.panic("no cpu descriptors from the bootloader", null);
     const entries = smp_response.cpus();
     return .{
         .limine = .{

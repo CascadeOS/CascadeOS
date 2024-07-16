@@ -250,7 +250,7 @@ pub fn sdfSlice() []const u8 {
     const ptr: [*]const u8 = @ptrCast(&static.__sdf_start);
     var fbs = std.io.fixedBufferStream(ptr[0..@sizeOf(static.sdf.Header)]);
 
-    const header = static.sdf.Header.read(fbs.reader()) catch core.panic("SDF data is invalid");
+    const header = static.sdf.Header.read(fbs.reader()) catch core.panic("SDF data is invalid", @errorReturnTrace());
 
     const slice = ptr[0..header.total_size_of_sdf_data];
 

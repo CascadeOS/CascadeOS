@@ -90,7 +90,7 @@ fn initStage2(cpu: *kernel.Cpu) noreturn {
     kernel.scheduler.init.initScheduler();
 
     kernel.arch.scheduling.callZeroArgs(null, cpu.scheduler_stack, initStage3) catch |err| {
-        core.panicFmt("unable to call initStage3: {s}", .{@errorName(err)});
+        core.panicFmt("unable to call initStage3: {s}", .{@errorName(err)}, @errorReturnTrace());
     };
     unreachable;
 }

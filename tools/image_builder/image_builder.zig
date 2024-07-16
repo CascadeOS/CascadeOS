@@ -87,7 +87,7 @@ fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: s
 
     const disk_size = blk: {
         if (!std.mem.isAligned(image_description.size, disk_block_size.value)) {
-            core.panic("image size is not a multiple of 512 bytes");
+            core.panic("image size is not a multiple of 512 bytes", null);
         }
         break :blk core.Size.from(image_description.size, .byte);
     };
@@ -223,7 +223,7 @@ fn addFilesAndDirectoriesToFAT(context: *FATContext, allocator: std.mem.Allocato
         switch (entry) {
             .file => |file| {
                 const parent_dir_path = std.fs.path.dirname(file.destination_path) orelse {
-                    core.panicFmt("file entry with invalid destination path: '{s}'", .{file.destination_path});
+                    core.panicFmt("file entry with invalid destination path: '{s}'", .{file.destination_path}, null);
                 };
                 const parent_directory = try ensureFATDirectory(context, allocator, parent_dir_path);
 
@@ -741,13 +741,13 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
             const starting_block = std.mem.alignForward(usize, next_free_block, partition_alignment);
 
             if (starting_block > last_usable_block) {
-                core.panic("exceeded disk image size");
+                core.panic("exceeded disk image size", null);
             }
 
             const desired_blocks_in_partition = blk: {
                 if (partition.size == 0) {
                     if (i != image_description.partitions.len - 1) {
-                        core.panic("partition with zero size that is not the last partition");
+                        core.panic("partition with zero size that is not the last partition", null);
                     }
                     break :blk last_usable_block - starting_block;
                 }
@@ -772,7 +772,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
                 break :blk last_usable_block;
             };
 
-            if (ending_block < starting_block) core.panic("ending block is less than starting block");
+            if (ending_block < starting_block) core.panic("ending block is less than starting block", null);
 
             const blocks_in_partition = (ending_block - starting_block) + 1;
 

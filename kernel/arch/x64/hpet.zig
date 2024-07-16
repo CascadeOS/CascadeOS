@@ -45,7 +45,7 @@ pub const init = struct {
         if (general_capabilities.counter_is_64bit) {
             log.debug("counter is 64-bit", .{});
         } else {
-            core.panic("HPET counter is not 64-bit");
+            core.panic("HPET counter is not 64-bit", null);
         }
 
         number_of_timers_minus_one = general_capabilities.number_of_timers_minus_one;
@@ -88,7 +88,7 @@ pub const init = struct {
         // unreachable: the table is known to exist as it is checked in `registerTimeSource`
         const description_table = kernel.acpi.init.getTable(acpi.HPET, 0) orelse unreachable;
 
-        if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped");
+        if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
 
         return kernel
             .vmm.nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(description_table.base_address.address))

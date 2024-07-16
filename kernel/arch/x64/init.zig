@@ -59,8 +59,8 @@ pub inline fn prepareCpu(
     cpu.arch = .{
         .lapic_id = cpu_descriptor.lapicId(),
 
-        .double_fault_stack = allocateCpuStackFn() catch core.panic("unable to create double fault stack"),
-        .non_maskable_interrupt_stack = allocateCpuStackFn() catch core.panic("unable to create non-mackable interrupt stack"),
+        .double_fault_stack = allocateCpuStackFn() catch core.panic("unable to create double fault stack", @errorReturnTrace()),
+        .non_maskable_interrupt_stack = allocateCpuStackFn() catch core.panic("unable to create non-mackable interrupt stack", @errorReturnTrace()),
     };
 
     cpu.arch.tss.setPrivilegeStack(
@@ -98,8 +98,8 @@ pub fn captureSystemInformation() !void {
     log.debug("capturing cpuid information", .{});
     try captureCPUIDInformation();
 
-    const madt = kernel.acpi.init.getTable(acpi.MADT, 0) orelse core.panic("unable to get MADT");
-    const fadt = kernel.acpi.init.getTable(acpi.FADT, 0) orelse core.panic("unable to get FADT");
+    const madt = kernel.acpi.init.getTable(acpi.MADT, 0) orelse core.panic("unable to get MADT", null);
+    const fadt = kernel.acpi.init.getTable(acpi.FADT, 0) orelse core.panic("unable to get FADT", null);
 
     log.debug("capturing FADT information", .{});
     captureFADTInformation(fadt);
@@ -175,7 +175,7 @@ pub fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
     {
         var cr0 = x64.Cr0.read();
 
-        if (!cr0.paging) core.panic("paging not enabled");
+        if (!cr0.paging) core.panic("paging not enabled", null);
 
         cr0.write_protect = true;
 
@@ -187,7 +187,7 @@ pub fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
     {
         var efer = x64.EFER.read();
 
-        if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode");
+        if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode", null);
 
         if (x64.info.cpu_id.syscall_sysret) efer.syscall_enable = true;
         if (x64.info.cpu_id.execute_disable) efer.no_execute_enable = true;

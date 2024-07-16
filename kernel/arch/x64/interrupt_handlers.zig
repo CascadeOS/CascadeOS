@@ -17,7 +17,7 @@ pub fn unhandledInterrupt(
     interrupt_frame: *const x64.interrupts.InterruptFrame,
 ) void {
     _ = interrupt_exclusion;
-    core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame});
+    core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
 }
 
 pub fn scheduler(

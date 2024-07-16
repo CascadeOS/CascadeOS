@@ -57,7 +57,7 @@ pub const init = struct {
     ) void {
         const time_source = findAndInitializeTimeSource(.{
             .wallclock = true,
-        }, reference_counter) orelse core.panic("no wallclock found");
+        }, reference_counter) orelse core.panic("no wallclock found", null);
 
         log.debug("using wallclock: {s}", .{time_source.name});
 
@@ -72,7 +72,7 @@ pub const init = struct {
     ) void {
         const time_source = findAndInitializeTimeSource(.{
             .per_core_periodic = true,
-        }, reference_counter) orelse core.panic("no per-core periodic found");
+        }, reference_counter) orelse core.panic("no per-core periodic found", null);
 
         log.debug("using per-core periodic: {s}", .{time_source.name});
 
@@ -161,12 +161,12 @@ pub const init = struct {
     pub fn addTimeSource(time_source: CandidateTimeSource) void {
         if (time_source.reference_counter != null) {
             if (time_source.initialization == .calibration_required) {
-                core.panic("reference counter cannot require calibration");
+                core.panic("reference counter cannot require calibration", null);
             }
         }
 
         candidate_time_sources.append(time_source) catch {
-            core.panic("exceeded maximum number of time sources");
+            core.panic("exceeded maximum number of time sources", null);
         };
 
         log.debug("adding time source: {s}", .{time_source.name});
@@ -248,7 +248,7 @@ pub const init = struct {
         const time_source = findAndInitializeTimeSource(.{
             .pre_calibrated = true,
             .reference_counter = true,
-        }, undefined) orelse core.panic("no reference counter found");
+        }, undefined) orelse core.panic("no reference counter found", null);
 
         log.debug("using reference counter: {s}", .{time_source.name});
 

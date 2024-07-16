@@ -67,7 +67,7 @@ pub fn acquire(mutex: *Mutex) Held {
             return .{ .mutex = mutex };
         }
 
-        const current_task = opt_current_task orelse core.panic("Mutex.acquire with no current task would block");
+        const current_task = opt_current_task orelse core.panic("Mutex.acquire with no current task would block", null);
 
         core.debugAssert(mutex.locked_by != current_task);
 

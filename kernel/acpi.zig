@@ -15,18 +15,18 @@ pub const init = struct {
 
     /// Initializes access to the ACPI tables.
     pub fn initializeACPITables() void {
-        const rsdp_address = kernel.boot.rsdp() orelse core.panic("RSDP not provided by bootloader");
+        const rsdp_address = kernel.boot.rsdp() orelse core.panic("RSDP not provided by bootloader", null);
         const rsdp = rsdp_address.toPtr(*const acpi.RSDP);
 
         log.debug("ACPI revision: {d}", .{rsdp.revision});
 
         log.debug("validating rsdp", .{});
-        if (!rsdp.isValid()) core.panic("invalid RSDP");
+        if (!rsdp.isValid()) core.panic("invalid RSDP", null);
 
         sdt_header = kernel.vmm.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
 
         log.debug("validating sdt", .{});
-        if (!sdt_header.isValid()) core.panic("invalid SDT");
+        if (!sdt_header.isValid()) core.panic("invalid SDT", null);
 
         if (log.levelEnabled(.debug)) {
             var iter = acpi.tableIterator(

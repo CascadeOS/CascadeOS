@@ -509,7 +509,7 @@ fn fillInBuilders(
 
         const directory = blk: {
             const directory = std.fs.path.dirname(line_info.file) orelse {
-                core.panicFmt("path with no directory: '{s}'", .{line_info.file});
+                core.panicFmt("path with no directory: '{s}'", .{line_info.file}, null);
             };
 
             for (directory_prefixes_to_strip) |directory_prefix_to_strip| {

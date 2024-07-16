@@ -30,7 +30,7 @@ pub fn create() !Stack {
         defer held.release();
 
         stacks_range_allocator.deallocateRange(virtual_range) catch {
-            core.panic("deallocateRange failed"); // FIXME
+            core.panic("deallocateRange failed", @errorReturnTrace()); // FIXME
         };
     }
 

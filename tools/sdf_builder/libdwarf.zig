@@ -655,6 +655,6 @@ fn toResult(return_value: c_int) !void {
     switch (return_value) {
         c.DW_DLV_OK => {},
         c.DW_DLV_ERROR, c.DW_DLV_NO_ENTRY => return error.DwarfError,
-        else => |v| core.panicFmt("unknown libdwarf return value: {}", .{v}),
+        else => |v| core.panicFmt("unknown libdwarf return value: {}", .{v}, null),
     }
 }

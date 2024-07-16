@@ -86,7 +86,7 @@ fn resize(_: *anyopaque, buf: []u8, _: u8, new_len: usize, _: usize) bool {
 }
 
 fn free(_: *anyopaque, _: []u8, _: u8, _: usize) void {
-    core.panic("free called on eternal heap allocator");
+    core.panic("free called on eternal heap allocator", null);
 }
 
 pub const init = struct {

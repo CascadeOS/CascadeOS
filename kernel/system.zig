@@ -33,7 +33,7 @@ pub const init = struct {
         cpus = kernel.heap.eternal_heap_allocator.alloc(
             Cpu,
             cpu_descriptors.count(),
-        ) catch core.panic("failed to allocate cpus");
+        ) catch core.panic("failed to allocate cpus", @errorReturnTrace());
 
         var i: u32 = 0;
 
@@ -44,7 +44,7 @@ pub const init = struct {
             log.debug("initializing cpu {}", .{cpu_id});
 
             const scheduler_stack = kernel.heap.stack_allocator.create() catch {
-                core.panic("failed to allocate scheduler stack");
+                core.panic("failed to allocate scheduler stack", @errorReturnTrace());
             };
 
             cpu.* = .{

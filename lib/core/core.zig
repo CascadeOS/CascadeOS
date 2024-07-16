@@ -39,16 +39,16 @@ pub fn debugAssert(ok: bool) void { // TODO: mark inline once that does not remo
 
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
-pub fn panic(comptime msg: []const u8) noreturn {
+pub fn panic(comptime msg: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
     @setCold(true);
-    std.builtin.panic(msg, null, @returnAddress());
+    std.builtin.panic(msg, error_return_trace, @returnAddress());
 }
 
 /// This function is the same as `std.debug.panicExtra` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
-pub fn panicFmt(comptime format: []const u8, args: anytype) noreturn {
+pub fn panicFmt(comptime format: []const u8, args: anytype, error_return_trace: ?*std.builtin.StackTrace) noreturn {
     @setCold(true);
-    std.debug.panicExtra(null, @returnAddress(), format, args);
+    std.debug.panicExtra(error_return_trace, @returnAddress(), format, args);
 }
 
 pub const Direction = enum {

@@ -27,7 +27,7 @@ pub var kernel_page_table: *kernel.arch.paging.PageTable = undefined;
 pub fn switchToPageTable(page_table: *const kernel.arch.paging.PageTable) void {
     const physical_address =
         physicalFromDirectMap(core.VirtualAddress.fromPtr(page_table)) catch
-        core.panicFmt("page table {*} is not in the direct map", .{page_table});
+        core.panicFmt("page table {*} is not in the direct map", .{page_table}, null);
 
     kernel.arch.paging.switchToPageTable(physical_address);
 }
@@ -397,7 +397,7 @@ pub const init = struct {
 
         // TODO: Align to large page?
         const range = memory_layout.findFreeRange(direct_map_size, null) orelse {
-            core.panic("unable to find free memory region for the non-cached direct map");
+            core.panic("unable to find free memory region for the non-cached direct map", @errorReturnTrace());
         };
         non_cached_direct_map_range = range;
         memory_layout.registerRegion(.{
@@ -440,14 +440,14 @@ pub const init = struct {
 
         memory_layout.registerRegion(.{
             .range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
-                core.panic("no space in kernel memory layout for the eternal heap"),
+                core.panic("no space in kernel memory layout for the eternal heap", null),
             .type = .eternal_heap,
             .operation = .top_level_map,
         });
 
         memory_layout.registerRegion(.{
             .range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
-                core.panic("no space in kernel memory layout for the kernel stacks"),
+                core.panic("no space in kernel memory layout for the kernel stacks", null),
             .type = .kernel_stacks,
             .operation = .top_level_map,
         });
