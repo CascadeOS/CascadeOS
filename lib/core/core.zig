@@ -51,6 +51,12 @@ pub fn panicFmt(comptime format: []const u8, args: anytype, error_return_trace: 
     std.debug.panicExtra(error_return_trace, @returnAddress(), format, args);
 }
 
+pub inline fn require(value: anytype, comptime msg: []const u8) @TypeOf(value catch unreachable) {
+    return value catch |err| {
+        panicFmt(comptime msg ++ ": {s}", .{@errorName(err)}, @errorReturnTrace());
+    };
+}
+
 pub const Direction = enum {
     forward,
     backward,
