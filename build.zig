@@ -16,7 +16,7 @@ const StepCollection = @import("build/StepCollection.zig");
 const Tool = @import("build/Tool.zig");
 
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
-const min_zig_version = "0.14.0-dev.41+8f27a4370";
+const min_zig_version = "0.14.0-dev.321+888708ec8";
 
 // Ensure this is kept in sync with `build.zig.zon`
 const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 2 };
@@ -70,9 +70,9 @@ pub fn build(b: *std.Build) !void {
 
 fn disableUnsupportedSteps(b: *std.Build) !void {
     const installMakeFn = struct {
-        fn installMakeFn(step: *std.Build.Step, node: std.Progress.Node) anyerror!void {
+        fn installMakeFn(step: *std.Build.Step, options: std.Build.Step.MakeOptions) anyerror!void {
             _ = step;
-            _ = node;
+            _ = options;
             std.debug.print(
                 "the 'install' step is not supported, to list available build targets run: 'zig build -l'\n",
                 .{},
@@ -85,9 +85,9 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
     b.install_tls.step.makeFn = &installMakeFn;
 
     const uninstallMakeFn = struct {
-        fn uninstallMakeFn(step: *std.Build.Step, node: std.Progress.Node) anyerror!void {
+        fn uninstallMakeFn(step: *std.Build.Step, options: std.Build.Step.MakeOptions) anyerror!void {
             _ = step;
-            _ = node;
+            _ = options;
             std.debug.print(
                 "the 'uninstall' step is not supported, to list available build targets run: 'zig build -l'\n",
                 .{},
@@ -100,9 +100,9 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
     b.uninstall_tls.step.makeFn = &uninstallMakeFn;
 
     const defaultMakeFn = struct {
-        fn defaultMakeFn(step: *std.Build.Step, node: std.Progress.Node) anyerror!void {
+        fn defaultMakeFn(step: *std.Build.Step, options: std.Build.Step.MakeOptions) anyerror!void {
             _ = step;
-            _ = node;
+            _ = options;
             std.debug.print(
                 "no build target given, to list available build targets run: 'zig build -l'\n",
                 .{},

@@ -110,8 +110,8 @@ pub fn registerImageSteps(
     return image_steps;
 }
 
-fn makeImage(step: *Step, progress_node: std.Progress.Node) !void {
-    _ = progress_node;
+fn makeImage(step: *Step, options: Step.MakeOptions) !void {
+    _ = options;
 
     const self: *ImageStep = @fieldParentPtr("step", step);
     self.generated_image_file.path = step.owner.getInstallPath(self.install_image.dir, self.install_image.dest_rel_path);
@@ -162,12 +162,12 @@ const ImageDescriptionStep = struct {
         return self;
     }
 
-    fn make(step: *Step, progress_node: std.Progress.Node) !void {
+    fn make(step: *Step, options: Step.MakeOptions) !void {
         const self: *ImageDescriptionStep = @fieldParentPtr("step", step);
 
         var timer = try std.time.Timer.start();
 
-        const child_node = progress_node.start("generate image_description.json", 1);
+        const child_node = options.progress_node.start("generate image_description.json", 1);
 
         defer {
             child_node.end();

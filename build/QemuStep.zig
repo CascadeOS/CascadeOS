@@ -95,9 +95,7 @@ fn needsUefi(self: CascadeTarget) bool {
     };
 }
 
-fn make(step: *Step, prog_node: std.Progress.Node) !void {
-    _ = prog_node;
-
+fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
@@ -265,7 +263,7 @@ fn make(step: *Step, prog_node: std.Progress.Node) !void {
 
     var timer = try std.time.Timer.start();
 
-    try run_qemu.step.make(.{ .index = .none });
+    try run_qemu.step.make(options);
 
     step.result_duration_ns = timer.read();
 }

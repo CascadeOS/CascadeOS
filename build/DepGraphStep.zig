@@ -64,10 +64,10 @@ fn create(
     return self;
 }
 
-fn make(step: *Step, progress_node: std.Progress.Node) !void {
+fn make(step: *Step, options: Step.MakeOptions) !void {
     const self: *DepGraphStep = @fieldParentPtr("step", step);
 
-    var node = progress_node.start(
+    var node = options.progress_node.start(
         step.name,
         self.kernels.count() + self.libraries.count() + self.tools.count(),
     );
