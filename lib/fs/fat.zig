@@ -139,7 +139,7 @@ pub const BPB = extern struct {
     /// Number of sectors per track.
     sectors_per_track: u16 align(1),
 
-    ///	Number of heads or sides on the storage media.
+    /// Number of heads or sides on the storage media.
     number_of_heads: u16 align(1),
 
     /// Count of hidden sectors preceding the partition that contains this FAT partition.
