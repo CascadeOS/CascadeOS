@@ -13,7 +13,6 @@ const current = switch (arch) {
     // x64 is first to help zls, atleast while x64 is the main target.
     .x64 => @import("x64/interface.zig"),
     .arm64 => @import("arm64/interface.zig"),
-    .riscv => @import("riscv/interface.zig"),
 };
 
 /// Architecture specific per-cpu information.

@@ -90,7 +90,6 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, optio
 fn needsUefi(self: CascadeTarget) bool {
     return switch (self) {
         .arm64 => true,
-        .riscv => true,
         .x64 => false,
     };
 }
@@ -175,27 +174,20 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // add display device if needed
     if (self.options.display_mode != .none) {
         switch (self.target) {
-            .arm64, .riscv => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .arm64, => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
             .x64 => {},
         }
     }
 
     // set target cpu
     switch (self.target) {
-        .arm64, .riscv => run_qemu.addArgs(&.{ "-cpu", "max" }),
+        .arm64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no,+invtsc" }),
     }
 
     // set target machine
     switch (self.target) {
         .arm64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
-        .riscv => {
-            if (self.firmware == .uefi) {
-                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1" });
-            } else {
-                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" });
-            }
-        },
         .x64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
     }
 
@@ -219,27 +211,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             const firmware_code = edk2.path(uefiFirmwareCodeFileName(self.target));
             const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
 
-            if (self.target == .riscv) {
-                run_qemu.addArgs(&[_][]const u8{
-                    "-blockdev",
-                    try std.fmt.allocPrint(
-                        b.allocator,
-                        "node-name=pflash0,driver=file,read-only=on,filename={s}",
-                        .{firmware_code.getPath2(b, step)},
-                    ),
-                });
-
-                // this being readonly is not correct but preventing modifcation of a file in the cache is good
-                run_qemu.addArgs(&[_][]const u8{
-                    "-blockdev",
-                    try std.fmt.allocPrint(
-                        b.allocator,
-                        "node-name=pflash1,driver=file,read-only=on,filename={s}",
-                        .{firmware_var.getPath2(b, step)},
-                    ),
-                });
-            } else {
-                run_qemu.addArgs(&[_][]const u8{
+            run_qemu.addArgs(&[_][]const u8{
                     "-drive",
                     try std.fmt.allocPrint(
                         b.allocator,
@@ -257,7 +229,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
                         .{firmware_var.getPath2(b, step)},
                     ),
                 });
-            }
         },
     }
 
@@ -271,7 +242,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
         .arm64 => "aarch64/code.fd",
-        .riscv => "riscv64/code.fd",
         .x64 => "x64/code.fd",
     };
 }
@@ -279,7 +249,6 @@ fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
 fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
         .arm64 => "aarch64/vars.fd",
-        .riscv => "riscv64/vars.fd",
         .x64 => "x64/vars.fd",
     };
 }
@@ -288,7 +257,6 @@ fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
 fn qemuExecutable(self: CascadeTarget) []const u8 {
     return switch (self) {
         .arm64 => "qemu-system-aarch64",
-        .riscv => "qemu-system-riscv64",
         .x64 => "qemu-system-x86_64",
     };
 }

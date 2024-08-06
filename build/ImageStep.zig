@@ -281,12 +281,6 @@ const ImageDescriptionStep = struct {
                     .source_path = self.limine_dep.path("BOOTAA64.EFI").getPath2(self.b, &self.step),
                 });
             },
-            .riscv => {
-                try efi_partition.addFile(.{
-                    .destination_path = "/EFI/BOOT/BOOTRISCV64.EFI",
-                    .source_path = self.limine_dep.path("BOOTRISCV64.EFI").getPath2(self.b, &self.step),
-                });
-            },
             .x64 => {
                 try efi_partition.addFile(.{
                     .destination_path = "/limine-bios.sys",
