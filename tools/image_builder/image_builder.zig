@@ -285,7 +285,6 @@ fn makeFATName(allocator: std.mem.Allocator, name: []const u8) !FATName {
     if (extension.len != 0) {
         core.assert(extension[0] == '.');
         const trimmed_extension = extension[1..];
-        core.assert(trimmed_extension.len <= fat.ShortFileName.extension_max_length);
 
         for (trimmed_extension, 0..) |char, i| {
             if (i >= fat.ShortFileName.extension_max_length) {
