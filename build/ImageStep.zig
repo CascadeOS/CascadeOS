@@ -267,10 +267,10 @@ const ImageDescriptionStep = struct {
         const efi_partition = try builder.addPartition("EFI", 0, .fat32, .efi);
 
         try efi_partition.addFile(.{
-            .destination_path = "/limine.cfg",
+            .destination_path = "/limine.conf",
             .source_path = self.b.pathJoin(&.{
                 "build",
-                "limine.cfg",
+                "limine.conf",
             }),
         });
 

@@ -462,11 +462,11 @@ fn addFilesAndDirectoriesToEfi(context: *EFIContext) !void {
         efi_boot_directory_index += 1;
     }
 
-    // limine.cfg
+    // limine.conf
     {
         const short_file_name: fat.ShortFileName = .{
             .name = [_]u8{ 'L', 'I', 'M', 'I', 'N', 'E', ' ', ' ' },
-            .extension = [_]u8{ 'C', 'F', 'G' },
+            .extension = [_]u8{ 'C', 'O', 'N' },
         };
 
         root_directory[root_directory_index] = fat.DirectoryEntry{
@@ -474,7 +474,7 @@ fn addFilesAndDirectoriesToEfi(context: *EFIContext) !void {
                 .sequence_number = 1 | fat.DirectoryEntry.LongFileNameEntry.last_entry,
                 .first_characters = [_]u16{ 'l', 'i', 'm', 'i', 'n' },
                 .checksum_of_short_name = short_file_name.checksum(),
-                .middle_characters = [_]u16{ 'e', '.', 'c', 'f', 'g', 0 },
+                .middle_characters = [_]u16{ 'e', '.', 'c', 'o', 'n', 'f' },
             },
         };
         root_directory_index += 1;

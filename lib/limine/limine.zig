@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v7.9.1/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.0.5/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of 0a873b53030fcb3f74e04fdd42c689f86b2dbddc (2024-07-02).
+//! This module contains the definitions of the Limine protocol as of 82c4ecf7f3a207e85c5a30f048272143cafc9cd7 (2024-08-12).
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v7.9.1/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.0.5/PROTOCOL.md)
 //!
 
 const core = @import("core");
@@ -40,12 +40,14 @@ pub const RequestDelimiters = struct {
 
 const Arch = enum {
     aarch64,
+    loongarch64,
     riscv64,
     x86_64,
 };
 
 const arch: Arch = switch (@import("builtin").cpu.arch) {
     .aarch64 => .aarch64,
+    .loongarch64 => .loongarch64,
     .riscv64 => .riscv64,
     .x86_64 => .x86_64,
     else => |e| @compileError("unsupported architecture " ++ @tagName(e)),
@@ -108,6 +110,27 @@ pub const BootloaderInfo = extern struct {
         pub fn version(self: *const Response) [:0]const u8 {
             return std.mem.sliceTo(self._version, 0);
         }
+    };
+};
+
+/// Firmware Type Feature
+pub const FirmwareType = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x8c2f75d90bef28a8, 0x7045a4688eac00c3 },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+        firmware_type: Type,
+    };
+
+    pub const Type = enum(u64) {
+        x86_bios = 0,
+        uefi_32 = 1,
+        uefi_64 = 2,
+
+        _,
     };
 };
 
@@ -231,14 +254,37 @@ pub const Framebuffer = extern struct {
 /// The response indicates which paging mode was actually enabled by the bootloader.
 ///
 /// Kernels must be prepared to handle the case where the requested paging mode is not supported by the hardware.
+///
+/// If no Paging Mode Request is provided, the values of `mode`, `max_mode`, and `min_mode` that the bootloader assumes
+/// are `PagingMode.default_mode`, `PagingMode.max_mode`, and `PagingMode.min_mode`, respectively.
+///
+/// If request revision 0 is used, the values of `max_mode` and `min_mode` that the bootloader assumes are the value of
+/// `mode` and `PagingMode.min_mode`, respectively.
 pub const PagingMode = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95c1a0edab0944cb, 0xa4e5cb3842f7488a },
     revision: u64 = 0,
 
     response: ?*const Response = null,
 
+    /// The preferred paging mode by the OS.
+    ///
+    /// The bootloader should always aim to pick this mode unless unavailable or overridden by the user in the
+    /// bootloader's configuration file.
     mode: Mode = default_mode,
-    flags: Flags = .{},
+
+    // Request revision 1 and above
+
+    /// The highest paging mode in that the OS supports.
+    ///
+    /// The bootloader will refuse to boot the OS if no paging modes of this type or lower (but equal or greater than
+    /// `min_mode`) are available.
+    max_mode: Mode = max_mode,
+
+    /// The lowest paging mode in numerical order that the OS supports.
+    ///
+    /// The bootloader will refuse to boot the OS if no paging modes of this type or greater (but equal or lower than
+    /// `max_mode`) are available.
+    min_mode: Mode = min_mode,
 
     pub const Response = extern struct {
         revision: u64,
@@ -247,20 +293,37 @@ pub const PagingMode = extern struct {
         ///
         /// Kernels must be prepared to handle the case where the requested paging mode is not supported by the hardware.
         mode: Mode,
-
-        flags: Flags,
     };
 
     pub const default_mode: Mode = switch (arch) {
         .aarch64 => .four_level,
+        .loongarch64 => .four_level,
         .riscv64 => .sv48,
         .x86_64 => .four_level,
+    };
+
+    pub const min_mode: Mode = switch (arch) {
+        .aarch64 => .four_level,
+        .loongarch64 => .four_level,
+        .riscv64 => .sv39,
+        .x86_64 => .four_level,
+    };
+
+    pub const max_mode: Mode = switch (arch) {
+        .aarch64 => .five_level,
+        .loongarch64 => .four_level,
+        .riscv64 => .sv57,
+        .x86_64 => .five_level,
     };
 
     pub const Mode = switch (arch) {
         .aarch64 => enum(u64) {
             four_level,
             five_level,
+            _,
+        },
+        .loongarch64 => enum(u64) {
+            four_level,
             _,
         },
         .riscv64 => enum(u64) {
@@ -272,17 +335,14 @@ pub const PagingMode = extern struct {
 
             /// Five level paging
             sv57,
+
+            _,
         },
         .x86_64 => enum(u64) {
             four_level,
             five_level,
             _,
         },
-    };
-
-    /// No flags are currently defined
-    pub const Flags = packed struct(u64) {
-        _reserved: u64 = 0,
     };
 };
 
@@ -307,6 +367,7 @@ pub const SMP = extern struct {
 
     pub const Response = switch (arch) {
         .aarch64 => aarch64,
+        .loongarch64 => unreachable,
         .riscv64 => riscv64,
         .x86_64 => x86_64,
     };
@@ -328,16 +389,15 @@ pub const SMP = extern struct {
         }
 
         pub const SMPInfo = extern struct {
-            /// ACPI Processor UID as specified by the MADT
+            /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems)
             processor_id: u32,
 
-            /// GIC CPU Interface number of the processor as specified by the MADT (possibly always 0)
-            gic_iface_no: u32,
+            _reserved1: u32,
 
             /// MPIDR of the processor as specified by the MADT or device tree
             mpidr: u64,
 
-            _reserved: u64,
+            _reserved2: u64,
 
             /// An atomic write to this field causes the parked CPU to jump to the written address,
             /// on a 64KiB (or Stack Size Request size) stack
@@ -570,6 +630,8 @@ pub const Module = extern struct {
             /// If `true` then fail if the requested module is not found.
             required: bool = false,
 
+            /// Deprecated. Bootloader may not support it and panic instead (from Limine 8.x onwards). Alternatively:
+            ///
             /// The module is GZ-compressed and should be decompressed by the bootloader.
             ///
             /// This is honoured if the response is revision 2 or greater.
