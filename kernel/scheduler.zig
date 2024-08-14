@@ -120,10 +120,7 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
 
     const new_task_node = ready_to_run.pop() orelse {
         switch (mode) {
-            .requeue => {
-                log.debug("no tasks to yield too", .{});
-                return;
-            },
+            .requeue => return, // no tasks to run
             .drop => {
                 if (cpu.current_task) |current_task| {
                     core.debugAssert(current_task.state == .running);
