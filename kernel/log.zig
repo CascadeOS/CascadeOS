@@ -1,60 +1,32 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-const kernel = @import("kernel");
-const builtin = @import("builtin");
-
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub inline fn err(comptime format: []const u8, args: anytype) void {
             if (comptime !levelEnabled(.err)) return;
-            init.initLogFn(scope, .err, format, args);
+            logFn(scope, .err, format, args);
         }
 
         pub inline fn warn(comptime format: []const u8, args: anytype) void {
             if (comptime !levelEnabled(.warn)) return;
-            init.initLogFn(scope, .warn, format, args);
+            logFn(scope, .warn, format, args);
         }
 
         pub inline fn info(comptime format: []const u8, args: anytype) void {
             if (comptime !levelEnabled(.info)) return;
-            init.initLogFn(scope, .info, format, args);
+            logFn(scope, .info, format, args);
         }
 
         pub inline fn debug(comptime format: []const u8, args: anytype) void {
             if (comptime !levelEnabled(.debug)) return;
-            init.initLogFn(scope, .debug, format, args);
+            logFn(scope, .debug, format, args);
         }
 
         pub inline fn levelEnabled(comptime message_level: std.log.Level) bool {
             comptime return loggingEnabledFor(scope, message_level);
         }
     };
-}
-
-/// Determine if a specific scope and log level pair is enabled for logging.
-inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: std.log.Level) bool {
-    comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(log_level);
-}
-
-/// Checks if a scope is in the list of scopes forced to log at debug level.
-inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.enum_literal)) bool {
-    if (kernel.config.forced_debug_log_scopes.len == 0) return false;
-
-    const tag = @tagName(scope);
-
-    inline for (kernel.config.forced_debug_log_scopes) |debug_scope| {
-        if (std.mem.endsWith(u8, debug_scope, "+")) {
-            // if this debug_scope ends with a +, then it is a prefix match
-            if (std.mem.startsWith(u8, tag, debug_scope[0 .. debug_scope.len - 1])) return true;
-        }
-
-        if (std.mem.eql(u8, tag, debug_scope)) return true;
-    }
-
-    return false;
 }
 
 pub const log_level: std.log.Level = blk: {
@@ -82,35 +54,77 @@ pub fn stdLogImpl(
     }
 }
 
-pub const init = struct {
-    var init_log_lock: kernel.sync.TicketSpinLock = .{};
+/// The main log function.
+fn logFn(
+    comptime scope: @Type(.EnumLiteral),
+    comptime message_level: std.log.Level,
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = scope;
+    _ = message_level;
+    _ = format;
+    _ = args;
+}
 
-    /// Logging function during kernel init.
-    fn initLogFn(
-        comptime scope: @Type(.enum_literal),
-        comptime message_level: std.log.Level,
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n')
-            format
-        else
-            format ++ "\n";
+/// Logging function during kernel init.
+fn initLogFn(
+    comptime scope: @Type(.enum_literal),
+    comptime message_level: std.log.Level,
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = scope;
+    _ = message_level;
+    _ = format;
+    _ = args;
 
-        const early_output = kernel.arch.init.getEarlyOutput() orelse return;
-        defer early_output.deinit();
+    // const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n')
+    //     format
+    // else
+    //     format ++ "\n";
 
-        const writer = early_output.writer;
+    // const early_output = kernel.arch.init.getEarlyOutput() orelse return;
+    // defer early_output.deinit();
 
-        const held = init_log_lock.acquire();
-        defer held.release();
+    // const writer = early_output.writer;
 
-        held.exclusion.cpu.print(writer, 0) catch unreachable;
+    // const held = init_log_lock.acquire();
+    // defer held.release();
 
-        writer.writeAll(
-            comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ",
-        ) catch unreachable;
+    // held.exclusion.cpu.print(writer, 0) catch unreachable;
 
-        writer.print(user_fmt, args) catch unreachable;
+    // writer.writeAll(
+    //     comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ",
+    // ) catch unreachable;
+
+    // writer.print(user_fmt, args) catch unreachable;
+}
+
+/// Determine if a specific scope and log level pair is enabled for logging.
+inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: std.log.Level) bool {
+    comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(log_level);
+}
+
+/// Checks if a scope is in the list of scopes forced to log at debug level.
+inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.enum_literal)) bool {
+    if (kernel.config.forced_debug_log_scopes.len == 0) return false;
+
+    const tag = @tagName(scope);
+
+    inline for (kernel.config.forced_debug_log_scopes) |debug_scope| {
+        if (std.mem.endsWith(u8, debug_scope, "+")) {
+            // if this debug_scope ends with a +, then it is a prefix match
+            if (std.mem.startsWith(u8, tag, debug_scope[0 .. debug_scope.len - 1])) return true;
+        }
+
+        if (std.mem.eql(u8, tag, debug_scope)) return true;
     }
-};
+
+    return false;
+}
+
+const std = @import("std");
+const core = @import("core");
+const kernel = @import("kernel");
+const builtin = @import("builtin");
