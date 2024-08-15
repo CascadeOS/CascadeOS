@@ -3,7 +3,7 @@
 
 const LibraryDependency = @import("../build/LibraryDependency.zig");
 
-pub const core_dependencies: []const LibraryDependency = &.{
+pub const dependencies: []const LibraryDependency = &.{
     .{ .name = "acpi" },
     .{ .name = "containers" },
     .{ .name = "core" },

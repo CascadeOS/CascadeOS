@@ -61,7 +61,7 @@ fn create(
         defer dependencies.deinit();
 
         // core dependencies
-        for (kernel_dependencies.core_dependencies) |dep| {
+        for (kernel_dependencies.dependencies) |dep| {
             const library = libraries.get(dep.name) orelse
                 std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
 
@@ -208,42 +208,43 @@ fn constructKernelExe(
     source_file_modules: []const SourceFileModule,
     options: Options,
 ) !*Step.Compile {
+    const kernel_module = blk: {
+        const kernel_module = b.createModule(.{
+            .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
+        });
+
+        for (dependencies) |dep| {
+            const library_module = dep.library.cascade_modules.get(target) orelse
+                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
+
+            kernel_module.addImport(dep.import_name, library_module);
+        }
+
+        // self reference
+        kernel_module.addImport("kernel", kernel_module);
+
+        // target options
+        kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
+
+        // kernel options
+        kernel_module.addImport("kernel_options", options.kernel_option_module);
+
+        // source file modules
+        for (source_file_modules) |module| {
+            kernel_module.addImport(module.name, module.module);
+        }
+
+        break :blk kernel_module;
+    };
+
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
-        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
+        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "root.zig" })),
         .target = getKernelCrossTarget(target, b),
         .optimize = options.optimize,
     });
 
-    kernel_exe.setLinkerScriptPath(b.path(
-        b.pathJoin(&.{
-            "kernel",
-            "arch",
-            @tagName(target),
-            "linker.ld",
-        }),
-    ));
-
-    for (dependencies) |dep| {
-        const library_module = dep.library.cascade_modules.get(target) orelse
-            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
-
-        kernel_exe.root_module.addImport(dep.import_name, library_module);
-    }
-
-    // self reference
-    kernel_exe.root_module.addImport("kernel", &kernel_exe.root_module);
-
-    // target options
-    kernel_exe.root_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
-
-    // kernel options
-    kernel_exe.root_module.addImport("kernel_options", options.kernel_option_module);
-
-    // source file modules
-    for (source_file_modules) |module| {
-        kernel_exe.root_module.addImport(module.name, module.module);
-    }
+    kernel_exe.root_module.addImport("kernel", kernel_module);
 
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
     kernel_exe.root_module.strip = false;
@@ -287,6 +288,15 @@ fn constructKernelExe(
             kernel_exe.addAssemblyFile(b.path(file_path));
         }
     }
+
+    kernel_exe.setLinkerScriptPath(b.path(
+        b.pathJoin(&.{
+            "kernel",
+            "arch",
+            @tagName(target),
+            "linker.ld",
+        }),
+    ));
 
     return kernel_exe;
 }

@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const arch_interface = struct {
+    pub const interrupts = struct {
+        pub const disableInterruptsAndHalt = lib_arm64.disableInterruptsAndHalt;
+        pub const disableInterrupts = lib_arm64.disableInterrupts;
+    };
+};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-
 const lib_arm64 = @import("lib_arm64");
-pub usingnamespace lib_arm64;
-
-pub const init = @import("init.zig");
-pub const interrupts = @import("interrupts.zig");
-
-/// Get the current CPU.
-///
-/// Assumes that `init.loadCpu()` has been called on the currently running CPU.
-pub inline fn getCpu() *kernel.Cpu {
-    return @ptrFromInt(lib_arm64.TPIDR_EL1.read());
-}
 
 comptime {
     if (@import("cascade_target").arch != .arm64) {
