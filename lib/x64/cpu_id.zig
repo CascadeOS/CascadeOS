@@ -40,13 +40,13 @@ pub fn capture() !void {
 ///
 /// Utilizes the `x64.RFlags.id` field to detect support for CPUID.
 pub fn isAvailable() bool {
-    const orig_rflags = x64.RFlags.read();
+    const orig_rflags = x64.registers.RFlags.read();
     var modified_rflags = orig_rflags;
 
     modified_rflags.id = !modified_rflags.id;
     modified_rflags.write();
 
-    const new_rflags = x64.RFlags.read();
+    const new_rflags = x64.registers.RFlags.read();
 
     return orig_rflags.id != new_rflags.id;
 }

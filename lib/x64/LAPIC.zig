@@ -547,7 +547,7 @@ pub const LAPIC = union(enum) {
             },
             .x2apic => {
                 return @bitCast(
-                    x64.readMSR(u64, Register.interrupt_command_0_31.x2apicRegister()),
+                    x64.registers.readMSR(u64, Register.interrupt_command_0_31.x2apicRegister()),
                 );
             },
         }
@@ -562,7 +562,7 @@ pub const LAPIC = union(enum) {
                 self.writeRegister(.interrupt_command_0_31, @truncate(value));
             },
             .x2apic => {
-                x64.writeMSR(
+                x64.registers.writeMSR(
                     u64,
                     Register.interrupt_command_0_31.x2apicRegister(),
                     @bitCast(register),
@@ -761,7 +761,7 @@ pub const LAPIC = union(enum) {
                 std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register", null);
 
-                return x64.readMSR(u32, register.x2apicRegister());
+                return x64.registers.readMSR(u32, register.x2apicRegister());
             },
         }
     }
@@ -781,7 +781,7 @@ pub const LAPIC = union(enum) {
                 std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register", null);
 
-                x64.writeMSR(u32, register.x2apicRegister(), value);
+                x64.registers.writeMSR(u32, register.x2apicRegister(), value);
             },
         }
     }
