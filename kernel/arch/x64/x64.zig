@@ -3,8 +3,8 @@
 
 pub const arch_interface = struct {
     pub const interrupts = struct {
-        pub const disableInterruptsAndHalt = lib_x64.disableInterruptsAndHalt;
-        pub const disableInterrupts = lib_x64.disableInterrupts;
+        pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
+        pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
     };
 };
 
