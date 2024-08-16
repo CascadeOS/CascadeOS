@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub usingnamespace @import("instructions.zig");
-pub usingnamespace @import("registers.zig");
+pub const instructions = @import("instructions.zig");
+pub const registers = @import("registers.zig");
 
 pub const cpu_id = @import("cpu_id.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
@@ -23,6 +23,8 @@ pub const PrivilegeLevel = enum(u2) {
 
 /// Remaps the PIC interrupts to 0x20-0x2f and masks all of them.
 pub fn disablePic() void {
+    const portWriteU8 = instructions.portWriteU8;
+
     const PRIMARY_COMMAND_PORT = 0x20;
     const PRIMARY_DATA_PORT = 0x21;
     const SECONDARY_COMMAND_PORT = 0xA0;
@@ -32,36 +34,36 @@ pub fn disablePic() void {
     const MODE_8086: u8 = 0x01;
 
     // Tell each PIC that we're going to send it a three-byte initialization sequence on its data port.
-    x64.portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
-    x64.portWriteU8(0x80, 0); // wait
-    x64.portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
-    x64.portWriteU8(0x80, 0); // wait
+    portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
+    portWriteU8(0x80, 0); // wait
 
     // Remap master PIC to 0x20
-    x64.portWriteU8(PRIMARY_DATA_PORT, 0x20);
-    x64.portWriteU8(0x80, 0); // wait
+    portWriteU8(PRIMARY_DATA_PORT, 0x20);
+    portWriteU8(0x80, 0); // wait
 
     // Remap slave PIC to 0x28
-    x64.portWriteU8(SECONDARY_DATA_PORT, 0x28);
-    x64.portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 0x28);
+    portWriteU8(0x80, 0); // wait
 
     // Configure chaining between master and slave
-    x64.portWriteU8(PRIMARY_DATA_PORT, 4);
-    x64.portWriteU8(0x80, 0); // wait
-    x64.portWriteU8(SECONDARY_DATA_PORT, 2);
-    x64.portWriteU8(0x80, 0); // wait
+    portWriteU8(PRIMARY_DATA_PORT, 4);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 2);
+    portWriteU8(0x80, 0); // wait
 
     // Set our mode.
-    x64.portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
-    x64.portWriteU8(0x80, 0); // wait
-    x64.portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
-    x64.portWriteU8(0x80, 0); // wait
+    portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
+    portWriteU8(0x80, 0); // wait
 
     // Mask all interrupts
-    x64.portWriteU8(PRIMARY_DATA_PORT, 0xFF);
-    x64.portWriteU8(0x80, 0); // wait
-    x64.portWriteU8(SECONDARY_DATA_PORT, 0xFF);
-    x64.portWriteU8(0x80, 0); // wait
+    portWriteU8(PRIMARY_DATA_PORT, 0xFF);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 0xFF);
+    portWriteU8(0x80, 0); // wait
 }
 
 comptime {
