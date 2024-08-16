@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub usingnamespace @import("instructions.zig");
-pub usingnamespace @import("registers.zig");
+pub const instructions = @import("instructions.zig");
+pub const registers = @import("registers.zig");
 
 comptime {
     refAllDeclsRecursive(@This());
