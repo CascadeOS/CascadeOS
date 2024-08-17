@@ -8,8 +8,10 @@ pub fn customConfiguration(
 ) void {
     if (b.graph.host.result.os.tag == .linux) {
         // Use musl to remove include of "/usr/include"
+        exe.root_module.resolved_target.?.query.abi = .musl;
         exe.root_module.resolved_target.?.result.abi = .musl;
     }
+
     exe.linkLibC();
 
     const lib_dwarf = b.dependency("libdwarf", .{});
