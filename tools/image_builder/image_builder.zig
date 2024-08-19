@@ -628,7 +628,7 @@ const FATContext = struct {
 
             var sequence_number_counter: u8 = @intCast(number_of_long_name_entries_required);
 
-            var start_index = std.mem.alignBackwardAnyAlign(long_name.len, fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_characters);
+            var start_index = std.mem.alignBackwardAnyAlign(usize, long_name.len, fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_characters);
 
             while (sequence_number_counter >= 1) : (sequence_number_counter -= 1) {
                 const entry = self.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
