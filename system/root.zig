@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+//! This file is the root of the kernel executable.
+//!
+//! It is responsible for exporting the boot modules entry points as well as hooking up the interface with the standard library and panic.
+
 comptime {
-    kernel.init.exportEntryPoints();
+    boot.exportEntryPoints();
 }
 
 pub const std_options: std.Options = .{
@@ -13,5 +17,5 @@ pub const std_options: std.Options = .{
 pub const panic = kernel.debug.zigPanic;
 
 const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+const boot = @import("boot");

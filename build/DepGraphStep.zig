@@ -89,7 +89,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         const kernel_name = try std.fmt.allocPrint(self.b.allocator, "{s}_kernel", .{@tagName(kernel.key_ptr.*)});
         try writer.print("{s}: {{class: binary}}\n", .{kernel_name});
 
-        for (kernel.value_ptr.dependencies) |dep| {
+        for (kernel.value_ptr.all_dependencies) |dep| {
             try writer.print("{s} -> {s}\n", .{ kernel_name, dep.library.name });
         }
 
