@@ -5,6 +5,10 @@
 ///
 /// Only the bootstrap cpu executes this function.
 pub fn initStage1() !noreturn {
+    // get output up and running as soon as possible
+    arch.init.setupEarlyOutput();
+    arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+
     arch.interrupts.disableInterruptsAndHalt();
 }
 

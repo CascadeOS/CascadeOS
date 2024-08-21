@@ -6,6 +6,8 @@ pub const arch_interface = struct {
         pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
         pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
     };
+
+    pub const init = @import("init.zig");
 };
 
 const std = @import("std");

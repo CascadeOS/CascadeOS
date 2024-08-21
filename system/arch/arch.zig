@@ -4,7 +4,7 @@
 //! Defines the interface of the architecture specific code.
 
 pub const interrupts = struct {
-    /// Disable interrupts and put the CPU to sleep.
+    /// Disable interrupts and halt the CPU.
     pub inline fn disableInterruptsAndHalt() noreturn {
         // `checkSupport` intentionally not called - mandatory function
 
@@ -16,6 +16,25 @@ pub const interrupts = struct {
         // `checkSupport` intentionally not called - mandatory function
 
         current.interrupts.disableInterrupts();
+    }
+};
+
+/// Functionality that is used during kernel init only.
+pub const init = struct {
+    /// Attempt to set up some form of early output.
+    pub inline fn setupEarlyOutput() void {
+        // `checkSupport` intentionally not called - mandatory function
+
+        current.init.setupEarlyOutput();
+    }
+
+    /// Write to early output.
+    ///
+    /// Cannot fail, any errors are ignored.
+    pub inline fn writeToEarlyOutput(bytes: []const u8) void {
+        // `checkSupport` intentionally not called - mandatory function
+
+        current.init.writeToEarlyOutput(bytes);
     }
 };
 
