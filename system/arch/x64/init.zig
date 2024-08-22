@@ -20,6 +20,26 @@ pub inline fn writeToEarlyOutput(bytes: []const u8) void {
     }
 }
 
+/// Prepares the provided `Executor` for the bootstrap executor.
+pub inline fn prepareBootstrapExecutor(
+    bootstrap_executor: *kernel.Executor,
+) void {
+    _ = bootstrap_executor;
+}
+
+/// Load the provided `Executor` as the current executor.
+pub inline fn loadExecutor(executor: *kernel.Executor) void {
+    executor.arch.gdt.load();
+
+    // TODO: set double fault, nmi and privilege stacks in the TSS
+
+    executor.arch.gdt.setTss(&executor.arch.tss);
+
+    // TODO: load the IDT
+
+    lib_x64.registers.KERNEL_GS_BASE.write(@intFromEnum(executor.id));
+}
+
 /// A *very* basic write only serial port.
 const SerialPort = struct {
     _data_port: u16,
