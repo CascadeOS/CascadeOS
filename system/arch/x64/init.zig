@@ -37,7 +37,7 @@ pub inline fn loadExecutor(executor: *kernel.Executor) void {
 
     // TODO: load the IDT
 
-    lib_x64.registers.KERNEL_GS_BASE.write(@intFromEnum(executor.id));
+    lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
 
 /// A *very* basic write only serial port.
