@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const arch_interface = struct {
+    pub const PerExecutor = struct {};
+
     pub const interrupts = struct {
         pub const disableInterruptsAndHalt = lib_arm64.instructions.disableInterruptsAndHalt;
         pub const disableInterrupts = lib_arm64.instructions.disableInterrupts;

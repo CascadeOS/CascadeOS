@@ -21,7 +21,7 @@ pub fn initStage1() !noreturn {
     };
 
     arch.init.prepareBootstrapExecutor(bootstrap_executor);
-    arch.init.setCurrentExecutor(bootstrap_executor);
+    arch.init.loadExecutor(bootstrap_executor);
 
     core.panic("NOT IMPLEMENTED", null);
 }
