@@ -12,6 +12,17 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can switch to the single executor panic
     kernel.debug.panic_impl = singleExecutorPanic;
 
+    const bootstrap_executor, const bootstrap_executor_id = blk: {
+        const id: kernel.Executor.Id = @enumFromInt(kernel.system.executors.len + 1);
+        break :blk .{ try kernel.system.executors.addOne(), id };
+    };
+    bootstrap_executor.* = .{
+        .id = bootstrap_executor_id,
+    };
+
+    arch.init.prepareBootstrapExecutor(bootstrap_executor);
+    arch.init.setCurrentExecutor(bootstrap_executor);
+
     core.panic("NOT IMPLEMENTED", null);
 }
 

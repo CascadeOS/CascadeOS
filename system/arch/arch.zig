@@ -36,6 +36,22 @@ pub const init = struct {
 
         current.init.writeToEarlyOutput(bytes);
     }
+
+    /// Prepares the provided `Executor` for the bootstrap executor.
+    pub inline fn prepareBootstrapExecutor(
+        bootstrap_executor: *kernel.Executor,
+    ) void {
+        checkSupport(current.init, "prepareBootstrapExecutor", fn (*kernel.Executor) void);
+
+        current.init.prepareBootstrapExecutor(bootstrap_executor);
+    }
+
+    /// Set the provided `Executor` as the current executor.
+    pub inline fn setCurrentExecutor(executor: *kernel.Executor) void {
+        checkSupport(current.init, "setCurrentExecutor", fn (*kernel.Executor) void);
+
+        current.init.setCurrentExecutor(executor);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {
