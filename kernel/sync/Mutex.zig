@@ -20,7 +20,7 @@ pub const Held = struct {
     pub fn release(self: Held) void {
         const mutex = self.mutex;
 
-        core.debugAssert(mutex.locked);
+        std.debug.assert(mutex.locked);
 
         const opt_current_task = blk: {
             const spinlock_held = mutex.spinlock.acquire();
@@ -28,7 +28,7 @@ pub const Held = struct {
 
             const opt_current_task = spinlock_held.exclusion.cpu.current_task;
 
-            core.debugAssert(mutex.locked_by == opt_current_task);
+            std.debug.assert(mutex.locked_by == opt_current_task);
 
             mutex.locked = false;
             mutex.locked_by = null;
@@ -69,7 +69,7 @@ pub fn acquire(mutex: *Mutex) Held {
 
         const current_task = opt_current_task orelse core.panic("Mutex.acquire with no current task would block", null);
 
-        core.debugAssert(mutex.locked_by != current_task);
+        std.debug.assert(mutex.locked_by != current_task);
 
         mutex.wait_queue.wait(current_task, &mutex.spinlock);
     }

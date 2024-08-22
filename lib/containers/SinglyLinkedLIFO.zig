@@ -26,7 +26,7 @@ pub fn isEmpty(self: SinglyLinkedLIFO) bool {
 ///
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
-    core.debugAssert(node.next == null);
+    std.debug.assert(node.next == null);
     node.* = .{ .next = self.start_node };
     self.start_node = node;
 }
@@ -37,7 +37,7 @@ pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
 ///
 /// This operation is O(1).
 pub fn pushList(self: *SinglyLinkedLIFO, first_node: *SingleNode, last_node: *SingleNode) void {
-    core.debugAssert(last_node.next == null);
+    std.debug.assert(last_node.next == null);
 
     if (self.start_node) |start| {
         last_node.* = .{ .next = start };

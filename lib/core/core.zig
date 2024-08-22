@@ -21,22 +21,6 @@ pub const VirtualRange = address.VirtualRange;
 
 pub const testing = @import("testing.zig");
 
-pub fn assert(ok: bool) void { // TODO: mark inline once that does not remove debug stack frames
-    if (!ok) unreachable;
-}
-
-pub fn debugAssert(ok: bool) void { // TODO: mark inline once that does not remove debug stack frames
-    if (builtin.mode == .ReleaseSafe) {
-        @setRuntimeSafety(false);
-
-        if (!ok) unreachable;
-
-        return;
-    }
-
-    if (!ok) unreachable;
-}
-
 /// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
 /// meaning the stack trace will not include any panic functions.
 pub fn panic(comptime msg: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {

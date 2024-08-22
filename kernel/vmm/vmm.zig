@@ -92,8 +92,8 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirect
 ///
 /// Physical pages are allocated for each page in the virtual range.
 pub fn mapRange(page_table: *kernel.arch.paging.PageTable, virtual_range: core.VirtualRange, map_type: MapType) !void {
-    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     const last_virtual_address = virtual_range.last();
     var current_virtual_range = core.VirtualRange.fromAddr(
@@ -131,11 +131,11 @@ pub fn mapToPhysicalRange(
     physical_range: core.PhysicalRange,
     map_type: MapType,
 ) !void {
-    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.equal(virtual_range.size));
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.equal(virtual_range.size));
 
     log.debug(
         "mapping: {} to {} with type: {}",
@@ -159,8 +159,8 @@ pub fn unmapRange(
     page_table: *kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
 ) void {
-    core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     log.debug("unmapping: {}", .{virtual_range});
 
@@ -354,7 +354,7 @@ pub const init = struct {
             const end_address = section[1];
             const region_type = section[2];
 
-            core.assert(end_address.greaterThan(start_address));
+            std.debug.assert(end_address.greaterThan(start_address));
 
             const virtual_range = core.VirtualRange.fromAddr(
                 start_address,

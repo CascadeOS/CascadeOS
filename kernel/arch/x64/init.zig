@@ -165,7 +165,7 @@ pub fn registerArchitecturalTimeSources() void {
 }
 
 pub fn configureSystemFeaturesForCurrentCpu(cpu: *kernel.Cpu) void {
-    core.debugAssert(cpu == x64.getCpu());
+    std.debug.assert(cpu == x64.getCpu());
 
     if (x64.info.cpu_id.rdtscp) {
         x64.IA32_TSC_AUX.write(@intFromEnum(cpu.id));

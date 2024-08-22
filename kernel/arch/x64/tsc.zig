@@ -42,8 +42,8 @@ pub const init = struct {
     }
 
     fn initializeTsc() void {
-        core.debugAssert(shouldUseTsc());
-        core.debugAssert(x64.info.tsc_tick_duration_fs != null);
+        std.debug.assert(shouldUseTsc());
+        std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
         tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
         log.debug("tick duration (fs) from cpuid: {}", .{tick_duration_fs});
@@ -52,7 +52,7 @@ pub const init = struct {
     fn initializeTscCalibrate(
         reference_counter: kernel.time.init.ReferenceCounter,
     ) void {
-        core.debugAssert(shouldUseTsc());
+        std.debug.assert(shouldUseTsc());
 
         // warmup
         {

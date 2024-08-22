@@ -17,7 +17,7 @@ pub const Held = struct {
 
     /// Unlocks the spinlock.
     pub fn release(self: Held) void {
-        core.debugAssert(self.spinlock.isLockedBy(self.exclusion.cpu.id));
+        std.debug.assert(self.spinlock.isLockedBy(self.exclusion.cpu.id));
 
         self.spinlock.unsafeRelease();
         self.exclusion.release();
@@ -45,7 +45,7 @@ pub fn unsafeRelease(self: *TicketSpinLock) void {
 pub fn acquire(self: *TicketSpinLock) Held {
     const exclusion = kernel.sync.getInterruptExclusion();
 
-    core.debugAssert(!self.isLockedBy(exclusion.cpu.id));
+    std.debug.assert(!self.isLockedBy(exclusion.cpu.id));
 
     const ticket = @atomicRmw(u32, &self.ticket, .Add, 1, .acq_rel);
 

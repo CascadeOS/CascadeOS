@@ -19,7 +19,7 @@ pub const MCFG = extern struct {
 
         const size_of_base_allocations = self.header.length - (@sizeOf(acpi.SharedHeader) + @sizeOf(u64));
 
-        core.debugAssert(size_of_base_allocations % @sizeOf(BaseAllocation) == 0);
+        std.debug.assert(size_of_base_allocations % @sizeOf(BaseAllocation) == 0);
 
         return base_allocations_ptr[0 .. size_of_base_allocations / @sizeOf(BaseAllocation)];
     }

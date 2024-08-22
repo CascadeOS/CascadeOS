@@ -24,7 +24,7 @@ range_size_tree: RegionSizeRedBlackTree = .{},
 /// **REQUIREMENTS**:
 /// - size of `total_range` must be non-zero
 pub fn init(total_range: core.VirtualRange) error{RangeAllocationFailed}!RangeAllocator {
-    core.assert(total_range.size.value != 0);
+    std.debug.assert(total_range.size.value != 0);
 
     const range_with_nodes = try getRange();
     errdefer giveRange(range_with_nodes);
@@ -50,7 +50,7 @@ pub fn allocateRange(self: *RangeAllocator, size: core.Size) error{RangeAllocato
     self.range_size_tree.remove(matching_range_size_ordered_node);
 
     const matching_range_with_nodes = RangeWithNodes.fromSizeNode(matching_range_size_ordered_node);
-    core.debugAssert(matching_range_with_nodes.range.size.greaterThanOrEqual(size));
+    std.debug.assert(matching_range_with_nodes.range.size.greaterThanOrEqual(size));
 
     // moving back from the end means we don't modify the address of the matching range, meaning it is still in the
     // correct location in the address tree.

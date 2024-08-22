@@ -32,11 +32,11 @@ pub fn remove(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
 }
 
 pub fn push(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
-    core.debugAssert(node.previous == null);
-    core.debugAssert(node.next == null);
+    std.debug.assert(node.previous == null);
+    std.debug.assert(node.next == null);
 
     if (self.start_node) |start| {
-        core.debugAssert(self.end_node != null);
+        std.debug.assert(self.end_node != null);
         node.next = start;
         start.previous = node;
         self.start_node = node;
@@ -48,16 +48,16 @@ pub fn push(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
 
 pub fn pop(self: *DoublyLinkedLIFO) ?*DoubleNode {
     const node = self.start_node orelse return null;
-    core.debugAssert(self.end_node != null);
+    std.debug.assert(self.end_node != null);
 
     if (self.start_node == self.end_node) {
-        core.debugAssert(node.previous == null);
-        core.debugAssert(node.next == null);
+        std.debug.assert(node.previous == null);
+        std.debug.assert(node.next == null);
         self.start_node = null;
         self.end_node = null;
     } else {
         if (node.next) |next| {
-            core.debugAssert(next.previous == node);
+            std.debug.assert(next.previous == node);
             next.previous = null;
         }
         self.start_node = node.next;

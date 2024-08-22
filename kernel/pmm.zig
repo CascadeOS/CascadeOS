@@ -17,7 +17,7 @@ var lock: kernel.sync.TicketSpinLock = .{};
 var free_pages: containers.SinglyLinkedLIFO = .{};
 
 comptime {
-    core.assert(core.Size.of(PageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
+    std.debug.assert(core.Size.of(PageNode).lessThanOrEqual(kernel.arch.paging.standard_page_size));
 }
 
 pub const AllocateError = error{OutOfPhysicalMemory};
@@ -62,8 +62,8 @@ pub fn allocatePage() AllocateError!core.PhysicalRange {
 /// - `range.address` must be aligned to `kernel.arch.paging.standard_page_size`
 /// - `range.size` must be *equal* to `kernel.arch.paging.standard_page_size`
 pub fn deallocatePage(range: core.PhysicalRange) void {
-    core.debugAssert(range.address.isAligned(kernel.arch.paging.standard_page_size));
-    core.debugAssert(range.size.equal(kernel.arch.paging.standard_page_size));
+    std.debug.assert(range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(range.size.equal(kernel.arch.paging.standard_page_size));
 
     const page_node = kernel.vmm.directMapFromPhysical(range.address).toPtr(*PageNode);
     page_node.* = .{};

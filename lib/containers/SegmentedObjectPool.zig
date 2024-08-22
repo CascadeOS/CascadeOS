@@ -59,7 +59,7 @@ pub fn SegmentedObjectPool(
             @setCold(true);
 
             const bytes = try allocateSegmentBackingMemory();
-            core.debugAssert(bytes.len == segment_size.value);
+            std.debug.assert(bytes.len == segment_size.value);
 
             const objects: [*]Object = @ptrCast(@alignCast(bytes.ptr));
 

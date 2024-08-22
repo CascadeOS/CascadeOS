@@ -66,7 +66,7 @@ pub const UUID = extern struct {
 
     /// `buf` must be atleast `uuid_buffer_length`
     pub fn bufPrint(self: UUID, buf: []u8) []const u8 {
-        core.assert(buf.len >= uuid_buffer_length);
+        std.debug.assert(buf.len >= uuid_buffer_length);
 
         var i: usize = 0;
 

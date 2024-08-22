@@ -49,7 +49,7 @@ pub fn rawTableIterator(sdt_header: *const SharedHeader) RawTableIterator {
     const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
 
     const is_xsdt = sdt_header.signatureIs("XSDT");
-    core.assert(is_xsdt or sdt_header.signatureIs("RSDT")); // Invalid SDT signature.
+    std.debug.assert(is_xsdt or sdt_header.signatureIs("RSDT")); // Invalid SDT signature.
 
     return .{
         .ptr = sdt_ptr + @sizeOf(SharedHeader),

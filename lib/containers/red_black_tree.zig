@@ -366,7 +366,7 @@ pub fn Tree(
         ///
         /// NOTE: `replacement` must have no right child.
         fn pointerSwap(self: *Self, node: *Node, replacement: *Node) void {
-            core.debugAssert(node.children[Direction.left.toValue()] != null and
+            std.debug.assert(node.children[Direction.left.toValue()] != null and
                 node.children[Direction.right.toValue()] != null); // node should have two children
 
             // swap node colors
@@ -379,7 +379,7 @@ pub fn Tree(
 
             const original_node_direction = node.direction();
 
-            core.debugAssert(replacement.children[Direction.right.toValue()] == null); // ensured by `replaceIfNeeded`
+            std.debug.assert(replacement.children[Direction.right.toValue()] == null); // ensured by `replaceIfNeeded`
 
             if (node.children[Direction.left.toValue()] == replacement) {
                 // case 1: replacement is left child of node

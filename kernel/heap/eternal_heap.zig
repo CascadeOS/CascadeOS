@@ -23,7 +23,7 @@ pub const allocator = std.mem.Allocator{
 };
 
 fn alloc(_: *anyopaque, len: usize, log2_ptr_align: u8, _: usize) ?[*]u8 {
-    core.debugAssert(len != 0);
+    std.debug.assert(len != 0);
 
     const aligned_size = core.Size.from(len, .byte)
         .alignForward(kernel.arch.paging.standard_page_size);
@@ -91,8 +91,8 @@ fn free(_: *anyopaque, _: []u8, _: u8, _: usize) void {
 
 pub const init = struct {
     pub fn initEternalHeap(kernel_eternal_heap_range: core.VirtualRange) void {
-        core.debugAssert(kernel_eternal_heap_range.size.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(kernel_eternal_heap_range.address.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(kernel_eternal_heap_range.size.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(kernel_eternal_heap_range.address.isAligned(kernel.arch.paging.standard_page_size));
 
         next_address = kernel_eternal_heap_range.address;
         last_address = kernel_eternal_heap_range.last();

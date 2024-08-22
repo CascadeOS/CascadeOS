@@ -85,7 +85,7 @@ pub inline fn readCounterRegister(self: Hpet) u64 {
 }
 
 pub fn writeCounterRegister(self: Hpet, value: u64) void {
-    core.debugAssert(!self.readGeneralConfigurationRegister().enable); // counter must be disabled
+    std.debug.assert(!self.readGeneralConfigurationRegister().enable); // counter must be disabled
     self.base[counter_register_offset] = value;
 }
 

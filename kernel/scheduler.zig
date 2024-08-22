@@ -42,8 +42,8 @@ pub fn acquireScheduler() SchedulerHeld {
 pub fn releaseScheduler() kernel.sync.InterruptExclusion {
     const cpu = kernel.arch.rawGetCpu();
 
-    core.debugAssert(lock.isLockedBy(cpu.id));
-    core.debugAssert(cpu.interrupt_disable_count != 0);
+    std.debug.assert(lock.isLockedBy(cpu.id));
+    std.debug.assert(cpu.interrupt_disable_count != 0);
 
     lock.unsafeRelease();
 
@@ -54,7 +54,7 @@ pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
-    core.debugAssert(cpu.interrupt_disable_count == 1); // the scheduler lock
+    std.debug.assert(cpu.interrupt_disable_count == 1); // the scheduler lock
 
     const current_task: *kernel.Task = cpu.current_task orelse {
         yield(scheduler_held, .requeue);
@@ -86,13 +86,13 @@ pub fn block(
 
     const cpu = scheduler_held.held.exclusion.cpu;
 
-    core.debugAssert(cpu.current_task != null);
-    core.debugAssert(cpu.interrupt_disable_count == 2); // the scheduler lock and the spinlock
+    std.debug.assert(cpu.current_task != null);
+    std.debug.assert(cpu.interrupt_disable_count == 2); // the scheduler lock and the spinlock
 
     const current_task = cpu.current_task.?;
-    core.debugAssert(current_task.state == .running);
-    core.debugAssert(current_task.preemption_disable_count == 0);
-    core.debugAssert(current_task.preemption_skipped == false);
+    std.debug.assert(current_task.state == .running);
+    std.debug.assert(current_task.preemption_disable_count == 0);
+    std.debug.assert(current_task.preemption_skipped == false);
 
     log.debug("blocking {}", .{current_task});
     current_task.state = .blocked;
@@ -103,8 +103,8 @@ pub fn block(
     };
 
     const new_task = kernel.Task.fromNode(new_task_node);
-    core.debugAssert(current_task != new_task);
-    core.debugAssert(new_task.state == .ready);
+    std.debug.assert(current_task != new_task);
+    std.debug.assert(new_task.state == .ready);
 
     switchToTaskFromTaskWithLock(cpu, current_task, new_task, spinlock);
 }
@@ -116,14 +116,14 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
     validateLock(scheduler_held);
 
     const cpu = scheduler_held.held.exclusion.cpu;
-    core.debugAssert(cpu.interrupt_disable_count == 1);
+    std.debug.assert(cpu.interrupt_disable_count == 1);
 
     const new_task_node = ready_to_run.pop() orelse {
         switch (mode) {
             .requeue => return, // no tasks to run
             .drop => {
                 if (cpu.current_task) |current_task| {
-                    core.debugAssert(current_task.state == .running);
+                    std.debug.assert(current_task.state == .running);
                     log.debug("dropping {}", .{current_task});
                     current_task.state = .dropped;
                 }
@@ -135,13 +135,13 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
     };
 
     const new_task = kernel.Task.fromNode(new_task_node);
-    core.debugAssert(new_task.state == .ready);
+    std.debug.assert(new_task.state == .ready);
 
     if (cpu.current_task) |current_task| {
-        core.debugAssert(current_task != new_task);
-        core.debugAssert(current_task.state == .running);
-        core.debugAssert(current_task.preemption_disable_count == 0);
-        core.debugAssert(current_task.preemption_skipped == false);
+        std.debug.assert(current_task != new_task);
+        std.debug.assert(current_task.state == .running);
+        std.debug.assert(current_task.preemption_disable_count == 0);
+        std.debug.assert(current_task.preemption_skipped == false);
 
         switch (mode) {
             .requeue => {
@@ -166,7 +166,7 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
 /// This function must be called with the lock held (see `acquireScheduler`).
 pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     validateLock(scheduler_held);
-    core.debugAssert(task.next_task_node.next == null);
+    std.debug.assert(task.next_task_node.next == null);
 
     task.state = .ready;
     ready_to_run.push(&task.next_task_node);
@@ -200,7 +200,7 @@ fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock: 
             const interrupt_exclusion: kernel.sync.InterruptExclusion = .{ .cpu = current_cpu };
             interrupt_exclusion.release();
 
-            core.debugAssert(current_cpu.interrupt_disable_count == 1); // the scheduler lock
+            std.debug.assert(current_cpu.interrupt_disable_count == 1); // the scheduler lock
 
             idle();
             unreachable;
@@ -229,7 +229,7 @@ fn switchToIdleWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, spinlock: 
 fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
     log.debug("switching to {} from idle", .{new_task});
 
-    core.debugAssert(new_task.next_task_node.next == null);
+    std.debug.assert(new_task.next_task_node.next == null);
 
     cpu.current_task = new_task;
     new_task.state = .running;
@@ -244,7 +244,7 @@ fn switchToTaskFromIdle(cpu: *kernel.Cpu, new_task: *kernel.Task) noreturn {
 fn switchToTaskFromTask(cpu: *kernel.Cpu, current_task: *kernel.Task, new_task: *kernel.Task) void {
     log.debug("switching to {} from {}", .{ new_task, current_task });
 
-    core.debugAssert(new_task.next_task_node.next == null);
+    std.debug.assert(new_task.next_task_node.next == null);
 
     cpu.current_task = new_task;
     new_task.state = .running;
@@ -266,7 +266,7 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
             const interrupt_exclusion: kernel.sync.InterruptExclusion = .{ .cpu = current_cpu };
             interrupt_exclusion.release();
 
-            core.debugAssert(current_cpu.interrupt_disable_count == 1); // the scheduler is expected to be unlocked by the resumed task
+            std.debug.assert(current_cpu.interrupt_disable_count == 1); // the scheduler is expected to be unlocked by the resumed task
 
             kernel.arch.scheduling.jumpToTaskFromIdle(@ptrFromInt(new_task_ptr));
             unreachable;
@@ -275,7 +275,7 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
 
     log.debug("switching to {} from {} with a lock", .{ new_task, current_task });
 
-    core.debugAssert(new_task.next_task_node.next == null);
+    std.debug.assert(new_task.next_task_node.next == null);
 
     cpu.current_task = new_task;
     new_task.state = .running;
@@ -297,13 +297,13 @@ fn switchToTaskFromTaskWithLock(cpu: *kernel.Cpu, current_task: *kernel.Task, ne
 }
 
 inline fn validateLock(scheduler_held: SchedulerHeld) void {
-    core.debugAssert(scheduler_held.held.spinlock == &lock);
-    core.debugAssert(lock.isLockedByCurrent());
+    std.debug.assert(scheduler_held.held.spinlock == &lock);
+    std.debug.assert(lock.isLockedByCurrent());
 }
 
 fn idle() callconv(.C) noreturn {
     const interrupt_exclusion = releaseScheduler();
-    core.debugAssert(interrupt_exclusion.cpu.interrupt_disable_count == 1);
+    std.debug.assert(interrupt_exclusion.cpu.interrupt_disable_count == 1);
 
     interrupt_exclusion.release();
 

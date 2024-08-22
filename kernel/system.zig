@@ -18,7 +18,7 @@ var cpus: []Cpu = undefined;
 ///
 /// `id` must not be `.none`
 pub fn getCpu(id: Cpu.Id) *Cpu {
-    core.debugAssert(id != .none);
+    std.debug.assert(id != .none);
 
     return &cpus[@intFromEnum(id)];
 }

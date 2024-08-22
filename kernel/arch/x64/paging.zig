@@ -21,7 +21,7 @@ pub const largest_higher_half_virtual_address: core.VirtualAddress = core.Virtua
 /// Allocates a new page table and returns a pointer to it in the direct map.
 pub fn allocatePageTable() kernel.pmm.AllocateError!*PageTable {
     const range = try kernel.pmm.allocatePage();
-    core.assert(range.size.greaterThanOrEqual(core.Size.of(x64.PageTable)));
+    std.debug.assert(range.size.greaterThanOrEqual(core.Size.of(x64.PageTable)));
 
     const page_table = kernel.vmm.directMapFromPhysical(range.address).toPtr(*x64.PageTable);
     page_table.* = .{};
@@ -113,8 +113,8 @@ fn mapTo4KiB(
     physical_address: core.PhysicalAddress,
     map_type: MapType,
 ) MapError!void {
-    core.debugAssert(virtual_address.isAligned(PageTable.small_page_size));
-    core.debugAssert(physical_address.isAligned(PageTable.small_page_size));
+    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+    std.debug.assert(physical_address.isAligned(PageTable.small_page_size));
 
     const level4_entry = level4_table.getEntryLevel4(virtual_address);
 
@@ -173,7 +173,7 @@ fn unmap4KiB(
     level4_table: *x64.PageTable,
     virtual_address: core.VirtualAddress,
 ) void {
-    core.debugAssert(virtual_address.isAligned(x64.PageTable.small_page_size));
+    std.debug.assert(virtual_address.isAligned(x64.PageTable.small_page_size));
 
     const level4_entry = level4_table.getEntryLevel4(virtual_address);
     if (!level4_entry.present.read() or level4_entry.huge.read()) return;
@@ -288,8 +288,8 @@ pub const init = struct {
         map_type: MapType,
     ) kernel.arch.paging.init.FillTopLevelError!void {
         const size_of_top_level_entry = sizeOfTopLevelEntry();
-        core.debugAssert(range.size.equal(size_of_top_level_entry));
-        core.debugAssert(range.address.isAligned(size_of_top_level_entry));
+        std.debug.assert(range.size.equal(size_of_top_level_entry));
+        std.debug.assert(range.address.isAligned(size_of_top_level_entry));
 
         const index = x64.PageTable.p4Index(range.address);
         const entry = &page_table.entries[index];
@@ -317,11 +317,11 @@ pub const init = struct {
         physical_range: core.PhysicalRange,
         map_type: MapType,
     ) MapError!void {
-        core.debugAssert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
-        core.debugAssert(virtual_range.size.equal(virtual_range.size));
+        std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.equal(virtual_range.size));
 
         var current_virtual_address = virtual_range.address;
         const last_virtual_address = virtual_range.last();
@@ -412,9 +412,9 @@ pub const init = struct {
         physical_address: core.PhysicalAddress,
         map_type: MapType,
     ) MapError!void {
-        core.debugAssert(x64.info.cpu_id.gbyte_pages);
-        core.debugAssert(virtual_address.isAligned(PageTable.large_page_size));
-        core.debugAssert(physical_address.isAligned(PageTable.large_page_size));
+        std.debug.assert(x64.info.cpu_id.gbyte_pages);
+        std.debug.assert(virtual_address.isAligned(PageTable.large_page_size));
+        std.debug.assert(physical_address.isAligned(PageTable.large_page_size));
 
         const level4_entry = level4_table.getEntryLevel4(virtual_address);
 
@@ -450,8 +450,8 @@ pub const init = struct {
         physical_address: core.PhysicalAddress,
         map_type: MapType,
     ) MapError!void {
-        core.debugAssert(virtual_address.isAligned(PageTable.medium_page_size));
-        core.debugAssert(physical_address.isAligned(PageTable.medium_page_size));
+        std.debug.assert(virtual_address.isAligned(PageTable.medium_page_size));
+        std.debug.assert(physical_address.isAligned(PageTable.medium_page_size));
 
         const level4_entry = level4_table.getEntryLevel4(virtual_address);
 

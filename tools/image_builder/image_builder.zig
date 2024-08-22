@@ -247,7 +247,7 @@ fn addFilesAndDirectoriesToFAT(context: *FATContext, allocator: std.mem.Allocato
 fn ensureFATDirectory(context: *FATContext, allocator: std.mem.Allocator, path: []const u8) !FATContext.FATDirectory {
     var parent_directory = context.getRootDirectory();
 
-    core.assert(path[0] == '/'); // paths are expected to be absolute
+    std.debug.assert(path[0] == '/'); // paths are expected to be absolute
 
     // Root directory is the parent.
     if (path.len == 1) return parent_directory;
@@ -283,7 +283,7 @@ fn makeFATName(allocator: std.mem.Allocator, name: []const u8) !FATName {
     var short_name: fat.ShortFileName = .{};
 
     if (extension.len != 0) {
-        core.assert(extension[0] == '.');
+        std.debug.assert(extension[0] == '.');
         const trimmed_extension = extension[1..];
 
         for (trimmed_extension, 0..) |char, i| {
@@ -359,7 +359,7 @@ const FATContext = struct {
         cluster_begin_sector: u32,
         number_of_clusters: u32,
     ) FATContext {
-        core.assert(root_cluster == 2); // TODO: Remove this requirement
+        std.debug.assert(root_cluster == 2); // TODO: Remove this requirement
 
         const cluster_size = sector_size.multiplyScalar(sectors_per_cluster);
         return FATContext{
@@ -431,7 +431,7 @@ const FATContext = struct {
 
         const file_size = core.Size.from(stat.size, .byte);
         const clusters_required = self.cluster_size.amountToCover(file_size);
-        core.assert(clusters_required != 0);
+        std.debug.assert(clusters_required != 0);
 
         var current_cluster = try self.nextCluster();
 
@@ -448,7 +448,7 @@ const FATContext = struct {
             const is_last_cluster = i == clusters_required - 1;
 
             // only for the last cluster will the amount read be less than a full cluster
-            core.assert(read == cluster_ptr.len or is_last_cluster);
+            std.debug.assert(read == cluster_ptr.len or is_last_cluster);
 
             if (is_last_cluster) {
                 self.setFAT(current_cluster, fat.FAT32Entry.end_of_chain);
@@ -466,10 +466,10 @@ const FATContext = struct {
         directory_entries: []fat.DirectoryEntry,
 
         fn getOrAddDirectory(self: FATDirectory, name: FATName) !FATDirectory {
-            core.assert(name.long_name == null); // TODO: support long names
+            std.debug.assert(name.long_name == null); // TODO: support long names
 
             if (self.findEntry(name)) |entry| {
-                core.assert(entry.standard.attributes.directory); // pre-existing entry is not a directory
+                std.debug.assert(entry.standard.attributes.directory); // pre-existing entry is not a directory
 
                 const cluster: u32 = @as(u32, entry.standard.high_cluster_number) << 16 | entry.standard.low_cluster_number;
 
@@ -488,7 +488,7 @@ const FATContext = struct {
         }
 
         fn findEntry(self: FATDirectory, name: FATName) ?*fat.DirectoryEntry {
-            core.assert(name.long_name == null); // TODO: support long names
+            std.debug.assert(name.long_name == null); // TODO: support long names
 
             for (self.directory_entries) |*entry| {
                 if (entry.isUnusedEntry()) continue;
@@ -618,11 +618,11 @@ const FATContext = struct {
         }
 
         fn addLongFileName(self: FATDirectory, short_name: fat.ShortFileName, long_name: []const u8) !void {
-            core.assert(long_name[long_name.len - 1] == 0);
+            std.debug.assert(long_name[long_name.len - 1] == 0);
 
             const number_of_long_name_entries_required = (long_name.len / fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_characters) + 1;
 
-            core.assert(number_of_long_name_entries_required <= fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_long_name_entries);
+            std.debug.assert(number_of_long_name_entries_required <= fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_long_name_entries);
 
             const short_name_checksum = short_name.checksum();
 
@@ -668,7 +668,7 @@ const FATContext = struct {
 
         fn firstUnusedEntry(self: FATDirectory) ?*fat.DirectoryEntry {
             for (self.directory_entries) |*entry| {
-                core.assert(!entry.isUnusedEntry()); // we only add more entries, never remove them
+                std.debug.assert(!entry.isUnusedEntry()); // we only add more entries, never remove them
                 if (entry.isLastEntry()) return entry;
             }
             return null;
@@ -701,7 +701,7 @@ const GptPartition = struct {
 };
 
 fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, disk_image: []u8, random: std.Random, gpt_partitions: []GptPartition) !void {
-    core.assert(std.mem.isAligned(disk_image.len, disk_block_size.value));
+    std.debug.assert(std.mem.isAligned(disk_image.len, disk_block_size.value));
 
     const number_of_blocks = disk_image.len / disk_block_size.value;
 
@@ -718,7 +718,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
 
     const last_usable_block = number_of_blocks - 2 - partition_array_size_in_blocks;
 
-    core.assert(last_usable_block - first_usable_block > 0);
+    std.debug.assert(last_usable_block - first_usable_block > 0);
 
     // Block 0 = Protective MBR
     protectiveMBR(disk_image, number_of_blocks);

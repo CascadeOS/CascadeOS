@@ -293,7 +293,7 @@ pub const LAPIC = union(enum) {
     }
 
     pub fn writeLogicalDestinationRegister(self: LAPIC, register: LogicalDestinationRegister) void {
-        core.debugAssert(self != .x2apic); // read only in x2APIC mode
+        std.debug.assert(self != .x2apic); // read only in x2APIC mode
         self.writeRegister(.logical_destination, @bitCast(register));
     }
 
@@ -370,12 +370,12 @@ pub const LAPIC = union(enum) {
     };
 
     pub fn readDestinationFormatRegister(self: LAPIC) DestinationFormatRegister {
-        core.debugAssert(self != .x2apic); // not supported in x2APIC mode
+        std.debug.assert(self != .x2apic); // not supported in x2APIC mode
         return @bitCast(self.readRegister(.logical_destination));
     }
 
     pub fn writeDestinationFormatRegister(self: LAPIC, register: DestinationFormatRegister) void {
-        core.debugAssert(self != .x2apic); // not supported in x2APIC mode
+        std.debug.assert(self != .x2apic); // not supported in x2APIC mode
         self.writeRegister(.logical_destination, @bitCast(register));
     }
 
@@ -764,7 +764,7 @@ pub const LAPIC = union(enum) {
                 return ptr.*;
             },
             .x2apic => {
-                core.debugAssert(register != .interrupt_command_32_63); // not supported in x2apic mode
+                std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register", null);
 
                 return x64.readMSR(u32, register.x2apicRegister());
@@ -784,7 +784,7 @@ pub const LAPIC = union(enum) {
                 ptr.* = value;
             },
             .x2apic => {
-                core.debugAssert(register != .interrupt_command_32_63); // not supported in x2apic mode
+                std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register", null);
 
                 x64.writeMSR(u32, register.x2apicRegister(), value);
@@ -1043,7 +1043,7 @@ pub const LAPIC = union(enum) {
         ///
         /// Does not support the `self_ipi` register as it is not supported in xAPIC mode.
         pub fn xapicOffset(self: Register) usize {
-            core.debugAssert(self != .self_ipi); // not supported in xAPIC mode
+            std.debug.assert(self != .self_ipi); // not supported in xAPIC mode
 
             return @intFromEnum(self) * 0x10;
         }
@@ -1056,10 +1056,10 @@ pub const LAPIC = union(enum) {
         ///  - `remote_read`
         ///  - `interrupt_command_32_63`
         pub fn x2apicRegister(self: Register) u32 {
-            core.debugAssert(self != .destination_format); // not supported in x2APIC mode
-            core.debugAssert(self != .arbitration_priority); // not supported in x2APIC mode
-            core.debugAssert(self != .remote_read); // not supported in x2APIC mode
-            core.debugAssert(self != .interrupt_command_32_63); // not supported in x2APIC mode
+            std.debug.assert(self != .destination_format); // not supported in x2APIC mode
+            std.debug.assert(self != .arbitration_priority); // not supported in x2APIC mode
+            std.debug.assert(self != .remote_read); // not supported in x2APIC mode
+            std.debug.assert(self != .interrupt_command_32_63); // not supported in x2APIC mode
 
             return 0x800 + @intFromEnum(self);
         }

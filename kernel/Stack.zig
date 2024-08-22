@@ -24,8 +24,8 @@ stack_pointer: core.VirtualAddress,
 /// - `range` must be aligned to 16 bytes.
 /// - `range` must fully contain `usable_range`.
 pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
-    core.debugAssert(range.containsRange(usable_range));
-    core.debugAssert(range.address.isAligned(core.Size.from(16, .byte)));
+    std.debug.assert(range.containsRange(usable_range));
+    std.debug.assert(range.address.isAligned(core.Size.from(16, .byte)));
 
     return Stack{
         .range = range,

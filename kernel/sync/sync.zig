@@ -34,11 +34,11 @@ pub fn getInterruptExclusionRestorer() InterruptExclusionRestorer {
 
 /// Asserts that interrupts are excluded with a disable count of 1.
 pub fn assertInterruptExclusion() InterruptExclusion {
-    core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());
+    std.debug.assert(!kernel.arch.interrupts.interruptsEnabled());
 
     const cpu = kernel.arch.rawGetCpu();
 
-    core.debugAssert(cpu.interrupt_disable_count == 1);
+    std.debug.assert(cpu.interrupt_disable_count == 1);
 
     return .{ .cpu = cpu };
 }
@@ -53,7 +53,7 @@ pub const InterruptExclusionRestorer = struct {
 
     pub inline fn restore(self: InterruptExclusionRestorer) void {
         // if this does not hold then just set it to the old value
-        core.debugAssert(self.cpu.interrupt_disable_count == self.old_interrupt_disable_count);
+        std.debug.assert(self.cpu.interrupt_disable_count == self.old_interrupt_disable_count);
         // self.cpu.interrupt_disable_count = self.old_interrupt_disable_count;
     }
 };
@@ -62,10 +62,10 @@ pub const InterruptExclusion = struct {
     cpu: *kernel.Cpu,
 
     pub fn release(self: InterruptExclusion) void {
-        core.debugAssert(!kernel.arch.interrupts.interruptsEnabled());
+        std.debug.assert(!kernel.arch.interrupts.interruptsEnabled());
 
         const old_interrupt_disable_count = self.cpu.interrupt_disable_count;
-        core.debugAssert(old_interrupt_disable_count != 0);
+        std.debug.assert(old_interrupt_disable_count != 0);
 
         self.cpu.interrupt_disable_count = old_interrupt_disable_count - 1;
 

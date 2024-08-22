@@ -27,10 +27,10 @@ pub fn isEmpty(self: SinglyLinkedFIFO) bool {
 ///
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedFIFO, node: *SingleNode) void {
-    core.debugAssert(node.next == null);
+    std.debug.assert(node.next == null);
 
     if (self.end_node) |end| {
-        core.debugAssert(self.start_node != null);
+        std.debug.assert(self.start_node != null);
         end.* = .{ .next = node };
     } else {
         self.start_node = node;
@@ -42,10 +42,10 @@ pub fn push(self: *SinglyLinkedFIFO, node: *SingleNode) void {
 /// Removes a node from the front of the list and returns it.
 pub fn pop(self: *SinglyLinkedFIFO) ?*SingleNode {
     const node = self.start_node orelse return null;
-    core.debugAssert(self.end_node != null);
+    std.debug.assert(self.end_node != null);
 
     if (self.start_node == self.end_node) {
-        core.debugAssert(node.next == null);
+        std.debug.assert(node.next == null);
         self.end_node = null;
     }
 
