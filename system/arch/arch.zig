@@ -3,6 +3,9 @@
 
 //! Defines the interface of the architecture specific code.
 
+/// Architecture specific per-executor data.
+pub const PerExecutor = current.PerExecutor;
+
 pub const interrupts = struct {
     /// Disable interrupts and halt the CPU.
     pub inline fn disableInterruptsAndHalt() noreturn {
@@ -46,11 +49,11 @@ pub const init = struct {
         current.init.prepareBootstrapExecutor(bootstrap_executor);
     }
 
-    /// Set the provided `Executor` as the current executor.
-    pub inline fn setCurrentExecutor(executor: *kernel.Executor) void {
-        checkSupport(current.init, "setCurrentExecutor", fn (*kernel.Executor) void);
+    /// Load the provided `Executor` as the current executor.
+    pub inline fn loadExecutor(executor: *kernel.Executor) void {
+        checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);
 
-        current.init.setCurrentExecutor(executor);
+        current.init.loadExecutor(executor);
     }
 };
 

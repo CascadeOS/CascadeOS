@@ -5,6 +5,8 @@
 
 id: Id,
 
+arch: @import("arch").PerExecutor = .{},
+
 /// A unique identifier for the executor.
 ///
 /// `Value - 1` is used as an index into the `kernel.system.executor` array.
