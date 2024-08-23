@@ -8,11 +8,9 @@ pub const PerExecutor = current.PerExecutor;
 
 pub const interrupts = struct {
     /// Disable interrupts and halt the CPU.
-    pub inline fn disableInterruptsAndHalt() noreturn {
-        // `checkSupport` intentionally not called - mandatory function
-
-        current.interrupts.disableInterruptsAndHalt();
-    }
+    ///
+    /// This is a decl not a wrapper function like the other functions so that it can be inlined into a naked function.
+    pub const disableInterruptsAndHalt = current.interrupts.disableInterruptsAndHalt;
 
     /// Disable interrupts.
     pub inline fn disableInterrupts() void {
@@ -29,6 +27,15 @@ pub const paging = struct {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
+    /// The entry point that is exported as `_start`.
+    ///
+    /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
+    /// meaning this function is not expected to ever be called.
+    ///
+    /// This function is required to disable interrupts and halt execution at a minimum but may perform any additional
+    /// debugging and error output if possible.
+    pub const defaultEntryPoint: *const fn () callconv(.Naked) noreturn = current.init.defaultEntryPoint;
+
     /// Attempt to set up some form of early output.
     pub inline fn setupEarlyOutput() void {
         // `checkSupport` intentionally not called - mandatory function

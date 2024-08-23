@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+/// The entry point that is exported as `_start`.
+///
+/// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
+/// meaning this function is not expected to ever be called.
+///
+/// This function is required to disable interrupts and halt execution at a minimum but may perform any additional
+/// debugging and error output if possible.
+pub fn defaultEntryPoint() callconv(.Naked) noreturn {
+    @call(.always_inline, arch.interrupts.disableInterruptsAndHalt, .{});
+    unreachable;
+}
+
 var opt_early_output_serial_port: ?SerialPort = null;
 
 /// Attempt to set up some form of early output.
@@ -121,3 +133,4 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
+const arch = @import("arch");

@@ -6,8 +6,9 @@
 /// Required to be called at comptime from the kernels root file 'system/root.zig'.
 pub fn exportEntryPoints() void {
     comptime {
-        // TODO: use the limine entry point request
-        @export(&limineEntryPoint, .{ .name = "_start" });
+        @export(arch.init.defaultEntryPoint, .{ .name = "_start" });
+
+        _ = &limine_requests;
     }
 }
 
@@ -18,7 +19,13 @@ fn limineEntryPoint() callconv(.C) noreturn {
     core.panic("`init.initStage1` returned", null);
 }
 
+const limine_requests = struct {
+    export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
+    export var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
+};
+
 const std = @import("std");
 const core = @import("core");
 const limine = @import("limine");
 const init = @import("init");
+const arch = @import("arch");
