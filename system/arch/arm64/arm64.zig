@@ -9,6 +9,10 @@ pub const arch_interface = struct {
         pub const disableInterrupts = lib_arm64.instructions.disableInterrupts;
     };
 
+    pub const paging = struct {
+        pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
+    };
+
     pub const init = @import("init.zig");
 };
 
