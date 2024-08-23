@@ -107,19 +107,18 @@ pub const formatting = struct {
     fn printSourceAtAddress(writer: anytype, address: usize, opt_symbol_source: ?SymbolSource) !void {
         if (address == 0) return;
 
-        // TODO: detect if the address is not in the higher half
-        // if (address < arch.paging.higher_half.value) {
-        //     try writer.writeAll(comptime indent ++ "0x");
-        //     std.fmt.formatInt(
-        //         address,
-        //         16,
-        //         .lower,
-        //         .{},
-        //         writer,
-        //     );
-        //     try writer.writeAll(" - address is not in the higher half so must be userspace\n");
-        //     return;
-        // }
+        if (address < arch.paging.higher_half_start.value) {
+            try writer.writeAll(comptime indent ++ "0x");
+            try std.fmt.formatInt(
+                address,
+                16,
+                .lower,
+                .{},
+                writer,
+            );
+            try writer.writeAll(" - address is not in the higher half so must be userspace\n");
+            return;
+        }
 
         // TODO: handle the virtual offset
         // var kernel_virtual_offset_is_null: bool = false;
