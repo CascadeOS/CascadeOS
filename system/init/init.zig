@@ -41,8 +41,12 @@ fn singleExecutorPanic(
     }
     static.panicked.store(true, .release);
 
-    kernel.debug.formatting.printUserPanicMessage(early_output_writer, msg) catch unreachable;
-    kernel.debug.formatting.printErrorAndCurrentStackTrace(early_output_writer, error_return_trace, return_address) catch unreachable;
+    kernel.debug.formatting.printPanic(
+        early_output_writer,
+        msg,
+        error_return_trace,
+        return_address,
+    ) catch unreachable;
 }
 
 const early_output_writer = std.io.Writer(
