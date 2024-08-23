@@ -17,8 +17,12 @@ var opt_early_output_serial_port: ?SerialPort = null;
 
 /// Attempt to set up some form of early output.
 pub fn setupEarlyOutput() void {
-    // TODO: check each COM port in turn rather than assuming COM1 is available.
-    opt_early_output_serial_port = SerialPort.init(.COM1, .Baud115200);
+    for (std.meta.tags(SerialPort.COMPort)) |com_port| {
+        if (SerialPort.init(com_port, .Baud115200)) |serial_port| {
+            opt_early_output_serial_port = serial_port;
+            return;
+        }
+    }
 }
 
 /// Write to early output.
@@ -55,14 +59,22 @@ const SerialPort = struct {
     _data_port: u16,
     _line_status_port: u16,
 
-    /// Init the serial port at `com_port` with the baud rate `baud_rate`
-    pub fn init(com_port: COMPort, baud_rate: BaudRate) SerialPort {
+    /// Init the serial port at `com_port` with the baud rate `baud_rate`.
+    ///
+    /// Returns `null` if either the serial port is not connected or is faulty.
+    pub fn init(com_port: COMPort, baud_rate: BaudRate) ?SerialPort {
         const data_port_number = @intFromEnum(com_port);
 
-        // Disable interrupts
+        // write to the scratch register to check if the serial port is connected
+        portWriteU8(data_port_number + 7, 0xBA);
+
+        // if the scratch register is not `0xBA` then the serial port is not connected
+        if (portReadU8(data_port_number + 7) != 0xBA) return null;
+
+        // disable interrupts
         portWriteU8(data_port_number + 1, 0x00);
 
-        // Set Baudrate
+        // set baudrate
         portWriteU8(data_port_number + 3, 0x80);
         portWriteU8(data_port_number, @intFromEnum(baud_rate));
         portWriteU8(data_port_number + 1, 0x00);
@@ -70,14 +82,23 @@ const SerialPort = struct {
         // 8 bits, no parity, one stop bit
         portWriteU8(data_port_number + 3, 0x03);
 
-        // Enable FIFO
+        // enable FIFO
         portWriteU8(data_port_number + 2, 0xC7);
 
-        // Mark data terminal ready
+        // mark data terminal ready
         portWriteU8(data_port_number + 4, 0x0B);
 
-        // Enable interupts
-        portWriteU8(data_port_number + 1, 0x01);
+        // enable loopback
+        portWriteU8(data_port_number + 4, 0x1E);
+
+        // send `0xAE` to the serial port
+        portWriteU8(data_port_number, 0xAE);
+
+        // check that the `0xAE` was received due to loopback
+        if (portReadU8(data_port_number) != 0xAE) return null;
+
+        // disable loopback
+        portWriteU8(data_port_number + 4, 0x0F);
 
         return .{
             ._data_port = data_port_number,
