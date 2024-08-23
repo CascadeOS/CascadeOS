@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const EarlyOutputWriter = SerialPort.Writer;
-
 var opt_early_output_serial_port: ?SerialPort = null;
 
 /// Attempt to set up some form of early output.
@@ -14,21 +12,21 @@ pub fn setupEarlyOutput() void {
 /// Write to early output.
 ///
 /// Cannot fail, any errors are ignored.
-pub inline fn writeToEarlyOutput(bytes: []const u8) void {
+pub fn writeToEarlyOutput(bytes: []const u8) void {
     if (opt_early_output_serial_port) |early_output_serial_port| {
         early_output_serial_port.write(bytes);
     }
 }
 
 /// Prepares the provided `Executor` for the bootstrap executor.
-pub inline fn prepareBootstrapExecutor(
+pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
 ) void {
     _ = bootstrap_executor;
 }
 
 /// Load the provided `Executor` as the current executor.
-pub inline fn loadExecutor(executor: *kernel.Executor) void {
+pub fn loadExecutor(executor: *kernel.Executor) void {
     executor.arch.gdt.load();
 
     // TODO: set double fault, nmi and privilege stacks in the TSS
