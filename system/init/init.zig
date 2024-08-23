@@ -32,21 +32,23 @@ fn singleExecutorPanic(
     return_address: usize,
 ) void {
     const static = struct {
-        var panicked = std.atomic.Value(bool).init(false);
+        var nested_panic_count = std.atomic.Value(usize).init(0);
     };
 
-    if (static.panicked.load(.acquire)) {
-        arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n");
-        return;
+    switch (static.nested_panic_count.fetchAdd(1, .acq_rel)) {
+        0 => { // on first panic attempt to print the full panic message
+            kernel.debug.formatting.printPanic(
+                early_output_writer,
+                msg,
+                error_return_trace,
+                return_address,
+            ) catch unreachable;
+        },
+        1 => { // on second panic print a shorter message using only `writeToEarlyOutput`
+            arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n");
+        },
+        else => {}, // don't trigger any more panics
     }
-    static.panicked.store(true, .release);
-
-    kernel.debug.formatting.printPanic(
-        early_output_writer,
-        msg,
-        error_return_trace,
-        return_address,
-    ) catch unreachable;
 }
 
 const early_output_writer = std.io.Writer(
