@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const EarlyOutputWriter = Uart.Writer;
-
 var opt_early_output_uart: ?Uart = null;
 
 /// Attempt to set up some form of early output.
@@ -14,14 +12,14 @@ pub fn setupEarlyOutput() void {
 /// Write to early output.
 ///
 /// Cannot fail, any errors are ignored.
-pub inline fn writeToEarlyOutput(bytes: []const u8) void {
+pub fn writeToEarlyOutput(bytes: []const u8) void {
     if (opt_early_output_uart) |early_output_uart| {
         early_output_uart.write(bytes);
     }
 }
 
 /// A basic write only UART.
-pub const Uart = struct {
+const Uart = struct {
     address: *volatile u8,
 
     pub fn init(address: usize) Uart {
