@@ -40,7 +40,17 @@ pub fn zigPanic(
 }
 
 pub const formatting = struct {
-    pub fn printUserPanicMessage(writer: anytype, msg: []const u8) !void {
+    pub fn printPanic(
+        writer: anytype,
+        msg: []const u8,
+        error_return_trace: ?*const std.builtin.StackTrace,
+        return_address: usize,
+    ) !void {
+        try printUserPanicMessage(writer, msg);
+        try printErrorAndCurrentStackTrace(writer, error_return_trace, return_address);
+    }
+
+    fn printUserPanicMessage(writer: anytype, msg: []const u8) !void {
         if (msg.len != 0) {
             try writer.writeAll("\nPANIC - ");
 
@@ -54,7 +64,7 @@ pub const formatting = struct {
         }
     }
 
-    pub fn printErrorAndCurrentStackTrace(
+    fn printErrorAndCurrentStackTrace(
         writer: anytype,
         error_return_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
