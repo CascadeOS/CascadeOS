@@ -130,17 +130,13 @@ pub const formatting = struct {
             return;
         }
 
-        // TODO: handle the virtual offset
-        // var kernel_virtual_offset_is_null: bool = false;
-        // const kernel_virtual_offset = if (kernel.vmm.memory_layout.virtual_offset) |offset| offset.value else blk: {
-        //     kernel_virtual_offset_is_null = true;
-        //     break :blk 0;
-        // };
-        // // we can't use `VirtualAddress` here as it is possible this subtract results in a non-canonical address
-        // const kernel_source_address = address - kernel_virtual_offset;
+        const opt_kernel_virtual_offset = if (kernel.system.memory_layout.virtual_offset) |offset|
+            offset.value
+        else
+            null;
 
-        const kernel_virtual_offset_is_null: bool = true;
-        const kernel_source_address = address;
+        // we can't use `VirtualAddress` here as it is possible this subtraction results in a non-canonical address
+        const kernel_source_address = address - (opt_kernel_virtual_offset orelse 0);
 
         const symbol = blk: {
             const symbol_source = opt_symbol_source orelse break :blk null;
@@ -155,7 +151,7 @@ pub const formatting = struct {
                 writer,
             );
 
-            if (kernel_virtual_offset_is_null) {
+            if (opt_kernel_virtual_offset == null) {
                 try writer.writeAll(" - ??? (address may be incorrect)\n");
             } else {
                 try writer.writeAll(" - ???\n");
@@ -164,7 +160,7 @@ pub const formatting = struct {
             return;
         };
 
-        try printSymbol(writer, symbol, kernel_virtual_offset_is_null);
+        try printSymbol(writer, symbol, opt_kernel_virtual_offset == null);
     }
 
     fn printSymbol(writer: anytype, symbol: SymbolSource.Symbol, kernel_virtual_offset_is_null: bool) !void {
