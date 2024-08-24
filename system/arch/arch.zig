@@ -52,6 +52,17 @@ pub const init = struct {
         current.init.writeToEarlyOutput(bytes);
     }
 
+    pub const early_output_writer = std.io.Writer(
+        void,
+        error{},
+        struct {
+            fn writeFn(_: void, bytes: []const u8) error{}!usize {
+                writeToEarlyOutput(bytes);
+                return bytes.len;
+            }
+        }.writeFn,
+    ){ .context = {} };
+
     /// Prepares the provided `Executor` for the bootstrap executor.
     pub inline fn prepareBootstrapExecutor(
         bootstrap_executor: *kernel.Executor,
