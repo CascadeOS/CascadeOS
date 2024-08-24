@@ -38,7 +38,7 @@ fn singleExecutorPanic(
     switch (static.nested_panic_count.fetchAdd(1, .acq_rel)) {
         0 => { // on first panic attempt to print the full panic message
             kernel.debug.formatting.printPanic(
-                early_output_writer,
+                arch.init.early_output_writer,
                 msg,
                 error_return_trace,
                 return_address,
@@ -50,17 +50,6 @@ fn singleExecutorPanic(
         else => {}, // don't trigger any more panics
     }
 }
-
-const early_output_writer = std.io.Writer(
-    void,
-    error{},
-    struct {
-        fn writeFn(_: void, bytes: []const u8) error{}!usize {
-            arch.init.writeToEarlyOutput(bytes);
-            return bytes.len;
-        }
-    }.writeFn,
-){ .context = {} };
 
 const std = @import("std");
 const core = @import("core");
