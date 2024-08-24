@@ -13,6 +13,7 @@ pub fn exportEntryPoints() void {
 }
 
 fn limineEntryPoint() callconv(.C) noreturn {
+    bootloader_api = .limine;
     @call(.never_inline, init.initStage1, .{}) catch |err| {
         core.panicFmt("unhandled error: {s}", .{@errorName(err)}, @errorReturnTrace());
     };
@@ -22,6 +23,13 @@ fn limineEntryPoint() callconv(.C) noreturn {
 const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
     export var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
+};
+
+var bootloader_api: BootloaderAPI = .unknown;
+
+const BootloaderAPI = enum {
+    unknown,
+    limine,
 };
 
 const std = @import("std");
