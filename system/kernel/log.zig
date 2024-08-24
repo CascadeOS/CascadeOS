@@ -54,51 +54,32 @@ pub fn stdLogImpl(
     }
 }
 
-/// The main log function.
-fn logFn(
-    comptime scope: @Type(.EnumLiteral),
-    comptime message_level: std.log.Level,
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    _ = scope;
-    _ = message_level;
-    _ = format;
-    _ = args;
-}
+/// Which logging implementation to use.
+///
+/// `init` is the early log output, which is only available during the early boot process.
+pub var log_impl: enum { init, full } = .init;
 
-/// Logging function during kernel init.
-fn initLogFn(
+/// The main log dispatch function.
+fn logFn(
     comptime scope: @Type(.enum_literal),
     comptime message_level: std.log.Level,
     comptime format: []const u8,
     args: anytype,
 ) void {
-    _ = scope;
-    _ = message_level;
-    _ = format;
-    _ = args;
+    const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n')
+        format
+    else
+        format ++ "\n";
 
-    // const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n')
-    //     format
-    // else
-    //     format ++ "\n";
+    const level_and_scope = comptime message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
 
-    // const early_output = kernel.arch.init.getEarlyOutput() orelse return;
-    // defer early_output.deinit();
-
-    // const writer = early_output.writer;
-
-    // const held = init_log_lock.acquire();
-    // defer held.release();
-
-    // held.exclusion.cpu.print(writer, 0) catch unreachable;
-
-    // writer.writeAll(
-    //     comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ",
-    // ) catch unreachable;
-
-    // writer.print(user_fmt, args) catch unreachable;
+    switch (log_impl) {
+        .init => {
+            arch.init.writeToEarlyOutput(level_and_scope);
+            arch.init.early_output_writer.print(user_fmt, args) catch unreachable;
+        },
+        .full => core.panic("UNIMPLEMENTED", null), // TODO: full log implementation
+    }
 }
 
 /// Determine if a specific scope and log level pair is enabled for logging.
@@ -128,3 +109,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const builtin = @import("builtin");
+const arch = @import("arch");
