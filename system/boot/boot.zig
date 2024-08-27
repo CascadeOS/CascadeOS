@@ -35,7 +35,7 @@ pub fn kernelBaseAddress() ?KernelBaseAddress {
 
 fn limineEntryPoint() callconv(.C) noreturn {
     bootloader_api = .limine;
-    @call(.never_inline, init.initStage1, .{}) catch |err| {
+    @call(.never_inline, @import("root").initEntryPoint, .{}) catch |err| {
         core.panicFmt("unhandled error: {s}", .{@errorName(err)}, @errorReturnTrace());
     };
     core.panic("`init.initStage1` returned", null);
@@ -57,5 +57,4 @@ const BootloaderAPI = enum {
 const std = @import("std");
 const core = @import("core");
 const limine = @import("limine");
-const init = @import("init");
 const arch = @import("arch");
