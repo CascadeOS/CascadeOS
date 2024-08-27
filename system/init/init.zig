@@ -47,6 +47,12 @@ fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
     };
 }
 
+/// The log implementation during init.
+pub fn initLogImpl(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
+    arch.init.writeToEarlyOutput(level_and_scope);
+    arch.init.early_output_writer.print(fmt, args) catch unreachable;
+}
+
 fn singleExecutorPanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,

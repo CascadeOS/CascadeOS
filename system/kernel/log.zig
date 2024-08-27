@@ -54,6 +54,9 @@ pub fn stdLogImpl(
     }
 }
 
+/// The function type for the init log implementation.
+pub const InitLogImpl = fn (level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void;
+
 /// Which logging implementation to use.
 ///
 /// `init` is the early log output, which is only available during the early boot process.
@@ -74,10 +77,7 @@ fn logFn(
     const level_and_scope = comptime message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
 
     switch (log_impl) {
-        .init => {
-            arch.init.writeToEarlyOutput(level_and_scope);
-            arch.init.early_output_writer.print(user_fmt, args) catch unreachable;
-        },
+        .init => @import("root").initLogImpl(level_and_scope, user_fmt, args),
         .full => core.panic("UNIMPLEMENTED", null), // TODO: full log implementation
     }
 }

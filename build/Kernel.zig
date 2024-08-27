@@ -331,7 +331,6 @@ fn constructKernelExe(
 
     arch_module.addImport("kernel", kernel_module);
     boot_module.addImport("arch", arch_module);
-    boot_module.addImport("init", init_module);
     init_module.addImport("arch", arch_module);
     init_module.addImport("kernel", kernel_module);
     init_module.addImport("boot", boot_module);
@@ -345,6 +344,7 @@ fn constructKernelExe(
     });
 
     kernel_exe.root_module.addImport("boot", boot_module);
+    kernel_exe.root_module.addImport("init", init_module);
     kernel_exe.root_module.addImport("kernel", kernel_module);
 
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
