@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-/// The entry point that is exported as `_start`.
+/// The entry point that is exported as `_start` and acts as fallback entry point for unknown bootloaders.
 ///
 /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
 /// meaning this function is not expected to ever be called.
 ///
 /// This function is required to disable interrupts and halt execution at a minimum but may perform any additional
 /// debugging and error output if possible.
-pub fn defaultEntryPoint() callconv(.Naked) noreturn {
+pub fn unknownBootloaderEntryPoint() callconv(.Naked) noreturn {
     @call(.always_inline, arch.interrupts.disableInterruptsAndHalt, .{});
     unreachable;
 }
