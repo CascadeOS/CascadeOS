@@ -6,8 +6,10 @@
 /// Required to be called at comptime from the kernels root file 'system/root.zig'.
 pub fn exportEntryPoints() void {
     comptime {
-        @export(arch.init.defaultEntryPoint, .{ .name = "_start" });
+        // export a fallback entry point for unknown bootloaders
+        @export(&arch.init.unknownBootloaderEntryPoint, .{ .name = "_start" });
 
+        // ensure the limine requests are exported
         _ = &limine_requests;
     }
 }
