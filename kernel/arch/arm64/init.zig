@@ -55,7 +55,7 @@ pub const Uart = struct {
             defer previous_byte = byte;
 
             if (byte == '\n' and previous_byte != '\r') {
-                // TODO: per branch cold
+                @branchHint(.unlikely);
                 self.address.* = '\r';
             }
 

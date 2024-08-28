@@ -11,7 +11,7 @@ pub fn zigPanic(
     stack_trace: ?*const std.builtin.StackTrace,
     return_address_opt: ?usize,
 ) noreturn {
-    @setCold(true);
+    @branchHint(.cold);
 
     panic_impl(
         msg,

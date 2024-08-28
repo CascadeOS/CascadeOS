@@ -32,7 +32,6 @@ pub fn SegmentedObjectPool(
             const node = blk: {
                 if (self.free_list.pop()) |node| break :blk node;
 
-                // TODO: cold
                 try self.allocateNewSegment();
 
                 break :blk self.free_list.pop() orelse unreachable; // `allocateNewSegment` call above ensures there is atleast one object
@@ -56,7 +55,7 @@ pub fn SegmentedObjectPool(
         }
 
         fn allocateNewSegment(self: *Self) error{SegmentAllocationFailed}!void {
-            @setCold(true);
+            @branchHint(.unlikely);
 
             const bytes = try allocateSegmentBackingMemory();
             std.debug.assert(bytes.len == segment_size.value);

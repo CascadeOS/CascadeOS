@@ -66,7 +66,7 @@ fn writerImpl(self: SerialPort, bytes: []const u8) error{}!usize {
         defer previous_byte = byte;
 
         if (byte == '\n' and previous_byte != '\r') {
-            // TODO: per branch cold
+            @branchHint(.unlikely);
             self.waitForOutputReady();
             portWriteU8(self._data_port, '\r');
         }
