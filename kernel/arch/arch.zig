@@ -514,26 +514,26 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
         comptime "Expected `" ++ name ++ "` to be compatible with `" ++ @typeName(TargetT) ++
         "`, but it is `" ++ @typeName(DeclT) ++ "`";
 
-    const decl_type_info = @typeInfo(DeclT).Fn;
-    const target_type_info = @typeInfo(TargetT).Fn;
+    const decl_type_info = @typeInfo(DeclT).@"fn";
+    const target_type_info = @typeInfo(TargetT).@"fn";
 
     if (decl_type_info.return_type != target_type_info.return_type) {
         const DeclReturnT = decl_type_info.return_type.?;
         const TargetReturnT = target_type_info.return_type.?;
 
         const target_return_type_info = @typeInfo(TargetReturnT);
-        if (target_return_type_info != .ErrorUnion) @compileError(mismatch_type_msg);
+        if (target_return_type_info != .error_union) @compileError(mismatch_type_msg);
 
-        const target_return_error_union = target_return_type_info.ErrorUnion;
+        const target_return_error_union = target_return_type_info.error_union;
         if (target_return_error_union.error_set != anyerror) @compileError(mismatch_type_msg);
 
         // the target return type is an error union with anyerror, so the decl return type just needs to be an
         // error union with the right child type.
 
         const decl_return_type_info = @typeInfo(DeclReturnT);
-        if (decl_return_type_info != .ErrorUnion) @compileError(mismatch_type_msg);
+        if (decl_return_type_info != .error_union) @compileError(mismatch_type_msg);
 
-        const decl_return_error_union = decl_return_type_info.ErrorUnion;
+        const decl_return_error_union = decl_return_type_info.error_union;
         if (decl_return_error_union.payload != target_return_error_union.payload) @compileError(mismatch_type_msg);
     }
 

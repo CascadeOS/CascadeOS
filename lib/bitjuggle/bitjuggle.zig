@@ -21,14 +21,14 @@ pub inline fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
     const TargetType = @TypeOf(target);
 
     comptime {
-        if (@typeInfo(TargetType) == .Int) {
-            if (@typeInfo(TargetType).Int.signedness != .unsigned) {
+        if (@typeInfo(TargetType) == .int) {
+            if (@typeInfo(TargetType).int.signedness != .unsigned) {
                 @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
             }
             if (bit >= @bitSizeOf(TargetType)) {
                 @compileError("bit index is out of bounds of the bit field");
             }
-        } else if (@typeInfo(TargetType) == .ComptimeInt) {
+        } else if (@typeInfo(TargetType) == .comptime_int) {
             if (target < 0) {
                 @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
             }
@@ -150,8 +150,8 @@ pub inline fn getBits(
     comptime {
         if (number_of_bits == 0) @compileError("non-zero number_of_bits must be provided");
 
-        if (@typeInfo(TargetType) == .Int) {
-            if (@typeInfo(TargetType).Int.signedness != .unsigned) {
+        if (@typeInfo(TargetType) == .int) {
+            if (@typeInfo(TargetType).int.signedness != .unsigned) {
                 @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
             }
             if (start_bit >= @bitSizeOf(TargetType)) {
@@ -160,7 +160,7 @@ pub inline fn getBits(
             if (start_bit + number_of_bits > @bitSizeOf(TargetType)) {
                 @compileError("start_bit + number_of_bits is out of bounds of the bit field");
             }
-        } else if (@typeInfo(TargetType) == .ComptimeInt) {
+        } else if (@typeInfo(TargetType) == .comptime_int) {
             if (target < 0) {
                 @compileError("requires an positive integer, found a negative");
             }
@@ -204,20 +204,20 @@ pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) voi
 
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
-        if (ptr_type_info != .Pointer) @compileError("not a pointer");
+        if (ptr_type_info != .pointer) @compileError("not a pointer");
     }
 
-    const TargetType = ptr_type_info.Pointer.child;
+    const TargetType = ptr_type_info.pointer.child;
 
     comptime {
-        if (@typeInfo(TargetType) == .Int) {
-            if (@typeInfo(TargetType).Int.signedness != .unsigned) {
+        if (@typeInfo(TargetType) == .int) {
+            if (@typeInfo(TargetType).int.signedness != .unsigned) {
                 @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
             }
             if (bit >= @bitSizeOf(TargetType)) {
                 @compileError("bit index is out of bounds of the bit field");
             }
-        } else if (@typeInfo(TargetType) == .ComptimeInt) {
+        } else if (@typeInfo(TargetType) == .comptime_int) {
             @compileError("comptime_int is unsupported");
         } else {
             @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
@@ -260,17 +260,17 @@ pub fn setBits(
 
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
-        if (ptr_type_info != .Pointer) @compileError("not a pointer");
+        if (ptr_type_info != .pointer) @compileError("not a pointer");
     }
 
-    const TargetType = ptr_type_info.Pointer.child;
+    const TargetType = ptr_type_info.pointer.child;
     const end_bit = start_bit + number_of_bits;
 
     comptime {
         if (number_of_bits == 0) @compileError("non-zero number_of_bits must be provided");
 
-        if (@typeInfo(TargetType) == .Int) {
-            if (@typeInfo(TargetType).Int.signedness != .unsigned) {
+        if (@typeInfo(TargetType) == .int) {
+            if (@typeInfo(TargetType).int.signedness != .unsigned) {
                 @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
             }
             if (start_bit >= @bitSizeOf(TargetType)) {
@@ -279,7 +279,7 @@ pub fn setBits(
             if (end_bit > @bitSizeOf(TargetType)) {
                 @compileError("start_bit + number_of_bits is out of bounds of the bit field");
             }
-        } else if (@typeInfo(TargetType) == .ComptimeInt) {
+        } else if (@typeInfo(TargetType) == .comptime_int) {
             @compileError("comptime_int is unsupported");
         } else {
             @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
@@ -512,15 +512,15 @@ fn refAllDeclsRecursive(comptime T: type) void {
     if (!@import("builtin").is_test) return;
 
     inline for (switch (@typeInfo(T)) {
-        .Struct => |info| info.decls,
-        .Enum => |info| info.decls,
-        .Union => |info| info.decls,
-        .Opaque => |info| info.decls,
+        .@"struct" => |info| info.decls,
+        .@"enum" => |info| info.decls,
+        .@"union" => |info| info.decls,
+        .@"opaque" => |info| info.decls,
         else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
     }) |decl| {
         if (@TypeOf(@field(T, decl.name)) == type) {
             switch (@typeInfo(@field(T, decl.name))) {
-                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
                 else => {},
             }
         }

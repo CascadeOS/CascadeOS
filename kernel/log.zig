@@ -6,7 +6,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const builtin = @import("builtin");
 
-pub fn scoped(comptime scope: @Type(.EnumLiteral)) type {
+pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub inline fn err(comptime format: []const u8, args: anytype) void {
             if (comptime !levelEnabled(.err)) return;
@@ -35,12 +35,12 @@ pub fn scoped(comptime scope: @Type(.EnumLiteral)) type {
 }
 
 /// Determine if a specific scope and log level pair is enabled for logging.
-inline fn loggingEnabledFor(comptime scope: @Type(.EnumLiteral), comptime message_level: std.log.Level) bool {
+inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: std.log.Level) bool {
     comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(log_level);
 }
 
 /// Checks if a scope is in the list of scopes forced to log at debug level.
-inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.EnumLiteral)) bool {
+inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.enum_literal)) bool {
     if (kernel.config.forced_debug_log_scopes.len == 0) return false;
 
     const tag = @tagName(scope);
@@ -87,7 +87,7 @@ pub const init = struct {
 
     /// Logging function during kernel init.
     fn initLogFn(
-        comptime scope: @Type(.EnumLiteral),
+        comptime scope: @Type(.enum_literal),
         comptime message_level: std.log.Level,
         comptime format: []const u8,
         args: anytype,

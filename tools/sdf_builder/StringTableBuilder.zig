@@ -46,15 +46,15 @@ fn refAllDeclsRecursive(comptime T: type) void {
     if (!@import("builtin").is_test) return;
 
     inline for (switch (@typeInfo(T)) {
-        .Struct => |info| info.decls,
-        .Enum => |info| info.decls,
-        .Union => |info| info.decls,
-        .Opaque => |info| info.decls,
+        .@"struct" => |info| info.decls,
+        .@"enum" => |info| info.decls,
+        .@"union" => |info| info.decls,
+        .@"opaque" => |info| info.decls,
         else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
     }) |decl| {
         if (@TypeOf(@field(T, decl.name)) == type) {
             switch (@typeInfo(@field(T, decl.name))) {
-                .Struct, .Enum, .Union, .Opaque => refAllDeclsRecursive(@field(T, decl.name)),
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
                 else => {},
             }
         }
