@@ -89,7 +89,7 @@ pub fn protectiveMBR(
         .record4 = .{},
 
         // Set to 0xAA55 (i.e., byte 510 contains 0x55 and byte 511 contains 0xAA).
-        .signature = MBR.signature,
+        .signature = MBR.mbr_signature,
     };
 }
 

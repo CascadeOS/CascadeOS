@@ -204,7 +204,7 @@ pub const ExtendedBPB_32 = extern struct {
 
     boot_code: [420]u8 = [_]u8{0} ** 420,
 
-    signature: u16 align(1) = fs.mbr.MBR.signature,
+    signature: u16 align(1) = fs.mbr.MBR.mbr_signature,
 
     pub const Flags = packed struct(u16) {
         active_fat: u4,

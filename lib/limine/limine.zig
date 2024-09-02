@@ -278,13 +278,13 @@ pub const PagingMode = extern struct {
     ///
     /// The bootloader will refuse to boot the OS if no paging modes of this type or lower (but equal or greater than
     /// `min_mode`) are available.
-    max_mode: Mode = max_mode,
+    max_mode: Mode = default_max_mode,
 
     /// The lowest paging mode in numerical order that the OS supports.
     ///
     /// The bootloader will refuse to boot the OS if no paging modes of this type or greater (but equal or lower than
     /// `max_mode`) are available.
-    min_mode: Mode = min_mode,
+    min_mode: Mode = default_min_mode,
 
     pub const Response = extern struct {
         revision: u64,
@@ -302,14 +302,14 @@ pub const PagingMode = extern struct {
         .x86_64 => .four_level,
     };
 
-    pub const min_mode: Mode = switch (arch) {
+    pub const default_min_mode: Mode = switch (arch) {
         .aarch64 => .four_level,
         .loongarch64 => .four_level,
         .riscv64 => .sv39,
         .x86_64 => .four_level,
     };
 
-    pub const max_mode: Mode = switch (arch) {
+    pub const default_max_mode: Mode = switch (arch) {
         .aarch64 => .five_level,
         .loongarch64 => .four_level,
         .riscv64 => .sv57,

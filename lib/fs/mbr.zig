@@ -16,7 +16,7 @@ pub const MBR = extern struct {
     record4: PartitonRecord align(1),
     signature: u16 align(1),
 
-    pub const signature: u16 = 0xAA55;
+    pub const mbr_signature: u16 = 0xAA55;
 
     pub const PartitonRecord = packed struct(u128) {
         boot_indicator: u8 = 0,
