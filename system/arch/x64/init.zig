@@ -38,7 +38,7 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
 pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
 ) void {
-    _ = bootstrap_executor;
+    bootstrap_executor.arch = .{};
 }
 
 /// Load the provided `Executor` as the current executor.

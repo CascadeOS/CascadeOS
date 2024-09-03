@@ -3,6 +3,8 @@
 
 //! Represents a single execution resource.
 
+const Executor = @This();
+
 id: Id,
 
 arch: @import("arch").PerExecutor = .{},
@@ -13,10 +15,10 @@ arch: @import("arch").PerExecutor = .{},
 pub const Id = enum(u32) {
     none = 0,
 
+    bootstrap = 1,
+
     _,
 };
-
-const Executor = @This();
 
 const std = @import("std");
 const core = @import("core");

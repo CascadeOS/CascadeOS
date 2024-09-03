@@ -4,7 +4,7 @@
 /// Array of all executors.
 ///
 /// Initialized during init and never modified again.
-pub var executors: std.BoundedArray(kernel.Executor, kernel.config.limits.max_executors) = .{};
+pub var executors: []kernel.Executor = &.{};
 
 /// The memory layout of the kernel.
 ///

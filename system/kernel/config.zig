@@ -9,10 +9,6 @@ pub const forced_debug_log_scopes = kernel_options.forced_debug_log_scopes;
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address: core.VirtualAddress = .fromInt(0xffffffff80000000);
 
-pub const limits = struct {
-    pub const max_executors = 32;
-};
-
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
