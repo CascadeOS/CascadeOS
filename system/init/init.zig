@@ -35,8 +35,8 @@ fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
     log.debug("kernel virtual base address: {}", .{base_address.virtual});
     log.debug("kernel physical base address: {}", .{base_address.physical});
 
-    const virtual_offset = core.Size.from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
-    const physical_to_virtual_offset = core.Size.from(base_address.virtual.value - base_address.physical.value, .byte);
+    const virtual_offset: core.Size = .from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
+    const physical_to_virtual_offset: core.Size = .from(base_address.virtual.value - base_address.physical.value, .byte);
     log.debug("kernel virtual offset: 0x{x}", .{virtual_offset.value});
     log.debug("kernel physical to virtual offset: 0x{x}", .{physical_to_virtual_offset.value});
 
@@ -59,7 +59,7 @@ fn singleExecutorPanic(
     return_address: usize,
 ) void {
     const static = struct {
-        var nested_panic_count = std.atomic.Value(usize).init(0);
+        var nested_panic_count: std.atomic.Value(usize) = .init(0);
     };
 
     switch (static.nested_panic_count.fetchAdd(1, .acq_rel)) {

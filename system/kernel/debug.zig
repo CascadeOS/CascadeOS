@@ -69,7 +69,7 @@ pub const formatting = struct {
         error_return_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) !void {
-        const symbol_source = SymbolSource.load();
+        const symbol_source: ?SymbolSource = .load();
 
         if (error_return_trace) |trace| {
             if (trace.index != 0) {
@@ -85,7 +85,7 @@ pub const formatting = struct {
         return_address: usize,
         symbol_source: ?SymbolSource,
     ) !void {
-        var stack_iter = std.debug.StackIterator.init(return_address, @frameAddress());
+        var stack_iter: std.debug.StackIterator = .init(return_address, @frameAddress());
 
         while (stack_iter.next()) |address| {
             try printSourceAtAddress(writer, address, symbol_source);
@@ -360,7 +360,7 @@ const SymbolSource = struct {
         return null;
     }
 
-    const embedded_source_files = std.StaticStringMap([]const u8).initComptime(embedded_source_files: {
+    const embedded_source_files: std.StaticStringMap([]const u8) = .initComptime(embedded_source_files: {
         @setEvalBranchQuota(1_000_000);
 
         const embedded_source_files_import = @import("embedded_source_files");
