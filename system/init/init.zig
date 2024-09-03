@@ -5,6 +5,13 @@
 ///
 /// Only the bootstrap cpu executes this function.
 pub fn initStage1() !noreturn {
+    const static = struct {
+        var bootstrap_executor: kernel.Executor = .{
+            .id = .bootstrap,
+            .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+        };
+    };
+
     // get output up and running as soon as possible
     arch.init.setupEarlyOutput();
     arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
@@ -12,16 +19,10 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can switch to the single executor panic
     kernel.debug.panic_impl = singleExecutorPanic;
 
-    const bootstrap_executor, const bootstrap_executor_id = blk: {
-        const id: kernel.Executor.Id = @enumFromInt(kernel.system.executors.len + 1);
-        break :blk .{ try kernel.system.executors.addOne(), id };
-    };
-    bootstrap_executor.* = .{
-        .id = bootstrap_executor_id,
-    };
-
-    arch.init.prepareBootstrapExecutor(bootstrap_executor);
-    arch.init.loadExecutor(bootstrap_executor);
+    // set up the bootstrap executor and load it
+    kernel.system.executors = @as([*]kernel.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
+    arch.init.prepareBootstrapExecutor(&static.bootstrap_executor);
+    arch.init.loadExecutor(&static.bootstrap_executor);
 
     log.debug("building kernel memory layout", .{});
     try buildMemoryLayout(&kernel.system.memory_layout);
