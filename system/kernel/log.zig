@@ -77,7 +77,10 @@ fn logFn(
     const level_and_scope = comptime message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
 
     switch (log_impl) {
-        .init => @import("root").initLogImpl(level_and_scope, user_fmt, args),
+        .init => {
+            @branchHint(.unlikely);
+            @import("root").initLogImpl(level_and_scope, user_fmt, args);
+        },
         .full => core.panic("UNIMPLEMENTED", null), // TODO: full log implementation
     }
 }
