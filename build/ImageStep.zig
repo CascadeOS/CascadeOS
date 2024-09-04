@@ -1,17 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Kernel = @import("Kernel.zig");
-const Tool = @import("Tool.zig");
+pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
 
 const ImageStep = @This();
-const StepCollection = @import("StepCollection.zig");
-
-pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
 
 step: Step,
 
@@ -306,3 +298,11 @@ const ImageDescriptionStep = struct {
         return image_description_buffer;
     }
 };
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Kernel = @import("Kernel.zig");
+const Tool = @import("Tool.zig");
+const StepCollection = @import("StepCollection.zig");

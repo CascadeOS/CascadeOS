@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
+pub const DoublyLinkedLIFO = @import("DoublyLinkedLIFO.zig");
+pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
+pub const SinglyLinkedLIFO = @import("SinglyLinkedLIFO.zig");
+
+pub const SegmentedObjectPool = @import("SegmentedObjectPool.zig").SegmentedObjectPool;
+
+pub const RedBlack = struct {
+    const red_black_tree = @import("red_black_tree.zig");
+
+    pub const Tree = red_black_tree.Tree;
+    pub const Node = red_black_tree.Node;
+    pub const Iterator = red_black_tree.Iterator;
+    pub const ComparisonAndMatch = red_black_tree.ComparisonAndMatch;
+};
 
 /// A node with a single next pointer.
 ///
@@ -43,21 +55,6 @@ pub const DoubleNode = extern struct {
     };
 };
 
-pub const DoublyLinkedLIFO = @import("DoublyLinkedLIFO.zig");
-pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
-pub const SinglyLinkedLIFO = @import("SinglyLinkedLIFO.zig");
-
-pub const SegmentedObjectPool = @import("SegmentedObjectPool.zig").SegmentedObjectPool;
-
-pub const RedBlack = struct {
-    const red_black_tree = @import("red_black_tree.zig");
-
-    pub const Tree = red_black_tree.Tree;
-    pub const Node = red_black_tree.Node;
-    pub const Iterator = red_black_tree.Iterator;
-    pub const ComparisonAndMatch = red_black_tree.ComparisonAndMatch;
-};
-
 comptime {
     refAllDeclsRecursive(@This());
 }
@@ -82,3 +79,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");

@@ -1,144 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-const bitjuggle = @import("bitjuggle");
-
-const Direction = enum(u1) {
-    left = 0,
-    right = 1,
-
-    inline fn fromValue(value: u1) Direction {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return @enumFromInt(value);
-    }
-
-    inline fn toValue(self: Direction) u1 {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return @intFromEnum(self);
-    }
-
-    inline fn otherDirection(direction: Direction) Direction {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return Direction.fromValue(1 - direction.toValue());
-    }
-};
-
-const Color = enum(u1) {
-    red = 0,
-    black = 1,
-
-    inline fn fromValue(value: u1) Color {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return @enumFromInt(value);
-    }
-
-    inline fn toValue(self: Color) u1 {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return @intFromEnum(self);
-    }
-};
-
-pub const Node = struct {
-    children: [2]?*Node = .{ null, null },
-
-    // As @alignOf(Node) is 8 this parent pointer has 3 unused bits, allowing us to store the color in the bottom bit.
-    // A new node is always red, which matches up with the pointer being null.
-    _parent: usize = 0,
-
-    const ALL_BITS_EXCEPT_FIRST: usize = ~@as(usize, 1);
-
-    inline fn getParent(self: *const Node) ?*Node {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return @ptrFromInt(self._parent & ALL_BITS_EXCEPT_FIRST);
-    }
-
-    inline fn setParent(self: *Node, parent: ?*Node) void {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        self._parent = @intFromPtr(parent) | self.getColor().toValue();
-    }
-
-    inline fn getColor(self: *const Node) Color {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return Color.fromValue(@truncate(self._parent));
-    }
-
-    inline fn setColor(self: *Node, color: Color) void {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        bitjuggle.setBit(&self._parent, 0, color.toValue());
-    }
-
-    /// Get direction from parent.
-    fn directionWithParent(self: *const Node, parent: *const Node) Direction {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return Direction.fromValue(@intFromBool(parent.children[Direction.right.toValue()] == self));
-    }
-
-    /// Get direction from parent. If parent is null, returns left.
-    fn direction(self: *const Node) Direction {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        if (self.getParent()) |parent| {
-            return directionWithParent(self, parent);
-        }
-
-        return .left;
-    }
-
-    fn sibling(self: *const Node) ?*Node {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        if (self.getParent()) |parent| {
-            return parent.children[self.directionWithParent(parent).otherDirection().toValue()];
-        }
-
-        return null;
-    }
-
-    inline fn setParentAndColorForRoot(self: *Node) void {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        self._parent = Color.black.toValue();
-    }
-
-    fn colorOrBlack(self: ?*const Node) Color {
-        // SAFETY: function is always safe
-        @setRuntimeSafety(false);
-
-        return (self orelse return .black).getColor();
-    }
-
-    comptime {
-        // validate the assumptions we make in order to squeeze the color bit into `_parent`
-        if (@alignOf(Node) != 8) @compileError("'Node' is not 8 byte aligned");
-        if (Color.red.toValue() != 0) @compileError("Color `RED` is not 0");
-    }
-};
-
 /// A red-black tree.
 ///
 /// Not thread-safe.
@@ -648,64 +510,6 @@ pub fn Tree(
     };
 }
 
-pub const ComparisonAndMatch = struct {
-    comparison: core.OrderedComparison,
-    counts_as_a_match: bool,
-};
-
-pub const Iterator = struct {
-    next_node: ?*Node,
-
-    fn init(root_node: ?*Node) Iterator {
-        var node = root_node orelse return .{ .next_node = null };
-
-        while (node.children[Direction.left.toValue()]) |left_child| {
-            node = left_child;
-        }
-
-        return .{
-            .next_node = node,
-        };
-    }
-
-    pub fn next(self: *Iterator) ?*Node {
-        const node = self.next_node orelse return null;
-
-        if (node.children[Direction.right.toValue()]) |right_child| {
-            // next is left most child
-
-            var next_node = right_child;
-
-            while (next_node.children[Direction.left.toValue()]) |left_child| {
-                next_node = left_child;
-            }
-
-            self.next_node = next_node;
-
-            return node;
-        }
-
-        var child_node = node;
-
-        while (true) {
-            const parent = child_node.getParent() orelse {
-                self.next_node = null;
-                return node;
-            };
-
-            const direction_from_parent = child_node.directionWithParent(parent);
-
-            switch (direction_from_parent) {
-                .left => {
-                    self.next_node = parent;
-                    return node;
-                },
-                .right => child_node = parent,
-            }
-        }
-    }
-};
-
 test Tree {
     var tree: Tree(Item.compareNodes) = .{};
 
@@ -809,6 +613,126 @@ test Tree {
     }
 }
 
+pub const Node = struct {
+    children: [2]?*Node = .{ null, null },
+
+    // As @alignOf(Node) is 8 this parent pointer has 3 unused bits, allowing us to store the color in the bottom bit.
+    // A new node is always red, which matches up with the pointer being null.
+    _parent: usize = 0,
+
+    const ALL_BITS_EXCEPT_FIRST: usize = ~@as(usize, 1);
+
+    inline fn getParent(self: *const Node) ?*Node {
+        return @ptrFromInt(self._parent & ALL_BITS_EXCEPT_FIRST);
+    }
+
+    inline fn setParent(self: *Node, parent: ?*Node) void {
+        self._parent = @intFromPtr(parent) | self.getColor().toValue();
+    }
+
+    inline fn getColor(self: *const Node) Color {
+        return Color.fromValue(@truncate(self._parent));
+    }
+
+    inline fn setColor(self: *Node, color: Color) void {
+        bitjuggle.setBit(&self._parent, 0, color.toValue());
+    }
+
+    /// Get direction from parent.
+    fn directionWithParent(self: *const Node, parent: *const Node) Direction {
+        return Direction.fromValue(@intFromBool(parent.children[Direction.right.toValue()] == self));
+    }
+
+    /// Get direction from parent. If parent is null, returns left.
+    fn direction(self: *const Node) Direction {
+        if (self.getParent()) |parent| {
+            return directionWithParent(self, parent);
+        }
+
+        return .left;
+    }
+
+    fn sibling(self: *const Node) ?*Node {
+        if (self.getParent()) |parent| {
+            return parent.children[self.directionWithParent(parent).otherDirection().toValue()];
+        }
+
+        return null;
+    }
+
+    inline fn setParentAndColorForRoot(self: *Node) void {
+        self._parent = Color.black.toValue();
+    }
+
+    fn colorOrBlack(self: ?*const Node) Color {
+        return (self orelse return .black).getColor();
+    }
+
+    comptime {
+        // validate the assumptions we make in order to squeeze the color bit into `_parent`
+        if (@alignOf(Node) != 8) @compileError("'Node' is not 8 byte aligned");
+        if (Color.red.toValue() != 0) @compileError("Color `RED` is not 0");
+    }
+};
+
+pub const ComparisonAndMatch = struct {
+    comparison: core.OrderedComparison,
+    counts_as_a_match: bool,
+};
+
+pub const Iterator = struct {
+    next_node: ?*Node,
+
+    fn init(root_node: ?*Node) Iterator {
+        var node = root_node orelse return .{ .next_node = null };
+
+        while (node.children[Direction.left.toValue()]) |left_child| {
+            node = left_child;
+        }
+
+        return .{
+            .next_node = node,
+        };
+    }
+
+    pub fn next(self: *Iterator) ?*Node {
+        const node = self.next_node orelse return null;
+
+        if (node.children[Direction.right.toValue()]) |right_child| {
+            // next is left most child
+
+            var next_node = right_child;
+
+            while (next_node.children[Direction.left.toValue()]) |left_child| {
+                next_node = left_child;
+            }
+
+            self.next_node = next_node;
+
+            return node;
+        }
+
+        var child_node = node;
+
+        while (true) {
+            const parent = child_node.getParent() orelse {
+                self.next_node = null;
+                return node;
+            };
+
+            const direction_from_parent = child_node.directionWithParent(parent);
+
+            switch (direction_from_parent) {
+                .left => {
+                    self.next_node = parent;
+                    return node;
+                },
+                .right => child_node = parent,
+            }
+        }
+    }
+};
+
 fn countNodes(tree: anytype) usize {
     var count: usize = 0;
 
@@ -820,6 +744,36 @@ fn countNodes(tree: anytype) usize {
 
     return count;
 }
+
+const Direction = enum(u1) {
+    left = 0,
+    right = 1,
+
+    inline fn fromValue(value: u1) Direction {
+        return @enumFromInt(value);
+    }
+
+    inline fn toValue(self: Direction) u1 {
+        return @intFromEnum(self);
+    }
+
+    inline fn otherDirection(direction: Direction) Direction {
+        return Direction.fromValue(1 - direction.toValue());
+    }
+};
+
+const Color = enum(u1) {
+    red = 0,
+    black = 1,
+
+    inline fn fromValue(value: u1) Color {
+        return @enumFromInt(value);
+    }
+
+    inline fn toValue(self: Color) u1 {
+        return @intFromEnum(self);
+    }
+};
 
 const Item = struct {
     value: usize,
@@ -896,3 +850,7 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+const bitjuggle = @import("bitjuggle");

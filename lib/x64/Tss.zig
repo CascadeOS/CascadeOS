@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-
-const x64 = @import("x64");
-
 /// The Task State Segment structure.
 pub const Tss = extern struct {
     _reserved_1: u32 align(1) = 0,
@@ -73,3 +68,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");
+
+const x64 = @import("x64");

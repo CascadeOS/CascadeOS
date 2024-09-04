@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const fs = @import("fs");
-const std = @import("std");
-
 /// FAT12 file allocation table entry.
 pub const FAT12Entry = enum(u12) {
     /// Free cluster.
@@ -501,3 +497,7 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const fs = @import("fs");
+const std = @import("std");

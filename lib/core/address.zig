@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-
 // TODO: Support u32 sized addresses
 
 pub const PhysicalAddress = extern struct {
@@ -55,6 +52,49 @@ pub const VirtualAddress = extern struct {
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }
+};
+
+pub const PhysicalRange = extern struct {
+    address: PhysicalAddress,
+    size: core.Size,
+
+    const name = "PhysicalRange";
+
+    pub usingnamespace RangeMixin(@This());
+};
+
+pub const VirtualRange = extern struct {
+    address: VirtualAddress,
+    size: core.Size,
+
+    const name = "VirtualRange";
+
+    /// Returns a virtual range corresponding to the given slice.
+    pub fn fromSlice(comptime T: type, slice: []const T) VirtualRange {
+        return .{
+            .address = VirtualAddress.fromPtr(slice.ptr),
+            .size = core.Size.from(@sizeOf(T) * slice.len, .byte),
+        };
+    }
+
+    /// Returns a slice of type `T` corresponding to this virtual range.
+    ///
+    /// It is the caller's responsibility to ensure that the range is valid in the current address space.
+    pub fn toSlice(self: VirtualRange, comptime T: type) ![]T {
+        const len = try std.math.divExact(u64, self.size.value, @sizeOf(T));
+        return self.address.toPtr([*]T)[0..len];
+    }
+
+    /// Returns a byte slice of the memory corresponding to this virtual range.
+    ///
+    /// It is the caller's responsibility to ensure:
+    ///   - the range is valid in the current address space
+    ///   - no writes are performed if the range is read-only
+    pub inline fn toByteSlice(self: VirtualRange) []u8 {
+        return self.address.toPtr([*]u8)[0..self.size.value];
+    }
+
+    pub usingnamespace RangeMixin(@This());
 };
 
 fn AddrMixin(comptime Self: type) type {
@@ -162,49 +202,6 @@ fn AddrMixin(comptime Self: type) type {
         }
     };
 }
-
-pub const PhysicalRange = extern struct {
-    address: PhysicalAddress,
-    size: core.Size,
-
-    const name = "PhysicalRange";
-
-    pub usingnamespace RangeMixin(@This());
-};
-
-pub const VirtualRange = extern struct {
-    address: VirtualAddress,
-    size: core.Size,
-
-    const name = "VirtualRange";
-
-    /// Returns a virtual range corresponding to the given slice.
-    pub fn fromSlice(comptime T: type, slice: []const T) VirtualRange {
-        return .{
-            .address = VirtualAddress.fromPtr(slice.ptr),
-            .size = core.Size.from(@sizeOf(T) * slice.len, .byte),
-        };
-    }
-
-    /// Returns a slice of type `T` corresponding to this virtual range.
-    ///
-    /// It is the caller's responsibility to ensure that the range is valid in the current address space.
-    pub fn toSlice(self: VirtualRange, comptime T: type) ![]T {
-        const len = try std.math.divExact(u64, self.size.value, @sizeOf(T));
-        return self.address.toPtr([*]T)[0..len];
-    }
-
-    /// Returns a byte slice of the memory corresponding to this virtual range.
-    ///
-    /// It is the caller's responsibility to ensure:
-    ///   - the range is valid in the current address space
-    ///   - no writes are performed if the range is read-only
-    pub inline fn toByteSlice(self: VirtualRange) []u8 {
-        return self.address.toPtr([*]u8)[0..self.size.value];
-    }
-
-    pub usingnamespace RangeMixin(@This());
-};
 
 fn RangeMixin(comptime Self: type) type {
     return struct {
@@ -323,3 +320,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");

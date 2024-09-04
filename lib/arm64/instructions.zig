@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-
-const arm64 = @import("arm64");
-
 /// Halt the CPU.
 pub inline fn halt() void {
     asm volatile ("wfe");
@@ -69,3 +64,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");
+
+const arm64 = @import("arm64");

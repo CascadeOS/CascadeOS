@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-
-const acpi = @import("acpi");
-
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#root-system-description-pointer-rsdp-structure)
 pub const RSDP = extern struct {
     /// "RSD PTR "
@@ -119,3 +114,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+
+const acpi = @import("acpi");

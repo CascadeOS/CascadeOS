@@ -1,19 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const helpers = @import("helpers.zig");
-
-const Library = @import("Library.zig");
-const StepCollection = @import("StepCollection.zig");
-const ToolDescription = @import("ToolDescription.zig");
-const Options = @import("Options.zig");
+pub const Collection = std.StringArrayHashMapUnmanaged(Tool);
 
 const Tool = @This();
-
-pub const Collection = std.StringArrayHashMapUnmanaged(Tool);
 
 name: []const u8,
 
@@ -279,3 +269,13 @@ fn addDependenciesToModule(
         module.addImport(dep.import_name, dep_module);
     }
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const helpers = @import("helpers.zig");
+
+const Library = @import("Library.zig");
+const StepCollection = @import("StepCollection.zig");
+const ToolDescription = @import("ToolDescription.zig");
+const Options = @import("Options.zig");

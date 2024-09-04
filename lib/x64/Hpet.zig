@@ -5,11 +5,6 @@
 //!
 //! [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
 
-const core = @import("core");
-const std = @import("std");
-
-const x64 = @import("x64");
-
 const Hpet = @This();
 
 base: [*]volatile u64,
@@ -258,3 +253,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");
+
+const x64 = @import("x64");

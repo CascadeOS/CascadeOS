@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-
 pub fn ValueTypeMixin(comptime Self: type) type {
     return struct {
         const FieldT: type = std.meta.fieldInfo(Self, .value).type;
@@ -111,3 +108,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");

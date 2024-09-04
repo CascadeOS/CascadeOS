@@ -19,9 +19,6 @@
 //! In any future versions of this specification added fields or data structures will be clearly marked with the
 //! version they are available from.
 
-const std = @import("std");
-const big_endian = @import("builtin").cpu.arch.endian() == .big;
-
 pub const version: u8 = 1;
 
 /// Magic bytes to identify the data as SDF.
@@ -616,3 +613,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const big_endian = @import("builtin").cpu.arch.endian() == .big;

@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-
-const x64 = @import("x64");
-
 /// The Global Descriptor Table for x64.
 pub const Gdt = extern struct {
     descriptors: [7]u64 = [7]u64{
@@ -27,11 +22,11 @@ pub const Gdt = extern struct {
         tss = 0x28,
     };
 
-    const mask_u8: u64 = std.math.maxInt(u8);
-    const mask_u16: u64 = std.math.maxInt(u16);
-    const mask_u24: u64 = std.math.maxInt(u24);
-
     pub fn setTss(self: *Gdt, tss: *x64.Tss) void {
+        const mask_u8: u64 = std.math.maxInt(u8);
+        const mask_u16: u64 = std.math.maxInt(u16);
+        const mask_u24: u64 = std.math.maxInt(u24);
+
         const tss_ptr = @intFromPtr(tss);
 
         const low_base: u64 = (tss_ptr & mask_u24) << 16;
@@ -122,3 +117,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");
+
+const x64 = @import("x64");

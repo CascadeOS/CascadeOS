@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-
 /// Represents a duration.
 pub const Duration = extern struct {
     /// The duration in nanoseconds.
     value: u64,
 
-    pub usingnamespace core.ValueTypeMixin(@This());
+    pub usingnamespace ValueTypeMixin(@This());
 
     pub const Unit = enum(u64) {
         nanosecond = 1,
@@ -132,3 +129,7 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+const ValueTypeMixin = @import("value_type_mixin.zig").ValueTypeMixin;

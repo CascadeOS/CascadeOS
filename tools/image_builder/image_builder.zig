@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-const UUID = @import("uuid").UUID;
-const fs = @import("fs");
-
-const gpt = fs.gpt;
-const fat = fs.fat;
-const mbr = fs.mbr;
-
-const ImageDescription = @import("ImageDescription.zig");
-
-const disk_block_size = core.Size.from(512, .byte);
+const disk_block_size: core.Size = .from(512, .byte);
 
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
@@ -974,3 +963,14 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+const UUID = @import("uuid").UUID;
+const fs = @import("fs");
+
+const gpt = fs.gpt;
+const fat = fs.fat;
+const mbr = fs.mbr;
+
+const ImageDescription = @import("ImageDescription.zig");

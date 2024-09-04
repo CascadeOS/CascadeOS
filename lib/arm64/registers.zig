@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-
-const aarch64 = @import("aarch64");
-
 pub const TPIDR_EL1 = MSR(u64, "TPIDR_EL1");
 
 pub fn MSR(comptime T: type, comptime name: []const u8) type {
@@ -56,3 +51,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");
+
+const aarch64 = @import("aarch64");

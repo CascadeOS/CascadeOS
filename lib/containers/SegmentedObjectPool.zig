@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-const containers = @import("containers");
-
-const builtin = @import("builtin");
-
 /// An object pool using a free list backed by a segmented array.
 ///
 /// Each segment of the array is the same fixed size.
@@ -30,7 +24,10 @@ pub fn SegmentedObjectPool(
         /// Get an object from the pool.
         pub fn get(self: *Self) error{SegmentAllocationFailed}!*T {
             const node = blk: {
-                if (self.free_list.pop()) |node| break :blk node;
+                if (self.free_list.pop()) |node| {
+                    @branchHint(.likely);
+                    break :blk node;
+                }
 
                 try self.allocateNewSegment();
 
@@ -55,8 +52,6 @@ pub fn SegmentedObjectPool(
         }
 
         fn allocateNewSegment(self: *Self) error{SegmentAllocationFailed}!void {
-            @branchHint(.unlikely);
-
             const bytes = try allocateSegmentBackingMemory();
             std.debug.assert(bytes.len == segment_size.value);
 
@@ -122,3 +117,9 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+const containers = @import("containers");
+
+const builtin = @import("builtin");

@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const LibraryDependency = @import("LibraryDependency.zig");
-
 /// The name of the library:
 ///   - used as the name of the module provided `@import("{name}");` (unless overridden with `LibraryDependency.import_name`)
 ///   - used to build the root file path `libraries/{name}/{name}.zig`
@@ -27,3 +22,8 @@ is_cascade_only: bool = false,
 ///
 /// If `null`, defaults to "name.zig".
 root_file_name: ?[]const u8 = null,
+
+const std = @import("std");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const LibraryDependency = @import("LibraryDependency.zig");

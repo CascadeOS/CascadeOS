@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-
-const acpi = @import("acpi");
-
 /// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {
     header: acpi.SharedHeader align(1),
@@ -46,3 +41,33 @@ pub const MCFG = extern struct {
         core.testing.expectSize(@This(), @sizeOf(acpi.SharedHeader) + @sizeOf(BaseAllocation) + @sizeOf(u64));
     }
 };
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .@"struct" => |info| info.decls,
+        .@"enum" => |info| info.decls,
+        .@"union" => |info| info.decls,
+        .@"opaque" => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}
+
+const core = @import("core");
+const std = @import("std");
+
+const acpi = @import("acpi");

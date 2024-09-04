@@ -7,52 +7,6 @@
 //! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.0.5/PROTOCOL.md)
 //!
 
-const core = @import("core");
-const std = @import("std");
-
-const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
-
-/// The bootloader can be told to start and/or stop searching for requests (including base revision tags) in an
-/// executable's loaded image by placing start and/or end markers, on an 8-byte aligned boundary.
-///
-/// The bootloader will only accept requests placed between the last start marker found (if there happen to be more
-/// than 1, which there should not, ideally) and the first end marker found.
-///
-/// For base revisions 0 and 1, the requests delimiters are *hints*. The bootloader can still search for requests
-/// and base revision tags outside the delimited area if it doesn't support the hints.
-///
-/// Base revision 2's sole difference compared to base revision 1 is that support for request delimiters has to be
-/// provided and the delimiters must be honoured, if present, rather than them just being a hint.
-pub const RequestDelimiters = struct {
-    pub const start_marker = extern struct {
-        id: [4]u64 = [_]u64{
-            0xf6b8f4b39de7d1ae, 0xfab91a6940fcb9cf,
-            0x785c6ed015d3e316, 0x181e920a7852b9d9,
-        },
-    };
-
-    pub const end_marker = extern struct {
-        id: [2]u64 = [_]u64{
-            0xadc0e0531bb10d03, 0x9572709f31764c62,
-        },
-    };
-};
-
-const Arch = enum {
-    aarch64,
-    loongarch64,
-    riscv64,
-    x86_64,
-};
-
-const arch: Arch = switch (@import("builtin").cpu.arch) {
-    .aarch64 => .aarch64,
-    .loongarch64 => .loongarch64,
-    .riscv64 => .riscv64,
-    .x86_64 => .x86_64,
-    else => |e| @compileError("unsupported architecture " ++ @tagName(e)),
-};
-
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
 /// needed throughout this specification.
@@ -89,6 +43,32 @@ pub const BaseRevison = extern struct {
     /// bootloader does not yet support the kernel's requested base revision,
     /// it is up to the kernel itself to fail (or handle the condition otherwise).
     revison: u64,
+};
+
+/// The bootloader can be told to start and/or stop searching for requests (including base revision tags) in an
+/// executable's loaded image by placing start and/or end markers, on an 8-byte aligned boundary.
+///
+/// The bootloader will only accept requests placed between the last start marker found (if there happen to be more
+/// than 1, which there should not, ideally) and the first end marker found.
+///
+/// For base revisions 0 and 1, the requests delimiters are *hints*. The bootloader can still search for requests
+/// and base revision tags outside the delimited area if it doesn't support the hints.
+///
+/// Base revision 2's sole difference compared to base revision 1 is that support for request delimiters has to be
+/// provided and the delimiters must be honoured, if present, rather than them just being a hint.
+pub const RequestDelimiters = struct {
+    pub const start_marker = extern struct {
+        id: [4]u64 = [_]u64{
+            0xf6b8f4b39de7d1ae, 0xfab91a6940fcb9cf,
+            0x785c6ed015d3e316, 0x181e920a7852b9d9,
+        },
+    };
+
+    pub const end_marker = extern struct {
+        id: [2]u64 = [_]u64{
+            0xadc0e0531bb10d03, 0x9572709f31764c62,
+        },
+    };
 };
 
 /// Bootloader Info Feature
@@ -840,6 +820,23 @@ pub const File = extern struct {
     };
 };
 
+const LIMINE_COMMON_MAGIC = [_]u64{ 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b };
+
+const Arch = enum {
+    aarch64,
+    loongarch64,
+    riscv64,
+    x86_64,
+};
+
+const arch: Arch = switch (@import("builtin").cpu.arch) {
+    .aarch64 => .aarch64,
+    .loongarch64 => .loongarch64,
+    .riscv64 => .riscv64,
+    .x86_64 => .x86_64,
+    else => |e| @compileError("unsupported architecture " ++ @tagName(e)),
+};
+
 comptime {
     refAllDeclsRecursive(@This());
 }
@@ -864,3 +861,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");

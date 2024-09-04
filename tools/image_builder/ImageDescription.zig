@@ -3,8 +3,6 @@
 
 // NOTE: This file is imported in build.zig so cannot import any modules.
 
-const std = @import("std");
-
 const ImageDescription = @This();
 
 /// Total size of the image.
@@ -222,3 +220,5 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");

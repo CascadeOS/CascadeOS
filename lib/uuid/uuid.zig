@@ -3,9 +3,6 @@
 // SPDX-FileCopyrightText: 2015 Jiri Svoboda (https://github.com/HelenOS/helenos)
 // SPDX-FileCopyrightText: 2021 Dmitri Goutnik (https://github.com/dmgk/zig-uuid)
 
-const std = @import("std");
-const core = @import("core");
-
 /// Defines a UUID (Universally Unique IDentifier) as defined by RFC 4122.
 pub const UUID = extern struct {
     bytes: [16]u8,
@@ -76,7 +73,7 @@ pub const UUID = extern struct {
                 i += 1;
             }
 
-            const characters_needed = section.charactersNeededToStoreField();
+            const characters_needed = comptime section.charactersNeededToStoreField();
             const ptr: *align(1) const section.field_type = @ptrCast(&self.bytes[section.start_index]);
 
             // TODO: Don't use `std.fmt`
@@ -193,3 +190,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");

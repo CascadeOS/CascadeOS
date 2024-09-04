@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const builtin = @import("builtin");
-
-const helpers = @import("../../build/helpers.zig");
-const ToolDescription = @import("../../build/ToolDescription.zig");
-
 pub fn customConfiguration(
     b: *std.Build,
     tool_description: ToolDescription,
@@ -96,3 +90,9 @@ pub fn customConfiguration(
         });
     }
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+
+const helpers = @import("../../build/helpers.zig");
+const ToolDescription = @import("../../build/ToolDescription.zig");

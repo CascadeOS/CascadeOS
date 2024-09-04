@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-
 pub const InterruptVector = enum(u8) {
     divide = 0,
     debug = 1,
@@ -68,6 +65,7 @@ pub const InterruptVector = enum(u8) {
         return false;
     }
 };
+
 comptime {
     refAllDeclsRecursive(@This());
 }
@@ -92,3 +90,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");

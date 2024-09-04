@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Options = @import("Options.zig");
-
 const StepCollection = @This();
 
 /// A map from targets to their kernel build steps.
-kernel_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+kernel_build_steps_per_target: Steps,
 
 /// A map from targets to their image build steps.
-image_build_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+image_build_steps_per_target: Steps,
 
 /// A map from targets to their non-Cascade library test steps.
-non_cascade_library_test_steps_per_target: std.AutoHashMapUnmanaged(CascadeTarget, *Step),
+non_cascade_library_test_steps_per_target: Steps,
 
 tools_build_step: *Step,
 tools_test_step: *Step,
@@ -173,8 +167,8 @@ fn buildPerTargetSteps(
     relevant_all_step: *Step,
     comptime name_fmt: []const u8,
     comptime description_fmt: []const u8,
-) !std.AutoHashMapUnmanaged(CascadeTarget, *Step) {
-    var map: std.AutoHashMapUnmanaged(CascadeTarget, *Step) = .{};
+) !Steps {
+    var map: Steps = .{};
     errdefer map.deinit(b.allocator);
 
     for (targets) |target| {
@@ -189,3 +183,10 @@ fn buildPerTargetSteps(
 
     return map;
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Options = @import("Options.zig");
+const Steps = std.AutoHashMapUnmanaged(CascadeTarget, *Step);

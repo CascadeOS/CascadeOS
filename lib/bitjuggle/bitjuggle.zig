@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const builtin = @import("builtin");
-
 /// Returns `true` if the the bit at index `bit` is set (equals 1).
 ///
 /// Note: that index 0 is the least significant bit, while index `length() - 1` is the most significant bit.
@@ -15,9 +12,6 @@ const builtin = @import("builtin");
 /// try std.testing.expect(isBitSet(a, 1));
 /// ```
 pub inline fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
-    // SAFETY: comptime checks ensure function is always safe
-    @setRuntimeSafety(false);
-
     const TargetType = @TypeOf(target);
 
     comptime {
@@ -48,8 +42,8 @@ pub inline fn isBitSet(target: anytype, comptime bit: comptime_int) bool {
 }
 
 test isBitSet {
-    // comptime_int
-    {
+    // comptime
+    comptime {
         const a: comptime_int = 0b00000000;
         try std.testing.expect(!isBitSet(a, 0));
         try std.testing.expect(!isBitSet(a, 1));
@@ -63,19 +57,19 @@ test isBitSet {
         try std.testing.expect(isBitSet(c, 1));
     }
 
-    // Runtime
+    // runtime
     {
-        const a: u8 = 0b00000000;
-        try std.testing.expect(!isBitSet(a, 0));
-        try std.testing.expect(!isBitSet(a, 1));
+        var value: u8 = 0b00000000;
+        try std.testing.expect(!isBitSet(value, 0));
+        try std.testing.expect(!isBitSet(value, 1));
 
-        const b: u8 = 0b11111111;
-        try std.testing.expect(isBitSet(b, 0));
-        try std.testing.expect(isBitSet(b, 1));
+        value = 0b11111111;
+        try std.testing.expect(isBitSet(value, 0));
+        try std.testing.expect(isBitSet(value, 1));
 
-        const c: u8 = 0b00000010;
-        try std.testing.expect(!isBitSet(c, 0));
-        try std.testing.expect(isBitSet(c, 1));
+        value = 0b00000010;
+        try std.testing.expect(!isBitSet(value, 0));
+        try std.testing.expect(isBitSet(value, 1));
     }
 }
 
@@ -90,15 +84,12 @@ test isBitSet {
 /// try std.testing.expect(getBit(a, 1) == 1);
 /// ```
 pub inline fn getBit(target: anytype, comptime bit: comptime_int) u1 {
-    // SAFETY: function is always safe
-    @setRuntimeSafety(false);
-
     return @intFromBool(isBitSet(target, bit));
 }
 
 test getBit {
-    // comptime_int
-    {
+    // comptime
+    comptime {
         const a: comptime_int = 0b00000000;
         try std.testing.expectEqual(@as(u1, 0), getBit(a, 0));
         try std.testing.expectEqual(@as(u1, 0), getBit(a, 1));
@@ -112,19 +103,19 @@ test getBit {
         try std.testing.expectEqual(@as(u1, 1), getBit(c, 1));
     }
 
-    // Runtime
+    // runtime
     {
-        const a: u8 = 0b00000000;
-        try std.testing.expectEqual(@as(u1, 0), getBit(a, 0));
-        try std.testing.expectEqual(@as(u1, 0), getBit(a, 1));
+        var value: u8 = 0b00000000;
+        try std.testing.expectEqual(@as(u1, 0), getBit(value, 0));
+        try std.testing.expectEqual(@as(u1, 0), getBit(value, 1));
 
-        const b: u8 = 0b11111111;
-        try std.testing.expectEqual(@as(u1, 1), getBit(b, 0));
-        try std.testing.expectEqual(@as(u1, 1), getBit(b, 1));
+        value = 0b11111111;
+        try std.testing.expectEqual(@as(u1, 1), getBit(value, 0));
+        try std.testing.expectEqual(@as(u1, 1), getBit(value, 1));
 
-        const c: u8 = 0b00000010;
-        try std.testing.expectEqual(@as(u1, 0), getBit(c, 0));
-        try std.testing.expectEqual(@as(u1, 1), getBit(c, 1));
+        value = 0b00000010;
+        try std.testing.expectEqual(@as(u1, 0), getBit(value, 0));
+        try std.testing.expectEqual(@as(u1, 1), getBit(value, 1));
     }
 }
 
@@ -142,9 +133,6 @@ pub inline fn getBits(
     comptime start_bit: comptime_int,
     comptime number_of_bits: comptime_int,
 ) std.meta.Int(.unsigned, number_of_bits) {
-    // SAFETY: comptime checks ensure function is always safe
-    @setRuntimeSafety(false);
-
     const TargetType = @TypeOf(target);
 
     comptime {
@@ -162,7 +150,7 @@ pub inline fn getBits(
             }
         } else if (@typeInfo(TargetType) == .comptime_int) {
             if (target < 0) {
-                @compileError("requires an positive integer, found a negative");
+                @compileError("requires a positive integer, found a negative");
             }
         } else {
             @compileError("requires an unsigned integer, found " ++ @typeName(TargetType));
@@ -173,18 +161,26 @@ pub inline fn getBits(
 }
 
 test getBits {
-    // comptime_int
-    {
+    // comptime
+    comptime {
         const a: comptime_int = 0b01101100;
         const b = getBits(a, 2, 4);
         try std.testing.expectEqual(@as(u4, 0b1011), b);
     }
 
-    // Runtime
+    // runtime
     {
-        const a: u8 = 0b01101100;
-        const b = getBits(a, 2, 4);
-        try std.testing.expectEqual(@as(u4, 0b1011), b);
+        var value: u8 = 0b01101100;
+        try std.testing.expectEqual(
+            @as(u4, 0b1011),
+            getBits(value, 2, 4),
+        );
+
+        value = 0b01101100;
+        try std.testing.expectEqual(
+            @as(u3, 0b100),
+            getBits(value, 0, 3),
+        );
     }
 }
 
@@ -199,9 +195,6 @@ test getBits {
 /// try std.testing.expect(getBit(val, 0));
 /// ```
 pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) void {
-    // SAFETY: comptime checks ensure function is always safe
-    @setRuntimeSafety(false);
-
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
         if (ptr_type_info != .pointer) @compileError("not a pointer");
@@ -225,9 +218,8 @@ pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) voi
     }
 
     const mask = ~(@as(TargetType, 1) << bit);
-    const peer_value: TargetType = value;
 
-    target.* = (target.* & mask) | (peer_value << bit);
+    target.* = (target.* & mask) | (@as(TargetType, value) << bit);
 }
 
 test setBit {
@@ -248,16 +240,13 @@ test setBit {
 /// ```
 ///
 /// ## Panic
-/// This method will panic if the `value` exceeds the bit range of the type of `target`
+/// In safe modes this method will panic if the `value` exceeds the bit range of the type of `target`.
 pub fn setBits(
     target: anytype,
     comptime start_bit: comptime_int,
     comptime number_of_bits: comptime_int,
     value: anytype,
 ) void {
-    // SAFETY: comptime checks and explicit runtime safety check
-    @setRuntimeSafety(false);
-
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
     comptime {
         if (ptr_type_info != .pointer) @compileError("not a pointer");
@@ -312,17 +301,6 @@ test setBits {
     try std.testing.expectEqual(@as(u8, 0b10110100), val);
 }
 
-/// Casts a pointer while preserving const/volatile qualifiers.
-inline fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime NewT: type) type {
-    return switch (PtrToT) {
-        *T => *NewT,
-        *const T => *const NewT,
-        *volatile T => *volatile NewT,
-        *const volatile T => *const volatile NewT,
-        else => @compileError("invalid type " ++ @typeName(PtrToT) ++ " given to PtrCastPreserveCV"),
-    };
-}
-
 /// Defines a bitfield.
 pub fn Bitfield(
     /// The type of the underlying integer containing the bitfield.
@@ -338,50 +316,41 @@ pub fn Bitfield(
 
     const self_mask: FieldType = ((1 << num_bits) - 1) << shift_amount;
 
-    const ValueType = std.meta.Int(.unsigned, num_bits);
+    const ValueType: type = std.meta.Int(.unsigned, num_bits);
 
     return extern struct {
         dummy: FieldType,
 
         const Self = @This();
 
-        /// A function to access the underlying integer as `FieldType`.
-        /// Uses `anytype` to support both const and non-const access.
-        inline fn field(self: anytype) PtrCastPreserveCV(Self, @TypeOf(self), FieldType) {
-            return @ptrCast(self);
+        pub fn write(self: *Self, val: ValueType) void {
+            self.writeNoShiftFullSize(@as(FieldType, val) << shift_amount);
         }
 
         /// Writes a value to the bitfield without shifting, all bits in `val` not in the bitfield are ignored.
+        ///
+        /// Not atomic.
         pub fn writeNoShiftFullSize(self: *Self, val: FieldType) void {
-            // SAFETY: function is always safe
-            @setRuntimeSafety(false);
-
-            self.field().* &= ~self_mask;
-            self.field().* |= (val & self_mask);
-        }
-
-        pub fn write(self: *Self, val: ValueType) void {
-            // SAFETY: function is always safe
-            @setRuntimeSafety(false);
-
-            self.writeNoShiftFullSize(@as(FieldType, @intCast(val)) << shift_amount);
+            self.field().* =
+                (self.field().* & ~self_mask) |
+                (val & self_mask);
         }
 
         pub fn read(self: Self) ValueType {
-            // SAFETY: function is always safe
-            @setRuntimeSafety(false);
-
-            return @intCast(self.readNoShiftFullSize() >> shift_amount);
+            return @truncate(self.readNoShiftFullSize() >> shift_amount);
         }
 
         /// Reads the full value of the bitfield without shifting and without truncating the type.
         ///
         /// All bits not in the bitfield will be zero.
         pub inline fn readNoShiftFullSize(self: Self) FieldType {
-            // SAFETY: function is always safe
-            @setRuntimeSafety(false);
-
             return (self.field().* & self_mask);
+        }
+
+        /// A function to access the underlying integer as `FieldType`.
+        /// Uses `anytype` to support both const and non-const access.
+        inline fn field(self: anytype) PtrCastPreserveCV(Self, @TypeOf(self), FieldType) {
+            return @ptrCast(self);
         }
     };
 }
@@ -422,16 +391,10 @@ fn BitType(
         const Self = @This();
 
         pub fn read(self: Self) ValueType {
-            // SAFETY: function is always safe
-            @setRuntimeSafety(false);
-
             return @bitCast(getBit(self.bits.field().*, shift_amount));
         }
 
         pub fn write(self: *Self, val: ValueType) void {
-            // SAFETY: function is always safe
-            @setRuntimeSafety(false);
-
             setBit(self.bits.field(), shift_amount, @bitCast(val));
         }
     };
@@ -499,6 +462,17 @@ test Boolean {
     try std.testing.expect(s.val == 1);
 }
 
+/// Casts a pointer while preserving const/volatile qualifiers.
+inline fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime NewT: type) type {
+    return switch (PtrToT) {
+        *T => *NewT,
+        *const T => *const NewT,
+        *volatile T => *volatile NewT,
+        *const volatile T => *const volatile NewT,
+        else => @compileError("invalid type " ++ @typeName(PtrToT) ++ " given to PtrCastPreserveCV"),
+    };
+}
+
 comptime {
     if (builtin.cpu.arch.endian() != .little) @compileError("'bitjuggle' assumes little endian");
 }
@@ -527,3 +501,6 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const builtin = @import("builtin");

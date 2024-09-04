@@ -1,20 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const builtin = @import("builtin");
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
-const DepGraphStep = @import("build/DepGraphStep.zig");
-const ImageStep = @import("build/ImageStep.zig");
-const Kernel = @import("build/Kernel.zig");
-const Library = @import("build/Library.zig");
-const Options = @import("build/Options.zig");
-const QemuStep = @import("build/QemuStep.zig");
-const StepCollection = @import("build/StepCollection.zig");
-const Tool = @import("build/Tool.zig");
-
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
 const min_zig_version = "0.14.0-dev.1409+6d2945f1f";
 
@@ -130,3 +116,17 @@ comptime {
         ));
     }
 }
+
+const builtin = @import("builtin");
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
+const DepGraphStep = @import("build/DepGraphStep.zig");
+const ImageStep = @import("build/ImageStep.zig");
+const Kernel = @import("build/Kernel.zig");
+const Library = @import("build/Library.zig");
+const Options = @import("build/Options.zig");
+const QemuStep = @import("build/QemuStep.zig");
+const StepCollection = @import("build/StepCollection.zig");
+const Tool = @import("build/Tool.zig");

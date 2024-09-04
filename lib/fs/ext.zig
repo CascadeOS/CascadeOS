@@ -3,11 +3,6 @@
 
 // TODO: This file is *very* WIP.
 
-const core = @import("core");
-const fs = @import("fs");
-const std = @import("std");
-const UUID = @import("uuid").UUID;
-
 pub const signature: u16 = 0xef53;
 
 /// The superblock is always 1024 bytes from the beginning of the file system.
@@ -1116,3 +1111,8 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const fs = @import("fs");
+const std = @import("std");
+const UUID = @import("uuid").UUID;

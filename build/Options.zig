@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-
 const Options = @This();
 
 /// The build directory root path
@@ -80,7 +75,7 @@ kernel_force_debug_log: bool,
 kernel_option_module: *std.Build.Module,
 
 /// Hash map of target to module containing target-specific kernel options.
-target_specific_kernel_options_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+target_specific_kernel_options_modules: Modules,
 
 /// Module containing CascadeOS options.
 cascade_os_options_module: *std.Build.Module,
@@ -233,8 +228,8 @@ fn buildCascadeOptionModule(b: *std.Build, is_cascade: bool) *std.Build.Module {
 fn buildKernelTargetOptionModules(
     b: *std.Build,
     targets: []const CascadeTarget,
-) !std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) {
-    var target_option_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+) !Modules {
+    var target_option_modules: Modules = .{};
     errdefer target_option_modules.deinit(b.allocator);
 
     try target_option_modules.ensureTotalCapacity(b.allocator, @intCast(targets.len));
@@ -361,3 +356,9 @@ fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion, r
         },
     }
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Modules = std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module);

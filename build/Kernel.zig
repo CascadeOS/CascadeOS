@@ -1,20 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const helpers = @import("helpers.zig");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Library = @import("Library.zig");
-const Options = @import("Options.zig");
-const Tool = @import("Tool.zig");
-const StepCollection = @import("StepCollection.zig");
+pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
 
 const Kernel = @This();
-
-const kernel_dependencies = @import("../kernel/dependencies.zig");
 
 b: *std.Build,
 
@@ -28,8 +17,6 @@ install_kernel_binaries: *Step,
 
 /// only used for generating a dependency graph
 dependencies: []const Library.Dependency,
-
-pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
 
 pub fn getKernels(
     b: *std.Build,
@@ -67,6 +54,8 @@ fn create(
     options: Options,
     step_collection: StepCollection,
 ) !Kernel {
+    const kernel_dependencies = @import("../kernel/dependencies.zig");
+
     const dependencies = blk: {
         var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
         defer dependencies.deinit();
@@ -463,3 +452,14 @@ fn addFilesRecursive(
         }
     }
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const helpers = @import("helpers.zig");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Library = @import("Library.zig");
+const Options = @import("Options.zig");
+const Tool = @import("Tool.zig");
+const StepCollection = @import("StepCollection.zig");

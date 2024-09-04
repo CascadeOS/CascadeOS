@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const LibraryDependency = @import("LibraryDependency.zig");
-
 const ToolDescription = @This();
 
 /// The name of the tool:
@@ -21,3 +17,7 @@ custom_configuration: ?*const fn (
     tool_description: ToolDescription,
     exe: *std.Build.Step.Compile,
 ) void = null,
+
+const std = @import("std");
+
+const LibraryDependency = @import("LibraryDependency.zig");

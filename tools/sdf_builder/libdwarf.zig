@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const core = @import("core");
-
-const c = @cImport({
-    @cInclude("dwarf.h");
-    @cInclude("libdwarf.h");
-});
-
-const DwarfError = error{DwarfError};
-
 pub fn initPath(path: [:0]const u8) DwarfDebug {
     var dwarf_debug: c.Dwarf_Debug = undefined;
 
@@ -642,6 +632,8 @@ pub const DW_TAG = enum(c.Dwarf_Half) {
     _,
 };
 
+const DwarfError = error{DwarfError};
+
 fn toResultNoEntry(return_value: c_int) DwarfError!bool {
     return switch (return_value) {
         c.DW_DLV_ERROR => error.DwarfError,
@@ -658,3 +650,36 @@ fn toResult(return_value: c_int) !void {
         else => |v| core.panicFmt("unknown libdwarf return value: {}", .{v}, null),
     }
 }
+
+comptime {
+    refAllDeclsRecursive(@This());
+}
+
+// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+
+    inline for (switch (@typeInfo(T)) {
+        .@"struct" => |info| info.decls,
+        .@"enum" => |info| info.decls,
+        .@"union" => |info| info.decls,
+        .@"opaque" => |info| info.decls,
+        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
+    }) |decl| {
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
+}
+
+const std = @import("std");
+const core = @import("core");
+
+const c = @cImport({
+    @cInclude("dwarf.h");
+    @cInclude("libdwarf.h");
+});

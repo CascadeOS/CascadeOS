@@ -3,60 +3,38 @@
 
 //! Provides access to CPU information.
 //!
+//! **Note:** The `capture` function must be called in order to populate the CPUID information.
+//!
 //! Specification's used:
 //!  - "Intel 64 and IA-32 Architectures Software Developer's Manual Volume 2A December 2023"
 //!  - "AMD64 Architecture Programmer's Manual Volume 3: General-Purpose and System Instructions 3.35 June 2023"
 //!
 
-// TODO: CPUID.02H - TLB/Cache/Prefetch Information (Intel Only)
-// TODO: CPUID.03H - Processor Serial Number (Intel Only)
-// TODO: CPUID.04H - Deterministic Cache Parameters (Intel Only)
-// TODO: CPUID.05H - MONITOR/MWAIT
-// TODO: CPUID.09H - Direct Cache Access Information (Intel Only)
-// TODO: CPUID.0AH - Architectural Performance Monitoring (Intel Only)
-// TODO: CPUID.0BH - Extended Topology Enumeration
-// TODO: CPUID.0DH - Processor Extended State Enumeration
-// TODO: CPUID.0FH - Intel Resource Director Technology Monitoring Enumeration Information (Intel Only)
-// TODO: CPUID.0FH - PQOS Monitoring (AMD Only)
-// TODO: CPUID.10H - Intel Resource Director Technology Allocation Enumeration Information (Intel Only)
-// TODO: CPUID.10H - PQOS Enforcement (AMD Only)
-// TODO: CPUID.12H - Intel SGX Enumeration Information (Intel Only)
-// TODO: CPUID.14H - Intel Processor Trace Enumeration Information (Intel Only)
-// TODO: CPUID.17H - System-On-Chip Information (Intel Only)
-// TODO: CPUID.18H - Deterministic Address Translation Parameters (Intel Only)
-// TODO: CPUID.19H - Key Locker (Intel Only)
-// TODO: CPUID.1AH - Native Model ID Enumeration (Intel Only)
-// TODO: CPUID.1BH - PCONFIG Information Sub-leaf (Intel Only)
-// TODO: CPUID.1CH - Last Branch Records Information (Intel Only)
-// TODO: CPUID.1DH - Tile Information (Intel Only)
-// TODO: CPUID.1EH - TMUL Information (Intel Only)
-// TODO: CPUID.1FH - V2 Extended Topology Enumeration (Intel Only)
-// TODO: CPUID.20H - History Reset Information (Intel Only)
-// TODO: CPUID.80000005H - L1 Cache and TLB Information (AMD Only)
-// TODO: CPUID.80000006H - L2 Cache and TLB and L3 Cache Information (AMD Only)
-// TODO: CPUID.80000006H - Cache stuff (Intel Only)
-// TODO: CPUID.80000008H - Processor Capacity Parameters and Extended Feature Identification (AMD Only)
-// TODO: CPUID.80000008H - Address bits (Intel Only)
-// TODO: CPUID.8000000AH - SVM Features (AMD Only)
-// TODO: CPUID.80000019H - TLB Characteristics for 1GB pages (AMD Only)
-// TODO: CPUID.8000001AH - Instruction Optimizations (AMD Only)
-// TODO: CPUID.8000001BH - Instruction-Based Sampling Capabilities (AMD Only)
-// TODO: CPUID.8000001CH - Lightweight Profiling Capabilities (AMD Only)
-// TODO: CPUID.8000001DH - Cache Topology Information (AMD Only)
-// TODO: CPUID.8000001EH - Processor Topology Information (AMD Only)
-// TODO: CPUID.8000001FH - Encrypted Memory Capabilities (AMD Only)
-// TODO: CPUID.80000020H - PQOS Extended Features (AMD Only)
-// TODO: CPUID.80000021H - Extended Feature Identification 2 (AMD Only)
-// TODO: CPUID.80000022H - Extended Performance Monitoring and Debug (AMD Only)
-// TODO: CPUID.80000023H - Multi-Key Encrypted Memory Capabilities (AMD Only)
-// TODO: CPUID.80000026H - Extended CPU Topology (AMD Only)
-// TODO: Processor Brand String's - Search "The Processor Brand String Method" in the Intel manual.
+/// Capture the CPUID information.
+pub fn capture() !void {
+    if (!isAvailable()) return error.CpuIdNotSupported;
 
-const std = @import("std");
-const core = @import("core");
-const bitjuggle = @import("bitjuggle");
+    capture00H();
+    vendor = determineVendor();
+    capture01H();
+    capture06H();
+    capture07H();
+    capture15H();
+    capture16H();
 
-const x64 = @import("x64");
+    capture80000000H();
+    capture80000001H();
+    capture80000002H_80000004H();
+    capture80000007H();
+
+    if (hypervisor_present) {
+        capture40000000H();
+
+        hypervisor = determineHypervisor();
+
+        capture40000010H();
+    }
+}
 
 /// Returns true if CPUID is available.
 ///
@@ -2330,9 +2308,7 @@ pub fn determineCrystalFrequency() ?u64 {
         const processor_frequency_info = intel_processor_frequency_information.?;
 
         crystal_hz =
-            (processor_frequency_info.processor_base_frequency *
-            hz_per_mhz *
-            tsc_and_core_crystal_info.denominator) /
+            (processor_frequency_info.processor_base_frequency * hz_per_mhz * tsc_and_core_crystal_info.denominator) /
             tsc_and_core_crystal_info.numerator;
     }
 
@@ -2358,31 +2334,6 @@ pub fn determineTscFrequency() ?u64 {
     }
 
     return null;
-}
-
-pub fn capture() !void {
-    if (!isAvailable()) return error.CpuIdNotSupported;
-
-    capture00H();
-    vendor = determineVendor();
-    capture01H();
-    capture06H();
-    capture07H();
-    capture15H();
-    capture16H();
-
-    capture80000000H();
-    capture80000001H();
-    capture80000002H_80000004H();
-    capture80000007H();
-
-    if (hypervisor_present) {
-        capture40000000H();
-
-        hypervisor = determineHypervisor();
-
-        capture40000010H();
-    }
 }
 
 /// Captures CPUID.00H.
@@ -3285,3 +3236,53 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+const bitjuggle = @import("bitjuggle");
+
+const x64 = @import("x64");
+
+// TODO: CPUID.02H - TLB/Cache/Prefetch Information (Intel Only)
+// TODO: CPUID.03H - Processor Serial Number (Intel Only)
+// TODO: CPUID.04H - Deterministic Cache Parameters (Intel Only)
+// TODO: CPUID.05H - MONITOR/MWAIT
+// TODO: CPUID.09H - Direct Cache Access Information (Intel Only)
+// TODO: CPUID.0AH - Architectural Performance Monitoring (Intel Only)
+// TODO: CPUID.0BH - Extended Topology Enumeration
+// TODO: CPUID.0DH - Processor Extended State Enumeration
+// TODO: CPUID.0FH - Intel Resource Director Technology Monitoring Enumeration Information (Intel Only)
+// TODO: CPUID.0FH - PQOS Monitoring (AMD Only)
+// TODO: CPUID.10H - Intel Resource Director Technology Allocation Enumeration Information (Intel Only)
+// TODO: CPUID.10H - PQOS Enforcement (AMD Only)
+// TODO: CPUID.12H - Intel SGX Enumeration Information (Intel Only)
+// TODO: CPUID.14H - Intel Processor Trace Enumeration Information (Intel Only)
+// TODO: CPUID.17H - System-On-Chip Information (Intel Only)
+// TODO: CPUID.18H - Deterministic Address Translation Parameters (Intel Only)
+// TODO: CPUID.19H - Key Locker (Intel Only)
+// TODO: CPUID.1AH - Native Model ID Enumeration (Intel Only)
+// TODO: CPUID.1BH - PCONFIG Information Sub-leaf (Intel Only)
+// TODO: CPUID.1CH - Last Branch Records Information (Intel Only)
+// TODO: CPUID.1DH - Tile Information (Intel Only)
+// TODO: CPUID.1EH - TMUL Information (Intel Only)
+// TODO: CPUID.1FH - V2 Extended Topology Enumeration (Intel Only)
+// TODO: CPUID.20H - History Reset Information (Intel Only)
+// TODO: CPUID.80000005H - L1 Cache and TLB Information (AMD Only)
+// TODO: CPUID.80000006H - L2 Cache and TLB and L3 Cache Information (AMD Only)
+// TODO: CPUID.80000006H - Cache stuff (Intel Only)
+// TODO: CPUID.80000008H - Processor Capacity Parameters and Extended Feature Identification (AMD Only)
+// TODO: CPUID.80000008H - Address bits (Intel Only)
+// TODO: CPUID.8000000AH - SVM Features (AMD Only)
+// TODO: CPUID.80000019H - TLB Characteristics for 1GB pages (AMD Only)
+// TODO: CPUID.8000001AH - Instruction Optimizations (AMD Only)
+// TODO: CPUID.8000001BH - Instruction-Based Sampling Capabilities (AMD Only)
+// TODO: CPUID.8000001CH - Lightweight Profiling Capabilities (AMD Only)
+// TODO: CPUID.8000001DH - Cache Topology Information (AMD Only)
+// TODO: CPUID.8000001EH - Processor Topology Information (AMD Only)
+// TODO: CPUID.8000001FH - Encrypted Memory Capabilities (AMD Only)
+// TODO: CPUID.80000020H - PQOS Extended Features (AMD Only)
+// TODO: CPUID.80000021H - Extended Feature Identification 2 (AMD Only)
+// TODO: CPUID.80000022H - Extended Performance Monitoring and Debug (AMD Only)
+// TODO: CPUID.80000023H - Multi-Key Encrypted Memory Capabilities (AMD Only)
+// TODO: CPUID.80000026H - Extended CPU Topology (AMD Only)
+// TODO: Processor Brand String's - Search "The Processor Brand String Method" in the Intel manual.

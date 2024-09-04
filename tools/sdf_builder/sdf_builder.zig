@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const builtin = @import("builtin");
-const core = @import("core");
-
-const libdwarf = @import("libdwarf.zig");
-
-const sdf = @import("sdf");
-
-const FileTableBuilder = @import("FileTableBuilder.zig");
-const LocationLookupBuilder = @import("LocationLookupBuilder.zig");
-const LocationProgramBuilder = @import("LocationProgramBuilder.zig");
-const StringTableBuilder = @import("StringTableBuilder.zig");
-
 const default_chunk_size = 8 * 1024;
 
 pub fn main() !void {
@@ -738,3 +725,16 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const core = @import("core");
+
+const libdwarf = @import("libdwarf.zig");
+
+const sdf = @import("sdf");
+
+const FileTableBuilder = @import("FileTableBuilder.zig");
+const LocationLookupBuilder = @import("LocationLookupBuilder.zig");
+const LocationProgramBuilder = @import("LocationProgramBuilder.zig");
+const StringTableBuilder = @import("StringTableBuilder.zig");

@@ -5,12 +5,6 @@
 //!
 //! Not thread-safe.
 
-const std = @import("std");
-const core = @import("core");
-const containers = @import("containers");
-
-const SingleNode = containers.SingleNode;
-
 const SinglyLinkedLIFO = @This();
 
 start_node: ?*SingleNode = null,
@@ -142,3 +136,9 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const std = @import("std");
+const core = @import("core");
+const containers = @import("containers");
+
+const SingleNode = containers.SingleNode;

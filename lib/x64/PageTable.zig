@@ -1,24 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const core = @import("core");
-const std = @import("std");
-const bitjuggle = @import("bitjuggle");
-
-const x64 = @import("x64");
-
 /// A page table for x64.
 pub const PageTable = extern struct {
     entries: [number_of_entries]Entry align(small_page_size.value) = [_]Entry{Entry.empty} ** number_of_entries,
 
     pub const number_of_entries = 512;
-    pub const small_page_size = core.Size.from(4, .kib);
-    pub const medium_page_size = core.Size.from(2, .mib);
-    pub const large_page_size = core.Size.from(1, .gib);
+    pub const small_page_size: core.Size = .from(4, .kib);
+    pub const medium_page_size: core.Size = .from(2, .mib);
+    pub const large_page_size: core.Size = .from(1, .gib);
 
     pub fn zero(self: *PageTable) void {
-        const bytes = std.mem.asBytes(self);
-        @memset(bytes, 0);
+        @memset(std.mem.asBytes(self), 0);
     }
 
     pub fn getEntryLevel4(self: *PageTable, virtual_address: core.VirtualAddress) *Entry {
@@ -497,15 +490,15 @@ const length_of_4kib_aligned_address = maximum_physical_address_bit - level_1_sh
 const length_of_2mib_aligned_address = maximum_physical_address_bit - level_2_shift;
 const length_of_1gib_aligned_address = maximum_physical_address_bit - level_3_shift;
 
-const type_of_4kib = std.meta.Int(
+const type_of_4kib: type = std.meta.Int(
     .unsigned,
     maximum_physical_address_bit - level_1_shift,
 );
-const type_of_2mib = std.meta.Int(
+const type_of_2mib: type = std.meta.Int(
     .unsigned,
     maximum_physical_address_bit - level_2_shift,
 );
-const type_of_1gib = std.meta.Int(
+const type_of_1gib: type = std.meta.Int(
     .unsigned,
     maximum_physical_address_bit - level_3_shift,
 );
@@ -534,3 +527,9 @@ fn refAllDeclsRecursive(comptime T: type) void {
         _ = &@field(T, decl.name);
     }
 }
+
+const core = @import("core");
+const std = @import("std");
+const bitjuggle = @import("bitjuggle");
+
+const x64 = @import("x64");

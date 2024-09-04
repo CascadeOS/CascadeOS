@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const helpers = @import("helpers.zig");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const ImageStep = @import("ImageStep.zig");
-const Options = @import("Options.zig");
-const StepCollection = @import("StepCollection.zig");
-
 const QemuStep = @This();
 
 step: Step,
@@ -174,7 +164,8 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // add display device if needed
     if (self.options.display_mode != .none) {
         switch (self.target) {
-            .arm64, => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .arm64,
+            => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
             .x64 => {},
         }
     }
@@ -212,23 +203,23 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
 
             run_qemu.addArgs(&[_][]const u8{
-                    "-drive",
-                    try std.fmt.allocPrint(
-                        b.allocator,
-                        "if=pflash,format=raw,unit=0,readonly=on,file={s}",
-                        .{firmware_code.getPath2(b, step)},
-                    ),
-                });
+                "-drive",
+                try std.fmt.allocPrint(
+                    b.allocator,
+                    "if=pflash,format=raw,unit=0,readonly=on,file={s}",
+                    .{firmware_code.getPath2(b, step)},
+                ),
+            });
 
-                // this being readonly is not correct but preventing modifcation of a file in the cache is good
-                run_qemu.addArgs(&[_][]const u8{
-                    "-drive",
-                    try std.fmt.allocPrint(
-                        b.allocator,
-                        "if=pflash,format=raw,unit=1,readonly=on,file={s}",
-                        .{firmware_var.getPath2(b, step)},
-                    ),
-                });
+            // this being readonly is not correct but preventing modifcation of a file in the cache is good
+            run_qemu.addArgs(&[_][]const u8{
+                "-drive",
+                try std.fmt.allocPrint(
+                    b.allocator,
+                    "if=pflash,format=raw,unit=1,readonly=on,file={s}",
+                    .{firmware_var.getPath2(b, step)},
+                ),
+            });
         },
     }
 
@@ -260,3 +251,13 @@ fn qemuExecutable(self: CascadeTarget) []const u8 {
         .x64 => "qemu-system-x86_64",
     };
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const helpers = @import("helpers.zig");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const ImageStep = @import("ImageStep.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");

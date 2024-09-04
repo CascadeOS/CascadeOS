@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const helpers = @import("helpers.zig");
-
-const Kernel = @import("Kernel.zig");
-const Library = @import("Library.zig");
-const Tool = @import("Tool.zig");
-
 const DepGraphStep = @This();
 
 b: *std.Build,
@@ -137,3 +128,12 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
     step.result_duration_ns = timer.read();
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const helpers = @import("helpers.zig");
+
+const Kernel = @import("Kernel.zig");
+const Library = @import("Library.zig");
+const Tool = @import("Tool.zig");

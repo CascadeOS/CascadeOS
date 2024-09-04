@@ -1,19 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-const Step = std.Build.Step;
-
-const helpers = @import("helpers.zig");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const LibraryDescription = @import("LibraryDescription.zig");
-const Options = @import("Options.zig");
-const StepCollection = @import("StepCollection.zig");
+pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 
 const Library = @This();
-
-pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 
 /// The name of the library.
 ///
@@ -30,10 +20,10 @@ directory_path: []const u8,
 dependencies: []const Dependency,
 
 /// The modules for each supported Cascade target.
-cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+cascade_modules: Modules,
 
 /// The modules for each supported non-Cascade target.
-non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+non_cascade_modules: Modules,
 
 /// If this library supports the hosts architecture the native module from `non_cascade_modules` will be stored here.
 non_cascade_module_for_host: ?*std.Build.Module,
@@ -153,10 +143,10 @@ fn resolveLibrary(
 
     const supported_targets = library_description.supported_targets orelse targets;
 
-    var cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+    var cascade_modules: Modules = .{};
     errdefer cascade_modules.deinit(b.allocator);
 
-    var non_cascade_modules: std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module) = .{};
+    var non_cascade_modules: Modules = .{};
     errdefer non_cascade_modules.deinit(b.allocator);
 
     const all_build_and_run_step_name = try std.fmt.allocPrint(
@@ -234,7 +224,7 @@ fn cascadeTestExecutableAndModule(
     dependencies: []Dependency,
     // all_build_and_run_step: *std.Build.Step,
     // step_collection: StepCollection,
-    cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+    cascade_modules: *Modules,
 ) !void {
     // {
     //     const check_test_exe = try createTestExe(
@@ -314,7 +304,7 @@ fn hostTestExecutableAndModule(
     dependencies: []Dependency,
     all_build_and_run_step: *std.Build.Step,
     step_collection: StepCollection,
-    non_cascade_modules: *std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module),
+    non_cascade_modules: *Modules,
 ) !?*std.Build.Module {
     {
         const check_test_exe = try createTestExe(
@@ -475,3 +465,14 @@ fn addDependenciesToModule(
         module.addImport(dependency.import_name, dependency_module);
     }
 }
+
+const std = @import("std");
+const Step = std.Build.Step;
+
+const helpers = @import("helpers.zig");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const LibraryDescription = @import("LibraryDescription.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
+const Modules = std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module);
