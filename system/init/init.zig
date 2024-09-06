@@ -24,34 +24,23 @@ pub fn initStage1() !noreturn {
     arch.init.prepareBootstrapExecutor(&static.bootstrap_executor);
     arch.init.loadExecutor(&static.bootstrap_executor);
 
+    arch.init.initInterrupts(&handleInterrupt);
+
     log.debug("building kernel memory layout", .{});
     try buildMemoryLayout(&kernel.system.memory_layout);
 
     core.panic("NOT IMPLEMENTED", null);
 }
 
-fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
-    const base_address = boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
-
-    log.debug("kernel virtual base address: {}", .{base_address.virtual});
-    log.debug("kernel physical base address: {}", .{base_address.physical});
-
-    const virtual_offset: core.Size = .from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
-    const physical_to_virtual_offset: core.Size = .from(base_address.virtual.value - base_address.physical.value, .byte);
-    log.debug("kernel virtual offset: 0x{x}", .{virtual_offset.value});
-    log.debug("kernel physical to virtual offset: 0x{x}", .{physical_to_virtual_offset.value});
-
-    memory_layout.* = .{
-        .virtual_base_address = base_address.virtual,
-        .virtual_offset = virtual_offset,
-        .physical_to_virtual_offset = physical_to_virtual_offset,
-    };
-}
-
 /// The log implementation during init.
 pub fn initLogImpl(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch unreachable;
+}
+
+/// The interrupt handler during init.
+fn handleInterrupt(_: arch.interrupts.InterruptContext) noreturn {
+    core.panic("unexpected interrupt", null);
 }
 
 fn singleExecutorPanic(
@@ -77,6 +66,24 @@ fn singleExecutorPanic(
         },
         else => {}, // don't trigger any more panics
     }
+}
+
+fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
+    const base_address = boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
+
+    log.debug("kernel virtual base address: {}", .{base_address.virtual});
+    log.debug("kernel physical base address: {}", .{base_address.physical});
+
+    const virtual_offset: core.Size = .from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
+    const physical_to_virtual_offset: core.Size = .from(base_address.virtual.value - base_address.physical.value, .byte);
+    log.debug("kernel virtual offset: 0x{x}", .{virtual_offset.value});
+    log.debug("kernel physical to virtual offset: 0x{x}", .{physical_to_virtual_offset.value});
+
+    memory_layout.* = .{
+        .virtual_base_address = base_address.virtual,
+        .virtual_offset = virtual_offset,
+        .physical_to_virtual_offset = physical_to_virtual_offset,
+    };
 }
 
 const std = @import("std");

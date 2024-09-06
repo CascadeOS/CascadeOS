@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const interrupts = @import("interrupts.zig");
+pub const PerExecutor = @import("PerExecutor.zig");
+
 pub const arch_interface = struct {
     pub const PerExecutor = @import("PerExecutor.zig");
 
-    pub const interrupts = struct {
-        pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
-        pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
-    };
+    pub const interrupts = @import("interrupts.zig");
 
     pub const paging = struct {
         pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
