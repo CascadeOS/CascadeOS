@@ -12,6 +12,7 @@ pub const arch_interface = struct {
     };
 
     pub const paging = struct {
+        pub const standard_page_size = core.Size.from(4, .kib);
         pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
     };
 
