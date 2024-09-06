@@ -23,6 +23,18 @@ pub const MemoryLayout = struct {
     /// Offset from the virtual address of kernel sections to the physical address of the section.
     physical_to_virtual_offset: ?core.Size = null,
 
+    /// Provides an identity mapping between virtual and physical addresses.
+    ///
+    /// Initialized during `init.buildMemoryLayout`.
+    direct_map: core.VirtualRange = undefined,
+
+    /// Provides an identity mapping between virtual and physical addresses.
+    ///
+    /// Caching is disabled for this mapping.
+    ///
+    /// Initialized during `init.buildMemoryLayout`.
+    non_cached_direct_map: core.VirtualRange = undefined,
+
     layout: std.BoundedArray(Region, std.meta.tags(Region.Type).len) = .{},
 
     /// Registers a kernel memory region.
@@ -49,6 +61,9 @@ pub const MemoryLayout = struct {
             readonly_section,
             executable_section,
             sdf_section,
+
+            direct_map,
+            non_cached_direct_map,
         };
 
         pub fn print(region: Region, writer: std.io.AnyWriter, indent: usize) !void {
