@@ -38,14 +38,49 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
 pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
 ) void {
-    bootstrap_executor.arch = .{};
+    const static = struct {
+        var bootstrap_double_fault_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+    };
+
+    prepareExecutorShared(
+        bootstrap_executor,
+        .fromRange(
+            .fromSlice(u8, &static.bootstrap_double_fault_stack),
+            .fromSlice(u8, &static.bootstrap_double_fault_stack),
+        ),
+        .fromRange(
+            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
+            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
+        ),
+    );
+}
+
+fn prepareExecutorShared(
+    executor: *kernel.Executor,
+    double_fault_stack: kernel.Stack,
+    non_maskable_interrupt_stack: kernel.Stack,
+) void {
+    executor.arch = .{
+        .double_fault_stack = double_fault_stack,
+        .non_maskable_interrupt_stack = non_maskable_interrupt_stack,
+    };
+
+    executor.arch.tss.setInterruptStack(
+        @intFromEnum(x64.interrupts.InterruptStackSelector.double_fault),
+        executor.arch.double_fault_stack.stack_pointer,
+    );
+    executor.arch.tss.setInterruptStack(
+        @intFromEnum(x64.interrupts.InterruptStackSelector.non_maskable_interrupt),
+        executor.arch.non_maskable_interrupt_stack.stack_pointer,
+    );
+
+    // TODO: set privilege stack in the TSS
 }
 
 /// Load the provided `Executor` as the current executor.
 pub fn loadExecutor(executor: *kernel.Executor) void {
     executor.arch.gdt.load();
-
-    // TODO: set double fault, nmi and privilege stacks in the TSS
 
     executor.arch.gdt.setTss(&executor.arch.tss);
 

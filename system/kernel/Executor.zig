@@ -7,7 +7,7 @@ const Executor = @This();
 
 id: Id,
 
-arch: @import("arch").PerExecutor = .{},
+arch: @import("arch").PerExecutor,
 
 /// A unique identifier for the executor.
 ///
