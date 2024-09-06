@@ -86,6 +86,7 @@ fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
     };
 
     try registerKernelSections(memory_layout);
+    try registerDirectMaps(memory_layout);
 
     memory_layout.sortMemoryLayout();
 
@@ -153,6 +154,122 @@ fn registerKernelSections(memory_layout: *kernel.system.MemoryLayout) !void {
         );
 
         memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+    }
+}
+
+fn registerDirectMaps(memory_layout: *kernel.system.MemoryLayout) !void {
+    const direct_map_size = try calculateSizeOfDirectMap();
+
+    const bootloader_direct_map_range = core.VirtualRange.fromAddr(
+        boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
+        direct_map_size,
+    );
+
+    // does the bootloader range overlap a pre-existing region?
+    for (memory_layout.layout.constSlice()) |region| {
+        if (region.range.containsRange(bootloader_direct_map_range)) {
+            log.err(
+                \\direct map overlaps another memory region:
+                \\  direct map: {}
+                \\  other region: {}
+            , .{ bootloader_direct_map_range, region });
+
+            return error.DirectMapOverlapsRegion;
+        }
+    }
+
+    memory_layout.direct_map = bootloader_direct_map_range;
+    memory_layout.registerRegion(.{
+        .range = bootloader_direct_map_range,
+        .type = .direct_map,
+    });
+
+    const range = findFreeRangeForDirectMap(
+        memory_layout,
+        direct_map_size,
+        arch.paging.all_page_sizes[arch.paging.all_page_sizes.len - 1],
+    ) orelse {
+        core.panic("unable to find free memory region for the non-cached direct map", @errorReturnTrace());
+    };
+    memory_layout.non_cached_direct_map = range;
+    memory_layout.registerRegion(.{
+        .range = range,
+        .type = .non_cached_direct_map,
+    });
+}
+
+/// Calculates the size of the direct map.
+fn calculateSizeOfDirectMap() !core.Size {
+    const last_memory_map_entry = blk: {
+        var memory_map_iterator = boot.memoryMap(.backward) orelse return error.NoMemoryMap;
+        while (memory_map_iterator.next()) |memory_map_entry| {
+            if (memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
+                log.debug("skipping weird QEMU memory map entry: {}", .{memory_map_entry});
+                // this is a qemu specific hack to not have a 1TiB direct map
+                // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
+                continue;
+            }
+            break :blk memory_map_entry;
+        }
+        return error.NoMemoryMapEntries;
+    };
+
+    var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
+
+    // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+    direct_map_size.alignForwardInPlace(arch.paging.all_page_sizes[arch.paging.all_page_sizes.len - 1]);
+
+    // We ensure that the lowest 4GiB are always mapped.
+    const four_gib = core.Size.from(4, .gib);
+    if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
+
+    return direct_map_size;
+}
+
+pub fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, size: core.Size, opt_alignment: ?core.Size) ?core.VirtualRange {
+    memory_layout.sortMemoryLayout();
+
+    const regions = memory_layout.layout.constSlice();
+
+    var current_address = arch.paging.higher_half_start;
+    if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+
+    var i: usize = 0;
+
+    while (true) {
+        const region = if (i < memory_layout.layout.len) regions[i] else {
+            const size_of_free_range = core.Size.from(
+                (arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                .byte,
+            );
+
+            if (size_of_free_range.lessThan(size)) return null;
+
+            return core.VirtualRange.fromAddr(current_address, size);
+        };
+
+        const region_address = region.range.address;
+
+        if (region_address.lessThanOrEqual(current_address)) {
+            current_address = region.range.endBound();
+            if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+            i += 1;
+            continue;
+        }
+
+        const size_of_free_range = core.Size.from(
+            (region_address.value - 1) - current_address.value,
+            .byte,
+        );
+
+        if (size_of_free_range.lessThan(size)) {
+            current_address = region.range.endBound();
+            if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+            i += 1;
+            continue;
+        }
+
+        return core.VirtualRange.fromAddr(current_address, size);
     }
 }
 
