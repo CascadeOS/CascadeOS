@@ -18,6 +18,12 @@ pub const interrupts = struct {
 
         current.interrupts.disableInterrupts();
     }
+
+    pub const InterruptHandler = *const fn (context: InterruptContext) void;
+
+    pub const InterruptContext = struct {
+        context: current.interrupts.ArchInterruptContext,
+    };
 };
 
 pub const paging = struct {
@@ -77,6 +83,15 @@ pub const init = struct {
         checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);
 
         current.init.loadExecutor(executor);
+    }
+
+    /// Ensure that any exceptions/faults that occur are handled.
+    ///
+    /// The `initial_interrupt_handler` will be set as the initial interrupt handler for all interrupts.
+    pub inline fn initInterrupts(initial_interrupt_handler: interrupts.InterruptHandler) void {
+        checkSupport(current.init, "initInterrupts", fn (interrupts.InterruptHandler) void);
+
+        current.init.initInterrupts(initial_interrupt_handler);
     }
 };
 

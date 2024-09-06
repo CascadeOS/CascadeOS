@@ -49,10 +49,12 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 
     executor.arch.gdt.setTss(&executor.arch.tss);
 
-    // TODO: load the IDT
+    x64.interrupts.init.loadIdt();
 
     lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
+
+pub const initInterrupts = x64.interrupts.init.initInterrupts;
 
 /// A *very* basic write only serial port.
 const SerialPort = struct {
