@@ -46,6 +46,82 @@ pub fn directMapAddress() ?core.VirtualAddress {
     return null;
 }
 
+/// Returns an iterator over the memory map entries, iterating in the given direction.
+pub fn memoryMap(direction: core.Direction) ?MemoryMapIterator {
+    switch (bootloader_api) {
+        .limine => if (limine_requests.memmap.response) |resp| {
+            const entries = resp.entries();
+            return .{
+                .limine = .{
+                    .index = switch (direction) {
+                        .forward => 0,
+                        .backward => entries.len,
+                    },
+                    .entries = entries,
+                    .direction = direction,
+                },
+            };
+        },
+        .unknown => {},
+    }
+
+    return null;
+}
+
+/// An entry in the memory map provided by the bootloader.
+pub const MemoryMapEntry = struct {
+    range: core.PhysicalRange,
+    type: Type,
+
+    pub const Type = enum {
+        free,
+        in_use,
+        reserved,
+        reclaimable,
+        unusable,
+    };
+
+    pub fn print(entry: MemoryMapEntry, writer: std.io.AnyWriter, indent: usize) !void {
+        try writer.writeAll("MemoryMapEntry - ");
+
+        try writer.writeAll(@tagName(entry.type));
+
+        try writer.writeAll(" - ");
+
+        try entry.range.print(writer, indent);
+    }
+
+    pub inline fn format(
+        value: MemoryMapEntry,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(value, writer, 0)
+        else
+            print(value, writer.any(), 0);
+    }
+
+    fn __helpZls() void {
+        MemoryMapEntry.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+    }
+};
+
+/// An iterator over the memory map entries provided by the bootloader.
+pub const MemoryMapIterator = union(enum) {
+    limine: LimineMemoryMapIterator,
+
+    /// Returns the next memory map entry from the iterator, if any remain.
+    pub fn next(self: *MemoryMapIterator) ?MemoryMapEntry {
+        return switch (self.*) {
+            inline else => |*i| i.next(),
+        };
+    }
+};
+
 fn limineEntryPoint() callconv(.C) noreturn {
     bootloader_api = .limine;
     @call(.never_inline, @import("root").initEntryPoint, .{}) catch |err| {
@@ -54,11 +130,46 @@ fn limineEntryPoint() callconv(.C) noreturn {
     core.panic("`init.initStage1` returned", null);
 }
 
+const LimineMemoryMapIterator = struct {
+    index: usize,
+    entries: []const *const limine.Memmap.Entry,
+    direction: core.Direction,
+
+    pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
+        const limine_entry = switch (self.direction) {
+            .backward => blk: {
+                if (self.index == 0) return null;
+                self.index -= 1;
+                break :blk self.entries[self.index];
+            },
+            .forward => blk: {
+                if (self.index >= self.entries.len) return null;
+                const entry = self.entries[self.index];
+                self.index += 1;
+                break :blk entry;
+            },
+        };
+
+        return .{
+            .range = .fromAddr(limine_entry.base, limine_entry.length),
+            .type = switch (limine_entry.type) {
+                .usable => .free,
+                .kernel_and_modules, .framebuffer => .in_use,
+                .reserved, .acpi_nvs => .reserved,
+                .acpi_reclaimable, .bootloader_reclaimable => .reclaimable,
+                .bad_memory => .unusable,
+                else => .unusable,
+            },
+        };
+    }
+};
+
 const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
     export var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
     export var kernel_address: limine.KernelAddress = .{};
     export var hhdm: limine.HHDM = .{};
+    export var memmap: limine.Memmap = .{};
 };
 
 var bootloader_api: BootloaderAPI = .unknown;
