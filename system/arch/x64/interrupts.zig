@@ -6,6 +6,11 @@ pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 
 pub const ArchInterruptContext = struct { frame: *InterruptFrame };
 
+pub const InterruptStackSelector = enum(u3) {
+    double_fault,
+    non_maskable_interrupt,
+};
+
 pub const Interrupt = enum(u8) {
     divide = 0,
     debug = 1,
@@ -245,6 +250,12 @@ pub const init = struct {
         for (&interrupt_handlers) |*handler| {
             handler.* = @ptrCast(initial_interrupt_handler); // the ptr cast is safe as
         }
+
+        idt.handlers[@intFromEnum(Interrupt.double_fault)]
+            .setStack(@intFromEnum(InterruptStackSelector.double_fault));
+
+        idt.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)]
+            .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
     }
 
     pub fn loadIdt() void {
