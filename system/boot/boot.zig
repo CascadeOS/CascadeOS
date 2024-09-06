@@ -122,6 +122,18 @@ pub const MemoryMapIterator = union(enum) {
     }
 };
 
+/// Returns the ACPI RSDP address provided by the bootloader, if any.
+pub fn rsdp() ?core.VirtualAddress {
+    switch (bootloader_api) {
+        .limine => if (limine_requests.rsdp.response) |resp| {
+            return resp.address;
+        },
+        .unknown => {},
+    }
+
+    return null;
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     bootloader_api = .limine;
     @call(.never_inline, @import("root").initEntryPoint, .{}) catch |err| {
@@ -170,6 +182,7 @@ const limine_requests = struct {
     export var kernel_address: limine.KernelAddress = .{};
     export var hhdm: limine.HHDM = .{};
     export var memmap: limine.Memmap = .{};
+    export var rsdp: limine.RSDP = .{};
 };
 
 var bootloader_api: BootloaderAPI = .unknown;
