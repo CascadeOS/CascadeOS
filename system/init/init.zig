@@ -29,6 +29,9 @@ pub fn initStage1() !noreturn {
     log.debug("building kernel memory layout", .{});
     try buildMemoryLayout(&kernel.system.memory_layout);
 
+    log.debug("initializing ACPI tables", .{});
+    try kernel.acpi.init.initializeACPITables(boot.rsdp() orelse return error.RSDPNotProvided);
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
