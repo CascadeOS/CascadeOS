@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const acpi = @import("acpi.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug.zig");
 pub const Executor = @import("Executor.zig");
