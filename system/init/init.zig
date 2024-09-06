@@ -187,7 +187,7 @@ fn registerDirectMaps(memory_layout: *kernel.system.MemoryLayout) !void {
     const range = findFreeRangeForDirectMap(
         memory_layout,
         direct_map_size,
-        arch.paging.all_page_sizes[arch.paging.all_page_sizes.len - 1],
+        arch.paging.largest_page_size,
     ) orelse {
         core.panic("unable to find free memory region for the non-cached direct map", @errorReturnTrace());
     };
@@ -216,23 +216,23 @@ fn calculateSizeOfDirectMap() !core.Size {
 
     var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
 
-    // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-    direct_map_size.alignForwardInPlace(arch.paging.all_page_sizes[arch.paging.all_page_sizes.len - 1]);
-
     // We ensure that the lowest 4GiB are always mapped.
     const four_gib = core.Size.from(4, .gib);
     if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
 
+    // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+    direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
+
     return direct_map_size;
 }
 
-pub fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, size: core.Size, opt_alignment: ?core.Size) ?core.VirtualRange {
+fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, size: core.Size, alignment: core.Size) ?core.VirtualRange {
     memory_layout.sortMemoryLayout();
 
     const regions = memory_layout.layout.constSlice();
 
     var current_address = arch.paging.higher_half_start;
-    if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+    current_address.alignForwardInPlace(alignment);
 
     var i: usize = 0;
 
@@ -252,7 +252,7 @@ pub fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, siz
 
         if (region_address.lessThanOrEqual(current_address)) {
             current_address = region.range.endBound();
-            if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+            current_address.alignForwardInPlace(alignment);
             i += 1;
             continue;
         }
@@ -264,7 +264,7 @@ pub fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, siz
 
         if (size_of_free_range.lessThan(size)) {
             current_address = region.range.endBound();
-            if (opt_alignment) |alignment| current_address.alignForwardInPlace(alignment);
+            current_address.alignForwardInPlace(alignment);
             i += 1;
             continue;
         }
