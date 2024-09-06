@@ -22,6 +22,61 @@ pub const MemoryLayout = struct {
 
     /// Offset from the virtual address of kernel sections to the physical address of the section.
     physical_to_virtual_offset: ?core.Size = null,
+
+    layout: std.BoundedArray(Region, std.meta.tags(Region.Type).len) = .{},
+
+    /// Registers a kernel memory region.
+    pub fn registerRegion(self: *MemoryLayout, region: Region) void {
+        self.layout.append(region) catch core.panic("failed to register region", @errorReturnTrace());
+    }
+
+    /// Sorts the kernel memory layout from lowest to highest address.
+    pub fn sortMemoryLayout(self: *MemoryLayout) void {
+        std.mem.sort(Region, self.layout.slice(), {}, struct {
+            fn lessThanFn(context: void, region: Region, other_region: Region) bool {
+                _ = context;
+                return region.range.address.lessThan(other_region.range.address);
+            }
+        }.lessThanFn);
+    }
+
+    pub const Region = struct {
+        range: core.VirtualRange,
+        type: Type,
+
+        pub const Type = enum {
+            writeable_section,
+            readonly_section,
+            executable_section,
+            sdf_section,
+        };
+
+        pub fn print(region: Region, writer: std.io.AnyWriter, indent: usize) !void {
+            try writer.writeAll("MemoryLayout.Region{ ");
+            try region.range.print(writer, indent);
+            try writer.writeAll(" - ");
+            try writer.writeAll(@tagName(region.type));
+            try writer.writeAll(" }");
+        }
+
+        pub inline fn format(
+            region: Region,
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = options;
+            _ = fmt;
+            return if (@TypeOf(writer) == std.io.AnyWriter)
+                print(region, writer, 0)
+            else
+                print(region, writer.any(), 0);
+        }
+
+        fn __helpZls() void {
+            Region.print(undefined, @as(std.fs.File.Writer, undefined), 0);
+        }
+    };
 };
 
 const std = @import("std");

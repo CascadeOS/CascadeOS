@@ -84,6 +84,76 @@ fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
         .virtual_offset = virtual_offset,
         .physical_to_virtual_offset = physical_to_virtual_offset,
     };
+
+    try registerKernelSections(memory_layout);
+
+    memory_layout.sortMemoryLayout();
+
+    if (log.levelEnabled(.debug)) {
+        log.debug("kernel memory layout:", .{});
+
+        for (memory_layout.layout.constSlice()) |region| {
+            log.debug("\t{}", .{region});
+        }
+    }
+}
+
+/// Registers the kernel sections in the memory layout.
+fn registerKernelSections(memory_layout: *kernel.system.MemoryLayout) !void {
+    const linker_symbols = struct {
+        extern const __text_start: u8;
+        extern const __text_end: u8;
+        extern const __rodata_start: u8;
+        extern const __rodata_end: u8;
+        extern const __data_start: u8;
+        extern const __data_end: u8;
+    };
+
+    const sdf_slice = kernel.debug.sdfSlice();
+    const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
+
+    const sections: []const struct {
+        core.VirtualAddress,
+        core.VirtualAddress,
+        kernel.system.MemoryLayout.Region.Type,
+    } = &.{
+        .{
+            core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
+            core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+            .executable_section,
+        },
+        .{
+            core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
+            core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+            .readonly_section,
+        },
+        .{
+            core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
+            core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+            .writeable_section,
+        },
+        .{
+            sdf_range.address,
+            sdf_range.endBound(),
+            .sdf_section,
+        },
+    };
+
+    for (sections) |section| {
+        const start_address = section[0];
+        const end_address = section[1];
+        const region_type = section[2];
+
+        std.debug.assert(end_address.greaterThan(start_address));
+
+        const virtual_range: core.VirtualRange = .fromAddr(
+            start_address,
+            core.Size.from(end_address.value - start_address.value, .byte)
+                .alignForward(arch.paging.standard_page_size),
+        );
+
+        memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+    }
 }
 
 const std = @import("std");
