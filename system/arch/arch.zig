@@ -28,7 +28,10 @@ pub const interrupts = struct {
 
 pub const paging = struct {
     /// The standard page size for the architecture.
-    pub const standard_page_size: core.Size = current.paging.standard_page_size;
+    pub const standard_page_size: core.Size = all_page_sizes[0];
+
+    /// The largest page size supproted by the architecture.
+    pub const largest_page_size: core.Size = all_page_sizes[current.paging.all_page_sizes.len - 1];
 
     /// All the page sizes supported by the architecture in order of smallest to largest.
     pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
