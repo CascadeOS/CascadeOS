@@ -377,7 +377,7 @@ const SymbolSource = struct {
     });
 };
 
-fn sdfSlice() []const u8 {
+pub fn sdfSlice() []const u8 {
     const static = struct {
         const sdf = @import("sdf");
 
