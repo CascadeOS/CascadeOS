@@ -22,17 +22,28 @@ pub const KernelBaseAddress = struct {
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
 pub fn kernelBaseAddress() ?KernelBaseAddress {
     switch (bootloader_api) {
-        .limine => {
-            if (limine_requests.kernel_address.response) |resp| {
-                return .{
-                    .virtual = resp.virtual_base,
-                    .physical = resp.physical_base,
-                };
-            }
-            return null;
+        .limine => if (limine_requests.kernel_address.response) |resp| {
+            return .{
+                .virtual = resp.virtual_base,
+                .physical = resp.physical_base,
+            };
         },
-        .unknown => return null,
+        .unknown => {},
     }
+
+    return null;
+}
+
+/// Returns the direct map address provided by the bootloader, if any.
+pub fn directMapAddress() ?core.VirtualAddress {
+    switch (bootloader_api) {
+        .limine => if (limine_requests.hhdm.response) |resp| {
+            return resp.offset;
+        },
+        .unknown => {},
+    }
+
+    return null;
 }
 
 fn limineEntryPoint() callconv(.C) noreturn {
@@ -47,6 +58,7 @@ const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
     export var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
     export var kernel_address: limine.KernelAddress = .{};
+    export var hhdm: limine.HHDM = .{};
 };
 
 var bootloader_api: BootloaderAPI = .unknown;
