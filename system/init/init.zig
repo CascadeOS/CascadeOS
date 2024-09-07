@@ -30,7 +30,7 @@ pub fn initStage1() !noreturn {
     try buildMemoryLayout();
 
     log.debug("initializing ACPI tables", .{});
-    try initializeACPITables(boot.rsdp() orelse return error.RSDPNotProvided);
+    try initializeACPITables();
 
     core.panic("NOT IMPLEMENTED", null);
 }
@@ -289,7 +289,8 @@ fn findFreeRangeForDirectMap(size: core.Size, alignment: core.Size) ?core.Virtua
     }
 }
 
-fn initializeACPITables(rsdp_address: core.VirtualAddress) !void {
+fn initializeACPITables() !void {
+    const rsdp_address = boot.rsdp() orelse return error.RSDPNotProvided;
     const rsdp = rsdp_address.toPtr(*const acpi.RSDP);
 
     log.debug("ACPI revision: {d}", .{rsdp.revision});
