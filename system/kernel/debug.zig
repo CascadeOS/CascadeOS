@@ -130,7 +130,7 @@ pub const formatting = struct {
             return;
         }
 
-        const opt_kernel_virtual_offset = if (kernel.system.memory_layout.virtual_offset) |offset|
+        const opt_kernel_virtual_offset = if (kernel.memory_layout.globals.virtual_offset) |offset|
             offset.value
         else
             null;

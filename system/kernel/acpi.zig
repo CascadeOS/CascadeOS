@@ -9,7 +9,7 @@
 pub fn getTable(comptime T: type, n: usize) ?*const T {
     var iter = acpi.tableIterator(
         globals.sdt_header,
-        kernel.directMapFromPhysical,
+        kernel.memory_layout.directMapFromPhysical,
     );
 
     var i: usize = 0;
