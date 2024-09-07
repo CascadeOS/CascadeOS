@@ -121,7 +121,7 @@ fn registerKernelSections() !void {
         extern const __data_end: u8;
     };
 
-    const sdf_slice = kernel.debug.sdfSlice();
+    const sdf_slice = try kernel.debug.sdfSlice();
     const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
 
     const sections: []const struct {
@@ -295,12 +295,12 @@ fn initializeACPITables(rsdp_address: core.VirtualAddress) !void {
     log.debug("ACPI revision: {d}", .{rsdp.revision});
 
     log.debug("validating rsdp", .{});
-    if (!rsdp.isValid()) core.panic("invalid RSDP", null);
+    if (!rsdp.isValid()) return error.InvalidRSDP;
 
     const sdt_header = kernel.memory_layout.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
 
     log.debug("validating sdt", .{});
-    if (!sdt_header.isValid()) core.panic("invalid SDT", null);
+    if (!sdt_header.isValid()) return error.InvalidSDT;
 
     if (log.levelEnabled(.debug)) {
         var iter = acpi.tableIterator(

@@ -69,7 +69,7 @@ pub const formatting = struct {
         error_return_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) !void {
-        const symbol_source: ?SymbolSource = .load();
+        const symbol_source = SymbolSource.load();
 
         if (error_return_trace) |trace| {
             if (trace.index != 0) {
@@ -271,7 +271,7 @@ const SymbolSource = struct {
     location_program: sdf.LocationProgram,
 
     pub fn load() ?SymbolSource {
-        const sdf_slice = sdfSlice();
+        const sdf_slice = sdfSlice() catch return null;
 
         var sdf_fbs = std.io.fixedBufferStream(sdf_slice);
 
@@ -377,7 +377,7 @@ const SymbolSource = struct {
     });
 };
 
-pub fn sdfSlice() []const u8 {
+pub fn sdfSlice() ![]const u8 {
     const static = struct {
         const sdf = @import("sdf");
 
@@ -390,7 +390,7 @@ pub fn sdfSlice() []const u8 {
     const ptr: [*]const u8 = @ptrCast(&static.__sdf_start);
     var fbs = std.io.fixedBufferStream(ptr[0..@sizeOf(static.sdf.Header)]);
 
-    const header = static.sdf.Header.read(fbs.reader()) catch core.panic("SDF data is invalid", @errorReturnTrace());
+    const header = try static.sdf.Header.read(fbs.reader());
 
     const slice = ptr[0..header.total_size_of_sdf_data];
 
