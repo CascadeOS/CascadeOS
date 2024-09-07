@@ -30,7 +30,7 @@ pub fn initStage1() !noreturn {
     try buildMemoryLayout(&kernel.system.memory_layout);
 
     log.debug("initializing ACPI tables", .{});
-    try kernel.acpi.init.initializeACPITables(boot.rsdp() orelse return error.RSDPNotProvided);
+    try initializeACPITables(boot.rsdp() orelse return error.RSDPNotProvided);
 
     core.panic("NOT IMPLEMENTED", null);
 }
@@ -276,9 +276,43 @@ fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, size: c
     }
 }
 
+fn initializeACPITables(rsdp_address: core.VirtualAddress) !void {
+    const rsdp = rsdp_address.toPtr(*const acpi.RSDP);
+
+    log.debug("ACPI revision: {d}", .{rsdp.revision});
+
+    log.debug("validating rsdp", .{});
+    if (!rsdp.isValid()) core.panic("invalid RSDP", null);
+
+    const sdt_header = kernel.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
+
+    log.debug("validating sdt", .{});
+    if (!sdt_header.isValid()) core.panic("invalid SDT", null);
+
+    if (log.levelEnabled(.debug)) {
+        var iter = acpi.tableIterator(
+            sdt_header,
+            kernel.directMapFromPhysical,
+        );
+
+        log.debug("ACPI tables:", .{});
+
+        while (iter.next()) |table| {
+            if (table.isValid()) {
+                log.debug("  {s}", .{table.signatureAsString()});
+            } else {
+                log.debug("  {s} - INVALID", .{table.signatureAsString()});
+            }
+        }
+    }
+
+    kernel.acpi.globals.sdt_header = sdt_header;
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const boot = @import("boot");
 const arch = @import("arch");
 const log = kernel.log.scoped(.init);
+const acpi = @import("acpi");
