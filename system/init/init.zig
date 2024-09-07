@@ -20,14 +20,14 @@ pub fn initStage1() !noreturn {
     kernel.debug.panic_impl = singleExecutorPanic;
 
     // set up the bootstrap executor and load it
-    kernel.system.executors = @as([*]kernel.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
+    kernel.executors = @as([*]kernel.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
     arch.init.prepareBootstrapExecutor(&static.bootstrap_executor);
     arch.init.loadExecutor(&static.bootstrap_executor);
 
     arch.init.initInterrupts(&handleInterrupt);
 
     log.debug("building kernel memory layout", .{});
-    try buildMemoryLayout(&kernel.system.memory_layout);
+    try buildMemoryLayout();
 
     log.debug("initializing ACPI tables", .{});
     try initializeACPITables(boot.rsdp() orelse return error.RSDPNotProvided);
@@ -71,39 +71,47 @@ fn singleExecutorPanic(
     }
 }
 
-fn buildMemoryLayout(memory_layout: *kernel.system.MemoryLayout) !void {
+fn buildMemoryLayout() !void {
     const base_address = boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
+    kernel.memory_layout.globals.virtual_base_address = base_address.virtual;
 
     log.debug("kernel virtual base address: {}", .{base_address.virtual});
     log.debug("kernel physical base address: {}", .{base_address.physical});
 
     const virtual_offset: core.Size = .from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
-    const physical_to_virtual_offset: core.Size = .from(base_address.virtual.value - base_address.physical.value, .byte);
+    kernel.memory_layout.globals.virtual_offset = virtual_offset;
     log.debug("kernel virtual offset: 0x{x}", .{virtual_offset.value});
+
+    const physical_to_virtual_offset: core.Size = .from(base_address.virtual.value - base_address.physical.value, .byte);
+    kernel.memory_layout.globals.physical_to_virtual_offset = physical_to_virtual_offset;
     log.debug("kernel physical to virtual offset: 0x{x}", .{physical_to_virtual_offset.value});
 
-    memory_layout.* = .{
-        .virtual_base_address = base_address.virtual,
-        .virtual_offset = virtual_offset,
-        .physical_to_virtual_offset = physical_to_virtual_offset,
-    };
+    try registerKernelSections();
+    try registerDirectMaps();
 
-    try registerKernelSections(memory_layout);
-    try registerDirectMaps(memory_layout);
-
-    memory_layout.sortMemoryLayout();
+    sortMemoryLayout();
 
     if (log.levelEnabled(.debug)) {
         log.debug("kernel memory layout:", .{});
 
-        for (memory_layout.layout.constSlice()) |region| {
+        for (kernel.memory_layout.globals.layout.constSlice()) |region| {
             log.debug("\t{}", .{region});
         }
     }
 }
 
+/// Sorts the kernel memory layout from lowest to highest address.
+fn sortMemoryLayout() void {
+    std.mem.sort(kernel.memory_layout.Region, kernel.memory_layout.globals.layout.slice(), {}, struct {
+        fn lessThanFn(context: void, region: kernel.memory_layout.Region, other_region: kernel.memory_layout.Region) bool {
+            _ = context;
+            return region.range.address.lessThan(other_region.range.address);
+        }
+    }.lessThanFn);
+}
+
 /// Registers the kernel sections in the memory layout.
-fn registerKernelSections(memory_layout: *kernel.system.MemoryLayout) !void {
+fn registerKernelSections() !void {
     const linker_symbols = struct {
         extern const __text_start: u8;
         extern const __text_end: u8;
@@ -119,7 +127,7 @@ fn registerKernelSections(memory_layout: *kernel.system.MemoryLayout) !void {
     const sections: []const struct {
         core.VirtualAddress,
         core.VirtualAddress,
-        kernel.system.MemoryLayout.Region.Type,
+        kernel.memory_layout.Region.Type,
     } = &.{
         .{
             core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
@@ -156,11 +164,14 @@ fn registerKernelSections(memory_layout: *kernel.system.MemoryLayout) !void {
                 .alignForward(arch.paging.standard_page_size),
         );
 
-        memory_layout.registerRegion(.{ .range = virtual_range, .type = region_type });
+        try kernel.memory_layout.globals.layout.append(.{
+            .range = virtual_range,
+            .type = region_type,
+        });
     }
 }
 
-fn registerDirectMaps(memory_layout: *kernel.system.MemoryLayout) !void {
+fn registerDirectMaps() !void {
     const direct_map_size = try calculateSizeOfDirectMap();
 
     const bootloader_direct_map_range = core.VirtualRange.fromAddr(
@@ -169,7 +180,7 @@ fn registerDirectMaps(memory_layout: *kernel.system.MemoryLayout) !void {
     );
 
     // does the bootloader range overlap a pre-existing region?
-    for (memory_layout.layout.constSlice()) |region| {
+    for (kernel.memory_layout.globals.layout.constSlice()) |region| {
         if (region.range.containsRange(bootloader_direct_map_range)) {
             log.err(
                 \\direct map overlaps another memory region:
@@ -181,22 +192,22 @@ fn registerDirectMaps(memory_layout: *kernel.system.MemoryLayout) !void {
         }
     }
 
-    memory_layout.direct_map = bootloader_direct_map_range;
-    memory_layout.registerRegion(.{
+    kernel.memory_layout.globals.direct_map = bootloader_direct_map_range;
+
+    try kernel.memory_layout.globals.layout.append(.{
         .range = bootloader_direct_map_range,
         .type = .direct_map,
     });
 
-    const range = findFreeRangeForDirectMap(
-        memory_layout,
+    const non_cached_direct_map_range = findFreeRangeForDirectMap(
         direct_map_size,
         arch.paging.largest_page_size,
-    ) orelse {
-        core.panic("unable to find free memory region for the non-cached direct map", @errorReturnTrace());
-    };
-    memory_layout.non_cached_direct_map = range;
-    memory_layout.registerRegion(.{
-        .range = range,
+    ) orelse return error.NoFreeRangeForDirectMap;
+
+    kernel.memory_layout.globals.non_cached_direct_map = non_cached_direct_map_range;
+
+    try kernel.memory_layout.globals.layout.append(.{
+        .range = non_cached_direct_map_range,
         .type = .non_cached_direct_map,
     });
 }
@@ -229,10 +240,12 @@ fn calculateSizeOfDirectMap() !core.Size {
     return direct_map_size;
 }
 
-fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, size: core.Size, alignment: core.Size) ?core.VirtualRange {
-    memory_layout.sortMemoryLayout();
+fn findFreeRangeForDirectMap(size: core.Size, alignment: core.Size) ?core.VirtualRange {
+    sortMemoryLayout();
 
-    const regions = memory_layout.layout.constSlice();
+    const layout = &kernel.memory_layout.globals.layout;
+
+    const regions = layout.constSlice();
 
     var current_address = arch.paging.higher_half_start;
     current_address.alignForwardInPlace(alignment);
@@ -240,7 +253,7 @@ fn findFreeRangeForDirectMap(memory_layout: *kernel.system.MemoryLayout, size: c
     var i: usize = 0;
 
     while (true) {
-        const region = if (i < memory_layout.layout.len) regions[i] else {
+        const region = if (i < layout.len) regions[i] else {
             const size_of_free_range = core.Size.from(
                 (arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
                 .byte,
@@ -284,7 +297,7 @@ fn initializeACPITables(rsdp_address: core.VirtualAddress) !void {
     log.debug("validating rsdp", .{});
     if (!rsdp.isValid()) core.panic("invalid RSDP", null);
 
-    const sdt_header = kernel.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
+    const sdt_header = kernel.memory_layout.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
 
     log.debug("validating sdt", .{});
     if (!sdt_header.isValid()) core.panic("invalid SDT", null);
@@ -292,7 +305,7 @@ fn initializeACPITables(rsdp_address: core.VirtualAddress) !void {
     if (log.levelEnabled(.debug)) {
         var iter = acpi.tableIterator(
             sdt_header,
-            kernel.directMapFromPhysical,
+            kernel.memory_layout.directMapFromPhysical,
         );
 
         log.debug("ACPI tables:", .{});
