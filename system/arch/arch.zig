@@ -122,7 +122,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        core.panic("`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`", null);
+        core.panic(comptime "`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`", null);
     }
 
     const DeclT = @TypeOf(@field(Container, name));
