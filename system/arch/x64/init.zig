@@ -141,6 +141,14 @@ fn captureMADTInformation(madt: *const acpi.MADT) void {
     log.debug("have pic: {}", .{x64.info.have_pic});
 }
 
+/// Configure any global system features.
+pub fn configureGlobalSystemFeatures() !void {
+    if (x64.info.have_pic) {
+        log.debug("disabling pic", .{});
+        lib_x64.disablePic();
+    }
+}
+
 /// A *very* basic write only serial port.
 const SerialPort = struct {
     _data_port: u16,
