@@ -114,6 +114,13 @@ pub const init = struct {
 
         return current.init.captureSystemInformation();
     }
+
+    /// Configure any global system features.
+    pub inline fn configureGlobalSystemFeatures() !void {
+        checkSupport(current.init, "configureGlobalSystemFeatures", fn () anyerror!void);
+
+        return current.init.configureGlobalSystemFeatures();
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {

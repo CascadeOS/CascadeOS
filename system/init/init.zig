@@ -32,6 +32,8 @@ pub fn initStage1() !noreturn {
 
     try arch.init.captureSystemInformation();
 
+    try arch.init.configureGlobalSystemFeatures();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
