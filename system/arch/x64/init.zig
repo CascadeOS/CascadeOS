@@ -91,6 +91,56 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 
 pub const initInterrupts = x64.interrupts.init.initInterrupts;
 
+/// Capture any system information that is required for the architecture.
+///
+/// For example, on x64 this should capture the CPUID information.
+pub fn captureSystemInformation() !void {
+    try captureCPUIDInformation();
+
+    const madt = kernel.acpi.getTable(acpi.MADT, 0) orelse return error.NoMADT;
+    const fadt = kernel.acpi.getTable(acpi.FADT, 0) orelse return error.NoFADT;
+
+    captureFADTInformation(fadt);
+
+    captureMADTInformation(madt);
+
+    // TODO: capture APIC information
+}
+
+fn captureCPUIDInformation() !void {
+    try x64.info.cpu_id.capture();
+
+    if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
+        const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
+        x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
+        log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
+    }
+
+    if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
+        const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
+        x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
+        log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
+    }
+}
+
+fn captureFADTInformation(fadt: *const acpi.FADT) void {
+    const flags = fadt.IA_PC_BOOT_ARCH;
+
+    x64.info.have_ps2_controller = flags.@"8042";
+    log.debug("have ps2 controller: {}", .{x64.info.have_ps2_controller});
+
+    x64.info.msi_supported = !flags.msi_not_supported;
+    log.debug("message signaled interrupts supported: {}", .{x64.info.msi_supported});
+
+    x64.info.have_cmos_rtc = !flags.cmos_rtc_not_present;
+    log.debug("have cmos rtc: {}", .{x64.info.have_cmos_rtc});
+}
+
+fn captureMADTInformation(madt: *const acpi.MADT) void {
+    x64.info.have_pic = madt.flags.PCAT_COMPAT;
+    log.debug("have pic: {}", .{x64.info.have_pic});
+}
+
 /// A *very* basic write only serial port.
 const SerialPort = struct {
     _data_port: u16,
@@ -192,3 +242,5 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
 const arch = @import("arch");
+const log = kernel.log.scoped(.init_x64);
+const acpi = @import("acpi");
