@@ -26,10 +26,8 @@ pub fn initStage1() !noreturn {
 
     arch.init.initInterrupts(&handleInterrupt);
 
-    log.debug("building kernel memory layout", .{});
     try buildMemoryLayout();
 
-    log.debug("initializing ACPI tables", .{});
     try initializeACPITables();
 
     core.panic("NOT IMPLEMENTED", null);
@@ -293,14 +291,10 @@ fn initializeACPITables() !void {
     const rsdp_address = boot.rsdp() orelse return error.RSDPNotProvided;
     const rsdp = rsdp_address.toPtr(*const acpi.RSDP);
 
-    log.debug("ACPI revision: {d}", .{rsdp.revision});
-
-    log.debug("validating rsdp", .{});
     if (!rsdp.isValid()) return error.InvalidRSDP;
 
     const sdt_header = kernel.memory_layout.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
 
-    log.debug("validating sdt", .{});
     if (!sdt_header.isValid()) return error.InvalidSDT;
 
     if (log.levelEnabled(.debug)) {
