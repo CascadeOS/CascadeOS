@@ -173,7 +173,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // set target cpu
     switch (self.target) {
         .arm64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
-        .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no,+invtsc" }),
+        .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }),
     }
 
     // set target machine
