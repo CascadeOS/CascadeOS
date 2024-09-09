@@ -105,6 +105,15 @@ pub const init = struct {
 
         current.init.initInterrupts(initial_interrupt_handler);
     }
+
+    /// Capture any system information that is required for the architecture.
+    ///
+    /// For example, on x64 this should capture the CPUID information.
+    pub inline fn captureSystemInformation() !void {
+        checkSupport(current.init, "captureSystemInformation", fn () anyerror!void);
+
+        return current.init.captureSystemInformation();
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {

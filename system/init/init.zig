@@ -30,6 +30,8 @@ pub fn initStage1() !noreturn {
 
     try initializeACPITables();
 
+    try arch.init.captureSystemInformation();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
