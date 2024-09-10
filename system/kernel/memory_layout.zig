@@ -92,26 +92,26 @@ pub const globals = struct {
 
     /// Offset from the virtual address of kernel sections to the physical address of the section.
     ///
-    /// Initialized during `init.buildMemoryLayout`.
+    /// Initialized during `init.earlyBuildMemoryLayout`.
     pub var physical_to_virtual_offset: core.Size = undefined;
 
     /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
     ///
     /// This is optional due to the small window on start up where the panic handler can run before this is set.
     ///
-    /// Initialized during `init.buildMemoryLayout`.
+    /// Initialized during `init.earlyBuildMemoryLayout`.
     pub var virtual_offset: ?core.Size = null;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
-    /// Initialized during `init.buildMemoryLayout`.
+    /// Initialized during `init.earlyBuildMemoryLayout`.
     pub var direct_map: core.VirtualRange = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Caching is disabled for this mapping.
     ///
-    /// Initialized during `init.buildMemoryLayout`.
+    /// Initialized during `init.finishBuildMemoryLayout`.
     pub var non_cached_direct_map: core.VirtualRange = undefined;
 
     pub var layout: std.BoundedArray(Region, std.meta.tags(Region.Type).len) = .{};
