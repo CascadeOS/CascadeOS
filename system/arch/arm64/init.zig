@@ -30,6 +30,13 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
     }
 }
 
+/// Prepares the provided `Executor` for the bootstrap executor.
+pub fn prepareBootstrapExecutor(
+    bootstrap_executor: *kernel.Executor,
+) void {
+    bootstrap_executor.arch = .{};
+}
+
 /// A basic write only UART.
 const Uart = struct {
     ptr: *volatile u8,
