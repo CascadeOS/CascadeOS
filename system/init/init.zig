@@ -12,6 +12,8 @@ pub fn initStage1() !noreturn {
         };
     };
 
+    try earlyBuildMemoryLayout();
+
     // get output up and running as soon as possible
     arch.init.setupEarlyOutput();
     arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
@@ -26,7 +28,7 @@ pub fn initStage1() !noreturn {
 
     arch.init.initInterrupts(&handleInterrupt);
 
-    try buildMemoryLayout();
+    try finishBuildMemoryLayout();
 
     try initializeACPITables();
 
@@ -73,21 +75,57 @@ fn singleExecutorPanic(
     }
 }
 
-fn buildMemoryLayout() !void {
-    const base_address = boot.kernelBaseAddress() orelse return error.KernelBaseAddressNotProvided;
+/// Ensures that the kernel base address, virtual offset and the direct map are set up.
+///
+/// Called very early so cannot log.
+fn earlyBuildMemoryLayout() !void {
+    const base_address = boot.kernelBaseAddress() orelse return error.NoKernelBaseAddress;
     kernel.memory_layout.globals.virtual_base_address = base_address.virtual;
 
-    log.debug("kernel virtual base address: {}", .{base_address.virtual});
-    log.debug("kernel physical base address: {}", .{base_address.physical});
+    kernel.memory_layout.globals.virtual_offset = core.Size.from(
+        base_address.virtual.value - kernel.config.kernel_base_address.value,
+        .byte,
+    );
 
-    const virtual_offset: core.Size = .from(base_address.virtual.value - kernel.config.kernel_base_address.value, .byte);
-    kernel.memory_layout.globals.virtual_offset = virtual_offset;
-    log.debug("kernel virtual offset: 0x{x}", .{virtual_offset.value});
+    kernel.memory_layout.globals.physical_to_virtual_offset = core.Size.from(
+        base_address.virtual.value - base_address.physical.value,
+        .byte,
+    );
 
-    const physical_to_virtual_offset: core.Size = .from(base_address.virtual.value - base_address.physical.value, .byte);
-    kernel.memory_layout.globals.physical_to_virtual_offset = physical_to_virtual_offset;
-    log.debug("kernel physical to virtual offset: 0x{x}", .{physical_to_virtual_offset.value});
+    const direct_map_size = direct_map_size: {
+        const last_memory_map_entry = last_memory_map_entry: {
+            var memory_map_iterator = boot.memoryMap(.backward) orelse return error.NoMemoryMap;
+            while (memory_map_iterator.next()) |memory_map_entry| {
+                if (memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
+                    // this is a qemu specific hack to not have a 1TiB direct map
+                    // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
+                    continue;
+                }
+                break :last_memory_map_entry memory_map_entry;
+            }
 
+            return error.NoMemoryMapEntries;
+        };
+
+        var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
+
+        // We ensure that the lowest 4GiB are always mapped.
+        const four_gib = core.Size.from(4, .gib);
+        if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
+
+        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+        direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
+
+        break :direct_map_size direct_map_size;
+    };
+
+    kernel.memory_layout.globals.direct_map = core.VirtualRange.fromAddr(
+        boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
+        direct_map_size,
+    );
+}
+
+fn finishBuildMemoryLayout() !void {
     try registerKernelSections();
     try registerDirectMaps();
 
@@ -174,72 +212,37 @@ fn registerKernelSections() !void {
 }
 
 fn registerDirectMaps() !void {
-    const direct_map_size = try calculateSizeOfDirectMap();
+    const direct_map = kernel.memory_layout.globals.direct_map;
 
-    const bootloader_direct_map_range = core.VirtualRange.fromAddr(
-        boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
-        direct_map_size,
-    );
-
-    // does the bootloader range overlap a pre-existing region?
+    // does the direct map range overlap a pre-existing region?
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
-        if (region.range.containsRange(bootloader_direct_map_range)) {
+        if (region.range.containsRange(direct_map)) {
             log.err(
                 \\direct map overlaps another memory region:
                 \\  direct map: {}
                 \\  other region: {}
-            , .{ bootloader_direct_map_range, region });
+            , .{ direct_map, region });
 
             return error.DirectMapOverlapsRegion;
         }
     }
 
-    kernel.memory_layout.globals.direct_map = bootloader_direct_map_range;
-
     try kernel.memory_layout.globals.layout.append(.{
-        .range = bootloader_direct_map_range,
+        .range = direct_map,
         .type = .direct_map,
     });
 
-    const non_cached_direct_map_range = findFreeRangeForDirectMap(
-        direct_map_size,
+    const non_cached_direct_map = findFreeRangeForDirectMap(
+        direct_map.size,
         arch.paging.largest_page_size,
     ) orelse return error.NoFreeRangeForDirectMap;
 
-    kernel.memory_layout.globals.non_cached_direct_map = non_cached_direct_map_range;
+    kernel.memory_layout.globals.non_cached_direct_map = non_cached_direct_map;
 
     try kernel.memory_layout.globals.layout.append(.{
-        .range = non_cached_direct_map_range,
+        .range = non_cached_direct_map,
         .type = .non_cached_direct_map,
     });
-}
-
-/// Calculates the size of the direct map.
-fn calculateSizeOfDirectMap() !core.Size {
-    const last_memory_map_entry = blk: {
-        var memory_map_iterator = boot.memoryMap(.backward) orelse return error.NoMemoryMap;
-        while (memory_map_iterator.next()) |memory_map_entry| {
-            if (memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
-                log.debug("skipping weird QEMU memory map entry: {}", .{memory_map_entry});
-                // this is a qemu specific hack to not have a 1TiB direct map
-                // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
-                continue;
-            }
-            break :blk memory_map_entry;
-        }
-        return error.NoMemoryMapEntries;
-    };
-
-    var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
-
-    // We ensure that the lowest 4GiB are always mapped.
-    const four_gib = core.Size.from(4, .gib);
-    if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
-
-    // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-    direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
-
-    return direct_map_size;
 }
 
 fn findFreeRangeForDirectMap(size: core.Size, alignment: core.Size) ?core.VirtualRange {
