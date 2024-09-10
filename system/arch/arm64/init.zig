@@ -32,11 +32,11 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
 
 /// A basic write only UART.
 const Uart = struct {
-    address: *volatile u8,
+    ptr: *volatile u8,
 
-    pub fn init(address: usize) Uart {
+    pub fn init(address: core.VirtualAddress) Uart {
         return .{
-            .address = @ptrFromInt(address),
+            .ptr = address.toPtr(*volatile u8),
         };
     }
 
@@ -49,10 +49,10 @@ const Uart = struct {
 
             if (byte == '\n' and previous_byte != '\r') {
                 // TODO: per branch cold
-                self.address.* = '\r';
+                self.ptr.* = '\r';
             }
 
-            self.address.* = byte;
+            self.ptr.* = byte;
         }
     }
 };
