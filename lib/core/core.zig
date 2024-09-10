@@ -108,6 +108,12 @@ pub const endian = struct {
     }
 };
 
+/// A calling convention that is `Inline` in non-debug builds, and `Unspecified` in debug builds.
+///
+/// This allows the effect of inlining for release builds but does result in missing debug information during
+/// debug builds.
+pub const inline_in_non_debug: std.builtin.CallingConvention = if (builtin.mode == .Debug) .Unspecified else .Inline;
+
 comptime {
     refAllDeclsRecursive(@This());
 }
