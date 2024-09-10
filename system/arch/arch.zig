@@ -13,7 +13,7 @@ pub const interrupts = struct {
     pub const disableInterruptsAndHalt = current.interrupts.disableInterruptsAndHalt;
 
     /// Disable interrupts.
-    pub inline fn disableInterrupts() void {
+    pub fn disableInterrupts() callconv(core.inline_in_non_debug) void {
         // `checkSupport` intentionally not called - mandatory function
 
         current.interrupts.disableInterrupts();
@@ -55,7 +55,7 @@ pub const init = struct {
     pub const unknownBootloaderEntryPoint: *const fn () callconv(.Naked) noreturn = current.init.unknownBootloaderEntryPoint;
 
     /// Attempt to set up some form of early output.
-    pub inline fn setupEarlyOutput() void {
+    pub fn setupEarlyOutput() callconv(core.inline_in_non_debug) void {
         // `checkSupport` intentionally not called - mandatory function
 
         current.init.setupEarlyOutput();
@@ -64,7 +64,7 @@ pub const init = struct {
     /// Write to early output.
     ///
     /// Cannot fail, any errors are ignored.
-    pub inline fn writeToEarlyOutput(bytes: []const u8) void {
+    pub fn writeToEarlyOutput(bytes: []const u8) callconv(core.inline_in_non_debug) void {
         // `checkSupport` intentionally not called - mandatory function
 
         current.init.writeToEarlyOutput(bytes);
@@ -82,16 +82,16 @@ pub const init = struct {
     ){ .context = {} };
 
     /// Prepares the provided `Executor` for the bootstrap executor.
-    pub inline fn prepareBootstrapExecutor(
+    pub fn prepareBootstrapExecutor(
         bootstrap_executor: *kernel.Executor,
-    ) void {
+    ) callconv(core.inline_in_non_debug) void {
         checkSupport(current.init, "prepareBootstrapExecutor", fn (*kernel.Executor) void);
 
         current.init.prepareBootstrapExecutor(bootstrap_executor);
     }
 
     /// Load the provided `Executor` as the current executor.
-    pub inline fn loadExecutor(executor: *kernel.Executor) void {
+    pub fn loadExecutor(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
         checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);
 
         current.init.loadExecutor(executor);
@@ -100,7 +100,7 @@ pub const init = struct {
     /// Ensure that any exceptions/faults that occur are handled.
     ///
     /// The `initial_interrupt_handler` will be set as the initial interrupt handler for all interrupts.
-    pub inline fn initInterrupts(initial_interrupt_handler: interrupts.InterruptHandler) void {
+    pub fn initInterrupts(initial_interrupt_handler: interrupts.InterruptHandler) callconv(core.inline_in_non_debug) void {
         checkSupport(current.init, "initInterrupts", fn (interrupts.InterruptHandler) void);
 
         current.init.initInterrupts(initial_interrupt_handler);
@@ -109,14 +109,14 @@ pub const init = struct {
     /// Capture any system information that is required for the architecture.
     ///
     /// For example, on x64 this should capture the CPUID information.
-    pub inline fn captureSystemInformation() !void {
+    pub fn captureSystemInformation() callconv(core.inline_in_non_debug) !void {
         checkSupport(current.init, "captureSystemInformation", fn () anyerror!void);
 
         return current.init.captureSystemInformation();
     }
 
     /// Configure any global system features.
-    pub inline fn configureGlobalSystemFeatures() !void {
+    pub fn configureGlobalSystemFeatures() callconv(core.inline_in_non_debug) !void {
         checkSupport(current.init, "configureGlobalSystemFeatures", fn () anyerror!void);
 
         return current.init.configureGlobalSystemFeatures();
