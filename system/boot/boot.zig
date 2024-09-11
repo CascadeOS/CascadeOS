@@ -77,8 +77,11 @@ pub const MemoryMapEntry = struct {
         free,
         in_use,
         reserved,
-        reclaimable,
+        bootloader_reclaimable,
+        acpi_reclaimable,
         unusable,
+
+        unknown,
     };
 
     pub fn print(entry: MemoryMapEntry, writer: std.io.AnyWriter, indent: usize) !void {
@@ -168,9 +171,10 @@ const LimineMemoryMapIterator = struct {
                 .usable => .free,
                 .kernel_and_modules, .framebuffer => .in_use,
                 .reserved, .acpi_nvs => .reserved,
-                .acpi_reclaimable, .bootloader_reclaimable => .reclaimable,
+                .bootloader_reclaimable => .bootloader_reclaimable,
+                .acpi_reclaimable => .acpi_reclaimable,
                 .bad_memory => .unusable,
-                else => .unusable,
+                else => .unknown,
             },
         };
     }
