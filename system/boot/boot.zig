@@ -119,9 +119,21 @@ pub const MemoryMapIterator = union(enum) {
 
     /// Returns the next memory map entry from the iterator, if any remain.
     pub fn next(self: *MemoryMapIterator) ?MemoryMapEntry {
-        return switch (self.*) {
-            inline else => |*i| i.next(),
-        };
+        while (true) {
+            const opt_entry = switch (self.*) {
+                inline else => |*i| i.next(),
+            };
+
+            if (opt_entry) |entry| {
+                if (entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
+                    // this is a qemu specific hack to not have a 1TiB direct map
+                    // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
+                    continue;
+                }
+            }
+
+            return opt_entry;
+        }
     }
 };
 
