@@ -10,6 +10,8 @@ pub fn initStage1() !noreturn {
             .id = .bootstrap,
             .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
         };
+
+        var pmm: PMM = undefined; // set by `initializePhysicalMemory`
     };
 
     try earlyBuildMemoryLayout();
@@ -21,7 +23,6 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can switch to the single executor panic
     kernel.debug.panic_impl = singleExecutorPanic;
 
-    // set up the bootstrap executor and load it
     kernel.executors = @as([*]kernel.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
     arch.init.prepareBootstrapExecutor(&static.bootstrap_executor);
     arch.init.loadExecutor(&static.bootstrap_executor);
@@ -35,6 +36,8 @@ pub fn initStage1() !noreturn {
     try arch.init.captureSystemInformation();
 
     try arch.init.configureGlobalSystemFeatures();
+
+    try initializePhysicalMemory(&static.pmm);
 
     core.panic("NOT IMPLEMENTED", null);
 }
@@ -313,6 +316,90 @@ fn initializeACPITables() !void {
     }
 
     kernel.acpi.globals.sdt_header = sdt_header;
+}
+
+/// A simple physical memory manager.
+///
+/// Only supports allocating a single `arch.paging.standard_page_size` sized page with no support for freeing.
+const PMM = struct {
+    ranges: Ranges,
+    total_memory: core.Size,
+    free_memory: core.Size,
+    reserved_memory: core.Size,
+    reclaimable_memory: core.Size,
+    unavailable_memory: core.Size,
+
+    pub const Ranges = std.BoundedArray(core.PhysicalRange, 16);
+
+    pub fn usedMemory(self: *const PMM) core.Size {
+        return self.total_memory
+            .subtract(self.free_memory)
+            .subtract(self.reserved_memory)
+            .subtract(self.reclaimable_memory)
+            .subtract(self.unavailable_memory);
+    }
+
+    pub fn allocatePhysicalPage(self: *PMM) !core.PhysicalRange {
+        if (self.ranges.len == 0) return error.NoMemory;
+
+        self.free_memory.subtractInPlace(arch.paging.standard_page_size);
+
+        const range = &self.ranges.buffer[0];
+        const physical_address = range.address;
+
+        range.size.subtractInPlace(arch.paging.standard_page_size);
+
+        if (range.size.value == 0) {
+            _ = self.ranges.swapRemove(0);
+        } else {
+            range.address.moveForwardInPlace(arch.paging.standard_page_size);
+        }
+
+        return core.PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
+    }
+};
+
+fn initializePhysicalMemory(pmm: *PMM) !void {
+    var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
+
+    var ranges: PMM.Ranges = .{};
+
+    var total_memory: core.Size = .zero;
+    var free_memory: core.Size = .zero;
+    var reserved_memory: core.Size = .zero;
+    var reclaimable_memory: core.Size = .zero;
+    var unavailable_memory: core.Size = .zero;
+
+    while (iter.next()) |entry| {
+        total_memory.addInPlace(entry.range.size);
+
+        switch (entry.type) {
+            .free => {
+                free_memory.addInPlace(entry.range.size);
+                try ranges.append(entry.range);
+            },
+            .in_use => {},
+            .reserved => reserved_memory.addInPlace(entry.range.size),
+            .bootloader_reclaimable, .acpi_reclaimable => reclaimable_memory.addInPlace(entry.range.size),
+            .unusable, .unknown => unavailable_memory.addInPlace(entry.range.size),
+        }
+    }
+
+    pmm.* = .{
+        .ranges = ranges,
+        .total_memory = total_memory,
+        .free_memory = free_memory,
+        .reserved_memory = reserved_memory,
+        .reclaimable_memory = reclaimable_memory,
+        .unavailable_memory = unavailable_memory,
+    };
+
+    log.debug("total memory:         {}", .{total_memory});
+    log.debug("  free memory:        {}", .{free_memory});
+    log.debug("  used memory:        {}", .{pmm.usedMemory()});
+    log.debug("  reserved memory:    {}", .{reserved_memory});
+    log.debug("  reclaimable memory: {}", .{reclaimable_memory});
+    log.debug("  unavailable memory: {}", .{unavailable_memory});
 }
 
 const std = @import("std");
