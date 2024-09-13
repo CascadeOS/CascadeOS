@@ -95,16 +95,7 @@ fn earlyBuildMemoryLayout() !void {
     const direct_map_size = direct_map_size: {
         const last_memory_map_entry = last_memory_map_entry: {
             var memory_map_iterator = boot.memoryMap(.backward) orelse return error.NoMemoryMap;
-            while (memory_map_iterator.next()) |memory_map_entry| {
-                if (memory_map_entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
-                    // this is a qemu specific hack to not have a 1TiB direct map
-                    // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
-                    continue;
-                }
-                break :last_memory_map_entry memory_map_entry;
-            }
-
-            return error.NoMemoryMapEntries;
+            break :last_memory_map_entry memory_map_iterator.next() orelse return error.NoMemoryMapEntries;
         };
 
         var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
