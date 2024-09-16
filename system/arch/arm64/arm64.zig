@@ -26,6 +26,10 @@ pub const arch_interface = struct {
 
         /// The largest possible higher half virtual address.
         pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
+
+        pub const ArchPageTable = struct {};
+        pub const page_table_alignment = small_page_size;
+        pub const page_table_size = small_page_size;
     };
 
     pub const init = @import("init.zig");
