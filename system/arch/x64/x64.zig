@@ -10,18 +10,7 @@ pub const arch_interface = struct {
 
     pub const interrupts = @import("interrupts.zig");
 
-    pub const paging = struct {
-        pub const all_page_sizes = &.{
-            lib_x64.PageTable.small_page_size,
-            lib_x64.PageTable.medium_page_size,
-            lib_x64.PageTable.large_page_size,
-        };
-
-        pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
-
-        /// The largest possible higher half virtual address.
-        pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
-    };
+    pub const paging = @import("paging.zig");
 
     pub const init = @import("init.zig");
 };
