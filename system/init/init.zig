@@ -5,15 +5,6 @@
 ///
 /// Only the bootstrap cpu executes this function.
 pub fn initStage1() !noreturn {
-    const static = struct {
-        var bootstrap_executor: kernel.Executor = .{
-            .id = .bootstrap,
-            .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
-        };
-
-        var pmm: PMM = undefined; // set by `initializePhysicalMemory`
-    };
-
     try earlyBuildMemoryLayout();
 
     // get output up and running as soon as possible
@@ -23,9 +14,9 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can switch to the single executor panic
     kernel.debug.panic_impl = singleExecutorPanic;
 
-    kernel.executors = @as([*]kernel.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
-    arch.init.prepareBootstrapExecutor(&static.bootstrap_executor);
-    arch.init.loadExecutor(&static.bootstrap_executor);
+    kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
+    arch.init.prepareBootstrapExecutor(&bootstrap_executor);
+    arch.init.loadExecutor(&bootstrap_executor);
 
     arch.init.initInterrupts(&handleInterrupt);
 
@@ -37,7 +28,7 @@ pub fn initStage1() !noreturn {
 
     try arch.init.configureGlobalSystemFeatures();
 
-    try initializePhysicalMemory(&static.pmm);
+    try initializePhysicalMemory();
 
     core.panic("NOT IMPLEMENTED", null);
 }
@@ -339,8 +330,8 @@ const PMM = struct {
             .subtract(self.unavailable_memory);
     }
 
-    pub fn allocatePhysicalPage(self: *PMM) !core.PhysicalRange {
-        if (self.ranges.len == 0) return error.NoMemory;
+    pub fn allocatePhysicalPage(self: *PMM) error{OutOfPhysicalMemory}!core.PhysicalRange {
+        if (self.ranges.len == 0) return error.OutOfPhysicalMemory;
 
         self.free_memory.subtractInPlace(arch.paging.standard_page_size);
 
@@ -359,7 +350,7 @@ const PMM = struct {
     }
 };
 
-fn initializePhysicalMemory(pmm: *PMM) !void {
+fn initializePhysicalMemory() !void {
     var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
 
     var ranges: PMM.Ranges = .{};
@@ -385,7 +376,7 @@ fn initializePhysicalMemory(pmm: *PMM) !void {
         }
     }
 
-    pmm.* = .{
+    pmm = .{
         .ranges = ranges,
         .total_memory = total_memory,
         .free_memory = free_memory,
@@ -401,6 +392,14 @@ fn initializePhysicalMemory(pmm: *PMM) !void {
     log.debug("  reclaimable memory: {}", .{reclaimable_memory});
     log.debug("  unavailable memory: {}", .{unavailable_memory});
 }
+
+
+var bootstrap_executor: kernel.Executor = .{
+    .id = .bootstrap,
+    .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+};
+
+var pmm: PMM = undefined; // set by `initializePhysicalMemory`
 
 const std = @import("std");
 const core = @import("core");
