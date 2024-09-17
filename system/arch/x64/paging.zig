@@ -35,6 +35,118 @@ pub const largest_higher_half_virtual_address: core.VirtualAddress = core.Virtua
 pub const ArchPageTable = lib_x64.PageTable;
 
 pub const init = struct {
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///  - the virtual range is not already mapped
+    ///
+    /// This function:
+    ///  - uses all page sizes available to the architecture
+    ///  - does not flush the TLB
+    ///  - on error is not required to roll back any modifications to the page tables
+    pub fn mapToPhysicalRangeAllPageSizes(
+        page_table: *ArchPageTable,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
+        map_type: MapType,
+        comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+        comptime deallocatePage: fn (core.PhysicalRange) void,
+    ) arch.paging.MapError!void {
+        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(physical_range.size.equal(virtual_range.size));
+
+        var current_virtual_address = virtual_range.address;
+        const last_virtual_address = virtual_range.last();
+        var current_physical_address = physical_range.address;
+        var size_remaining = virtual_range.size;
+
+        var gib_page_mappings: usize = 0;
+        var mib_page_mappings: usize = 0;
+        var kib_page_mappings: usize = 0;
+
+        while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+            const map_1gib = x64.info.cpu_id.gbyte_pages and
+                size_remaining.greaterThanOrEqual(ArchPageTable.large_page_size) and
+                current_virtual_address.isAligned(ArchPageTable.large_page_size) and
+                current_physical_address.isAligned(ArchPageTable.large_page_size);
+
+            if (map_1gib) {
+                mapTo1GiB(
+                    page_table,
+                    current_virtual_address,
+                    current_physical_address,
+                    map_type,
+                    allocatePage,
+                    deallocatePage,
+                ) catch |err| {
+                    log.err("failed to map {} to {} 1GiB", .{ current_virtual_address, current_physical_address });
+                    return err;
+                };
+
+                gib_page_mappings += 1;
+
+                current_virtual_address.moveForwardInPlace(ArchPageTable.large_page_size);
+                current_physical_address.moveForwardInPlace(ArchPageTable.large_page_size);
+                size_remaining.subtractInPlace(ArchPageTable.large_page_size);
+                continue;
+            }
+
+            const map_2mib = size_remaining.greaterThanOrEqual(ArchPageTable.medium_page_size) and
+                current_virtual_address.isAligned(ArchPageTable.medium_page_size) and
+                current_physical_address.isAligned(ArchPageTable.medium_page_size);
+
+            if (map_2mib) {
+                mapTo2MiB(
+                    page_table,
+                    current_virtual_address,
+                    current_physical_address,
+                    map_type,
+                    allocatePage,
+                    deallocatePage,
+                ) catch |err| {
+                    log.err("failed to map {} to {} 2MiB", .{ current_virtual_address, current_physical_address });
+                    return err;
+                };
+
+                mib_page_mappings += 1;
+
+                current_virtual_address.moveForwardInPlace(ArchPageTable.medium_page_size);
+                current_physical_address.moveForwardInPlace(ArchPageTable.medium_page_size);
+                size_remaining.subtractInPlace(ArchPageTable.medium_page_size);
+                continue;
+            }
+
+            mapTo4KiB(
+                page_table,
+                current_virtual_address,
+                current_physical_address,
+                map_type,
+                allocatePage,
+                deallocatePage,
+            ) catch |err| {
+                log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
+                return err;
+            };
+
+            kib_page_mappings += 1;
+
+            current_virtual_address.moveForwardInPlace(ArchPageTable.small_page_size);
+            current_physical_address.moveForwardInPlace(ArchPageTable.small_page_size);
+            size_remaining.subtractInPlace(ArchPageTable.small_page_size);
+        }
+
+        log.debug(
+            "mapToPhysicalRangeAllPageSizes - satified using {} 1GiB pages, {} 2MiB pages, {} 4KiB pages",
+            .{ gib_page_mappings, mib_page_mappings, kib_page_mappings },
+        );
+    }
+
     /// Maps a 1 GiB page.
     ///
     /// Only kernel init maps 1 GiB pages.
