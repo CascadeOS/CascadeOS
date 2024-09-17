@@ -35,7 +35,267 @@ pub const largest_higher_half_virtual_address: core.VirtualAddress = core.Virtua
 pub const ArchPageTable = lib_x64.PageTable;
 
 pub const init = struct {
+    /// Maps a 1 GiB page.
+    ///
+    /// Only kernel init maps 1 GiB pages.
+    fn mapTo1GiB(
+        level4_table: *ArchPageTable,
+        virtual_address: core.VirtualAddress,
+        physical_address: core.PhysicalAddress,
+        map_type: MapType,
+        comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+        comptime deallocatePage: fn (core.PhysicalRange) void,
+    ) arch.paging.MapError!void {
+        std.debug.assert(x64.info.cpu_id.gbyte_pages);
+        std.debug.assert(virtual_address.isAligned(ArchPageTable.large_page_size));
+        std.debug.assert(physical_address.isAligned(ArchPageTable.large_page_size));
+
+        const raw_level4_entry = level4_table.getEntry(.four, virtual_address);
+
+        const level3_table, const created_level3_table = try ensureNextTable(
+            raw_level4_entry,
+            map_type,
+            allocatePage,
+        );
+        errdefer {
+            if (created_level3_table) {
+                var level_4_entry = raw_level4_entry.load();
+
+                const address = level_4_entry.getAddress4kib();
+                level_4_entry.zero();
+                raw_level4_entry.store(level_4_entry);
+
+                deallocatePage(address.toRange(ArchPageTable.small_page_size));
+            }
+        }
+
+        const raw_entry = level3_table.getEntry(.three, virtual_address);
+        var entry = raw_entry.load();
+
+        if (entry.present.read()) return error.AlreadyMapped;
+        errdefer comptime unreachable;
+
+        entry.setAddress1gib(physical_address);
+
+        entry.huge.write(true);
+        applyMapType(map_type, &entry);
+
+        entry.present.write(true);
+
+        raw_entry.store(entry);
+    }
+
+    /// Maps a 2 MiB page.
+    ///
+    /// Only kernel init maps 2 MiB pages.
+    fn mapTo2MiB(
+        level4_table: *ArchPageTable,
+        virtual_address: core.VirtualAddress,
+        physical_address: core.PhysicalAddress,
+        map_type: MapType,
+        comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+        comptime deallocatePage: fn (core.PhysicalRange) void,
+    ) arch.paging.MapError!void {
+        std.debug.assert(virtual_address.isAligned(ArchPageTable.medium_page_size));
+        std.debug.assert(physical_address.isAligned(ArchPageTable.medium_page_size));
+
+        const raw_level4_entry = level4_table.getEntry(.four, virtual_address);
+
+        const level3_table, const created_level3_table = try ensureNextTable(
+            raw_level4_entry,
+            map_type,
+            allocatePage,
+        );
+        errdefer {
+            if (created_level3_table) {
+                var level_4_entry = raw_level4_entry.load();
+
+                const address = level_4_entry.getAddress4kib();
+                level_4_entry.zero();
+                raw_level4_entry.store(level_4_entry);
+
+                deallocatePage(address.toRange(ArchPageTable.small_page_size));
+            }
+        }
+
+        const raw_level3_entry = level3_table.getEntry(.three, virtual_address);
+
+        const level2_table, const created_level2_table = try ensureNextTable(
+            raw_level3_entry,
+            map_type,
+            allocatePage,
+        );
+        errdefer {
+            if (created_level2_table) {
+                var level_3_entry = raw_level3_entry.load();
+
+                const address = level_3_entry.getAddress4kib();
+                level_3_entry.zero();
+                raw_level4_entry.store(level_3_entry);
+
+                deallocatePage(address.toRange(ArchPageTable.small_page_size));
+            }
+        }
+
+        const raw_entry = level2_table.getEntry(.two, virtual_address);
+        var entry = raw_entry.load();
+
+        if (entry.present.read()) return error.AlreadyMapped;
+        errdefer comptime unreachable;
+
+        entry.setAddress2mib(physical_address);
+
+        entry.huge.write(true);
+        applyMapType(map_type, &entry);
+
+        entry.present.write(true);
+
+        raw_entry.store(entry);
+    }
 };
+
+/// Maps a 4 KiB page.
+fn mapTo4KiB(
+    level4_table: *ArchPageTable,
+    virtual_address: core.VirtualAddress,
+    physical_address: core.PhysicalAddress,
+    map_type: MapType,
+    comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+    comptime deallocatePage: fn (core.PhysicalRange) void,
+) arch.paging.MapError!void {
+    std.debug.assert(virtual_address.isAligned(ArchPageTable.small_page_size));
+    std.debug.assert(physical_address.isAligned(ArchPageTable.small_page_size));
+
+    const raw_level4_entry = level4_table.getEntry(.four, virtual_address);
+
+    const level3_table, const created_level3_table = try ensureNextTable(
+        raw_level4_entry,
+        map_type,
+        allocatePage,
+    );
+    errdefer {
+        if (created_level3_table) {
+            var level_4_entry = raw_level4_entry.load();
+
+            const address = level_4_entry.getAddress4kib();
+            level_4_entry.zero();
+            raw_level4_entry.store(level_4_entry);
+
+            deallocatePage(address.toRange(ArchPageTable.small_page_size));
+        }
+    }
+
+    const raw_level3_entry = level3_table.getEntry(.three, virtual_address);
+
+    const level2_table, const created_level2_table = try ensureNextTable(
+        raw_level3_entry,
+        map_type,
+        allocatePage,
+    );
+    errdefer {
+        if (created_level2_table) {
+            var level_3_entry = raw_level3_entry.load();
+
+            const address = level_3_entry.getAddress4kib();
+            level_3_entry.zero();
+            raw_level4_entry.store(level_3_entry);
+
+            deallocatePage(address.toRange(ArchPageTable.small_page_size));
+        }
+    }
+
+    const raw_level2_entry = level2_table.getEntry(.two, virtual_address);
+
+    const level1_table, const created_level1_table = try ensureNextTable(
+        raw_level2_entry,
+        map_type,
+        allocatePage,
+    );
+    errdefer {
+        if (created_level1_table) {
+            var level_2_entry = raw_level2_entry.load();
+
+            const address = level_2_entry.getAddress4kib();
+            level_2_entry.zero();
+            raw_level4_entry.store(level_2_entry);
+
+            deallocatePage(address.toRange(ArchPageTable.small_page_size));
+        }
+    }
+
+    const raw_entry = level1_table.getEntry(.one, virtual_address);
+    var entry = raw_entry.load();
+
+    if (entry.present.read()) return error.AlreadyMapped;
+    errdefer comptime unreachable;
+
+    entry.setAddress4kib(physical_address);
+
+    applyMapType(map_type, &entry);
+
+    entry.present.write(true);
+
+    raw_entry.store(entry);
+}
+
+/// Ensures the next page table level exists.
+fn ensureNextTable(
+    raw_entry: *ArchPageTable.RawEntry,
+    map_type: MapType,
+    comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+) !struct { *ArchPageTable, bool } {
+    var opt_backing_range: ?core.PhysicalRange = null;
+
+    var entry = raw_entry.load();
+
+    const next_level_phys_address = if (entry.present.read()) blk: {
+        if (entry.huge.read()) return error.MappingNotValid;
+
+        break :blk entry.getAddress4kib();
+    } else blk: {
+        const backing_range = try allocatePage();
+
+        opt_backing_range = backing_range;
+
+        break :blk backing_range.address;
+    };
+    errdefer comptime unreachable;
+
+    const next_level = kernel.memory_layout.directMapFromPhysical(next_level_phys_address).toPtr(*ArchPageTable);
+
+    if (opt_backing_range) |backing_range| {
+        next_level.zero();
+
+        entry.zero();
+        applyParentMapType(map_type, &entry);
+        entry.setAddress4kib(backing_range.address);
+        entry.present.write(true);
+
+        raw_entry.store(entry);
+    }
+
+    return .{ next_level, opt_backing_range != null };
+}
+
+fn applyMapType(map_type: MapType, entry: *ArchPageTable.Entry) void {
+    if (map_type.user) entry.user_accessible.write(true);
+
+    if (map_type.global) entry.global.write(true);
+
+    if (!map_type.executable and x64.info.cpu_id.execute_disable) entry.no_execute.write(true);
+
+    if (map_type.writeable) entry.writeable.write(true);
+
+    if (map_type.no_cache) {
+        entry.no_cache.write(true);
+        entry.write_through.write(true);
+    }
+}
+
+fn applyParentMapType(map_type: MapType, entry: *ArchPageTable.Entry) void {
+    entry.writeable.write(true);
+    if (map_type.user) entry.user_accessible.write(true);
+}
 
 const std = @import("std");
 const core = @import("core");
@@ -43,3 +303,5 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
 const arch = @import("arch");
+const MapType = kernel.vmm.MapType;
+const log = kernel.log.scoped(.paging_x64);
