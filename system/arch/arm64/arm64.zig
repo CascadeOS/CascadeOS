@@ -30,6 +30,8 @@ pub const arch_interface = struct {
         pub const ArchPageTable = struct {};
         pub const page_table_alignment = small_page_size;
         pub const page_table_size = small_page_size;
+
+        pub const init = struct {};
     };
 
     pub const init = @import("init.zig");
