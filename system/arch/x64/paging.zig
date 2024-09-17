@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+/// Create a new page table at the given physical range.
+///
+/// The range must have alignment of `page_table_alignment` and size greater than or equal to
+/// `page_table_size`.
+pub fn createPageTable(physical_range: core.PhysicalRange) *ArchPageTable {
+    std.debug.assert(physical_range.address.isAligned(page_table_alignment));
+    std.debug.assert(physical_range.size.greaterThanOrEqual(page_table_size));
+
+    const page_table = kernel.memory_layout.directMapFromPhysical(physical_range.address).toPtr(*ArchPageTable);
+    page_table.zero();
+    return page_table;
+}
+
+pub fn loadPageTable(physical_address: core.PhysicalAddress) void {
+    lib_x64.registers.Cr3.writeAddress(physical_address);
+}
+
 pub const page_table_alignment = ArchPageTable.small_page_size;
 pub const page_table_size = ArchPageTable.small_page_size;
 
