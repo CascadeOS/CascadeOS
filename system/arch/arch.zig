@@ -70,6 +70,54 @@ pub const paging = struct {
 
         const ArchPageTable = current.paging.ArchPageTable;
     };
+
+    pub const MapError = error{
+        AlreadyMapped,
+
+        /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+        MappingNotValid,
+    } || error{OutOfPhysicalMemory};
+
+    pub const init = struct {
+        /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual range address and size are aligned to the standard page size
+        ///  - the physical range address and size are aligned to the standard page size
+        ///  - the virtual range size is equal to the physical range size
+        ///  - the virtual range is not already mapped
+        ///
+        /// This function:
+        ///  - uses all page sizes available to the architecture
+        ///  - does not flush the TLB
+        ///  - on error is not required to roll back any modifications to the page tables
+        pub inline fn mapToPhysicalRangeAllPageSizes(
+            page_table: paging.PageTable,
+            virtual_range: core.VirtualRange,
+            physical_range: core.PhysicalRange,
+            map_type: kernel.vmm.MapType,
+            comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+            comptime deallocatePage: fn (core.PhysicalRange) void,
+        ) paging.MapError!void {
+            checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
+                *paging.PageTable.ArchPageTable,
+                core.VirtualRange,
+                core.PhysicalRange,
+                kernel.vmm.MapType,
+                fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+                fn (core.PhysicalRange) void,
+            ) paging.MapError!void);
+
+            return current.paging.init.mapToPhysicalRangeAllPageSizes(
+                page_table.arch,
+                virtual_range,
+                physical_range,
+                map_type,
+                allocatePage,
+                deallocatePage,
+            );
+        }
+    };
 };
 
 /// Functionality that is used during kernel init only.
