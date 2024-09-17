@@ -30,6 +30,8 @@ pub fn initStage1() !noreturn {
 
     try initializePhysicalMemory();
 
+    try initializeVirtualMemory();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
@@ -393,6 +395,47 @@ fn initializePhysicalMemory() !void {
     log.debug("  unavailable memory: {}", .{unavailable_memory});
 }
 
+fn initializeVirtualMemory() !void {
+    kernel.core_page_table = arch.paging.PageTable.create(try pmm.allocatePhysicalPage());
+
+    for (kernel.memory_layout.globals.layout.constSlice()) |region| {
+        const physical_range = switch (region.type) {
+            .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+            .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
+                core.PhysicalAddress.fromInt(
+                    region.range.address.value - kernel.memory_layout.globals.physical_to_virtual_offset.value,
+                ),
+                region.range.size,
+            ),
+        };
+
+        const map_type: kernel.vmm.MapType = switch (region.type) {
+            .executable_section => .{ .executable = true, .global = true },
+            .readonly_section, .sdf_section => .{ .global = true },
+            .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+            .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
+        };
+
+        try arch.paging.init.mapToPhysicalRangeAllPageSizes(
+            kernel.core_page_table,
+            region.range,
+            physical_range,
+            map_type,
+            struct {
+                fn allocatePage() !core.PhysicalRange {
+                    return pmm.allocatePhysicalPage();
+                }
+            }.allocatePage,
+            struct {
+                fn deallocatePage(_: core.PhysicalRange) void {
+                    core.panic("init PMM does not support deallocation", null);
+                }
+            }.deallocatePage,
+        );
+    }
+
+    kernel.core_page_table.load();
+}
 
 var bootstrap_executor: kernel.Executor = .{
     .id = .bootstrap,
