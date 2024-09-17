@@ -18,6 +18,7 @@ pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
 pub const Stack = @import("Stack.zig");
 pub const time = @import("time.zig");
+pub const vmm = @import("vmm.zig");
 
 const std = @import("std");
 const core = @import("core");
