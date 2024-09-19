@@ -10,36 +10,16 @@ pub const PageTable = extern struct {
     pub const medium_page_size: core.Size = .from(2, .mib);
     pub const large_page_size: core.Size = .from(1, .gib);
 
+    pub const level_1_address_space_size = small_page_size;
+    pub const level_2_address_space_size = medium_page_size;
+    pub const level_3_address_space_size = large_page_size;
+    pub const level_4_address_space_size = core.Size.from(512, .gib);
+
+    pub const RawEntry = u64;
+
     pub fn zero(self: *PageTable) void {
         @memset(std.mem.asBytes(self), 0);
     }
-
-    pub inline fn getEntry(self: *PageTable, comptime level: Level, virtual_address: core.VirtualAddress) *RawEntry {
-        const index = switch (level) {
-            .one => p1Index(virtual_address),
-            .two => p2Index(virtual_address),
-            .three => p3Index(virtual_address),
-            .four => p4Index(virtual_address),
-        };
-
-        return &self.entries[index];
-    }
-
-    pub const RawEntry = extern struct {
-        _backing: std.atomic.Value(u64) = .init(0),
-
-        pub fn load(self: *RawEntry) Entry {
-            return @bitCast(self._backing.load(.acquire));
-        }
-
-        pub fn store(self: *RawEntry, entry: Entry) void {
-            return self._backing.store(@bitCast(entry), .release);
-        }
-
-        comptime {
-            core.testing.expectSize(@This(), @sizeOf(u64));
-        }
-    };
 
     pub const Entry = extern union {
         /// Specifies whether the mapped physical page or page table is loaded in memory.
@@ -94,7 +74,7 @@ pub const PageTable = extern struct {
         ///  - 4KiB
         write_through: bitjuggle.Boolean(u64, 3),
 
-        /// Disables caching for the pointed entry is cacheable.
+        /// Disables caching for the entry.
         ///
         /// Valid for:
         ///  - PML5
@@ -188,10 +168,10 @@ pub const PageTable = extern struct {
         ///  - 4KiB
         no_execute: bitjuggle.Boolean(u64, 63),
 
-        _backing: u64,
+        raw: RawEntry,
 
         pub fn zero(self: *Entry) void {
-            self._backing = 0;
+            self.raw = 0;
         }
 
         pub fn getAddress4kib(self: Entry) core.PhysicalAddress {
@@ -371,10 +351,8 @@ pub const PageTable = extern struct {
         comptime print_detailed_level1: bool,
         comptime virtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
     ) !void {
-        @fence(.acquire); // we assume the page table is not modified during printing allowing us to avoid atomic loads
-
         for (self.entries, 0..) |raw_level4_entry, level4_index| {
-            const level4_entry: Entry = @bitCast(raw_level4_entry._backing.raw);
+            const level4_entry: Entry = .{ .raw = raw_level4_entry };
 
             if (!level4_entry.present.read()) continue;
 
@@ -389,7 +367,7 @@ pub const PageTable = extern struct {
 
             const level3_table = try level4_entry.getNextLevel(virtualFromPhysical);
             for (level3_table.entries, 0..) |raw_level3_entry, level3_index| {
-                const level3_entry: Entry = @bitCast(raw_level3_entry._backing.raw);
+                const level3_entry: Entry = .{ .raw = raw_level3_entry };
 
                 if (!level3_entry.present.read()) continue;
 
@@ -410,7 +388,7 @@ pub const PageTable = extern struct {
 
                 const level2_table = try level3_entry.getNextLevel(virtualFromPhysical);
                 for (level2_table.entries, 0..) |raw_level2_entry, level2_index| {
-                    const level2_entry: Entry = @bitCast(raw_level2_entry._backing.raw);
+                    const level2_entry: Entry = .{ .raw = raw_level2_entry };
 
                     if (!level2_entry.present.read()) continue;
 
@@ -419,7 +397,7 @@ pub const PageTable = extern struct {
                     if (level2_entry.huge.read()) {
                         const virtual = core.VirtualAddress.fromInt(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
-                        try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ virtual, physical, level2_index });
+                        try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ level2_index, virtual, physical });
                         try level2_entry.printHugeEntryFlags(writer);
                         try writer.writeByte('\n');
                         continue;
@@ -434,7 +412,7 @@ pub const PageTable = extern struct {
 
                     const level1_table = try level2_entry.getNextLevel(virtualFromPhysical);
                     for (level1_table.entries, 0..) |raw_level1_entry, level1_index| {
-                        const level1_entry: Entry = @bitCast(raw_level1_entry._backing.raw);
+                        const level1_entry: Entry = .{ .raw = raw_level1_entry };
 
                         if (!level1_entry.present.read()) continue;
 
@@ -449,7 +427,7 @@ pub const PageTable = extern struct {
 
                         const virtual = core.VirtualAddress.fromInt(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
-                        try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ virtual, physical, level1_index });
+                        try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ level1_index, virtual, physical });
                         try level1_entry.printSmallEntryFlags(writer);
                         try writer.writeByte('\n');
                     }
