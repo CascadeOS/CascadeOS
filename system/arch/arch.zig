@@ -21,9 +21,7 @@ pub const interrupts = struct {
 
     pub const InterruptHandler = *const fn (context: InterruptContext) void;
 
-    pub const InterruptContext = struct {
-        context: current.interrupts.ArchInterruptContext,
-    };
+    pub const InterruptContext = current.interrupts.InterruptContext;
 };
 
 pub const paging = struct {
@@ -59,7 +57,7 @@ pub const paging = struct {
             };
         }
 
-        pub inline fn load(page_table: PageTable) void {
+        pub fn load(page_table: PageTable) callconv(core.inline_in_non_debug) void {
             checkSupport(current.paging, "loadPageTable", fn (core.PhysicalAddress) void);
 
             current.paging.loadPageTable(page_table.physical_address);
@@ -91,14 +89,14 @@ pub const paging = struct {
         ///  - uses all page sizes available to the architecture
         ///  - does not flush the TLB
         ///  - on error is not required to roll back any modifications to the page tables
-        pub inline fn mapToPhysicalRangeAllPageSizes(
+        pub fn mapToPhysicalRangeAllPageSizes(
             page_table: paging.PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: kernel.vmm.MapType,
             comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
             comptime deallocatePage: fn (core.PhysicalRange) void,
-        ) paging.MapError!void {
+        ) callconv(core.inline_in_non_debug) paging.MapError!void {
             checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualRange,
@@ -202,8 +200,8 @@ pub const init = struct {
 
 const current = switch (@import("cascade_target").arch) {
     // x64 is first to help zls, atleast while x64 is the main target.
-    .x64 => @import("x64/x64.zig").arch_interface,
-    .arm64 => @import("arm64/arm64.zig").arch_interface,
+    .x64 => @import("x64/x64.zig"),
+    .arm64 => @import("arm64/arm64.zig"),
 };
 
 /// Checks if the current architecture implements the given function.
