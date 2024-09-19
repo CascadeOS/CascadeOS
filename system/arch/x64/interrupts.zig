@@ -4,7 +4,7 @@
 pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
 pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 
-pub const ArchInterruptContext = struct { frame: *InterruptFrame };
+pub const InterruptContext = struct { frame: *InterruptFrame };
 
 pub const InterruptStackSelector = enum(u3) {
     double_fault,
@@ -338,7 +338,7 @@ pub const init = struct {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](.{ .context = .{ .frame = interrupt_frame } });
+    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](.{ .frame = interrupt_frame });
 }
 
 var idt: Idt = .{};

@@ -2,18 +2,10 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const info = @import("info.zig");
+pub const init = @import("init.zig");
 pub const interrupts = @import("interrupts.zig");
+pub const paging = @import("paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
-
-pub const arch_interface = struct {
-    pub const PerExecutor = @import("PerExecutor.zig");
-
-    pub const interrupts = @import("interrupts.zig");
-
-    pub const paging = @import("paging.zig");
-
-    pub const init = @import("init.zig");
-};
 
 const std = @import("std");
 const core = @import("core");
