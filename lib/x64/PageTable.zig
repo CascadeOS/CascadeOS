@@ -447,20 +447,20 @@ pub const PageTable = extern struct {
         four,
     };
 
-    pub inline fn p1Index(address: core.VirtualAddress) u9 {
-        return @truncate(address.value >> level_1_shift);
+    pub inline fn p1Index(address: core.VirtualAddress) usize {
+        return @as(u9, @truncate(address.value >> level_1_shift));
     }
 
-    pub inline fn p2Index(address: core.VirtualAddress) u9 {
-        return @truncate(address.value >> level_2_shift);
+    pub inline fn p2Index(address: core.VirtualAddress) usize {
+        return @as(u9, @truncate(address.value >> level_2_shift));
     }
 
-    pub inline fn p3Index(address: core.VirtualAddress) u9 {
-        return @truncate(address.value >> level_3_shift);
+    pub inline fn p3Index(address: core.VirtualAddress) usize {
+        return @as(u9, @truncate(address.value >> level_3_shift));
     }
 
-    pub inline fn p4Index(address: core.VirtualAddress) u9 {
-        return @truncate(address.value >> level_4_shift);
+    pub inline fn p4Index(address: core.VirtualAddress) usize {
+        return @as(u9, @truncate(address.value >> level_4_shift));
     }
 
     /// Converts page table indices to a virtual address.
