@@ -124,8 +124,8 @@ pub const init = struct {
         var current_physical_address = physical_range.address;
         var size_remaining = virtual_range.size;
 
-        var level4_index: usize = PageTable.p4Index(current_virtual_address);
-        const last_level4_index: usize = PageTable.p4Index(last_virtual_address);
+        var level4_index = PageTable.p4Index(current_virtual_address);
+        const last_level4_index = PageTable.p4Index(last_virtual_address);
 
         while (level4_index <= last_level4_index) : (level4_index += 1) {
             const level3_table = core.require(ensureNextTable(
@@ -135,8 +135,8 @@ pub const init = struct {
             ), "failed to allocate page table");
 
             var level3_index = PageTable.p3Index(current_virtual_address);
-            const last_level3_index: usize = if (size_remaining.greaterThanOrEqual(PageTable.level_4_address_space_size))
-                PageTable.number_of_entries
+            const last_level3_index = if (size_remaining.greaterThanOrEqual(PageTable.level_4_address_space_size))
+                PageTable.number_of_entries - 1
             else
                 PageTable.p3Index(last_virtual_address);
 
@@ -168,8 +168,8 @@ pub const init = struct {
                 ), "failed to allocate page table");
 
                 var level2_index = PageTable.p2Index(current_virtual_address);
-                const last_level2_index: usize = if (size_remaining.greaterThanOrEqual(PageTable.level_3_address_space_size))
-                    PageTable.number_of_entries
+                const last_level2_index = if (size_remaining.greaterThanOrEqual(PageTable.level_3_address_space_size))
+                    PageTable.number_of_entries - 1
                 else
                     PageTable.p2Index(last_virtual_address);
 
@@ -200,8 +200,8 @@ pub const init = struct {
                     ), "failed to allocate page table");
 
                     var level1_index = PageTable.p1Index(current_virtual_address);
-                    const last_level1_index: usize = if (size_remaining.greaterThanOrEqual(PageTable.level_2_address_space_size))
-                        PageTable.number_of_entries
+                    const last_level1_index = if (size_remaining.greaterThanOrEqual(PageTable.level_2_address_space_size))
+                        PageTable.number_of_entries - 1
                     else
                         PageTable.p1Index(last_virtual_address);
 
