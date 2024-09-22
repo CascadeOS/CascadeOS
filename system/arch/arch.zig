@@ -69,13 +69,6 @@ pub const paging = struct {
         const ArchPageTable = current.paging.ArchPageTable;
     };
 
-    pub const MapError = error{
-        AlreadyMapped,
-
-        /// This is used to surface errors from the underlying paging implementation that are architecture specific.
-        MappingNotValid,
-    } || error{OutOfPhysicalMemory};
-
     pub const init = struct {
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
         ///
@@ -88,23 +81,21 @@ pub const paging = struct {
         /// This function:
         ///  - uses all page sizes available to the architecture
         ///  - does not flush the TLB
-        ///  - on error is not required to roll back any modifications to the page tables
+        ///  - panics on error
         pub fn mapToPhysicalRangeAllPageSizes(
             page_table: paging.PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: kernel.vmm.MapType,
             comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
-            comptime deallocatePage: fn (core.PhysicalRange) void,
-        ) callconv(core.inline_in_non_debug) paging.MapError!void {
+        ) callconv(core.inline_in_non_debug) void {
             checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualRange,
                 core.PhysicalRange,
                 kernel.vmm.MapType,
                 fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
-                fn (core.PhysicalRange) void,
-            ) paging.MapError!void);
+            ) void);
 
             return current.paging.init.mapToPhysicalRangeAllPageSizes(
                 page_table.arch,
@@ -112,7 +103,6 @@ pub const paging = struct {
                 physical_range,
                 map_type,
                 allocatePage,
-                deallocatePage,
             );
         }
     };

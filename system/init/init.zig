@@ -408,7 +408,6 @@ fn initializeVirtualMemory() !void {
                 region.range.size,
             ),
         };
-        _ = physical_range;
 
         const map_type: kernel.vmm.MapType = switch (region.type) {
             .executable_section => .{ .executable = true, .global = true },
@@ -416,8 +415,18 @@ fn initializeVirtualMemory() !void {
             .writeable_section, .direct_map => .{ .writeable = true, .global = true },
             .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
         };
-        _ = map_type;
 
+        arch.paging.init.mapToPhysicalRangeAllPageSizes(
+            kernel.core_page_table,
+            region.range,
+            physical_range,
+            map_type,
+            struct {
+                fn allocatePage() !core.PhysicalRange {
+                    return pmm.allocatePhysicalPage();
+                }
+            }.allocatePage,
+        );
     }
 
     kernel.core_page_table.load();

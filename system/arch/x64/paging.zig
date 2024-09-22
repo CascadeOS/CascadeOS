@@ -30,52 +30,20 @@ pub fn createPageTable(physical_range: core.PhysicalRange) *PageTable {
     return page_table;
 }
 
-/// Ensures the next page table level exists.
-fn ensureNextTable(
-    raw_entry: *ArchPageTable.RawEntry,
-    map_type: MapType,
-    comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
-) !struct { *ArchPageTable, bool } {
-    var opt_backing_range: ?core.PhysicalRange = null;
-
-    var entry = raw_entry.load();
-
-    const next_level_phys_address = if (entry.present.read()) blk: {
-        if (entry.huge.read()) return error.MappingNotValid;
-
-        break :blk entry.getAddress4kib();
-    } else blk: {
-        const backing_range = try allocatePage();
-
-        opt_backing_range = backing_range;
-
-        break :blk backing_range.address;
-    };
-    errdefer comptime unreachable;
-
-    const next_level = kernel.memory_layout.directMapFromPhysical(next_level_phys_address).toPtr(*ArchPageTable);
-
-    if (opt_backing_range) |backing_range| {
-        next_level.zero();
-
-        entry.zero();
-        applyParentMapType(map_type, &entry);
-        entry.setAddress4kib(backing_range.address);
-        entry.present.write(true);
-
-        raw_entry.store(entry);
-    }
-
-    return .{ next_level, opt_backing_range != null };
+pub fn loadPageTable(physical_address: core.PhysicalAddress) void {
+    lib_x64.registers.Cr3.writeAddress(physical_address);
 }
 
-fn applyMapType(map_type: MapType, entry: *ArchPageTable.Entry) void {
 fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
     if (map_type.user) entry.user_accessible.write(true);
 
     if (map_type.global) entry.global.write(true);
 
-    if (!map_type.executable and x64.info.cpu_id.execute_disable) entry.no_execute.write(true);
+    if (x64.info.cpu_id.execute_disable) {
+        @branchHint(.likely); // modern CPUs support NX
+
+        if (!map_type.executable) entry.no_execute.write(true);
+    }
 
     if (map_type.writeable) entry.writeable.write(true);
 
@@ -89,6 +57,202 @@ fn applyParentMapType(map_type: MapType, entry: *PageTable.Entry) void {
     entry.writeable.write(true);
     if (map_type.user) entry.user_accessible.write(true);
 }
+
+fn ensureNextTable(
+    raw_entry: *u64,
+    map_type: MapType,
+    comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+) !*PageTable {
+    const next_level_physical_address = blk: {
+        var entry: PageTable.Entry = .{ .raw = raw_entry.* };
+
+        if (entry.present.read()) {
+            if (entry.huge.read()) return error.MappingNotValid;
+
+            break :blk entry.getAddress4kib();
+        }
+
+        std.debug.assert(entry.raw == 0);
+
+        const backing_range = try allocatePage();
+        errdefer comptime unreachable;
+
+        entry.setAddress4kib(backing_range.address);
+        entry.present.write(true);
+        applyParentMapType(map_type, &entry);
+
+        raw_entry.* = entry.raw;
+
+        break :blk backing_range.address;
+    };
+
+    return kernel.memory_layout
+        .directMapFromPhysical(next_level_physical_address)
+        .toPtr(*PageTable);
+}
+
+pub const init = struct {
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///  - the virtual range is not already mapped
+    ///
+    /// This function:
+    ///  - uses all page sizes available to the architecture
+    ///  - does not flush the TLB
+    ///  - panics on error
+    pub fn mapToPhysicalRangeAllPageSizes(
+        level4_table: *PageTable,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
+        map_type: kernel.vmm.MapType,
+        comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+    ) void {
+        std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
+        std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
+        std.debug.assert(physical_range.address.isAligned(PageTable.small_page_size));
+        std.debug.assert(physical_range.size.isAligned(PageTable.small_page_size));
+        std.debug.assert(virtual_range.size.equal(physical_range.size));
+
+        const supports_1gib = x64.info.cpu_id.gbyte_pages;
+
+        var current_virtual_address = virtual_range.address;
+        const last_virtual_address = virtual_range.last();
+        var current_physical_address = physical_range.address;
+        var size_remaining = virtual_range.size;
+
+        var level4_index: usize = PageTable.p4Index(current_virtual_address);
+        const last_level4_index: usize = PageTable.p4Index(last_virtual_address);
+
+        while (level4_index <= last_level4_index) : (level4_index += 1) {
+            const level3_table = core.require(ensureNextTable(
+                &level4_table.entries[level4_index],
+                map_type,
+                allocatePage,
+            ), "failed to allocate page table");
+
+            var level3_index = PageTable.p3Index(current_virtual_address);
+            const last_level3_index: usize = if (size_remaining.greaterThanOrEqual(PageTable.level_4_address_space_size))
+                PageTable.number_of_entries
+            else
+                PageTable.p3Index(last_virtual_address);
+
+            while (level3_index <= last_level3_index) : (level3_index += 1) {
+                if (supports_1gib and
+                    size_remaining.greaterThanOrEqual(PageTable.large_page_size) and
+                    current_virtual_address.isAligned(PageTable.large_page_size) and
+                    current_physical_address.isAligned(PageTable.large_page_size))
+                {
+                    // large 1 GiB page
+                    setEntry(
+                        level3_table,
+                        level3_index,
+                        current_physical_address,
+                        map_type,
+                        .large,
+                    );
+
+                    current_virtual_address.moveForwardInPlace(PageTable.large_page_size);
+                    current_physical_address.moveForwardInPlace(PageTable.large_page_size);
+                    size_remaining.subtractInPlace(PageTable.large_page_size);
+                    continue;
+                }
+
+                const level2_table = core.require(ensureNextTable(
+                    &level3_table.entries[level3_index],
+                    map_type,
+                    allocatePage,
+                ), "failed to allocate page table");
+
+                var level2_index = PageTable.p2Index(current_virtual_address);
+                const last_level2_index: usize = if (size_remaining.greaterThanOrEqual(PageTable.level_3_address_space_size))
+                    PageTable.number_of_entries
+                else
+                    PageTable.p2Index(last_virtual_address);
+
+                while (level2_index <= last_level2_index) : (level2_index += 1) {
+                    if (size_remaining.greaterThanOrEqual(PageTable.medium_page_size) and
+                        current_virtual_address.isAligned(PageTable.medium_page_size) and
+                        current_physical_address.isAligned(PageTable.medium_page_size))
+                    {
+                        // large 2 MiB page
+                        setEntry(
+                            level2_table,
+                            level2_index,
+                            current_physical_address,
+                            map_type,
+                            .medium,
+                        );
+
+                        current_virtual_address.moveForwardInPlace(PageTable.medium_page_size);
+                        current_physical_address.moveForwardInPlace(PageTable.medium_page_size);
+                        size_remaining.subtractInPlace(PageTable.medium_page_size);
+                        continue;
+                    }
+
+                    const level1_table = core.require(ensureNextTable(
+                        &level2_table.entries[level2_index],
+                        map_type,
+                        allocatePage,
+                    ), "failed to allocate page table");
+
+                    var level1_index = PageTable.p1Index(current_virtual_address);
+                    const last_level1_index: usize = if (size_remaining.greaterThanOrEqual(PageTable.level_2_address_space_size))
+                        PageTable.number_of_entries
+                    else
+                        PageTable.p1Index(last_virtual_address);
+
+                    while (level1_index <= last_level1_index) : (level1_index += 1) {
+                        setEntry(
+                            level1_table,
+                            level1_index,
+                            current_physical_address,
+                            map_type,
+                            .small,
+                        );
+
+                        current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
+                        current_physical_address.moveForwardInPlace(PageTable.small_page_size);
+                        size_remaining.subtractInPlace(PageTable.small_page_size);
+                    }
+                }
+            }
+        }
+    }
+
+    fn setEntry(
+        page_table: *PageTable,
+        index: usize,
+        physical_address: core.PhysicalAddress,
+        map_type: kernel.vmm.MapType,
+        comptime page_type: enum { small, medium, large },
+    ) void {
+        var entry = PageTable.Entry{ .raw = page_table.entries[index] };
+
+        if (entry.present.read()) core.panic("already mapped", null);
+
+        switch (page_type) {
+            .small => entry.setAddress4kib(physical_address),
+            .medium => {
+                entry.huge.write(true);
+                entry.setAddress2mib(physical_address);
+            },
+            .large => {
+                entry.huge.write(true);
+                entry.setAddress1gib(physical_address);
+            },
+        }
+
+        applyMapType(map_type, &entry);
+
+        entry.present.write(true);
+
+        page_table.entries[index] = entry.raw;
+    }
+};
 
 const std = @import("std");
 const core = @import("core");
