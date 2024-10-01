@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.0.5/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.0.14/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of 82c4ecf7f3a207e85c5a30f048272143cafc9cd7 (2024-08-12).
+//! This module contains the definitions of the Limine protocol as of 97c31196a9aec28b36ed9ff64d6df77a061c3d9b (2024-09-16).
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.0.5/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.0.14/PROTOCOL.md)
 //!
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
@@ -254,13 +254,13 @@ pub const PagingMode = extern struct {
 
     // Request revision 1 and above
 
-    /// The highest paging mode in that the OS supports.
+    /// The highest paging mode that the OS supports.
     ///
     /// The bootloader will refuse to boot the OS if no paging modes of this type or lower (but equal or greater than
     /// `min_mode`) are available.
-    max_mode: Mode = default_max_mode,
+    max_mode: Mode,
 
-    /// The lowest paging mode in numerical order that the OS supports.
+    /// The lowest paging mode that the OS supports.
     ///
     /// The bootloader will refuse to boot the OS if no paging modes of this type or greater (but equal or lower than
     /// `max_mode`) are available.
@@ -287,13 +287,6 @@ pub const PagingMode = extern struct {
         .loongarch64 => .four_level,
         .riscv64 => .sv39,
         .x86_64 => .four_level,
-    };
-
-    pub const default_max_mode: Mode = switch (arch) {
-        .aarch64 => .five_level,
-        .loongarch64 => .four_level,
-        .riscv64 => .sv57,
-        .x86_64 => .five_level,
     };
 
     pub const Mode = switch (arch) {
