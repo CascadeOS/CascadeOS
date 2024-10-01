@@ -17,8 +17,8 @@
         },
 
         .libdwarf = .{
-            .url = "git+https://github.com/davea42/libdwarf-code.git#v0.10.1",
-            .hash = "12202859ad938219785a1286e2b4d8b1517254f1bceca99756156555722c63dc90c1",
+            .url = "git+https://github.com/davea42/libdwarf-code.git#v0.11.0",
+            .hash = "12209c5e07806ab45de758d6343300300663df021a21c861d028044c21f207e01289",
         },
 
         .limine = .{
