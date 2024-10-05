@@ -79,10 +79,25 @@ pub const VirtualRange = extern struct {
 
     /// Returns a slice of type `T` corresponding to this virtual range.
     ///
+    /// The range is asserted to have the exact size of the slice.
+    ///
     /// It is the caller's responsibility to ensure that the range is valid in the current address space.
-    pub fn toSlice(self: VirtualRange, comptime T: type) ![]T {
-        const len = try std.math.divExact(u64, self.size.value, @sizeOf(T));
-        return self.address.toPtr([*]T)[0..len];
+    pub fn toSliceExact(self: VirtualRange, comptime T: type) ![]T {
+        const size_of_t = core.Size.of(T);
+        const count = size_of_t.amountToCover(self.size);
+        if (size_of_t.multiplyScalar(count) != self.size) return error.NotExact;
+        return self.address.toPtr([*]T)[0..count];
+    }
+
+    /// Returns a slice of type `T` corresponding to this virtual range.
+    ///
+    /// The range is allowed to be longer that the the slice needs.
+    ///
+    /// It is the caller's responsibility to ensure that the range is valid in the current address space.
+    pub fn toSliceRelaxed(self: VirtualRange, comptime T: type) []T {
+        const size_of_t = core.Size.of(T);
+        const count = size_of_t.amountToCover(self.size);
+        return self.address.toPtr([*]T)[0..count];
     }
 
     /// Returns a byte slice of the memory corresponding to this virtual range.
