@@ -345,23 +345,36 @@ const PMM = struct {
             .subtract(self.unavailable_memory);
     }
 
-    pub fn allocatePhysicalPage(self: *PMM) error{OutOfPhysicalMemory}!core.PhysicalRange {
-        if (self.ranges.len == 0) return error.OutOfPhysicalMemory;
+    pub fn allocateContiguousPages(
+        self: *PMM,
+        count: usize,
+    ) error{InsufficentContiguousPhysicalMemory}!core.PhysicalRange {
+        if (count == 0) core.panic("non-zero count required", null);
 
-        self.free_memory.subtractInPlace(arch.paging.standard_page_size);
+        const size = arch.paging.standard_page_size.multiplyScalar(count);
 
-        const range = &self.ranges.buffer[0];
-        const physical_address = range.address;
+        const ranges: []core.PhysicalRange = self.ranges.slice();
 
-        range.size.subtractInPlace(arch.paging.standard_page_size);
+        for (ranges, 0..) |*range, i| {
+            if (range.size.lessThan(size)) continue;
 
-        if (range.size.value == 0) {
-            _ = self.ranges.swapRemove(0);
-        } else {
-            range.address.moveForwardInPlace(arch.paging.standard_page_size);
+            // found a range with enough space for the allocation
+
+            const allocated_range = core.PhysicalRange.fromAddr(range.address, size);
+
+            range.size.subtractInPlace(size);
+
+            if (range.size.value == 0) {
+                // the range is now empty, so remove it from `self.ranges`
+                _ = self.ranges.swapRemove(i);
+            } else {
+                range.address.moveForwardInPlace(size);
+            }
+
+            return allocated_range;
         }
 
-        return core.PhysicalRange.fromAddr(physical_address, arch.paging.standard_page_size);
+        return error.InsufficentContiguousPhysicalMemory;
     }
 };
 
@@ -409,7 +422,7 @@ fn initializePhysicalMemory() !void {
 }
 
 fn initializeVirtualMemory() !void {
-    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocatePhysicalPage());
+    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(1));
 
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
         const physical_range = switch (region.type) {
@@ -436,7 +449,7 @@ fn initializeVirtualMemory() !void {
             map_type,
             struct {
                 fn allocatePage() !core.PhysicalRange {
-                    return pmm.allocatePhysicalPage();
+                    return pmm.allocateContiguousPages(1) catch return error.OutOfPhysicalMemory;
                 }
             }.allocatePage,
         );
