@@ -324,64 +324,10 @@ fn initializeACPITables() !void {
     kernel.acpi.globals.sdt_header = sdt_header;
 }
 
-/// A simple physical memory manager.
-///
-/// Only supports allocating a single `arch.paging.standard_page_size` sized page with no support for freeing.
-const PMM = struct {
-    ranges: Ranges,
-    total_memory: core.Size,
-    free_memory: core.Size,
-    reserved_memory: core.Size,
-    reclaimable_memory: core.Size,
-    unavailable_memory: core.Size,
-
-    pub const Ranges = std.BoundedArray(core.PhysicalRange, 16);
-
-    pub fn usedMemory(self: *const PMM) core.Size {
-        return self.total_memory
-            .subtract(self.free_memory)
-            .subtract(self.reserved_memory)
-            .subtract(self.reclaimable_memory)
-            .subtract(self.unavailable_memory);
-    }
-
-    pub fn allocateContiguousPages(
-        self: *PMM,
-        count: usize,
-    ) error{InsufficentContiguousPhysicalMemory}!core.PhysicalRange {
-        if (count == 0) core.panic("non-zero count required", null);
-
-        const size = arch.paging.standard_page_size.multiplyScalar(count);
-
-        const ranges: []core.PhysicalRange = self.ranges.slice();
-
-        for (ranges, 0..) |*range, i| {
-            if (range.size.lessThan(size)) continue;
-
-            // found a range with enough space for the allocation
-
-            const allocated_range = core.PhysicalRange.fromAddr(range.address, size);
-
-            range.size.subtractInPlace(size);
-
-            if (range.size.value == 0) {
-                // the range is now empty, so remove it from `self.ranges`
-                _ = self.ranges.swapRemove(i);
-            } else {
-                range.address.moveForwardInPlace(size);
-            }
-
-            return allocated_range;
-        }
-
-        return error.InsufficentContiguousPhysicalMemory;
-    }
-};
-
 fn initializePhysicalMemory() !void {
     var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
 
-    var ranges: PMM.Ranges = .{};
+    var ranges: pmm.Ranges = .{};
 
     var total_memory: core.Size = .zero;
     var free_memory: core.Size = .zero;
@@ -404,14 +350,12 @@ fn initializePhysicalMemory() !void {
         }
     }
 
-    pmm = .{
-        .ranges = ranges,
-        .total_memory = total_memory,
-        .free_memory = free_memory,
-        .reserved_memory = reserved_memory,
-        .reclaimable_memory = reclaimable_memory,
-        .unavailable_memory = unavailable_memory,
-    };
+    pmm.free_ranges = ranges;
+    pmm.total_memory = total_memory;
+    pmm.free_memory = free_memory;
+    pmm.reserved_memory = reserved_memory;
+    pmm.reclaimable_memory = reclaimable_memory;
+    pmm.unavailable_memory = unavailable_memory;
 
     log.debug("total memory:         {}", .{total_memory});
     log.debug("  free memory:        {}", .{free_memory});
@@ -422,7 +366,7 @@ fn initializePhysicalMemory() !void {
 }
 
 fn initializeVirtualMemory() !void {
-    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(1));
+    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
 
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
         const physical_range = switch (region.type) {
@@ -449,7 +393,7 @@ fn initializeVirtualMemory() !void {
             map_type,
             struct {
                 fn allocatePage() !core.PhysicalRange {
-                    return pmm.allocateContiguousPages(1) catch return error.OutOfPhysicalMemory;
+                    return pmm.allocateContiguousPages(arch.paging.standard_page_size) catch return error.OutOfPhysicalMemory;
                 }
             }.allocatePage,
         );
@@ -463,7 +407,71 @@ var bootstrap_executor: kernel.Executor = .{
     .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
 };
 
-var pmm: PMM = undefined; // set by `initializePhysicalMemory`
+/// A simple physical memory manager.
+///
+/// Only supports allocating a single `arch.paging.standard_page_size` sized page with no support for freeing.
+const pmm = struct {
+    var free_ranges: Ranges = undefined; // set by `initializePhysicalMemory`
+    var total_memory: core.Size = undefined; // set by `initializePhysicalMemory`
+    var free_memory: core.Size = undefined; // set by `initializePhysicalMemory`
+    var reserved_memory: core.Size = undefined; // set by `initializePhysicalMemory`
+    var reclaimable_memory: core.Size = undefined; // set by `initializePhysicalMemory`
+    var unavailable_memory: core.Size = undefined; // set by `initializePhysicalMemory`
+
+    pub const Ranges = std.BoundedArray(core.PhysicalRange, 16);
+
+    pub fn usedMemory() core.Size {
+        return total_memory
+            .subtract(free_memory)
+            .subtract(reserved_memory)
+            .subtract(reclaimable_memory)
+            .subtract(unavailable_memory);
+    }
+
+    pub fn allocateContigousSlice(
+        comptime T: type,
+        count: usize,
+    ) ![]T {
+        const size = core.Size.of(T).multiplyScalar(count);
+        const physical_range = try allocateContiguousPages(size);
+        const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
+        return virtual_range.toSliceRelaxed(T);
+    }
+
+    /// Allocate contiguous physical pages.
+    ///
+    /// The allocation is rounded up to the next page.
+    pub fn allocateContiguousPages(
+        requested_size: core.Size,
+    ) error{InsufficentContiguousPhysicalMemory}!core.PhysicalRange {
+        if (requested_size.value == 0) core.panic("non-zero size required", null);
+
+        const size = requested_size.alignForward(arch.paging.standard_page_size);
+
+        const ranges: []core.PhysicalRange = free_ranges.slice();
+
+        for (ranges, 0..) |*range, i| {
+            if (range.size.lessThan(size)) continue;
+
+            // found a range with enough space for the allocation
+
+            const allocated_range = core.PhysicalRange.fromAddr(range.address, size);
+
+            range.size.subtractInPlace(size);
+
+            if (range.size.value == 0) {
+                // the range is now empty, so remove it from `free_ranges`
+                _ = free_ranges.swapRemove(i);
+            } else {
+                range.address.moveForwardInPlace(size);
+            }
+
+            return allocated_range;
+        }
+
+        return error.InsufficentContiguousPhysicalMemory;
+    }
+};
 
 const std = @import("std");
 const core = @import("core");
