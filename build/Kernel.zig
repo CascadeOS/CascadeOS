@@ -218,7 +218,7 @@ fn constructKernelExe(
 ) !*Step.Compile {
     const arch_module = blk: {
         const arch_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "system", "arch", "arch.zig" })),
+            .root_source_file = b.path(b.pathJoin(&.{ "sys", "arch", "arch.zig" })),
         });
 
         const deps = try getAllDependencies(b, target, libraries, &.{arch_module_dependencies});
@@ -245,7 +245,7 @@ fn constructKernelExe(
 
     const boot_module = blk: {
         const boot_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "system", "boot", "boot.zig" })),
+            .root_source_file = b.path(b.pathJoin(&.{ "sys", "boot", "boot.zig" })),
         });
 
         const deps = try getAllDependencies(b, target, libraries, &.{boot_module_dependencies});
@@ -272,7 +272,7 @@ fn constructKernelExe(
 
     const init_module = blk: {
         const init_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "system", "init", "init.zig" })),
+            .root_source_file = b.path(b.pathJoin(&.{ "sys", "init", "init.zig" })),
         });
 
         const deps = try getAllDependencies(b, target, libraries, &.{init_module_dependencies});
@@ -299,7 +299,7 @@ fn constructKernelExe(
 
     const kernel_module = blk: {
         const kernel_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "system", "kernel", "kernel.zig" })),
+            .root_source_file = b.path(b.pathJoin(&.{ "sys", "kernel", "kernel.zig" })),
         });
 
         const deps = try getAllDependencies(b, target, libraries, &.{kernel_module_dependencies});
@@ -338,7 +338,7 @@ fn constructKernelExe(
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
-        .root_source_file = b.path(b.pathJoin(&.{ "system", "root.zig" })),
+        .root_source_file = b.path(b.pathJoin(&.{ "sys", "root.zig" })),
         .target = getKernelCrossTarget(target, b),
         .optimize = options.optimize,
     });
@@ -392,7 +392,7 @@ fn constructKernelExe(
 
     kernel_exe.setLinkerScriptPath(b.path(
         b.pathJoin(&.{
-            "system",
+            "sys",
             "arch",
             @tagName(target),
             "linker.ld",
@@ -480,7 +480,7 @@ fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const L
     defer file_paths.deinit();
 
     // add the kernel's files
-    try addFilesRecursive(b, &modules, &file_paths, options.root_path, b.pathJoin(&.{"system"}));
+    try addFilesRecursive(b, &modules, &file_paths, options.root_path, b.pathJoin(&.{"sys"}));
 
     // add each dependencies files
     var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
@@ -575,10 +575,10 @@ const Options = @import("Options.zig");
 const Tool = @import("Tool.zig");
 const StepCollection = @import("StepCollection.zig");
 
-const arch_module_dependencies = @import("../system/arch/dependencies.zig");
-const boot_module_dependencies = @import("../system/boot/dependencies.zig");
-const init_module_dependencies = @import("../system/init/dependencies.zig");
-const kernel_module_dependencies = @import("../system/kernel/dependencies.zig");
+const arch_module_dependencies = @import("../sys/arch/dependencies.zig");
+const boot_module_dependencies = @import("../sys/boot/dependencies.zig");
+const init_module_dependencies = @import("../sys/init/dependencies.zig");
+const kernel_module_dependencies = @import("../sys/kernel/dependencies.zig");
 
 const all_module_dependencies = &.{
     arch_module_dependencies,
