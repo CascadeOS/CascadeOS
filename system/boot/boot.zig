@@ -184,6 +184,106 @@ pub fn rsdp() ?core.VirtualAddress {
     return null;
 }
 
+pub fn cpuDescriptors() ?CpuDescriptor.Iterator {
+    switch (bootloader_api) {
+        .limine => if (limine_requests.smp.response) |resp| {
+            const entries = resp.cpus();
+            return .{
+                .limine = .{
+                    .index = 0,
+                    .entries = entries,
+                },
+            };
+        },
+        .unknown => {},
+    }
+
+    return null;
+}
+
+pub const CpuDescriptor = struct {
+    _raw: Raw,
+
+    pub fn boot(
+        self: CpuDescriptor,
+        user_data: *anyopaque,
+        comptime targetFn: fn (user_data: *anyopaque) noreturn,
+    ) void {
+        switch (self._raw) {
+            .limine => |limine_info| {
+                const trampolineFn = struct {
+                    fn trampolineFn(smp_info: *const limine.SMP.Response.SMPInfo) callconv(.C) noreturn {
+                        targetFn(@ptrFromInt(smp_info.extra_argument));
+                    }
+                }.trampolineFn;
+
+                @atomicStore(
+                    usize,
+                    &limine_info.extra_argument,
+                    @intFromPtr(user_data),
+                    .release,
+                );
+
+                @atomicStore(
+                    ?*const fn (*const limine.SMP.Response.SMPInfo) callconv(.C) noreturn,
+                    &limine_info.goto_address,
+                    &trampolineFn,
+                    .release,
+                );
+            },
+        }
+    }
+
+    pub fn processorId(self: CpuDescriptor) u32 {
+        return switch (self._raw) {
+            .limine => |limine_info| limine_info.processor_id,
+        };
+    }
+
+    pub const Raw = union(enum) {
+        limine: *limine.SMP.Response.SMPInfo,
+    };
+
+    /// An iterator over the cpu descriptors provided by the bootloader.
+    pub const Iterator = union(enum) {
+        limine: LimineCpuDescriptorIterator,
+
+        pub fn count(self: Iterator) usize {
+            return switch (self) {
+                inline else => |i| i.count(),
+            };
+        }
+
+        /// Returns the next cpu descriptor from the iterator, if any remain.
+        pub fn next(self: *Iterator) ?CpuDescriptor {
+            return switch (self.*) {
+                inline else => |*i| i.next(),
+            };
+        }
+
+        const LimineCpuDescriptorIterator = struct {
+            index: usize,
+            entries: []*limine.SMP.Response.SMPInfo,
+
+            pub fn count(self: LimineCpuDescriptorIterator) usize {
+                return self.entries.len;
+            }
+
+            pub fn next(self: *LimineCpuDescriptorIterator) ?CpuDescriptor {
+                if (self.index >= self.entries.len) return null;
+
+                const smp_info = self.entries[self.index];
+
+                self.index += 1;
+
+                return .{
+                    ._raw = .{ .limine = smp_info },
+                };
+            }
+        };
+    };
+};
+
 fn limineEntryPoint() callconv(.C) noreturn {
     bootloader_api = .limine;
     @call(.never_inline, @import("root").initEntryPoint, .{}) catch |err| {
@@ -199,6 +299,7 @@ const limine_requests = struct {
     export var hhdm: limine.HHDM = .{};
     export var memmap: limine.Memmap = .{};
     export var rsdp: limine.RSDP = .{};
+    export var smp: limine.SMP = .{ .flags = .{ .x2apic = true } };
 };
 
 var bootloader_api: BootloaderAPI = .unknown;
