@@ -32,6 +32,19 @@ pub fn initStage1() !noreturn {
 
     try initializeVirtualMemory();
 
+
+    initStage2(kernel.getExecutor(.bootstrap));
+    core.panic("`init.initStage2` returned", null);
+}
+
+/// Stage 2 of kernel initialization.
+///
+/// This function is executed by all executors, including the bootstrap executor.
+///
+/// All executors are using the bootloader provided stack.
+fn initStage2(executor: *kernel.Executor) noreturn {
+    if (executor.id != .bootstrap) arch.interrupts.disableInterruptsAndHalt(); // park non-bootstrap
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
