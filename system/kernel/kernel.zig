@@ -6,13 +6,6 @@
 /// Initialized during init and never modified again.
 pub var executors: []Executor = &.{};
 
-/// The core page table.
-///
-/// All other page tables start as a copy of this one.
-///
-/// Initialized during `init.initializeVirtualMemory`.
-pub var core_page_table: arch.paging.PageTable = undefined;
-
 /// The memory layout of the kernel.
 ///
 /// Initialized during `init.buildMemoryLayout`.

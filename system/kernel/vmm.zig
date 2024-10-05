@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+/// The core page table.
+///
+/// All other page tables start as a copy of this one.
+///
+/// Initialized during `init.initializeVirtualMemory`.
+pub var core_page_table: arch.paging.PageTable = undefined;
+
 pub const MapType = struct {
     /// Accessible from userspace.
     user: bool = false,
@@ -64,3 +71,4 @@ pub const MapType = struct {
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
+const arch = @import("arch");
