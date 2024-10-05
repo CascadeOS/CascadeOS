@@ -396,7 +396,7 @@ fn initializePhysicalMemory() !void {
 }
 
 fn initializeVirtualMemory() !void {
-    kernel.core_page_table = arch.paging.PageTable.create(try pmm.allocatePhysicalPage());
+    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocatePhysicalPage());
 
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
         const physical_range = switch (region.type) {
@@ -417,7 +417,7 @@ fn initializeVirtualMemory() !void {
         };
 
         arch.paging.init.mapToPhysicalRangeAllPageSizes(
-            kernel.core_page_table,
+            kernel.vmm.core_page_table,
             region.range,
             physical_range,
             map_type,
@@ -429,7 +429,7 @@ fn initializeVirtualMemory() !void {
         );
     }
 
-    kernel.core_page_table.load();
+    kernel.vmm.core_page_table.load();
 }
 
 var bootstrap_executor: kernel.Executor = .{
