@@ -32,6 +32,7 @@ pub fn initStage1() !noreturn {
 
     try initializeVirtualMemory();
 
+    try initializeExecutors();
 
     initStage2(kernel.getExecutor(.bootstrap));
     core.panic("`init.initStage2` returned", null);
@@ -400,6 +401,53 @@ fn initializeVirtualMemory() !void {
     }
 
     kernel.vmm.core_page_table.load();
+}
+
+/// Initialize the per executor data structures for all executors including the bootstrap executor.
+///
+/// Also wakes the non-bootstrap executors and jumps them to `initStage2`.
+fn initializeExecutors() !void {
+    var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
+
+    const executors = try pmm.allocateContigousSlice(kernel.Executor, descriptors.count());
+
+    var i: u32 = 0;
+    while (descriptors.next()) |desc| : (i += 1) {
+        if (i == 0) std.debug.assert(desc.processorId() == 0);
+
+        const executor = &executors[i];
+
+        executor.* = .{
+            .id = @enumFromInt(i),
+            .arch = undefined, // set by `arch.init.prepareExecutor`
+        };
+
+        arch.init.prepareExecutor(
+            executor,
+            struct {
+                fn allocateKernelStack() !kernel.Stack {
+                    // TODO: we will eventually need a proper stack allocator, especically if we want guard pages
+
+                    const physical_range = try pmm.allocateContiguousPages(kernel.config.kernel_stack_size);
+                    const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
+
+                    return kernel.Stack.fromRange(virtual_range, virtual_range);
+                }
+            }.allocateKernelStack,
+        );
+
+        if (executor.id != .bootstrap) {
+            desc.boot(
+                executor,
+                struct {
+                    fn bootFn(user_data: *anyopaque) noreturn {
+                        initStage2(@as(*kernel.Executor, @ptrCast(@alignCast(user_data))));
+                        core.panic("`init.initStage2` returned", null);
+                    }
+                }.bootFn,
+            );
+        }
+    }
 }
 
 var bootstrap_executor: kernel.Executor = .{

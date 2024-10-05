@@ -3,7 +3,7 @@
 
 /// Array of all executors.
 ///
-/// Initialized during init and never modified again.
+/// Initialized by `init.initializeExecutors` and never modified again.
 pub var executors: []Executor = &.{};
 
 /// Get the executor with the given id.
