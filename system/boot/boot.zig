@@ -47,7 +47,7 @@ pub fn directMapAddress() ?core.VirtualAddress {
 }
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMap(direction: core.Direction) ?MemoryMapIterator {
+pub fn memoryMap(direction: core.Direction) ?MemoryMapEntry.Iterator {
     switch (bootloader_api) {
         .limine => if (limine_requests.memmap.response) |resp| {
             const entries = resp.entries();
@@ -111,30 +111,65 @@ pub const MemoryMapEntry = struct {
     fn __helpZls() void {
         MemoryMapEntry.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
-};
 
-/// An iterator over the memory map entries provided by the bootloader.
-pub const MemoryMapIterator = union(enum) {
-    limine: LimineMemoryMapIterator,
+    /// An iterator over the memory map entries provided by the bootloader.
+    pub const Iterator = union(enum) {
+        limine: LimineMemoryMapIterator,
 
-    /// Returns the next memory map entry from the iterator, if any remain.
-    pub fn next(self: *MemoryMapIterator) ?MemoryMapEntry {
-        while (true) {
-            const opt_entry = switch (self.*) {
-                inline else => |*i| i.next(),
-            };
+        /// Returns the next memory map entry from the iterator, if any remain.
+        pub fn next(self: *Iterator) ?MemoryMapEntry {
+            while (true) {
+                const opt_entry = switch (self.*) {
+                    inline else => |*i| i.next(),
+                };
 
-            if (opt_entry) |entry| {
-                if (entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
-                    // this is a qemu specific hack to not have a 1TiB direct map
-                    // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
-                    continue;
+                if (opt_entry) |entry| {
+                    if (entry.range.address.equal(core.PhysicalAddress.fromInt(0x000000fd00000000))) {
+                        // this is a qemu specific hack to not have a 1TiB direct map
+                        // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
+                        continue;
+                    }
                 }
-            }
 
-            return opt_entry;
+                return opt_entry;
+            }
         }
-    }
+
+        const LimineMemoryMapIterator = struct {
+            index: usize,
+            entries: []const *const limine.Memmap.Entry,
+            direction: core.Direction,
+
+            pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
+                const limine_entry = switch (self.direction) {
+                    .backward => blk: {
+                        if (self.index == 0) return null;
+                        self.index -= 1;
+                        break :blk self.entries[self.index];
+                    },
+                    .forward => blk: {
+                        if (self.index >= self.entries.len) return null;
+                        const entry = self.entries[self.index];
+                        self.index += 1;
+                        break :blk entry;
+                    },
+                };
+
+                return .{
+                    .range = .fromAddr(limine_entry.base, limine_entry.length),
+                    .type = switch (limine_entry.type) {
+                        .usable => .free,
+                        .kernel_and_modules, .framebuffer => .in_use,
+                        .reserved, .acpi_nvs => .reserved,
+                        .bootloader_reclaimable => .bootloader_reclaimable,
+                        .acpi_reclaimable => .acpi_reclaimable,
+                        .bad_memory => .unusable,
+                        else => .unknown,
+                    },
+                };
+            }
+        };
+    };
 };
 
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
@@ -156,41 +191,6 @@ fn limineEntryPoint() callconv(.C) noreturn {
     };
     core.panic("`init.initStage1` returned", null);
 }
-
-const LimineMemoryMapIterator = struct {
-    index: usize,
-    entries: []const *const limine.Memmap.Entry,
-    direction: core.Direction,
-
-    pub fn next(self: *LimineMemoryMapIterator) ?MemoryMapEntry {
-        const limine_entry = switch (self.direction) {
-            .backward => blk: {
-                if (self.index == 0) return null;
-                self.index -= 1;
-                break :blk self.entries[self.index];
-            },
-            .forward => blk: {
-                if (self.index >= self.entries.len) return null;
-                const entry = self.entries[self.index];
-                self.index += 1;
-                break :blk entry;
-            },
-        };
-
-        return .{
-            .range = .fromAddr(limine_entry.base, limine_entry.length),
-            .type = switch (limine_entry.type) {
-                .usable => .free,
-                .kernel_and_modules, .framebuffer => .in_use,
-                .reserved, .acpi_nvs => .reserved,
-                .bootloader_reclaimable => .bootloader_reclaimable,
-                .acpi_reclaimable => .acpi_reclaimable,
-                .bad_memory => .unusable,
-                else => .unknown,
-            },
-        };
-    }
-};
 
 const limine_requests = struct {
     export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
