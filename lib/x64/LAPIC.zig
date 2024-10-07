@@ -559,7 +559,6 @@ pub const LAPIC = union(enum) {
                 const value: u64 = @bitCast(register);
 
                 self.writeRegister(.interrupt_command_32_63, @truncate(value >> 32));
-                @fence(.seq_cst);
                 self.writeRegister(.interrupt_command_0_31, @truncate(value));
             },
             .x2apic => {
