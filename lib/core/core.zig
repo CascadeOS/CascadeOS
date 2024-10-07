@@ -19,7 +19,7 @@ pub const testing = @import("testing.zig");
 /// meaning the stack trace will not include any panic functions.
 pub fn panic(comptime msg: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
     @branchHint(.cold);
-    std.builtin.panic(msg, error_return_trace, @returnAddress());
+    std.builtin.Panic.call(msg, error_return_trace, @returnAddress());
 }
 
 /// This function is the same as `std.debug.panicExtra` except it passes `@returnAddress()`

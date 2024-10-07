@@ -18,7 +18,7 @@ pub const std_options: std.Options = .{
     .logFn = kernel.log.stdLogImpl,
 };
 
-pub const panic = kernel.debug.zigPanic;
+pub const Panic = kernel.debug.Panic;
 
 // Expose the init log implementation so that the `kernel` module can access it on @import("root").
 pub const initLogImpl: kernel.log.InitLogImpl = init.initLogImpl;
