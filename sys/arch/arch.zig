@@ -87,14 +87,16 @@ pub const paging = struct {
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: kernel.vmm.MapType,
-            comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+            allocate_page_context: anytype,
+            comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
         ) callconv(core.inline_in_non_debug) void {
             checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualRange,
                 core.PhysicalRange,
                 kernel.vmm.MapType,
-                fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+                anytype,
+                fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
             ) void);
 
             return current.paging.init.mapToPhysicalRangeAllPageSizes(
@@ -102,6 +104,7 @@ pub const paging = struct {
                 virtual_range,
                 physical_range,
                 map_type,
+                allocate_page_context,
                 allocatePage,
             );
         }

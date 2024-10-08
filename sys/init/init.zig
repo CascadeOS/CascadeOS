@@ -372,6 +372,14 @@ fn initializePhysicalMemory() !void {
 }
 
 fn initializeVirtualMemory() !void {
+    const AllocatePageContext = struct {
+        pmm: *PMM,
+
+        fn allocatePage(context: @This()) !core.PhysicalRange {
+            return context.pmm.allocateContiguousPages(arch.paging.standard_page_size) catch return error.OutOfPhysicalMemory;
+        }
+    };
+
     kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
 
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
@@ -397,11 +405,8 @@ fn initializeVirtualMemory() !void {
             region.range,
             physical_range,
             map_type,
-            struct {
-                fn allocatePage() !core.PhysicalRange {
-                    return pmm.allocateContiguousPages(arch.paging.standard_page_size) catch return error.OutOfPhysicalMemory;
-                }
-            }.allocatePage,
+            AllocatePageContext{ .pmm = &pmm },
+            AllocatePageContext.allocatePage,
         );
     }
 
