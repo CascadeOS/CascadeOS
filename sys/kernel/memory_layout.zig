@@ -49,6 +49,8 @@ pub const Region = struct {
     range: core.VirtualRange,
     type: Type,
 
+    operation: Operation,
+
     pub const Type = enum {
         writeable_section,
         readonly_section,
@@ -57,6 +59,10 @@ pub const Region = struct {
 
         direct_map,
         non_cached_direct_map,
+
+    pub const Operation = enum {
+        full_map,
+        top_level_map,
     };
 
     pub fn print(region: Region, writer: std.io.AnyWriter, indent: usize) !void {

@@ -211,6 +211,7 @@ fn registerKernelSections() !void {
         try kernel.memory_layout.globals.layout.append(.{
             .range = virtual_range,
             .type = region_type,
+            .operation = .full_map,
         });
     }
 }
@@ -234,6 +235,7 @@ fn registerDirectMaps() !void {
     try kernel.memory_layout.globals.layout.append(.{
         .range = direct_map,
         .type = .direct_map,
+        .operation = .full_map,
     });
 
     const non_cached_direct_map = findFreeRangeForDirectMap(
@@ -246,6 +248,7 @@ fn registerDirectMaps() !void {
     try kernel.memory_layout.globals.layout.append(.{
         .range = non_cached_direct_map,
         .type = .non_cached_direct_map,
+        .operation = .full_map,
     });
 }
 
@@ -383,31 +386,42 @@ fn initializeVirtualMemory() !void {
     kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
 
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
-        const physical_range = switch (region.type) {
-            .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
-            .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
-                core.PhysicalAddress.fromInt(
-                    region.range.address.value - kernel.memory_layout.globals.physical_to_virtual_offset.value,
-                ),
-                region.range.size,
+        switch (region.operation) {
+            .full_map => {
+                const physical_range = switch (region.type) {
+                    .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+                    .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
+                        core.PhysicalAddress.fromInt(
+                            region.range.address.value - kernel.memory_layout.globals.physical_to_virtual_offset.value,
+                        ),
+                        region.range.size,
+                    ),
+                };
+
+                const map_type: kernel.vmm.MapType = switch (region.type) {
+                    .executable_section => .{ .executable = true, .global = true },
+                    .readonly_section, .sdf_section => .{ .global = true },
+                    .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+                    .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
+                };
+
+                arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                    kernel.vmm.core_page_table,
+                    region.range,
+                    physical_range,
+                    map_type,
+                    AllocatePageContext{ .pmm = &pmm },
+                    AllocatePageContext.allocatePage,
+                );
+            },
+            .top_level_map => arch.paging.init.fillTopLevel(
+                kernel.vmm.core_page_table,
+                region.range,
+                .{ .global = true, .writeable = true },
+                AllocatePageContext{ .pmm = &pmm },
+                AllocatePageContext.allocatePage,
             ),
-        };
-
-        const map_type: kernel.vmm.MapType = switch (region.type) {
-            .executable_section => .{ .executable = true, .global = true },
-            .readonly_section, .sdf_section => .{ .global = true },
-            .writeable_section, .direct_map => .{ .writeable = true, .global = true },
-            .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
-        };
-
-        arch.paging.init.mapToPhysicalRangeAllPageSizes(
-            kernel.vmm.core_page_table,
-            region.range,
-            physical_range,
-            map_type,
-            AllocatePageContext{ .pmm = &pmm },
-            AllocatePageContext.allocatePage,
-        );
+        }
     }
 
     kernel.vmm.core_page_table.load();
