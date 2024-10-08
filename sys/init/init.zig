@@ -44,6 +44,9 @@ pub fn initStage1() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage2(executor: *kernel.Executor) noreturn {
+    kernel.vmm.core_page_table.load();
+    arch.init.loadExecutor(executor);
+
     if (executor.id != .bootstrap) arch.interrupts.disableInterruptsAndHalt(); // park non-bootstrap
 
     core.panic("NOT IMPLEMENTED", null);
