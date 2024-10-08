@@ -61,7 +61,8 @@ fn applyParentMapType(map_type: MapType, entry: *PageTable.Entry) void {
 fn ensureNextTable(
     raw_entry: *u64,
     map_type: MapType,
-    comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+    allocate_page_context: anytype,
+    comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
 ) !*PageTable {
     const next_level_physical_address = blk: {
         var entry: PageTable.Entry = .{ .raw = raw_entry.* };
@@ -74,7 +75,7 @@ fn ensureNextTable(
 
         std.debug.assert(entry.raw == 0);
 
-        const backing_range = try allocatePage();
+        const backing_range = try allocatePage(allocate_page_context);
         errdefer comptime unreachable;
 
         entry.setAddress4kib(backing_range.address);
@@ -109,7 +110,8 @@ pub const init = struct {
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
         map_type: kernel.vmm.MapType,
-        comptime allocatePage: fn () error{OutOfPhysicalMemory}!core.PhysicalRange,
+        allocate_page_context: anytype,
+        comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
     ) void {
         std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
         std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
@@ -131,6 +133,7 @@ pub const init = struct {
             const level3_table = core.require(ensureNextTable(
                 &level4_table.entries[level4_index],
                 map_type,
+                allocate_page_context,
                 allocatePage,
             ), "failed to allocate page table");
 
@@ -164,6 +167,7 @@ pub const init = struct {
                 const level2_table = core.require(ensureNextTable(
                     &level3_table.entries[level3_index],
                     map_type,
+                    allocate_page_context,
                     allocatePage,
                 ), "failed to allocate page table");
 
@@ -196,6 +200,7 @@ pub const init = struct {
                     const level1_table = core.require(ensureNextTable(
                         &level2_table.entries[level2_index],
                         map_type,
+                        allocate_page_context,
                         allocatePage,
                     ), "failed to allocate page table");
 
