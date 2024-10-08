@@ -132,6 +132,7 @@ fn earlyBuildMemoryLayout() !void {
 fn finishBuildMemoryLayout() !void {
     try registerKernelSections();
     try registerDirectMaps();
+    try registerHeaps();
 
     sortMemoryLayout();
 
@@ -249,6 +250,17 @@ fn registerDirectMaps() !void {
         .range = non_cached_direct_map,
         .type = .non_cached_direct_map,
         .operation = .full_map,
+    });
+}
+
+fn registerHeaps() !void {
+    const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
+
+    try kernel.memory_layout.globals.layout.append(.{
+        .range = findFreeKernelMemoryRange(size_of_top_level, size_of_top_level) orelse
+            core.panic("no space in kernel memory layout for the kernel stacks", null),
+        .type = .kernel_stacks,
+        .operation = .top_level_map,
     });
 }
 
@@ -396,6 +408,7 @@ fn initializeVirtualMemory() !void {
                         ),
                         region.range.size,
                     ),
+                    .kernel_stacks => unreachable, // never full mapped
                 };
 
                 const map_type: kernel.vmm.MapType = switch (region.type) {
@@ -403,6 +416,7 @@ fn initializeVirtualMemory() !void {
                     .readonly_section, .sdf_section => .{ .global = true },
                     .writeable_section, .direct_map => .{ .writeable = true, .global = true },
                     .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
+                    .kernel_stacks => unreachable, // never full mapped
                 };
 
                 arch.paging.init.mapToPhysicalRangeAllPageSizes(
