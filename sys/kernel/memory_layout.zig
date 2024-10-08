@@ -60,6 +60,9 @@ pub const Region = struct {
         direct_map,
         non_cached_direct_map,
 
+        kernel_stacks,
+    };
+
     pub const Operation = enum {
         full_map,
         top_level_map,
