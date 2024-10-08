@@ -238,7 +238,7 @@ fn registerDirectMaps() !void {
         .operation = .full_map,
     });
 
-    const non_cached_direct_map = findFreeRangeForDirectMap(
+    const non_cached_direct_map = findFreeKernelMemoryRange(
         direct_map.size,
         arch.paging.largest_page_size,
     ) orelse return error.NoFreeRangeForDirectMap;
@@ -252,7 +252,7 @@ fn registerDirectMaps() !void {
     });
 }
 
-fn findFreeRangeForDirectMap(size: core.Size, alignment: core.Size) ?core.VirtualRange {
+fn findFreeKernelMemoryRange(size: core.Size, alignment: core.Size) ?core.VirtualRange {
     sortMemoryLayout();
 
     const layout = &kernel.memory_layout.globals.layout;
