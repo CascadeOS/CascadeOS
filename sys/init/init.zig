@@ -331,7 +331,7 @@ fn initializeACPITables() !void {
 fn initializePhysicalMemory() !void {
     var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
 
-    var ranges: pmm.Ranges = .{};
+    var ranges: PMM.Ranges = .{};
 
     var total_memory: core.Size = .zero;
     var free_memory: core.Size = .zero;
@@ -354,12 +354,14 @@ fn initializePhysicalMemory() !void {
         }
     }
 
-    pmm.free_ranges = ranges;
-    pmm.total_memory = total_memory;
-    pmm.free_memory = free_memory;
-    pmm.reserved_memory = reserved_memory;
-    pmm.reclaimable_memory = reclaimable_memory;
-    pmm.unavailable_memory = unavailable_memory;
+    pmm = .{
+        .free_ranges = ranges,
+        .total_memory = total_memory,
+        .free_memory = free_memory,
+        .reserved_memory = reserved_memory,
+        .reclaimable_memory = reclaimable_memory,
+        .unavailable_memory = unavailable_memory,
+    };
 
     log.debug("total memory:         {}", .{total_memory});
     log.debug("  free memory:        {}", .{free_memory});
@@ -410,6 +412,19 @@ fn initializeVirtualMemory() !void {
 ///
 /// Also wakes the non-bootstrap executors and jumps them to `initStage2`.
 fn initializeExecutors() !void {
+    const KernelStackContext = struct {
+        pmm: *PMM,
+
+        fn allocateKernelStack(context: @This()) !kernel.Stack {
+            // TODO: we will eventually need a proper stack allocator, especically if we want guard pages
+
+            const physical_range = try context.pmm.allocateContiguousPages(kernel.config.kernel_stack_size);
+            const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
+
+            return kernel.Stack.fromRange(virtual_range, virtual_range);
+        }
+    };
+
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     const executors = try pmm.allocateContigousSlice(kernel.Executor, descriptors.count());
@@ -427,16 +442,8 @@ fn initializeExecutors() !void {
 
         arch.init.prepareExecutor(
             executor,
-            struct {
-                fn allocateKernelStack() !kernel.Stack {
-                    // TODO: we will eventually need a proper stack allocator, especically if we want guard pages
-
-                    const physical_range = try pmm.allocateContiguousPages(kernel.config.kernel_stack_size);
-                    const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
-
-                    return kernel.Stack.fromRange(virtual_range, virtual_range);
-                }
-            }.allocateKernelStack,
+            KernelStackContext{ .pmm = &pmm },
+            KernelStackContext.allocateKernelStack,
         );
 
         if (executor.id != .bootstrap) {
@@ -458,33 +465,36 @@ var bootstrap_executor: kernel.Executor = .{
     .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
 };
 
+var pmm: PMM = undefined; // set by `initializePhysicalMemory`
+
 /// A simple physical memory manager.
 ///
 /// Only supports allocating a single `arch.paging.standard_page_size` sized page with no support for freeing.
-const pmm = struct {
-    var free_ranges: Ranges = undefined; // set by `initializePhysicalMemory`
-    var total_memory: core.Size = undefined; // set by `initializePhysicalMemory`
-    var free_memory: core.Size = undefined; // set by `initializePhysicalMemory`
-    var reserved_memory: core.Size = undefined; // set by `initializePhysicalMemory`
-    var reclaimable_memory: core.Size = undefined; // set by `initializePhysicalMemory`
-    var unavailable_memory: core.Size = undefined; // set by `initializePhysicalMemory`
+const PMM = struct {
+    free_ranges: Ranges,
+    total_memory: core.Size,
+    free_memory: core.Size,
+    reserved_memory: core.Size,
+    reclaimable_memory: core.Size,
+    unavailable_memory: core.Size,
 
     pub const Ranges = std.BoundedArray(core.PhysicalRange, 16);
 
-    pub fn usedMemory() core.Size {
-        return total_memory
-            .subtract(free_memory)
-            .subtract(reserved_memory)
-            .subtract(reclaimable_memory)
-            .subtract(unavailable_memory);
+    pub fn usedMemory(self: *const PMM) core.Size {
+        return self.total_memory
+            .subtract(self.free_memory)
+            .subtract(self.reserved_memory)
+            .subtract(self.reclaimable_memory)
+            .subtract(self.unavailable_memory);
     }
 
     pub fn allocateContigousSlice(
+        self: *PMM,
         comptime T: type,
         count: usize,
     ) ![]T {
         const size = core.Size.of(T).multiplyScalar(count);
-        const physical_range = try allocateContiguousPages(size);
+        const physical_range = try self.allocateContiguousPages(size);
         const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
         return virtual_range.toSliceRelaxed(T);
     }
@@ -493,13 +503,14 @@ const pmm = struct {
     ///
     /// The allocation is rounded up to the next page.
     pub fn allocateContiguousPages(
+        self: *PMM,
         requested_size: core.Size,
     ) error{InsufficentContiguousPhysicalMemory}!core.PhysicalRange {
         if (requested_size.value == 0) core.panic("non-zero size required", null);
 
         const size = requested_size.alignForward(arch.paging.standard_page_size);
 
-        const ranges: []core.PhysicalRange = free_ranges.slice();
+        const ranges: []core.PhysicalRange = self.free_ranges.slice();
 
         for (ranges, 0..) |*range, i| {
             if (range.size.lessThan(size)) continue;
@@ -512,7 +523,7 @@ const pmm = struct {
 
             if (range.size.value == 0) {
                 // the range is now empty, so remove it from `free_ranges`
-                _ = free_ranges.swapRemove(i);
+                _ = self.free_ranges.swapRemove(i);
             } else {
                 range.address.moveForwardInPlace(size);
             }
