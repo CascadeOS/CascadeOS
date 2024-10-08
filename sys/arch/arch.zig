@@ -70,6 +70,46 @@ pub const paging = struct {
     };
 
     pub const init = struct {
+        /// The total size of the virtual address space that one entry in the top level of the page table covers.
+        pub inline fn sizeOfTopLevelEntry() core.Size {
+            checkSupport(current.paging.init, "sizeOfTopLevelEntry", fn () core.Size);
+
+            return current.paging.init.sizeOfTopLevelEntry();
+        }
+
+        /// This function fills in the top level of the page table for the given range.
+        ///
+        /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+        ///
+        /// This function panics on error.
+        pub inline fn fillTopLevel(
+            page_table: paging.PageTable,
+            range: core.VirtualRange,
+            map_type: kernel.vmm.MapType,
+            allocate_page_context: anytype,
+            comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
+        ) void {
+            checkSupport(
+                current.paging.init,
+                "fillTopLevel",
+                fn (
+                    *paging.PageTable.ArchPageTable,
+                    core.VirtualRange,
+                    kernel.vmm.MapType,
+                    anytype,
+                    fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
+                ) void,
+            );
+
+            return current.paging.init.fillTopLevel(
+                page_table.arch,
+                range,
+                map_type,
+                allocate_page_context,
+                allocatePage,
+            );
+        }
+
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
         ///
         /// Caller must ensure:
