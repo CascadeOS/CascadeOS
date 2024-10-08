@@ -254,6 +254,10 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (decl_type_info.params.len != target_type_info.params.len) @compileError(mismatch_type_msg);
 
     inline for (decl_type_info.params, target_type_info.params) |decl_param, target_param| {
+        // `null` means generics/anytype, so we just assume the types match and let zig catch mismatches.
+        if (decl_param.type == null) continue;
+        if (target_param.type == null) continue;
+
         if (decl_param.type != target_param.type) @compileError(mismatch_type_msg);
     }
 }
