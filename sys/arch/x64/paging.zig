@@ -93,6 +93,40 @@ fn ensureNextTable(
 }
 
 pub const init = struct {
+    /// The total size of the virtual address space that one entry in the top level of the page table covers.
+    pub inline fn sizeOfTopLevelEntry() core.Size {
+        // TODO: Only correct for 4 level paging
+        return core.Size.from(0x8000000000, .byte);
+    }
+
+    /// This function fills in the top level of the page table for the given range.
+    ///
+    /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+    ///
+    /// This function panics on error.
+    pub fn fillTopLevel(
+        level4_table: *PageTable,
+        range: core.VirtualRange,
+        map_type: kernel.vmm.MapType,
+        allocate_page_context: anytype,
+        comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
+    ) void {
+        const size_of_top_level_entry = sizeOfTopLevelEntry();
+        std.debug.assert(range.size.equal(size_of_top_level_entry));
+        std.debug.assert(range.address.isAligned(size_of_top_level_entry));
+
+        const raw_entry = &level4_table.entries[PageTable.p4Index(range.address)];
+        const entry: PageTable.Entry = .{ .raw = raw_entry.* };
+        if (entry.present.read()) core.panic("already mapped", null);
+
+        _ = core.require(ensureNextTable(
+            raw_entry,
+            map_type,
+            allocate_page_context,
+            allocatePage,
+        ), "failed to allocate page table");
+    }
+
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// Caller must ensure:
