@@ -160,15 +160,20 @@ pub const init = struct {
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
     pub inline fn prepareExecutor(
         executor: *kernel.Executor,
-        allocateStackFn: fn () anyerror!kernel.Stack,
+        allocate_stack_context: anytype,
+        comptime allocateStackFn: fn (ctx: @TypeOf(allocate_stack_context)) anyerror!kernel.Stack,
     ) void {
         checkSupport(
             current.init,
             "prepareExecutor",
-            fn (*kernel.Executor, fn () anyerror!kernel.Stack) void,
+            fn (
+                *kernel.Executor,
+                anytype,
+                fn (ctx: @TypeOf(allocate_stack_context)) anyerror!kernel.Stack,
+            ) void,
         );
 
-        current.init.prepareExecutor(executor, allocateStackFn);
+        current.init.prepareExecutor(executor, allocate_stack_context, allocateStackFn);
     }
 
     /// Load the provided `Executor` as the current executor.
