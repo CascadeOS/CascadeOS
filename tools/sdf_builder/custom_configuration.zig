@@ -85,12 +85,12 @@ pub fn customConfiguration(
         "src/lib/libdwarf/dwarf_util.c",
         "src/lib/libdwarf/dwarf_xu_index.c",
     };
-    for (c_files) |c_file| {
-        exe.addCSourceFile(.{
-            .file = lib_dwarf.path(c_file),
-            .flags = &.{"-fno-sanitize=undefined"},
-        });
-    }
+
+    exe.addCSourceFiles(.{
+        .root = lib_dwarf.path(""),
+        .files = c_files,
+        .flags = &.{"-fno-sanitize=undefined"},
+    });
 }
 
 const std = @import("std");
