@@ -250,6 +250,19 @@ pub const init = struct {
 
         return current.init.configureGlobalSystemFeatures();
     }
+
+    /// Register any architectural time sources.
+    ///
+    /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
+    pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.init,
+            "registerArchitecturalTimeSources",
+            fn (*init_time.CandidateTimeSources) void,
+        );
+
+        current.init.registerArchitecturalTimeSources(candidate_time_sources);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {
@@ -313,3 +326,4 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const init_time = @import("init").time;

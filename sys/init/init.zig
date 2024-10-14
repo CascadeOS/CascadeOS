@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const time = @import("time.zig");
+
 /// Entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function.
@@ -31,6 +33,8 @@ pub fn initStage1() !noreturn {
     try initializePhysicalMemory();
 
     try initializeVirtualMemory();
+
+    try time.initializeTime();
 
     try initializeExecutors();
 

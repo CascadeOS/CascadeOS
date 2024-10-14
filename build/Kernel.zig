@@ -330,6 +330,7 @@ fn constructKernelExe(
     };
 
     arch_module.addImport("kernel", kernel_module);
+    arch_module.addImport("init", init_module);
     boot_module.addImport("arch", arch_module);
     init_module.addImport("arch", arch_module);
     init_module.addImport("kernel", kernel_module);
