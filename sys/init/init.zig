@@ -3,7 +3,7 @@
 
 /// Entry point from bootloader specific code.
 ///
-/// Only the bootstrap cpu executes this function.
+/// Only the bootstrap executor executes this function.
 pub fn initStage1() !noreturn {
     try earlyBuildMemoryLayout();
 
