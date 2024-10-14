@@ -1,16 +1,24 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-const ToolDescription = @import("../build/ToolDescription.zig");
-
-pub const tools: []const ToolDescription = &[_]ToolDescription{
+pub const tools: []const ToolDescription = &.{
     .{
         .name = "image_builder",
-        .dependencies = &.{ .{ .name = "core" }, .{ .name = "fs" }, .{ .name = "uuid" } },
+        .dependencies = &[_]LibraryDependency{
+            .{ .name = "core" },
+            .{ .name = "fs" },
+            .{ .name = "uuid" },
+        },
     },
     .{
         .name = "sdf_builder",
-        .dependencies = &.{ .{ .name = "core" }, .{ .name = "sdf" } },
+        .dependencies = &[_]LibraryDependency{
+            .{ .name = "core" },
+            .{ .name = "sdf" },
+        },
         .custom_configuration = @import("sdf_builder/custom_configuration.zig").customConfiguration,
     },
 };
+
+const ToolDescription = @import("../build/ToolDescription.zig");
+const LibraryDependency = @import("../build/LibraryDependency.zig");
