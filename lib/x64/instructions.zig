@@ -23,7 +23,7 @@ pub fn disableInterruptsAndHalt() noreturn {
     }
 }
 
-pub fn readTsc() u64 {
+pub inline fn readTsc() u64 {
     var low: u32 = undefined;
     var high: u32 = undefined;
     asm volatile ("rdtsc"
