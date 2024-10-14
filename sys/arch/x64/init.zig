@@ -164,6 +164,15 @@ pub fn configureGlobalSystemFeatures() !void {
     }
 }
 
+/// Register any architectural time sources.
+///
+/// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
+pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) void {
+    x64.tsc.registerTimeSource(candidate_time_sources);
+
+    // TODO: APIC, HPET, PIT, KVMCLOCK
+}
+
 /// A *very* basic write only serial port.
 const SerialPort = struct {
     _data_port: u16,
@@ -267,3 +276,4 @@ const lib_x64 = @import("lib_x64");
 const arch = @import("arch");
 const log = kernel.log.scoped(.init_x64);
 const acpi = @import("acpi");
+const init_time = @import("init").time;
