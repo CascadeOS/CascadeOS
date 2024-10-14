@@ -9,30 +9,55 @@ pub fn registerTimeSource(candidate_time_sources: *init_time.CandidateTimeSource
         .priority = 200,
 
         .initialization = if (x64.info.tsc_tick_duration_fs != null)
-            .{ .simple = initializeTsc }
+            .{
+                .simple = struct {
+                    fn simple() void {
+                        std.debug.assert(shouldUseTsc());
+                        std.debug.assert(x64.info.tsc_tick_duration_fs != null);
+
+                        tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
+                    }
+                }.simple,
+            }
         else
             .{ .calibration_required = initializeTscCalibrate },
 
         .reference_counter = if (x64.info.tsc_tick_duration_fs != null)
             .{
-                .prepareToWaitForFn = referenceCounterPrepareToWaitFor,
-                .waitForFn = referenceCounterWaitFor,
+                .prepareToWaitForFn = struct {
+                    fn prepareToWaitForFn(duration: core.Duration) void {
+                        _ = duration;
+                    }
+                }.prepareToWaitForFn,
+                .waitForFn = struct {
+                    fn waitForFn(duration: core.Duration) void {
+                        const current_value = readTsc();
+
+                        const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
+
+                        while (readTsc() < target_value) {
+                            lib_x64.instructions.pause();
+                        }
+                    }
+                }.waitForFn,
             }
         else
             null,
 
         .wallclock = .{
-            .readFn = readTsc,
-            .elapsedFn = wallClockElapsed,
+            .readFn = struct {
+                fn readFn() Tick {
+                    return @enumFromInt(readTsc());
+                }
+            }.readFn,
+            .elapsedFn = struct {
+                fn elapsedFn(value1: Tick, value2: Tick) core.Duration {
+                    const number_of_ticks = @intFromEnum(value2) - @intFromEnum(value1);
+                    return core.Duration.from((number_of_ticks * tick_duration_fs) / kernel.time.fs_per_ns, .nanosecond);
+                }
+            }.elapsedFn,
         },
     });
-}
-
-fn initializeTsc() void {
-    std.debug.assert(shouldUseTsc());
-    std.debug.assert(x64.info.tsc_tick_duration_fs != null);
-
-    tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
 }
 
 fn initializeTscCalibrate(
@@ -60,25 +85,6 @@ fn initializeTscCalibrate(
     log.debug("tick duration (fs) using reference counter: {}", .{tick_duration_fs});
 }
 
-fn referenceCounterPrepareToWaitFor(duration: core.Duration) void {
-    _ = duration;
-}
-
-fn referenceCounterWaitFor(duration: core.Duration) void {
-    const current_value = readTsc();
-
-    const target_value = current_value + ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
-
-    while (readTsc() < target_value) {
-        lib_x64.instructions.pause();
-    }
-}
-
-fn wallClockElapsed(value1: u64, value2: u64) core.Duration {
-    const number_of_ticks = value2 - value1;
-    return core.Duration.from((number_of_ticks * tick_duration_fs) / kernel.time.fs_per_ns, .nanosecond);
-}
-
 fn shouldUseTsc() bool {
     return x64.info.cpu_id.invariant_tsc or x64.info.cpu_id.hypervisor == .tcg;
 }
@@ -92,5 +98,6 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
 const log = kernel.log.scoped(.tsc);
-const init_time = @import("init").time;
 const readTsc = lib_x64.instructions.readTsc;
+const init_time = @import("init").time;
+const Tick = kernel.time.wallclock.Tick;

@@ -54,7 +54,7 @@ fn initStage2(executor: *kernel.Executor) noreturn {
     if (executor.id != .bootstrap) arch.interrupts.disableInterruptsAndHalt(); // park non-bootstrap
 
     log.info("initialization complete - duration: {}", .{
-        kernel.time.wallclock.elapsed(0, kernel.time.wallclock.read()),
+        kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
     });
 
     core.panic("NOT IMPLEMENTED", null);
