@@ -90,14 +90,14 @@ pub const CandidateTimeSource = struct {
 
     pub const WallclockOptions = struct {
         /// Read the wallclock value.
-        ///
-        /// The value returned is an opaque timer tick.
-        readFn: *const fn () u64,
+        readFn: *const fn () Tick,
 
-        /// Returns the number of nanoseconds between `value1` and `value2`, where `value2` occurs after `value1`.
+        /// Returns the duration between `value1` and `value2`, where `value2 >= value1`.
         ///
         /// Counter wraparound is assumed to have not occured.
-        elapsedFn: *const fn (value1: u64, value2: u64) core.Duration,
+        elapsedFn: *const fn (value1: Tick, value2: Tick) core.Duration,
+
+        pub const Tick = kernel.time.wallclock.Tick;
     };
 };
 
