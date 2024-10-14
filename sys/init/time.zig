@@ -4,6 +4,11 @@
 pub fn initializeTime() !void {
     var candidate_time_sources: CandidateTimeSources = .{};
     arch.init.registerArchitecturalTimeSources(&candidate_time_sources);
+    const time_sources = candidate_time_sources.candidate_time_sources.slice();
+
+    const reference_counter = getReferenceCounter(time_sources);
+
+    configureWallclockTimeSource(time_sources, reference_counter);
 }
 
 pub const CandidateTimeSources = struct {
@@ -127,6 +132,72 @@ pub const ReferenceCounter = struct {
         self._waitForFn(duration);
     }
 };
+
+fn getReferenceCounter(time_sources: []CandidateTimeSource) ReferenceCounter {
+    const time_source = findAndInitializeTimeSource(time_sources, .{
+        .pre_calibrated = true,
+        .reference_counter = true,
+    }, undefined) orelse core.panic("no reference counter found", null);
+
+    log.debug("using reference counter: {s}", .{time_source.name});
+
+    const reference_counter_impl = time_source.reference_counter.?;
+
+    return .{
+        ._prepareToWaitForFn = reference_counter_impl.prepareToWaitForFn,
+        ._waitForFn = reference_counter_impl.waitForFn,
+    };
+}
+
+fn configureWallclockTimeSource(
+    time_sources: []CandidateTimeSource,
+    reference_counter: ReferenceCounter,
+) void {
+    const time_source = findAndInitializeTimeSource(time_sources, .{
+        .wallclock = true,
+    }, reference_counter) orelse core.panic("no wallclock found", null);
+
+    log.debug("using wallclock: {s}", .{time_source.name});
+
+    const wallclock_impl = time_source.wallclock.?;
+
+    kernel.time.wallclock.globals.readFn = wallclock_impl.readFn;
+    kernel.time.wallclock.globals.elapsedFn = wallclock_impl.elapsedFn;
+}
+
+const TimeSourceQuery = struct {
+    pre_calibrated: bool = false,
+
+    reference_counter: bool = false,
+
+    wallclock: bool = false,
+};
+
+fn findAndInitializeTimeSource(
+    time_sources: []CandidateTimeSource,
+    query: TimeSourceQuery,
+    reference_counter: ReferenceCounter,
+) ?*CandidateTimeSource {
+    var opt_best_candidate: ?*CandidateTimeSource = null;
+
+    for (time_sources) |*time_source| {
+        if (query.pre_calibrated and time_source.initialization == .calibration_required) continue;
+
+        if (query.reference_counter and time_source.reference_counter == null) continue;
+
+        if (query.wallclock and time_source.wallclock == null) continue;
+
+        if (opt_best_candidate) |best_candidate| {
+            if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
+        } else {
+            opt_best_candidate = time_source;
+        }
+    }
+
+    if (opt_best_candidate) |best_candidate| best_candidate.initialize(reference_counter);
+
+    return opt_best_candidate;
+}
 
 const std = @import("std");
 const core = @import("core");
