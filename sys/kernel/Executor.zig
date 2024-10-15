@@ -18,11 +18,11 @@ pub const Id = enum(u32) {
     _,
 
     pub fn print(id: Id, writer: std.io.AnyWriter, indent: usize) !void {
-        // Cpu(id)
+        // Executor(id)
 
         _ = indent;
 
-        try writer.writeAll("Cpu(");
+        try writer.writeAll("Executor(");
         try std.fmt.formatInt(@intFromEnum(id), 10, .lower, .{}, writer);
         try writer.writeByte(')');
     }
