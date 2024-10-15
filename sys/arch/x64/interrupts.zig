@@ -3,6 +3,7 @@
 
 pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
 pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
+pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 
 pub const InterruptContext = struct { frame: *InterruptFrame };
 
