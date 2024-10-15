@@ -25,6 +25,13 @@ pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor 
 }
 
 pub const interrupts = struct {
+    /// Returns true if interrupts are enabled.
+    pub fn areEnabled() callconv(core.inline_in_non_debug) bool {
+        // `checkSupport` intentionally not called - mandatory function
+
+        return current.interrupts.areEnabled();
+    }
+
     /// Disable interrupts and halt the CPU.
     ///
     /// This is a decl not a wrapper function like the other functions so that it can be inlined into a naked function.
