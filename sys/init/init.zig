@@ -7,19 +7,23 @@ pub const time = @import("time.zig");
 ///
 /// Only the bootstrap executor executes this function.
 pub fn initStage1() !noreturn {
-    try earlyBuildMemoryLayout();
+    { // as the bootstrap executor has not been initialized yet, we can't log in this block
+        try earlyBuildMemoryLayout();
 
-    // get output up and running as soon as possible
-    arch.init.setupEarlyOutput();
-    arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+        // get output up and running as soon as possible
+        arch.init.setupEarlyOutput();
+        arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
-    // now that early output is ready, we can switch to the single executor panic
-    kernel.debug.panic_impl = singleExecutorPanic;
+        // now that early output is ready, we can switch to the single executor panic
+        kernel.debug.panic_impl = singleExecutorPanic;
 
-    log.debug("initializing bootstrap executor", .{});
-    kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
-    arch.init.prepareBootstrapExecutor(&bootstrap_executor);
-    arch.init.loadExecutor(&bootstrap_executor);
+        kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
+        arch.init.prepareBootstrapExecutor(&bootstrap_executor);
+        arch.init.loadExecutor(&bootstrap_executor);
+
+        // now that the bootstrap executor is ready, we can log
+        log.debug("bootstrap executor initialized", .{});
+    }
 
     log.debug("initializing interrupts", .{});
     arch.init.initInterrupts(&handleInterrupt);
@@ -72,8 +76,13 @@ fn initStage2(executor: *kernel.Executor) noreturn {
 
 /// The log implementation during init.
 pub fn initLogImpl(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    // TODO: there is a period of time during init when multiple executors are running to handle this we will need a
-    //       lock here
+    const static = struct {
+        var lock: kernel.sync.TicketSpinLock = .{};
+    };
+
+    static.lock.lock();
+    defer static.lock.unlock();
+
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch unreachable;
 }
