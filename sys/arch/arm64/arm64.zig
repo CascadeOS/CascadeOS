@@ -35,6 +35,8 @@ pub const paging = struct {
     pub const init = struct {};
 };
 
+pub const spinLoopHint = lib_arm64.instructions.isb;
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

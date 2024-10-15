@@ -6,6 +6,13 @@
 /// Architecture specific per-executor data.
 pub const PerExecutor = current.PerExecutor;
 
+/// Issues an architecture specific hint to the CPU that we are spinning in a loop.
+pub fn spinLoopHint() callconv(core.inline_in_non_debug) void {
+    // `checkSupport` intentionally not called - mandatory function
+
+    current.spinLoopHint();
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and halt the CPU.
     ///

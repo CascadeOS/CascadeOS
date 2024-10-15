@@ -8,6 +8,9 @@ pub const paging = @import("paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
 pub const tsc = @import("tsc.zig");
 
+/// Issues an architecture specific hint to the CPU that we are spinning in a loop.
+pub const spinLoopHint = lib_x64.instructions.pause;
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
