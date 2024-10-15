@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+
+version = 1
+SPDX-PackageName = "CascadeOS"
+SPDX-PackageSupplier = "Lee Cannon <leecannon@leecannon.xyz>"
+SPDX-PackageDownloadLocation = "https://github.com/CascadeOS/CascadeOS"
+
+[[annotations]]
+path = "**.md"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2024 Lee Cannon <leecannon@leecannon.xyz>"
+SPDX-License-Identifier = "CC0-1.0"
