@@ -16,26 +16,36 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can switch to the single executor panic
     kernel.debug.panic_impl = singleExecutorPanic;
 
+    log.debug("initializing bootstrap executor", .{});
     kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
     arch.init.prepareBootstrapExecutor(&bootstrap_executor);
     arch.init.loadExecutor(&bootstrap_executor);
 
+    log.debug("initializing interrupts", .{});
     arch.init.initInterrupts(&handleInterrupt);
 
+    log.debug("building memory layout", .{});
     try finishBuildMemoryLayout();
 
+    log.debug("initializing ACPI tables", .{});
     try initializeACPITables();
 
+    log.debug("capturing system information", .{});
     try arch.init.captureSystemInformation();
 
+    log.debug("configuring global system features", .{});
     try arch.init.configureGlobalSystemFeatures();
 
+    log.debug("initializing physical memory", .{});
     try initializePhysicalMemory();
 
+    log.debug("initializing virtual memory", .{});
     try initializeVirtualMemory();
 
+    log.debug("initializing time", .{});
     try time.initializeTime();
 
+    log.debug("initializing executors", .{});
     try initializeExecutors();
 
     initStage2(kernel.getExecutor(.bootstrap));
@@ -62,6 +72,8 @@ fn initStage2(executor: *kernel.Executor) noreturn {
 
 /// The log implementation during init.
 pub fn initLogImpl(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
+    // TODO: there is a period of time during init when multiple executors are running to handle this we will need a
+    //       lock here
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch unreachable;
 }
@@ -138,8 +150,11 @@ fn earlyBuildMemoryLayout() !void {
 }
 
 fn finishBuildMemoryLayout() !void {
+    log.debug("registering kernel sections", .{});
     try registerKernelSections();
+    log.debug("registering direct maps", .{});
     try registerDirectMaps();
+    log.debug("registering heaps", .{});
     try registerHeaps();
 
     sortMemoryLayout();
@@ -406,6 +421,8 @@ const AllocatePageContext = struct {
 };
 
 fn initializeVirtualMemory() !void {
+    log.debug("building core page table", .{});
+
     kernel.vmm.core_page_table = arch.paging.PageTable.create(try PMM.instance.allocateContiguousPages(arch.paging.PageTable.page_table_size));
 
     for (kernel.memory_layout.globals.layout.constSlice()) |region| {
@@ -493,9 +510,11 @@ fn initializeExecutors() !void {
         if (i == 0) std.debug.assert(desc.processorId() == 0);
 
         const executor = &executors[i];
+        const id: kernel.Executor.Id = @enumFromInt(i);
+        log.debug("initializing executor {}", .{id});
 
         executor.* = .{
-            .id = @enumFromInt(i),
+            .id = id,
             .arch = undefined, // set by `arch.init.prepareExecutor`
         };
 
