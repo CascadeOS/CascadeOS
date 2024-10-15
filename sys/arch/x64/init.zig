@@ -167,6 +167,38 @@ pub fn configureGlobalSystemFeatures() !void {
     }
 }
 
+/// Configure any per-executor system features.
+pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) void {
+    std.debug.assert(executor == x64.getCurrentExecutor());
+
+    if (x64.info.cpu_id.rdtscp) {
+        lib_x64.registers.IA32_TSC_AUX.write(@intFromEnum(executor.id));
+    }
+
+    // CR0
+    {
+        var cr0 = lib_x64.registers.Cr0.read();
+
+        if (!cr0.paging) core.panic("paging not enabled", null);
+
+        cr0.write_protect = true;
+
+        cr0.write();
+    }
+
+    // EFER
+    {
+        var efer = lib_x64.registers.EFER.read();
+
+        if (!efer.long_mode_active or !efer.long_mode_enable) core.panic("not in long mode", null);
+
+        if (x64.info.cpu_id.syscall_sysret) efer.syscall_enable = true;
+        if (x64.info.cpu_id.execute_disable) efer.no_execute_enable = true;
+
+        efer.write();
+    }
+}
+
 /// Register any architectural time sources.
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
