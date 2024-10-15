@@ -3,7 +3,7 @@
 
 /// Are interrupts enabled?
 pub inline fn interruptsEnabled() bool {
-    return x64.RFlags.read().interrupt;
+    return x64.registers.RFlags.read().interrupt;
 }
 
 /// Enable interrupts.
