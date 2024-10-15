@@ -110,13 +110,16 @@ pub const initInterrupts = x64.interrupts.init.initInterrupts;
 ///
 /// For example, on x64 this should capture the CPUID information.
 pub fn captureSystemInformation() !void {
+    log.debug("capturing cpuid information", .{});
     try captureCPUIDInformation();
 
     const madt = kernel.acpi.getTable(acpi.MADT, 0) orelse return error.NoMADT;
     const fadt = kernel.acpi.getTable(acpi.FADT, 0) orelse return error.NoFADT;
 
+    log.debug("capturing FADT information", .{});
     captureFADTInformation(fadt);
 
+    log.debug("capturing MADT information", .{});
     captureMADTInformation(madt);
 
     // TODO: capture APIC information
