@@ -204,8 +204,9 @@ pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) void {
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) void {
     x64.tsc.registerTimeSource(candidate_time_sources);
+    x64.hpet.registerTimeSource(candidate_time_sources);
 
-    // TODO: APIC, HPET, PIT, KVMCLOCK
+    // TODO: APIC, PIT, KVMCLOCK
 }
 
 /// A *very* basic write only serial port.
