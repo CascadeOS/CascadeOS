@@ -276,6 +276,13 @@ pub const init = struct {
         return current.init.configureGlobalSystemFeatures();
     }
 
+    /// Configure any per-executor system features.
+    pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "configurePerExecutorSystemFeatures", fn (*kernel.Executor) void);
+
+        current.init.configurePerExecutorSystemFeatures(executor);
+    }
+
     /// Register any architectural time sources.
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
