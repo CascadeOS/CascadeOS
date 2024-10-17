@@ -506,7 +506,7 @@ fn initializeExecutors() !void {
 
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
-    const executors = try PMM.instance.allocateContigousSlice(kernel.Executor, descriptors.count());
+    kernel.executors = try PMM.instance.allocateContigousSlice(kernel.Executor, descriptors.count());
 
     var kernel_stack_context: KernelStackContext = .{
         .pmm = &PMM.instance,
@@ -517,7 +517,7 @@ fn initializeExecutors() !void {
     while (descriptors.next()) |desc| : (i += 1) {
         if (i == 0) std.debug.assert(desc.processorId() == 0);
 
-        const executor = &executors[i];
+        const executor = &kernel.executors[i];
         const id: kernel.Executor.Id = @enumFromInt(i);
         log.debug("initializing executor {}", .{id});
 
