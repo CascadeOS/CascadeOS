@@ -79,12 +79,8 @@ fn initStage2(executor: *kernel.Executor) noreturn {
 
 /// The log implementation during init.
 pub fn initLogImpl(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    const static = struct {
-        var lock: kernel.sync.TicketSpinLock = .{};
-    };
-
-    static.lock.lock();
-    defer static.lock.unlock();
+    early_output_lock.lock();
+    defer early_output_lock.unlock();
 
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch unreachable;
@@ -650,6 +646,8 @@ const PMM = struct {
         return error.InsufficentContiguousPhysicalMemory;
     }
 };
+
+var early_output_lock: kernel.sync.TicketSpinLock = .{};
 
 const std = @import("std");
 const core = @import("core");
