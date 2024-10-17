@@ -37,6 +37,11 @@ pub fn unlock(self: *TicketSpinLock) void {
     _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);
 }
 
+/// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
+pub fn poison(self: *TicketSpinLock) void {
+    _ = @atomicRmw(u32, &self.current, .Sub, 1, .acq_rel);
+}
+
 /// Returns true if the spinlock is locked by the current executor.
 fn isLockedBy(self: *const TicketSpinLock, executor_id: kernel.Executor.Id) bool {
     return @atomicLoad(kernel.Executor.Id, &self.current_holder, .acquire) == executor_id;

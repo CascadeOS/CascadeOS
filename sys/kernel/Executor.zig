@@ -7,6 +7,8 @@ const Executor = @This();
 
 id: Id,
 
+panicked: std.atomic.Value(bool) = .init(false),
+
 arch: @import("arch").PerExecutor,
 
 /// A unique identifier for the executor.

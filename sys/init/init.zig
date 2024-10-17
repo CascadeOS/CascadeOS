@@ -14,12 +14,28 @@ pub fn initStage1() !noreturn {
         arch.init.setupEarlyOutput();
         arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
-        // now that early output is ready, we can switch to the single executor panic
-        kernel.debug.panic_impl = singleExecutorPanic;
+        // now that early output is ready, we can provide a very simple panic implementation
+        kernel.debug.panic_impl = struct {
+            fn simplePanic(
+                msg: []const u8,
+                error_return_trace: ?*const std.builtin.StackTrace,
+                return_address: usize,
+            ) void {
+                kernel.debug.formatting.printPanic(
+                    arch.init.early_output_writer,
+                    msg,
+                    error_return_trace,
+                    return_address,
+                ) catch unreachable;
+            }
+        }.simplePanic;
 
         kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
         arch.init.prepareBootstrapExecutor(&bootstrap_executor);
         arch.init.loadExecutor(&bootstrap_executor);
+
+        // now that the executor is loaded we can switch to the full init panic implementation
+        kernel.debug.panic_impl = executorPanic;
 
         // now that the bootstrap executor is ready, we can log
         log.debug("bootstrap executor initialized", .{});
@@ -91,14 +107,64 @@ fn handleInterrupt(_: arch.interrupts.InterruptContext) noreturn {
     core.panic("unexpected interrupt", null);
 }
 
-fn singleExecutorPanic(
+/// The panic implementation during init.
+///
+/// Handles nested panics and multiple executors (only one panics at a time any others block).
+///
+/// This function expects that `arch.init.loadExecutor` has been called on the current executor.
+fn executorPanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
 ) void {
     const static = struct {
-        var nested_panic_count: std.atomic.Value(usize) = .init(0);
+        var panicking_executor = std.atomic.Value(kernel.Executor.Id).init(.none);
+        var nested_panic_count = std.atomic.Value(usize).init(0);
     };
+
+    const executor = arch.getCurrentExecutor();
+    executor.panicked.store(true, .release);
+
+    if (static.panicking_executor.cmpxchgStrong(
+        .none,
+        executor.id,
+        .acq_rel,
+        .acquire,
+    )) |panicking_executor_id| {
+        if (panicking_executor_id != executor.id) return; // another executor is panicking
+    }
+
+    guarantee_exclusive_early_output_access: {
+        early_output_lock.poison();
+
+        while (true) {
+            const current_holder_id = @atomicLoad(
+                kernel.Executor.Id,
+                &early_output_lock.current_holder,
+                .acquire,
+            );
+
+            if (current_holder_id == executor.id) {
+                // we already have the lock
+                break :guarantee_exclusive_early_output_access;
+            }
+
+            if (current_holder_id == .none) {
+                // the lock is poisoned, so we can just subsume control of the lock
+                break :guarantee_exclusive_early_output_access;
+            }
+
+            const current_holder = kernel.getExecutor(current_holder_id);
+
+            if (current_holder.panicked.load(.acquire)) {
+                // the current holder has panicked but as we are the one panicking
+                // we can just subsume control of the lock
+                break :guarantee_exclusive_early_output_access;
+            }
+
+            arch.spinLoopHint();
+        }
+    }
 
     switch (static.nested_panic_count.fetchAdd(1, .acq_rel)) {
         0 => { // on first panic attempt to print the full panic message
