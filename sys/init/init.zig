@@ -3,49 +3,62 @@
 
 pub const time = @import("time.zig");
 
-/// Entry point from bootloader specific code.
+/// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
-/// Only the bootstrap executor executes this function.
+/// Only the bootstrap executor executes this function, using the bootloader provided stack.
+///
+/// The bootstrap executor is not initialzed upon entry to this function so any features
+/// requiring an initialized executor (like logging) must be avoided until explicitly initialized.
 pub fn initStage1() !noreturn {
-    { // as the bootstrap executor has not been initialized yet, we can't log in this block
-        try earlyBuildMemoryLayout();
+    // as the executor is not yet initialized, we can't log
 
-        // get output up and running as soon as possible
-        arch.init.setupEarlyOutput();
-        arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+    // we want the direct map to be available as early as possible
+    try earlyPartialMemoryLayout();
 
-        // now that early output is ready, we can provide a very simple panic implementation
-        kernel.debug.panic_impl = struct {
-            fn simplePanic(
-                msg: []const u8,
-                error_return_trace: ?*const std.builtin.StackTrace,
-                return_address: usize,
-            ) void {
-                kernel.debug.formatting.printPanic(
-                    arch.init.early_output_writer,
-                    msg,
-                    error_return_trace,
-                    return_address,
-                ) catch unreachable;
-            }
-        }.simplePanic;
+    arch.init.setupEarlyOutput();
 
-        kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
-        arch.init.prepareBootstrapExecutor(&bootstrap_executor);
-        arch.init.loadExecutor(&bootstrap_executor);
+    // now that early output is ready, we can provide a very simple panic implementation
+    kernel.debug.panic_impl = struct {
+        fn simplePanic(
+            msg: []const u8,
+            error_return_trace: ?*const std.builtin.StackTrace,
+            return_address: usize,
+        ) void {
+            kernel.debug.formatting.printPanic(
+                arch.init.early_output_writer,
+                msg,
+                error_return_trace,
+                return_address,
+            ) catch unreachable;
+        }
+    }.simplePanic;
 
-        // now that the executor is loaded we can switch to the full init panic implementation
-        kernel.debug.panic_impl = executorPanic;
+    arch.init.writeToEarlyOutput(
+        comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n",
+    );
 
-        // now that the bootstrap executor is ready, we can log
-        log.debug("bootstrap executor initialized", .{});
-    }
+    kernel.executors = @as([*]kernel.Executor, @ptrCast(&globals.bootstrap_executor))[0..1];
+    arch.init.prepareBootstrapExecutor(&globals.bootstrap_executor);
+    arch.init.loadExecutor(&globals.bootstrap_executor);
 
+    // now that the executor is loaded we can switch to the full init panic implementation and start logging
+    kernel.debug.panic_impl = handlePanic;
+
+    log.debug("bootstrap executor initialized", .{});
+
+    try initStage2();
+    core.panic("`init.initStage2` returned", null);
+}
+
+/// Stage 2 of kernel initialization.
+///
+/// Only the bootstrap executor executes this function, using the bootloader provided stack.
+fn initStage2() !noreturn {
     log.debug("initializing interrupts", .{});
     arch.init.initInterrupts(&handleInterrupt);
 
     log.debug("building memory layout", .{});
-    try finishBuildMemoryLayout();
+    try buildMemoryLayout();
 
     log.debug("initializing ACPI tables", .{});
     try initializeACPITables();
@@ -57,27 +70,27 @@ pub fn initStage1() !noreturn {
     try arch.init.configureGlobalSystemFeatures();
 
     log.debug("initializing physical memory", .{});
-    try initializePhysicalMemory();
+    try initializePMM(&globals.pmm);
 
     log.debug("initializing virtual memory", .{});
-    try initializeVirtualMemory();
+    try initializeVirtualMemory(&globals.pmm, &globals.memory_layout);
 
     log.debug("initializing time", .{});
     try time.initializeTime();
 
     log.debug("initializing executors", .{});
-    try initializeExecutors();
+    try initializeExecutors(&globals.pmm, &globals.stack_allocator);
 
-    initStage2(kernel.getExecutor(.bootstrap));
-    core.panic("`init.initStage2` returned", null);
+    try initStage3(kernel.getExecutor(.bootstrap));
+    core.panic("`init.initStage3` returned", null);
 }
 
-/// Stage 2 of kernel initialization.
+/// Stage 3 of kernel initialization.
 ///
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(executor: *kernel.Executor) noreturn {
+fn initStage3(executor: *kernel.Executor) !noreturn {
     kernel.vmm.core_page_table.load();
     arch.init.loadExecutor(executor);
 
@@ -94,9 +107,9 @@ fn initStage2(executor: *kernel.Executor) noreturn {
 }
 
 /// The log implementation during init.
-pub fn initLogImpl(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    early_output_lock.lock();
-    defer early_output_lock.unlock();
+pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
+    globals.early_output_lock.lock();
+    defer globals.early_output_lock.unlock();
 
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch unreachable;
@@ -112,7 +125,7 @@ fn handleInterrupt(_: arch.interrupts.InterruptContext) noreturn {
 /// Handles nested panics and multiple executors (only one panics at a time any others block).
 ///
 /// This function expects that `arch.init.loadExecutor` has been called on the current executor.
-fn executorPanic(
+fn handlePanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
@@ -135,12 +148,12 @@ fn executorPanic(
     }
 
     guarantee_exclusive_early_output_access: {
-        early_output_lock.poison();
+        globals.early_output_lock.poison();
 
         while (true) {
             const current_holder_id = @atomicLoad(
                 kernel.Executor.Id,
-                &early_output_lock.current_holder,
+                &globals.early_output_lock.current_holder,
                 .acquire,
             );
 
@@ -185,7 +198,7 @@ fn executorPanic(
 /// Ensures that the kernel base address, virtual offset and the direct map are set up.
 ///
 /// Called very early so cannot log.
-fn earlyBuildMemoryLayout() !void {
+fn earlyPartialMemoryLayout() !void {
     const base_address = boot.kernelBaseAddress() orelse return error.NoKernelBaseAddress;
     kernel.memory_layout.globals.virtual_base_address = base_address.virtual;
 
@@ -223,37 +236,33 @@ fn earlyBuildMemoryLayout() !void {
     );
 }
 
-fn finishBuildMemoryLayout() !void {
-    log.debug("registering kernel sections", .{});
-    try registerKernelSections();
-    log.debug("registering direct maps", .{});
-    try registerDirectMaps();
-    log.debug("registering heaps", .{});
-    try registerHeaps();
+fn buildMemoryLayout() !void {
+    const memory_layout = blk: {
+        globals.memory_layout = .{
+            .regions = &kernel.memory_layout.globals.regions,
+        };
+        break :blk &globals.memory_layout;
+    };
 
-    sortMemoryLayout();
+    log.debug("registering kernel sections", .{});
+    try registerKernelSections(memory_layout);
+    log.debug("registering direct maps", .{});
+    try registerDirectMaps(memory_layout);
+    log.debug("registering heaps", .{});
+    const kernel_stacks_range = try registerHeaps(memory_layout);
+
+    globals.stack_allocator = .{ .kernel_stacks_heap_range = kernel_stacks_range };
 
     if (log.levelEnabled(.debug)) {
         log.debug("kernel memory layout:", .{});
 
-        for (kernel.memory_layout.globals.layout.constSlice()) |region| {
+        for (memory_layout.regions.constSlice()) |region| {
             log.debug("\t{}", .{region});
         }
     }
 }
 
-/// Sorts the kernel memory layout from lowest to highest address.
-fn sortMemoryLayout() void {
-    std.mem.sort(kernel.memory_layout.Region, kernel.memory_layout.globals.layout.slice(), {}, struct {
-        fn lessThanFn(context: void, region: kernel.memory_layout.Region, other_region: kernel.memory_layout.Region) bool {
-            _ = context;
-            return region.range.address.lessThan(other_region.range.address);
-        }
-    }.lessThanFn);
-}
-
-/// Registers the kernel sections in the memory layout.
-fn registerKernelSections() !void {
+fn registerKernelSections(memory_layout: *MemoryLayout) !void {
     const linker_symbols = struct {
         extern const __text_start: u8;
         extern const __text_end: u8;
@@ -306,7 +315,7 @@ fn registerKernelSections() !void {
                 .alignForward(arch.paging.standard_page_size),
         );
 
-        try kernel.memory_layout.globals.layout.append(.{
+        try memory_layout.append(.{
             .range = virtual_range,
             .type = region_type,
             .operation = .full_map,
@@ -314,11 +323,11 @@ fn registerKernelSections() !void {
     }
 }
 
-fn registerDirectMaps() !void {
+fn registerDirectMaps(memory_layout: *MemoryLayout) !void {
     const direct_map = kernel.memory_layout.globals.direct_map;
 
     // does the direct map range overlap a pre-existing region?
-    for (kernel.memory_layout.globals.layout.constSlice()) |region| {
+    for (memory_layout.regions.constSlice()) |region| {
         if (region.range.containsRange(direct_map)) {
             log.err(
                 \\direct map overlaps another memory region:
@@ -330,87 +339,39 @@ fn registerDirectMaps() !void {
         }
     }
 
-    try kernel.memory_layout.globals.layout.append(.{
+    try memory_layout.append(.{
         .range = direct_map,
         .type = .direct_map,
         .operation = .full_map,
     });
 
-    const non_cached_direct_map = findFreeKernelMemoryRange(
+    const non_cached_direct_map = memory_layout.findFreeRange(
         direct_map.size,
         arch.paging.largest_page_size,
     ) orelse return error.NoFreeRangeForDirectMap;
 
     kernel.memory_layout.globals.non_cached_direct_map = non_cached_direct_map;
 
-    try kernel.memory_layout.globals.layout.append(.{
+    try memory_layout.append(.{
         .range = non_cached_direct_map,
         .type = .non_cached_direct_map,
         .operation = .full_map,
     });
 }
 
-fn registerHeaps() !void {
+fn registerHeaps(memory_layout: *MemoryLayout) !core.VirtualRange {
     const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
 
-    const kernel_stacks_range = findFreeKernelMemoryRange(size_of_top_level, size_of_top_level) orelse
+    const kernel_stacks_range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
         core.panic("no space in kernel memory layout for the kernel stacks", null);
 
-    try kernel.memory_layout.globals.layout.append(.{
+    try memory_layout.append(.{
         .range = kernel_stacks_range,
         .type = .kernel_stacks,
         .operation = .top_level_map,
     });
-    StackAllocator.instance = .{ .kernel_stacks_heap_range = kernel_stacks_range };
-}
 
-fn findFreeKernelMemoryRange(size: core.Size, alignment: core.Size) ?core.VirtualRange {
-    sortMemoryLayout();
-
-    const layout = &kernel.memory_layout.globals.layout;
-
-    const regions = layout.constSlice();
-
-    var current_address = arch.paging.higher_half_start;
-    current_address.alignForwardInPlace(alignment);
-
-    var i: usize = 0;
-
-    while (true) {
-        const region = if (i < layout.len) regions[i] else {
-            const size_of_free_range = core.Size.from(
-                (arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
-                .byte,
-            );
-
-            if (size_of_free_range.lessThan(size)) return null;
-
-            return core.VirtualRange.fromAddr(current_address, size);
-        };
-
-        const region_address = region.range.address;
-
-        if (region_address.lessThanOrEqual(current_address)) {
-            current_address = region.range.endBound();
-            current_address.alignForwardInPlace(alignment);
-            i += 1;
-            continue;
-        }
-
-        const size_of_free_range = core.Size.from(
-            (region_address.value - 1) - current_address.value,
-            .byte,
-        );
-
-        if (size_of_free_range.lessThan(size)) {
-            current_address = region.range.endBound();
-            current_address.alignForwardInPlace(alignment);
-            i += 1;
-            continue;
-        }
-
-        return core.VirtualRange.fromAddr(current_address, size);
-    }
+    return kernel_stacks_range;
 }
 
 fn initializeACPITables() !void {
@@ -443,7 +404,7 @@ fn initializeACPITables() !void {
     kernel.acpi.globals.sdt_header = sdt_header;
 }
 
-fn initializePhysicalMemory() !void {
+fn initializePMM(pmm: *PMM) !void {
     var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
 
     var ranges: PMM.Ranges = .{};
@@ -469,7 +430,7 @@ fn initializePhysicalMemory() !void {
         }
     }
 
-    PMM.instance = .{
+    pmm.* = .{
         .free_ranges = ranges,
         .total_memory = total_memory,
         .free_memory = free_memory,
@@ -480,26 +441,18 @@ fn initializePhysicalMemory() !void {
 
     log.debug("total memory:         {}", .{total_memory});
     log.debug("  free memory:        {}", .{free_memory});
-    log.debug("  used memory:        {}", .{PMM.instance.usedMemory()});
+    log.debug("  used memory:        {}", .{pmm.usedMemory()});
     log.debug("  reserved memory:    {}", .{reserved_memory});
     log.debug("  reclaimable memory: {}", .{reclaimable_memory});
     log.debug("  unavailable memory: {}", .{unavailable_memory});
 }
 
-const AllocatePageContext = struct {
-    pmm: *PMM,
-
-    fn allocatePage(context: @This()) !core.PhysicalRange {
-        return context.pmm.allocateContiguousPages(arch.paging.standard_page_size) catch return error.OutOfPhysicalMemory;
-    }
-};
-
-fn initializeVirtualMemory() !void {
+fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void {
     log.debug("building core page table", .{});
 
-    kernel.vmm.core_page_table = arch.paging.PageTable.create(try PMM.instance.allocateContiguousPages(arch.paging.PageTable.page_table_size));
+    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
 
-    for (kernel.memory_layout.globals.layout.constSlice()) |region| {
+    for (memory_layout.regions.constSlice()) |region| {
         switch (region.operation) {
             .full_map => {
                 const physical_range = switch (region.type) {
@@ -526,7 +479,7 @@ fn initializeVirtualMemory() !void {
                     region.range,
                     physical_range,
                     map_type,
-                    AllocatePageContext{ .pmm = &PMM.instance },
+                    AllocatePageContext{ .pmm = pmm },
                     AllocatePageContext.allocatePage,
                 );
             },
@@ -534,7 +487,7 @@ fn initializeVirtualMemory() !void {
                 kernel.vmm.core_page_table,
                 region.range,
                 .{ .global = true, .writeable = true },
-                AllocatePageContext{ .pmm = &PMM.instance },
+                AllocatePageContext{ .pmm = pmm },
                 AllocatePageContext.allocatePage,
             ),
         }
@@ -545,8 +498,8 @@ fn initializeVirtualMemory() !void {
 
 /// Initialize the per executor data structures for all executors including the bootstrap executor.
 ///
-/// Also wakes the non-bootstrap executors and jumps them to `initStage2`.
-fn initializeExecutors() !void {
+/// Also wakes the non-bootstrap executors and jumps them to `initStage3`.
+fn initializeExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
     const KernelStackContext = struct {
         pmm: *PMM,
         stack_allocator: *StackAllocator,
@@ -562,7 +515,7 @@ fn initializeExecutors() !void {
                 stack.usable_range,
                 physical_range,
                 .{ .global = true, .writeable = true },
-                AllocatePageContext{ .pmm = &PMM.instance },
+                AllocatePageContext{ .pmm = context.pmm },
                 AllocatePageContext.allocatePage,
             );
 
@@ -572,18 +525,18 @@ fn initializeExecutors() !void {
 
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
-    kernel.executors = try PMM.instance.allocateContigousSlice(kernel.Executor, descriptors.count());
+    const executors = try pmm.allocateContigousSlice(kernel.Executor, descriptors.count());
 
     var kernel_stack_context: KernelStackContext = .{
-        .pmm = &PMM.instance,
-        .stack_allocator = &StackAllocator.instance,
+        .pmm = pmm,
+        .stack_allocator = stack_allocator,
     };
 
     var i: u32 = 0;
     while (descriptors.next()) |desc| : (i += 1) {
         if (i == 0) std.debug.assert(desc.processorId() == 0);
 
-        const executor = &kernel.executors[i];
+        const executor = &executors[i];
         const id: kernel.Executor.Id = @enumFromInt(i);
         log.debug("initializing executor {}", .{id});
 
@@ -597,123 +550,49 @@ fn initializeExecutors() !void {
             &kernel_stack_context,
             KernelStackContext.allocateKernelStack,
         );
+    }
 
-        if (executor.id != .bootstrap) {
-            desc.boot(
-                executor,
-                struct {
-                    fn bootFn(user_data: *anyopaque) noreturn {
-                        initStage2(@as(*kernel.Executor, @ptrCast(@alignCast(user_data))));
-                        core.panic("`init.initStage2` returned", null);
-                    }
-                }.bootFn,
-            );
-        }
+    // publish the prepared executors then boot them
+    kernel.executors = executors;
+
+    while (descriptors.next()) |desc| : (i += 1) {
+        const executor = &executors[i];
+        if (executor.id == .bootstrap) continue;
+
+        desc.boot(
+            executor,
+            struct {
+                fn bootFn(user_data: *anyopaque) noreturn {
+                    initStage3(@as(*kernel.Executor, @ptrCast(@alignCast(user_data)))) catch |err| {
+                        core.panicFmt("unhandled error: {s}", .{@errorName(err)}, @errorReturnTrace());
+                    };
+                    core.panic("`init.initStage3` returned", null);
+                }
+            }.bootFn,
+        );
     }
 
     // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
 }
 
-var bootstrap_executor: kernel.Executor = .{
-    .id = .bootstrap,
-    .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
-};
+const AllocatePageContext = struct {
+    pmm: *PMM,
 
-const StackAllocator = struct {
-    kernel_stacks_heap_range: core.VirtualRange,
-
-    var instance: StackAllocator = undefined; // set by `registerHeaps`
-
-    fn allocate(self: *StackAllocator) kernel.Stack {
-        const full_range: core.VirtualRange = core.VirtualRange.fromAddr(
-            self.kernel_stacks_heap_range.address,
-            kernel.config.kernel_stack_size.add(arch.paging.standard_page_size), // extra page for guard page
-        );
-
-        const usable_range: core.VirtualRange = blk: {
-            var range = full_range;
-            range.size.subtractInPlace(arch.paging.standard_page_size);
-            break :blk range;
-        };
-
-        self.kernel_stacks_heap_range.moveForwardInPlace(full_range.size);
-        self.kernel_stacks_heap_range.size.subtractInPlace(full_range.size);
-
-        return kernel.Stack.fromRange(full_range, usable_range);
+    fn allocatePage(context: @This()) !core.PhysicalRange {
+        return context.pmm.allocateContiguousPages(arch.paging.standard_page_size) catch return error.OutOfPhysicalMemory;
     }
 };
 
-/// A simple physical memory manager.
-///
-/// Only supports allocating a single `arch.paging.standard_page_size` sized page with no support for freeing.
-const PMM = struct {
-    free_ranges: Ranges,
-    total_memory: core.Size,
-    free_memory: core.Size,
-    reserved_memory: core.Size,
-    reclaimable_memory: core.Size,
-    unavailable_memory: core.Size,
-
-    var instance: PMM = undefined; // set by `initializePhysicalMemory`
-
-    pub const Ranges = std.BoundedArray(core.PhysicalRange, 16);
-
-    pub fn usedMemory(self: *const PMM) core.Size {
-        return self.total_memory
-            .subtract(self.free_memory)
-            .subtract(self.reserved_memory)
-            .subtract(self.reclaimable_memory)
-            .subtract(self.unavailable_memory);
-    }
-
-    pub fn allocateContigousSlice(
-        self: *PMM,
-        comptime T: type,
-        count: usize,
-    ) ![]T {
-        const size = core.Size.of(T).multiplyScalar(count);
-        const physical_range = try self.allocateContiguousPages(size);
-        const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
-        return virtual_range.toSliceRelaxed(T);
-    }
-
-    /// Allocate contiguous physical pages.
-    ///
-    /// The allocation is rounded up to the next page.
-    pub fn allocateContiguousPages(
-        self: *PMM,
-        requested_size: core.Size,
-    ) error{InsufficentContiguousPhysicalMemory}!core.PhysicalRange {
-        if (requested_size.value == 0) core.panic("non-zero size required", null);
-
-        const size = requested_size.alignForward(arch.paging.standard_page_size);
-
-        const ranges: []core.PhysicalRange = self.free_ranges.slice();
-
-        for (ranges, 0..) |*range, i| {
-            if (range.size.lessThan(size)) continue;
-
-            // found a range with enough space for the allocation
-
-            const allocated_range = core.PhysicalRange.fromAddr(range.address, size);
-
-            range.size.subtractInPlace(size);
-
-            if (range.size.value == 0) {
-                // the range is now empty, so remove it from `free_ranges`
-                _ = self.free_ranges.swapRemove(i);
-            } else {
-                range.address.moveForwardInPlace(size);
-            }
-
-            return allocated_range;
-        }
-
-        return error.InsufficentContiguousPhysicalMemory;
-    }
+const globals = struct {
+    var bootstrap_executor: kernel.Executor = .{
+        .id = .bootstrap,
+        .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+    };
+    var pmm: PMM = undefined; // set by `initializePMM`
+    var memory_layout: MemoryLayout = undefined; // set by `buildMemoryLayout`
+    var stack_allocator: StackAllocator = undefined; // set by `buildMemoryLayout`
+    var early_output_lock: kernel.sync.TicketSpinLock = .{};
 };
-
-var early_output_lock: kernel.sync.TicketSpinLock = .{};
 
 const std = @import("std");
 const core = @import("core");
@@ -722,3 +601,6 @@ const boot = @import("boot");
 const arch = @import("arch");
 const log = kernel.log.scoped(.init);
 const acpi = @import("acpi");
+const MemoryLayout = @import("MemoryLayout.zig");
+const StackAllocator = @import("StackAllocator.zig");
+const PMM = @import("PMM.zig");
