@@ -11,6 +11,12 @@ pub const tools: []const ToolDescription = &.{
         },
     },
     .{
+        .name = "log_wrapper",
+        .dependencies = &[_]LibraryDependency{
+            .{ .name = "core" },
+        },
+    },
+    .{
         .name = "sdf_builder",
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
