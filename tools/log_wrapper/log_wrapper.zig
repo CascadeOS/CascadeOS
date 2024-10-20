@@ -29,9 +29,7 @@ const rules = [_]Rule{
 };
 
 pub fn main() !void {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    const allocator = std.heap.c_allocator;
 
     const command = try getCommand(allocator);
     defer command.deinit(allocator);

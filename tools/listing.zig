@@ -15,6 +15,7 @@ pub const tools: []const ToolDescription = &.{
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
         },
+        .custom_configuration = @import("log_wrapper/custom_configuration.zig").customConfiguration,
     },
     .{
         .name = "sdf_builder",
