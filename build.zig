@@ -49,7 +49,13 @@ pub fn build(b: *std.Build) !void {
         all_targets,
     );
 
-    try QemuStep.registerQemuSteps(b, image_steps, options, all_targets);
+    try QemuStep.registerQemuSteps(
+        b,
+        image_steps,
+        tools,
+        options,
+        all_targets,
+    );
 
     try DepGraphStep.register(b, kernels, libraries, tools);
 }

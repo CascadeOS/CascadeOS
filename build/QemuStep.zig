@@ -11,6 +11,8 @@ options: Options,
 
 firmware: Firmware,
 
+log_wrapper_compile_step: *Step.Compile,
+
 const Firmware = union(enum) {
     default,
     uefi: *std.Build.Dependency, // EDK2 dependency
@@ -22,13 +24,22 @@ const Firmware = union(enum) {
 pub fn registerQemuSteps(
     b: *std.Build,
     image_steps: ImageStep.Collection,
+    tools: Tool.Collection,
     options: Options,
     targets: []const CascadeTarget,
 ) !void {
+    const log_wrapper = tools.get("log_wrapper").?;
+
     for (targets) |target| {
         const image_step = image_steps.get(target).?;
 
-        const qemu_step = try QemuStep.create(b, target, image_step.image_file, options);
+        const qemu_step = try QemuStep.create(
+            b,
+            target,
+            log_wrapper,
+            image_step.image_file,
+            options,
+        );
 
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
@@ -46,7 +57,13 @@ pub fn registerQemuSteps(
     }
 }
 
-fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, options: Options) !*QemuStep {
+fn create(
+    b: *std.Build,
+    target: CascadeTarget,
+    log_wrapper: Tool,
+    image: std.Build.LazyPath,
+    options: Options,
+) !*QemuStep {
     const uefi = options.uefi or needsUefi(target);
 
     const step_name = try std.fmt.allocPrint(
@@ -69,8 +86,10 @@ fn create(b: *std.Build, target: CascadeTarget, image: std.Build.LazyPath, optio
         .target = target,
         .options = options,
         .firmware = if (uefi) .{ .uefi = b.dependency("edk2", .{}) } else .default,
+        .log_wrapper_compile_step = log_wrapper.release_safe_compile_step,
     };
 
+    self.log_wrapper_compile_step.getEmittedBin().addStepDependencies(&self.step);
     image.addStepDependencies(&self.step);
 
     return self;
@@ -88,7 +107,8 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = b.addSystemCommand(&.{qemuExecutable(self.target)});
+    const run_qemu = b.addRunArtifact(self.log_wrapper_compile_step);
+    run_qemu.addArg(qemuExecutable(self.target));
 
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
@@ -261,3 +281,4 @@ const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const ImageStep = @import("ImageStep.zig");
 const Options = @import("Options.zig");
 const StepCollection = @import("StepCollection.zig");
+const Tool = @import("Tool.zig");
