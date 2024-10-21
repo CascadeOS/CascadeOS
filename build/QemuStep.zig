@@ -11,7 +11,7 @@ options: Options,
 
 firmware: Firmware,
 
-log_wrapper_compile_step: *Step.Compile,
+log_wrapper_compile: ?*Step.Compile,
 
 const Firmware = union(enum) {
     default,
@@ -30,13 +30,19 @@ pub fn registerQemuSteps(
 ) !void {
     const log_wrapper = tools.get("log_wrapper").?;
 
+    // log wrapper will interfere with the qemu monitor
+    const log_wrapper_compile = if (!options.qemu_monitor)
+        log_wrapper.release_safe_compile_step
+    else
+        null;
+
     for (targets) |target| {
         const image_step = image_steps.get(target).?;
 
         const qemu_step = try QemuStep.create(
             b,
             target,
-            log_wrapper,
+            log_wrapper_compile,
             image_step.image_file,
             options,
         );
@@ -60,7 +66,7 @@ pub fn registerQemuSteps(
 fn create(
     b: *std.Build,
     target: CascadeTarget,
-    log_wrapper: Tool,
+    log_wrapper_compile: ?*Step.Compile,
     image: std.Build.LazyPath,
     options: Options,
 ) !*QemuStep {
@@ -86,10 +92,12 @@ fn create(
         .target = target,
         .options = options,
         .firmware = if (uefi) .{ .uefi = b.dependency("edk2", .{}) } else .default,
-        .log_wrapper_compile_step = log_wrapper.release_safe_compile_step,
+        .log_wrapper_compile = log_wrapper_compile,
     };
 
-    self.log_wrapper_compile_step.getEmittedBin().addStepDependencies(&self.step);
+    if (log_wrapper_compile) |compile| {
+        compile.getEmittedBin().addStepDependencies(&self.step);
+    }
     image.addStepDependencies(&self.step);
 
     return self;
@@ -107,8 +115,11 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = b.addRunArtifact(self.log_wrapper_compile_step);
-    run_qemu.addArg(qemuExecutable(self.target));
+    const run_qemu = if (self.log_wrapper_compile) |compile| run_qemu: {
+        const run_qemu = b.addRunArtifact(compile);
+        run_qemu.addArg(qemuExecutable(self.target));
+        break :run_qemu run_qemu;
+    } else b.addSystemCommand(&.{qemuExecutable(self.target)});
 
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
