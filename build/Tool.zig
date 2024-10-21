@@ -227,8 +227,7 @@ fn createExe(
     });
 
     addDependenciesToModule(&exe.root_module, tool_description, dependencies);
-
-    if (tool_description.custom_configuration) |f| f(b, tool_description, exe);
+    handleToolConfiguration(b, tool_description, exe);
 
     return exe;
 }
@@ -245,10 +244,25 @@ fn createTestExe(
     });
 
     addDependenciesToModule(&test_exe.root_module, tool_description, dependencies);
-
-    if (tool_description.custom_configuration) |f| f(b, tool_description, test_exe);
+    handleToolConfiguration(b, tool_description, test_exe);
 
     return test_exe;
+}
+
+fn handleToolConfiguration(b: *std.Build, tool_description: ToolDescription, exe: *Step.Compile) void {
+    switch (tool_description.configuration) {
+        .simple => {},
+        .link_c => {
+            if (b.graph.host.result.os.tag == .linux) {
+                // Use musl to remove include of "/usr/include" that breaks watch mode on btrfs
+                exe.root_module.resolved_target.?.query.abi = .musl;
+                exe.root_module.resolved_target.?.result.abi = .musl;
+            }
+
+            exe.linkLibC();
+        },
+        .custom => |f| f(b, tool_description, exe),
+    }
 }
 
 fn addDependenciesToModule(
