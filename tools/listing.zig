@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const tools: []const ToolDescription = &.{
+pub const tools: []const ToolDescription = &[_]ToolDescription{
     .{
         .name = "image_builder",
         .dependencies = &[_]LibraryDependency{
@@ -15,7 +15,7 @@ pub const tools: []const ToolDescription = &.{
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
         },
-        .custom_configuration = @import("log_wrapper/custom_configuration.zig").customConfiguration,
+        .configuration = .link_c,
     },
     .{
         .name = "sdf_builder",
@@ -23,7 +23,9 @@ pub const tools: []const ToolDescription = &.{
             .{ .name = "core" },
             .{ .name = "sdf" },
         },
-        .custom_configuration = @import("sdf_builder/custom_configuration.zig").customConfiguration,
+        .configuration = .{
+            .custom = @import("sdf_builder/custom_configuration.zig").customConfiguration,
+        },
     },
 };
 

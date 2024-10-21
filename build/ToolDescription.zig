@@ -12,11 +12,22 @@ name: []const u8,
 dependencies: []const LibraryDependency = &.{},
 
 /// Allows for custom configuration of the tool.
-custom_configuration: ?*const fn (
-    b: *std.Build,
-    tool_description: ToolDescription,
-    exe: *std.Build.Step.Compile,
-) void = null,
+configuration: Configuration = .simple,
+
+pub const Configuration = union(enum) {
+    simple,
+
+    /// The same as `simple` but links libc.
+    link_c,
+
+    custom: CustomFn,
+
+    pub const CustomFn = *const fn (
+        b: *std.Build,
+        tool_description: ToolDescription,
+        exe: *std.Build.Step.Compile,
+    ) void;
+};
 
 const std = @import("std");
 
