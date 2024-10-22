@@ -1,6 +1,46 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub fn main() !void {
+    var gpa_impl = if (builtin.mode == .Debug) std.heap.GeneralPurposeAllocator(.{}){} else {};
+    defer {
+        if (builtin.mode == .Debug) _ = gpa_impl.deinit();
+    }
+    const allocator = if (builtin.mode == .Debug) gpa_impl.allocator() else std.heap.c_allocator;
+
+    const stdout = std.io.getStdOut();
+
+    const command = try getCommand(allocator);
+    defer command.deinit(allocator);
+
+    var child = std.process.Child.init(command.argv, allocator);
+    child.stdout_behavior = .Pipe;
+    try child.spawn();
+
+    var stdout_wrapper = try StdoutWrapper.init(allocator, child.stdout.?);
+    defer stdout_wrapper.deinit();
+
+    while (try stdout_wrapper.next()) |line| {
+        try handleLine(stdout, line);
+    }
+
+    // the above loop will exit when the child closes its stdout, which usually means the child has exited
+    _ = try child.wait();
+}
+
+fn handleLine(stdout: std.fs.File, line: []const u8) !void {
+    inline for (rules) |rule| {
+        if (std.mem.startsWith(u8, line, rule.pattern)) {
+            const formatted_string = comptime rule.buildFormattedString();
+            try stdout.writeAll(formatted_string);
+            try stdout.writeAll(line[rule.pattern.len..]);
+            return;
+        }
+    }
+
+    try stdout.writeAll(line);
+}
+
 const rules = [_]Rule{
     .{
         .pattern = "debug",
@@ -27,83 +67,6 @@ const rules = [_]Rule{
         .background = .{ .rgb = .{ .r = 255, .g = 0, .b = 0 } }, // red
     },
 };
-
-pub fn main() !void {
-    const allocator = std.heap.c_allocator;
-
-    const command = try getCommand(allocator);
-    defer command.deinit(allocator);
-
-    var child = std.process.Child.init(command.argv, allocator);
-    child.stdout_behavior = .Pipe;
-    try child.spawn();
-
-    var poller = std.io.poll(allocator, enum { stdout }, .{
-        .stdout = child.stdout.?,
-    });
-    defer poller.deinit();
-    const stdout_fifo = poller.fifo(.stdout);
-
-    const stdout = std.io.getStdOut();
-
-    var partial_read_buffer = std.ArrayList(u8).init(allocator);
-    defer partial_read_buffer.deinit();
-
-    while (try poller.poll()) {
-        if (stdout_fifo.count == 0) continue;
-
-        var stdout_window = stdout_fifo.readableSlice(0);
-
-        while (stdout_window.len != 0) {
-            const newline_index = std.mem.indexOfScalar(
-                u8,
-                stdout_window,
-                '\n',
-            ) orelse {
-                // no newline found, store this partial line read in the partial read buffer
-                try partial_read_buffer.appendSlice(stdout_window);
-                break;
-            };
-            const next_line_index = newline_index + 1;
-
-            if (partial_read_buffer.items.len != 0) {
-                try partial_read_buffer.appendSlice(stdout_window[0..next_line_index]);
-                try handleLine(allocator, stdout, partial_read_buffer.items);
-                partial_read_buffer.clearRetainingCapacity();
-            } else {
-                try handleLine(allocator, stdout, stdout_window[0..next_line_index]);
-            }
-
-            stdout_window = stdout_window[next_line_index..];
-        }
-
-        stdout_fifo.discard(stdout_fifo.count);
-    }
-
-    if (partial_read_buffer.items.len != 0) {
-        try handleLine(allocator, stdout, partial_read_buffer.items);
-    }
-
-    // the above loop will exit when the child closes its stdout, which usually means the child has exited
-    _ = try child.wait();
-}
-
-/// Handles a single line of output from the child process.
-fn handleLine(allocator: std.mem.Allocator, stdout: std.fs.File, line: []const u8) !void {
-    _ = allocator;
-
-    inline for (rules) |rule| {
-        if (std.mem.startsWith(u8, line, rule.pattern)) {
-            const formatted_string = comptime rule.buildFormattedString();
-            // std.debug.print("RAW: '{}'\n", .{std.fmt.fmtSliceEscapeLower(formatted_string)});
-            try stdout.writeAll(formatted_string);
-            try stdout.writeAll(line[rule.pattern.len..]);
-            return;
-        }
-    }
-
-    try stdout.writeAll(line);
-}
 
 const Rule = struct {
     pattern: []const u8,
@@ -222,6 +185,8 @@ fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
 const std = @import("std");
 const core = @import("core");
 const ansi = @import("ansi.zig");
+const builtin = @import("builtin");
+const StdoutWrapper = @import("StdoutWrapper.zig");
 
 comptime {
     refAllDeclsRecursive(@This());
