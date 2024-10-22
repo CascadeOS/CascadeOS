@@ -243,7 +243,7 @@ const ImageDescriptionStep = struct {
         }
     }
 
-    const ImageDescription = @import("../tools/image_builder/ImageDescription.zig");
+    const ImageDescription = @import("../tool/image_builder/ImageDescription.zig");
 
     fn buildImageDescription(self: *ImageDescriptionStep) !std.ArrayList(u8) {
         const image_size = 256 * 1024 * 1024; // 256 MiB
