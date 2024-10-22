@@ -30,7 +30,7 @@ pub fn getTools(
     libraries: Library.Collection,
     optimize_mode: std.builtin.OptimizeMode,
 ) !Collection {
-    const tool_descriptions: []const ToolDescription = @import("../tools/listing.zig").tools;
+    const tool_descriptions: []const ToolDescription = @import("../tool/listing.zig").tools;
 
     var tools: Collection = .{};
     try tools.ensureTotalCapacity(b.allocator, tool_descriptions.len);
@@ -71,7 +71,7 @@ fn resolveTool(
     const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{tool_description.name});
 
     const lazy_path = b.path(b.pathJoin(&.{
-        "tools",
+        "tool",
         tool_description.name,
         root_file_name,
     }));
@@ -112,7 +112,7 @@ fn resolveTool(
             .dest_dir = .{
                 .override = .{
                     .custom = b.pathJoin(&.{
-                        "tools",
+                        "tool",
                         tool_description.name,
                     }),
                 },
@@ -149,7 +149,7 @@ fn resolveTool(
             .dest_dir = .{
                 .override = .{
                     .custom = b.pathJoin(&.{
-                        "tools",
+                        "tool",
                         tool_description.name,
                     }),
                 },

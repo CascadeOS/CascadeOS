@@ -17,7 +17,7 @@ pub fn customConfiguration(
     const lib_dwarf = b.dependency("libdwarf", .{});
 
     const own_directory_path = b.pathJoin(&.{
-        "tools",
+        "tool",
         tool_description.name,
     });
 
