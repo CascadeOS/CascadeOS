@@ -478,6 +478,13 @@ pub const FADT = extern struct {
 
     pub const SIGNATURE_STRING = "FACP";
 
+    /// Physical address of the DSDT.
+    ///
+    /// Uses `X_DSDT` if it is non-zero, otherwise `DSDT`.
+    pub fn getDSDT(self: *const FADT) core.PhysicalAddress {
+        return if (self.X_DSDT.value != 0) self.X_DSDT else core.PhysicalAddress.fromInt(self.DSDT);
+    }
+
     pub const PowerManagementProfile = enum(u8) {
         unspecified = 0,
 
