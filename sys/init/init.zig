@@ -91,6 +91,10 @@ fn initStage2() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage3(executor: *kernel.Executor) !noreturn {
+    const static = struct {
+        var executor_count = std.atomic.Value(usize).init(0);
+    };
+
     kernel.vmm.core_page_table.load();
     arch.init.loadExecutor(executor);
 
@@ -100,7 +104,17 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     log.debug("configuring local interrupt controller on {}", .{executor.id});
     arch.init.initLocalInterruptController();
 
-    if (executor.id != .bootstrap) arch.interrupts.disableInterruptsAndHalt(); // park non-bootstrap
+    _ = static.executor_count.fetchAdd(1, .monotonic);
+
+    if (executor.id != .bootstrap) {
+        // park non-bootstrap
+        arch.interrupts.disableInterruptsAndHalt();
+    } else {
+        // park the bootstrap executor until all executors have initialized
+        while (static.executor_count.load(.monotonic) != kernel.executors.len) {
+            arch.spinLoopHint();
+        }
+    }
 
     // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
 
