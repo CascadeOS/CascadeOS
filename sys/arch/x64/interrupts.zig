@@ -249,7 +249,7 @@ pub const init = struct {
         }
 
         for (&interrupt_handlers) |*handler| {
-            handler.* = @ptrCast(initial_interrupt_handler); // the ptr cast is safe as
+            handler.* = @ptrCast(initial_interrupt_handler);
         }
 
         idt.handlers[@intFromEnum(Interrupt.double_fault)]
