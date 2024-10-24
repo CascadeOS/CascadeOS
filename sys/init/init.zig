@@ -97,6 +97,9 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     log.debug("configuring per-executor system features on {}", .{executor.id});
     arch.init.configurePerExecutorSystemFeatures(executor);
 
+    log.debug("configuring local interrupt controller on {}", .{executor.id});
+    arch.init.initLocalInterruptController();
+
     if (executor.id != .bootstrap) arch.interrupts.disableInterruptsAndHalt(); // park non-bootstrap
 
     log.info("initialization complete - duration: {}", .{
