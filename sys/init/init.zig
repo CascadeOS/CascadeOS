@@ -116,8 +116,8 @@ pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: an
 }
 
 /// The interrupt handler during init.
-fn handleInterrupt(_: arch.interrupts.InterruptContext) noreturn {
-    core.panic("unexpected interrupt", null);
+fn handleInterrupt(context: arch.interrupts.InterruptContext) noreturn {
+    core.panicFmt("unexpected interrupt with context:\n{}", .{context}, null);
 }
 
 /// The panic implementation during init.
