@@ -124,12 +124,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
 
-    // no reboot
-    run_qemu.addArg("-no-reboot");
-
-    // no shutdown
-    run_qemu.addArg("-no-shutdown");
-
     run_qemu.addArgs(&.{ "-boot", "menu=off" });
 
     // RAM
