@@ -96,7 +96,7 @@ pub const paging = struct {
 
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
-        pub inline fn sizeOfTopLevelEntry() core.Size {
+        pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
             checkSupport(current.paging.init, "sizeOfTopLevelEntry", fn () core.Size);
 
             return current.paging.init.sizeOfTopLevelEntry();
@@ -107,13 +107,13 @@ pub const paging = struct {
         /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
         ///
         /// This function panics on error.
-        pub inline fn fillTopLevel(
+        pub fn fillTopLevel(
             page_table: paging.PageTable,
             range: core.VirtualRange,
             map_type: kernel.vmm.MapType,
             allocate_page_context: anytype,
             comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
-        ) void {
+        ) callconv(core.inline_in_non_debug) void {
             checkSupport(
                 current.paging.init,
                 "fillTopLevel",
@@ -226,11 +226,11 @@ pub const init = struct {
     /// Prepares the provided `Executor` for use.
     ///
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
-    pub inline fn prepareExecutor(
+    pub fn prepareExecutor(
         executor: *kernel.Executor,
         allocate_stack_context: anytype,
         comptime allocateStackFn: fn (ctx: @TypeOf(allocate_stack_context)) anyerror!kernel.Stack,
-    ) void {
+    ) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.init,
             "prepareExecutor",
