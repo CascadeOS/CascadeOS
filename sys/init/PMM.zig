@@ -14,7 +14,7 @@ unavailable_memory: core.Size,
 
 pub const Ranges = std.BoundedArray(core.PhysicalRange, 16);
 
-pub fn allocateContigousSlice(
+pub fn allocateContiguousSlice(
     self: *PMM,
     comptime T: type,
     count: usize,
