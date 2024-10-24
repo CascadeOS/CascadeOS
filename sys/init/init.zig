@@ -7,8 +7,8 @@ pub const time = @import("time.zig");
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 ///
-/// The bootstrap executor is not initialzed upon entry to this function so any features
-/// requiring an initialized executor (like logging) must be avoided until explicitly initialized.
+/// The bootstrap executor is not initialized upon entry to this function so any features
+/// requiring an initialized executor (like logging) must be avoided until initialization has been performed.
 pub fn initStage1() !noreturn {
     // as the executor is not yet initialized, we can't log
 
