@@ -168,9 +168,9 @@ pub fn configureGlobalSystemFeatures() !void {
 }
 
 /// Configure any per-executor system features.
+///
+/// The `executor` provided must be the current executor.
 pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) void {
-    std.debug.assert(executor == x64.getCurrentExecutor());
-
     if (x64.info.cpu_id.rdtscp) {
         lib_x64.registers.IA32_TSC_AUX.write(@intFromEnum(executor.id));
     }
@@ -203,8 +203,8 @@ pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) void {
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) void {
-    x64.tsc.registerTimeSource(candidate_time_sources);
-    x64.hpet.registerTimeSource(candidate_time_sources);
+    x64.tsc.init.registerTimeSource(candidate_time_sources);
+    x64.hpet.init.registerTimeSource(candidate_time_sources);
 
     // TODO: APIC, PIT, KVMCLOCK
 }
