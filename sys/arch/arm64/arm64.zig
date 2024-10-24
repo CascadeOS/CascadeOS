@@ -42,6 +42,8 @@ pub inline fn getCurrentExecutor() *kernel.Executor {
     return @ptrFromInt(lib_arm64.registers.TPIDR_EL1.read());
 }
 
+pub const jank = struct {};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

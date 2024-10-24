@@ -310,6 +310,29 @@ pub const init = struct {
     }
 };
 
+/// The stuff in here is not clean or nice, but it's the best we can do for now.
+pub const jank = struct {
+    pub fn outb(port: u16, value: u8) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.jank, "outb", fn (u16, u8) void);
+        current.jank.outb(port, value);
+    }
+
+    pub fn outw(port: u16, value: u16) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.jank, "outw", fn (u16, u16) void);
+        current.jank.outw(port, value);
+    }
+
+    pub fn inb(port: u16) callconv(core.inline_in_non_debug) u8 {
+        checkSupport(current.jank, "inb", fn (u16) u8);
+        return current.jank.inb(port);
+    }
+
+    pub fn inw(port: u16) callconv(core.inline_in_non_debug) u16 {
+        checkSupport(current.jank, "inw", fn (u16) u16);
+        return current.jank.inw(port);
+    }
+};
+
 const current = switch (@import("cascade_target").arch) {
     // x64 is first to help zls, atleast while x64 is the main target.
     .x64 => @import("x64/x64.zig"),

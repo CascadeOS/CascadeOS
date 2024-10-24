@@ -22,6 +22,13 @@ pub inline fn getCurrentExecutor() *kernel.Executor {
     return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
 }
 
+pub const jank = struct {
+    pub const outb = lib_x64.instructions.portWriteU8;
+    pub const outw = lib_x64.instructions.portWriteU16;
+    pub const inb = lib_x64.instructions.portReadU8;
+    pub const inw = lib_x64.instructions.portReadU16;
+};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
