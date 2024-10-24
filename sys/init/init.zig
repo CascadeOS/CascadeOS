@@ -122,7 +122,10 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
         kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
     });
 
-    core.panic("NOT IMPLEMENTED", null);
+    log.warn("nothing to do - shutting down", .{});
+
+    try kernel.acpi.tryShutdown();
+    core.panic("SHUTDOWN FAILED", null);
 }
 
 /// The log implementation during init.
