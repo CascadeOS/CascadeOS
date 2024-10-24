@@ -284,6 +284,18 @@ pub const CpuDescriptor = struct {
     };
 };
 
+pub fn x2apicEnabled() bool {
+    if (@import("cascade_target").arch != .x64) @compileError("x2apicEnabled can only be called on x64");
+
+    switch (bootloader_api) {
+        .limine => {
+            const smp_response = limine_requests.smp.response orelse return false;
+            return smp_response.flags.x2apic_enabled;
+        },
+        .unknown => return false,
+    }
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     bootloader_api = .limine;
     @call(.never_inline, @import("root").initEntryPoint, .{}) catch |err| {
