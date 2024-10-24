@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const Address = @import("Address.zig").Address;
+pub const DSDT = @import("DSDT.zig").DSDT;
 pub const FADT = @import("FADT.zig").FADT;
 pub const HPET = @import("HPET.zig").HPET;
 pub const MADT = @import("MADT.zig").MADT;
