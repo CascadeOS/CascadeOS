@@ -9,6 +9,16 @@ pub fn initializeTime() !void {
     const reference_counter = getReferenceCounter(time_sources);
 
     configureWallclockTimeSource(time_sources, reference_counter);
+
+    log.debug(
+        "time initialized {} after system bootup",
+        .{
+            kernel.time.wallclock.elapsed(
+                @enumFromInt(0),
+                kernel.time.wallclock.read(),
+            ),
+        },
+    );
 }
 
 pub const CandidateTimeSources = struct {
