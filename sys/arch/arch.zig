@@ -277,8 +277,12 @@ pub const init = struct {
     }
 
     /// Configure any per-executor system features.
+    ///
+    /// **WARNING**: The `executor` provided must be the current executor.
     pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
         checkSupport(current.init, "configurePerExecutorSystemFeatures", fn (*kernel.Executor) void);
+
+        std.debug.assert(executor == getCurrentExecutor());
 
         current.init.configurePerExecutorSystemFeatures(executor);
     }

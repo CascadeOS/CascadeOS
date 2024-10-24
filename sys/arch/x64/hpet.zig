@@ -3,80 +3,82 @@
 
 // [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
 
-pub fn registerTimeSource(candidate_time_sources: *init_time.CandidateTimeSources) void {
-    if (kernel.acpi.getTable(acpi.HPET, 0) == null) return;
+pub const init = struct {
+    pub fn registerTimeSource(candidate_time_sources: *init_time.CandidateTimeSources) void {
+        if (kernel.acpi.getTable(acpi.HPET, 0) == null) return;
 
-    candidate_time_sources.addTimeSource(.{
-        .name = "hpet",
-        .priority = 100,
-        .initialization = .{ .simple = initializeHPET },
-        .reference_counter = .{
-            .prepareToWaitForFn = referenceCounterPrepareToWaitFor,
-            .waitForFn = referenceCounterWaitFor,
-        },
-    });
-}
-
-fn initializeHPET() void {
-    hpet = .{ .base = getHpetBase() };
-    log.debug("using hpet: {}", .{hpet});
-
-    const general_capabilities = hpet.readGeneralCapabilitiesAndIDRegister();
-
-    if (general_capabilities.counter_is_64bit) {
-        log.debug("counter is 64-bit", .{});
-    } else {
-        core.panic("HPET counter is not 64-bit", null);
+        candidate_time_sources.addTimeSource(.{
+            .name = "hpet",
+            .priority = 100,
+            .initialization = .{ .simple = initializeHPET },
+            .reference_counter = .{
+                .prepareToWaitForFn = referenceCounterPrepareToWaitFor,
+                .waitForFn = referenceCounterWaitFor,
+            },
+        });
     }
 
-    number_of_timers_minus_one = general_capabilities.number_of_timers_minus_one;
+    fn initializeHPET() void {
+        hpet = .{ .base = getHpetBase() };
+        log.debug("using hpet: {}", .{hpet});
 
-    tick_duration_fs = general_capabilities.counter_tick_period_fs;
-    log.debug("tick duration (fs): {}", .{tick_duration_fs});
+        const general_capabilities = hpet.readGeneralCapabilitiesAndIDRegister();
 
-    var general_configuration = hpet.readGeneralConfigurationRegister();
-    general_configuration.enable = false;
-    general_configuration.legacy_routing_enable = false;
-    hpet.writeGeneralConfigurationRegister(general_configuration);
+        if (general_capabilities.counter_is_64bit) {
+            log.debug("counter is 64-bit", .{});
+        } else {
+            core.panic("HPET counter is not 64-bit", null);
+        }
 
-    hpet.writeCounterRegister(0);
-}
+        number_of_timers_minus_one = general_capabilities.number_of_timers_minus_one;
 
-fn referenceCounterPrepareToWaitFor(duration: core.Duration) void {
-    _ = duration;
+        tick_duration_fs = general_capabilities.counter_tick_period_fs;
+        log.debug("tick duration (fs): {}", .{tick_duration_fs});
 
-    var general_configuration = hpet.readGeneralConfigurationRegister();
-    general_configuration.enable = false;
-    hpet.writeGeneralConfigurationRegister(general_configuration);
+        var general_configuration = hpet.readGeneralConfigurationRegister();
+        general_configuration.enable = false;
+        general_configuration.legacy_routing_enable = false;
+        hpet.writeGeneralConfigurationRegister(general_configuration);
 
-    hpet.writeCounterRegister(0);
-
-    general_configuration.enable = true;
-    hpet.writeGeneralConfigurationRegister(general_configuration);
-}
-
-fn referenceCounterWaitFor(duration: core.Duration) void {
-    const duration_ticks = ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
-
-    const current_value = hpet.readCounterRegister();
-
-    const target_value = current_value + duration_ticks;
-
-    while (hpet.readCounterRegister() < target_value) {
-        arch.spinLoopHint();
+        hpet.writeCounterRegister(0);
     }
-}
 
-fn getHpetBase() [*]volatile u64 {
-    // unreachable: the table is known to exist as it is checked in `registerTimeSource`
-    const description_table = kernel.acpi.getTable(acpi.HPET, 0) orelse unreachable;
+    fn referenceCounterPrepareToWaitFor(duration: core.Duration) void {
+        _ = duration;
 
-    if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
+        var general_configuration = hpet.readGeneralConfigurationRegister();
+        general_configuration.enable = false;
+        hpet.writeGeneralConfigurationRegister(general_configuration);
 
-    return kernel.memory_layout
-        .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(description_table.base_address.address))
-        .toPtr([*]volatile u64);
-}
+        hpet.writeCounterRegister(0);
+
+        general_configuration.enable = true;
+        hpet.writeGeneralConfigurationRegister(general_configuration);
+    }
+
+    fn referenceCounterWaitFor(duration: core.Duration) void {
+        const duration_ticks = ((duration.value * kernel.time.fs_per_ns) / tick_duration_fs);
+
+        const current_value = hpet.readCounterRegister();
+
+        const target_value = current_value + duration_ticks;
+
+        while (hpet.readCounterRegister() < target_value) {
+            arch.spinLoopHint();
+        }
+    }
+
+    fn getHpetBase() [*]volatile u64 {
+        // unreachable: the table is known to exist as it is checked in `registerTimeSource`
+        const description_table = kernel.acpi.getTable(acpi.HPET, 0) orelse unreachable;
+
+        if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
+
+        return kernel.memory_layout
+            .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(description_table.base_address.address))
+            .toPtr([*]volatile u64);
+    }
+};
 
 var hpet: lib_x64.Hpet = undefined; // Initalized during `initializeHPET`
 
