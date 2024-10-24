@@ -102,6 +102,8 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
 
     if (executor.id != .bootstrap) arch.interrupts.disableInterruptsAndHalt(); // park non-bootstrap
 
+    // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
+
     log.info("initialization complete - duration: {}", .{
         kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
     });
@@ -503,6 +505,11 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
 ///
 /// Also wakes the non-bootstrap executors and jumps them to `initStage3`.
 fn initializeExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
+    try allocateAndPrepareExecutors(pmm, stack_allocator);
+    try bootNonBootstrapExecutors();
+}
+
+fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
     const KernelStackContext = struct {
         pmm: *PMM,
         stack_allocator: *StackAllocator,
@@ -528,7 +535,7 @@ fn initializeExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
 
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
-    const executors = try pmm.allocateContigousSlice(kernel.Executor, descriptors.count());
+    const executors = try pmm.allocateContiguousSlice(kernel.Executor, descriptors.count());
 
     var kernel_stack_context: KernelStackContext = .{
         .pmm = pmm,
@@ -555,11 +562,15 @@ fn initializeExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
         );
     }
 
-    // publish the prepared executors then boot them
     kernel.executors = executors;
+}
+
+fn bootNonBootstrapExecutors() !void {
+    var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
+    var i: u32 = 0;
 
     while (descriptors.next()) |desc| : (i += 1) {
-        const executor = &executors[i];
+        const executor = &kernel.executors[i];
         if (executor.id == .bootstrap) continue;
 
         desc.boot(
@@ -574,8 +585,6 @@ fn initializeExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
             }.bootFn,
         );
     }
-
-    // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
 }
 
 const AllocatePageContext = struct {
