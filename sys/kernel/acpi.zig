@@ -16,10 +16,14 @@ pub fn getTable(comptime T: type, n: usize) ?*const T {
     var i: usize = 0;
 
     while (iter.next()) |header| {
-        if (!header.signatureIs(T.SIGNATURE_STRING)) continue;
+        if (!header.signatureIs(T.SIGNATURE_STRING)) {
+            continue;
+        }
 
-        if (i != n) continue;
-        i += 1;
+        if (i != n) {
+            i += 1;
+            continue;
+        }
 
         if (!header.isValid()) {
             log.warn("invalid table: {s}", .{header.signatureAsString()});
