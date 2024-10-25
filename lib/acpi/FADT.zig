@@ -34,7 +34,9 @@ pub const FADT = extern struct {
     ///
     /// If the `X_DSDT` field contains a non-zero value which can be used by the OSPM, then this field must be ignored
     /// by the OSPM.
-    DSDT: u32 align(1),
+    ///
+    /// Use `getDSDT` to get the DSDT.
+    _DSDT: u32 align(1),
 
     /// ACPI 1.0 defined this offset as a field named `int_model`, which was eliminated in ACPI 2.0.
     ///
@@ -122,7 +124,9 @@ pub const FADT = extern struct {
     ///
     /// If the `X_PM1a_CNT_BLK` field contains a non zero value which can be used by the OSPM, then this field must be
     /// ignored by the OSPM.
-    PM1a_CNT_BLK: u32 align(1),
+    ///
+    /// Use `getPM1a_CNT` to get the PM1a_CNT.
+    _PM1a_CNT_BLK: u32 align(1),
 
     /// System port address of the PM1b Control Register Block.
     ///
@@ -130,7 +134,9 @@ pub const FADT = extern struct {
     ///
     /// If the `X_PM1b_CNT_BLK` field contains a non zero value which can be used by the OSPM, then this field must be
     /// ignored by the OSPM.
-    PM1b_CNT_BLK: u32 align(1),
+    ///
+    /// Use `getPM1b_CNT` to get the PM1b_CNT.
+    _PM1b_CNT_BLK: u32 align(1),
 
     /// System port address of the PM2 Control Register Block.
     ///
@@ -372,7 +378,9 @@ pub const FADT = extern struct {
     ///
     /// If this field contains a nonzero value which can be used by the OSPM, then the `DSDT` field must be ignored
     /// by the OSPM.
-    X_DSDT: core.PhysicalAddress align(1),
+    ///
+    /// Use `getDSDT` to get the DSDT.
+    _X_DSDT: core.PhysicalAddress align(1),
 
     /// Extended address of the PM1a Event Register Block.
     ///
@@ -396,7 +404,9 @@ pub const FADT = extern struct {
     ///
     /// If this field contains a nonzero value which can be used by the OSPM, then the `PM1a_CNT_BLK` field must be
     /// ignored by the OSPM.
-    X_PM1a_CNT_BLK: acpi.Address align(1),
+    ///
+    /// Use `getPM1a_CNT` to get the PM1a_CNT.
+    _X_PM1a_CNT_BLK: acpi.Address align(1),
 
     /// Extended address of the PM1b Control Register Block.
     ///
@@ -404,7 +414,9 @@ pub const FADT = extern struct {
     ///
     /// If this field contains a nonzero value which can be used by the OSPM, then the `PM1b_CNT_BLK` field must be
     /// ignored by the OSPM.
-    X_PM1b_CNT_BLK: acpi.Address align(1),
+    ///
+    /// Use `getPM1b_CNT` to get the PM1b_CNT.
+    _X_PM1b_CNT_BLK: acpi.Address align(1),
 
     /// Extended address of the PM2 Control Register Block.
     ///
@@ -479,10 +491,38 @@ pub const FADT = extern struct {
     pub const SIGNATURE_STRING = "FACP";
 
     /// Physical address of the DSDT.
-    ///
-    /// Uses `X_DSDT` if it is non-zero, otherwise `DSDT`.
     pub fn getDSDT(self: *const FADT) core.PhysicalAddress {
-        return if (self.X_DSDT.value != 0) self.X_DSDT else core.PhysicalAddress.fromInt(self.DSDT);
+        return if (self._X_DSDT.value != 0) self._X_DSDT else core.PhysicalAddress.fromInt(self._DSDT);
+    }
+
+    /// Address of the PM1a Control Register Block.
+    pub fn getPM1a_CNT(self: *const FADT) acpi.Address {
+        return if (self._X_PM1a_CNT_BLK.address != 0)
+            self._X_PM1a_CNT_BLK
+        else
+            .{ // FIXME: non-x86?
+                .address_space = .io,
+                .address = @intCast(self._PM1a_CNT_BLK),
+                .register_bit_width = 16,
+                .register_bit_offset = 0,
+                .access_size = .undefined,
+            };
+    }
+
+    /// Address of the PM1b Control Register Block.
+    pub fn getPM1b_CNT(self: *const FADT) ?acpi.Address {
+        return if (self._X_PM1b_CNT_BLK.address != 0)
+            self._X_PM1b_CNT_BLK
+        else if (self._PM1b_CNT_BLK != 0)
+            .{ // FIXME: non-x86?
+                .address_space = .io,
+                .address = @intCast(self._PM1b_CNT_BLK),
+                .register_bit_width = 16,
+                .register_bit_offset = 0,
+                .access_size = .undefined,
+            }
+        else
+            null;
     }
 
     pub const PowerManagementProfile = enum(u8) {
