@@ -310,26 +310,21 @@ pub const init = struct {
     }
 };
 
-/// The stuff in here is not clean or nice, but it's the best we can do for now.
-pub const jank = struct {
-    pub fn outb(port: u16, value: u8) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.jank, "outb", fn (u16, u8) void);
-        current.jank.outb(port, value);
+pub const io = struct {
+    pub const Port = current.io.Port;
+
+    pub const PortError = error{UnsupportedPortSize};
+
+    pub fn readPort(comptime T: type, port: Port) callconv(core.inline_in_non_debug) PortError!T {
+        checkSupport(current.io, "readPort", fn (type, Port) PortError!T);
+
+        return current.io.readPort(T, port);
     }
 
-    pub fn outw(port: u16, value: u16) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.jank, "outw", fn (u16, u16) void);
-        current.jank.outw(port, value);
-    }
+    pub fn writePort(comptime T: type, port: Port, value: T) callconv(core.inline_in_non_debug) PortError!void {
+        checkSupport(current.io, "writePort", fn (type, Port, T) PortError!void);
 
-    pub fn inb(port: u16) callconv(core.inline_in_non_debug) u8 {
-        checkSupport(current.jank, "inb", fn (u16) u8);
-        return current.jank.inb(port);
-    }
-
-    pub fn inw(port: u16) callconv(core.inline_in_non_debug) u16 {
-        checkSupport(current.jank, "inw", fn (u16) u16);
-        return current.jank.inw(port);
+        return current.io.writePort(T, port, value);
     }
 };
 
@@ -360,9 +355,9 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     const decl_type_info = @typeInfo(DeclT).@"fn";
     const target_type_info = @typeInfo(TargetT).@"fn";
 
-    if (decl_type_info.return_type != target_type_info.return_type) {
-        const DeclReturnT = decl_type_info.return_type.?;
-        const TargetReturnT = target_type_info.return_type.?;
+    if (decl_type_info.return_type != target_type_info.return_type) blk: {
+        const DeclReturnT = decl_type_info.return_type orelse break :blk;
+        const TargetReturnT = target_type_info.return_type orelse @compileError(mismatch_type_msg);
 
         const target_return_type_info = @typeInfo(TargetReturnT);
         if (target_return_type_info != .error_union) @compileError(mismatch_type_msg);

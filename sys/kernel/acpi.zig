@@ -88,10 +88,10 @@ pub fn tryShutdown() !void {
 
     if (fadt.SMI_CMD != 0 and fadt.ACPI_ENABLE != 0) {
         // we have SMM and we need to enable ACPI mode first
-        arch.jank.outb(@intCast(fadt.SMI_CMD), fadt.ACPI_ENABLE);
+        try arch.io.writePort(u8, @intCast(fadt.SMI_CMD), fadt.ACPI_ENABLE);
 
         for (0..100) |_| {
-            _ = arch.jank.inb(0x80);
+            _ = try arch.io.readPort(u8, 0x80);
         }
 
         while (try readAddress(u16, PM1a_CNT) & SCI_EN == 0) {
@@ -105,15 +105,15 @@ pub fn tryShutdown() !void {
         try writeAddress(PM1b_CNT, SLP_TYPb | SLP_EN);
     }
 
-    for (0..100) |_| _ = arch.jank.inb(0x80);
+    for (0..100) |_| _ = try arch.io.readPort(u8, 0x80);
 }
 
 const WriteAddressError = error{
     UnsupportedAddressSpace,
     UnsupportedRegisterBitWidth,
-    InvalidIoPort,
+    InvalidPort,
     ValueOutOfRange,
-};
+} || arch.io.PortError;
 
 fn writeAddress(address: acpi.Address, value: u64) WriteAddressError!void {
     switch (address.address_space) {
@@ -121,25 +121,24 @@ fn writeAddress(address: acpi.Address, value: u64) WriteAddressError!void {
             const port = cast(
                 u16,
                 address.address,
-            ) orelse return WriteAddressError.InvalidIoPort;
+            ) orelse return WriteAddressError.InvalidPort;
 
-            switch (address.register_bit_width) {
-                8 => arch.jank.outb(
+            inline for (.{ 8, 16, 32 }) |bit_width| if (bit_width == address.register_bit_width) {
+                const T = std.meta.Int(.unsigned, bit_width);
+
+                try arch.io.writePort(
+                    T,
                     port,
                     cast(
-                        u8,
+                        T,
                         value,
                     ) orelse return WriteAddressError.ValueOutOfRange,
-                ),
-                16 => arch.jank.outw(
-                    port,
-                    cast(
-                        u16,
-                        value,
-                    ) orelse return WriteAddressError.ValueOutOfRange,
-                ),
-                else => return WriteAddressError.UnsupportedRegisterBitWidth, // TODO: support more register bit widths
-            }
+                );
+
+                return;
+            };
+
+            return WriteAddressError.UnsupportedPortSize; // TODO: support more register bit widths
         },
         else => return WriteAddressError.UnsupportedAddressSpace, // TODO: support more address spaces
     }
@@ -147,23 +146,18 @@ fn writeAddress(address: acpi.Address, value: u64) WriteAddressError!void {
 
 const ReadAddressError = error{
     UnsupportedAddressSpace,
-    UnsupportedRegisterBitWidth,
-    InvalidIoPort,
-};
+    InvalidPort,
+} || arch.io.PortError;
 
 fn readAddress(comptime T: type, address: acpi.Address) ReadAddressError!T {
     switch (address.address_space) {
         .io => {
             const port = cast(
-                u16,
+                arch.io.Port,
                 address.address,
-            ) orelse return ReadAddressError.InvalidIoPort;
+            ) orelse return ReadAddressError.InvalidPort;
 
-            return switch (address.register_bit_width) {
-                8 => arch.jank.inb(port),
-                16 => arch.jank.inw(port),
-                else => ReadAddressError.UnsupportedRegisterBitWidth, // TODO: support more register bit widths
-            };
+            return arch.io.readPort(T, port);
         },
         else => return ReadAddressError.UnsupportedAddressSpace, // TODO: support more address spaces
     }
