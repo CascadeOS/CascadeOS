@@ -83,15 +83,18 @@ pub fn tryShutdown() !void {
     const SCI_EN: u8 = 1;
     const SLP_EN = @as(u16, 1) << 13;
 
-    const PM1a_CNT_BLK: u16 = blk: {
-        if (fadt.X_PM1a_CNT_BLK.address != 0) {
-            if (fadt.X_PM1a_CNT_BLK.address_space != .io) return error.X_PM1a_CNT_BLK_NotIO;
+    const PM1a_CNT_BLK: u16 = if (fadt.X_PM1a_CNT_BLK.address != 0) blk: {
+        if (fadt.X_PM1a_CNT_BLK.address_space != .io) return error.X_PM1a_CNT_BLK_NotIO;
+        break :blk @intCast(fadt.X_PM1a_CNT_BLK.address);
+    } else @intCast(fadt.PM1a_CNT_BLK);
 
-            break :blk @intCast(fadt.X_PM1a_CNT_BLK.address);
-        }
-
-        break :blk @intCast(fadt.PM1a_CNT_BLK);
-    };
+    const PM1b_CNT_BLK_opt: ?u16 = if (fadt.X_PM1b_CNT_BLK.address != 0) blk: {
+        if (fadt.X_PM1b_CNT_BLK.address_space != .io) return error.X_PM1b_CNT_BLK_NotIO;
+        break :blk @intCast(fadt.X_PM1b_CNT_BLK.address);
+    } else if (fadt.PM1b_CNT_BLK != 0)
+        @intCast(fadt.PM1b_CNT_BLK)
+    else
+        null;
 
     if (fadt.SMI_CMD != 0 and fadt.ACPI_ENABLE != 0) {
         // we have SMM and we need to enable ACPI mode first
@@ -104,17 +107,8 @@ pub fn tryShutdown() !void {
 
     arch.jank.outw(PM1a_CNT_BLK, SLP_TYPa | SLP_EN);
 
-    PM1b_CNT_BLK: {
-        if (fadt.X_PM1b_CNT_BLK.address != 0) {
-            if (fadt.X_PM1b_CNT_BLK.address_space != .io) return error.X_PM1b_CNT_BLK_NotIO;
-
-            arch.jank.outw(@intCast(fadt.X_PM1b_CNT_BLK.address), SLP_TYPb | SLP_EN);
-            break :PM1b_CNT_BLK;
-        }
-
-        if (fadt.PM1b_CNT_BLK != 0) {
-            arch.jank.outw(@intCast(fadt.PM1b_CNT_BLK), SLP_TYPb | SLP_EN);
-        }
+    if (PM1b_CNT_BLK_opt) |PM1b_CNT_BLK| {
+        arch.jank.outw(PM1b_CNT_BLK, SLP_TYPb | SLP_EN);
     }
 
     for (0..100) |_| _ = arch.jank.inb(0x80);
