@@ -114,6 +114,67 @@ pub fn tryShutdown() !void {
     for (0..100) |_| _ = arch.jank.inb(0x80);
 }
 
+const WriteAddressError = error{
+    UnsupportedAddressSpace,
+    UnsupportedRegisterBitWidth,
+    InvalidIoPort,
+    ValueOutOfRange,
+};
+
+fn writeAddress(address: acpi.Address, value: u64) WriteAddressError!void {
+    switch (address.address_space) {
+        .io => {
+            const port = cast(
+                u16,
+                address.address,
+            ) orelse return WriteAddressError.InvalidIoPort;
+
+            switch (address.register_bit_width) {
+                8 => arch.jank.outb(
+                    port,
+                    cast(
+                        u8,
+                        value,
+                    ) orelse return WriteAddressError.ValueOutOfRange,
+                ),
+                16 => arch.jank.outw(
+                    port,
+                    cast(
+                        u16,
+                        value,
+                    ) orelse return WriteAddressError.ValueOutOfRange,
+                ),
+                else => return WriteAddressError.UnsupportedRegisterBitWidth, // TODO: support more register bit widths
+            }
+        },
+        else => return WriteAddressError.UnsupportedAddressSpace, // TODO: support more address spaces
+    }
+}
+
+const ReadAddressError = error{
+    UnsupportedAddressSpace,
+    UnsupportedRegisterBitWidth,
+    InvalidIoPort,
+};
+
+fn readAddress(comptime T: type, address: acpi.Address) ReadAddressError!T {
+    switch (address.address_space) {
+        .io => {
+            const port = cast(
+                u16,
+                address.address,
+            ) orelse return ReadAddressError.InvalidIoPort;
+
+            return switch (address.register_bit_width) {
+                8 => arch.jank.inb(port),
+                16 => arch.jank.inw(port),
+                else => ReadAddressError.UnsupportedRegisterBitWidth, // TODO: support more register bit widths
+            };
+        },
+        else => return ReadAddressError.UnsupportedAddressSpace, // TODO: support more address spaces
+    }
+}
+
 fn parseInteger(s5_addr: [*]const u8, value: *u64) ?u8 {
     var addr = s5_addr;
 
@@ -185,3 +246,4 @@ const kernel = @import("kernel");
 const arch = @import("arch");
 const acpi = @import("acpi");
 const log = kernel.log.scoped(.acpi);
+const cast = std.math.cast;
