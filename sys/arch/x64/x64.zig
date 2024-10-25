@@ -22,17 +22,33 @@ pub inline fn getCurrentExecutor() *kernel.Executor {
     return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
 }
 
-pub const jank = struct {
-    pub const outb = lib_x64.instructions.portWriteU8;
-    pub const outw = lib_x64.instructions.portWriteU16;
-    pub const inb = lib_x64.instructions.portReadU8;
-    pub const inw = lib_x64.instructions.portReadU16;
+pub const io = struct {
+    pub const Port = u16;
+
+    pub inline fn readPort(comptime T: type, port: Port) arch.io.PortError!T {
+        return switch (T) {
+            u8 => lib_x64.instructions.portReadU8(port),
+            u16 => lib_x64.instructions.portReadU16(port),
+            u32 => lib_x64.instructions.portReadU32(port),
+            else => arch.io.PortError.UnsupportedPortSize,
+        };
+    }
+
+    pub inline fn writePort(comptime T: type, port: Port, value: T) arch.io.PortError!void {
+        return switch (T) {
+            u8 => lib_x64.instructions.portWriteU8(port, value),
+            u16 => lib_x64.instructions.portWriteU16(port, value),
+            u32 => lib_x64.instructions.portWriteU32(port, value),
+            else => arch.io.PortError.UnsupportedPortSize,
+        };
+    }
 };
 
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const lib_x64 = @import("lib_x64");
+const arch = @import("arch");
 
 comptime {
     if (@import("cascade_target").arch != .x64) {
