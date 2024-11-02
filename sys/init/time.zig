@@ -22,7 +22,10 @@ pub fn initializeTime() !void {
 }
 
 pub const CandidateTimeSources = struct {
-    candidate_time_sources: std.BoundedArray(CandidateTimeSource, kernel.config.maxium_number_of_time_sources) = .{},
+    candidate_time_sources: std.BoundedArray(
+        CandidateTimeSource,
+        kernel.config.maximum_number_of_time_sources,
+    ) = .{},
 
     pub fn addTimeSource(self: *CandidateTimeSources, time_source: CandidateTimeSource) void {
         if (time_source.reference_counter != null) {
