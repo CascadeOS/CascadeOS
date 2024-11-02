@@ -398,6 +398,21 @@ pub const scheduling = struct {
 
         current.scheduling.jumpToTaskFromIdle(task);
     }
+
+    /// Prepares the executor for jumping from `old_task` to `new_task`.
+    pub fn prepareForJumpToTaskFromTask(
+        executor: *kernel.Executor,
+        old_task: *kernel.Task,
+        new_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "prepareForJumpToTaskFromTask", fn (
+            *kernel.Executor,
+            *kernel.Task,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToTaskFromTask(executor, old_task, new_task);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {

@@ -129,6 +129,21 @@ pub inline fn jumpToTaskFromIdle(
     unreachable;
 }
 
+/// Prepares the executor for jumping from `old_task` to `new_task`.
+pub fn prepareForJumpToTaskFromTask(
+    executor: *kernel.Executor,
+    old_task: *kernel.Task,
+    new_task: *kernel.Task,
+) void {
+    _ = old_task;
+    // TODO: switch page tables
+
+    executor.arch.tss.setPrivilegeStack(
+        .ring0,
+        new_task.stack.stack_pointer,
+    );
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
