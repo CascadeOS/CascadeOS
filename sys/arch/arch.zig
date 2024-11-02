@@ -427,6 +427,29 @@ pub const scheduling = struct {
 
         current.scheduling.jumpToTaskFromTask(old_task, new_task);
     }
+
+    pub const NewTaskFunction = *const fn (
+        task: *kernel.Task,
+        context: u64,
+    ) noreturn;
+
+    /// Prepares the given task for being scheduled.
+    ///
+    /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
+    /// the given `context`.
+    pub inline fn prepareNewTaskForScheduling(
+        task: *kernel.Task,
+        context: u64,
+        target_function: NewTaskFunction,
+    ) error{StackOverflow}!void {
+        checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
+            *kernel.Task,
+            u64,
+            NewTaskFunction,
+        ) error{StackOverflow}!void);
+
+        return current.scheduling.prepareNewTaskForScheduling(task, context, target_function);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {
