@@ -13,6 +13,9 @@ pub const tsc = @import("tsc.zig");
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
 pub const spinLoopHint = lib_x64.instructions.pause;
 
+/// Halts the current executor
+pub const halt = lib_x64.instructions.halt;
+
 /// Get the current `Executor`.
 ///
 /// Assumes that `init.loadExecutor()` has been called on the currently running CPU.

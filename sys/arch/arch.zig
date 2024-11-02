@@ -24,6 +24,13 @@ pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor 
     return current.getCurrentExecutor();
 }
 
+/// Halts the current executor
+pub fn halt() callconv(core.inline_in_non_debug) void {
+    // `checkSupport` intentionally not called - mandatory function
+
+    current.halt();
+}
+
 pub const interrupts = struct {
     /// Returns true if interrupts are enabled.
     pub fn areEnabled() callconv(core.inline_in_non_debug) bool {
