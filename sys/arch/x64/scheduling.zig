@@ -144,6 +144,60 @@ pub fn prepareForJumpToTaskFromTask(
     );
 }
 
+/// Jumps from `old_task` to `new_task`.
+///
+/// Saves the old task's state to allow it to be resumed later.
+///
+/// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+pub inline fn jumpToTaskFromTask(
+    old_task: *kernel.Task,
+    new_task: *kernel.Task,
+) void {
+    const impls = struct {
+        const jumpToTaskFromTask: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
+        ) callconv(.C) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) noreturn {
+                    asm volatile (
+                        \\// all other registers are saved by the caller due to the calling convention
+                        \\push %rbx
+                        \\push %rbp
+                        \\push %r12
+                        \\push %r13
+                        \\push %r14
+                        \\push %r15
+                        \\
+                        \\// save current stack to `previous_kernel_stack_pointer`
+                        \\mov %rsp, %rax
+                        \\mov %rax, (%rsi)
+                        \\
+                        \\// switch to `new_kernel_stack_pointer`
+                        \\mov %rdi, %rsp
+                        \\
+                        \\pop %r15
+                        \\pop %r14
+                        \\pop %r13
+                        \\pop %r12
+                        \\pop %rbp
+                        \\pop %rbx
+                        \\
+                        \\ret
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+    };
+
+    impls.jumpToTaskFromTask(
+        new_task.stack.stack_pointer,
+        &old_task.stack.stack_pointer,
+    );
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
