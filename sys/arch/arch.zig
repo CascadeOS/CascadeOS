@@ -51,6 +51,13 @@ pub const interrupts = struct {
         current.interrupts.disableInterrupts();
     }
 
+    /// Enable interrupts.
+    pub fn enableInterrupts() callconv(core.inline_in_non_debug) void {
+        // `checkSupport` intentionally not called - mandatory function
+
+        current.interrupts.enableInterrupts();
+    }
+
     pub const InterruptHandler = *const fn (context: InterruptContext) void;
 
     pub const InterruptContext = current.interrupts.InterruptContext;

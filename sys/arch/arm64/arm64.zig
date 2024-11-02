@@ -8,6 +8,7 @@ pub const PerExecutor = struct {};
 pub const interrupts = struct {
     pub const disableInterruptsAndHalt = lib_arm64.instructions.disableInterruptsAndHalt;
     pub const disableInterrupts = lib_arm64.instructions.disableInterrupts;
+    pub const enableInterrupts = lib_arm64.instructions.enableInterrupts;
     pub const areEnabled = lib_arm64.instructions.interruptsEnabled;
 
     pub const InterruptContext = struct {};
