@@ -19,6 +19,11 @@ panicked: std.atomic.Value(bool) = .init(false),
 /// Tracks the depth of nested interrupt disables.
 interrupt_disable_count: u32 = 1, // interrupts start disabled
 
+/// The currently running task.
+///
+/// This is set to `null` when the executor is idle and also before we start scheduling.
+current_task: ?*kernel.Task = null,
+
 arch: @import("arch").PerExecutor,
 
 /// A unique identifier for the executor.
