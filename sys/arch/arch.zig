@@ -385,6 +385,19 @@ pub const scheduling = struct {
 
         current.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
     }
+
+    /// Jumps to the given task from the idle state.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
+    pub fn jumpToTaskFromIdle(
+        task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) noreturn {
+        checkSupport(current.scheduling, "jumpToTaskFromIdle", fn (*kernel.Task) noreturn);
+
+        current.scheduling.jumpToTaskFromIdle(task);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {

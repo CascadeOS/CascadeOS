@@ -94,6 +94,41 @@ pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kerne
     );
 }
 
+/// Jumps to the given task from the idle state.
+///
+/// Saves the old task's state to allow it to be resumed later.
+///
+/// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
+pub inline fn jumpToTaskFromIdle(
+    task: *kernel.Task,
+) noreturn {
+    const impls = struct {
+        const jumpToTaskFromIdle: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+        ) callconv(.C) noreturn = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) noreturn {
+                    asm volatile (
+                        \\mov %rdi, %rsp
+                        \\pop %r15
+                        \\pop %r14
+                        \\pop %r13
+                        \\pop %r12
+                        \\pop %rbp
+                        \\pop %rbx
+                        \\ret
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+    };
+
+    impls.jumpToTaskFromIdle(task.stack.stack_pointer);
+    unreachable;
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
