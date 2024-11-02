@@ -342,6 +342,9 @@ pub const io = struct {
     }
 };
 
+pub const scheduling = struct {
+};
+
 const current = switch (@import("cascade_target").arch) {
     // x64 is first to help zls, atleast while x64 is the main target.
     .x64 => @import("x64/x64.zig"),
