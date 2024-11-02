@@ -16,6 +16,9 @@ scheduler_stack: kernel.Stack,
 
 panicked: std.atomic.Value(bool) = .init(false),
 
+/// Tracks the depth of nested interrupt disables.
+interrupt_disable_count: u32 = 1, // interrupts start disabled
+
 arch: @import("arch").PerExecutor,
 
 /// A unique identifier for the executor.
