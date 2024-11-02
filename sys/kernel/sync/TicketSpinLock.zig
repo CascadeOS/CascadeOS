@@ -16,22 +16,27 @@ current_holder: kernel.Executor.Id = .none,
 /// **WARNING**: This lock is not interrupt safe, it is the callers responsibility to ensure that interrupts are
 /// disabled while the lock is held.
 pub fn lock(self: *TicketSpinLock) void {
+    const current_executor = arch.getCurrentExecutor();
+
     std.debug.assert(!arch.interrupts.areEnabled());
+    std.debug.assert(current_executor.interrupt_disable_count != 0);
 
-    const current_executor = arch.getCurrentExecutor().id;
-
-    std.debug.assert(!self.isLockedBy(current_executor));
+    std.debug.assert(!self.isLockedBy(current_executor.id));
 
     const ticket = @atomicRmw(u32, &self.ticket, .Add, 1, .acq_rel);
     while (@atomicLoad(u32, &self.current, .monotonic) != ticket) {
         arch.spinLoopHint();
     }
-    @atomicStore(kernel.Executor.Id, &self.current_holder, current_executor, .release);
+    @atomicStore(kernel.Executor.Id, &self.current_holder, current_executor.id, .release);
 }
 
 pub fn unlock(self: *TicketSpinLock) void {
+    const current_executor = arch.getCurrentExecutor();
+
     std.debug.assert(!arch.interrupts.areEnabled());
-    std.debug.assert(self.isLockedBy(arch.getCurrentExecutor().id));
+    std.debug.assert(current_executor.interrupt_disable_count != 0);
+
+    std.debug.assert(self.isLockedBy(current_executor.id));
 
     @atomicStore(kernel.Executor.Id, &self.current_holder, .none, .release);
     _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);
