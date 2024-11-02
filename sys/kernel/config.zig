@@ -12,6 +12,8 @@ pub const kernel_base_address: core.VirtualAddress = .fromInt(0xffffffff80000000
 /// The size of the usable region of a kernel stack.
 pub const kernel_stack_size = arch.paging.standard_page_size.multiplyScalar(16);
 
+pub const task_name_length = 32;
+
 pub const maximum_number_of_time_sources = 8;
 
 const std = @import("std");
