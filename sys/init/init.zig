@@ -123,9 +123,9 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     if (executor.id == .bootstrap) {
         barrier.waitForOthers();
 
-        log.info("initialization complete - duration: {}", .{
+        arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
-        });
+        }) catch unreachable;
 
         barrier.executorReady();
     } else {
