@@ -413,6 +413,20 @@ pub const scheduling = struct {
 
         current.scheduling.prepareForJumpToTaskFromTask(executor, old_task, new_task);
     }
+
+    /// Jumps from `old_task` to `new_task`.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+    pub fn jumpToTaskFromTask(
+        old_task: *kernel.Task,
+        new_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "jumpToTaskFromTask", fn (*kernel.Task, *kernel.Task) void);
+
+        current.scheduling.jumpToTaskFromTask(old_task, new_task);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {
