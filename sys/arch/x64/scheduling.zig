@@ -198,6 +198,59 @@ pub inline fn jumpToTaskFromTask(
     );
 }
 
+/// Prepares the given task for being scheduled.
+///
+/// Ensures that when the task is scheduled it will runlock the scheduler lock then call the `target_function` with the
+/// given `context`.
+pub fn prepareNewTaskForScheduling(
+    task: *kernel.Task,
+    context: u64,
+    target_function: arch.scheduling.NewTaskFunction,
+) error{StackOverflow}!void {
+    const impls = struct {
+        const startNewTaskStage1: *const fn () callconv(.C) noreturn = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) noreturn {
+                    asm volatile (
+                        \\pop %rdi // task
+                        \\pop %rsi // context
+                        \\pop %rdx // target_function
+                        \\
+                        \\ret // the return address of `startNewTaskStage2` should be on the stack
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+
+        fn startNewTaskStage2(
+            current_task: *kernel.Task,
+            task_context: u64,
+            target_function_addr: *const anyopaque,
+        ) callconv(.C) noreturn {
+            kernel.scheduler.lock.unlock();
+
+            const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
+            func(current_task, task_context);
+            unreachable;
+        }
+    };
+
+    try task.stack.pushReturnAddress(.zero); // zero return address prevents walking off the end of the stack
+
+    try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&impls.startNewTaskStage2)));
+
+    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try task.stack.push(context);
+    try task.stack.push(core.VirtualAddress.fromPtr(task));
+
+    try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));
+
+    // general purpose registers
+    for (0..6) |_| task.stack.push(@as(u64, 0)) catch unreachable;
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
