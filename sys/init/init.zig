@@ -569,6 +569,7 @@ fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !voi
 
         executor.* = .{
             .id = id,
+            .scheduler_stack = try kernel_stack_context.allocateKernelStack(),
             .arch = undefined, // set by `arch.init.prepareExecutor`
         };
 
@@ -615,6 +616,7 @@ const AllocatePageContext = struct {
 const globals = struct {
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
+        .scheduler_stack = undefined, // never used
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
     };
     var pmm: PMM = undefined; // set by `initializePMM`

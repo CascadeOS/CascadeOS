@@ -7,6 +7,13 @@ const Executor = @This();
 
 id: Id,
 
+/// This stack is used during context switches, idle, and during the move from the bootloader provided stack until we
+/// start scheduling.
+///
+/// The `stack_pointer` of this stack should never be modified in place, any push/pop operations should be done on a
+/// *copy* of this field.
+scheduler_stack: kernel.Stack,
+
 panicked: std.atomic.Value(bool) = .init(false),
 
 arch: @import("arch").PerExecutor,
