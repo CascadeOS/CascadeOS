@@ -36,6 +36,7 @@ pub const paging = struct {
     pub const init = struct {};
 };
 
+pub const halt = lib_arm64.instructions.halt;
 pub const spinLoopHint = lib_arm64.instructions.isb;
 
 pub inline fn getCurrentExecutor() *kernel.Executor {
