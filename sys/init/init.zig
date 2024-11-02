@@ -135,10 +135,10 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
 
     // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
 
-    log.warn("nothing to do - shutting down", .{});
-
-    try kernel.acpi.tryShutdown();
-    core.panic("SHUTDOWN FAILED", null);
+    // entering scheduler
+    kernel.scheduler.lock.lock();
+    kernel.scheduler.yield(.drop);
+    unreachable;
 }
 
 /// The log implementation during init.
