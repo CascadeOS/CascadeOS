@@ -343,6 +343,22 @@ pub const io = struct {
 };
 
 pub const scheduling = struct {
+    pub const CallError = error{StackOverflow};
+
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+    pub fn callZeroArgs(
+        opt_old_task: ?*kernel.Task,
+        new_stack: kernel.Stack,
+        target_function: *const fn () callconv(.C) noreturn,
+    ) callconv(core.inline_in_non_debug) CallError!void {
+        checkSupport(current.scheduling, "callZeroArgs", fn (
+            ?*kernel.Task,
+            kernel.Stack,
+            *const fn () callconv(.C) noreturn,
+        ) CallError!void);
+
+        try current.scheduling.callZeroArgs(opt_old_task, new_stack, target_function);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {
