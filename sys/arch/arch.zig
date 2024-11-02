@@ -359,6 +359,19 @@ pub const scheduling = struct {
 
         try current.scheduling.callZeroArgs(opt_old_task, new_stack, target_function);
     }
+
+    /// Prepares the executor for jumping to the idle state.
+    pub fn prepareForJumpToIdleFromTask(
+        executor: *kernel.Executor,
+        old_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "prepareForJumpToIdleFromTask", fn (
+            *kernel.Executor,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToIdleFromTask(executor, old_task);
+    }
 };
 
 const current = switch (@import("cascade_target").arch) {

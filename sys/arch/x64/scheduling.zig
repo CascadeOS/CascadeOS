@@ -72,6 +72,28 @@ pub fn callZeroArgs(
     }
 }
 
+/// Prepares the executor for jumping to the idle state.
+pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kernel.Task) void {
+    _ = old_task;
+
+    // TODO: switch page table
+
+    executor.arch.tss.setPrivilegeStack(
+        .ring0,
+        executor.scheduler_stack.stack_pointer,
+    );
+}
+
+/// Prepares the executor for jumping to the given task from the idle state.
+pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) void {
+    // TODO: switch page tables
+
+    executor.arch.tss.setPrivilegeStack(
+        .ring0,
+        new_task.stack.stack_pointer,
+    );
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
