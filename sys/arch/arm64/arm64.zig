@@ -48,6 +48,8 @@ pub const io = struct {
     pub const Port = u64;
 };
 
+pub const scheduling = struct {};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

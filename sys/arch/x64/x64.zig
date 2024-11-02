@@ -8,6 +8,7 @@ pub const init = @import("init.zig");
 pub const interrupts = @import("interrupts.zig");
 pub const paging = @import("paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
+pub const scheduling = @import("scheduling.zig");
 pub const tsc = @import("tsc.zig");
 
 /// Issues an architecture specific hint to the CPU that we are spinning in a loop.
