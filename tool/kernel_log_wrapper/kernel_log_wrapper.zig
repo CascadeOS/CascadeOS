@@ -8,23 +8,28 @@ pub fn main() !void {
     }
     const allocator = if (builtin.mode == .Debug) gpa_impl.allocator() else std.heap.c_allocator;
 
-    const stdout = std.io.getStdOut();
-
     const command = try getCommand(allocator);
     defer command.deinit(allocator);
 
     var child = std.process.Child.init(command.argv, allocator);
-    child.stdout_behavior = .Pipe;
-    try child.spawn();
 
-    var stdout_wrapper = try StdoutWrapper.init(allocator, child.stdout.?);
-    defer stdout_wrapper.deinit();
+    const stdout = std.io.getStdOut();
+    const config = std.io.tty.detectConfig(stdout);
 
-    while (try stdout_wrapper.next()) |line| {
-        try handleLine(stdout, line);
+    if (config == .no_color or config == .windows_api) {
+        try child.spawn();
+    } else {
+        child.stdout_behavior = .Pipe;
+        try child.spawn();
+
+        var stdout_wrapper = try StdoutWrapper.init(allocator, child.stdout.?);
+        defer stdout_wrapper.deinit();
+
+        while (try stdout_wrapper.next()) |line| {
+            try handleLine(stdout, line);
+        }
     }
 
-    // the above loop will exit when the child closes its stdout, which usually means the child has exited
     _ = try child.wait();
 }
 
