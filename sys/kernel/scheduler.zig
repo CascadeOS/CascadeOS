@@ -107,14 +107,14 @@ fn switchToTaskFromTask(executor: *kernel.Executor, current_task: *kernel.Task, 
 fn idle() callconv(.C) noreturn {
     lock.unlock();
 
+    log.debug("entering idle", .{});
+
     const executor = arch.getCurrentExecutor();
     std.debug.assert(executor.interrupt_disable_count == 1);
 
     // TODO: correctly handle `interrupt_disable_count`
     executor.interrupt_disable_count -= 1;
     arch.interrupts.enableInterrupts();
-
-    log.debug("entering idle", .{});
 
     while (true) {
         if (!ready_to_run.isEmpty()) {
