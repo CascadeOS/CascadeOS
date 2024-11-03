@@ -11,7 +11,7 @@ options: Options,
 
 firmware: Firmware,
 
-log_wrapper_compile: ?*Step.Compile,
+kernel_log_wrapper_compile: ?*Step.Compile,
 
 const Firmware = union(enum) {
     default,
@@ -28,11 +28,11 @@ pub fn registerQemuSteps(
     options: Options,
     targets: []const CascadeTarget,
 ) !void {
-    const log_wrapper = tools.get("log_wrapper").?;
+    const kernel_log_wrapper = tools.get("kernel_log_wrapper").?;
 
-    // log wrapper will interfere with the qemu monitor
-    const log_wrapper_compile = if (!options.qemu_monitor)
-        log_wrapper.release_safe_compile_step
+    // the kernel log wrapper interferes with the qemu monitor
+    const kernel_log_wrapper_compile = if (!options.qemu_monitor)
+        kernel_log_wrapper.release_safe_compile_step
     else
         null;
 
@@ -42,7 +42,7 @@ pub fn registerQemuSteps(
         const qemu_step = try QemuStep.create(
             b,
             target,
-            log_wrapper_compile,
+            kernel_log_wrapper_compile,
             image_step.image_file,
             options,
         );
@@ -66,7 +66,7 @@ pub fn registerQemuSteps(
 fn create(
     b: *std.Build,
     target: CascadeTarget,
-    log_wrapper_compile: ?*Step.Compile,
+    kernel_log_wrapper_compile: ?*Step.Compile,
     image: std.Build.LazyPath,
     options: Options,
 ) !*QemuStep {
@@ -92,10 +92,10 @@ fn create(
         .target = target,
         .options = options,
         .firmware = if (uefi) .{ .uefi = b.dependency("edk2", .{}) } else .default,
-        .log_wrapper_compile = log_wrapper_compile,
+        .kernel_log_wrapper_compile = kernel_log_wrapper_compile,
     };
 
-    if (log_wrapper_compile) |compile| {
+    if (kernel_log_wrapper_compile) |compile| {
         compile.getEmittedBin().addStepDependencies(&self.step);
     }
     image.addStepDependencies(&self.step);
@@ -115,7 +115,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = if (self.log_wrapper_compile) |compile| run_qemu: {
+    const run_qemu = if (self.kernel_log_wrapper_compile) |compile| run_qemu: {
         const run_qemu = b.addRunArtifact(compile);
         run_qemu.addArg(qemuExecutable(self.target));
         break :run_qemu run_qemu;

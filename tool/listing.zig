@@ -11,7 +11,7 @@ pub const tools: []const ToolDescription = &[_]ToolDescription{
         },
     },
     .{
-        .name = "log_wrapper",
+        .name = "kernel_log_wrapper",
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
         },
