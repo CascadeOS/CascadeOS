@@ -13,24 +13,17 @@ pub fn callZeroArgs(
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
         ) callconv(.C) void = blk: {
             const impl = struct {
-                fn impl() callconv(.naked) noreturn {
+                fn impl() callconv(.naked) void {
                     asm volatile (
-                        \\// all other registers are saved by the caller due to the calling convention
                         \\push %rbx
                         \\push %rbp
                         \\push %r12
                         \\push %r13
                         \\push %r14
                         \\push %r15
-                        \\
-                        \\// save current stack to `previous_kernel_stack_pointer`
                         \\mov %rsp, %rax
                         \\mov %rax, (%rsi)
-                        \\
-                        \\// switch to `new_kernel_stack_pointer`
                         \\mov %rdi, %rsp
-                        \\
-                        \\// the address of `targetFunction` should be on the stack as the return address
                         \\ret
                     );
                 }
@@ -43,12 +36,9 @@ pub fn callZeroArgs(
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
         ) callconv(.C) void = blk: {
             const impl = struct {
-                fn impl() callconv(.naked) noreturn {
+                fn impl() callconv(.naked) void {
                     asm volatile (
-                        \\// switch to `new_kernel_stack_pointer`
                         \\mov %rdi, %rsp
-                        \\
-                        \\// the address of `targetFunction` should be on the stack as the return address
                         \\ret
                     );
                 }
@@ -99,15 +89,15 @@ pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kerne
 /// Saves the old task's state to allow it to be resumed later.
 ///
 /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
-pub inline fn jumpToTaskFromIdle(
+pub fn jumpToTaskFromIdle(
     task: *kernel.Task,
 ) noreturn {
     const impls = struct {
         const jumpToTaskFromIdle: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.C) noreturn = blk: {
+        ) callconv(.C) void = blk: {
             const impl = struct {
-                fn impl() callconv(.naked) noreturn {
+                fn impl() callconv(.naked) void {
                     asm volatile (
                         \\mov %rdi, %rsp
                         \\pop %r15
@@ -149,7 +139,7 @@ pub fn prepareForJumpToTaskFromTask(
 /// Saves the old task's state to allow it to be resumed later.
 ///
 /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-pub inline fn jumpToTaskFromTask(
+pub fn jumpToTaskFromTask(
     old_task: *kernel.Task,
     new_task: *kernel.Task,
 ) void {
@@ -159,30 +149,23 @@ pub inline fn jumpToTaskFromTask(
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
         ) callconv(.C) void = blk: {
             const impl = struct {
-                fn impl() callconv(.naked) noreturn {
+                fn impl() callconv(.naked) void {
                     asm volatile (
-                        \\// all other registers are saved by the caller due to the calling convention
                         \\push %rbx
                         \\push %rbp
                         \\push %r12
                         \\push %r13
                         \\push %r14
                         \\push %r15
-                        \\
-                        \\// save current stack to `previous_kernel_stack_pointer`
                         \\mov %rsp, %rax
                         \\mov %rax, (%rsi)
-                        \\
-                        \\// switch to `new_kernel_stack_pointer`
                         \\mov %rdi, %rsp
-                        \\
                         \\pop %r15
                         \\pop %r14
                         \\pop %r13
                         \\pop %r12
                         \\pop %rbp
                         \\pop %rbx
-                        \\
                         \\ret
                     );
                 }
@@ -208,14 +191,13 @@ pub fn prepareNewTaskForScheduling(
     target_function: arch.scheduling.NewTaskFunction,
 ) error{StackOverflow}!void {
     const impls = struct {
-        const startNewTaskStage1: *const fn () callconv(.C) noreturn = blk: {
+        const startNewTaskStage1: *const fn () callconv(.C) void = blk: {
             const impl = struct {
-                fn impl() callconv(.naked) noreturn {
+                fn impl() callconv(.naked) void {
                     asm volatile (
                         \\pop %rdi // task
                         \\pop %rsi // context
                         \\pop %rdx // target_function
-                        \\
                         \\ret // the return address of `startNewTaskStage2` should be on the stack
                     );
                 }
@@ -228,7 +210,7 @@ pub fn prepareNewTaskForScheduling(
             current_task: *kernel.Task,
             task_context: u64,
             target_function_addr: *const anyopaque,
-        ) callconv(.C) noreturn {
+        ) callconv(.C) void {
             kernel.scheduler.lock.unlock();
 
             const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
