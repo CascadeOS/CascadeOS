@@ -69,8 +69,10 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        // unreachable: the table is known to exist as it is checked in `registerTimeSource`
-        const description_table = kernel.acpi.getTable(acpi.HPET, 0) orelse unreachable;
+        const description_table = kernel.acpi.getTable(acpi.HPET, 0) orelse {
+            // the table is known to exist as it is checked in `registerTimeSource`
+            core.panic("hpet table missing", null);
+        };
 
         if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
 
