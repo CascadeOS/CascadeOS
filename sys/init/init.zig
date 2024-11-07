@@ -29,7 +29,7 @@ pub fn initStage1() !noreturn {
                 msg,
                 error_return_trace,
                 return_address,
-            ) catch unreachable;
+            ) catch {};
         }
     }.simplePanic;
 
@@ -125,7 +125,7 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
 
         arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
-        }) catch unreachable;
+        }) catch {};
 
         barrier.executorReady();
     } else {
@@ -147,7 +147,7 @@ pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: an
     defer globals.early_output_lock.unlock();
 
     arch.init.writeToEarlyOutput(level_and_scope);
-    arch.init.early_output_writer.print(fmt, args) catch unreachable;
+    arch.init.early_output_writer.print(fmt, args) catch {};
 }
 
 /// The interrupt handler during init.
@@ -221,7 +221,7 @@ fn handlePanic(
                 msg,
                 error_return_trace,
                 return_address,
-            ) catch unreachable;
+            ) catch {};
         },
         1 => { // on second panic print a shorter message using only `writeToEarlyOutput`
             arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n");
