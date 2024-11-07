@@ -230,7 +230,7 @@ pub fn prepareNewTaskForScheduling(
     try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));
 
     // general purpose registers
-    for (0..6) |_| task.stack.push(@as(u64, 0)) catch unreachable;
+    for (0..6) |_| try task.stack.push(@as(u64, 0));
 }
 
 const std = @import("std");
