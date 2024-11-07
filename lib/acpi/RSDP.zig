@@ -73,7 +73,7 @@ pub const RSDP = extern struct {
             const length_of_table = switch (self.revision) {
                 0 => BYTES_IN_ACPI_1_STRUCTURE,
                 2 => self.length,
-                else => unreachable,
+                else => return false,
             };
             break :blk ptr[0..length_of_table];
         };
