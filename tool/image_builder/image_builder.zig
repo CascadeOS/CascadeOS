@@ -647,7 +647,7 @@ const FATContext = struct {
                         0...4 => entry.long_file_name.first_characters[i] = char,
                         5...10 => entry.long_file_name.middle_characters[i - 5] = char,
                         11...12 => entry.long_file_name.final_characters[i - 11] = char,
-                        else => unreachable,
+                        else => return error.InvalidLongFileName,
                     }
                 }
 
