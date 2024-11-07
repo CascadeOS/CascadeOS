@@ -498,7 +498,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                         ),
                         region.range.size,
                     ),
-                    .kernel_stacks => unreachable, // never full mapped
+                    .kernel_stacks => core.panic("kernel stack region is full mapped", null),
                 };
 
                 const map_type: kernel.vmm.MapType = switch (region.type) {
@@ -506,7 +506,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                     .readonly_section, .sdf_section => .{ .global = true },
                     .writeable_section, .direct_map => .{ .writeable = true, .global = true },
                     .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
-                    .kernel_stacks => unreachable, // never full mapped
+                    .kernel_stacks => core.panic("kernel stack region is full mapped", null),
                 };
 
                 arch.paging.init.mapToPhysicalRangeAllPageSizes(
