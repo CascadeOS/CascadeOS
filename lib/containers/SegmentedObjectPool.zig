@@ -23,15 +23,13 @@ pub fn SegmentedObjectPool(
 
         /// Get an object from the pool.
         pub fn get(self: *Self) error{SegmentAllocationFailed}!*T {
-            const node = blk: {
+            const node = blk: while (true) {
                 if (self.free_list.pop()) |node| {
                     @branchHint(.likely);
                     break :blk node;
                 }
 
                 try self.allocateNewSegment();
-
-                break :blk self.free_list.pop() orelse unreachable; // `allocateNewSegment` call above ensures there is atleast one object
             };
 
             const obj: *Object = @ptrCast(node);
