@@ -74,7 +74,8 @@ fn switchToIdle(executor: *kernel.Executor, opt_current_task: ?*kernel.Task) voi
 
     arch.scheduling.callZeroArgs(opt_current_task, executor.scheduler_stack, idle) catch |err| {
         switch (err) {
-            error.StackOverflow => unreachable, // the scheduler stack is big enough
+            // the scheduler stack should be big enough
+            error.StackOverflow => core.panic("insufficent space on the scheduler stack", null),
         }
     };
 }
