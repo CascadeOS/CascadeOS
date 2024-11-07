@@ -59,7 +59,7 @@ pub fn yield(comptime mode: enum { requeue, drop }) void {
         switchToTaskFromTask(executor, current_task, new_task);
     } else {
         switchToTaskFromIdle(executor, new_task);
-        unreachable;
+        core.panic("task returned to idle", null);
     }
 }
 
@@ -90,7 +90,7 @@ fn switchToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) nore
 
     arch.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
     arch.scheduling.jumpToTaskFromIdle(new_task);
-    unreachable;
+    core.panic("task returned to idle", null);
 }
 
 fn switchToTaskFromTask(executor: *kernel.Executor, current_task: *kernel.Task, new_task: *kernel.Task) void {

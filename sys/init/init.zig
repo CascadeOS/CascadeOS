@@ -138,7 +138,8 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     // entering scheduler
     kernel.scheduler.lock.lock();
     kernel.scheduler.yield(.drop);
-    unreachable;
+
+    core.panic("scheduler returned to init", null);
 }
 
 /// The log implementation during init.
