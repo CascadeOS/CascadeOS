@@ -120,6 +120,8 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     log.debug("configuring local interrupt controller on {}", .{executor.id});
     arch.init.initLocalInterruptController();
 
+    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
+
     if (executor.id == .bootstrap) {
         barrier.waitForOthers();
 
@@ -136,23 +138,29 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
 
     // entering scheduler
-    kernel.scheduler.lock.lock();
-    kernel.scheduler.yield(.drop);
+    const held = kernel.scheduler.lockScheduler(interrupt_exclusion);
+    kernel.scheduler.yield(.drop, held);
 
     core.panic("scheduler returned to init", null);
 }
 
 /// The log implementation during init.
 pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    globals.early_output_lock.lock();
-    defer globals.early_output_lock.unlock();
+    var exclusion = kernel.sync.acquireInterruptExclusion();
+    defer exclusion.release();
+
+    var held = globals.early_output_lock.lock(exclusion);
+    defer held.unlock();
 
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch {};
 }
 
 /// The interrupt handler during init.
-fn handleInterrupt(context: arch.interrupts.InterruptContext) noreturn {
+fn handleInterrupt(
+    context: arch.interrupts.InterruptContext,
+    _: kernel.sync.InterruptExclusion,
+) noreturn {
     core.panicFmt("unexpected interrupt with context:\n{}", .{context}, null);
 }
 
@@ -171,7 +179,7 @@ fn handlePanic(
         var nested_panic_count = std.atomic.Value(usize).init(0);
     };
 
-    const executor = arch.getCurrentExecutor();
+    const executor = arch.rawGetCurrentExecutor();
     executor.panicked.store(true, .release);
 
     if (static.panicking_executor.cmpxchgStrong(

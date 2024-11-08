@@ -211,10 +211,10 @@ pub fn prepareNewTaskForScheduling(
             task_context: u64,
             target_function_addr: *const anyopaque,
         ) callconv(.C) void {
-            kernel.scheduler.lock.unlock();
+            var interrupt_exclusion = kernel.scheduler.unlockSchedulerFromOtherTask();
 
             const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
-            func(current_task, task_context);
+            func(current_task, task_context, &interrupt_exclusion);
             core.panic("task returned to entry point", null);
         }
     };

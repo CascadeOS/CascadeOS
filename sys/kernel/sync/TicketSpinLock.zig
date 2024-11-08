@@ -11,15 +11,22 @@ current: u32 = 0,
 ticket: u32 = 0,
 current_holder: kernel.Executor.Id = .none,
 
-/// Lock the spinlock.
-///
-/// **WARNING**: This lock is not interrupt safe, it is the callers responsibility to ensure that interrupts are
-/// disabled while the lock is held.
-pub fn lock(self: *TicketSpinLock) void {
-    const current_executor = arch.getCurrentExecutor();
+pub const Held = struct {
+    exclusion: kernel.sync.InterruptExclusion,
+    spinlock: *TicketSpinLock,
 
-    std.debug.assert(!arch.interrupts.areEnabled());
-    std.debug.assert(current_executor.interrupt_disable_count != 0);
+    pub fn unlock(self: *Held) void {
+        self.exclusion.validate();
+        self.spinlock.unsafeRelease();
+        self.exclusion = undefined;
+    }
+};
+
+/// Lock the spinlock with a prexisting interrupt exclusion token.
+pub fn lock(self: *TicketSpinLock, exclusion: kernel.sync.InterruptExclusion) Held {
+    exclusion.validate();
+
+    const current_executor = exclusion.executor;
 
     std.debug.assert(!self.isLockedBy(current_executor.id));
 
@@ -28,18 +35,11 @@ pub fn lock(self: *TicketSpinLock) void {
         arch.spinLoopHint();
     }
     @atomicStore(kernel.Executor.Id, &self.current_holder, current_executor.id, .release);
-}
 
-pub fn unlock(self: *TicketSpinLock) void {
-    const current_executor = arch.getCurrentExecutor();
-
-    std.debug.assert(!arch.interrupts.areEnabled());
-    std.debug.assert(current_executor.interrupt_disable_count != 0);
-
-    std.debug.assert(self.isLockedBy(current_executor.id));
-
-    @atomicStore(kernel.Executor.Id, &self.current_holder, .none, .release);
-    _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);
+    return .{
+        .exclusion = exclusion,
+        .spinlock = self,
+    };
 }
 
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
@@ -47,8 +47,16 @@ pub fn poison(self: *TicketSpinLock) void {
     _ = @atomicRmw(u32, &self.current, .Sub, 1, .acq_rel);
 }
 
-/// Returns true if the spinlock is locked by the current executor.
-fn isLockedBy(self: *const TicketSpinLock, executor_id: kernel.Executor.Id) bool {
+/// Releases the spinlock.
+///
+/// Intended to be used only when the caller needs to unlock the spinlock on behalf of another task.
+pub fn unsafeRelease(self: *TicketSpinLock) void {
+    @atomicStore(kernel.Executor.Id, &self.current_holder, .none, .release);
+    _ = @atomicRmw(u32, &self.current, .Add, 1, .acq_rel);
+}
+
+/// Returns true if the spinlock is locked by the given executor.
+pub fn isLockedBy(self: *const TicketSpinLock, executor_id: kernel.Executor.Id) bool {
     return @atomicLoad(kernel.Executor.Id, &self.current_holder, .acquire) == executor_id;
 }
 
