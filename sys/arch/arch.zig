@@ -18,7 +18,7 @@ pub fn spinLoopHint() callconv(core.inline_in_non_debug) void {
 /// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
 ///
 /// It is the callers responsibility to ensure that the current task is not re-scheduled onto another executor.
-pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
+pub fn rawGetCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
     // `checkSupport` intentionally not called - mandatory function
 
     return current.getCurrentExecutor();
@@ -58,7 +58,10 @@ pub const interrupts = struct {
         current.interrupts.enableInterrupts();
     }
 
-    pub const InterruptHandler = *const fn (context: InterruptContext) void;
+    pub const InterruptHandler = *const fn (
+        context: InterruptContext,
+        interrupt_exclusion: kernel.sync.InterruptExclusion,
+    ) void;
 
     pub const InterruptContext = current.interrupts.InterruptContext;
 };
@@ -296,7 +299,7 @@ pub const init = struct {
     pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
         checkSupport(current.init, "configurePerExecutorSystemFeatures", fn (*kernel.Executor) void);
 
-        std.debug.assert(executor == getCurrentExecutor());
+        std.debug.assert(executor == rawGetCurrentExecutor());
 
         current.init.configurePerExecutorSystemFeatures(executor);
     }
@@ -431,6 +434,7 @@ pub const scheduling = struct {
     pub const NewTaskFunction = *const fn (
         task: *kernel.Task,
         context: u64,
+        interrupt_exclusion: *kernel.sync.InterruptExclusion,
     ) noreturn;
 
     /// Prepares the given task for being scheduled.

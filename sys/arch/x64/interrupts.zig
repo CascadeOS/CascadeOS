@@ -342,7 +342,10 @@ pub const init = struct {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame);
+    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(
+        interrupt_frame.rflags.interrupt,
+    );
+    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, interrupt_exclusion);
 }
 
 var idt: Idt = .{};

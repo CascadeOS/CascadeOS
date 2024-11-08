@@ -2,10 +2,8 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Queues a task to be run by the scheduler.
-///
-/// This function must be called with the scheduler lock held.
-pub fn queueTask(task: *kernel.Task) void {
-    std.debug.assert(lock.current_holder == arch.getCurrentExecutor().id);
+pub fn queueTask(task: *kernel.Task, scheduler_held: SchedulerHeld) void {
+    scheduler_held.validate();
     std.debug.assert(task.next_task_node.next == null);
 
     task.state = .ready;
@@ -15,9 +13,10 @@ pub fn queueTask(task: *kernel.Task) void {
 /// Yield execution to the scheduler.
 ///
 /// This function must be called with the scheduler lock held.
-pub fn yield(comptime mode: enum { requeue, drop }) void {
-    const executor = arch.getCurrentExecutor();
-    std.debug.assert(lock.current_holder == executor.id);
+pub fn yield(comptime mode: enum { requeue, drop }, scheduler_held: SchedulerHeld) void {
+    scheduler_held.validate();
+
+    const executor = scheduler_held.held.exclusion.executor;
 
     const new_task_node = ready_to_run.pop() orelse {
         switch (mode) {
@@ -48,7 +47,7 @@ pub fn yield(comptime mode: enum { requeue, drop }) void {
         switch (mode) {
             .requeue => {
                 log.debug("yielding {}", .{current_task});
-                queueTask(current_task);
+                queueTask(current_task, scheduler_held);
             },
             .drop => {
                 log.debug("dropping {}", .{current_task});
@@ -61,6 +60,41 @@ pub fn yield(comptime mode: enum { requeue, drop }) void {
         switchToTaskFromIdle(executor, new_task);
         core.panic("task returned to idle", null);
     }
+}
+
+pub const SchedulerHeld = struct {
+    held: kernel.sync.TicketSpinLock.Held,
+
+    pub fn unlock(self: *SchedulerHeld) void {
+        self.held.unlock();
+    }
+
+    fn validate(scheduler_held: SchedulerHeld) void {
+        std.debug.assert(scheduler_held.held.spinlock == &lock);
+        std.debug.assert(lock.isLockedBy(arch.rawGetCurrentExecutor().id));
+    }
+};
+
+/// Lock the scheduler and produces a `SchedulerHeld`.
+///
+/// It is the caller's responsibility to call `SchedulerHeld.held.release()` when done.
+pub fn lockScheduler(exclusion: kernel.sync.InterruptExclusion) SchedulerHeld {
+    return .{
+        .held = lock.lock(exclusion),
+    };
+}
+
+/// Unlock the scheduler lock and produces a `kernel.sync.InterruptExclusion`.
+///
+/// Intended to only be called in idle or a new task.
+pub fn unlockSchedulerFromOtherTask() kernel.sync.InterruptExclusion {
+    const exclusion = kernel.sync.assertInterruptExclusion(true);
+
+    std.debug.assert(lock.isLockedBy(exclusion.executor.id));
+
+    lock.unsafeRelease();
+
+    return exclusion;
 }
 
 fn switchToIdle(executor: *kernel.Executor, opt_current_task: ?*kernel.Task) void {
@@ -106,23 +140,20 @@ fn switchToTaskFromTask(executor: *kernel.Executor, current_task: *kernel.Task, 
 }
 
 fn idle() callconv(.C) noreturn {
-    lock.unlock();
-
+    var entry_exclusion = unlockSchedulerFromOtherTask();
     log.debug("entering idle", .{});
-
-    const executor = arch.getCurrentExecutor();
-    std.debug.assert(executor.interrupt_disable_count == 1);
-
-    // TODO: correctly handle `interrupt_disable_count`
-    executor.interrupt_disable_count -= 1;
-    arch.interrupts.enableInterrupts();
+    entry_exclusion.release();
 
     while (true) {
         if (!ready_to_run.isEmpty()) {
-            lock.lock();
-            defer lock.unlock();
+            var exclusion = kernel.sync.acquireInterruptExclusion();
+            defer exclusion.release();
+
+            var held = lockScheduler(exclusion);
+            defer held.unlock();
+
             if (!ready_to_run.isEmpty()) {
-                yield(.requeue);
+                yield(.requeue, held);
             }
         }
 
@@ -130,7 +161,7 @@ fn idle() callconv(.C) noreturn {
     }
 }
 
-pub var lock: kernel.sync.TicketSpinLock = .{};
+var lock: kernel.sync.TicketSpinLock = .{};
 var ready_to_run: containers.SinglyLinkedFIFO = .{};
 
 const std = @import("std");
