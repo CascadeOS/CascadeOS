@@ -12,8 +12,8 @@
 
     .dependencies = .{
         .edk2 = .{
-            .url = "https://github.com/rust-osdev/ovmf-prebuilt/releases/download/edk2-stable202405-r1/edk2-stable202405-r1-bin.tar.xz",
-            .hash = "1220476dde5ecdbcdfb15b1358fe42447ddcf6f50e73b601ede7a9d92b932df3ad8c",
+            .url = "https://github.com/rust-osdev/ovmf-prebuilt/releases/download/edk2-stable202408-r1/edk2-stable202408-r1-bin.tar.xz",
+            .hash = "1220b2a92a363978da5dc670e67ca5f0228314638235a21570ec4d3909fd38ff2665",
         },
 
         .libdwarf = .{
