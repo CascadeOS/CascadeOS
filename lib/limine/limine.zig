@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.0.14/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.4.0/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of 97c31196a9aec28b36ed9ff64d6df77a061c3d9b (2024-09-16).
+//! This module contains the definitions of the Limine protocol as of v8.4.0.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.0.14/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.4.0/PROTOCOL.md)
 //!
+//! ffbdf54f8ee3e25c0d59e78d9d9e463869f69efe 2024-10-31
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
@@ -13,14 +14,14 @@
 pub const BaseRevison = extern struct {
     id: [2]u64 = [_]u64{ 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc },
 
-    /// The Limine boot protocol comes in several base revisions; so far, 3 base revisions
-    /// are specified: 0, 1, and 2.
+    /// The Limine boot protocol comes in several base revisions; so far, 4
+    /// base revisions are specified: 0 through 3.
     ///
     /// Base protocol revisions change certain behaviours of the Limine boot protocol
     /// outside any specific feature. The specifics are going to be described as
     /// needed throughout this specification.
     ///
-    /// Base revision 0 and 1 are considered deprecated. Base revision 0 is the default
+    /// Base revision 0 through 2 are considered deprecated. Base revision 0 is the default
     /// base revision a kernel is assumed to be requesting and complying to if no base
     /// revision tag is provided by the kernel, for backwards compatibility.
     ///
@@ -478,6 +479,12 @@ pub const SMP = extern struct {
 
 /// Memory Map Feature
 ///
+/// Note: All these memory entry types, besides usable and bootloader reclaimable,
+/// are meant to have an illustrative purpose only, and are not authoritative sources
+/// to be used as a means to find the addresses of kernel, modules, framebuffer, ACPI,
+/// or otherwise. Use the specific Limine features to do that, if available, or other
+/// discovery means.
+///
 /// Note: Memory between 0 and 0x1000 is never marked as usable memory.
 /// The kernel and modules loaded are not marked as usable memory.
 /// They are marked as Kernel/Modules. The entries are guaranteed to be sorted by
@@ -726,6 +733,9 @@ pub const KernelAddress = extern struct {
 ///
 /// Note: Information contained in the /chosen node may not reflect the information given by bootloader tags,
 /// and as such the /chosen node properties should be ignored.
+///
+/// Note: If the DTB contained `memory@...` nodes, they will get removed.
+/// Kernels may not rely on these nodes and should use the Memory Map feature instead.
 pub const DeviceTreeBlob = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0xb40ddb48fb54bac7, 0x545081493f81ffb7 },
     revision: u64 = 0,
