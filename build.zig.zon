@@ -17,12 +17,12 @@
         },
 
         .libdwarf = .{
-            .url = "git+https://github.com/davea42/libdwarf-code.git#v0.11.0",
+            .url = "git+https://github.com/davea42/libdwarf-code.git?ref=v0.11.0#285d9d34f3e9f56cc1c487d0055f6dc54a9c54a1",
             .hash = "12209c5e07806ab45de758d6343300300663df021a21c861d028044c21f207e01289",
         },
 
         .limine = .{
-            .url = "git+https://github.com/limine-bootloader/limine.git#v8.0.14-binary",
+            .url = "git+https://github.com/limine-bootloader/limine.git?ref=v8.0.14-binary#96fdf45e5d2dc06a7462a747c51021cc805e938b",
             .hash = "1220fa07991f327b59463332f06c31fbc5f376ff3a078f15c7d42444f143a1020122",
         },
     },
