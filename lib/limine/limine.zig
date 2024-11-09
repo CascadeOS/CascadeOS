@@ -43,7 +43,26 @@ pub const BaseRevison = extern struct {
     /// revision and *it* is responsible for failing to boot the kernel, in case the
     /// bootloader does not yet support the kernel's requested base revision,
     /// it is up to the kernel itself to fail (or handle the condition otherwise).
-    revison: u64,
+    ///
+    /// **WARNING**: if the requested revision is supported this is set to 0
+    revison: Revison,
+
+    pub const Revison = enum(u64) {
+        @"0" = 0,
+        @"1" = 1,
+        @"2" = 2,
+        @"3" = 3,
+
+        _,
+
+        pub fn equalToOrGreaterThan(self: Revison, other: Revison) bool {
+            return @intFromEnum(self) >= @intFromEnum(other);
+        }
+    };
+
+    comptime {
+        core.testing.expectSize(@This(), 3 * @sizeOf(u64));
+    }
 };
 
 /// The bootloader can be told to start and/or stop searching for requests (including base revision tags) in an
@@ -631,9 +650,15 @@ pub const RSDP = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
+        _address: core.Address.Raw,
 
-        /// Address of the RSDP table.
-        address: core.VirtualAddress,
+        /// Address of the RSDP table. Physical for base @intFromEnum(revision) >= 3.
+        pub fn address(self: *const Response, revision: BaseRevison.Revison) core.Address {
+            return if (revision.equalToOrGreaterThan(.@"3"))
+                .{ .physical = self._address.physical }
+            else
+                .{ .virtual = self._address.virtual };
+        }
     };
 };
 
@@ -646,12 +671,24 @@ pub const SMBIOS = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
+        _entry_32: core.Address.Raw,
+        _entry_64: core.Address.Raw,
 
-        /// Address of the 32-bit SMBIOS entry point, `null` if not present.
-        entry_32: ?*anyopaque,
+        /// Address of the 32-bit SMBIOS entry point, `null` if not present. Physical for base @intFromEnum(revision) >= 3.
+        pub fn entry32(self: *const Response, revision: BaseRevison.Revison) core.Address {
+            return if (revision.equalToOrGreaterThan(.@"3"))
+                .{ .physical = self._entry_32.physical }
+            else
+                .{ .virtual = self._entry_32.virtual };
+        }
 
-        /// Address of the 64-bit SMBIOS entry point, `null` if not present.
-        entry_64: ?*anyopaque,
+        /// Address of the 64-bit SMBIOS entry point, `null` if not present. Physical for base @intFromEnum(revision) >= 3.
+        pub fn entry64(self: *const Response, revision: BaseRevison.Revison) core.Address {
+            return if (revision.equalToOrGreaterThan(.@"3"))
+                .{ .physical = self._entry_64.physical }
+            else
+                .{ .virtual = self._entry_64.virtual };
+        }
     };
 };
 
@@ -664,9 +701,15 @@ pub const EFISystemTable = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
+        _address: core.Address.Raw,
 
-        /// Address of EFI system table.
-        address: core.VirtualAddress,
+        /// Address of EFI system table. Physical for base @intFromEnum(revision) >= 3.
+        pub fn address(self: *const Response, revision: BaseRevison.Revison) core.Address {
+            return if (revision.equalToOrGreaterThan(.@"3"))
+                .{ .physical = self._address.physical }
+            else
+                .{ .virtual = self._address.virtual };
+        }
     };
 };
 
@@ -682,8 +725,7 @@ pub const EFIMemoryMap = extern struct {
     pub const Response = extern struct {
         revision: u64,
 
-        /// Address (HHDM) of the EFI memory map..
-        memmap: core.VirtualAddress,
+        _memmap: core.Address.Raw,
 
         /// Size in bytes of the EFI memory map.
         memmap_size: core.Size,
@@ -693,6 +735,14 @@ pub const EFIMemoryMap = extern struct {
 
         /// Version of EFI memory map descriptors.
         desc_version: u64,
+
+        /// Address (HHDM for base revision <= 2, else physical) of the EFI memory map.
+        pub fn memmap(self: *const Response, revision: BaseRevison.Revison) core.Address {
+            return if (revision.equalToOrGreaterThan(.@"3"))
+                .{ .physical = self._memmap.physical }
+            else
+                .{ .virtual = self._memmap.virtual };
+        }
     };
 };
 

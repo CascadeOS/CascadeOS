@@ -173,10 +173,10 @@ pub const MemoryMapEntry = struct {
 };
 
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
-pub fn rsdp() ?core.VirtualAddress {
+pub fn rsdp() ?core.Address {
     switch (bootloader_api) {
         .limine => if (limine_requests.rsdp.response) |resp| {
-            return resp.address;
+            return resp.address(limine_requests.limine_revison);
         },
         .unknown => {},
     }

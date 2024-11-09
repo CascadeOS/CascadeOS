@@ -420,8 +420,11 @@ fn registerHeaps(memory_layout: *MemoryLayout) !core.VirtualRange {
 
 fn initializeACPITables() !void {
     const rsdp_address = boot.rsdp() orelse return error.RSDPNotProvided;
-    const rsdp = rsdp_address.toPtr(*const acpi.RSDP);
 
+    const rsdp = switch (rsdp_address) {
+        .physical => |addr| kernel.memory_layout.directMapFromPhysical(addr).toPtr(*const acpi.RSDP),
+        .virtual => |addr| addr.toPtr(*const acpi.RSDP),
+    };
     if (!rsdp.isValid()) return error.InvalidRSDP;
 
     const sdt_header = kernel.memory_layout.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
