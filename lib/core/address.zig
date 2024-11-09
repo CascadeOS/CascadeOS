@@ -3,6 +3,16 @@
 
 // TODO: Support u32 sized addresses
 
+pub const Address = union(enum) {
+    physical: core.PhysicalAddress,
+    virtual: core.VirtualAddress,
+
+    pub const Raw = extern union {
+        physical: core.PhysicalAddress,
+        virtual: core.VirtualAddress,
+    };
+};
+
 pub const PhysicalAddress = extern struct {
     value: u64,
 
