@@ -8,6 +8,7 @@ pub const Duration = @import("duration.zig").Duration;
 pub const Size = @import("size.zig").Size;
 
 const address = @import("address.zig");
+pub const Address = address.Address;
 pub const PhysicalAddress = address.PhysicalAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const VirtualAddress = address.VirtualAddress;
