@@ -298,6 +298,11 @@ pub fn x2apicEnabled() bool {
 
 fn limineEntryPoint() callconv(.C) noreturn {
     bootloader_api = .limine;
+    if (limine_requests.limine_base_revison.revison == .@"0") {
+        // limine sets the `revison` field to `0` to signal that the requested revision is supported
+        limine_requests.limine_revison = limine_requests.target_limine_revison;
+    }
+
     @call(.never_inline, @import("root").initEntryPoint, .{}) catch |err| {
         core.panicFmt("unhandled error: {s}", .{@errorName(err)}, @errorReturnTrace());
     };
@@ -305,7 +310,12 @@ fn limineEntryPoint() callconv(.C) noreturn {
 }
 
 const limine_requests = struct {
-    export var limine_revison: limine.BaseRevison = .{ .revison = 2 };
+    // TODO: update to 3, needs annoying changes as things like the ACPI RSDP are not mapped in the
+    //       HHDM from that revision onwards
+    const target_limine_revison: limine.BaseRevison.Revison = .@"2";
+    var limine_revison: limine.BaseRevison.Revison = .@"0";
+
+    export var limine_base_revison: limine.BaseRevison = .{ .revison = target_limine_revison };
     export var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
     export var kernel_address: limine.KernelAddress = .{};
     export var hhdm: limine.HHDM = .{};
