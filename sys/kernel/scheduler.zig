@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Queues a task to be run by the scheduler.
-pub fn queueTask(task: *kernel.Task, scheduler_held: SchedulerHeld) void {
+pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     scheduler_held.validate();
     std.debug.assert(task.next_task_node.next == null);
 
@@ -13,7 +13,7 @@ pub fn queueTask(task: *kernel.Task, scheduler_held: SchedulerHeld) void {
 /// Yield execution to the scheduler.
 ///
 /// This function must be called with the scheduler lock held.
-pub fn yield(comptime mode: enum { requeue, drop }, scheduler_held: SchedulerHeld) void {
+pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop }) void {
     scheduler_held.validate();
 
     const executor = scheduler_held.held.exclusion.executor;
@@ -47,7 +47,7 @@ pub fn yield(comptime mode: enum { requeue, drop }, scheduler_held: SchedulerHel
         switch (mode) {
             .requeue => {
                 log.debug("yielding {}", .{current_task});
-                queueTask(current_task, scheduler_held);
+                queueTask(scheduler_held, current_task);
             },
             .drop => {
                 log.debug("dropping {}", .{current_task});
@@ -153,7 +153,7 @@ fn idle() callconv(.C) noreturn {
             defer held.unlock();
 
             if (!ready_to_run.isEmpty()) {
-                yield(.requeue, held);
+                yield(held, .requeue);
             }
         }
 
