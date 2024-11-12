@@ -11,6 +11,26 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     ready_to_run.push(&task.next_task_node);
 }
 
+pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
+    const executor = scheduler_held.held.exclusion.executor;
+
+    const current_task: *kernel.Task = executor.current_task orelse {
+        yield(scheduler_held, .requeue);
+        return;
+    };
+
+    if (current_task.preemption_disable_count != 0) {
+        current_task.preemption_skipped = true;
+        log.debug("preemption skipped for {}", .{current_task});
+        return;
+    }
+
+    log.debug("preempting {}", .{current_task});
+    current_task.preemption_skipped = false;
+
+    yield(scheduler_held, .requeue);
+}
+
 /// Yield execution to the scheduler.
 ///
 /// This function must be called with the scheduler lock held.
@@ -39,9 +59,8 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
     if (executor.current_task) |current_task| {
         std.debug.assert(current_task != new_task);
         std.debug.assert(current_task.state == .running);
-        // TODO: reinstate these
-        // std.debug.assert(current_task.preemption_disable_count == 0);
-        // std.debug.assert(current_task.preemption_skipped == false);
+        std.debug.assert(current_task.preemption_disable_count == 0);
+        std.debug.assert(current_task.preemption_skipped == false);
 
         switch (mode) {
             .requeue => {
