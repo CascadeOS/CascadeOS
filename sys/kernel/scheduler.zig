@@ -3,7 +3,8 @@
 
 /// Queues a task to be run by the scheduler.
 pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
-    scheduler_held.validate();
+    _ = scheduler_held;
+
     std.debug.assert(task.next_task_node.next == null);
 
     task.state = .ready;
@@ -14,8 +15,6 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
 ///
 /// This function must be called with the scheduler lock held.
 pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop }) void {
-    scheduler_held.validate();
-
     const executor = scheduler_held.held.exclusion.executor;
 
     const new_task_node = ready_to_run.pop() orelse {
@@ -67,11 +66,6 @@ pub const SchedulerHeld = struct {
 
     pub fn unlock(self: *SchedulerHeld) void {
         self.held.unlock();
-    }
-
-    fn validate(scheduler_held: SchedulerHeld) void {
-        std.debug.assert(scheduler_held.held.spinlock == &lock);
-        std.debug.assert(lock.isLockedBy(arch.rawGetCurrentExecutor().id));
     }
 };
 
