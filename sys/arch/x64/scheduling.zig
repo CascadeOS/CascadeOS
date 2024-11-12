@@ -62,6 +62,140 @@ pub fn callZeroArgs(
     }
 }
 
+/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+pub fn callOneArgs(
+    opt_old_task: ?*kernel.Task,
+    new_stack: kernel.Stack,
+    arg1: anytype,
+    target_function: *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
+) arch.scheduling.CallError!void {
+    const impls = struct {
+        const callOneArgs: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
+        ) callconv(.C) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) void {
+                    asm volatile (
+                        \\push %rbx
+                        \\push %rbp
+                        \\push %r12
+                        \\push %r13
+                        \\push %r14
+                        \\push %r15
+                        \\mov %rsp, %rax
+                        \\mov %rax, (%rsi)
+                        \\mov %rdi, %rsp
+                        \\pop %rdi
+                        \\ret
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+
+        const callOneArgsNoPrevious: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+        ) callconv(.C) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) void {
+                    asm volatile (
+                        \\mov %rdi, %rsp
+                        \\pop %rdi
+                        \\ret
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+    };
+
+    var stack = new_stack;
+
+    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(arg1);
+
+    if (opt_old_task) |old_task| {
+        impls.callOneArgs(
+            stack.stack_pointer,
+            &old_task.stack.stack_pointer,
+        );
+    } else {
+        impls.callOneArgsNoPrevious(stack.stack_pointer);
+    }
+}
+
+/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+pub fn callTwoArgs(
+    opt_old_task: ?*kernel.Task,
+    new_stack: kernel.Stack,
+    arg1: anytype,
+    arg2: anytype,
+    target_function: *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
+) arch.scheduling.CallError!void {
+    const impls = struct {
+        const callTwoArgs: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
+        ) callconv(.C) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) void {
+                    asm volatile (
+                        \\push %rbx
+                        \\push %rbp
+                        \\push %r12
+                        \\push %r13
+                        \\push %r14
+                        \\push %r15
+                        \\mov %rsp, %rax
+                        \\mov %rax, (%rsi)
+                        \\mov %rdi, %rsp
+                        \\pop %rdi
+                        \\pop %rsi
+                        \\ret
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+
+        const callTwoArgsNoPrevious: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+        ) callconv(.C) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) void {
+                    asm volatile (
+                        \\mov %rdi, %rsp
+                        \\pop %rdi
+                        \\pop %rsi
+                        \\ret
+                    );
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+    };
+
+    var stack = new_stack;
+
+    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(arg2);
+    try stack.push(arg1);
+
+    if (opt_old_task) |old_task| {
+        impls.callTwoArgs(
+            stack.stack_pointer,
+            &old_task.stack.stack_pointer,
+        );
+    } else {
+        impls.callTwoArgsNoPrevious(stack.stack_pointer);
+    }
+}
+
 /// Prepares the executor for jumping to the idle state.
 pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kernel.Task) void {
     _ = old_task;
