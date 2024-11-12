@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const TicketSpinLock = @import("TicketSpinLock.zig");
+pub const WaitQueue = @import("WaitQueue.zig");
 
 /// Acquire interrupt exclusion.
 pub fn acquireInterruptExclusion() InterruptExclusion {
