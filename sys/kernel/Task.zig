@@ -13,6 +13,14 @@ stack: kernel.Stack,
 /// Used for various linked lists.
 next_task_node: containers.SingleNode = .{},
 
+/// Tracks the depth of nested preemption disables.
+preemption_disable_count: u32 = 0,
+
+/// Whenever we skip preemption, we set this to true.
+///
+/// Then when we re-enable preemption, we check this flag.
+preemption_skipped: bool = false,
+
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();
 }
