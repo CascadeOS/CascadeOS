@@ -139,7 +139,7 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
 
     // entering scheduler
     const held = kernel.scheduler.lockScheduler(interrupt_exclusion);
-    kernel.scheduler.yield(.drop, held);
+    kernel.scheduler.yield(held, .drop);
 
     core.panic("scheduler returned to init", null);
 }
