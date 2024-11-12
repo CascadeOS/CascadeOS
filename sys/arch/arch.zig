@@ -441,11 +441,11 @@ pub const scheduling = struct {
     ///
     /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
     /// the given `context`.
-    pub inline fn prepareNewTaskForScheduling(
+    pub fn prepareNewTaskForScheduling(
         task: *kernel.Task,
         context: u64,
         target_function: NewTaskFunction,
-    ) error{StackOverflow}!void {
+    ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
             *kernel.Task,
             u64,
