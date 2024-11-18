@@ -91,6 +91,30 @@ fn initStage2() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage3(executor: *kernel.Executor) !noreturn {
+    kernel.vmm.core_page_table.load();
+    arch.init.loadExecutor(executor);
+
+    log.debug("configuring per-executor system features on {}", .{executor.id});
+    arch.init.configurePerExecutorSystemFeatures(executor);
+
+    log.debug("configuring local interrupt controller on {}", .{executor.id});
+    arch.init.initLocalInterruptController();
+
+    try arch.scheduling.callOneArgs(
+        null,
+        executor.scheduler_stack,
+        executor,
+        initStage4,
+    );
+    core.panic("`init.initStage4` returned", null);
+}
+
+/// Stage 4 of kernel initialization.
+///
+/// This function is executed by all executors, including the bootstrap executor.
+///
+/// All executors are using their `scheduler_stack`.
+fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
     const barrier = struct {
         var executor_count = std.atomic.Value(usize).init(0);
 
@@ -111,17 +135,6 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
         }
     };
 
-    kernel.vmm.core_page_table.load();
-    arch.init.loadExecutor(executor);
-
-    log.debug("configuring per-executor system features on {}", .{executor.id});
-    arch.init.configurePerExecutorSystemFeatures(executor);
-
-    log.debug("configuring local interrupt controller on {}", .{executor.id});
-    arch.init.initLocalInterruptController();
-
-    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
-
     if (executor.id == .bootstrap) {
         barrier.waitForOthers();
 
@@ -135,9 +148,8 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
         barrier.waitForAll();
     }
 
-    // TODO: pass the remaining free range from `StackAllocator` to the main stack allocator
+    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
 
-    // entering scheduler
     const held = kernel.scheduler.lockScheduler(interrupt_exclusion);
     kernel.scheduler.yield(held, .drop);
 
