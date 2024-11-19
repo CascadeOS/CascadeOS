@@ -26,7 +26,7 @@ pub const Held = struct {
 pub fn lock(self: *TicketSpinLock, exclusion: kernel.sync.InterruptExclusion) Held {
     exclusion.validate();
 
-    const current_executor = exclusion.executor;
+    const current_executor = exclusion.getCurrentExecutor();
 
     std.debug.assert(!self.isLockedBy(current_executor.id));
 
