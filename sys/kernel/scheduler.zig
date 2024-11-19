@@ -12,7 +12,7 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
 }
 
 pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
-    const executor = scheduler_held.held.exclusion.executor;
+    const executor = scheduler_held.held.exclusion.getCurrentExecutor();
 
     const current_task: *kernel.Task = executor.current_task orelse {
         yield(scheduler_held, .requeue);
@@ -35,7 +35,7 @@ pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
 ///
 /// This function must be called with the scheduler lock held.
 pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop }) void {
-    const executor = scheduler_held.held.exclusion.executor;
+    const executor = scheduler_held.held.exclusion.getCurrentExecutor();
 
     const new_task_node = ready_to_run.pop() orelse {
         switch (mode) {
@@ -87,7 +87,7 @@ pub fn block(
     scheduler_held: SchedulerHeld,
     spinlock_held: kernel.sync.TicketSpinLock.Held,
 ) void {
-    const executor = scheduler_held.held.exclusion.executor;
+    const executor = scheduler_held.held.exclusion.getCurrentExecutor();
 
     std.debug.assert(executor.current_task != null);
 
@@ -134,7 +134,7 @@ pub fn lockScheduler(exclusion: kernel.sync.InterruptExclusion) SchedulerHeld {
 pub fn unlockSchedulerFromOtherTask() kernel.sync.InterruptExclusion {
     const exclusion = kernel.sync.assertInterruptExclusion(true);
 
-    std.debug.assert(lock.isLockedBy(exclusion.executor.id));
+    std.debug.assert(lock.isLockedBy(exclusion.getCurrentExecutor().id));
 
     lock.unsafeRelease();
 

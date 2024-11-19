@@ -21,7 +21,7 @@ pub const Held = struct {
             var spinlock_held = mutex.spinlock.lock(exclusion);
             defer spinlock_held.unlock();
 
-            const opt_current_task = exclusion.executor.current_task;
+            const opt_current_task = exclusion.getCurrentExecutor().current_task;
 
             std.debug.assert(mutex.locked_by == opt_current_task);
 
@@ -54,7 +54,7 @@ pub fn lock(mutex: *Mutex) Held {
 
         var spinlock_held = mutex.spinlock.lock(exclusion);
 
-        const opt_current_task = exclusion.executor.current_task;
+        const opt_current_task = exclusion.getCurrentExecutor().current_task;
 
         if (mutex.locked_by == null) {
             mutex.locked_by = opt_current_task;

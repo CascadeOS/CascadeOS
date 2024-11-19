@@ -11,36 +11,33 @@ pub fn acquireInterruptExclusion() InterruptExclusion {
 
     if (enabled) arch.interrupts.disableInterrupts();
 
-    return .{
-        .executor = arch.rawGetCurrentExecutor(),
-        .enable_on_release = enabled,
-    };
+    return .{ .enable_on_release = enabled };
 }
 
 pub fn assertInterruptExclusion(enable_on_release: bool) InterruptExclusion {
     std.debug.assert(!arch.interrupts.areEnabled());
 
-    return .{
-        .executor = arch.rawGetCurrentExecutor(),
-        .enable_on_release = enable_on_release,
-    };
+    return .{ .enable_on_release = enable_on_release };
 }
 
 pub const InterruptExclusion = struct {
-    executor: *kernel.Executor,
     enable_on_release: bool,
 
     pub fn release(self: *InterruptExclusion) void {
         self.validate();
 
         if (self.enable_on_release) arch.interrupts.enableInterrupts();
-
-        self.executor = undefined;
         self.enable_on_release = false;
     }
 
     pub fn validate(_: InterruptExclusion) void {
         std.debug.assert(!arch.interrupts.areEnabled()); // TODO: debug assert
+    }
+
+    pub fn getCurrentExecutor(self: InterruptExclusion) *kernel.Executor {
+        self.validate();
+
+        return arch.rawGetCurrentExecutor();
     }
 };
 
