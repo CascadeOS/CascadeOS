@@ -14,10 +14,7 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
 pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
     const executor = scheduler_held.held.exclusion.getCurrentExecutor();
 
-    const current_task: *kernel.Task = executor.current_task orelse {
-        yield(scheduler_held, .requeue);
-        return;
-    };
+    const current_task = executor.current_task orelse return;
 
     if (current_task.preemption_disable_count != 0) {
         current_task.preemption_skipped = true;
