@@ -141,12 +141,10 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
         arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
         }) catch {};
-
-        barrier.executorReady();
-    } else {
-        barrier.executorReady();
-        barrier.waitForAll();
     }
+
+    barrier.executorReady();
+    barrier.waitForAll();
 
     const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
 
