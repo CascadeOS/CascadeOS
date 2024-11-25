@@ -342,9 +342,7 @@ pub const init = struct {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(
-        interrupt_frame.rflags.interrupt,
-    );
+    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
     interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, interrupt_exclusion);
 }
 
