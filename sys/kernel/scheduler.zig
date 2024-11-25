@@ -139,8 +139,6 @@ pub fn unlockSchedulerFromOtherTask() kernel.sync.InterruptExclusion {
 }
 
 fn switchToIdle(executor: *kernel.Executor, opt_current_task: ?*kernel.Task) void {
-    log.debug("no tasks to run, switching to idle", .{});
-
     executor.current_task = null;
 
     if (opt_current_task) |current_task| {
@@ -169,8 +167,6 @@ fn switchToIdleWithLock(
             core.panic("task returned to idle", null);
         }
     };
-
-    log.debug("no tasks to run, switching to idle with lock", .{});
 
     executor.current_task = null;
 
