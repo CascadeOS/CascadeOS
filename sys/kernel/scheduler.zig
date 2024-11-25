@@ -53,28 +53,28 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
     const new_task = kernel.Task.fromNode(new_task_node);
     std.debug.assert(new_task.state == .ready);
 
-    if (executor.current_task) |current_task| {
-        std.debug.assert(current_task != new_task);
-        std.debug.assert(current_task.state == .running);
-        std.debug.assert(current_task.preemption_disable_count == 0);
-        std.debug.assert(current_task.preemption_skipped == false);
-
-        switch (mode) {
-            .requeue => {
-                log.debug("yielding {}", .{current_task});
-                queueTask(scheduler_held, current_task);
-            },
-            .drop => {
-                log.debug("dropping {}", .{current_task});
-                current_task.state = .dropped;
-            },
-        }
-
-        switchToTaskFromTask(executor, current_task, new_task);
-    } else {
+    const current_task = executor.current_task orelse {
         switchToTaskFromIdle(executor, new_task);
-        core.panic("task returned to idle", null);
+        core.panic("idle returned", null);
+    };
+
+    std.debug.assert(current_task != new_task);
+    std.debug.assert(current_task.state == .running);
+    std.debug.assert(current_task.preemption_disable_count == 0);
+    std.debug.assert(current_task.preemption_skipped == false);
+
+    switch (mode) {
+        .requeue => {
+            log.debug("yielding {}", .{current_task});
+            queueTask(scheduler_held, current_task);
+        },
+        .drop => {
+            log.debug("dropping {}", .{current_task});
+            current_task.state = .dropped;
+        },
     }
+
+    switchToTaskFromTask(executor, current_task, new_task);
 }
 
 /// Blocks the currently running task.
