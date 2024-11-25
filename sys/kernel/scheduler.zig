@@ -164,7 +164,7 @@ fn switchToIdleWithLock(
         ) callconv(.C) noreturn {
             spinlock.unsafeRelease();
             idle();
-            core.panic("task returned to idle", null);
+            core.panic("idle returned", null);
         }
     };
 
@@ -197,7 +197,7 @@ fn switchToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) nore
 
     arch.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
     arch.scheduling.jumpToTaskFromIdle(new_task);
-    core.panic("task returned to idle", null);
+    core.panic("task returned", null);
 }
 
 fn switchToTaskFromTask(executor: *kernel.Executor, current_task: *kernel.Task, new_task: *kernel.Task) void {
@@ -225,7 +225,7 @@ fn switchToTaskFromTaskWithLock(
         ) callconv(.C) noreturn {
             spinlock.unsafeRelease();
             arch.scheduling.jumpToTaskFromIdle(new_task_inner);
-            core.panic("task returned to idle", null);
+            core.panic("task returned", null);
         }
     };
 
