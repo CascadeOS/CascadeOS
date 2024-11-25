@@ -165,10 +165,6 @@ fn switchToIdleWithLock(
             spinlock: *kernel.sync.TicketSpinLock,
         ) callconv(.C) noreturn {
             spinlock.unsafeRelease();
-
-            var interrupt_exclusion = kernel.sync.assertInterruptExclusion(false);
-            interrupt_exclusion.release();
-
             idle();
             core.panic("task returned to idle", null);
         }
@@ -232,10 +228,6 @@ fn switchToTaskFromTaskWithLock(
             new_task_inner: *kernel.Task,
         ) callconv(.C) noreturn {
             spinlock.unsafeRelease();
-
-            var interrupt_exclusion = kernel.sync.assertInterruptExclusion(false);
-            interrupt_exclusion.release();
-
             arch.scheduling.jumpToTaskFromIdle(new_task_inner);
             core.panic("task returned to idle", null);
         }
