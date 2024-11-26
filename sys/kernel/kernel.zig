@@ -21,6 +21,7 @@ pub const memory_layout = @import("memory_layout.zig");
 pub const acpi = @import("acpi.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug.zig");
+pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
 pub const scheduler = @import("scheduler.zig");
