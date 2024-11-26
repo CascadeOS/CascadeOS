@@ -105,6 +105,7 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 }
 
 pub const initInterrupts = x64.interrupts.init.initInterrupts;
+pub const loadStandardInterruptHandlers = x64.interrupts.init.loadStandardInterruptHandlers;
 
 /// Capture any system information that is required for the architecture.
 ///
