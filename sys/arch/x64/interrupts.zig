@@ -264,6 +264,12 @@ pub const init = struct {
             .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
     }
 
+    /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
+    /// system interrupt handlers.
+    pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
+        interrupt_handlers[@intFromEnum(Interrupt.per_executor_periodic)] = &handlers.perExecutorPeriodic;
+    }
+
     pub fn loadIdt() void {
         idt.load();
     }
@@ -355,6 +361,17 @@ const handlers = struct {
     ) void {
         _ = interrupt_exclusion;
         core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
+    }
+
+    fn perExecutorPeriodic(
+        interrupt_frame: *InterruptFrame,
+        interrupt_exclusion: *kernel.sync.InterruptExclusion,
+    ) void {
+        _ = interrupt_frame;
+
+        x64.apic.eoi();
+
+        kernel.entry.onPerExecutorPeriodic(interrupt_exclusion);
     }
 };
 
