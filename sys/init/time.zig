@@ -4,11 +4,13 @@
 pub fn initializeTime() !void {
     var candidate_time_sources: CandidateTimeSources = .{};
     arch.init.registerArchitecturalTimeSources(&candidate_time_sources);
+
     const time_sources = candidate_time_sources.candidate_time_sources.slice();
 
     const reference_counter = getReferenceCounter(time_sources);
 
     configureWallclockTimeSource(time_sources, reference_counter);
+    configurePerExecutorPeriodicTimeSource(time_sources, reference_counter);
 
     log.debug(
         "time initialized {} after system bootup",
@@ -44,9 +46,10 @@ pub const CandidateTimeSources = struct {
 
         log.debug("adding time source: {s}", .{time_source.name});
         log.debug("  priority: {}", .{time_source.priority});
-        log.debug("  reference counter: {} - wall clock: {}", .{
+        log.debug("  reference counter: {} - wall clock: {} - per-executor periodic: {}", .{
             time_source.reference_counter != null,
             time_source.wallclock != null,
+            time_source.per_executor_periodic != null,
         });
     }
 };
@@ -67,6 +70,11 @@ pub const CandidateTimeSource = struct {
 
     /// Provided if the time source is usable as a wallclock.
     wallclock: ?WallclockOptions = null,
+
+    /// Provided if the time source is usable as a per-executor periodic interrupt.
+    ///
+    /// If there is only one executor then a non per-executor time source is acceptable.
+    per_executor_periodic: ?PerExecutorPeriodicOptions = null,
 
     initialized: bool = false,
 
@@ -111,6 +119,11 @@ pub const CandidateTimeSource = struct {
         elapsedFn: *const fn (value1: Tick, value2: Tick) core.Duration,
 
         pub const Tick = kernel.time.wallclock.Tick;
+    };
+
+    pub const PerExecutorPeriodicOptions = struct {
+        /// Enables a per-executor scheduler interrupt to be delivered every `period`.
+        enableInterruptFn: *const fn (period: core.Duration) void,
     };
 };
 
@@ -178,12 +191,29 @@ fn configureWallclockTimeSource(
     kernel.time.wallclock.globals.elapsedFn = wallclock_impl.elapsedFn;
 }
 
+fn configurePerExecutorPeriodicTimeSource(
+    time_sources: []CandidateTimeSource,
+    reference_counter: ReferenceCounter,
+) void {
+    const time_source = findAndInitializeTimeSource(time_sources, .{
+        .per_executor_periodic = true,
+    }, reference_counter) orelse core.panic("no per-executor periodic found", null);
+
+    log.debug("using per-executor periodic: {s}", .{time_source.name});
+
+    const per_executor_periodic_impl = time_source.per_executor_periodic.?;
+
+    kernel.time.per_executor_periodic.globals.enableInterruptFn = per_executor_periodic_impl.enableInterruptFn;
+}
+
 const TimeSourceQuery = struct {
     pre_calibrated: bool = false,
 
     reference_counter: bool = false,
 
     wallclock: bool = false,
+
+    per_executor_periodic: bool = false,
 };
 
 fn findAndInitializeTimeSource(
@@ -199,6 +229,8 @@ fn findAndInitializeTimeSource(
         if (query.reference_counter and time_source.reference_counter == null) continue;
 
         if (query.wallclock and time_source.wallclock == null) continue;
+
+        if (query.per_executor_periodic and time_source.per_executor_periodic == null) continue;
 
         if (opt_best_candidate) |best_candidate| {
             if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
