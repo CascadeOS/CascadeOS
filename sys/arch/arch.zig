@@ -60,7 +60,7 @@ pub const interrupts = struct {
 
     pub const InterruptHandler = *const fn (
         context: InterruptContext,
-        interrupt_exclusion: kernel.sync.InterruptExclusion,
+        interrupt_exclusion: *kernel.sync.InterruptExclusion,
     ) void;
 
     pub const InterruptContext = current.interrupts.InterruptContext;
