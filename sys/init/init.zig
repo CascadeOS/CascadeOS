@@ -55,7 +55,7 @@ pub fn initStage1() !noreturn {
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 fn initStage2() !noreturn {
     log.debug("initializing interrupts", .{});
-    arch.init.initInterrupts(&handleInterrupt);
+    arch.init.initInterrupts();
 
     log.debug("building memory layout", .{});
     try buildMemoryLayout();
@@ -147,7 +147,6 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
     barrier.waitForAll();
 
     const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
-
     const held = kernel.scheduler.lockScheduler(interrupt_exclusion);
     kernel.scheduler.yield(held, .drop);
 
@@ -164,14 +163,6 @@ pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: an
 
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch {};
-}
-
-/// The interrupt handler during init.
-fn handleInterrupt(
-    context: arch.interrupts.InterruptContext,
-    _: kernel.sync.InterruptExclusion,
-) noreturn {
-    core.panicFmt("unexpected interrupt with context:\n{}", .{context}, null);
 }
 
 /// The panic implementation during init.

@@ -269,12 +269,10 @@ pub const init = struct {
     }
 
     /// Ensure that any exceptions/faults that occur are handled.
-    ///
-    /// The `initial_interrupt_handler` will be set as the initial interrupt handler for all interrupts.
-    pub fn initInterrupts(initial_interrupt_handler: interrupts.InterruptHandler) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "initInterrupts", fn (interrupts.InterruptHandler) void);
+    pub fn initInterrupts() callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "initInterrupts", fn () void);
 
-        current.init.initInterrupts(initial_interrupt_handler);
+        current.init.initInterrupts();
     }
 
     /// Capture any system information that is required for the architecture.

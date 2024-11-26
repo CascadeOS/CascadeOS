@@ -244,7 +244,7 @@ pub const init = struct {
     /// Ensure that any exceptions/faults that occur are handled.
     ///
     /// The `initial_interrupt_handler` will be set as the initial interrupt handler for all interrupts.
-    pub fn initInterrupts(initial_interrupt_handler: arch.interrupts.InterruptHandler) void {
+    pub fn initInterrupts() void {
         for (raw_interrupt_handlers, 0..) |raw_handler, i| {
             idt.handlers[i].init(
                 .kernel_code,
@@ -254,7 +254,7 @@ pub const init = struct {
         }
 
         for (&interrupt_handlers) |*handler| {
-            handler.* = @ptrCast(initial_interrupt_handler);
+            handler.* = @ptrCast(&handlers.unhandledInterrupt);
         }
 
         idt.handlers[@intFromEnum(Interrupt.double_fault)]
@@ -347,6 +347,16 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
     interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, interrupt_exclusion);
 }
+
+const handlers = struct {
+    fn unhandledInterrupt(
+        interrupt_frame: *const x64.interrupts.InterruptFrame,
+        interrupt_exclusion: kernel.sync.InterruptExclusion,
+    ) void {
+        _ = interrupt_exclusion;
+        core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
+    }
+};
 
 var idt: Idt = .{};
 const raw_interrupt_handlers = init.makeRawHandlers();
