@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+/// Signal end of interrupt.
+pub inline fn eoi() void {
+    lapic.eoi();
+}
+
 pub const init = struct {
     pub fn captureApicInformation(
         fadt: *const acpi.FADT,
