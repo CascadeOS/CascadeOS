@@ -275,6 +275,14 @@ pub const init = struct {
         current.init.initInterrupts();
     }
 
+    /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
+    /// system interrupt handlers.
+    pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "loadStandardInterruptHandlers", fn () void);
+
+        current.init.loadStandardInterruptHandlers();
+    }
+
     /// Capture any system information that is required for the architecture.
     ///
     /// For example, on x64 this should capture the CPUID information.

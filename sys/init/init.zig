@@ -138,6 +138,9 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
     if (executor.id == .bootstrap) {
         barrier.waitForOthers();
 
+        log.debug("loading standard interrupt handlers", .{});
+        arch.init.loadStandardInterruptHandlers();
+
         arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
         }) catch {};
