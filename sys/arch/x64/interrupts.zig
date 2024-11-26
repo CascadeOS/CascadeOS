@@ -344,14 +344,14 @@ pub const init = struct {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
-    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, interrupt_exclusion);
+    var interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
+    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, &interrupt_exclusion);
 }
 
 const handlers = struct {
     fn unhandledInterrupt(
-        interrupt_frame: *const x64.interrupts.InterruptFrame,
-        interrupt_exclusion: kernel.sync.InterruptExclusion,
+        interrupt_frame: *InterruptFrame,
+        interrupt_exclusion: *kernel.sync.InterruptExclusion,
     ) void {
         _ = interrupt_exclusion;
         core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
