@@ -30,11 +30,11 @@ pub const InterruptExclusion = struct {
         self.enable_on_release = false;
     }
 
-    pub fn validate(_: InterruptExclusion) void {
+    pub fn validate(_: *const InterruptExclusion) void {
         std.debug.assert(!arch.interrupts.areEnabled()); // TODO: debug assert
     }
 
-    pub fn getCurrentExecutor(self: InterruptExclusion) *kernel.Executor {
+    pub fn getCurrentExecutor(self: *const InterruptExclusion) *kernel.Executor {
         self.validate();
 
         return arch.rawGetCurrentExecutor();

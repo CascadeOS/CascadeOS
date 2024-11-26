@@ -12,7 +12,7 @@ ticket: u32 = 0,
 current_holder: kernel.Executor.Id = .none,
 
 pub const Held = struct {
-    exclusion: kernel.sync.InterruptExclusion,
+    exclusion: *const kernel.sync.InterruptExclusion,
     spinlock: *TicketSpinLock,
 
     pub fn unlock(self: *Held) void {
@@ -23,7 +23,7 @@ pub const Held = struct {
 };
 
 /// Lock the spinlock with a prexisting interrupt exclusion token.
-pub fn lock(self: *TicketSpinLock, exclusion: kernel.sync.InterruptExclusion) Held {
+pub fn lock(self: *TicketSpinLock, exclusion: *const kernel.sync.InterruptExclusion) Held {
     exclusion.validate();
 
     const current_executor = exclusion.getCurrentExecutor();
