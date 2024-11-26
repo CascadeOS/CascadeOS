@@ -147,7 +147,7 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
     barrier.waitForAll();
 
     const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
-    const held = kernel.scheduler.lockScheduler(interrupt_exclusion);
+    const held = kernel.scheduler.lockScheduler(&interrupt_exclusion);
     kernel.scheduler.yield(held, .drop);
 
     core.panic("scheduler returned to init", null);
@@ -158,7 +158,7 @@ pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: an
     var exclusion = kernel.sync.acquireInterruptExclusion();
     defer exclusion.release();
 
-    var held = globals.early_output_lock.lock(exclusion);
+    var held = globals.early_output_lock.lock(&exclusion);
     defer held.unlock();
 
     arch.init.writeToEarlyOutput(level_and_scope);

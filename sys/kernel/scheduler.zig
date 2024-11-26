@@ -119,7 +119,7 @@ pub const SchedulerHeld = struct {
 /// Lock the scheduler and produces a `SchedulerHeld`.
 ///
 /// It is the caller's responsibility to call `SchedulerHeld.held.release()` when done.
-pub fn lockScheduler(exclusion: kernel.sync.InterruptExclusion) SchedulerHeld {
+pub fn lockScheduler(exclusion: *const kernel.sync.InterruptExclusion) SchedulerHeld {
     return .{
         .held = lock.lock(exclusion),
     };
@@ -262,7 +262,7 @@ fn idle() callconv(.C) noreturn {
             var exclusion = kernel.sync.acquireInterruptExclusion();
             defer exclusion.release();
 
-            var held = lockScheduler(exclusion);
+            var held = lockScheduler(&exclusion);
             defer held.unlock();
 
             if (!ready_to_run.isEmpty()) {
