@@ -45,7 +45,7 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
                 }
 
                 switchToIdle(executor, executor.current_task);
-                return;
+                core.panic("idle returned", null);
             },
         }
     };
