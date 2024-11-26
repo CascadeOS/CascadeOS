@@ -100,6 +100,12 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     log.debug("configuring local interrupt controller on {}", .{executor.id});
     arch.init.initLocalInterruptController();
 
+    log.debug(
+        "set per-executor interrupt period {} on {}",
+        .{ kernel.config.per_executor_interrupt_period, executor.id },
+    );
+    kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
+
     try arch.scheduling.callOneArgs(
         null,
         executor.scheduler_stack,
