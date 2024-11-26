@@ -206,8 +206,9 @@ pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) void {
 pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) void {
     x64.tsc.init.registerTimeSource(candidate_time_sources);
     x64.hpet.init.registerTimeSource(candidate_time_sources);
+    x64.apic.init.registerTimeSource(candidate_time_sources);
 
-    // TODO: APIC, PIT, KVMCLOCK
+    // TODO: PIT, KVMCLOCK
 }
 
 /// Initialize the local interrupt controller for the current executor.
