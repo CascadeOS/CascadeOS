@@ -11,19 +11,22 @@ pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
     ready_to_run.push(&task.next_task_node);
 }
 
-pub fn maybePreempt(scheduler_held: SchedulerHeld) void {
-    const executor = scheduler_held.held.exclusion.getCurrentExecutor();
+pub fn maybePreempt(interrupt_exclusion: *const kernel.sync.InterruptExclusion) void {
+    if (ready_to_run.isEmpty()) return;
 
-    const current_task = executor.current_task orelse return;
+    if (interrupt_exclusion.getCurrentExecutor().current_task) |current_task| {
+        if (current_task.preemption_disable_count != 0) {
+            current_task.preemption_skipped = true;
+            log.debug("preemption skipped for {}", .{current_task});
+            return;
+        }
 
-    if (current_task.preemption_disable_count != 0) {
-        current_task.preemption_skipped = true;
-        log.debug("preemption skipped for {}", .{current_task});
-        return;
+        log.debug("preempting {}", .{current_task});
+        current_task.preemption_skipped = false;
     }
 
-    log.debug("preempting {}", .{current_task});
-    current_task.preemption_skipped = false;
+    var scheduler_held = lockScheduler(interrupt_exclusion);
+    defer scheduler_held.unlock();
 
     yield(scheduler_held, .requeue);
 }

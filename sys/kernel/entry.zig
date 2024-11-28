@@ -4,10 +4,7 @@
 pub fn onPerExecutorPeriodic(interrupt_exclusion: *kernel.sync.InterruptExclusion) void {
     // TODO: do more than just preempt on every interrupt
 
-    var scheduler_held = kernel.scheduler.lockScheduler(interrupt_exclusion);
-    defer scheduler_held.unlock();
-
-    kernel.scheduler.maybePreempt(scheduler_held);
+    kernel.scheduler.maybePreempt(interrupt_exclusion);
 }
 
 const std = @import("std");
