@@ -91,6 +91,8 @@ fn initStage2() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage3(executor: *kernel.Executor) !noreturn {
+    // we can't log until we load the executor
+
     kernel.vmm.core_page_table.load();
     arch.init.loadExecutor(executor);
 
@@ -170,6 +172,8 @@ pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: an
     var held = globals.early_output_lock.lock(&exclusion);
     defer held.unlock();
 
+    // TODO: make the log output look nicer
+    exclusion.getCurrentExecutor().format("", .{}, arch.init.early_output_writer) catch {};
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch {};
 }
