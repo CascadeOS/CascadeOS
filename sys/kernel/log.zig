@@ -74,7 +74,7 @@ fn logFn(
     else
         format ++ "\n";
 
-    const level_and_scope = comptime message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
+    const level_and_scope = comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
 
     switch (log_impl) {
         .init => {
