@@ -5,7 +5,7 @@
 const min_zig_version = "0.14.0-dev.1816+20e03beae";
 
 // Ensure this is kept in sync with `build.zig.zon`
-const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 2 };
+const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 3 };
 
 pub fn build(b: *std.Build) !void {
     try disableUnsupportedSteps(b);

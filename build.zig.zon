@@ -5,7 +5,7 @@
     .name = "CascadeOS",
 
     // Ensure this is kept in sync with `build.zig`
-    .version = "0.0.2",
+    .version = "0.0.3",
 
     // Ensure this is kept in sync with `build.zig` and `README.md`
     .minimum_zig_version = "0.14.0-dev.1816+20e03beae",
