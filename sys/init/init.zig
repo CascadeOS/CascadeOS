@@ -96,16 +96,13 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
     kernel.vmm.core_page_table.load();
     arch.init.loadExecutor(executor);
 
-    log.debug("configuring per-executor system features on {}", .{executor.id});
+    log.debug("configuring per-executor system features", .{});
     arch.init.configurePerExecutorSystemFeatures(executor);
 
-    log.debug("configuring local interrupt controller on {}", .{executor.id});
+    log.debug("configuring local interrupt controller", .{});
     arch.init.initLocalInterruptController();
 
-    log.debug(
-        "set per-executor interrupt period {} on {}",
-        .{ kernel.config.per_executor_interrupt_period, executor.id },
-    );
+    log.debug("enabling per-executor interrupt", .{});
     kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
 
     try arch.scheduling.callOneArgs(
@@ -604,7 +601,7 @@ fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !voi
 
         const executor = &executors[i];
         const id: kernel.Executor.Id = @enumFromInt(i);
-        log.debug("initializing executor {}", .{id});
+        log.debug("initializing {}", .{id});
 
         executor.* = .{
             .id = id,
