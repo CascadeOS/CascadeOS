@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.4.0/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.5.0/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of v8.4.0.
+//! This module contains the definitions of the Limine protocol as of v8.5.0.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.4.0/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.5.0/PROTOCOL.md)
 //!
-//! ffbdf54f8ee3e25c0d59e78d9d9e463869f69efe 2024-10-31
+//! 0ba9919ed318067013516224283293049c3a59b9 2024-11-30
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
@@ -141,7 +141,7 @@ pub const StackSize = extern struct {
 
     response: ?*const Response = null,
 
-    /// The requested stack size (also used for SMP processors).
+    /// The requested stack size (also used for MP processors).
     stack_size: core.Size,
 
     pub const Response = extern struct {
@@ -339,11 +339,11 @@ pub const PagingMode = extern struct {
     };
 };
 
-/// SMP (multiprocessor) Feature
+/// MP (multiprocessor) Feature
 ///
 /// Notes: The presence of this request will prompt the bootloader to bootstrap the secondary processors.
 /// This will not be done if this request is not present.
-pub const SMP = extern struct {
+pub const MP = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95a67b819a1b857e, 0xa0b61b723b6a73e0 },
     revision: u64 = 0,
 
@@ -375,13 +375,13 @@ pub const SMP = extern struct {
         bsp_mpidr: u64,
 
         _cpu_count: u64,
-        _cpus: [*]*SMPInfo,
+        _cpus: [*]*MPInfo,
 
-        pub fn cpus(self: *const aarch64) []*SMPInfo {
+        pub fn cpus(self: *const aarch64) []*MPInfo {
             return self._cpus[0..self._cpu_count];
         }
 
-        pub const SMPInfo = extern struct {
+        pub const MPInfo = extern struct {
             /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems)
             processor_id: u32,
 
@@ -395,12 +395,12 @@ pub const SMP = extern struct {
             /// An atomic write to this field causes the parked CPU to jump to the written address,
             /// on a 64KiB (or Stack Size Request size) stack
             ///
-            /// A pointer to the `SMPInfo` structure of the CPU is passed in X0.
+            /// A pointer to the `MPInfo` structure of the CPU is passed in X0.
             ///
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
             ///
             /// This field is unused for the structure describing the bootstrap processor.
-            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+            goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.C) noreturn,
 
             /// A free for use field
             extra_argument: u64,
@@ -417,13 +417,13 @@ pub const SMP = extern struct {
         bsp_hartid: u64,
 
         _cpu_count: u64,
-        _cpus: [*]*SMPInfo,
+        _cpus: [*]*MPInfo,
 
-        pub fn cpus(self: *const riscv64) []*SMPInfo {
+        pub fn cpus(self: *const riscv64) []*MPInfo {
             return self._cpus[0..self._cpu_count];
         }
 
-        pub const SMPInfo = extern struct {
+        pub const MPInfo = extern struct {
             /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems).
             processor_id: u32,
 
@@ -435,12 +435,12 @@ pub const SMP = extern struct {
             /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB
             /// (or Stack Size Request size) stack.
             ///
-            /// A pointer to the `SMPInfo` structure of the CPU is passed in x10(a0).
+            /// A pointer to the `MPInfo` structure of the CPU is passed in x10(a0).
             ///
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
             ///
             /// This field is unused for the structure describing the bootstrap processor.
-            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+            goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.C) noreturn,
 
             /// A free for use field
             extra_argument: u64,
@@ -456,7 +456,7 @@ pub const SMP = extern struct {
         bsp_lapic_id: u32,
 
         _cpu_count: u64,
-        _cpus: [*]*SMPInfo,
+        _cpus: [*]*MPInfo,
 
         pub const ResponseFlags = packed struct(u32) {
             /// X2APIC has been enabled
@@ -464,11 +464,11 @@ pub const SMP = extern struct {
             _: u31 = 0,
         };
 
-        pub fn cpus(self: *const x86_64) []*SMPInfo {
+        pub fn cpus(self: *const x86_64) []*MPInfo {
             return self._cpus[0..self._cpu_count];
         }
 
-        pub const SMPInfo = extern struct {
+        pub const MPInfo = extern struct {
             /// ACPI Processor UID as specified by the MADT
             processor_id: u32,
 
@@ -480,7 +480,7 @@ pub const SMP = extern struct {
             /// An atomic write to this field causes the parked CPU to jump to the written address,
             /// on a 64KiB (or Stack Size Request size) stack.
             ///
-            /// A pointer to the `SMPInfo` structure of the CPU is passed in RDI.
+            /// A pointer to the `MPInfo` structure of the CPU is passed in RDI.
             ///
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
             ///
@@ -488,7 +488,7 @@ pub const SMP = extern struct {
             ///
             /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
             /// processor.
-            goto_address: ?*const fn (smp_info: *const SMPInfo) callconv(.C) noreturn,
+            goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.C) noreturn,
 
             /// A free for use field
             extra_argument: u64,
@@ -725,7 +725,8 @@ pub const EFIMemoryMap = extern struct {
     pub const Response = extern struct {
         revision: u64,
 
-        _memmap: core.Address.Raw,
+        /// Address (HHDM, in bootloader reclaimable memory) of the EFI memory map.
+        memmap: core.VirtualAddress,
 
         /// Size in bytes of the EFI memory map.
         memmap_size: core.Size,
@@ -735,14 +736,6 @@ pub const EFIMemoryMap = extern struct {
 
         /// Version of EFI memory map descriptors.
         desc_version: u64,
-
-        /// Address (HHDM for base revision <= 2, else physical) of the EFI memory map.
-        pub fn memmap(self: *const Response, revision: BaseRevison.Revison) core.Address {
-            return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = self._memmap.physical }
-            else
-                .{ .virtual = self._memmap.virtual };
-        }
     };
 };
 
@@ -795,7 +788,7 @@ pub const DeviceTreeBlob = extern struct {
     pub const Response = extern struct {
         revision: u64,
 
-        /// Virtual pointer to the device tree blob.
+        /// Virtual (HHDM) pointer to the device tree blob, in bootloader reclaimable memory.
         address: core.VirtualAddress,
     };
 };

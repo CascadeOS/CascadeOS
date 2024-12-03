@@ -38,7 +38,7 @@ pub fn rsdp() ?core.Address {
 pub fn x2apicEnabled() bool {
     std.debug.assert(@import("cascade_target").arch == .x64);
 
-    const resp: *const limine.SMP.x86_64 = requests.smp.response orelse
+    const resp: *const limine.MP.x86_64 = requests.smp.response orelse
         return false;
 
     return resp.flags.x2apic_enabled;
@@ -125,10 +125,10 @@ pub fn cpuDescriptors() ?boot.CpuDescriptors {
 
 pub const CpuDescriptorIterator = struct {
     index: usize,
-    entries: []*limine.SMP.Response.SMPInfo,
+    entries: []*limine.MP.Response.MPInfo,
 
     pub const Descriptor = struct {
-        smp_info: *limine.SMP.Response.SMPInfo,
+        smp_info: *limine.MP.Response.MPInfo,
     };
 
     pub fn count(cpu_descriptors: *const boot.CpuDescriptors) usize {
@@ -162,7 +162,7 @@ pub const CpuDescriptorIterator = struct {
         comptime targetFn: fn (user_data: *anyopaque) noreturn,
     ) void {
         const trampolineFn = struct {
-            fn trampolineFn(smp_info: *const limine.SMP.Response.SMPInfo) callconv(.C) noreturn {
+            fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.C) noreturn {
                 targetFn(@ptrFromInt(smp_info.extra_argument));
             }
         }.trampolineFn;
@@ -178,7 +178,7 @@ pub const CpuDescriptorIterator = struct {
         );
 
         @atomicStore(
-            ?*const fn (*const limine.SMP.Response.SMPInfo) callconv(.C) noreturn,
+            ?*const fn (*const limine.MP.Response.MPInfo) callconv(.C) noreturn,
             &smp_info.goto_address,
             &trampolineFn,
             .release,
@@ -219,7 +219,7 @@ const requests = struct {
     var hhdm: limine.HHDM = .{};
     var memmap: limine.Memmap = .{};
     var rsdp: limine.RSDP = .{};
-    var smp: limine.SMP = .{ .flags = .{ .x2apic = true } };
+    var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
 };
 
 const std = @import("std");
