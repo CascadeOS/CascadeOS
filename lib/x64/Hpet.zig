@@ -230,28 +230,7 @@ pub const timer_comparator_register_base_offset: usize = 0x108 / @sizeOf(u64);
 pub const timer_fsb_interrupt_route_register_base_offset: usize = 0x110 / @sizeOf(u64);
 
 comptime {
-    refAllDeclsRecursive(@This());
-}
-
-// Copy of `std.testing.refAllDeclsRecursive`, being in the file give access to private decls.
-fn refAllDeclsRecursive(comptime T: type) void {
-    if (!@import("builtin").is_test) return;
-
-    inline for (switch (@typeInfo(T)) {
-        .@"struct" => |info| info.decls,
-        .@"enum" => |info| info.decls,
-        .@"union" => |info| info.decls,
-        .@"opaque" => |info| info.decls,
-        else => @compileError("Expected struct, enum, union, or opaque type, found '" ++ @typeName(T) ++ "'"),
-    }) |decl| {
-        if (@TypeOf(@field(T, decl.name)) == type) {
-            switch (@typeInfo(@field(T, decl.name))) {
-                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
-                else => {},
-            }
-        }
-        _ = &@field(T, decl.name);
-    }
+    std.testing.refAllDeclsRecursive(@This());
 }
 
 const core = @import("core");
