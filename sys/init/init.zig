@@ -64,7 +64,10 @@ fn initStage2() !noreturn {
     try initializeACPITables();
 
     log.debug("capturing system information", .{});
-    try arch.init.captureSystemInformation();
+    try arch.init.captureSystemInformation(switch (cascade_target) {
+        .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
+        else => .{},
+    });
 
     log.debug("configuring global system features", .{});
     try arch.init.configureGlobalSystemFeatures();
@@ -671,3 +674,4 @@ const acpi = @import("acpi");
 const MemoryLayout = @import("MemoryLayout.zig");
 const StackAllocator = @import("StackAllocator.zig");
 const PMM = @import("PMM.zig");
+const cascade_target = @import("cascade_target").arch;

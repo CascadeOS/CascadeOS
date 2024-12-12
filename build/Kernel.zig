@@ -331,9 +331,6 @@ fn constructKernelExe(
 
     arch_module.addImport("kernel", kernel_module);
     arch_module.addImport("init", init_module);
-    // TODO: this import is currently only needed to find out if the bootloader enabled x2apic on x64
-    //       we should find a better way to do this so we can remove this import
-    arch_module.addImport("boot", boot_module);
     boot_module.addImport("arch", arch_module);
     init_module.addImport("arch", arch_module);
     init_module.addImport("kernel", kernel_module);

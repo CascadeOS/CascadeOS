@@ -283,13 +283,25 @@ pub const init = struct {
         current.init.loadStandardInterruptHandlers();
     }
 
+    pub const CaptureSystemInformationOptions: type =
+        if (@hasDecl(current.init, "CaptureSystemInformationOptions"))
+        current.init.CaptureSystemInformationOptions
+    else
+        struct {};
+
     /// Capture any system information that is required for the architecture.
     ///
     /// For example, on x64 this should capture the CPUID information.
-    pub fn captureSystemInformation() callconv(core.inline_in_non_debug) !void {
-        checkSupport(current.init, "captureSystemInformation", fn () anyerror!void);
+    pub fn captureSystemInformation(
+        options: CaptureSystemInformationOptions,
+    ) callconv(core.inline_in_non_debug) !void {
+        checkSupport(
+            current.init,
+            "captureSystemInformation",
+            fn (CaptureSystemInformationOptions) anyerror!void,
+        );
 
-        return current.init.captureSystemInformation();
+        return current.init.captureSystemInformation(options);
     }
 
     /// Configure any global system features.
@@ -498,7 +510,7 @@ pub const scheduling = struct {
     }
 };
 
-const current = switch (@import("cascade_target").arch) {
+const current = switch (cascade_target) {
     // x64 is first to help zls, atleast while x64 is the main target.
     .x64 => @import("x64/x64.zig"),
     .arm64 => @import("arm64/arm64.zig"),
@@ -513,7 +525,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        core.panic(comptime "`" ++ @tagName(@import("cascade_target").arch) ++ "` does not implement `" ++ name ++ "`", null);
+        core.panic(comptime "`" ++ @tagName(cascade_target) ++ "` does not implement `" ++ name ++ "`", null);
     }
 
     const DeclT = @TypeOf(@field(Container, name));
@@ -560,3 +572,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const init_time = @import("init").time;
+const cascade_target = @import("cascade_target").arch;

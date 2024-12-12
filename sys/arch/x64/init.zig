@@ -107,10 +107,16 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 pub const initInterrupts = x64.interrupts.init.initInterrupts;
 pub const loadStandardInterruptHandlers = x64.interrupts.init.loadStandardInterruptHandlers;
 
+pub const CaptureSystemInformationOptions = struct {
+    x2apic_enabled: bool,
+};
+
 /// Capture any system information that is required for the architecture.
 ///
 /// For example, on x64 this should capture the CPUID information.
-pub fn captureSystemInformation() !void {
+pub fn captureSystemInformation(
+    options: CaptureSystemInformationOptions,
+) !void {
     log.debug("capturing cpuid information", .{});
     try captureCPUIDInformation();
 
@@ -124,7 +130,7 @@ pub fn captureSystemInformation() !void {
     captureMADTInformation(madt);
 
     log.debug("capturing APIC information", .{});
-    x64.apic.init.captureApicInformation(fadt, madt);
+    x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
 }
 
 fn captureCPUIDInformation() !void {

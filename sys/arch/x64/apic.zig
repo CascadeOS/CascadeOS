@@ -10,8 +10,9 @@ pub const init = struct {
     pub fn captureApicInformation(
         fadt: *const acpi.FADT,
         madt: *const acpi.MADT,
+        x2apic_enabled: bool,
     ) void {
-        if (boot.x2apicEnabled()) {
+        if (x2apic_enabled) {
             lapic = .x2apic;
         } else {
             // FIXME: if this is changed to union initialization then zig panics
@@ -152,5 +153,4 @@ const lib_x64 = @import("lib_x64");
 const log = kernel.log.scoped(.apic);
 const arch = @import("arch");
 const acpi = @import("acpi");
-const boot = @import("boot");
 const init_time = @import("init").time;
