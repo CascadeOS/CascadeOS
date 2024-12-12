@@ -94,7 +94,7 @@ pub const MemoryMapIterator = struct {
             .range = .fromAddr(limine_entry.base, limine_entry.length),
             .type = switch (limine_entry.type) {
                 .usable => .free,
-                .kernel_and_modules, .framebuffer => .in_use,
+                .executable_and_modules, .framebuffer => .in_use,
                 .reserved, .acpi_nvs => .reserved,
                 .bootloader_reclaimable => .bootloader_reclaimable,
                 .acpi_reclaimable => .acpi_reclaimable,
@@ -215,7 +215,7 @@ var limine_revison: limine.BaseRevison.Revison = .@"0";
 const requests = struct {
     var limine_base_revison: limine.BaseRevison = .{ .revison = target_limine_revison };
     var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
-    var kernel_address: limine.KernelAddress = .{};
+    var kernel_address: limine.ExecutableAddress = .{};
     var hhdm: limine.HHDM = .{};
     var memmap: limine.Memmap = .{};
     var rsdp: limine.RSDP = .{};

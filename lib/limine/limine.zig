@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.5.0/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.6.0/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of v8.5.0.
+//! This module contains the definitions of the Limine protocol as of v8.6.0.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.5.0/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.6.0/PROTOCOL.md)
 //!
-//! 0ba9919ed318067013516224283293049c3a59b9 2024-11-30
+//! 3ae5dd792357dcdc3721af34bb04bfbaeba806cc 2024-12-08
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
@@ -22,27 +22,27 @@ pub const BaseRevison = extern struct {
     /// needed throughout this specification.
     ///
     /// Base revision 0 through 2 are considered deprecated. Base revision 0 is the default
-    /// base revision a kernel is assumed to be requesting and complying to if no base
-    /// revision tag is provided by the kernel, for backwards compatibility.
+    /// base revision an executable is assumed to be requesting and complying to if no base
+    /// revision tag is provided by the executable, for backwards compatibility.
     ///
-    /// A base revision tag is a set of 3 64-bit values placed somewhere in the loaded kernel
+    /// A base revision tag is a set of 3 64-bit values placed somewhere in the loaded executable
     /// image on an 8-byte aligned boundary; the first 2 values are a magic number
     /// for the bootloader to be able to identify the tag, and the last value is the
     /// requested base revision number. Lack of base revision tag implies revision 0.
     ///
     /// If a bootloader drops support for an older base revision, the bootloader must
-    /// fail to boot a kernel requesting such base revision. If a bootloader does not yet
+    /// fail to boot an executable requesting such base revision. If a bootloader does not yet
     /// support a requested base revision (i.e. if the requested base revision is higher
-    /// than the maximum base revision supported), it must boot the kernel using any
-    /// arbitrary revision it supports, and communicate failure to comply to the kernel by
+    /// than the maximum base revision supported), it must boot the executable using any
+    /// arbitrary revision it supports, and communicate failure to comply to the executable by
     /// *leaving the 3rd component of the base revision tag unchanged*.
-    /// On the other hand, if the kernel's requested base revision is supported,
+    /// On the other hand, if the executable's requested base revision is supported,
     /// *the 3rd component of the base revision tag must be set to 0 by the bootloader*.
     ///
     /// Note: this means that unlike when the bootloader drops support for an older base
-    /// revision and *it* is responsible for failing to boot the kernel, in case the
-    /// bootloader does not yet support the kernel's requested base revision,
-    /// it is up to the kernel itself to fail (or handle the condition otherwise).
+    /// revision and *it* is responsible for failing to boot the executable, in case the
+    /// bootloader does not yet support the executable's requested base revision,
+    /// it is up to the executable itself to fail (or handle the condition otherwise).
     ///
     /// **WARNING**: if the requested revision is supported this is set to 0
     revison: Revison,
@@ -129,6 +129,7 @@ pub const FirmwareType = extern struct {
         x86_bios = 0,
         uefi_32 = 1,
         uefi_64 = 2,
+        sbi = 3,
 
         _,
     };
@@ -249,11 +250,11 @@ pub const Framebuffer = extern struct {
 
 /// Paging Mode Feature
 ///
-/// The Paging Mode feature allows the kernel to control which paging mode is enabled before control is passed to it.
+/// The Paging Mode feature allows the executable to control which paging mode is enabled before control is passed to it.
 ///
 /// The response indicates which paging mode was actually enabled by the bootloader.
 ///
-/// Kernels must be prepared to handle the case where the requested paging mode is not supported by the hardware.
+/// Executables must be prepared to handle the case where the requested paging mode is not supported by the hardware.
 ///
 /// If no Paging Mode Request is provided, the values of `mode`, `max_mode`, and `min_mode` that the bootloader assumes
 /// are `PagingMode.default_mode`, `PagingMode.max_mode`, and `PagingMode.min_mode`, respectively.
@@ -291,7 +292,7 @@ pub const PagingMode = extern struct {
 
         /// Which paging mode was actually enabled by the bootloader.
         ///
-        /// Kernels must be prepared to handle the case where the requested paging mode is not supported by the hardware.
+        /// Executables must be prepared to handle the case where the requested paging mode is not supported by the hardware.
         mode: Mode,
     };
 
@@ -498,21 +499,23 @@ pub const MP = extern struct {
 
 /// Memory Map Feature
 ///
-/// Note: All these memory entry types, besides usable and bootloader reclaimable,
+/// All these memory entry types, besides usable and bootloader reclaimable,
 /// are meant to have an illustrative purpose only, and are not authoritative sources
-/// to be used as a means to find the addresses of kernel, modules, framebuffer, ACPI,
+/// to be used as a means to find the addresses of the executable, modules, framebuffer, ACPI,
 /// or otherwise. Use the specific Limine features to do that, if available, or other
 /// discovery means.
 ///
-/// Note: Memory between 0 and 0x1000 is never marked as usable memory.
-/// The kernel and modules loaded are not marked as usable memory.
-/// They are marked as Kernel/Modules. The entries are guaranteed to be sorted by
-/// base address, lowest to highest. Usable and bootloader reclaimable entries
-/// are guaranteed to be 4096 byte aligned for both base and length. Usable and
-/// bootloader reclaimable entries are guaranteed not to overlap with any other
-/// entry. To the contrary, all non-usable entries (including kernel/modules) are
-/// not guaranteed any alignment, nor is it guaranteed that they do not overlap
-/// other entries.
+/// For base revisions <= 2, memory between 0 and 0x1000 is never marked as usable memory.
+///
+/// The executable and modules loaded are not marked as usable memory, but as Executable/Modules.
+///
+/// The entries are guaranteed to be sorted by base address, lowest to highest.
+///
+/// Usable and bootloader reclaimable entries are guaranteed to be 4096 byte aligned for both base and length.
+///
+/// Usable and bootloader reclaimable entries are guaranteed not to overlap with any other entry.
+/// To the contrary, all non-usable entries (including executable/modules) are not guaranteed any alignment,
+/// nor is it guaranteed that they do not overlap other entries.
 pub const Memmap = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x67cf3d9d378a806f, 0xe304acdfc50c3c62 },
     revision: u64 = 0,
@@ -545,7 +548,7 @@ pub const Memmap = extern struct {
             acpi_nvs = 3,
             bad_memory = 4,
             bootloader_reclaimable = 5,
-            kernel_and_modules = 6,
+            executable_and_modules = 6,
             framebuffer = 7,
             _,
         };
@@ -567,8 +570,8 @@ pub const EntryPoint = extern struct {
     };
 };
 
-/// Kernel File Feature
-pub const KernelFile = extern struct {
+/// Executable File Feature
+pub const ExecutableFile = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0xad97e90e83f1ed67, 0x31eb5d1c5ff23b69 },
     revision: u64 = 0,
 
@@ -576,7 +579,7 @@ pub const KernelFile = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
-        kernel_file: *const File,
+        executable_file: *const File,
     };
 };
 
@@ -616,7 +619,7 @@ pub const Module = extern struct {
     pub const InternalModule = extern struct {
         /// Path to the module to load.
         ///
-        /// This path is relative to the location of the kernel.
+        /// This path is relative to the location of the executable.
         path: [*:0]const u8,
 
         /// Command line for the given module.
@@ -754,8 +757,8 @@ pub const BootTime = extern struct {
     };
 };
 
-/// Kernel Address Feature
-pub const KernelAddress = extern struct {
+/// Executable Address Feature
+pub const ExecutableAddress = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x71ba76863cc55f63, 0xb2644a48c516a487 },
     revision: u64 = 0,
 
@@ -764,10 +767,10 @@ pub const KernelAddress = extern struct {
     pub const Response = extern struct {
         revision: u64,
 
-        /// The physical base address of the kernel.
+        /// The physical base address of the executable.
         physical_base: core.PhysicalAddress,
 
-        /// The virtual base address of the kernel.
+        /// The virtual base address of the executable.
         virtual_base: core.VirtualAddress,
     };
 };
@@ -778,7 +781,7 @@ pub const KernelAddress = extern struct {
 /// and as such the /chosen node properties should be ignored.
 ///
 /// Note: If the DTB contained `memory@...` nodes, they will get removed.
-/// Kernels may not rely on these nodes and should use the Memory Map feature instead.
+/// Executable may not rely on these nodes and should use the Memory Map feature instead.
 pub const DeviceTreeBlob = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0xb40ddb48fb54bac7, 0x545081493f81ffb7 },
     revision: u64 = 0,
@@ -790,6 +793,23 @@ pub const DeviceTreeBlob = extern struct {
 
         /// Virtual (HHDM) pointer to the device tree blob, in bootloader reclaimable memory.
         address: core.VirtualAddress,
+    };
+};
+
+/// RISC-V BSP Hart ID Feature
+///
+/// This request contains the same information as `MP.riscv64.bsp_hartid`, but doesn't boot up other APs.
+pub const BSPHartID = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x1369359f025525f9, 0x2ff2a56178391bb6 },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// The Hart ID of the boot processor.
+        bsp_hartid: u64,
     };
 };
 
