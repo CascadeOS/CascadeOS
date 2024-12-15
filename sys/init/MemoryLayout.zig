@@ -5,7 +5,7 @@ const MemoryLayout = @This();
 
 regions: *Regions,
 
-pub fn append(self: *MemoryLayout, region: Region) !void {
+pub fn append(self: *MemoryLayout, region: KernelMemoryRegion) !void {
     try self.regions.append(region);
     self.sortMemoryLayout();
 }
@@ -57,8 +57,8 @@ pub fn findFreeRange(self: *MemoryLayout, size: core.Size, alignment: core.Size)
 
 /// Sorts the kernel memory layout from lowest to highest address.
 fn sortMemoryLayout(self: *MemoryLayout) void {
-    std.mem.sort(Region, self.regions.slice(), {}, struct {
-        fn lessThanFn(context: void, region: Region, other_region: Region) bool {
+    std.mem.sort(KernelMemoryRegion, self.regions.slice(), {}, struct {
+        fn lessThanFn(context: void, region: KernelMemoryRegion, other_region: KernelMemoryRegion) bool {
             _ = context;
             return region.range.address.lessThan(other_region.range.address);
         }
@@ -71,5 +71,5 @@ const kernel = @import("kernel");
 const boot = @import("boot");
 const log = kernel.log.scoped(.init_memory_layout);
 const arch = @import("arch");
-const Regions = kernel.memory_layout.Regions;
-const Region = kernel.memory_layout.Region;
+const Regions = kernel.mem.Regions;
+const KernelMemoryRegion = kernel.mem.KernelMemoryRegion;

@@ -96,7 +96,7 @@ fn initStage2() !noreturn {
 fn initStage3(executor: *kernel.Executor) !noreturn {
     // we can't log until we load the executor
 
-    kernel.mem.core_page_table.load();
+    kernel.mem.globals.core_page_table.load();
     arch.init.loadExecutor(executor);
 
     log.debug("configuring per-executor system features", .{});
@@ -258,14 +258,14 @@ fn handlePanic(
 /// Called very early so cannot log.
 fn earlyPartialMemoryLayout() !void {
     const base_address = boot.kernelBaseAddress() orelse return error.NoKernelBaseAddress;
-    kernel.memory_layout.globals.virtual_base_address = base_address.virtual;
+    kernel.mem.globals.virtual_base_address = base_address.virtual;
 
-    kernel.memory_layout.globals.virtual_offset = core.Size.from(
+    kernel.mem.globals.virtual_offset = core.Size.from(
         base_address.virtual.value - kernel.config.kernel_base_address.value,
         .byte,
     );
 
-    kernel.memory_layout.globals.physical_to_virtual_offset = core.Size.from(
+    kernel.mem.globals.physical_to_virtual_offset = core.Size.from(
         base_address.virtual.value - base_address.physical.value,
         .byte,
     );
@@ -288,7 +288,7 @@ fn earlyPartialMemoryLayout() !void {
         break :direct_map_size direct_map_size;
     };
 
-    kernel.memory_layout.globals.direct_map = core.VirtualRange.fromAddr(
+    kernel.mem.globals.direct_map = core.VirtualRange.fromAddr(
         boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
         direct_map_size,
     );
@@ -297,7 +297,7 @@ fn earlyPartialMemoryLayout() !void {
 fn buildMemoryLayout() !void {
     const memory_layout = blk: {
         globals.memory_layout = .{
-            .regions = &kernel.memory_layout.globals.regions,
+            .regions = &kernel.mem.globals.regions,
         };
         break :blk &globals.memory_layout;
     };
@@ -336,7 +336,7 @@ fn registerKernelSections(memory_layout: *MemoryLayout) !void {
     const sections: []const struct {
         core.VirtualAddress,
         core.VirtualAddress,
-        kernel.memory_layout.Region.Type,
+        kernel.mem.KernelMemoryRegion.Type,
     } = &.{
         .{
             core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
@@ -382,7 +382,7 @@ fn registerKernelSections(memory_layout: *MemoryLayout) !void {
 }
 
 fn registerDirectMaps(memory_layout: *MemoryLayout) !void {
-    const direct_map = kernel.memory_layout.globals.direct_map;
+    const direct_map = kernel.mem.globals.direct_map;
 
     // does the direct map range overlap a pre-existing region?
     for (memory_layout.regions.constSlice()) |region| {
@@ -408,7 +408,7 @@ fn registerDirectMaps(memory_layout: *MemoryLayout) !void {
         arch.paging.largest_page_size,
     ) orelse return error.NoFreeRangeForDirectMap;
 
-    kernel.memory_layout.globals.non_cached_direct_map = non_cached_direct_map;
+    kernel.mem.globals.non_cached_direct_map = non_cached_direct_map;
 
     try memory_layout.append(.{
         .range = non_cached_direct_map,
@@ -436,19 +436,19 @@ fn initializeACPITables() !void {
     const rsdp_address = boot.rsdp() orelse return error.RSDPNotProvided;
 
     const rsdp = switch (rsdp_address) {
-        .physical => |addr| kernel.memory_layout.directMapFromPhysical(addr).toPtr(*const acpi.RSDP),
+        .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const acpi.RSDP),
         .virtual => |addr| addr.toPtr(*const acpi.RSDP),
     };
     if (!rsdp.isValid()) return error.InvalidRSDP;
 
-    const sdt_header = kernel.memory_layout.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
+    const sdt_header = kernel.mem.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
 
     if (!sdt_header.isValid()) return error.InvalidSDT;
 
     if (log.levelEnabled(.debug)) {
         var iter = acpi.tableIterator(
             sdt_header,
-            kernel.memory_layout.directMapFromPhysical,
+            kernel.mem.directMapFromPhysical,
         );
 
         log.debug("ACPI tables:", .{});
@@ -511,7 +511,9 @@ fn initializePMM(pmm: *PMM) !void {
 fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void {
     log.debug("building core page table", .{});
 
-    kernel.mem.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
+    kernel.mem.globals.core_page_table = arch.paging.PageTable.create(
+        try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size),
+    );
 
     for (memory_layout.regions.constSlice()) |region| {
         switch (region.operation) {
@@ -520,7 +522,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                     .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
                     .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
                         core.PhysicalAddress.fromInt(
-                            region.range.address.value - kernel.memory_layout.globals.physical_to_virtual_offset.value,
+                            region.range.address.value - kernel.mem.globals.physical_to_virtual_offset.value,
                         ),
                         region.range.size,
                     ),
@@ -536,7 +538,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                 };
 
                 arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                    kernel.mem.core_page_table,
+                    kernel.mem.globals.core_page_table,
                     region.range,
                     physical_range,
                     map_type,
@@ -545,7 +547,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                 );
             },
             .top_level_map => arch.paging.init.fillTopLevel(
-                kernel.mem.core_page_table,
+                kernel.mem.globals.core_page_table,
                 region.range,
                 .{ .global = true, .writeable = true },
                 AllocatePageContext{ .pmm = pmm },
@@ -554,7 +556,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
         }
     }
 
-    kernel.mem.core_page_table.load();
+    kernel.mem.globals.core_page_table.load();
 }
 
 /// Initialize the per executor data structures for all executors including the bootstrap executor.
@@ -577,7 +579,7 @@ fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !voi
             const stack = context.stack_allocator.allocate();
 
             arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                kernel.mem.core_page_table,
+                kernel.mem.globals.core_page_table,
                 stack.usable_range,
                 physical_range,
                 .{ .global = true, .writeable = true },

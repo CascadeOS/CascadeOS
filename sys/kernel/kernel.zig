@@ -13,11 +13,6 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
     return &executors[@intFromEnum(id)];
 }
 
-/// The memory layout of the kernel.
-///
-/// Initialized during `init.buildMemoryLayout`.
-pub const memory_layout = @import("memory_layout.zig");
-
 pub const acpi = @import("acpi.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug.zig");

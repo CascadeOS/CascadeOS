@@ -21,7 +21,7 @@ pub fn allocateContiguousSlice(
 ) ![]T {
     const size = core.Size.of(T).multiplyScalar(count);
     const physical_range = try self.allocateContiguousPages(size);
-    const virtual_range = kernel.memory_layout.directMapFromPhysicalRange(physical_range);
+    const virtual_range = kernel.mem.directMapFromPhysicalRange(physical_range);
     return virtual_range.toSliceRelaxed(T)[0..count];
 }
 

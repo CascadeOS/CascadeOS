@@ -25,7 +25,7 @@ pub fn createPageTable(physical_range: core.PhysicalRange) *PageTable {
     std.debug.assert(physical_range.address.isAligned(page_table_alignment));
     std.debug.assert(physical_range.size.greaterThanOrEqual(page_table_size));
 
-    const page_table = kernel.memory_layout.directMapFromPhysical(physical_range.address).toPtr(*PageTable);
+    const page_table = kernel.mem.directMapFromPhysical(physical_range.address).toPtr(*PageTable);
     page_table.zero();
     return page_table;
 }
@@ -87,7 +87,7 @@ fn ensureNextTable(
         break :blk backing_range.address;
     };
 
-    return kernel.memory_layout
+    return kernel.mem
         .directMapFromPhysical(next_level_physical_address)
         .toPtr(*PageTable);
 }
