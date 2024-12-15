@@ -278,7 +278,7 @@ fn idle() callconv(.C) noreturn {
 }
 
 var lock: kernel.sync.TicketSpinLock = .{};
-var ready_to_run: containers.SinglyLinkedFIFO = .{};
+var ready_to_run: containers.SinglyLinkedFIFO = .empty;
 
 const std = @import("std");
 const core = @import("core");

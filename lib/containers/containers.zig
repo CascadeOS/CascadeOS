@@ -20,7 +20,9 @@ pub const RedBlack = struct {
 ///
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const SingleNode = extern struct {
-    next: ?*SingleNode = null,
+    next: ?*SingleNode,
+
+    pub const empty: SingleNode = .{ .next = null };
 
     pub const Iterator = struct {
         current_node: ?*SingleNode,
@@ -37,8 +39,10 @@ pub const SingleNode = extern struct {
 ///
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const DoubleNode = extern struct {
-    next: ?*DoubleNode = null,
-    previous: ?*DoubleNode = null,
+    next: ?*DoubleNode,
+    previous: ?*DoubleNode,
+
+    pub const empty: DoubleNode = .{ .next = null, .previous = null };
 
     pub const Iterator = struct {
         direction: core.Direction,

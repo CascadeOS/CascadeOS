@@ -11,7 +11,7 @@ state: State,
 stack: kernel.Stack,
 
 /// Used for various linked lists.
-next_task_node: containers.SingleNode = .{},
+next_task_node: containers.SingleNode = .empty,
 
 /// Tracks the depth of nested preemption disables.
 preemption_disable_count: u32 = 0,

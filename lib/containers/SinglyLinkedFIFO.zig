@@ -7,13 +7,18 @@
 
 const SinglyLinkedFIFO = @This();
 
-start_node: ?*SingleNode = null,
-end_node: ?*SingleNode = null,
+start_node: ?*SingleNode,
+end_node: ?*SingleNode,
+
+pub const empty: SinglyLinkedFIFO = .{
+    .start_node = null,
+    .end_node = null,
+};
 
 /// Returns `true` if the list is empty.
 ///
 /// This operation is O(1).
-pub fn isEmpty(self: SinglyLinkedFIFO) bool {
+pub fn isEmpty(self: *const SinglyLinkedFIFO) bool {
     return self.start_node == null;
 }
 
@@ -21,8 +26,6 @@ pub fn isEmpty(self: SinglyLinkedFIFO) bool {
 ///
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedFIFO, node: *SingleNode) void {
-    std.debug.assert(node.next == null);
-
     if (self.end_node) |end| {
         std.debug.assert(self.start_node != null);
         end.* = .{ .next = node };
@@ -44,14 +47,14 @@ pub fn pop(self: *SinglyLinkedFIFO) ?*SingleNode {
     }
 
     self.start_node = node.next;
-    node.* = .{};
+    node.* = .empty;
     return node;
 }
 
 /// Returns the number of nodes in the list.
 ///
 /// This operation is O(N).
-pub fn len(self: SinglyLinkedFIFO) usize {
+pub fn len(self: *const SinglyLinkedFIFO) usize {
     var result: usize = 0;
 
     var opt_node = self.start_node;
@@ -62,20 +65,20 @@ pub fn len(self: SinglyLinkedFIFO) usize {
     return result;
 }
 
-pub fn iterate(self: SinglyLinkedFIFO) SingleNode.Iterator {
+pub fn iterate(self: *const SinglyLinkedFIFO) SingleNode.Iterator {
     return .{ .current_node = self.start_node };
 }
 
 test SinglyLinkedFIFO {
     const NODE_COUNT = 10;
 
-    var fifo: SinglyLinkedFIFO = .{};
+    var fifo: SinglyLinkedFIFO = .empty;
 
     // starts empty
     try std.testing.expect(fifo.isEmpty());
     try std.testing.expect(fifo.len() == 0);
 
-    var nodes = [_]SingleNode{.{}} ** NODE_COUNT;
+    var nodes = [_]SingleNode{.empty} ** NODE_COUNT;
 
     for (&nodes) |*node| {
         // add node to the end of the list

@@ -7,12 +7,14 @@
 
 const SinglyLinkedLIFO = @This();
 
-start_node: ?*SingleNode = null,
+start_node: ?*SingleNode,
+
+pub const empty: SinglyLinkedLIFO = .{ .start_node = null };
 
 /// Returns `true` if the list is empty.
 ///
 /// This operation is O(1).
-pub fn isEmpty(self: SinglyLinkedLIFO) bool {
+pub fn isEmpty(self: *const SinglyLinkedLIFO) bool {
     return self.start_node == null;
 }
 
@@ -20,7 +22,6 @@ pub fn isEmpty(self: SinglyLinkedLIFO) bool {
 ///
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
-    std.debug.assert(node.next == null);
     node.* = .{ .next = self.start_node };
     self.start_node = node;
 }
@@ -46,14 +47,14 @@ pub fn pushList(self: *SinglyLinkedLIFO, first_node: *SingleNode, last_node: *Si
 pub fn pop(self: *SinglyLinkedLIFO) ?*SingleNode {
     const node = self.start_node orelse return null;
     self.start_node = node.next;
-    node.* = .{};
+    node.* = .empty;
     return node;
 }
 
 /// Returns the number of nodes in the list.
 ///
 /// This operation is O(N).
-pub fn len(self: SinglyLinkedLIFO) usize {
+pub fn len(self: *const SinglyLinkedLIFO) usize {
     var result: usize = 0;
 
     var opt_node = self.start_node;
@@ -64,20 +65,20 @@ pub fn len(self: SinglyLinkedLIFO) usize {
     return result;
 }
 
-pub fn iterate(self: SinglyLinkedLIFO) SingleNode.Iterator {
+pub fn iterate(self: *const SinglyLinkedLIFO) SingleNode.Iterator {
     return .{ .current_node = self.start_node };
 }
 
 test SinglyLinkedLIFO {
     const NODE_COUNT = 10;
 
-    var lifo: SinglyLinkedLIFO = .{};
+    var lifo: SinglyLinkedLIFO = .empty;
 
     // starts empty
     try std.testing.expect(lifo.isEmpty());
     try std.testing.expect(lifo.len() == 0);
 
-    var nodes = [_]SingleNode{.{}} ** NODE_COUNT;
+    var nodes = [_]SingleNode{.empty} ** NODE_COUNT;
 
     for (&nodes) |*node| {
         // add node to the front of the list

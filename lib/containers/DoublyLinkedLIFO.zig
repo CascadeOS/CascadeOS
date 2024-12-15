@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-//! Doubly linked FIFO (first in first out).
+//! Doubly linked LIFO (last in first out).
 //!
 //! Not thread-safe.
 
 const DoublyLinkedLIFO = @This();
 
-start_node: ?*DoubleNode = null,
-end_node: ?*DoubleNode = null,
+start_node: ?*DoubleNode,
+end_node: ?*DoubleNode,
 
-pub fn isEmpty(self: DoublyLinkedLIFO) bool {
+pub const empty: DoublyLinkedLIFO = .{
+    .start_node = null,
+    .end_node = null,
+};
+
+pub fn isEmpty(self: *const DoublyLinkedLIFO) bool {
     return self.start_node == null;
 }
 
@@ -26,18 +31,15 @@ pub fn remove(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
 }
 
 pub fn push(self: *DoublyLinkedLIFO, node: *DoubleNode) void {
-    std.debug.assert(node.previous == null);
-    std.debug.assert(node.next == null);
-
     if (self.start_node) |start| {
         std.debug.assert(self.end_node != null);
         node.next = start;
         start.previous = node;
-        self.start_node = node;
     } else {
-        self.start_node = node;
         self.end_node = node;
     }
+
+    self.start_node = node;
 }
 
 pub fn pop(self: *DoublyLinkedLIFO) ?*DoubleNode {
@@ -55,8 +57,7 @@ pub fn pop(self: *DoublyLinkedLIFO) ?*DoubleNode {
             next.previous = null;
         }
         self.start_node = node.next;
-        node.previous = null;
-        node.next = null;
+        node.* = .empty;
     }
 
     return node;
