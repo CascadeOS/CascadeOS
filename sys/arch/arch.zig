@@ -127,7 +127,7 @@ pub const paging = struct {
         pub fn fillTopLevel(
             page_table: paging.PageTable,
             range: core.VirtualRange,
-            map_type: kernel.vmm.MapType,
+            map_type: kernel.mem.MapType,
             allocate_page_context: anytype,
             comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
         ) callconv(core.inline_in_non_debug) void {
@@ -137,7 +137,7 @@ pub const paging = struct {
                 fn (
                     *paging.PageTable.ArchPageTable,
                     core.VirtualRange,
-                    kernel.vmm.MapType,
+                    kernel.mem.MapType,
                     anytype,
                     fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
                 ) void,
@@ -168,7 +168,7 @@ pub const paging = struct {
             page_table: paging.PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
-            map_type: kernel.vmm.MapType,
+            map_type: kernel.mem.MapType,
             allocate_page_context: anytype,
             comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
         ) callconv(core.inline_in_non_debug) void {
@@ -176,7 +176,7 @@ pub const paging = struct {
                 *paging.PageTable.ArchPageTable,
                 core.VirtualRange,
                 core.PhysicalRange,
-                kernel.vmm.MapType,
+                kernel.mem.MapType,
                 anytype,
                 fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
             ) void);

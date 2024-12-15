@@ -96,7 +96,7 @@ fn initStage2() !noreturn {
 fn initStage3(executor: *kernel.Executor) !noreturn {
     // we can't log until we load the executor
 
-    kernel.vmm.core_page_table.load();
+    kernel.mem.core_page_table.load();
     arch.init.loadExecutor(executor);
 
     log.debug("configuring per-executor system features", .{});
@@ -511,7 +511,7 @@ fn initializePMM(pmm: *PMM) !void {
 fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void {
     log.debug("building core page table", .{});
 
-    kernel.vmm.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
+    kernel.mem.core_page_table = arch.paging.PageTable.create(try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size));
 
     for (memory_layout.regions.constSlice()) |region| {
         switch (region.operation) {
@@ -527,7 +527,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                     .kernel_stacks => core.panic("kernel stack region is full mapped", null),
                 };
 
-                const map_type: kernel.vmm.MapType = switch (region.type) {
+                const map_type: kernel.mem.MapType = switch (region.type) {
                     .executable_section => .{ .executable = true, .global = true },
                     .readonly_section, .sdf_section => .{ .global = true },
                     .writeable_section, .direct_map => .{ .writeable = true, .global = true },
@@ -536,7 +536,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                 };
 
                 arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                    kernel.vmm.core_page_table,
+                    kernel.mem.core_page_table,
                     region.range,
                     physical_range,
                     map_type,
@@ -545,7 +545,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                 );
             },
             .top_level_map => arch.paging.init.fillTopLevel(
-                kernel.vmm.core_page_table,
+                kernel.mem.core_page_table,
                 region.range,
                 .{ .global = true, .writeable = true },
                 AllocatePageContext{ .pmm = pmm },
@@ -554,7 +554,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
         }
     }
 
-    kernel.vmm.core_page_table.load();
+    kernel.mem.core_page_table.load();
 }
 
 /// Initialize the per executor data structures for all executors including the bootstrap executor.
@@ -577,7 +577,7 @@ fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !voi
             const stack = context.stack_allocator.allocate();
 
             arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                kernel.vmm.core_page_table,
+                kernel.mem.core_page_table,
                 stack.usable_range,
                 physical_range,
                 .{ .global = true, .writeable = true },

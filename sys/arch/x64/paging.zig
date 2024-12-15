@@ -107,7 +107,7 @@ pub const init = struct {
     pub fn fillTopLevel(
         level4_table: *PageTable,
         range: core.VirtualRange,
-        map_type: kernel.vmm.MapType,
+        map_type: kernel.mem.MapType,
         allocate_page_context: anytype,
         comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
     ) void {
@@ -143,7 +143,7 @@ pub const init = struct {
         level4_table: *PageTable,
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
-        map_type: kernel.vmm.MapType,
+        map_type: kernel.mem.MapType,
         allocate_page_context: anytype,
         comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
     ) void {
@@ -266,7 +266,7 @@ pub const init = struct {
         page_table: *PageTable,
         index: usize,
         physical_address: core.PhysicalAddress,
-        map_type: kernel.vmm.MapType,
+        map_type: kernel.mem.MapType,
         comptime page_type: enum { small, medium, large },
     ) void {
         var entry = PageTable.Entry{ .raw = page_table.entries[index] };
@@ -299,6 +299,6 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
 const arch = @import("arch");
-const MapType = kernel.vmm.MapType;
+const MapType = kernel.mem.MapType;
 const log = kernel.log.scoped(.paging_x64);
 const PageTable = lib_x64.PageTable;
