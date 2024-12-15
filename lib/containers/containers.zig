@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const AtomicSinglyLinkedLIFO = @import("AtomicSinglyLinkedLIFO.zig");
 pub const DoublyLinkedLIFO = @import("DoublyLinkedLIFO.zig");
 pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
 pub const SinglyLinkedLIFO = @import("SinglyLinkedLIFO.zig");
