@@ -73,16 +73,16 @@ fn initStage2() !noreturn {
     try arch.init.configureGlobalSystemFeatures();
 
     log.debug("initializing physical memory", .{});
-    try initializePMM(&globals.pmm);
+    try initializePhysicalMemory();
 
     log.debug("initializing virtual memory", .{});
-    try initializeVirtualMemory(&globals.pmm, &globals.memory_layout);
+    try initializeVirtualMemory(&globals.memory_layout);
 
     log.debug("initializing time", .{});
     try time.initializeTime();
 
     log.debug("initializing executors", .{});
-    try initializeExecutors(&globals.pmm, &globals.stack_allocator);
+    try initializeExecutors();
 
     try initStage3(kernel.getExecutor(.bootstrap));
     core.panic("`init.initStage3` returned", null);
@@ -307,9 +307,7 @@ fn buildMemoryLayout() !void {
     log.debug("registering direct maps", .{});
     try registerDirectMaps(memory_layout);
     log.debug("registering heaps", .{});
-    const kernel_stacks_range = try registerHeaps(memory_layout);
-
-    globals.stack_allocator = .{ .kernel_stacks_heap_range = kernel_stacks_range };
+    try registerHeaps(memory_layout);
 
     if (log.levelEnabled(.debug)) {
         log.debug("kernel memory layout:", .{});
@@ -417,7 +415,7 @@ fn registerDirectMaps(memory_layout: *MemoryLayout) !void {
     });
 }
 
-fn registerHeaps(memory_layout: *MemoryLayout) !core.VirtualRange {
+fn registerHeaps(memory_layout: *MemoryLayout) !void {
     const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
 
     const kernel_stacks_range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
@@ -429,7 +427,14 @@ fn registerHeaps(memory_layout: *MemoryLayout) !core.VirtualRange {
         .operation = .top_level_map,
     });
 
-    return kernel_stacks_range;
+    const kernel_heap_range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
+        core.panic("no space in kernel memory layout for the kernel heap", null);
+
+    try memory_layout.append(.{
+        .range = kernel_heap_range,
+        .type = .kernel_heap,
+        .operation = .top_level_map,
+    });
 }
 
 fn initializeACPITables() !void {
@@ -465,10 +470,8 @@ fn initializeACPITables() !void {
     kernel.acpi.globals.sdt_header = sdt_header;
 }
 
-fn initializePMM(pmm: *PMM) !void {
+fn initializePhysicalMemory() !void {
     var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
-
-    var ranges: PMM.Ranges = .{};
 
     var total_memory: core.Size = .zero;
     var free_memory: core.Size = .zero;
@@ -482,7 +485,22 @@ fn initializePMM(pmm: *PMM) !void {
         switch (entry.type) {
             .free => {
                 free_memory.addInPlace(entry.range.size);
-                try ranges.append(entry.range);
+
+                std.debug.assert(entry.range.address.isAligned(arch.paging.standard_page_size));
+                std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
+
+                const virtual_range = kernel.mem.directMapFromPhysicalRange(entry.range);
+
+                var current_virtual_address = virtual_range.address;
+                const last_virtual_address = virtual_range.last();
+
+                while (current_virtual_address.lessThanOrEqual(last_virtual_address)) : ({
+                    current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+                }) {
+                    kernel.mem.physical.globals.free_pages.push(
+                        current_virtual_address.toPtr(*containers.SingleNode),
+                    );
+                }
             },
             .in_use => {},
             .reserved => reserved_memory.addInPlace(entry.range.size),
@@ -491,28 +509,36 @@ fn initializePMM(pmm: *PMM) !void {
         }
     }
 
-    pmm.* = .{
-        .free_ranges = ranges,
-        .total_memory = total_memory,
-        .free_memory = free_memory,
-        .reserved_memory = reserved_memory,
-        .reclaimable_memory = reclaimable_memory,
-        .unavailable_memory = unavailable_memory,
-    };
+    const used_memory = total_memory
+        .subtract(free_memory)
+        .subtract(reserved_memory)
+        .subtract(reclaimable_memory)
+        .subtract(unavailable_memory);
 
     log.debug("total memory:         {}", .{total_memory});
     log.debug("  free memory:        {}", .{free_memory});
-    log.debug("  used memory:        {}", .{pmm.usedMemory()});
+    log.debug("  used memory:        {}", .{used_memory});
     log.debug("  reserved memory:    {}", .{reserved_memory});
     log.debug("  reclaimable memory: {}", .{reclaimable_memory});
     log.debug("  unavailable memory: {}", .{unavailable_memory});
+
+    kernel.mem.physical.globals.total_memory = total_memory;
+    kernel.mem.physical.globals.free_memory.store(free_memory.value, .release);
+    kernel.mem.physical.globals.reserved_memory = reserved_memory;
+    kernel.mem.physical.globals.reclaimable_memory = reclaimable_memory;
+    kernel.mem.physical.globals.unavailable_memory = unavailable_memory;
 }
 
-fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void {
+fn initializeVirtualMemory(memory_layout: *const MemoryLayout) !void {
     log.debug("building core page table", .{});
+    try buildCorePageTable(memory_layout);
+    log.debug("initializing resource arenas and kernel heap", .{});
+    try initializeResourceArenasAndHeap(memory_layout);
+}
 
+fn buildCorePageTable(memory_layout: *const MemoryLayout) !void {
     kernel.mem.globals.core_page_table = arch.paging.PageTable.create(
-        try pmm.allocateContiguousPages(arch.paging.PageTable.page_table_size),
+        try kernel.mem.physical.allocatePage(),
     );
 
     for (memory_layout.regions.constSlice()) |region| {
@@ -527,6 +553,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                         region.range.size,
                     ),
                     .kernel_stacks => core.panic("kernel stack region is full mapped", null),
+                    .kernel_heap => core.panic("kernel heap region is full mapped", null),
                 };
 
                 const map_type: kernel.mem.MapType = switch (region.type) {
@@ -535,6 +562,7 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                     .writeable_section, .direct_map => .{ .writeable = true, .global = true },
                     .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
                     .kernel_stacks => core.panic("kernel stack region is full mapped", null),
+                    .kernel_heap => core.panic("kernel heap region is full mapped", null),
                 };
 
                 arch.paging.init.mapToPhysicalRangeAllPageSizes(
@@ -542,16 +570,12 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
                     region.range,
                     physical_range,
                     map_type,
-                    AllocatePageContext{ .pmm = pmm },
-                    AllocatePageContext.allocatePage,
                 );
             },
             .top_level_map => arch.paging.init.fillTopLevel(
                 kernel.mem.globals.core_page_table,
                 region.range,
                 .{ .global = true, .writeable = true },
-                AllocatePageContext{ .pmm = pmm },
-                AllocatePageContext.allocatePage,
             ),
         }
     }
@@ -559,46 +583,90 @@ fn initializeVirtualMemory(pmm: *PMM, memory_layout: *const MemoryLayout) !void 
     kernel.mem.globals.core_page_table.load();
 }
 
+fn initializeResourceArenasAndHeap(memory_layout: *const MemoryLayout) !void {
+    kernel.mem.ResourceArena.globals.populateUnusedTags();
+
+    try kernel.mem.ResourceArena.globals.tag_arena.init(
+        "tags",
+        arch.paging.standard_page_size.value,
+        .{
+            .populator = true,
+            .source = .{ .arena = &kernel.mem.heap.globals.heap_arena },
+        },
+    );
+
+    // heap
+    {
+        try kernel.mem.heap.globals.heap_address_space_arena.init(
+            "heap_address_space",
+            arch.paging.standard_page_size.value,
+            .{ .populator = true },
+        );
+
+        try kernel.mem.heap.globals.heap_arena.init(
+            "heap",
+            arch.paging.standard_page_size.value,
+            .{
+                .populator = true,
+                .source = .{
+                    .arena = &kernel.mem.heap.globals.heap_address_space_arena,
+                    .import = kernel.mem.heap._heapArenaImport,
+                    .release = kernel.mem.heap._heapArenaRelease,
+                },
+            },
+        );
+
+        const heap_range = memory_layout.getRange(.kernel_heap) orelse
+            core.panic("no kernel heap", null);
+
+        kernel.mem.heap.globals.heap_address_space_arena.addSpan(
+            heap_range.address.value,
+            heap_range.size.value,
+        ) catch |err| {
+            core.panicFmt(
+                "failed to add heap range to `heap_address_space_arena`: {s}",
+                .{@errorName(err)},
+                @errorReturnTrace(),
+            );
+        };
+    }
+
+    // stacks
+    {
+        try kernel.Stack.globals.stack_arena.init(
+            "stacks",
+            arch.paging.standard_page_size.value,
+            .{},
+        );
+
+        const stacks_range = memory_layout.getRange(.kernel_stacks) orelse
+            core.panic("no kernel stacks", null);
+
+        kernel.Stack.globals.stack_arena.addSpan(
+            stacks_range.address.value,
+            stacks_range.size.value,
+        ) catch |err| {
+            core.panicFmt(
+                "failed to add stack range to `stack_arena`: {s}",
+                .{@errorName(err)},
+                @errorReturnTrace(),
+            );
+        };
+    }
+}
+
 /// Initialize the per executor data structures for all executors including the bootstrap executor.
 ///
 /// Also wakes the non-bootstrap executors and jumps them to `initStage3`.
-fn initializeExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
-    try allocateAndPrepareExecutors(pmm, stack_allocator);
+fn initializeExecutors() !void {
+    try allocateAndPrepareExecutors();
     try bootNonBootstrapExecutors();
 }
 
-fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !void {
-    const KernelStackContext = struct {
-        pmm: *PMM,
-        stack_allocator: *StackAllocator,
-
-        fn allocateKernelStack(context: *@This()) !kernel.Stack {
-            // TODO: we will eventually need a proper stack allocator, especically if we want guard pages
-
-            const physical_range = try context.pmm.allocateContiguousPages(kernel.config.kernel_stack_size);
-            const stack = context.stack_allocator.allocate();
-
-            arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                kernel.mem.globals.core_page_table,
-                stack.usable_range,
-                physical_range,
-                .{ .global = true, .writeable = true },
-                AllocatePageContext{ .pmm = context.pmm },
-                AllocatePageContext.allocatePage,
-            );
-
-            return stack;
-        }
-    };
-
+fn allocateAndPrepareExecutors() !void {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
-    const executors = try pmm.allocateContiguousSlice(kernel.Executor, descriptors.count());
-
-    var kernel_stack_context: KernelStackContext = .{
-        .pmm = pmm,
-        .stack_allocator = stack_allocator,
-    };
+    const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
     var i: u32 = 0;
     while (descriptors.next()) |desc| : (i += 1) {
@@ -610,15 +678,16 @@ fn allocateAndPrepareExecutors(pmm: *PMM, stack_allocator: *StackAllocator) !voi
 
         executor.* = .{
             .id = id,
-            .scheduler_stack = try kernel_stack_context.allocateKernelStack(),
+            .scheduler_stack = try kernel.Stack.createStack(),
             .arch = undefined, // set by `arch.init.prepareExecutor`
         };
 
-        arch.init.prepareExecutor(
-            executor,
-            &kernel_stack_context,
-            KernelStackContext.allocateKernelStack,
-        );
+        if (id == .bootstrap) {
+            globals.init_task.stack = executor.scheduler_stack;
+            executor.current_task = &globals.init_task;
+        }
+
+        arch.init.prepareExecutor(executor);
     }
 
     kernel.executors = executors;
@@ -646,23 +715,21 @@ fn bootNonBootstrapExecutors() !void {
     }
 }
 
-const AllocatePageContext = struct {
-    pmm: *PMM,
-
-    fn allocatePage(context: @This()) !core.PhysicalRange {
-        return context.pmm.allocateContiguousPages(arch.paging.standard_page_size) catch return error.OutOfPhysicalMemory;
-    }
-};
-
 const globals = struct {
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
         .scheduler_stack = undefined, // never used
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+        .current_task = &init_task,
     };
-    var pmm: PMM = undefined; // set by `initializePMM`
+
+    var init_task: kernel.Task = .{
+        ._name = kernel.Task.Name.fromSlice("init") catch unreachable,
+        .state = .running,
+        .stack = undefined, // never used, until it is set by `allocateAndPrepareExecutors`
+    };
+
     var memory_layout: MemoryLayout = undefined; // set by `buildMemoryLayout`
-    var stack_allocator: StackAllocator = undefined; // set by `buildMemoryLayout`
     var early_output_lock: kernel.sync.TicketSpinLock = .{};
 };
 
@@ -674,6 +741,5 @@ const arch = @import("arch");
 const log = kernel.log.scoped(.init);
 const acpi = @import("acpi");
 const MemoryLayout = @import("MemoryLayout.zig");
-const StackAllocator = @import("StackAllocator.zig");
-const PMM = @import("PMM.zig");
 const cascade_target = @import("cascade_target").arch;
+const containers = @import("containers");

@@ -1,8 +1,103 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const heap = @import("heap.zig");
+pub const physical = @import("physical.zig");
+
 pub const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
 pub const MapType = @import("MapType.zig");
+pub const ResourceArena = @import("ResourceArena.zig");
+
+pub const MapError = error{
+    AlreadyMapped,
+
+    /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+    MappingNotValid,
+} || kernel.mem.physical.AllocatePageError;
+
+/// Maps a virtual range using the standard page size.
+///
+/// Physical pages are allocated for each page in the virtual range.
+pub fn mapRange(
+    page_table: *arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    map_type: MapType,
+) MapError!void {
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_range = core.VirtualRange.fromAddr(
+        virtual_range.address,
+        arch.paging.standard_page_size,
+    );
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
+            unmapRange(page_table, current_virtual_range, true);
+            current_virtual_range.address.moveBackwardInPlace(arch.paging.standard_page_size);
+        }
+    }
+
+    // Map all pages that were allocated.
+    while (current_virtual_range.address.lessThanOrEqual(last_virtual_address)) {
+        const physical_range = try kernel.mem.physical.allocatePage();
+        errdefer kernel.mem.physical.deallocatePage(physical_range);
+
+        try mapToPhysicalRange(
+            page_table,
+            current_virtual_range,
+            physical_range,
+            map_type,
+        );
+
+        current_virtual_range.address.moveForwardInPlace(arch.paging.standard_page_size);
+    }
+
+    // TODO: flush caches
+}
+
+/// Maps a virtual address range to a physical range using the standard page size.
+pub fn mapToPhysicalRange(
+    page_table: *arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: MapType,
+) MapError!void {
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.equal(virtual_range.size));
+
+    try arch.paging.mapToPhysicalRange(
+        page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+    );
+
+    // TODO: flush caches
+}
+
+/// Unmaps a virtual range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+pub fn unmapRange(
+    page_table: *arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    free_backing_pages: bool,
+) void {
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+
+    arch.paging.unmapRange(page_table, virtual_range, free_backing_pages);
+
+    // TODO: flush caches
+}
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
@@ -53,7 +148,7 @@ pub const globals = struct {
     ///
     /// All other page tables start as a copy of this one.
     ///
-    /// Initialized during `init.initializeVirtualMemory`.
+    /// Initialized during `init.buildCorePageTable`.
     pub var core_page_table: arch.paging.PageTable = undefined;
 
     /// The virtual base address that the kernel was loaded at.

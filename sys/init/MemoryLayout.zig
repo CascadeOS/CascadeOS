@@ -55,6 +55,14 @@ pub fn findFreeRange(self: *MemoryLayout, size: core.Size, alignment: core.Size)
     }
 }
 
+pub fn getRange(self: *const MemoryLayout, range_type: KernelMemoryRegion.Type) ?core.VirtualRange {
+    for (self.regions.constSlice()) |region| {
+        if (region.type == range_type) return region.range;
+    }
+
+    return null;
+}
+
 /// Sorts the kernel memory layout from lowest to highest address.
 fn sortMemoryLayout(self: *MemoryLayout) void {
     std.mem.sort(KernelMemoryRegion, self.regions.slice(), {}, struct {

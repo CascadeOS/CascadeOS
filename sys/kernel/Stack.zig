@@ -64,6 +64,46 @@ pub fn pushReturnAddress(stack: *Stack, return_address: core.VirtualAddress) err
     try stack.push(return_address.value);
 }
 
+pub fn createStack() !Stack {
+    const stack_range = try globals.stack_arena.allocate(
+        stack_size_including_guard_page.value,
+        .instant_fit,
+    );
+
+    const stack = fromRange(
+        .{ .address = .fromInt(stack_range.base), .size = stack_size_including_guard_page },
+        .{ .address = .fromInt(stack_range.base), .size = kernel.config.kernel_stack_size },
+    );
+
+    try kernel.mem.mapRange(
+        &kernel.mem.globals.core_page_table,
+        stack.usable_range,
+        .{ .writeable = true, .global = true },
+    );
+
+    return stack;
+}
+
+pub fn destroyStack(stack: Stack) void {
+    try kernel.mem.unmapRange(
+        &kernel.mem.globals.core_page_table,
+        stack.usable_range,
+        true,
+    );
+
+    globals.stack_arena.deallocate(.{
+        .base = stack.range.address.value,
+        .len = stack.range.size.value,
+    });
+}
+
+const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(arch.paging.standard_page_size);
+
+pub const globals = struct {
+    pub var stack_arena: kernel.mem.ResourceArena = undefined;
+};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const arch = @import("arch");

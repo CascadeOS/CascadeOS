@@ -111,6 +111,66 @@ pub const paging = struct {
         const ArchPageTable = current.paging.ArchPageTable;
     };
 
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///  - the virtual range is not already mapped
+    ///
+    /// This function:
+    ///  - uses only the standard page size for the architecture
+    ///  - does not flush the TLB
+    ///  - on error is not required roll back any modifications to the page tables
+    pub inline fn mapToPhysicalRange(
+        page_table: *PageTable,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
+        map_type: kernel.mem.MapType,
+    ) kernel.mem.MapError!void {
+        checkSupport(current.paging, "mapToPhysicalRange", fn (
+            *paging.PageTable.ArchPageTable,
+            core.VirtualRange,
+            core.PhysicalRange,
+            kernel.mem.MapType,
+        ) kernel.mem.MapError!void);
+
+        return current.paging.mapToPhysicalRange(
+            page_table.arch,
+            virtual_range,
+            physical_range,
+            map_type,
+        );
+    }
+
+    /// Unmaps the `virtual_range`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the virtual range is mapped
+    ///  - the virtual range is mapped using only the standard page size for the architecture
+    ///
+    /// This function:
+    ///  - does not flush the TLB
+    pub inline fn unmapRange(
+        page_table: *PageTable,
+        virtual_range: core.VirtualRange,
+        free_backing_pages: bool,
+    ) void {
+        checkSupport(
+            current.paging,
+            "unmapRange",
+            fn (*paging.PageTable.ArchPageTable, core.VirtualRange, bool) void,
+        );
+
+        current.paging.unmapRange(
+            page_table.arch,
+            virtual_range,
+            free_backing_pages,
+        );
+    }
+
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
@@ -128,8 +188,6 @@ pub const paging = struct {
             page_table: paging.PageTable,
             range: core.VirtualRange,
             map_type: kernel.mem.MapType,
-            allocate_page_context: anytype,
-            comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
         ) callconv(core.inline_in_non_debug) void {
             checkSupport(
                 current.paging.init,
@@ -138,8 +196,6 @@ pub const paging = struct {
                     *paging.PageTable.ArchPageTable,
                     core.VirtualRange,
                     kernel.mem.MapType,
-                    anytype,
-                    fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
                 ) void,
             );
 
@@ -147,8 +203,6 @@ pub const paging = struct {
                 page_table.arch,
                 range,
                 map_type,
-                allocate_page_context,
-                allocatePage,
             );
         }
 
@@ -169,16 +223,12 @@ pub const paging = struct {
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: kernel.mem.MapType,
-            allocate_page_context: anytype,
-            comptime allocatePage: fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
         ) callconv(core.inline_in_non_debug) void {
             checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualRange,
                 core.PhysicalRange,
                 kernel.mem.MapType,
-                anytype,
-                fn (ctx: @TypeOf(allocate_page_context)) error{OutOfPhysicalMemory}!core.PhysicalRange,
             ) void);
 
             return current.paging.init.mapToPhysicalRangeAllPageSizes(
@@ -186,8 +236,6 @@ pub const paging = struct {
                 virtual_range,
                 physical_range,
                 map_type,
-                allocate_page_context,
-                allocatePage,
             );
         }
     };
@@ -243,22 +291,14 @@ pub const init = struct {
     /// Prepares the provided `Executor` for use.
     ///
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
-    pub fn prepareExecutor(
-        executor: *kernel.Executor,
-        allocate_stack_context: anytype,
-        comptime allocateStackFn: fn (ctx: @TypeOf(allocate_stack_context)) anyerror!kernel.Stack,
-    ) callconv(core.inline_in_non_debug) void {
+    pub fn prepareExecutor(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.init,
             "prepareExecutor",
-            fn (
-                *kernel.Executor,
-                anytype,
-                fn (ctx: @TypeOf(allocate_stack_context)) anyerror!kernel.Stack,
-            ) void,
+            fn (*kernel.Executor) void,
         );
 
-        current.init.prepareExecutor(executor, allocate_stack_context, allocateStackFn);
+        current.init.prepareExecutor(executor);
     }
 
     /// Load the provided `Executor` as the current executor.

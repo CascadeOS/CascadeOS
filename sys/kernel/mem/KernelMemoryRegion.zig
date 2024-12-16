@@ -18,6 +18,7 @@ pub const Type = enum {
     non_cached_direct_map,
 
     kernel_stacks,
+    kernel_heap,
 };
 
 pub const Operation = enum {
