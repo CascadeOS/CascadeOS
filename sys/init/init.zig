@@ -58,7 +58,7 @@ fn initStage2() !noreturn {
     arch.init.initInterrupts();
 
     log.debug("building memory layout", .{});
-    try buildMemoryLayout();
+    try kernel.mem.init.buildMemoryLayout();
 
     log.debug("initializing ACPI tables", .{});
     try initializeACPITables();
@@ -76,7 +76,7 @@ fn initStage2() !noreturn {
     try initializePhysicalMemory();
 
     log.debug("initializing virtual memory", .{});
-    try initializeVirtualMemory(&globals.memory_layout);
+    try initializeVirtualMemory();
 
     log.debug("initializing time", .{});
     try time.initializeTime();
@@ -253,150 +253,6 @@ fn handlePanic(
     }
 }
 
-
-fn buildMemoryLayout() !void {
-    const memory_layout = blk: {
-        globals.memory_layout = .{
-            .regions = &kernel.mem.globals.regions,
-        };
-        break :blk &globals.memory_layout;
-    };
-
-    log.debug("registering kernel sections", .{});
-    try registerKernelSections(memory_layout);
-    log.debug("registering direct maps", .{});
-    try registerDirectMaps(memory_layout);
-    log.debug("registering heaps", .{});
-    try registerHeaps(memory_layout);
-
-    if (log.levelEnabled(.debug)) {
-        log.debug("kernel memory layout:", .{});
-
-        for (memory_layout.regions.constSlice()) |region| {
-            log.debug("\t{}", .{region});
-        }
-    }
-}
-
-fn registerKernelSections(memory_layout: *MemoryLayout) !void {
-    const linker_symbols = struct {
-        extern const __text_start: u8;
-        extern const __text_end: u8;
-        extern const __rodata_start: u8;
-        extern const __rodata_end: u8;
-        extern const __data_start: u8;
-        extern const __data_end: u8;
-    };
-
-    const sdf_slice = try kernel.debug.sdfSlice();
-    const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
-
-    const sections: []const struct {
-        core.VirtualAddress,
-        core.VirtualAddress,
-        kernel.mem.KernelMemoryRegion.Type,
-    } = &.{
-        .{
-            core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
-            core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
-            .executable_section,
-        },
-        .{
-            core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
-            core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
-            .readonly_section,
-        },
-        .{
-            core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
-            core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
-            .writeable_section,
-        },
-        .{
-            sdf_range.address,
-            sdf_range.endBound(),
-            .sdf_section,
-        },
-    };
-
-    for (sections) |section| {
-        const start_address = section[0];
-        const end_address = section[1];
-        const region_type = section[2];
-
-        std.debug.assert(end_address.greaterThan(start_address));
-
-        const virtual_range: core.VirtualRange = .fromAddr(
-            start_address,
-            core.Size.from(end_address.value - start_address.value, .byte)
-                .alignForward(arch.paging.standard_page_size),
-        );
-
-        try memory_layout.append(.{
-            .range = virtual_range,
-            .type = region_type,
-            .operation = .full_map,
-        });
-    }
-}
-
-fn registerDirectMaps(memory_layout: *MemoryLayout) !void {
-    const direct_map = kernel.mem.globals.direct_map;
-
-    // does the direct map range overlap a pre-existing region?
-    for (memory_layout.regions.constSlice()) |region| {
-        if (region.range.containsRange(direct_map)) {
-            log.err(
-                \\direct map overlaps another memory region:
-                \\  direct map: {}
-                \\  other region: {}
-            , .{ direct_map, region });
-
-            return error.DirectMapOverlapsRegion;
-        }
-    }
-
-    try memory_layout.append(.{
-        .range = direct_map,
-        .type = .direct_map,
-        .operation = .full_map,
-    });
-
-    const non_cached_direct_map = memory_layout.findFreeRange(
-        direct_map.size,
-        arch.paging.largest_page_size,
-    ) orelse return error.NoFreeRangeForDirectMap;
-
-    kernel.mem.globals.non_cached_direct_map = non_cached_direct_map;
-
-    try memory_layout.append(.{
-        .range = non_cached_direct_map,
-        .type = .non_cached_direct_map,
-        .operation = .full_map,
-    });
-}
-
-fn registerHeaps(memory_layout: *MemoryLayout) !void {
-    const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
-
-    const kernel_stacks_range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
-        core.panic("no space in kernel memory layout for the kernel stacks", null);
-
-    try memory_layout.append(.{
-        .range = kernel_stacks_range,
-        .type = .kernel_stacks,
-        .operation = .top_level_map,
-    });
-
-    const kernel_heap_range = memory_layout.findFreeRange(size_of_top_level, size_of_top_level) orelse
-        core.panic("no space in kernel memory layout for the kernel heap", null);
-
-    try memory_layout.append(.{
-        .range = kernel_heap_range,
-        .type = .kernel_heap,
-        .operation = .top_level_map,
-    });
-}
-
 fn initializeACPITables() !void {
     const rsdp_address = boot.rsdp() orelse return error.RSDPNotProvided;
 
@@ -489,19 +345,19 @@ fn initializePhysicalMemory() !void {
     kernel.mem.physical.globals.unavailable_memory = unavailable_memory;
 }
 
-fn initializeVirtualMemory(memory_layout: *const MemoryLayout) !void {
+fn initializeVirtualMemory() !void {
     log.debug("building core page table", .{});
-    try buildCorePageTable(memory_layout);
+    try buildCorePageTable();
     log.debug("initializing resource arenas and kernel heap", .{});
-    try initializeResourceArenasAndHeap(memory_layout);
+    try initializeResourceArenasAndHeap();
 }
 
-fn buildCorePageTable(memory_layout: *const MemoryLayout) !void {
+fn buildCorePageTable() !void {
     kernel.mem.globals.core_page_table = arch.paging.PageTable.create(
         try kernel.mem.physical.allocatePage(),
     );
 
-    for (memory_layout.regions.constSlice()) |region| {
+    for (kernel.mem.globals.regions.constSlice()) |region| {
         switch (region.operation) {
             .full_map => {
                 const physical_range = switch (region.type) {
@@ -543,7 +399,7 @@ fn buildCorePageTable(memory_layout: *const MemoryLayout) !void {
     kernel.mem.globals.core_page_table.load();
 }
 
-fn initializeResourceArenasAndHeap(memory_layout: *const MemoryLayout) !void {
+fn initializeResourceArenasAndHeap() !void {
     kernel.mem.ResourceArena.globals.populateUnusedTags();
 
     try kernel.mem.ResourceArena.globals.tag_arena.init(
@@ -576,7 +432,7 @@ fn initializeResourceArenasAndHeap(memory_layout: *const MemoryLayout) !void {
             },
         );
 
-        const heap_range = memory_layout.getRange(.kernel_heap) orelse
+        const heap_range = kernel.mem.getKernelRegion(.kernel_heap) orelse
             core.panic("no kernel heap", null);
 
         kernel.mem.heap.globals.heap_address_space_arena.addSpan(
@@ -599,7 +455,7 @@ fn initializeResourceArenasAndHeap(memory_layout: *const MemoryLayout) !void {
             .{},
         );
 
-        const stacks_range = memory_layout.getRange(.kernel_stacks) orelse
+        const stacks_range = kernel.mem.getKernelRegion(.kernel_stacks) orelse
             core.panic("no kernel stacks", null);
 
         kernel.Stack.globals.stack_arena.addSpan(
@@ -689,7 +545,6 @@ const globals = struct {
         .stack = undefined, // never used, until it is set by `allocateAndPrepareExecutors`
     };
 
-    var memory_layout: MemoryLayout = undefined; // set by `buildMemoryLayout`
     var early_output_lock: kernel.sync.TicketSpinLock = .{};
 };
 
@@ -700,6 +555,5 @@ const boot = @import("boot");
 const arch = @import("arch");
 const log = kernel.log.scoped(.init);
 const acpi = @import("acpi");
-const MemoryLayout = @import("MemoryLayout.zig");
 const cascade_target = @import("cascade_target").arch;
 const containers = @import("containers");

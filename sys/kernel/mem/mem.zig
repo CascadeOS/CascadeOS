@@ -143,6 +143,14 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirect
     return error.AddressNotInDirectMap;
 }
 
+pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) ?core.VirtualRange {
+    for (globals.regions.constSlice()) |region| {
+        if (region.type == range_type) return region.range;
+    }
+
+    return null;
+}
+
 pub const Regions = std.BoundedArray(KernelMemoryRegion, std.meta.tags(KernelMemoryRegion.Type).len);
 
 pub const globals = struct {
@@ -226,6 +234,202 @@ pub const init = struct {
             boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
             direct_map_size,
         );
+    }
+
+    pub fn buildMemoryLayout() !void {
+        log.debug("registering kernel sections", .{});
+        try registerKernelSections();
+        log.debug("registering direct maps", .{});
+        try registerDirectMaps();
+        log.debug("registering heaps", .{});
+        try registerHeaps();
+
+        if (log.levelEnabled(.debug)) {
+            log.debug("kernel memory layout:", .{});
+
+            for (globals.regions.constSlice()) |region| {
+                log.debug("\t{}", .{region});
+            }
+        }
+    }
+
+    fn registerKernelSections() !void {
+        const linker_symbols = struct {
+            extern const __text_start: u8;
+            extern const __text_end: u8;
+            extern const __rodata_start: u8;
+            extern const __rodata_end: u8;
+            extern const __data_start: u8;
+            extern const __data_end: u8;
+        };
+
+        const sdf_slice = try kernel.debug.sdfSlice();
+        const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
+
+        const sections: []const struct {
+            core.VirtualAddress,
+            core.VirtualAddress,
+            kernel.mem.KernelMemoryRegion.Type,
+        } = &.{
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+                .executable_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+                .readonly_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+                .writeable_section,
+            },
+            .{
+                sdf_range.address,
+                sdf_range.endBound(),
+                .sdf_section,
+            },
+        };
+
+        for (sections) |section| {
+            const start_address = section[0];
+            const end_address = section[1];
+            const region_type = section[2];
+
+            std.debug.assert(end_address.greaterThan(start_address));
+
+            const virtual_range: core.VirtualRange = .fromAddr(
+                start_address,
+                core.Size.from(end_address.value - start_address.value, .byte)
+                    .alignForward(arch.paging.standard_page_size),
+            );
+
+            try appendKernelRegion(.{
+                .range = virtual_range,
+                .type = region_type,
+                .operation = .full_map,
+            });
+        }
+    }
+
+    fn registerDirectMaps() !void {
+        const direct_map = kernel.mem.globals.direct_map;
+
+        // does the direct map range overlap a pre-existing region?
+        for (globals.regions.constSlice()) |region| {
+            if (region.range.containsRange(direct_map)) {
+                log.err(
+                    \\direct map overlaps another memory region:
+                    \\  direct map: {}
+                    \\  other region: {}
+                , .{ direct_map, region });
+
+                return error.DirectMapOverlapsRegion;
+            }
+        }
+
+        try appendKernelRegion(.{
+            .range = direct_map,
+            .type = .direct_map,
+            .operation = .full_map,
+        });
+
+        const non_cached_direct_map = findFreeRange(
+            direct_map.size,
+            arch.paging.largest_page_size,
+        ) orelse return error.NoFreeRangeForDirectMap;
+
+        kernel.mem.globals.non_cached_direct_map = non_cached_direct_map;
+
+        try appendKernelRegion(.{
+            .range = non_cached_direct_map,
+            .type = .non_cached_direct_map,
+            .operation = .full_map,
+        });
+    }
+
+    fn registerHeaps() !void {
+        const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
+
+        const kernel_stacks_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
+            core.panic("no space in kernel memory layout for the kernel stacks", null);
+
+        try appendKernelRegion(.{
+            .range = kernel_stacks_range,
+            .type = .kernel_stacks,
+            .operation = .top_level_map,
+        });
+
+        const kernel_heap_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
+            core.panic("no space in kernel memory layout for the kernel heap", null);
+
+        try appendKernelRegion(.{
+            .range = kernel_heap_range,
+            .type = .kernel_heap,
+            .operation = .top_level_map,
+        });
+    }
+
+    pub fn appendKernelRegion(region: KernelMemoryRegion) !void {
+        try globals.regions.append(region);
+        sortMemoryLayout();
+    }
+
+    /// Sorts the kernel memory layout from lowest to highest address.
+    fn sortMemoryLayout() void {
+        std.mem.sort(KernelMemoryRegion, globals.regions.slice(), {}, struct {
+            fn lessThanFn(context: void, region: KernelMemoryRegion, other_region: KernelMemoryRegion) bool {
+                _ = context;
+                return region.range.address.lessThan(other_region.range.address);
+            }
+        }.lessThanFn);
+    }
+
+    fn findFreeRange(size: core.Size, alignment: core.Size) ?core.VirtualRange {
+        const regions = globals.regions.constSlice();
+
+        var current_address = arch.paging.higher_half_start;
+        current_address.alignForwardInPlace(alignment);
+
+        var i: usize = 0;
+
+        while (true) {
+            const region = if (i < regions.len) regions[i] else {
+                const size_of_free_range = core.Size.from(
+                    (arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                    .byte,
+                );
+
+                if (size_of_free_range.lessThan(size)) return null;
+
+                return core.VirtualRange.fromAddr(current_address, size);
+            };
+
+            const region_address = region.range.address;
+
+            if (region_address.lessThanOrEqual(current_address)) {
+                current_address = region.range.endBound();
+                current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            const size_of_free_range = core.Size.from(
+                (region_address.value - 1) - current_address.value,
+                .byte,
+            );
+
+            if (size_of_free_range.lessThan(size)) {
+                current_address = region.range.endBound();
+                current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            return core.VirtualRange.fromAddr(current_address, size);
+        }
     }
 };
 
