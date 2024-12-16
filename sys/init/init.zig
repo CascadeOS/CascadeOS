@@ -13,7 +13,7 @@ pub fn initStage1() !noreturn {
     // as the executor is not yet initialized, we can't log
 
     // we want the direct map to be available as early as possible
-    try earlyPartialMemoryLayout();
+    try kernel.mem.init.earlyPartialMemoryLayout();
 
     arch.init.setupEarlyOutput();
 
@@ -253,46 +253,6 @@ fn handlePanic(
     }
 }
 
-/// Ensures that the kernel base address, virtual offset and the direct map are set up.
-///
-/// Called very early so cannot log.
-fn earlyPartialMemoryLayout() !void {
-    const base_address = boot.kernelBaseAddress() orelse return error.NoKernelBaseAddress;
-    kernel.mem.globals.virtual_base_address = base_address.virtual;
-
-    kernel.mem.globals.virtual_offset = core.Size.from(
-        base_address.virtual.value - kernel.config.kernel_base_address.value,
-        .byte,
-    );
-
-    kernel.mem.globals.physical_to_virtual_offset = core.Size.from(
-        base_address.virtual.value - base_address.physical.value,
-        .byte,
-    );
-
-    const direct_map_size = direct_map_size: {
-        const last_memory_map_entry = last_memory_map_entry: {
-            var memory_map_iterator = boot.memoryMap(.backward) orelse return error.NoMemoryMap;
-            break :last_memory_map_entry memory_map_iterator.next() orelse return error.NoMemoryMapEntries;
-        };
-
-        var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
-
-        // We ensure that the lowest 4GiB are always mapped.
-        const four_gib = core.Size.from(4, .gib);
-        if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
-
-        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-        direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
-
-        break :direct_map_size direct_map_size;
-    };
-
-    kernel.mem.globals.direct_map = core.VirtualRange.fromAddr(
-        boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
-        direct_map_size,
-    );
-}
 
 fn buildMemoryLayout() !void {
     const memory_layout = blk: {
