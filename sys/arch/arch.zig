@@ -365,11 +365,11 @@ pub const init = struct {
     /// Register any architectural time sources.
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
-    pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) callconv(core.inline_in_non_debug) void {
+    pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.init,
             "registerArchitecturalTimeSources",
-            fn (*init_time.CandidateTimeSources) void,
+            fn (*kernel.time.init.CandidateTimeSources) void,
         );
 
         current.init.registerArchitecturalTimeSources(candidate_time_sources);
@@ -611,5 +611,4 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const init_time = @import("init").time;
 const cascade_target = @import("cascade_target").arch;

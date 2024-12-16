@@ -206,7 +206,7 @@ pub fn configurePerExecutorSystemFeatures(executor: *kernel.Executor) void {
 /// Register any architectural time sources.
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
-pub fn registerArchitecturalTimeSources(candidate_time_sources: *init_time.CandidateTimeSources) void {
+pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
     x64.tsc.init.registerTimeSource(candidate_time_sources);
     x64.hpet.init.registerTimeSource(candidate_time_sources);
     x64.apic.init.registerTimeSource(candidate_time_sources);
@@ -324,4 +324,3 @@ const lib_x64 = @import("lib_x64");
 const arch = @import("arch");
 const log = kernel.log.scoped(.init_x64);
 const acpi = @import("acpi");
-const init_time = @import("init").time;

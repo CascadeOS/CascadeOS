@@ -39,7 +39,7 @@ pub const init = struct {
         // TODO: error interrupt
     }
 
-    pub fn registerTimeSource(candidate_time_sources: *init_time.CandidateTimeSources) void {
+    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         candidate_time_sources.addTimeSource(.{
             .name = "lapic",
             .priority = 150,
@@ -63,7 +63,7 @@ pub const init = struct {
     }
 
     fn initializeLapicTimerCalibrate(
-        reference_counter: init_time.ReferenceCounter,
+        reference_counter: kernel.time.init.ReferenceCounter,
     ) void {
         lapic.writeDivideConfigurationRegister(divide_configuration);
 
@@ -153,4 +153,3 @@ const lib_x64 = @import("lib_x64");
 const log = kernel.log.scoped(.apic);
 const arch = @import("arch");
 const acpi = @import("acpi");
-const init_time = @import("init").time;

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const time = @import("time.zig");
-
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
@@ -88,7 +86,7 @@ fn initStage2() !noreturn {
     try kernel.Stack.init.initializeStacks();
 
     log.debug("initializing time", .{});
-    try time.initializeTime();
+    try kernel.time.init.initializeTime();
 
     log.debug("initializing executors", .{});
     try initializeExecutors();

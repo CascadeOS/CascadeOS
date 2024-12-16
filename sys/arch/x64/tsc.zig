@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const init = struct {
-    pub fn registerTimeSource(candidate_time_sources: *init_time.CandidateTimeSources) void {
+    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         if (!shouldUseTsc()) return;
 
         candidate_time_sources.addTimeSource(.{
@@ -62,7 +62,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
-        reference_counter: init_time.ReferenceCounter,
+        reference_counter: kernel.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());
 
@@ -101,5 +101,4 @@ const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
 const log = kernel.log.scoped(.tsc);
 const readTsc = lib_x64.instructions.readTsc;
-const init_time = @import("init").time;
 const Tick = kernel.time.wallclock.Tick;

@@ -4,7 +4,7 @@
 // [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
 
 pub const init = struct {
-    pub fn registerTimeSource(candidate_time_sources: *init_time.CandidateTimeSources) void {
+    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         if (kernel.acpi.getTable(acpi.HPET, 0) == null) return;
 
         candidate_time_sources.addTimeSource(.{
@@ -95,7 +95,6 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("lib_x64");
 const log = kernel.log.scoped(.hpet);
-const init_time = @import("init").time;
 const Tick = kernel.time.wallclock.Tick;
 const arch = @import("arch");
 const acpi = @import("acpi");
