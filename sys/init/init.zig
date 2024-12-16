@@ -61,7 +61,7 @@ fn initStage2() !noreturn {
     try kernel.mem.init.buildMemoryLayout();
 
     log.debug("initializing ACPI tables", .{});
-    try initializeACPITables();
+    try kernel.acpi.init.initializeACPITables();
 
     log.debug("capturing system information", .{});
     try arch.init.captureSystemInformation(switch (cascade_target) {
@@ -251,39 +251,6 @@ fn handlePanic(
         },
         else => {}, // don't trigger any more panics
     }
-}
-
-fn initializeACPITables() !void {
-    const rsdp_address = boot.rsdp() orelse return error.RSDPNotProvided;
-
-    const rsdp = switch (rsdp_address) {
-        .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const acpi.RSDP),
-        .virtual => |addr| addr.toPtr(*const acpi.RSDP),
-    };
-    if (!rsdp.isValid()) return error.InvalidRSDP;
-
-    const sdt_header = kernel.mem.directMapFromPhysical(rsdp.sdtAddress()).toPtr(*const acpi.SharedHeader);
-
-    if (!sdt_header.isValid()) return error.InvalidSDT;
-
-    if (log.levelEnabled(.debug)) {
-        var iter = acpi.tableIterator(
-            sdt_header,
-            kernel.mem.directMapFromPhysical,
-        );
-
-        log.debug("ACPI tables:", .{});
-
-        while (iter.next()) |table| {
-            if (table.isValid()) {
-                log.debug("  {s}", .{table.signatureAsString()});
-            } else {
-                log.debug("  {s} - INVALID", .{table.signatureAsString()});
-            }
-        }
-    }
-
-    kernel.acpi.globals.sdt_header = sdt_header;
 }
 
 fn initializePhysicalMemory() !void {
