@@ -1242,8 +1242,6 @@ const MAX_TAGS_PER_ALLOCATION = TAGS_PER_SPAN_CREATE + TAGS_PER_PARTIAL_ALLOCATI
 const TARGET_UNUSED_TAGS = MAX_TAGS_PER_ALLOCATION;
 const TARGET_UNUSED_TAGS_FOR_POPULATOR = MAX_TAGS_PER_ALLOCATION * globals.populator_arenas.len;
 
-const NUMBER_OF_EARLY_TAGS = 200;
-
 pub const Name = std.BoundedArray(u8, kernel.config.resource_arena_name_length);
 
 pub const globals = struct {
@@ -1265,14 +1263,15 @@ pub const globals = struct {
         &kernel.mem.heap.globals.heap_arena,
         &tag_arena,
     };
+};
+
+pub const init = struct {
+    const NUMBER_OF_EARLY_TAGS = 200;
+    var early_tags: [NUMBER_OF_EARLY_TAGS]BoundaryTag = @splat(.empty(.free));
 
     pub fn populateUnusedTags() void {
-        const static = struct {
-            var early_tags: [NUMBER_OF_EARLY_TAGS]BoundaryTag = @splat(.empty(.free));
-        };
-
-        for (&static.early_tags) |*tag| {
-            unused_tags.push(&tag.all_tag_node);
+        for (&early_tags) |*tag| {
+            globals.unused_tags.push(&tag.all_tag_node);
         }
 
         // TODO: populate the populator arenas

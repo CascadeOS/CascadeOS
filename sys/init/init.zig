@@ -257,7 +257,7 @@ fn handlePanic(
 }
 
 fn initializeResourceArenasAndHeap() !void {
-    kernel.mem.ResourceArena.globals.populateUnusedTags();
+    kernel.mem.ResourceArena.init.populateUnusedTags();
 
     try kernel.mem.ResourceArena.globals.tag_arena.create(
         "tags",
