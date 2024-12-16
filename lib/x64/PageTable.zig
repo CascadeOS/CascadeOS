@@ -211,7 +211,7 @@ pub const PageTable = extern struct {
         pub fn getNextLevel(
             self: Entry,
             comptime virtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
-        ) !*PageTable {
+        ) error{ NotPresent, HugePage }!*PageTable {
             if (!self.present.read()) return error.NotPresent;
             if (self.huge.read()) return error.HugePage;
             return virtualFromPhysical(self.getAddress4kib()).toPtr(*PageTable);
