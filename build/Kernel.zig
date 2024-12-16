@@ -270,33 +270,6 @@ fn constructKernelExe(
         break :blk boot_module;
     };
 
-    const init_module = blk: {
-        const init_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "sys", "init", "init.zig" })),
-        });
-
-        const deps = try getAllDependencies(b, target, libraries, &.{init_module_dependencies});
-        defer b.allocator.free(deps);
-
-        for (deps) |dep| {
-            const library_module = dep.library.cascade_modules.get(target) orelse
-                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
-
-            init_module.addImport(dep.import_name, library_module);
-        }
-
-        // self reference
-        init_module.addImport("init", init_module);
-
-        // target options
-        init_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
-
-        // kernel options
-        init_module.addImport("kernel_options", options.kernel_option_module);
-
-        break :blk init_module;
-    };
-
     const kernel_module = blk: {
         const kernel_module = b.createModule(.{
             .root_source_file = b.path(b.pathJoin(&.{ "sys", "kernel", "kernel.zig" })),
@@ -330,11 +303,7 @@ fn constructKernelExe(
     };
 
     arch_module.addImport("kernel", kernel_module);
-    arch_module.addImport("init", init_module);
     boot_module.addImport("arch", arch_module);
-    init_module.addImport("arch", arch_module);
-    init_module.addImport("kernel", kernel_module);
-    init_module.addImport("boot", boot_module);
     kernel_module.addImport("arch", arch_module);
     kernel_module.addImport("boot", boot_module);
 
@@ -346,7 +315,6 @@ fn constructKernelExe(
     });
 
     kernel_exe.root_module.addImport("boot", boot_module);
-    kernel_exe.root_module.addImport("init", init_module);
     kernel_exe.root_module.addImport("kernel", kernel_module);
 
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
@@ -579,12 +547,10 @@ const StepCollection = @import("StepCollection.zig");
 
 const arch_module_dependencies = @import("../sys/arch/dependencies.zig");
 const boot_module_dependencies = @import("../sys/boot/dependencies.zig");
-const init_module_dependencies = @import("../sys/init/dependencies.zig");
 const kernel_module_dependencies = @import("../sys/kernel/dependencies.zig");
 
 const all_module_dependencies = &.{
     arch_module_dependencies,
     boot_module_dependencies,
-    init_module_dependencies,
     kernel_module_dependencies,
 };

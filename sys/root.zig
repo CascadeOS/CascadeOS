@@ -21,12 +21,11 @@ pub const std_options: std.Options = .{
 pub const Panic = kernel.debug.Panic;
 
 // Expose the init log implementation so that the `kernel` module can access it on @import("root").
-pub const initLogImpl: kernel.log.InitLogImpl = init.handleLog;
+pub const initLogImpl: kernel.log.InitLogImpl = kernel.init.handleLog;
 
 // Expose the init entry point so that the `boot` module can access it on @import("root").
-pub const initEntryPoint = init.initStage1;
+pub const initEntryPoint = kernel.init.initStage1;
 
 const std = @import("std");
 const kernel = @import("kernel");
 const boot = @import("boot");
-const init = @import("init");

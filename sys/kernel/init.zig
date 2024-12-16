@@ -101,8 +101,6 @@ fn initStage2() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage3(executor: *kernel.Executor) !noreturn {
-    // we can't log until we load the executor
-
     kernel.mem.globals.core_page_table.load();
     arch.init.loadExecutor(executor);
 
@@ -343,6 +341,5 @@ const kernel = @import("kernel");
 const boot = @import("boot");
 const arch = @import("arch");
 const log = kernel.log.scoped(.init);
-const acpi = @import("acpi");
 const cascade_target = @import("cascade_target").arch;
 const containers = @import("containers");

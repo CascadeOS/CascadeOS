@@ -26,6 +26,8 @@ pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 
+pub const init = @import("init.zig");
+
 const std = @import("std");
 const core = @import("core");
 const arch = @import("arch");
