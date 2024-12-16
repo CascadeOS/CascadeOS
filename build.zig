@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
-const min_zig_version = "0.14.0-dev.1816+20e03beae";
+const min_zig_version = "0.14.0-dev.2487+af89bb05d";
 
 // Ensure this is kept in sync with `build.zig.zon`
 const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 3 };
