@@ -78,8 +78,11 @@ fn initStage2() !noreturn {
     log.debug("building core page table", .{});
     try kernel.mem.init.buildCorePageTable();
 
-    log.debug("initializing resource arenas and kernel heap", .{});
-    try initializeResourceArenasAndHeap();
+    log.debug("initializing resource arenas", .{});
+    try kernel.mem.ResourceArena.init.initializeResourceArenas();
+
+    log.debug("initializing kernel heap", .{});
+    try initializeHeap();
 
     log.debug("initializing time", .{});
     try time.initializeTime();
@@ -256,17 +259,7 @@ fn handlePanic(
     }
 }
 
-fn initializeResourceArenasAndHeap() !void {
-    kernel.mem.ResourceArena.init.populateUnusedTags();
-
-    try kernel.mem.ResourceArena.globals.tag_arena.create(
-        "tags",
-        arch.paging.standard_page_size.value,
-        .{
-            .populator = true,
-            .source = .{ .arena = &kernel.mem.heap.globals.heap_arena },
-        },
-    );
+fn initializeHeap() !void {
 
     // heap
     {

@@ -1269,12 +1269,21 @@ pub const init = struct {
     const NUMBER_OF_EARLY_TAGS = 200;
     var early_tags: [NUMBER_OF_EARLY_TAGS]BoundaryTag = @splat(.empty(.free));
 
-    pub fn populateUnusedTags() void {
+    pub fn populateUnusedTags() void {}
+
+    pub fn initializeResourceArenas() !void {
         for (&early_tags) |*tag| {
             globals.unused_tags.push(&tag.all_tag_node);
         }
 
-        // TODO: populate the populator arenas
+        try globals.tag_arena.create(
+            "tags",
+            arch.paging.standard_page_size.value,
+            .{
+                .populator = true,
+                .source = .{ .arena = &kernel.mem.heap.globals.heap_arena },
+            },
+        );
     }
 };
 
