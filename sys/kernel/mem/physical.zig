@@ -91,9 +91,71 @@ pub const globals = struct {
     pub var unavailable_memory: core.Size = undefined;
 };
 
+pub const init = struct {
+    pub fn initializePhysicalMemory() !void {
+        var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
+
+        var total_memory: core.Size = .zero;
+        var free_memory: core.Size = .zero;
+        var reserved_memory: core.Size = .zero;
+        var reclaimable_memory: core.Size = .zero;
+        var unavailable_memory: core.Size = .zero;
+
+        while (iter.next()) |entry| {
+            total_memory.addInPlace(entry.range.size);
+
+            switch (entry.type) {
+                .free => {
+                    free_memory.addInPlace(entry.range.size);
+
+                    std.debug.assert(entry.range.address.isAligned(arch.paging.standard_page_size));
+                    std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
+
+                    const virtual_range = kernel.mem.directMapFromPhysicalRange(entry.range);
+
+                    var current_virtual_address = virtual_range.address;
+                    const last_virtual_address = virtual_range.last();
+
+                    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) : ({
+                        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+                    }) {
+                        globals.free_pages.push(
+                            current_virtual_address.toPtr(*containers.SingleNode),
+                        );
+                    }
+                },
+                .in_use => {},
+                .reserved => reserved_memory.addInPlace(entry.range.size),
+                .bootloader_reclaimable, .acpi_reclaimable => reclaimable_memory.addInPlace(entry.range.size),
+                .unusable, .unknown => unavailable_memory.addInPlace(entry.range.size),
+            }
+        }
+
+        const used_memory = total_memory
+            .subtract(free_memory)
+            .subtract(reserved_memory)
+            .subtract(reclaimable_memory)
+            .subtract(unavailable_memory);
+
+        log.debug("total memory:         {}", .{total_memory});
+        log.debug("  free memory:        {}", .{free_memory});
+        log.debug("  used memory:        {}", .{used_memory});
+        log.debug("  reserved memory:    {}", .{reserved_memory});
+        log.debug("  reclaimable memory: {}", .{reclaimable_memory});
+        log.debug("  unavailable memory: {}", .{unavailable_memory});
+
+        globals.total_memory = total_memory;
+        globals.free_memory.store(free_memory.value, .release);
+        globals.reserved_memory = reserved_memory;
+        globals.reclaimable_memory = reclaimable_memory;
+        globals.unavailable_memory = unavailable_memory;
+    }
+};
+
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
 const arch = @import("arch");
 const containers = @import("containers");
 const log = kernel.log.scoped(.mem_physical);
+const boot = @import("boot");

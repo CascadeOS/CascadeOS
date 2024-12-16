@@ -73,7 +73,7 @@ fn initStage2() !noreturn {
     try arch.init.configureGlobalSystemFeatures();
 
     log.debug("initializing physical memory", .{});
-    try initializePhysicalMemory();
+    try kernel.mem.physical.init.initializePhysicalMemory();
 
     log.debug("initializing virtual memory", .{});
     try initializeVirtualMemory();
@@ -251,65 +251,6 @@ fn handlePanic(
         },
         else => {}, // don't trigger any more panics
     }
-}
-
-fn initializePhysicalMemory() !void {
-    var iter = boot.memoryMap(.forward) orelse return error.NoMemoryMap;
-
-    var total_memory: core.Size = .zero;
-    var free_memory: core.Size = .zero;
-    var reserved_memory: core.Size = .zero;
-    var reclaimable_memory: core.Size = .zero;
-    var unavailable_memory: core.Size = .zero;
-
-    while (iter.next()) |entry| {
-        total_memory.addInPlace(entry.range.size);
-
-        switch (entry.type) {
-            .free => {
-                free_memory.addInPlace(entry.range.size);
-
-                std.debug.assert(entry.range.address.isAligned(arch.paging.standard_page_size));
-                std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
-
-                const virtual_range = kernel.mem.directMapFromPhysicalRange(entry.range);
-
-                var current_virtual_address = virtual_range.address;
-                const last_virtual_address = virtual_range.last();
-
-                while (current_virtual_address.lessThanOrEqual(last_virtual_address)) : ({
-                    current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
-                }) {
-                    kernel.mem.physical.globals.free_pages.push(
-                        current_virtual_address.toPtr(*containers.SingleNode),
-                    );
-                }
-            },
-            .in_use => {},
-            .reserved => reserved_memory.addInPlace(entry.range.size),
-            .bootloader_reclaimable, .acpi_reclaimable => reclaimable_memory.addInPlace(entry.range.size),
-            .unusable, .unknown => unavailable_memory.addInPlace(entry.range.size),
-        }
-    }
-
-    const used_memory = total_memory
-        .subtract(free_memory)
-        .subtract(reserved_memory)
-        .subtract(reclaimable_memory)
-        .subtract(unavailable_memory);
-
-    log.debug("total memory:         {}", .{total_memory});
-    log.debug("  free memory:        {}", .{free_memory});
-    log.debug("  used memory:        {}", .{used_memory});
-    log.debug("  reserved memory:    {}", .{reserved_memory});
-    log.debug("  reclaimable memory: {}", .{reclaimable_memory});
-    log.debug("  unavailable memory: {}", .{unavailable_memory});
-
-    kernel.mem.physical.globals.total_memory = total_memory;
-    kernel.mem.physical.globals.free_memory.store(free_memory.value, .release);
-    kernel.mem.physical.globals.reserved_memory = reserved_memory;
-    kernel.mem.physical.globals.reclaimable_memory = reclaimable_memory;
-    kernel.mem.physical.globals.unavailable_memory = unavailable_memory;
 }
 
 fn initializeVirtualMemory() !void {
