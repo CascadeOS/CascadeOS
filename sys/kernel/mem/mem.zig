@@ -13,7 +13,7 @@ pub const MapError = error{
 
     /// This is used to surface errors from the underlying paging implementation that are architecture specific.
     MappingNotValid,
-} || kernel.mem.physical.AllocatePageError;
+} || physical.AllocatePageError;
 
 /// Maps a virtual range using the standard page size.
 ///
@@ -42,8 +42,8 @@ pub fn mapRange(
 
     // Map all pages that were allocated.
     while (current_virtual_range.address.lessThanOrEqual(last_virtual_address)) {
-        const physical_range = try kernel.mem.physical.allocatePage();
-        errdefer kernel.mem.physical.deallocatePage(physical_range);
+        const physical_range = try physical.allocatePage();
+        errdefer physical.deallocatePage(physical_range);
 
         try mapToPhysicalRange(
             page_table,
@@ -269,7 +269,7 @@ pub const init = struct {
         const sections: []const struct {
             core.VirtualAddress,
             core.VirtualAddress,
-            kernel.mem.KernelMemoryRegion.Type,
+            KernelMemoryRegion.Type,
         } = &.{
             .{
                 core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
@@ -315,7 +315,7 @@ pub const init = struct {
     }
 
     fn registerDirectMaps() !void {
-        const direct_map = kernel.mem.globals.direct_map;
+        const direct_map = globals.direct_map;
 
         // does the direct map range overlap a pre-existing region?
         for (globals.regions.constSlice()) |region| {
@@ -341,7 +341,7 @@ pub const init = struct {
             arch.paging.largest_page_size,
         ) orelse return error.NoFreeRangeForDirectMap;
 
-        kernel.mem.globals.non_cached_direct_map = non_cached_direct_map;
+        globals.non_cached_direct_map = non_cached_direct_map;
 
         try appendKernelRegion(.{
             .range = non_cached_direct_map,
@@ -372,7 +372,54 @@ pub const init = struct {
         });
     }
 
-    pub fn appendKernelRegion(region: KernelMemoryRegion) !void {
+    pub fn buildCorePageTable() !void {
+        globals.core_page_table = arch.paging.PageTable.create(
+            try physical.allocatePage(),
+        );
+
+        for (globals.regions.constSlice()) |region| {
+            switch (region.operation) {
+                .full_map => {
+                    const physical_range = switch (region.type) {
+                        .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+                        .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
+                            core.PhysicalAddress.fromInt(
+                                region.range.address.value - globals.physical_to_virtual_offset.value,
+                            ),
+                            region.range.size,
+                        ),
+                        .kernel_stacks => core.panic("kernel stack region is full mapped", null),
+                        .kernel_heap => core.panic("kernel heap region is full mapped", null),
+                    };
+
+                    const map_type: MapType = switch (region.type) {
+                        .executable_section => .{ .executable = true, .global = true },
+                        .readonly_section, .sdf_section => .{ .global = true },
+                        .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+                        .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
+                        .kernel_stacks => core.panic("kernel stack region is full mapped", null),
+                        .kernel_heap => core.panic("kernel heap region is full mapped", null),
+                    };
+
+                    arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                        globals.core_page_table,
+                        region.range,
+                        physical_range,
+                        map_type,
+                    );
+                },
+                .top_level_map => arch.paging.init.fillTopLevel(
+                    globals.core_page_table,
+                    region.range,
+                    .{ .global = true, .writeable = true },
+                ),
+            }
+        }
+
+        globals.core_page_table.load();
+    }
+
+    fn appendKernelRegion(region: KernelMemoryRegion) !void {
         try globals.regions.append(region);
         sortMemoryLayout();
     }

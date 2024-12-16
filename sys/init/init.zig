@@ -75,8 +75,11 @@ fn initStage2() !noreturn {
     log.debug("initializing physical memory", .{});
     try kernel.mem.physical.init.initializePhysicalMemory();
 
-    log.debug("initializing virtual memory", .{});
-    try initializeVirtualMemory();
+    log.debug("building core page table", .{});
+    try kernel.mem.init.buildCorePageTable();
+
+    log.debug("initializing resource arenas and kernel heap", .{});
+    try initializeResourceArenasAndHeap();
 
     log.debug("initializing time", .{});
     try time.initializeTime();
@@ -251,60 +254,6 @@ fn handlePanic(
         },
         else => {}, // don't trigger any more panics
     }
-}
-
-fn initializeVirtualMemory() !void {
-    log.debug("building core page table", .{});
-    try buildCorePageTable();
-    log.debug("initializing resource arenas and kernel heap", .{});
-    try initializeResourceArenasAndHeap();
-}
-
-fn buildCorePageTable() !void {
-    kernel.mem.globals.core_page_table = arch.paging.PageTable.create(
-        try kernel.mem.physical.allocatePage(),
-    );
-
-    for (kernel.mem.globals.regions.constSlice()) |region| {
-        switch (region.operation) {
-            .full_map => {
-                const physical_range = switch (region.type) {
-                    .direct_map, .non_cached_direct_map => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
-                    .executable_section, .readonly_section, .sdf_section, .writeable_section => core.PhysicalRange.fromAddr(
-                        core.PhysicalAddress.fromInt(
-                            region.range.address.value - kernel.mem.globals.physical_to_virtual_offset.value,
-                        ),
-                        region.range.size,
-                    ),
-                    .kernel_stacks => core.panic("kernel stack region is full mapped", null),
-                    .kernel_heap => core.panic("kernel heap region is full mapped", null),
-                };
-
-                const map_type: kernel.mem.MapType = switch (region.type) {
-                    .executable_section => .{ .executable = true, .global = true },
-                    .readonly_section, .sdf_section => .{ .global = true },
-                    .writeable_section, .direct_map => .{ .writeable = true, .global = true },
-                    .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
-                    .kernel_stacks => core.panic("kernel stack region is full mapped", null),
-                    .kernel_heap => core.panic("kernel heap region is full mapped", null),
-                };
-
-                arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                    kernel.mem.globals.core_page_table,
-                    region.range,
-                    physical_range,
-                    map_type,
-                );
-            },
-            .top_level_map => arch.paging.init.fillTopLevel(
-                kernel.mem.globals.core_page_table,
-                region.range,
-                .{ .global = true, .writeable = true },
-            ),
-        }
-    }
-
-    kernel.mem.globals.core_page_table.load();
 }
 
 fn initializeResourceArenasAndHeap() !void {
