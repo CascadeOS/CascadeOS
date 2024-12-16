@@ -85,7 +85,7 @@ fn initStage2() !noreturn {
     try kernel.mem.heap.init.initializeHeap();
 
     log.debug("initializing kernel stacks", .{});
-    try initializeStacks();
+    try kernel.Stack.init.initializeStacks();
 
     log.debug("initializing time", .{});
     try time.initializeTime();
@@ -259,31 +259,6 @@ fn handlePanic(
             arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n");
         },
         else => {}, // don't trigger any more panics
-    }
-}
-
-fn initializeStacks() !void {
-    // stacks
-    {
-        try kernel.Stack.globals.stack_arena.create(
-            "stacks",
-            arch.paging.standard_page_size.value,
-            .{},
-        );
-
-        const stacks_range = kernel.mem.getKernelRegion(.kernel_stacks) orelse
-            core.panic("no kernel stacks", null);
-
-        kernel.Stack.globals.stack_arena.addSpan(
-            stacks_range.address.value,
-            stacks_range.size.value,
-        ) catch |err| {
-            core.panicFmt(
-                "failed to add stack range to `stack_arena`: {s}",
-                .{@errorName(err)},
-                @errorReturnTrace(),
-            );
-        };
     }
 }
 

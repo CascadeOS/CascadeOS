@@ -103,6 +103,30 @@ pub const globals = struct {
     pub var stack_arena: kernel.mem.ResourceArena = undefined;
 };
 
+pub const init = struct {
+    pub fn initializeStacks() !void {
+        try globals.stack_arena.create(
+            "stacks",
+            arch.paging.standard_page_size.value,
+            .{},
+        );
+
+        const stacks_range = kernel.mem.getKernelRegion(.kernel_stacks) orelse
+            core.panic("no kernel stacks", null);
+
+        globals.stack_arena.addSpan(
+            stacks_range.address.value,
+            stacks_range.size.value,
+        ) catch |err| {
+            core.panicFmt(
+                "failed to add stack range to `stack_arena`: {s}",
+                .{@errorName(err)},
+                @errorReturnTrace(),
+            );
+        };
+    }
+};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
