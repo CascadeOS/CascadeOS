@@ -88,12 +88,12 @@ pub const Source = struct {
     }
 };
 
-pub const InitOptions = struct {
+pub const CreateOptions = struct {
     source: ?Source = null,
     populator: bool = false,
 };
 
-pub const InitError = error{
+pub const CreateError = error{
     /// The `quantum` is not a power of two.
     InvalidQuantum,
 
@@ -101,18 +101,18 @@ pub const InitError = error{
     NameTooLong,
 };
 
-pub fn init(
+pub fn create(
     arena: *ResourceArena,
     arena_name: []const u8,
     quantum: usize,
-    options: InitOptions,
-) InitError!void {
-    if (!std.mem.isValidAlign(quantum)) return InitError.InvalidQuantum;
+    options: CreateOptions,
+) CreateError!void {
+    if (!std.mem.isValidAlign(quantum)) return CreateError.InvalidQuantum;
 
-    log.debug("{s}: initializing with quantum 0x{x}", .{ arena_name, quantum });
+    log.debug("{s}: creating arena with quantum 0x{x}", .{ arena_name, quantum });
 
     arena.* = .{
-        ._name = Name.fromSlice(arena_name) catch return InitError.NameTooLong,
+        ._name = Name.fromSlice(arena_name) catch return CreateError.NameTooLong,
         .quantum = quantum,
         .mutex = .{},
         .source = options.source,
@@ -127,13 +127,13 @@ pub fn init(
     };
 }
 
-/// Deinitializes the resource arena.
+/// Destory the resource arena.
 ///
 /// Assumes that no concurrent access to the resource arena is happening, does not lock.
 ///
 /// Panics if there are any allocations in the resource arena.
-pub fn deinit(arena: *ResourceArena) void {
-    log.debug("{s}: deinitializing", .{arena.name()});
+pub fn destory(arena: *ResourceArena) void {
+    log.debug("{s}: destroying arena", .{arena.name()});
 
     var tags_to_release: SingleLinkedList = .empty;
 

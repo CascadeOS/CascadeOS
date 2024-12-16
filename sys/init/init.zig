@@ -259,7 +259,7 @@ fn handlePanic(
 fn initializeResourceArenasAndHeap() !void {
     kernel.mem.ResourceArena.globals.populateUnusedTags();
 
-    try kernel.mem.ResourceArena.globals.tag_arena.init(
+    try kernel.mem.ResourceArena.globals.tag_arena.create(
         "tags",
         arch.paging.standard_page_size.value,
         .{
@@ -270,13 +270,13 @@ fn initializeResourceArenasAndHeap() !void {
 
     // heap
     {
-        try kernel.mem.heap.globals.heap_address_space_arena.init(
+        try kernel.mem.heap.globals.heap_address_space_arena.create(
             "heap_address_space",
             arch.paging.standard_page_size.value,
             .{ .populator = true },
         );
 
-        try kernel.mem.heap.globals.heap_arena.init(
+        try kernel.mem.heap.globals.heap_arena.create(
             "heap",
             arch.paging.standard_page_size.value,
             .{
@@ -306,7 +306,7 @@ fn initializeResourceArenasAndHeap() !void {
 
     // stacks
     {
-        try kernel.Stack.globals.stack_arena.init(
+        try kernel.Stack.globals.stack_arena.create(
             "stacks",
             arch.paging.standard_page_size.value,
             .{},
