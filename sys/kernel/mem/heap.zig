@@ -69,7 +69,7 @@ pub const allocator = std.mem.Allocator{
     },
 };
 
-pub fn _heapArenaImport(
+fn heapArenaImport(
     arena: *ResourceArena,
     len: usize,
     policy: ResourceArena.Policy,
@@ -90,7 +90,7 @@ pub fn _heapArenaImport(
     return allocation;
 }
 
-pub fn _heapArenaRelease(
+fn heapArenaRelease(
     arena: *ResourceArena,
     allocation: ResourceArena.Allocation,
 ) void {
@@ -122,6 +122,43 @@ pub const globals = struct {
     ///
     /// Initialized during `init.initializeResourceArenasAndHeap`.
     pub var heap_arena: ResourceArena = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeHeap() !void {
+        try globals.heap_address_space_arena.create(
+            "heap_address_space",
+            arch.paging.standard_page_size.value,
+            .{ .populator = true },
+        );
+
+        try globals.heap_arena.create(
+            "heap",
+            arch.paging.standard_page_size.value,
+            .{
+                .populator = true,
+                .source = .{
+                    .arena = &globals.heap_address_space_arena,
+                    .import = heapArenaImport,
+                    .release = heapArenaRelease,
+                },
+            },
+        );
+
+        const heap_range = kernel.mem.getKernelRegion(.kernel_heap) orelse
+            core.panic("no kernel heap", null);
+
+        globals.heap_address_space_arena.addSpan(
+            heap_range.address.value,
+            heap_range.size.value,
+        ) catch |err| {
+            core.panicFmt(
+                "failed to add heap range to `heap_address_space_arena`: {s}",
+                .{@errorName(err)},
+                @errorReturnTrace(),
+            );
+        };
+    }
 };
 
 const core = @import("core");

@@ -82,7 +82,10 @@ fn initStage2() !noreturn {
     try kernel.mem.ResourceArena.init.initializeResourceArenas();
 
     log.debug("initializing kernel heap", .{});
-    try initializeHeap();
+    try kernel.mem.heap.init.initializeHeap();
+
+    log.debug("initializing kernel stacks", .{});
+    try initializeStacks();
 
     log.debug("initializing time", .{});
     try time.initializeTime();
@@ -259,44 +262,7 @@ fn handlePanic(
     }
 }
 
-fn initializeHeap() !void {
-
-    // heap
-    {
-        try kernel.mem.heap.globals.heap_address_space_arena.create(
-            "heap_address_space",
-            arch.paging.standard_page_size.value,
-            .{ .populator = true },
-        );
-
-        try kernel.mem.heap.globals.heap_arena.create(
-            "heap",
-            arch.paging.standard_page_size.value,
-            .{
-                .populator = true,
-                .source = .{
-                    .arena = &kernel.mem.heap.globals.heap_address_space_arena,
-                    .import = kernel.mem.heap._heapArenaImport,
-                    .release = kernel.mem.heap._heapArenaRelease,
-                },
-            },
-        );
-
-        const heap_range = kernel.mem.getKernelRegion(.kernel_heap) orelse
-            core.panic("no kernel heap", null);
-
-        kernel.mem.heap.globals.heap_address_space_arena.addSpan(
-            heap_range.address.value,
-            heap_range.size.value,
-        ) catch |err| {
-            core.panicFmt(
-                "failed to add heap range to `heap_address_space_arena`: {s}",
-                .{@errorName(err)},
-                @errorReturnTrace(),
-            );
-        };
-    }
-
+fn initializeStacks() !void {
     // stacks
     {
         try kernel.Stack.globals.stack_arena.create(
