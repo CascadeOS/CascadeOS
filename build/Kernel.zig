@@ -336,6 +336,7 @@ fn constructKernelExe(
     init_module.addImport("kernel", kernel_module);
     init_module.addImport("boot", boot_module);
     kernel_module.addImport("arch", arch_module);
+    kernel_module.addImport("boot", boot_module);
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
