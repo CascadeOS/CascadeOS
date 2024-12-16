@@ -3,9 +3,9 @@
 
 const WaitQueue = @This();
 
-waiting_tasks: containers.SinglyLinkedFIFO = .{},
+waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 
-pub fn wakeOne(self: *WaitQueue, exclusion: kernel.sync.InterruptExclusion) void {
+pub fn wakeOne(self: *WaitQueue, exclusion: *const kernel.sync.InterruptExclusion) void {
     const task_to_wake_node = self.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
 
