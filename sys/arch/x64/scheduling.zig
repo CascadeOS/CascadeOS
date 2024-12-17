@@ -204,7 +204,7 @@ pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kerne
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
-        executor.scheduler_stack.stack_pointer,
+        executor.idle_task.stack.stack_pointer,
     );
 }
 

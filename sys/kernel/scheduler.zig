@@ -3,30 +3,32 @@
 
 /// Queues a task to be run by the scheduler.
 pub fn queueTask(scheduler_held: SchedulerHeld, task: *kernel.Task) void {
-    _ = scheduler_held;
-
     std.debug.assert(task.next_task_node.next == null);
+    std.debug.assert(&scheduler_held.held.exclusion.getCurrentExecutor().idle_task != task);
 
     task.state = .ready;
     ready_to_run.push(&task.next_task_node);
 }
 
 pub fn maybePreempt(interrupt_exclusion: *const kernel.sync.InterruptExclusion) void {
-    if (ready_to_run.isEmpty()) return;
+    const executor = interrupt_exclusion.getCurrentExecutor();
+    if (executor.isCurrentTaskIdle()) return;
 
-    if (interrupt_exclusion.getCurrentExecutor().current_task) |current_task| {
-        if (current_task.preemption_disable_count != 0) {
-            current_task.preemption_skipped = true;
-            log.debug("preemption skipped for {}", .{current_task});
-            return;
-        }
+    const current_task = executor.current_task;
 
-        log.debug("preempting {}", .{current_task});
-        current_task.preemption_skipped = false;
+    if (current_task.preemption_disable_count != 0) {
+        current_task.preemption_skipped = true;
+        log.debug("preemption skipped for {}", .{current_task});
+        return;
     }
+
+    log.debug("preempting {}", .{current_task});
+    current_task.preemption_skipped = false;
 
     var scheduler_held = lockScheduler(interrupt_exclusion);
     defer scheduler_held.unlock();
+
+    if (ready_to_run.isEmpty()) return;
 
     yield(scheduler_held, .requeue);
 }
@@ -37,17 +39,19 @@ pub fn maybePreempt(interrupt_exclusion: *const kernel.sync.InterruptExclusion) 
 pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop }) void {
     const executor = scheduler_held.held.exclusion.getCurrentExecutor();
 
+    const current_task = executor.current_task;
+    std.debug.assert(current_task.state == .running);
+
     const new_task_node = ready_to_run.pop() orelse {
         switch (mode) {
             .requeue => return, // no tasks to run
             .drop => {
-                if (executor.current_task) |current_task| {
-                    std.debug.assert(current_task.state == .running);
-                    log.debug("dropping {}", .{current_task});
-                    current_task.state = .dropped;
-                }
+                std.debug.assert(!executor.isCurrentTaskIdle()); // drop during idle
 
-                switchToIdle(executor, executor.current_task);
+                log.debug("dropping {}", .{current_task});
+                current_task.state = .dropped;
+
+                switchToIdle(executor, current_task);
                 core.panic("idle returned", null);
             },
         }
@@ -56,10 +60,10 @@ pub fn yield(scheduler_held: SchedulerHeld, comptime mode: enum { requeue, drop 
     const new_task = kernel.Task.fromNode(new_task_node);
     std.debug.assert(new_task.state == .ready);
 
-    const current_task = executor.current_task orelse {
+    if (executor.isCurrentTaskIdle()) {
         switchToTaskFromIdle(executor, new_task);
         core.panic("idle returned", null);
-    };
+    }
 
     std.debug.assert(current_task != new_task);
     std.debug.assert(current_task.state == .running);
@@ -88,10 +92,9 @@ pub fn block(
     spinlock_held: kernel.sync.TicketSpinLock.Held,
 ) void {
     const executor = scheduler_held.held.exclusion.getCurrentExecutor();
+    const current_task = executor.current_task;
+    std.debug.assert(!executor.isCurrentTaskIdle()); // block during idle
 
-    std.debug.assert(executor.current_task != null);
-
-    const current_task = executor.current_task.?;
     std.debug.assert(current_task.state == .running);
     std.debug.assert(current_task.preemption_disable_count == 0);
     std.debug.assert(current_task.preemption_skipped == false);
@@ -141,24 +144,29 @@ pub fn unlockSchedulerFromOtherTask() kernel.sync.InterruptExclusion {
     return exclusion;
 }
 
-fn switchToIdle(executor: *kernel.Executor, opt_current_task: ?*kernel.Task) void {
-    executor.current_task = null;
+fn switchToIdle(executor: *kernel.Executor, current_task: *kernel.Task) void {
+    std.debug.assert(!executor.isCurrentTaskIdle());
 
-    if (opt_current_task) |current_task| {
-        arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
-    }
+    arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
 
-    arch.scheduling.callZeroArgs(opt_current_task, executor.scheduler_stack, idle) catch |err| {
+    executor.idle_task.state = .running;
+    executor.current_task = &executor.idle_task;
+
+    arch.scheduling.callZeroArgs(
+        current_task,
+        executor.idle_task.stack,
+        idle,
+    ) catch |err| {
         switch (err) {
-            // the scheduler stack should be big enough
-            error.StackOverflow => core.panic("insufficent space on the scheduler stack", null),
+            // the idle task stack should be big enough
+            error.StackOverflow => core.panic("insufficent space on the idle task stack", null),
         }
     };
 }
 
 fn switchToIdleWithLock(
     executor: *kernel.Executor,
-    opt_current_task: ?*kernel.Task,
+    current_task: *kernel.Task,
     spinlock_held: kernel.sync.TicketSpinLock.Held,
 ) void {
     const static = struct {
@@ -171,47 +179,55 @@ fn switchToIdleWithLock(
         }
     };
 
-    executor.current_task = null;
+    std.debug.assert(!executor.isCurrentTaskIdle());
 
-    if (opt_current_task) |current_task| {
-        arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
-    }
+    arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
+
+    executor.idle_task.state = .running;
+    executor.current_task = &executor.idle_task;
 
     arch.scheduling.callOneArgs(
-        opt_current_task,
-        executor.scheduler_stack,
+        current_task,
+        executor.idle_task.stack,
         spinlock_held.spinlock,
         static.idleWithLock,
     ) catch |err| {
         switch (err) {
-            // the scheduler stack should be big enough
-            error.StackOverflow => core.panic("insufficent space on the scheduler stack", null),
+            // the idle task stack should be big enough
+            error.StackOverflow => core.panic("insufficent space on the idle task stack", null),
         }
     };
 }
 
 fn switchToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) noreturn {
+    std.debug.assert(executor.isCurrentTaskIdle());
+
     log.debug("switching to {} from idle", .{new_task});
 
     std.debug.assert(new_task.next_task_node.next == null);
 
+    arch.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
+
     executor.current_task = new_task;
     new_task.state = .running;
+    executor.idle_task.state = .ready;
 
-    arch.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
     arch.scheduling.jumpToTaskFromIdle(new_task);
     core.panic("task returned", null);
 }
 
 fn switchToTaskFromTask(executor: *kernel.Executor, current_task: *kernel.Task, new_task: *kernel.Task) void {
+    std.debug.assert(!executor.isCurrentTaskIdle());
+
     log.debug("switching to {} from {}", .{ new_task, current_task });
 
     std.debug.assert(new_task.next_task_node.next == null);
 
+    arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
+
     executor.current_task = new_task;
     new_task.state = .running;
 
-    arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
     arch.scheduling.jumpToTaskFromTask(current_task, new_task);
 }
 
@@ -232,25 +248,27 @@ fn switchToTaskFromTaskWithLock(
         }
     };
 
+    std.debug.assert(!executor.isCurrentTaskIdle());
+
     log.debug("switching to {} from {} with a lock", .{ new_task, current_task });
 
     std.debug.assert(new_task.next_task_node.next == null);
 
+    arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
+
     executor.current_task = new_task;
     new_task.state = .running;
 
-    arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
-
     arch.scheduling.callTwoArgs(
         current_task,
-        executor.scheduler_stack,
+        executor.idle_task.stack,
         spinlock_held.spinlock,
         new_task,
         static.switchToTaskWithLock,
     ) catch |err| {
         switch (err) {
-            // the scheduler stack should be big enough
-            error.StackOverflow => core.panic("insufficent space on the scheduler stack", null),
+            // the idle task stack should be big enough
+            error.StackOverflow => core.panic("insufficent space on the idle task stack", null),
         }
     };
 }
@@ -261,7 +279,7 @@ fn idle() callconv(.C) noreturn {
     entry_exclusion.release();
 
     while (true) {
-        if (!ready_to_run.isEmpty()) {
+        {
             var exclusion = kernel.sync.acquireInterruptExclusion();
             defer exclusion.release();
 

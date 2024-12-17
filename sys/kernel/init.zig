@@ -115,7 +115,7 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
 
     try arch.scheduling.callOneArgs(
         null,
-        executor.scheduler_stack,
+        executor.current_task.stack,
         executor,
         initStage4,
     );
@@ -126,7 +126,7 @@ fn initStage3(executor: *kernel.Executor) !noreturn {
 ///
 /// This function is executed by all executors, including the bootstrap executor.
 ///
-/// All executors are using their `scheduler_stack`.
+/// All executors are using their init task's stack.
 fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
     const barrier = struct {
         var executor_count = std.atomic.Value(usize).init(0);
@@ -269,6 +269,8 @@ fn initializeExecutors() !void {
 fn allocateAndPrepareExecutors() !void {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
+    globals.init_tasks = try kernel.mem.heap.allocator.alloc(kernel.Task, descriptors.count());
+
     const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
     var i: u32 = 0;
@@ -279,16 +281,28 @@ fn allocateAndPrepareExecutors() !void {
         const id: kernel.Executor.Id = @enumFromInt(i);
         log.debug("initializing {}", .{id});
 
-        executor.* = .{
-            .id = id,
-            .scheduler_stack = try kernel.Stack.createStack(),
-            .arch = undefined, // set by `arch.init.prepareExecutor`
+        const init_task = &globals.init_tasks[i];
+
+        init_task.* = .{
+            ._name = .{}, // set below
+            .state = .running,
+            .stack = try kernel.Stack.createStack(),
         };
 
-        if (id == .bootstrap) {
-            globals.init_task.stack = executor.scheduler_stack;
-            executor.current_task = &globals.init_task;
-        }
+        try init_task._name.writer().print("init {}", .{i});
+
+        executor.* = .{
+            .id = id,
+            .arch = undefined, // set by `arch.init.prepareExecutor`
+            .current_task = init_task,
+            .idle_task = .{
+                ._name = .{}, // set below
+                .state = .ready,
+                .stack = try kernel.Stack.createStack(),
+            },
+        };
+
+        try executor.idle_task._name.writer().print("idle {}", .{i});
 
         arch.init.prepareExecutor(executor);
     }
@@ -321,18 +335,20 @@ fn bootNonBootstrapExecutors() !void {
 const globals = struct {
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
-        .scheduler_stack = undefined, // never used
+        .idle_task = undefined, // never used
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
-        .current_task = &init_task,
+        .current_task = &bootstrap_init_task,
     };
 
-    var init_task: kernel.Task = .{
-        ._name = kernel.Task.Name.fromSlice("init") catch unreachable,
+    var bootstrap_init_task: kernel.Task = .{
+        ._name = kernel.Task.Name.fromSlice("init bootstrap") catch unreachable,
         .state = .running,
-        .stack = undefined, // never used, until it is set by `allocateAndPrepareExecutors`
+        .stack = undefined, // never used
     };
 
     var early_output_lock: kernel.sync.TicketSpinLock = .{};
+
+    var init_tasks: []kernel.Task = undefined;
 };
 
 const std = @import("std");

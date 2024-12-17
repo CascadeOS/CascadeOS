@@ -7,21 +7,22 @@ const Executor = @This();
 
 id: Id,
 
-/// This stack is used during context switches, idle, and during the move from the bootloader provided stack until we
-/// start scheduling.
-///
-/// The `stack_pointer` of this stack should never be modified in place, any push/pop operations should be done on a
-/// *copy* of this field.
-scheduler_stack: kernel.Stack,
-
 panicked: std.atomic.Value(bool) = .init(false),
 
 /// The currently running task.
+current_task: *kernel.Task,
+
+/// This executor's idle task.
 ///
-/// This is set to `null` when the executor is idle and also before we start scheduling.
-current_task: ?*kernel.Task = null,
+/// The `stack_pointer` of this task's stack should never be modified in place, any push/pop operations should be done
+/// on a *copy* of the stack.
+idle_task: kernel.Task,
 
 arch: @import("arch").PerExecutor,
+
+pub fn isCurrentTaskIdle(executor: *const Executor) bool {
+    return executor.current_task == &executor.idle_task;
+}
 
 /// A unique identifier for the executor.
 pub const Id = enum(u32) {
