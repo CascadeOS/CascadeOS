@@ -35,7 +35,7 @@ jobs:
           version: master
 
       - name: Lint
-        run: zig fmt --check --ast-check **.zig
+        run: zig fmt --check --ast-check .
 
       - name: Test
         run: zig build test --summary all
