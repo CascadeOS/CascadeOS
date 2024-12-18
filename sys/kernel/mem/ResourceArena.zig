@@ -70,21 +70,23 @@ pub const Source = struct {
 
     import: *const fn (
         arena: *ResourceArena,
+        context: *kernel.Context,
         len: usize,
         policy: Policy,
     ) AllocateError!Allocation = allocate,
 
     release: *const fn (
         arena: *ResourceArena,
+        context: *kernel.Context,
         allocation: Allocation,
     ) void = deallocate,
 
-    inline fn callImport(source: *const Source, len: usize, policy: Policy) AllocateError!Allocation {
-        return source.import(source.arena, len, policy);
+    inline fn callImport(source: *const Source, context: *kernel.Context, len: usize, policy: Policy) AllocateError!Allocation {
+        return source.import(source.arena, context, len, policy);
     }
 
-    inline fn callRelease(source: *const Source, allocation: Allocation) void {
-        source.release(source.arena, allocation);
+    inline fn callRelease(source: *const Source, context: *kernel.Context, allocation: Allocation) void {
+        source.release(source.arena, context, allocation);
     }
 };
 
@@ -191,11 +193,11 @@ pub const AddSpanError = error{
 /// Both `base` and `len` must be aligned to the arena's quantum.
 ///
 /// O(N) runtime.
-pub fn addSpan(arena: *ResourceArena, base: usize, len: usize) AddSpanError!void {
+pub fn addSpan(arena: *ResourceArena, context: *kernel.Context, base: usize, len: usize) AddSpanError!void {
     log.debug("{s}: adding span [0x{x}, 0x{x})", .{ arena.name(), base, base + len });
 
-    try arena.ensureBoundaryTags();
-    defer arena.mutex.unlock();
+    try arena.ensureBoundaryTags(context);
+    defer arena.mutex.unlock(context);
 
     const span_tag, const free_tag =
         try arena.getTagsForNewSpan(base, len, false);
@@ -400,7 +402,7 @@ pub const AllocateError = error{
 } || EnsureBoundaryTagsError;
 
 /// Allocate a block of length `len` from the arena, using the provided policy.
-pub fn allocate(arena: *ResourceArena, len: usize, policy: Policy) AllocateError!Allocation {
+pub fn allocate(arena: *ResourceArena, context: *kernel.Context, len: usize, policy: Policy) AllocateError!Allocation {
     if (len == 0) return AllocateError.ZeroLength;
 
     const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
@@ -412,8 +414,8 @@ pub fn allocate(arena: *ResourceArena, len: usize, policy: Policy) AllocateError
         @tagName(policy),
     });
 
-    try arena.ensureBoundaryTags();
-    defer arena.mutex.unlock();
+    try arena.ensureBoundaryTags(context);
+    defer arena.mutex.unlock(context);
 
     const target_tag: *BoundaryTag = while (true) {
         break switch (policy) {
@@ -423,7 +425,7 @@ pub fn allocate(arena: *ResourceArena, len: usize, policy: Policy) AllocateError
         } orelse {
             const source = arena.source orelse return AllocateError.RequestedLengthUnavailable;
 
-            break arena.importFromSource(source, quantum_aligned_len) catch
+            break arena.importFromSource(context, source, quantum_aligned_len) catch
                 return AllocateError.RequestedLengthUnavailable;
         };
     };
@@ -537,20 +539,21 @@ fn findFirstFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag
 /// The mutex must be locked upon entry and will be locked upon exit.
 fn importFromSource(
     arena: *ResourceArena,
+    context: *kernel.Context,
     source: Source,
     len: usize,
 ) (AllocateError || AddSpanError)!*BoundaryTag {
-    arena.mutex.unlock();
+    arena.mutex.unlock(context);
 
     log.debug("{s}: importing len 0x{x} from source {s}", .{ arena.name(), len, source.arena.name() });
 
     var need_to_lock_mutex = true;
-    defer if (need_to_lock_mutex) arena.mutex.lock();
+    defer if (need_to_lock_mutex) arena.mutex.lock(context);
 
-    const allocation = try source.callImport(len, .instant_fit);
-    errdefer source.callRelease(allocation);
+    const allocation = try source.callImport(context, len, .instant_fit);
+    errdefer source.callRelease(context, allocation);
 
-    arena.mutex.lock();
+    arena.mutex.lock(context);
     need_to_lock_mutex = false;
 
     const span_tag, const free_tag =
@@ -597,26 +600,26 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
 /// Deallocate the allocation.
 ///
 /// Panics if the allocation does not match a previous call to `allocate`.
-pub fn deallocate(arena: *ResourceArena, allocation: Allocation) void {
+pub fn deallocate(arena: *ResourceArena, context: *kernel.Context, allocation: Allocation) void {
     log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
 
-    arena.deallocateInner(allocation.base, allocation.len);
+    arena.deallocateInner(context, allocation.base, allocation.len);
 }
 
 /// Deallocate the allocation at `base`.
 ///
 /// Panics if the `base` does not match a previous call to `allocate`.
-pub fn deallocateBase(arena: *ResourceArena, base: usize) void {
+pub fn deallocateBase(arena: *ResourceArena, context: *kernel.Context, base: usize) void {
     log.debug("{s}: deallocating base 0x{x}", .{ arena.name(), base });
 
-    arena.deallocateInner(base, null);
+    arena.deallocateInner(context, base, null);
 }
 
-fn deallocateInner(arena: *ResourceArena, base: usize, len: ?usize) void {
-    arena.mutex.lock();
+fn deallocateInner(arena: *ResourceArena, context: *kernel.Context, base: usize, len: ?usize) void {
+    arena.mutex.lock(context);
 
     var need_to_unlock_mutex = true;
-    defer if (need_to_unlock_mutex) arena.mutex.unlock();
+    defer if (need_to_unlock_mutex) arena.mutex.unlock(context);
 
     const tag = arena.removeFromAllocationTable(base) orelse {
         core.panicFmt(
@@ -691,10 +694,10 @@ fn deallocateInner(arena: *ResourceArena, base: usize, len: ?usize) void {
             arena.pushUnusedTag(previous_tag);
             arena.pushUnusedTag(tag);
 
-            arena.mutex.unlock();
+            arena.mutex.unlock(context);
             need_to_unlock_mutex = false;
 
-            source.callRelease(allocation_to_release);
+            source.callRelease(context, allocation_to_release);
 
             return;
         }
@@ -710,7 +713,7 @@ pub const EnsureBoundaryTagsError = error{
 /// Attempts to ensure that there are at least `min_unused_tags_count` unused tags.
 ///
 /// Upon non-error return, the mutex is locked.
-fn ensureBoundaryTags(arena: *ResourceArena) EnsureBoundaryTagsError!void {
+fn ensureBoundaryTags(arena: *ResourceArena, context: *kernel.Context) EnsureBoundaryTagsError!void {
     const static = struct {
         var allocate_tags_lock: kernel.sync.Mutex = .{};
     };
@@ -725,7 +728,7 @@ fn ensureBoundaryTags(arena: *ResourceArena) EnsureBoundaryTagsError!void {
         TARGET_UNUSED_TAGS;
 
     while (true) {
-        arena.mutex.lock();
+        arena.mutex.lock(context);
 
         if (arena.unused_tags_count >= target_unused_tags_count) return;
 
@@ -738,7 +741,7 @@ fn ensureBoundaryTags(arena: *ResourceArena) EnsureBoundaryTagsError!void {
             if (tags_needed == 0) return;
         }
 
-        if (static.allocate_tags_lock.isLockedByCurrent()) {
+        if (static.allocate_tags_lock.isLockedByCurrent(context)) {
             std.debug.assert(arena.populator);
 
             if (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
@@ -749,22 +752,23 @@ fn ensureBoundaryTags(arena: *ResourceArena) EnsureBoundaryTagsError!void {
             return;
         }
 
-        arena.mutex.unlock();
-        static.allocate_tags_lock.lock();
+        arena.mutex.unlock(context);
+        static.allocate_tags_lock.lock(context);
 
         if (!globals.unused_tags.isEmpty()) {
             // someone else has populated the global unused tags, so try again
-            static.allocate_tags_lock.unlock();
+            static.allocate_tags_lock.unlock(context);
             continue;
         }
 
         log.debug("{s}: performing boundary tag allocation", .{arena.name()});
 
         const allocation = globals.tag_arena.allocate(
+            context,
             tags_needed * @sizeOf(BoundaryTag),
             .instant_fit,
         ) catch {
-            static.allocate_tags_lock.unlock();
+            static.allocate_tags_lock.unlock(context);
             // TODO: reclaim from caches, wait for memory, etc.
             return EnsureBoundaryTagsError.OutOfBoundaryTags;
         };
@@ -780,8 +784,8 @@ fn ensureBoundaryTags(arena: *ResourceArena) EnsureBoundaryTagsError!void {
 
         // restock the populator arenas
         for (globals.populator_arenas) |populator_arena| {
-            populator_arena.mutex.lock();
-            defer populator_arena.mutex.unlock();
+            populator_arena.mutex.lock(context);
+            defer populator_arena.mutex.unlock(context);
 
             while (populator_arena.unused_tags_count < TARGET_UNUSED_TAGS_FOR_POPULATOR) {
                 populator_arena.pushUnusedTag(&allocated_tags[tag_index]);
@@ -789,8 +793,8 @@ fn ensureBoundaryTags(arena: *ResourceArena) EnsureBoundaryTagsError!void {
             }
         }
 
-        static.allocate_tags_lock.unlock();
-        arena.mutex.lock();
+        static.allocate_tags_lock.unlock(context);
+        arena.mutex.lock(context);
 
         // restock the arena's unused tags
         while (arena.unused_tags_count < target_unused_tags_count) {

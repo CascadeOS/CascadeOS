@@ -2,9 +2,6 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 //! A simple spinlock implementation using tickets to ensure fairness.
-//!
-//! **WARNING**: This lock is not interrupt safe, it is the callers responsibility to ensure that interrupts are
-/// disabled while the lock is held.
 const TicketSpinLock = @This();
 
 current: u32 = 0,
@@ -12,32 +9,35 @@ ticket: u32 = 0,
 current_holder: kernel.Executor.Id = .none,
 
 pub const Held = struct {
-    exclusion: *const kernel.sync.InterruptExclusion,
+    context: *kernel.Context,
     spinlock: *TicketSpinLock,
 
-    pub fn unlock(self: *Held) void {
-        self.exclusion.validate();
+    /// Unlocks the spinlock.
+    ///
+    /// Enables interrupts if they were previously enabled.
+    pub fn unlock(self: Held) void {
         self.spinlock.unsafeRelease();
-        self.exclusion = undefined;
+        self.context.decrementInterruptDisable();
     }
 };
 
-/// Lock the spinlock with a prexisting interrupt exclusion token.
-pub fn lock(self: *TicketSpinLock, exclusion: *const kernel.sync.InterruptExclusion) Held {
-    exclusion.validate();
+/// Locks the spinlock.
+///
+/// Disables interrupts if they are currently enabled.
+pub fn lock(self: *TicketSpinLock, context: *kernel.Context) Held {
+    context.incrementInterruptDisable();
+    const executor = context.executor.?;
 
-    const current_executor = exclusion.getCurrentExecutor();
-
-    std.debug.assert(!self.isLockedBy(current_executor.id));
+    std.debug.assert(!self.isLockedBy(executor.id));
 
     const ticket = @atomicRmw(u32, &self.ticket, .Add, 1, .acq_rel);
     while (@atomicLoad(u32, &self.current, .monotonic) != ticket) {
         arch.spinLoopHint();
     }
-    @atomicStore(kernel.Executor.Id, &self.current_holder, current_executor.id, .release);
+    @atomicStore(kernel.Executor.Id, &self.current_holder, executor.id, .release);
 
     return .{
-        .exclusion = exclusion,
+        .context = context,
         .spinlock = self,
     };
 }

@@ -350,28 +350,41 @@ pub const init = struct {
 };
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
-    var interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
-    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, &interrupt_exclusion);
+    const executor = arch.rawGetCurrentExecutor();
+
+    if (executor.current_context) |current_context| {
+        const restore = current_context.onInterruptEntry(executor);
+        defer restore.exit();
+
+        interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, current_context);
+        return;
+    }
+
+    var context: kernel.Context = undefined;
+    context.createNew(executor);
+    defer executor.current_context = null;
+
+    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, &context);
 }
 
 const handlers = struct {
     fn unhandledInterrupt(
         interrupt_frame: *InterruptFrame,
-        interrupt_exclusion: *kernel.sync.InterruptExclusion,
+        context: *kernel.Context,
     ) void {
-        _ = interrupt_exclusion;
+        _ = context;
         core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
     }
 
     fn perExecutorPeriodic(
         interrupt_frame: *InterruptFrame,
-        interrupt_exclusion: *kernel.sync.InterruptExclusion,
+        context: *kernel.Context,
     ) void {
         _ = interrupt_frame;
 
         x64.apic.eoi();
 
-        kernel.entry.onPerExecutorPeriodic(interrupt_exclusion);
+        kernel.entry.onPerExecutorPeriodic(context);
     }
 };
 

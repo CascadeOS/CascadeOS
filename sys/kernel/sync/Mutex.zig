@@ -8,65 +8,45 @@ wait_queue: kernel.sync.WaitQueue = .{},
 
 locked_by: ?*kernel.Task = null,
 
-pub fn lock(mutex: *Mutex) void {
+pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
     while (true) {
-        var exclusion = kernel.sync.acquireInterruptExclusion();
-        defer exclusion.release();
+        const spinlock_held = mutex.spinlock.lock(context);
 
-        var spinlock_held = mutex.spinlock.lock(&exclusion);
-
-        const executor = exclusion.getCurrentExecutor();
-        const current_task = executor.current_task;
+        const current_task = context.task;
 
         const locked_by = mutex.locked_by orelse {
             mutex.locked_by = current_task;
-            current_task.preemption_disable_count += 1;
 
+            context.incrementPreemptionDisable();
             spinlock_held.unlock();
 
             return;
         };
 
-        std.debug.assert(!executor.isCurrentTaskIdle()); // block during idle
+        std.debug.assert(current_task.idle_for == null); // block during idle
         std.debug.assert(locked_by == current_task); // recursive lock
 
-        mutex.wait_queue.wait(current_task, spinlock_held);
+        mutex.wait_queue.wait(context, current_task, spinlock_held);
 
         continue;
     }
 }
 
-pub fn unlock(mutex: *Mutex) void {
-    const current_task = blk: {
-        var exclusion = kernel.sync.acquireInterruptExclusion();
-        defer exclusion.release();
+pub fn unlock(mutex: *Mutex, context: *kernel.Context) void {
+    const spinlock_held = mutex.spinlock.lock(context);
+    defer spinlock_held.unlock();
 
-        var spinlock_held = mutex.spinlock.lock(&exclusion);
-        defer spinlock_held.unlock();
+    std.debug.assert(mutex.locked_by == context.task);
+    mutex.locked_by = null;
 
-        const current_task = exclusion.getCurrentExecutor().current_task;
+    mutex.wait_queue.wakeOne(context);
 
-        std.debug.assert(mutex.locked_by == current_task);
-
-        mutex.locked_by = null;
-
-        mutex.wait_queue.wakeOne(&exclusion);
-
-        break :blk current_task;
-    };
-
-    current_task.preemption_disable_count -= 1;
-    if (current_task.preemption_disable_count == 0 and current_task.preemption_skipped) {
-        var exclusion = kernel.sync.acquireInterruptExclusion();
-        defer exclusion.release();
-
-        kernel.scheduler.maybePreempt(&exclusion);
-    }
+    context.decrementPreemptionDisable();
 }
 
 /// Returns true if the mutex is locked by the current task.
-pub fn isLockedByCurrent(mutex: *const Mutex) bool {
-    return arch.rawGetCurrentExecutor().current_task == mutex.locked_by;
+pub fn isLockedByCurrent(mutex: *const Mutex, context: *const kernel.Context) bool {
+    return context.task == mutex.locked_by;
 }
 
 const core = @import("core");

@@ -9,20 +9,18 @@ id: Id,
 
 panicked: std.atomic.Value(bool) = .init(false),
 
-/// The currently running task.
 current_task: *kernel.Task,
 
-/// This executor's idle task.
+current_context: ?*kernel.Context,
+
+/// Tracks the depth of nested intertupt disables.
 ///
-/// The `stack_pointer` of this task's stack should never be modified in place, any push/pop operations should be done
-/// on a *copy* of the stack.
+/// Must be in sync with `kernel.Context.interrupt_disable_count`.
+interrupt_disable_count: u32,
+
 idle_task: kernel.Task,
 
 arch: @import("arch").PerExecutor,
-
-pub fn isCurrentTaskIdle(executor: *const Executor) bool {
-    return executor.current_task == &executor.idle_task;
-}
 
 /// A unique identifier for the executor.
 pub const Id = enum(u32) {

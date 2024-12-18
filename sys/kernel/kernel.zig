@@ -15,6 +15,7 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
 
 pub const acpi = @import("acpi.zig");
 pub const config = @import("config.zig");
+pub const Context = @import("Context.zig");
 pub const debug = @import("debug.zig");
 pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");

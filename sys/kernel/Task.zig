@@ -14,12 +14,17 @@ stack: kernel.Stack,
 next_task_node: containers.SingleNode = .empty,
 
 /// Tracks the depth of nested preemption disables.
+///
+/// Must be in sync with `kernel.Context.preemption_disable_count`.
 preemption_disable_count: u32 = 0,
 
 /// Whenever we skip preemption, we set this to true.
 ///
 /// Then when we re-enable preemption, we check this flag.
 preemption_skipped: bool = false,
+
+/// If this is an idle task, this will be the executor id that this is the idle task for.
+idle_for: ?kernel.Executor.Id = null,
 
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();

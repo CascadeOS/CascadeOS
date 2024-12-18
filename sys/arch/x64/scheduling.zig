@@ -197,10 +197,12 @@ pub fn callTwoArgs(
 }
 
 /// Prepares the executor for jumping to the idle state.
-pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kernel.Task) void {
+pub fn prepareForJumpToIdleFromTask(context: *kernel.Context, old_task: *kernel.Task) void {
     _ = old_task;
 
     // TODO: switch page table
+
+    const executor = context.executor.?;
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -209,8 +211,10 @@ pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kerne
 }
 
 /// Prepares the executor for jumping to the given task from the idle state.
-pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) void {
+pub fn prepareForJumpToTaskFromIdle(context: *kernel.Context, new_task: *kernel.Task) void {
     // TODO: switch page tables
+
+    const executor = context.executor.?;
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -255,12 +259,14 @@ pub fn jumpToTaskFromIdle(
 
 /// Prepares the executor for jumping from `old_task` to `new_task`.
 pub fn prepareForJumpToTaskFromTask(
-    executor: *kernel.Executor,
+    context: *kernel.Context,
     old_task: *kernel.Task,
     new_task: *kernel.Task,
 ) void {
     _ = old_task;
     // TODO: switch page tables
+
+    const executor = context.executor.?;
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,

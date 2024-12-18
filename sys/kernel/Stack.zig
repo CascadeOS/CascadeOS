@@ -64,8 +64,9 @@ pub fn pushReturnAddress(stack: *Stack, return_address: core.VirtualAddress) err
     try stack.push(return_address.value);
 }
 
-pub fn createStack() !Stack {
+pub fn createStack(context: *kernel.Context) !Stack {
     const stack_range = try globals.stack_arena.allocate(
+        context,
         stack_size_including_guard_page.value,
         .instant_fit,
     );
@@ -104,7 +105,7 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeStacks() !void {
+    pub fn initializeStacks(context: *kernel.Context) !void {
         try globals.stack_arena.create(
             "stacks",
             arch.paging.standard_page_size.value,
@@ -115,6 +116,7 @@ pub const init = struct {
             core.panic("no kernel stacks", null);
 
         globals.stack_arena.addSpan(
+            context,
             stacks_range.address.value,
             stacks_range.size.value,
         ) catch |err| {

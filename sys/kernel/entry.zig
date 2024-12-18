@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub fn onPerExecutorPeriodic(interrupt_exclusion: *kernel.sync.InterruptExclusion) void {
+pub fn onPerExecutorPeriodic(context: *kernel.Context) void {
     // TODO: do more than just preempt on every interrupt
 
-    kernel.scheduler.maybePreempt(interrupt_exclusion);
+    kernel.scheduler.maybePreempt(context);
 }
 
 const std = @import("std");

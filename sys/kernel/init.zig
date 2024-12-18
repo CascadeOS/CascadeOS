@@ -18,10 +18,13 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can provide a very simple panic implementation
     kernel.debug.panic_impl = struct {
         fn simplePanic(
+            context: *kernel.Context,
             msg: []const u8,
             error_return_trace: ?*const std.builtin.StackTrace,
             return_address: usize,
         ) void {
+            _ = context;
+
             kernel.debug.formatting.printPanic(
                 arch.init.early_output_writer,
                 msg,
@@ -36,7 +39,17 @@ pub fn initStage1() !noreturn {
     );
 
     kernel.executors = @as([*]kernel.Executor, @ptrCast(&globals.bootstrap_executor))[0..1];
+
+    var context: kernel.Context = .{
+        .executor = &globals.bootstrap_executor,
+        .preemption_disable_count = 0,
+        .task = &globals.bootstrap_init_task,
+        .interrupt_disable_count = globals.bootstrap_executor.interrupt_disable_count,
+    };
+    globals.bootstrap_executor.current_context = &context;
+
     arch.init.prepareBootstrapExecutor(&globals.bootstrap_executor);
+
     arch.init.loadExecutor(&globals.bootstrap_executor);
 
     // now that the executor is loaded we can switch to the full init panic implementation and start logging
@@ -44,14 +57,14 @@ pub fn initStage1() !noreturn {
 
     log.debug("bootstrap executor initialized", .{});
 
-    try initStage2();
+    try initStage2(&context);
     core.panic("`init.initStage2` returned", null);
 }
 
 /// Stage 2 of kernel initialization.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
-fn initStage2() !noreturn {
+fn initStage2(context: *kernel.Context) !noreturn {
     log.debug("initializing interrupts", .{});
     arch.init.initInterrupts();
 
@@ -80,16 +93,16 @@ fn initStage2() !noreturn {
     try kernel.mem.ResourceArena.init.initializeResourceArenas();
 
     log.debug("initializing kernel heap", .{});
-    try kernel.mem.heap.init.initializeHeap();
+    try kernel.mem.heap.init.initializeHeap(context);
 
     log.debug("initializing kernel stacks", .{});
-    try kernel.Stack.init.initializeStacks();
+    try kernel.Stack.init.initializeStacks(context);
 
     log.debug("initializing time", .{});
     try kernel.time.init.initializeTime();
 
     log.debug("initializing executors", .{});
-    try initializeExecutors();
+    try initializeExecutors(context);
 
     try initStage3(kernel.getExecutor(.bootstrap));
     core.panic("`init.initStage3` returned", null);
@@ -102,6 +115,15 @@ fn initStage2() !noreturn {
 /// All executors are using the bootloader provided stack.
 fn initStage3(executor: *kernel.Executor) !noreturn {
     kernel.mem.globals.core_page_table.load();
+
+    var context: kernel.Context = .{
+        .executor = executor,
+        .preemption_disable_count = 0,
+        .task = executor.current_task,
+        .interrupt_disable_count = executor.interrupt_disable_count,
+    };
+    executor.current_context = &context;
+
     arch.init.loadExecutor(executor);
 
     log.debug("configuring per-executor system features", .{});
@@ -148,6 +170,14 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
         }
     };
 
+    var context: kernel.Context = .{
+        .executor = executor,
+        .preemption_disable_count = 0,
+        .task = executor.current_task,
+        .interrupt_disable_count = executor.interrupt_disable_count,
+    };
+    executor.current_context = &context;
+
     if (executor.id == .bootstrap) {
         barrier.waitForOthers();
 
@@ -162,23 +192,19 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
     barrier.executorReady();
     barrier.waitForAll();
 
-    const interrupt_exclusion = kernel.sync.assertInterruptExclusion(true);
-    const held = kernel.scheduler.lockScheduler(&interrupt_exclusion);
-    kernel.scheduler.yield(held, .drop);
+    _ = kernel.scheduler.lock(&context);
+    kernel.scheduler.yield(&context, .drop);
 
     core.panic("scheduler returned to init", null);
 }
 
 /// The log implementation during init.
-pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    var exclusion = kernel.sync.acquireInterruptExclusion();
-    defer exclusion.release();
-
-    var held = globals.early_output_lock.lock(&exclusion);
+pub fn handleLog(context: *kernel.Context, level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
+    var held = globals.early_output_lock.lock(context);
     defer held.unlock();
 
     // TODO: make the log output look nicer
-    exclusion.getCurrentExecutor().format("", .{}, arch.init.early_output_writer) catch {};
+    context.executor.?.format("", .{}, arch.init.early_output_writer) catch {};
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch {};
 }
@@ -189,6 +215,7 @@ pub fn handleLog(level_and_scope: []const u8, comptime fmt: []const u8, args: an
 ///
 /// This function expects that `arch.init.loadExecutor` has been called on the current executor.
 fn handlePanic(
+    context: *kernel.Context,
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
@@ -198,7 +225,7 @@ fn handlePanic(
         var nested_panic_count = std.atomic.Value(usize).init(0);
     };
 
-    const executor = arch.rawGetCurrentExecutor();
+    const executor = context.executor.?;
     executor.panicked.store(true, .release);
 
     if (static.panicking_executor.cmpxchgStrong(
@@ -261,12 +288,12 @@ fn handlePanic(
 /// Initialize the per executor data structures for all executors including the bootstrap executor.
 ///
 /// Also wakes the non-bootstrap executors and jumps them to `initStage3`.
-fn initializeExecutors() !void {
-    try allocateAndPrepareExecutors();
+fn initializeExecutors(context: *kernel.Context) !void {
+    try allocateAndPrepareExecutors(context);
     try bootNonBootstrapExecutors();
 }
 
-fn allocateAndPrepareExecutors() !void {
+fn allocateAndPrepareExecutors(context: *kernel.Context) !void {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     globals.init_tasks = try kernel.mem.heap.allocator.alloc(kernel.Task, descriptors.count());
@@ -286,7 +313,7 @@ fn allocateAndPrepareExecutors() !void {
         init_task.* = .{
             ._name = .{}, // set below
             .state = .running,
-            .stack = try kernel.Stack.createStack(),
+            .stack = try kernel.Stack.createStack(context),
         };
 
         try init_task._name.writer().print("init {}", .{i});
@@ -294,17 +321,19 @@ fn allocateAndPrepareExecutors() !void {
         executor.* = .{
             .id = id,
             .arch = undefined, // set by `arch.init.prepareExecutor`
+            .current_context = undefined, // set in `initStage3` and `initStage4`
             .current_task = init_task,
+            .interrupt_disable_count = 1, // interrupts start disabled
             .idle_task = .{
                 ._name = .{}, // set below
                 .state = .ready,
-                .stack = try kernel.Stack.createStack(),
+                .stack = try kernel.Stack.createStack(context),
             },
         };
 
         try executor.idle_task._name.writer().print("idle {}", .{i});
 
-        arch.init.prepareExecutor(executor);
+        arch.init.prepareExecutor(executor, context);
     }
 
     kernel.executors = executors;
@@ -335,9 +364,11 @@ fn bootNonBootstrapExecutors() !void {
 const globals = struct {
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
+        .current_context = undefined, // set in `initStage1`
         .idle_task = undefined, // never used
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
         .current_task = &bootstrap_init_task,
+        .interrupt_disable_count = 1, // interrupts start disabled
     };
 
     var bootstrap_init_task: kernel.Task = .{

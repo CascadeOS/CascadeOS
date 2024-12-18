@@ -5,27 +5,28 @@ const WaitQueue = @This();
 
 waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 
-pub fn wakeOne(self: *WaitQueue, exclusion: *const kernel.sync.InterruptExclusion) void {
+pub fn wakeOne(self: *WaitQueue, context: *kernel.Context) void {
     const task_to_wake_node = self.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
 
-    var scheduler_held = kernel.scheduler.lockScheduler(exclusion);
-    defer scheduler_held.unlock();
+    const held = kernel.scheduler.lock(context);
+    defer held.unlock();
 
-    kernel.scheduler.queueTask(scheduler_held, task_to_wake);
+    kernel.scheduler.queueTask(context, task_to_wake);
 }
 
 pub fn wait(
     self: *WaitQueue,
+    context: *kernel.Context,
     current_task: *kernel.Task,
     spinlock_held: kernel.sync.TicketSpinLock.Held,
 ) void {
     self.waiting_tasks.push(&current_task.next_task_node);
 
-    var scheduler_held = kernel.scheduler.lockScheduler(spinlock_held.exclusion);
-    defer scheduler_held.unlock();
+    const held = kernel.scheduler.lock(context);
+    defer held.unlock();
 
-    kernel.scheduler.block(scheduler_held, spinlock_held);
+    kernel.scheduler.block(context, spinlock_held);
 }
 
 const core = @import("core");
