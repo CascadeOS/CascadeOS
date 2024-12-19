@@ -104,23 +104,31 @@ pub fn decrementPreemptionDisable(self: *Context) void {
 
 pub const InterruptContextRestore = struct {
     context: *Context,
-    executor: *kernel.Executor,
 
     interrupt_disable_count: u32,
     preemption_disable_count: u32,
 
-    pub fn exit(self: InterruptContextRestore) void {
-        std.debug.assert(self.executor.current_context == self.context);
+    pub fn interruptExit(self: InterruptContextRestore) void {
+        const context = self.context;
 
-        std.debug.assert(self.context.interrupt_disable_count == self.executor.interrupt_disable_count);
-        std.debug.assert(self.context.preemption_disable_count == self.executor.current_task.preemption_disable_count);
+        std.debug.assert(context.preemption_disable_count == self.preemption_disable_count);
+        std.debug.assert(context.preemption_disable_count == context.task.preemption_disable_count);
 
-        self.context.interrupt_disable_count = self.interrupt_disable_count;
-        self.executor.interrupt_disable_count = self.interrupt_disable_count;
-        self.context.preemption_disable_count = self.preemption_disable_count;
-        self.executor.current_task.preemption_disable_count = self.preemption_disable_count;
+        std.debug.assert(
+            self.interrupt_disable_count == context.interrupt_disable_count or
+                self.interrupt_disable_count + 1 == context.interrupt_disable_count,
+        );
 
-        if (self.interrupt_disable_count == 0 and self.preemption_disable_count == 0) self.context.executor = null;
+        if (context.executor) |executor| {
+            std.debug.assert(executor.current_context == context);
+            std.debug.assert(executor.interrupt_disable_count == context.interrupt_disable_count);
+
+            executor.interrupt_disable_count = self.interrupt_disable_count;
+        }
+
+        context.interrupt_disable_count = self.interrupt_disable_count;
+
+        if (self.interrupt_disable_count == 0 and self.preemption_disable_count == 0) context.executor = null;
     }
 };
 
@@ -133,7 +141,6 @@ pub fn onInterruptEntry(self: *Context, executor: *kernel.Executor) InterruptCon
 
     const restore: InterruptContextRestore = .{
         .context = self,
-        .executor = executor,
         .interrupt_disable_count = executor.interrupt_disable_count,
         .preemption_disable_count = executor.current_task.preemption_disable_count,
     };

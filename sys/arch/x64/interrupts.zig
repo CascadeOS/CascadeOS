@@ -354,7 +354,7 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
 
     if (executor.current_context) |current_context| {
         const restore = current_context.onInterruptEntry(executor);
-        defer restore.exit();
+        defer restore.interruptExit();
 
         interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, current_context);
         return;
