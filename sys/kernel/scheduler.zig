@@ -279,6 +279,8 @@ fn idle() callconv(.C) noreturn {
 
     log.debug("entering idle", .{});
     context.decrementInterruptDisable();
+    std.debug.assert(context.interrupt_disable_count == 0);
+    std.debug.assert(context.preemption_disable_count == 0);
 
     while (true) {
         {
