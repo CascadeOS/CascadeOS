@@ -356,6 +356,9 @@ pub fn prepareNewTaskForScheduling(
             std.debug.assert(context.task == current_task);
 
             kernel.scheduler.unlock(&context);
+            context.decrementInterruptDisable();
+            std.debug.assert(context.interrupt_disable_count == 0);
+            std.debug.assert(context.preemption_disable_count == 0);
 
             const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
             func(&context, task_arg);
