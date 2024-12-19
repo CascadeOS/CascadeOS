@@ -271,11 +271,10 @@ fn idle() callconv(.C) noreturn {
     var context: kernel.Context = undefined;
     context.createNew(arch.rawGetCurrentExecutor());
 
-    std.debug.assert(globals.lock.isLockedBy(context.executor.?.id));
-
-    globals.lock.unsafeRelease();
+    unlock(&context);
 
     log.debug("entering idle", .{});
+
     context.decrementInterruptDisable();
     std.debug.assert(context.interrupt_disable_count == 0);
     std.debug.assert(context.preemption_disable_count == 0);
