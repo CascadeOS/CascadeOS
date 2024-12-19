@@ -27,7 +27,7 @@ pub const CascadeTarget = enum {
 
     /// Returns true if the targets architecture is equal to the host systems.
     pub fn isNative(self: CascadeTarget, b: *std.Build) bool {
-        return switch (b.host.result.cpu.arch) {
+        return switch (b.graph.host.result.cpu.arch) {
             .aarch64 => self == .arm64,
             .x86_64 => self == .x64,
             else => false,

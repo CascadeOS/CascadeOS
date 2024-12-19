@@ -102,14 +102,14 @@ fn create(
     const source_file_modules = try getSourceFileModules(b, options, all_dependencies);
 
     {
-        const check_kernel_exe = try constructKernelExe(
+        const check_exe = try constructKernelExe(
             b,
             target,
             libraries,
             source_file_modules,
             options,
         );
-        step_collection.registerCheck(check_kernel_exe);
+        step_collection.registerCheck(check_exe);
     }
 
     const kernel_exe = try constructKernelExe(
@@ -120,7 +120,7 @@ fn create(
         options,
     );
 
-    const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+    const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
     // action
     generate_sdf.addArg("generate");
     // binary_input_path
@@ -131,7 +131,7 @@ fn create(
     generate_sdf.addArg(options.root_path);
 
     const fat_kernel_with_sdf = blk: {
-        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
         // action
         embed_sdf.addArg("embed");
         // binary_input_path
@@ -158,7 +158,7 @@ fn create(
     };
 
     const stripped_kernel_with_sdf = blk: {
-        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_compile_step);
+        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
         // action
         embed_sdf.addArg("embed");
         // binary_input_path
@@ -215,7 +215,7 @@ fn constructKernelExe(
     libraries: Library.Collection,
     source_file_modules: []const SourceFileModule,
     options: Options,
-) !*Step.Compile {
+) !*std.Build.Step.Compile {
     const arch_module = blk: {
         const arch_module = b.createModule(.{
             .root_source_file = b.path(b.pathJoin(&.{ "sys", "arch", "arch.zig" })),
@@ -307,30 +307,25 @@ fn constructKernelExe(
     kernel_module.addImport("arch", arch_module);
     kernel_module.addImport("boot", boot_module);
 
-    const kernel_exe = b.addExecutable(.{
-        .name = "kernel",
+    const root_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "sys", "root.zig" })),
         .target = getKernelCrossTarget(target, b),
         .optimize = options.optimize,
     });
 
-    kernel_exe.root_module.addImport("boot", boot_module);
-    kernel_exe.root_module.addImport("kernel", kernel_module);
+    root_module.addImport("boot", boot_module);
+    root_module.addImport("kernel", kernel_module);
 
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
-    kernel_exe.root_module.strip = false;
-    kernel_exe.root_module.omit_frame_pointer = false;
-    kernel_exe.entry = .disabled;
-    kernel_exe.want_lto = false;
-    kernel_exe.pie = false;
-    kernel_exe.linkage = .static;
+    root_module.strip = false;
+    root_module.omit_frame_pointer = false;
 
     // apply target-specific configuration to the kernel
     switch (target) {
         .arm64 => {},
         .x64 => {
-            kernel_exe.root_module.code_model = .kernel;
-            kernel_exe.root_module.red_zone = false;
+            root_module.code_model = .kernel;
+            root_module.red_zone = false;
         },
     }
 
@@ -356,11 +351,21 @@ fn constructKernelExe(
             }
 
             const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
-            kernel_exe.addAssemblyFile(b.path(file_path));
+            root_module.addAssemblyFile(b.path(file_path));
         }
     }
 
-    kernel_exe.setLinkerScriptPath(b.path(
+    const kernel_exe = b.addExecutable(.{
+        .name = "kernel",
+        .root_module = root_module,
+    });
+
+    kernel_exe.entry = .disabled;
+    kernel_exe.want_lto = false;
+    kernel_exe.pie = false;
+    kernel_exe.linkage = .static;
+
+    kernel_exe.setLinkerScript(b.path(
         b.pathJoin(&.{
             "sys",
             "arch",

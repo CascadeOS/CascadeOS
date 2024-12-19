@@ -22,14 +22,14 @@ pub fn registerImageSteps(
     targets: []const CascadeTarget,
 ) !Collection {
     const image_builder_tool = tools.get("image_builder").?;
-    const image_builder_compile_step = image_builder_tool.release_safe_compile_step;
+    const image_builder_compile_step = image_builder_tool.release_safe_exe;
 
     const limine_dep = b.dependency("limine", .{});
 
     const limine_exe = b.addExecutable(.{
         .name = "limine",
         .link_libc = true,
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .ReleaseSafe,
     });
     limine_exe.addIncludePath(limine_dep.path(""));

@@ -7,18 +7,18 @@ const Tool = @This();
 
 name: []const u8,
 
-/// The compile step using the user provided `OptimizeMode`.
-compile_step: *Step.Compile,
+/// The exe using the user provided `OptimizeMode`.
+normal_exe: *Step.Compile,
 
-/// The compile step using `OptimizeMode.ReleaseSafe`.
+/// The exe using `OptimizeMode.ReleaseSafe`.
 ///
-/// If the user provided `OptimizeMode` is `.ReleaseSafe` then `release_safe_compile_step == compile_step`.
-release_safe_compile_step: *Step.Compile,
+/// If the user provided `OptimizeMode` is `.ReleaseSafe` then `release_safe_exe == normal_exe`.
+release_safe_exe: *Step.Compile,
 
-test_compile_step: *Step.Compile,
+test_exe: *Step.Compile,
 
-/// Installs the artifact produced by `compile_step`
-compile_step_install_step: *Step,
+/// Installs the artifact produced by `normal_exe`
+exe_install_step: *Step,
 
 /// only used for generating a dependency graph
 dependencies: []const Library.Dependency,
@@ -70,44 +70,54 @@ fn resolveTool(
 
     const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{tool_description.name});
 
+    const test_name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_test" });
+
     const lazy_path = b.path(b.pathJoin(&.{
         "tool",
         tool_description.name,
         root_file_name,
     }));
 
+    const normal_module = b.createModule(.{
+        .root_source_file = lazy_path,
+        .target = b.graph.host,
+        .optimize = optimize_mode,
+    });
+    addDependenciesToModule(normal_module, tool_description, dependencies);
+    handleToolConfiguration(b, tool_description, normal_module);
+
     {
-        const check_compile_step = try createExe(
-            b,
-            tool_description,
-            lazy_path,
-            dependencies,
-            optimize_mode,
-        );
-        step_collection.registerCheck(check_compile_step);
+        const check_exe = b.addExecutable(.{
+            .name = tool_description.name,
+            .root_module = normal_module,
+        });
+        step_collection.registerCheck(check_exe);
     }
 
-    const compile_step = try createExe(
-        b,
-        tool_description,
-        lazy_path,
-        dependencies,
-        optimize_mode,
-    );
+    const normal_exe = b.addExecutable(.{
+        .name = tool_description.name,
+        .root_module = normal_module,
+    });
 
-    const release_safe_compile_step = if (optimize_mode == .ReleaseSafe)
-        compile_step
-    else
-        try createExe(
-            b,
-            tool_description,
-            lazy_path,
-            dependencies,
-            .ReleaseSafe,
-        );
+    const release_safe_exe = if (optimize_mode == .ReleaseSafe)
+        normal_exe
+    else release_safe_exe: {
+        const release_safe_module = b.createModule(.{
+            .root_source_file = lazy_path,
+            .target = b.graph.host,
+            .optimize = .ReleaseSafe,
+        });
+        addDependenciesToModule(release_safe_module, tool_description, dependencies);
+        handleToolConfiguration(b, tool_description, release_safe_module);
 
-    const compile_step_install_step = b.addInstallArtifact(
-        compile_step,
+        break :release_safe_exe b.addExecutable(.{
+            .name = tool_description.name,
+            .root_module = release_safe_module,
+        });
+    };
+
+    const exe_install_step = b.addInstallArtifact(
+        normal_exe,
         .{
             .dest_dir = .{
                 .override = .{
@@ -134,17 +144,23 @@ fn resolveTool(
     );
 
     const build_step = b.step(build_step_name, build_step_description);
-    build_step.dependOn(&compile_step_install_step.step);
+    build_step.dependOn(&exe_install_step.step);
 
     {
-        const check_test_compile_step = try createTestExe(b, tool_description, lazy_path, dependencies);
-        step_collection.registerCheck(check_test_compile_step);
+        const check_test_exe = b.addTest(.{
+            .name = test_name,
+            .root_module = normal_module,
+        });
+        step_collection.registerCheck(check_test_exe);
     }
 
-    const test_compile_step = try createTestExe(b, tool_description, lazy_path, dependencies);
+    const test_exe = b.addTest(.{
+        .name = test_name,
+        .root_module = normal_module,
+    });
 
     const test_install_step = b.addInstallArtifact(
-        test_compile_step,
+        test_exe,
         .{
             .dest_dir = .{
                 .override = .{
@@ -157,8 +173,8 @@ fn resolveTool(
         },
     );
 
-    const run_test = b.addRunArtifact(test_compile_step);
-    run_test.step.dependOn(&test_install_step.step);
+    const run_test = b.addRunArtifact(test_exe);
+    run_test.step.dependOn(&test_install_step.step); // ensure the test exe is installed
 
     const test_step_name = try std.fmt.allocPrint(
         b.allocator,
@@ -191,8 +207,8 @@ fn resolveTool(
         .{tool_description.name},
     );
 
-    const run = b.addRunArtifact(compile_step);
-    run.step.dependOn(&compile_step_install_step.step);
+    const run = b.addRunArtifact(normal_exe);
+    run.step.dependOn(&exe_install_step.step);
 
     if (b.args) |args| {
         run.addArgs(args);
@@ -203,65 +219,28 @@ fn resolveTool(
 
     return .{
         .name = tool_description.name,
-        .compile_step = compile_step,
-        .release_safe_compile_step = release_safe_compile_step,
-        .test_compile_step = test_compile_step,
-        .compile_step_install_step = &compile_step_install_step.step,
+        .normal_exe = normal_exe,
+        .release_safe_exe = release_safe_exe,
+        .test_exe = test_exe,
+        .exe_install_step = &exe_install_step.step,
 
         .dependencies = dependencies,
     };
 }
 
-fn createExe(
-    b: *std.Build,
-    tool_description: ToolDescription,
-    lazy_path: std.Build.LazyPath,
-    dependencies: []const Library.Dependency,
-    optimize_mode: std.builtin.OptimizeMode,
-) !*Step.Compile {
-    const exe = b.addExecutable(.{
-        .name = tool_description.name,
-        .root_source_file = lazy_path,
-        .target = b.host,
-        .optimize = optimize_mode,
-    });
-
-    addDependenciesToModule(&exe.root_module, tool_description, dependencies);
-    handleToolConfiguration(b, tool_description, exe);
-
-    return exe;
-}
-
-fn createTestExe(
-    b: *std.Build,
-    tool_description: ToolDescription,
-    lazy_path: std.Build.LazyPath,
-    dependencies: []const Library.Dependency,
-) !*Step.Compile {
-    const test_exe = b.addTest(.{
-        .name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_test" }),
-        .root_source_file = lazy_path,
-    });
-
-    addDependenciesToModule(&test_exe.root_module, tool_description, dependencies);
-    handleToolConfiguration(b, tool_description, test_exe);
-
-    return test_exe;
-}
-
-fn handleToolConfiguration(b: *std.Build, tool_description: ToolDescription, exe: *Step.Compile) void {
+fn handleToolConfiguration(b: *std.Build, tool_description: ToolDescription, module: *std.Build.Module) void {
     switch (tool_description.configuration) {
         .simple => {},
         .link_c => {
             if (b.graph.host.result.os.tag == .linux) {
                 // Use musl to remove include of "/usr/include" that breaks watch mode on btrfs
-                exe.root_module.resolved_target.?.query.abi = .musl;
-                exe.root_module.resolved_target.?.result.abi = .musl;
+                module.resolved_target.?.query.abi = .musl;
+                module.resolved_target.?.result.abi = .musl;
             }
 
-            exe.linkLibC();
+            module.link_libc = true;
         },
-        .custom => |f| f(b, tool_description, exe),
+        .custom => |f| f(b, tool_description, module),
     }
 }
 

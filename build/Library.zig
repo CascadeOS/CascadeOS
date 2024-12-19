@@ -172,31 +172,111 @@ fn resolveLibrary(
     var host_native_module: ?*std.Build.Module = null;
 
     for (supported_targets) |target| {
-        try cascadeTestExecutableAndModule(
-            b,
-            library_description,
-            lazy_path,
-            options,
-            target,
-            dependencies,
-            // all_build_and_run_step,
-            // step_collection,
-            &cascade_modules,
-        );
-
-        // host test executable and module
-        if (!library_description.is_cascade_only) {
-            if (try hostTestExecutableAndModule(
+        {
+            const cascade_module = try createModule(
                 b,
                 library_description,
                 lazy_path,
                 options,
                 target,
                 dependencies,
-                all_build_and_run_step,
-                step_collection,
-                &non_cascade_modules,
-            )) |module| host_native_module = module;
+                true,
+                false,
+            );
+            try cascade_modules.putNoClobber(b.allocator, target, cascade_module);
+        }
+
+        // host check exe
+        {
+            const check_module = try createModule(
+                b,
+                library_description,
+                lazy_path,
+                options,
+                target,
+                dependencies,
+                false,
+                true,
+            );
+            const check_test_exe = b.addTest(.{
+                .name = library_description.name,
+                .root_module = check_module,
+            });
+            step_collection.registerCheck(check_test_exe);
+        }
+
+        {
+            const host_module = try createModule(
+                b,
+                library_description,
+                lazy_path,
+                options,
+                target,
+                dependencies,
+                false,
+                false,
+            );
+            try non_cascade_modules.putNoClobber(b.allocator, target, host_module);
+
+            if (target.isNative(b)) host_native_module = host_module;
+        }
+
+        {
+            const host_test_module = try createModule(
+                b,
+                library_description,
+                lazy_path,
+                options,
+                target,
+                dependencies,
+                false,
+                true,
+            );
+
+            const host_test_exe = b.addTest(.{
+                .name = library_description.name,
+                .root_module = host_test_module,
+            });
+
+            const host_test_install_step = b.addInstallArtifact(
+                host_test_exe,
+                .{
+                    .dest_dir = .{
+                        .override = .{
+                            .custom = b.pathJoin(&.{
+                                @tagName(target),
+                                "tests",
+                                "non_cascade",
+                            }),
+                        },
+                    },
+                },
+            );
+
+            const host_test_run_step = b.addRunArtifact(host_test_exe);
+            host_test_run_step.skip_foreign_checks = true;
+            host_test_run_step.failing_to_execute_foreign_is_an_error = false;
+
+            host_test_run_step.step.dependOn(&host_test_install_step.step); // ensure the test exe is installed
+
+            const host_test_step_name = try std.fmt.allocPrint(
+                b.allocator,
+                "{s}_host_{s}",
+                .{ library_description.name, @tagName(target) },
+            );
+
+            const host_test_step_description =
+                try std.fmt.allocPrint(
+                b.allocator,
+                "Build and attempt to run the tests for {s} on {s} targeting the host os",
+                .{ library_description.name, @tagName(target) },
+            );
+
+            const host_test_step = b.step(host_test_step_name, host_test_step_description);
+            host_test_step.dependOn(&host_test_run_step.step);
+
+            all_build_and_run_step.dependOn(host_test_step);
+            step_collection.registerNonCascadeLibrary(target, host_test_step);
         }
     }
 
@@ -214,205 +294,6 @@ fn resolveLibrary(
     return library;
 }
 
-/// Creates a test executable and module for `library_description` targeting `target` for cascade.
-fn cascadeTestExecutableAndModule(
-    b: *std.Build,
-    library_description: LibraryDescription,
-    lazy_path: std.Build.LazyPath,
-    options: Options,
-    target: CascadeTarget,
-    dependencies: []Dependency,
-    // all_build_and_run_step: *std.Build.Step,
-    // step_collection: StepCollection,
-    cascade_modules: *Modules,
-) !void {
-    // {
-    //     const check_test_exe = try createTestExe(
-    //         b,
-    //         library_description,
-    //         lazy_path,
-    //         options,
-    //         target,
-    //         dependencies,
-    //         true,
-    //     );
-    //     step_collection.registerCheck(check_test_exe);
-    // }
-
-    // const test_exe = try createTestExe(
-    //     b,
-    //     library_description,
-    //     lazy_path,
-    //     options,
-    //     target,
-    //     dependencies,
-    //     true,
-    // );
-
-    // const install_step = b.addInstallArtifact(
-    //     test_exe,
-    //     .{
-    //         .dest_dir = .{
-    //             .override = .{
-    //                 .custom = b.pathJoin(&.{
-    //                     @tagName(target),
-    //                     "tests",
-    //                     "cascade",
-    //                 }),
-    //             },
-    //         },
-    //     },
-    // );
-
-    // const build_step_name = try std.fmt.allocPrint(
-    //     b.allocator,
-    //     "{s}_cascade_{s}",
-    //     .{ library_description.name, @tagName(target) },
-    // );
-
-    // const build_step_description = try std.fmt.allocPrint(
-    //     b.allocator,
-    //     "Build the tests for {s} on {s} targeting cascade",
-    //     .{ library_description.name, @tagName(target) },
-    // );
-
-    // const build_step = b.step(build_step_name, build_step_description);
-    // build_step.dependOn(&install_step.step);
-
-    // all_build_and_run_step.dependOn(build_step);
-    // step_collection.registerCascadeLibrary(target, build_step);
-
-    const module = try createModule(
-        b,
-        library_description,
-        lazy_path,
-        options,
-        target,
-        dependencies,
-        true,
-    );
-    try cascade_modules.putNoClobber(b.allocator, target, module);
-}
-
-/// Creates a test executable and module for `library_description` targeting the host system.
-fn hostTestExecutableAndModule(
-    b: *std.Build,
-    library_description: LibraryDescription,
-    lazy_path: std.Build.LazyPath,
-    options: Options,
-    target: CascadeTarget,
-    dependencies: []Dependency,
-    all_build_and_run_step: *std.Build.Step,
-    step_collection: StepCollection,
-    non_cascade_modules: *Modules,
-) !?*std.Build.Module {
-    {
-        const check_test_exe = try createTestExe(
-            b,
-            library_description,
-            lazy_path,
-            options,
-            target,
-            dependencies,
-            false,
-        );
-        step_collection.registerCheck(check_test_exe);
-    }
-
-    const test_exe = try createTestExe(
-        b,
-        library_description,
-        lazy_path,
-        options,
-        target,
-        dependencies,
-        false,
-    );
-
-    const install_step = b.addInstallArtifact(
-        test_exe,
-        .{
-            .dest_dir = .{
-                .override = .{
-                    .custom = b.pathJoin(&.{
-                        @tagName(target),
-                        "tests",
-                        "non_cascade",
-                    }),
-                },
-            },
-        },
-    );
-
-    const run_step = b.addRunArtifact(test_exe);
-    run_step.skip_foreign_checks = true;
-    run_step.failing_to_execute_foreign_is_an_error = false;
-
-    run_step.step.dependOn(&install_step.step);
-
-    const build_step_name = try std.fmt.allocPrint(
-        b.allocator,
-        "{s}_host_{s}",
-        .{ library_description.name, @tagName(target) },
-    );
-
-    const build_step_description =
-        try std.fmt.allocPrint(
-        b.allocator,
-        "Build and attempt to run the tests for {s} on {s} targeting the host os",
-        .{ library_description.name, @tagName(target) },
-    );
-
-    const build_step = b.step(build_step_name, build_step_description);
-    build_step.dependOn(&run_step.step);
-
-    all_build_and_run_step.dependOn(build_step);
-    step_collection.registerNonCascadeLibrary(target, build_step);
-
-    const module = try createModule(
-        b,
-        library_description,
-        lazy_path,
-        options,
-        target,
-        dependencies,
-        false,
-    );
-    try non_cascade_modules.putNoClobber(b.allocator, target, module);
-
-    if (target.isNative(b)) return module;
-    return null;
-}
-
-/// Creates a test executable for a library.
-fn createTestExe(
-    b: *std.Build,
-    library_description: LibraryDescription,
-    lazy_path: std.Build.LazyPath,
-    options: Options,
-    target: CascadeTarget,
-    dependencies: []const Dependency,
-    build_for_cascade: bool,
-) !*Step.Compile {
-    const test_exe = b.addTest(.{
-        .name = library_description.name,
-        .root_source_file = lazy_path,
-        .optimize = options.optimize,
-        .target = if (build_for_cascade) target.getCascadeCrossTarget(b) else target.getNonCascadeCrossTarget(b),
-    });
-
-    addDependenciesToModule(
-        &test_exe.root_module,
-        library_description,
-        options,
-        target,
-        dependencies,
-        build_for_cascade,
-    );
-
-    return test_exe;
-}
-
 /// Creates a module for a library.
 fn createModule(
     b: *std.Build,
@@ -422,10 +303,16 @@ fn createModule(
     target: CascadeTarget,
     dependencies: []const Dependency,
     build_for_cascade: bool,
+    is_exe_root_module: bool,
 ) !*std.Build.Module {
     const module = b.createModule(.{
         .root_source_file = lazy_path,
+        .optimize = options.optimize,
     });
+
+    if (is_exe_root_module) {
+        module.resolved_target = if (build_for_cascade) target.getCascadeCrossTarget(b) else target.getNonCascadeCrossTarget(b);
+    }
 
     addDependenciesToModule(
         module,

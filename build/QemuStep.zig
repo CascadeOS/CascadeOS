@@ -32,7 +32,7 @@ pub fn registerQemuSteps(
 
     // the kernel log wrapper interferes with the qemu monitor
     const kernel_log_wrapper_compile = if (!options.qemu_monitor)
-        kernel_log_wrapper.release_safe_compile_step
+        kernel_log_wrapper.release_safe_exe
     else
         null;
 
@@ -212,11 +212,11 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // qemu acceleration
     const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
     if (should_use_acceleration) {
-        switch (b.host.result.os.tag) {
+        switch (b.graph.host.result.os.tag) {
             .linux => if (helpers.fileExists("/dev/kvm")) run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
             .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
             .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
-            else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.host.result.os.tag)}),
+            else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.graph.host.result.os.tag)}),
         }
     }
 

@@ -4,15 +4,15 @@
 pub fn customConfiguration(
     b: *std.Build,
     tool_description: ToolDescription,
-    exe: *std.Build.Step.Compile,
+    module: *std.Build.Module,
 ) void {
     if (b.graph.host.result.os.tag == .linux) {
         // Use musl to remove include of "/usr/include"
-        exe.root_module.resolved_target.?.query.abi = .musl;
-        exe.root_module.resolved_target.?.result.abi = .musl;
+        module.resolved_target.?.query.abi = .musl;
+        module.resolved_target.?.result.abi = .musl;
     }
 
-    exe.linkLibC();
+    module.link_libc = true;
 
     const lib_dwarf = b.dependency("libdwarf", .{});
 
@@ -21,9 +21,9 @@ pub fn customConfiguration(
         tool_description.name,
     });
 
-    exe.addIncludePath(b.path(own_directory_path));
+    module.addIncludePath(b.path(own_directory_path));
 
-    exe.addIncludePath(lib_dwarf.path("src/lib/libdwarf"));
+    module.addIncludePath(lib_dwarf.path("src/lib/libdwarf"));
 
     const c_files: []const []const u8 = &.{
         "src/lib/libdwarf/dwarf_abbrev.c",
@@ -86,7 +86,7 @@ pub fn customConfiguration(
         "src/lib/libdwarf/dwarf_xu_index.c",
     };
 
-    exe.addCSourceFiles(.{
+    module.addCSourceFiles(.{
         .root = lib_dwarf.path(""),
         .files = c_files,
         .flags = &.{"-fno-sanitize=undefined"},

@@ -25,7 +25,7 @@ pub const Configuration = union(enum) {
     pub const CustomFn = *const fn (
         b: *std.Build,
         tool_description: ToolDescription,
-        exe: *std.Build.Step.Compile,
+        module: *std.Build.Module,
     ) void;
 };
 
