@@ -141,7 +141,7 @@ pub fn onInterruptEntry(self: *Context, executor: *kernel.Executor) InterruptCon
     const current_disable_count = self.interrupt_disable_count;
 
     self.interrupt_disable_count = current_disable_count + 1;
-    self.task.preemption_disable_count = current_disable_count + 1;
+    executor.interrupt_disable_count = current_disable_count + 1;
 
     self.executor = executor;
     executor.current_context = self;
