@@ -18,12 +18,11 @@ pub fn initStage1() !noreturn {
     // now that early output is ready, we can provide a very simple panic implementation
     kernel.debug.panic_impl = struct {
         fn simplePanic(
-            context: *kernel.Context,
             msg: []const u8,
             error_return_trace: ?*const std.builtin.StackTrace,
             return_address: usize,
         ) void {
-            _ = context;
+            arch.interrupts.disableInterrupts();
 
             kernel.debug.formatting.printPanic(
                 arch.init.early_output_writer,
@@ -215,7 +214,6 @@ pub fn handleLog(context: *kernel.Context, level_and_scope: []const u8, comptime
 ///
 /// This function expects that `arch.init.loadExecutor` has been called on the current executor.
 fn handlePanic(
-    context: *kernel.Context,
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
@@ -224,6 +222,9 @@ fn handlePanic(
         var panicking_executor = std.atomic.Value(kernel.Executor.Id).init(.none);
         var nested_panic_count = std.atomic.Value(usize).init(0);
     };
+
+    const context = kernel.Context.getCurrent();
+    context.incrementInterruptDisable();
 
     const executor = context.executor.?;
     executor.panicked.store(true, .release);

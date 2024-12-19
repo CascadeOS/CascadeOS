@@ -3,18 +3,15 @@
 
 /// This is the runtime selected panic implementation.
 pub var panic_impl: *const fn (
-    context: *kernel.Context,
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
 ) void = struct {
     fn noOpPanic(
-        context: *kernel.Context,
         msg: []const u8,
         error_return_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) void {
-        _ = context;
         _ = msg;
         _ = error_return_trace;
         _ = return_address;
@@ -29,11 +26,7 @@ fn zigPanic(
 ) noreturn {
     @branchHint(.cold);
 
-    const context = kernel.Context.getCurrent();
-    context.incrementInterruptDisable();
-
     panic_impl(
-        context,
         msg,
         error_return_trace,
         return_address_opt orelse @returnAddress(),
