@@ -24,8 +24,6 @@ pub fn maybePreempt(context: *kernel.Context) void {
         return;
     }
 
-    log.debug("preempting {}", .{context.task});
-
     const held = lock(context);
     defer held.unlock();
 
@@ -298,6 +296,11 @@ fn idle() callconv(.C) noreturn {
 
 pub fn lock(context: *kernel.Context) kernel.sync.TicketSpinLock.Held {
     return globals.lock.lock(context);
+}
+
+pub fn unlock(context: *kernel.Context) void {
+    std.debug.assert(globals.lock.isLockedBy(context.executor.?.id));
+    globals.lock.unsafeRelease();
 }
 
 const globals = struct {
