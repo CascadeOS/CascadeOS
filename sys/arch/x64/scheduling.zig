@@ -50,7 +50,7 @@ pub fn callZeroArgs(
 
     var stack = new_stack;
 
-    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
 
     if (opt_old_task) |old_task| {
         impls.callZeroArgs(
@@ -114,7 +114,7 @@ pub fn callOneArgs(
 
     var stack = new_stack;
 
-    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
     try stack.push(arg1);
 
     if (opt_old_task) |old_task| {
@@ -182,7 +182,7 @@ pub fn callTwoArgs(
 
     var stack = new_stack;
 
-    try stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
     try stack.push(arg2);
     try stack.push(arg1);
 
@@ -324,10 +324,10 @@ pub fn jumpToTaskFromTask(
 /// Prepares the given task for being scheduled.
 ///
 /// Ensures that when the task is scheduled it will runlock the scheduler lock then call the `target_function` with the
-/// given `context`.
+/// given `arg`.
 pub fn prepareNewTaskForScheduling(
     task: *kernel.Task,
-    context: u64,
+    arg: u64,
     target_function: arch.scheduling.NewTaskFunction,
 ) error{StackOverflow}!void {
     const impls = struct {
@@ -336,7 +336,7 @@ pub fn prepareNewTaskForScheduling(
                 fn impl() callconv(.naked) void {
                     asm volatile (
                         \\pop %rdi // task
-                        \\pop %rsi // context
+                        \\pop %rsi // arg
                         \\pop %rdx // target_function
                         \\ret // the return address of `startNewTaskStage2` should be on the stack
                     );
@@ -348,26 +348,30 @@ pub fn prepareNewTaskForScheduling(
 
         fn startNewTaskStage2(
             current_task: *kernel.Task,
-            task_context: u64,
+            task_arg: u64,
             target_function_addr: *const anyopaque,
         ) callconv(.C) void {
-            var interrupt_exclusion = kernel.scheduler.unlockSchedulerFromOtherTask();
+            var context: kernel.Context = undefined;
+            context.createNew(arch.rawGetCurrentExecutor());
+            std.debug.assert(context.task == current_task);
+
+            kernel.scheduler.unlock(&context);
 
             const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
-            func(current_task, task_context, &interrupt_exclusion);
+            func(&context, task_arg);
             core.panic("task returned to entry point", null);
         }
     };
 
-    try task.stack.pushReturnAddress(.zero); // zero return address prevents walking off the end of the stack
+    try task.stack.push(core.VirtualAddress.zero); // zero return address prevents walking off the end of the stack
 
-    try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(@ptrCast(&impls.startNewTaskStage2)));
+    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(&impls.startNewTaskStage2)));
 
     try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
-    try task.stack.push(context);
+    try task.stack.push(arg);
     try task.stack.push(core.VirtualAddress.fromPtr(task));
 
-    try task.stack.pushReturnAddress(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));
+    try task.stack.push(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));
 
     // general purpose registers
     for (0..6) |_| try task.stack.push(@as(u64, 0));

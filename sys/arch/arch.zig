@@ -526,18 +526,17 @@ pub const scheduling = struct {
     }
 
     pub const NewTaskFunction = *const fn (
-        task: *kernel.Task,
-        context: u64,
-        interrupt_exclusion: *kernel.sync.InterruptExclusion,
+        context: *kernel.Context,
+        arg: u64,
     ) noreturn;
 
     /// Prepares the given task for being scheduled.
     ///
     /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
-    /// the given `context`.
+    /// the given `arg`.
     pub fn prepareNewTaskForScheduling(
         task: *kernel.Task,
-        context: u64,
+        arg: u64,
         target_function: NewTaskFunction,
     ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
@@ -546,7 +545,7 @@ pub const scheduling = struct {
             NewTaskFunction,
         ) error{StackOverflow}!void);
 
-        return current.scheduling.prepareNewTaskForScheduling(task, context, target_function);
+        return current.scheduling.prepareNewTaskForScheduling(task, arg, target_function);
     }
 };
 

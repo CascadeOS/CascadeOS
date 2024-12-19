@@ -52,18 +52,6 @@ pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
     stack.stack_pointer = new_stack_pointer;
 }
 
-/// Pushes a return address to the stack.
-pub fn pushReturnAddress(stack: *Stack, return_address: core.VirtualAddress) error{StackOverflow}!void {
-    const old_stack_pointer = stack.stack_pointer;
-
-    const RETURN_ADDRESS_ALIGNMENT = core.Size.from(16, .byte); // TODO: Is this correct on non-x64?
-
-    try stack.alignPointer(RETURN_ADDRESS_ALIGNMENT);
-    errdefer stack.stack_pointer = old_stack_pointer;
-
-    try stack.push(return_address.value);
-}
-
 pub fn createStack(context: *kernel.Context) !Stack {
     const stack_range = try globals.stack_arena.allocate(
         context,
