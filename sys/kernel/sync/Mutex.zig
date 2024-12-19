@@ -23,7 +23,7 @@ pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
             return;
         };
 
-        std.debug.assert(current_task.idle_for == null); // block during idle
+        std.debug.assert(!current_task.is_idle_task); // block during idle
         std.debug.assert(locked_by == current_task); // recursive lock
 
         mutex.wait_queue.wait(context, current_task, spinlock_held);

@@ -23,8 +23,7 @@ preemption_disable_count: u32 = 0,
 /// Then when we re-enable preemption, we check this flag.
 preemption_skipped: bool = false,
 
-/// If this is an idle task, this will be the executor id that this is the idle task for.
-idle_for: ?kernel.Executor.Id = null,
+is_idle_task: bool,
 
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();

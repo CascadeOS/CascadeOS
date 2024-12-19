@@ -314,6 +314,7 @@ fn allocateAndPrepareExecutors(context: *kernel.Context) !void {
             ._name = .{}, // set below
             .state = .running,
             .stack = try kernel.Stack.createStack(context),
+            .is_idle_task = false,
         };
 
         try init_task._name.writer().print("init {}", .{i});
@@ -328,6 +329,7 @@ fn allocateAndPrepareExecutors(context: *kernel.Context) !void {
                 ._name = .{}, // set below
                 .state = .ready,
                 .stack = try kernel.Stack.createStack(context),
+                .is_idle_task = true,
             },
         };
 
@@ -375,6 +377,7 @@ const globals = struct {
         ._name = kernel.Task.Name.fromSlice("init bootstrap") catch unreachable,
         .state = .running,
         .stack = undefined, // never used
+        .is_idle_task = false,
     };
 
     var early_output_lock: kernel.sync.TicketSpinLock = .{};

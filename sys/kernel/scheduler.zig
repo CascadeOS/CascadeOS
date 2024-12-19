@@ -6,7 +6,7 @@
 /// Must be called with the scheduler lock held.
 pub fn queueTask(context: *kernel.Context, task: *kernel.Task) void {
     std.debug.assert(task.next_task_node.next == null);
-    std.debug.assert(task.idle_for == null); // cannot queue an idle task
+    std.debug.assert(!task.is_idle_task); // cannot queue an idle task
 
     std.debug.assert(globals.lock.isLockedBy(context.executor.?.id));
 
@@ -49,7 +49,7 @@ pub fn yield(context: *kernel.Context, comptime mode: enum { requeue, drop }) vo
         switch (mode) {
             .requeue => return, // no tasks to run
             .drop => {
-                std.debug.assert(current_task.idle_for == null); // drop during idle
+                std.debug.assert(!current_task.is_idle_task); // drop during idle
 
                 log.debug("dropping {}", .{current_task});
                 current_task.state = .dropped;
@@ -63,7 +63,7 @@ pub fn yield(context: *kernel.Context, comptime mode: enum { requeue, drop }) vo
     const new_task = kernel.Task.fromNode(new_task_node);
     std.debug.assert(new_task.state == .ready);
 
-    if (current_task.idle_for != null) {
+    if (current_task.is_idle_task) {
         switchToTaskFromIdle(context, new_task);
         core.panic("idle returned", null);
     }
@@ -99,7 +99,7 @@ pub fn block(
     std.debug.assert(globals.lock.isLockedBy(context.executor.?.id));
 
     const current_task = context.task;
-    std.debug.assert(current_task.idle_for == null); // block during idle
+    std.debug.assert(!current_task.is_idle_task); // block during idle
 
     std.debug.assert(current_task.state == .running);
     std.debug.assert(current_task.preemption_disable_count == 0);
@@ -121,7 +121,7 @@ pub fn block(
 }
 
 fn switchToIdle(context: *kernel.Context, current_task: *kernel.Task) void {
-    std.debug.assert(current_task.idle_for == null);
+    std.debug.assert(!current_task.is_idle_task);
 
     arch.scheduling.prepareForJumpToIdleFromTask(context, current_task);
 
@@ -159,7 +159,7 @@ fn switchToIdleWithLock(
         }
     };
 
-    std.debug.assert(current_task.idle_for == null);
+    std.debug.assert(!current_task.is_idle_task);
 
     arch.scheduling.prepareForJumpToIdleFromTask(context, current_task);
 
@@ -184,7 +184,7 @@ fn switchToIdleWithLock(
 }
 
 fn switchToTaskFromIdle(context: *kernel.Context, new_task: *kernel.Task) noreturn {
-    std.debug.assert(context.task.idle_for != null);
+    std.debug.assert(context.task.is_idle_task);
 
     log.debug("switching to {} from idle", .{new_task});
 
@@ -203,8 +203,8 @@ fn switchToTaskFromIdle(context: *kernel.Context, new_task: *kernel.Task) noretu
 }
 
 fn switchToTaskFromTask(context: *kernel.Context, current_task: *kernel.Task, new_task: *kernel.Task) void {
-    std.debug.assert(current_task.idle_for == null);
-    std.debug.assert(new_task.idle_for == null);
+    std.debug.assert(!current_task.is_idle_task);
+    std.debug.assert(!new_task.is_idle_task);
 
     log.debug("switching to {} from {}", .{ new_task, current_task });
 
@@ -239,8 +239,8 @@ fn switchToTaskFromTaskWithLock(
         }
     };
 
-    std.debug.assert(current_task.idle_for == null);
-    std.debug.assert(new_task.idle_for == null);
+    std.debug.assert(!current_task.is_idle_task);
+    std.debug.assert(!new_task.is_idle_task);
 
     log.debug("switching to {} from {} with a lock", .{ new_task, current_task });
 
