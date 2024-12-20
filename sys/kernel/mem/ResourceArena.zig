@@ -50,17 +50,6 @@ unused_tags: SingleLinkedList,
 /// Number of unused boundary tags.
 unused_tags_count: usize,
 
-/// Is this arena a populator?
-///
-/// `true` if this arena is involved in boundary tag allocation.
-///
-/// If `true`, the number of unused boundary tags that `ensureBoundaryTags()` will ensure is
-/// `TARGET_UNUSED_TAGS_FOR_POPULATOR`.
-///
-/// If `false`, the number of unused boundary tags that `ensureBoundaryTags()` will ensure is
-/// `TARGET_UNUSED_TAGS`.
-populator: bool,
-
 pub fn name(self: *const ResourceArena) []const u8 {
     return self._name.constSlice();
 }
@@ -92,7 +81,6 @@ pub const Source = struct {
 
 pub const CreateOptions = struct {
     source: ?Source = null,
-    populator: bool = false,
 };
 
 pub const CreateError = error{
@@ -125,7 +113,6 @@ pub fn create(
         .freelist_bitmap = .empty,
         .unused_tags = .empty,
         .unused_tags_count = 0,
-        .populator = options.populator,
     };
 }
 
@@ -718,38 +705,16 @@ fn ensureBoundaryTags(arena: *ResourceArena, context: *kernel.Context) EnsureBou
         var allocate_tags_lock: kernel.sync.Mutex = .{};
     };
 
-    // ** WARNING **
-    // Due to the management of the arena's mutex as well as the `boundary_tag_allocation` mutex
-    // care needs to be taken in this function regarding early returns, continue, errors, etc.
-
-    const target_unused_tags_count: usize = if (arena.populator)
-        TARGET_UNUSED_TAGS_FOR_POPULATOR
-    else
-        TARGET_UNUSED_TAGS;
-
     while (true) {
         arena.mutex.lock(context);
 
-        if (arena.unused_tags_count >= target_unused_tags_count) return;
+        if (arena.unused_tags_count >= MAX_TAGS_PER_ALLOCATION) return;
 
-        var tags_needed = target_unused_tags_count - arena.unused_tags_count;
-
-        while (globals.unused_tags.pop()) |node| {
+        while (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
+            const node = globals.unused_tags.pop() orelse break;
             arena.pushUnusedTag(node.toTag());
-
-            tags_needed -= 1;
-            if (tags_needed == 0) return;
-        }
-
-        if (static.allocate_tags_lock.isLockedByCurrent(context)) {
-            std.debug.assert(arena.populator);
-
-            if (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
-                // TODO: reclaim from caches, wait for memory, etc.
-                return EnsureBoundaryTagsError.OutOfBoundaryTags;
-            }
-
-            return;
+        } else {
+            return; // loop condition was false meaning we have enough tags
         }
 
         arena.mutex.unlock(context);
@@ -763,47 +728,41 @@ fn ensureBoundaryTags(arena: *ResourceArena, context: *kernel.Context) EnsureBou
 
         log.debug("{s}: performing boundary tag allocation", .{arena.name()});
 
-        const allocation = globals.tag_arena.allocate(
-            context,
-            tags_needed * @sizeOf(BoundaryTag),
-            .instant_fit,
-        ) catch {
-            static.allocate_tags_lock.unlock(context);
-            // TODO: reclaim from caches, wait for memory, etc.
-            return EnsureBoundaryTagsError.OutOfBoundaryTags;
+        const tags = blk: {
+            const physical_range = kernel.mem.physical.allocatePage() catch
+                return EnsureBoundaryTagsError.OutOfBoundaryTags;
+            errdefer comptime unreachable;
+
+            const ptr = kernel.mem.directMapFromPhysicalRange(physical_range).address.toPtr([*]BoundaryTag);
+            break :blk ptr[0..TAGS_PER_PAGE];
         };
         errdefer comptime unreachable;
+        std.debug.assert(tags.len >= MAX_TAGS_PER_ALLOCATION);
 
-        const ptr: [*]BoundaryTag = @ptrFromInt(allocation.base);
-        const allocated_tags = ptr[0 .. allocation.len / @sizeOf(BoundaryTag)];
-        std.debug.assert(allocated_tags.len >= tags_needed);
+        @memset(tags, .empty(.free));
 
-        @memset(allocated_tags, .empty(.free));
+        const extra_tags = tags[MAX_TAGS_PER_ALLOCATION..];
 
-        var tag_index: usize = 0;
-
-        // restock the populator arenas
-        for (globals.populator_arenas) |populator_arena| {
-            populator_arena.mutex.lock(context);
-            defer populator_arena.mutex.unlock(context);
-
-            while (populator_arena.unused_tags_count < TARGET_UNUSED_TAGS_FOR_POPULATOR) {
-                populator_arena.pushUnusedTag(&allocated_tags[tag_index]);
-                tag_index += 1;
-            }
+        // give the extra tags to the global unused tags list
+        for (extra_tags) |*tag| {
+            globals.unused_tags.push(&tag.all_tag_node);
         }
 
         static.allocate_tags_lock.unlock(context);
         arena.mutex.lock(context);
 
+        const maximum_needed_tags = tags[0..MAX_TAGS_PER_ALLOCATION];
+
+        var tag_index: usize = 0;
+
         // restock the arena's unused tags
-        while (arena.unused_tags_count < target_unused_tags_count) {
-            arena.pushUnusedTag(&allocated_tags[tag_index]);
+        while (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
+            arena.pushUnusedTag(&maximum_needed_tags[tag_index]);
             tag_index += 1;
         }
 
-        // give the rest to the global unused tags
-        for (allocated_tags[tag_index..]) |*tag| {
+        // give the left over tags to the global unused tags list
+        for (maximum_needed_tags[tag_index..]) |*tag| {
             globals.unused_tags.push(&tag.all_tag_node);
         }
 
@@ -1243,52 +1202,13 @@ const TAGS_PER_EXACT_ALLOCATION = 0;
 const TAGS_PER_PARTIAL_ALLOCATION = 1;
 const MAX_TAGS_PER_ALLOCATION = TAGS_PER_SPAN_CREATE + TAGS_PER_PARTIAL_ALLOCATION;
 
-const TARGET_UNUSED_TAGS = MAX_TAGS_PER_ALLOCATION;
-const TARGET_UNUSED_TAGS_FOR_POPULATOR = MAX_TAGS_PER_ALLOCATION * globals.populator_arenas.len;
+const TAGS_PER_PAGE = arch.paging.standard_page_size.value / @sizeOf(BoundaryTag);
 
 pub const Name = std.BoundedArray(u8, kernel.config.resource_arena_name_length);
 
-pub const globals = struct {
+const globals = struct {
     /// The global list of unused boundary tags.
-    ///
-    /// Populated with `NUMBER_OF_EARLY_TAGS` tags during `init.initializeResourceArenasAndHeap`.
-    pub var unused_tags: AtomicSingleLinkedList = .empty;
-
-    /// The arena used for all boundary tags.
-    ///
-    /// Has a source arena of `kernel.mem.globals.heap_arena`.
-    ///
-    /// Initialized during `init.initializeResourceArenasAndHeap`.
-    pub var tag_arena: ResourceArena = undefined;
-
-    /// Arenas that are involved in boundary tag allocation.
-    const populator_arenas = [_]*ResourceArena{
-        &kernel.mem.heap.globals.heap_address_space_arena,
-        &kernel.mem.heap.globals.heap_arena,
-        &tag_arena,
-    };
-};
-
-pub const init = struct {
-    const NUMBER_OF_EARLY_TAGS = 200;
-    var early_tags: [NUMBER_OF_EARLY_TAGS]BoundaryTag = @splat(.empty(.free));
-
-    pub fn populateUnusedTags() void {}
-
-    pub fn initializeResourceArenas() !void {
-        for (&early_tags) |*tag| {
-            globals.unused_tags.push(&tag.all_tag_node);
-        }
-
-        try globals.tag_arena.create(
-            "tags",
-            arch.paging.standard_page_size.value,
-            .{
-                .populator = true,
-                .source = .{ .arena = &kernel.mem.heap.globals.heap_arena },
-            },
-        );
-    }
+    var unused_tags: AtomicSingleLinkedList = .empty;
 };
 
 const std = @import("std");

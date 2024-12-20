@@ -88,9 +88,6 @@ fn initStage2(context: *kernel.Context) !noreturn {
     log.debug("building core page table", .{});
     try kernel.mem.init.buildCorePageTable();
 
-    log.debug("initializing resource arenas", .{});
-    try kernel.mem.ResourceArena.init.initializeResourceArenas();
-
     log.debug("initializing kernel heap", .{});
     try kernel.mem.heap.init.initializeHeap(context);
 
