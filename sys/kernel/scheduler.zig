@@ -24,8 +24,13 @@ pub fn maybePreempt(context: *kernel.Context) void {
         return;
     }
 
-    const held = lock(context);
-    defer held.unlock();
+    context.incrementInterruptDisable();
+    defer context.decrementInterruptDisable();
+
+    std.debug.assert(!globals.lock.isLockedBy(context.executor.?.id));
+
+    globals.lock.lock(context);
+    defer globals.lock.unlock(context);
 
     context.task.preemption_skipped = false;
 
@@ -92,7 +97,7 @@ pub fn yield(context: *kernel.Context, comptime mode: enum { requeue, drop }) vo
 /// This function must be called with the scheduler lock held.
 pub fn block(
     context: *kernel.Context,
-    spinlock_held: kernel.sync.TicketSpinLock.Held,
+    spinlock: *kernel.sync.TicketSpinLock,
 ) void {
     std.debug.assert(globals.lock.isLockedBy(context.executor.?.id));
 
@@ -107,7 +112,7 @@ pub fn block(
     current_task.state = .blocked;
 
     const new_task_node = globals.ready_to_run.pop() orelse {
-        switchToIdleWithLock(context, current_task, spinlock_held);
+        switchToIdleWithLock(context, current_task, spinlock);
         return;
     };
 
@@ -115,7 +120,7 @@ pub fn block(
     std.debug.assert(current_task != new_task);
     std.debug.assert(new_task.state == .ready);
 
-    switchToTaskFromTaskWithLock(context, current_task, new_task, spinlock_held);
+    switchToTaskFromTaskWithLock(context, current_task, new_task, spinlock);
 }
 
 fn switchToIdle(context: *kernel.Context, current_task: *kernel.Task) void {
@@ -145,13 +150,13 @@ fn switchToIdle(context: *kernel.Context, current_task: *kernel.Task) void {
 fn switchToIdleWithLock(
     context: *kernel.Context,
     current_task: *kernel.Task,
-    spinlock_held: kernel.sync.TicketSpinLock.Held,
+    spinlock: *kernel.sync.TicketSpinLock,
 ) void {
     const static = struct {
-        fn idleWithLock(
-            spinlock: *kernel.sync.TicketSpinLock,
+        fn idleEntryWithLock(
+            inner_spinlock: *kernel.sync.TicketSpinLock,
         ) callconv(.C) noreturn {
-            spinlock.unsafeRelease();
+            inner_spinlock.unsafeUnlock();
             idle();
             core.panic("idle returned", null);
         }
@@ -169,8 +174,8 @@ fn switchToIdleWithLock(
     arch.scheduling.callOneArgs(
         current_task,
         executor.idle_task.stack,
-        spinlock_held.spinlock,
-        static.idleWithLock,
+        spinlock,
+        static.idleEntryWithLock,
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
@@ -224,14 +229,18 @@ fn switchToTaskFromTaskWithLock(
     context: *kernel.Context,
     current_task: *kernel.Task,
     new_task: *kernel.Task,
-    spinlock_held: kernel.sync.TicketSpinLock.Held,
+    spinlock: *kernel.sync.TicketSpinLock,
 ) void {
     const static = struct {
         fn switchToTaskWithLock(
-            spinlock: *kernel.sync.TicketSpinLock,
+            inner_spinlock: *kernel.sync.TicketSpinLock,
             new_task_inner: *kernel.Task,
         ) callconv(.C) noreturn {
-            spinlock.unsafeRelease();
+            var idle_context: kernel.Context = undefined;
+            idle_context.createNew(arch.rawGetCurrentExecutor());
+
+            inner_spinlock.unlock(&idle_context);
+
             arch.scheduling.jumpToTaskFromIdle(new_task_inner);
             core.panic("task returned", null);
         }
@@ -254,7 +263,7 @@ fn switchToTaskFromTaskWithLock(
     arch.scheduling.callTwoArgs(
         current_task,
         executor.idle_task.stack,
-        spinlock_held.spinlock,
+        spinlock,
         new_task,
         static.switchToTaskWithLock,
     ) catch |err| {
@@ -271,7 +280,7 @@ fn idle() callconv(.C) noreturn {
     var context: kernel.Context = undefined;
     context.createNew(arch.rawGetCurrentExecutor());
 
-    unlock(&context);
+    globals.lock.unlock(&context);
 
     log.debug("entering idle", .{});
 
@@ -281,8 +290,11 @@ fn idle() callconv(.C) noreturn {
 
     while (true) {
         {
-            const held = lock(&context);
-            defer held.unlock();
+            context.incrementInterruptDisable();
+            defer context.decrementInterruptDisable();
+
+            globals.lock.lock(&context);
+            defer globals.lock.unlock(&context);
 
             if (!globals.ready_to_run.isEmpty()) {
                 yield(&context, .requeue);
@@ -293,13 +305,12 @@ fn idle() callconv(.C) noreturn {
     }
 }
 
-pub fn lock(context: *kernel.Context) kernel.sync.TicketSpinLock.Held {
+pub fn lock(context: *kernel.Context) void {
     return globals.lock.lock(context);
 }
 
 pub fn unlock(context: *kernel.Context) void {
-    std.debug.assert(globals.lock.isLockedBy(context.executor.?.id));
-    globals.lock.unsafeRelease();
+    globals.lock.unlock(context);
 }
 
 const globals = struct {

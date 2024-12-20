@@ -199,8 +199,11 @@ fn initStage4(executor: *kernel.Executor) callconv(.c) noreturn {
 
 /// The log implementation during init.
 pub fn handleLog(context: *kernel.Context, level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    var held = globals.early_output_lock.lock(context);
-    defer held.unlock();
+    context.incrementInterruptDisable();
+    defer context.decrementInterruptDisable();
+
+    globals.early_output_lock.lock(context);
+    defer globals.early_output_lock.unlock(context);
 
     // TODO: make the log output look nicer
     context.executor.?.format("", .{}, arch.init.early_output_writer) catch {};

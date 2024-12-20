@@ -10,7 +10,8 @@ locked_by: ?*kernel.Task = null,
 
 pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
     while (true) {
-        const spinlock_held = mutex.spinlock.lock(context);
+        context.incrementInterruptDisable();
+        mutex.spinlock.lock(context);
 
         const current_task = context.task;
 
@@ -18,7 +19,9 @@ pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
             mutex.locked_by = current_task;
 
             context.incrementPreemptionDisable();
-            spinlock_held.unlock();
+
+            mutex.spinlock.unlock(context);
+            context.decrementInterruptDisable();
 
             return;
         };
@@ -26,15 +29,18 @@ pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
         std.debug.assert(!current_task.is_idle_task); // block during idle
         std.debug.assert(locked_by == current_task); // recursive lock
 
-        mutex.wait_queue.wait(context, current_task, spinlock_held);
+        mutex.wait_queue.wait(context, current_task, &mutex.spinlock);
 
         continue;
     }
 }
 
 pub fn unlock(mutex: *Mutex, context: *kernel.Context) void {
-    const spinlock_held = mutex.spinlock.lock(context);
-    defer spinlock_held.unlock();
+    context.incrementInterruptDisable();
+    defer context.decrementInterruptDisable();
+
+    mutex.spinlock.lock(context);
+    defer mutex.spinlock.unlock(context);
 
     std.debug.assert(mutex.locked_by == context.task);
     mutex.locked_by = null;
