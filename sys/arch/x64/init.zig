@@ -59,11 +59,11 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(executor: *kernel.Executor, context: *kernel.Context) void {
+pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) void {
     prepareExecutorShared(
         executor,
-        kernel.Stack.createStack(context) catch core.panic("failed to allocate double fault stack", null),
-        kernel.Stack.createStack(context) catch core.panic("failed to allocate NMI stack", null),
+        kernel.Stack.createStack(current_task) catch core.panic("failed to allocate double fault stack", null),
+        kernel.Stack.createStack(current_task) catch core.panic("failed to allocate NMI stack", null),
     );
 }
 

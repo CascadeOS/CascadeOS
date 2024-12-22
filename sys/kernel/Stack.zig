@@ -52,9 +52,9 @@ pub fn alignPointer(stack: *Stack, alignment: core.Size) !void {
     stack.stack_pointer = new_stack_pointer;
 }
 
-pub fn createStack(context: *kernel.Context) !Stack {
+pub fn createStack(current_task: *kernel.Task) !Stack {
     const stack_range = try globals.stack_arena.allocate(
-        context,
+        current_task,
         stack_size_including_guard_page.value,
         .instant_fit,
     );
@@ -93,7 +93,7 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeStacks(context: *kernel.Context) !void {
+    pub fn initializeStacks(current_task: *kernel.Task) !void {
         try globals.stack_arena.create(
             "stacks",
             arch.paging.standard_page_size.value,
@@ -104,7 +104,7 @@ pub const init = struct {
             core.panic("no kernel stacks", null);
 
         globals.stack_arena.addSpan(
-            context,
+            current_task,
             stacks_range.address.value,
             stacks_range.size.value,
         ) catch |err| {

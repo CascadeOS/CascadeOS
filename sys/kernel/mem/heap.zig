@@ -35,7 +35,7 @@ pub const allocator = std.mem.Allocator{
                 _: usize,
             ) ?[*]u8 {
                 const allocation = globals.heap_arena.allocate(
-                    kernel.Context.getCurrent(),
+                    kernel.Task.getCurrent(),
                     len,
                     .instant_fit,
                 ) catch return null;
@@ -64,7 +64,7 @@ pub const allocator = std.mem.Allocator{
                 _: u8,
                 _: usize,
             ) void {
-                globals.heap_arena.deallocateBase(kernel.Context.getCurrent(), @intFromPtr(buf.ptr));
+                globals.heap_arena.deallocateBase(kernel.Task.getCurrent(), @intFromPtr(buf.ptr));
             }
         }.free,
     },
@@ -72,11 +72,11 @@ pub const allocator = std.mem.Allocator{
 
 fn heapArenaImport(
     arena: *ResourceArena,
-    context: *kernel.Context,
+    current_task: *kernel.Task,
     len: usize,
     policy: ResourceArena.Policy,
 ) ResourceArena.AllocateError!ResourceArena.Allocation {
-    const allocation = try arena.allocate(context, len, policy);
+    const allocation = try arena.allocate(current_task, len, policy);
 
     log.debug("mapping {} into heap", .{allocation});
 
@@ -94,7 +94,7 @@ fn heapArenaImport(
 
 fn heapArenaRelease(
     arena: *ResourceArena,
-    context: *kernel.Context,
+    current_task: *kernel.Task,
     allocation: ResourceArena.Allocation,
 ) void {
     log.debug("unmapping {} from heap", .{allocation});
@@ -108,7 +108,7 @@ fn heapArenaRelease(
         true,
     );
 
-    arena.deallocate(context, allocation);
+    arena.deallocate(current_task, allocation);
 }
 
 pub const globals = struct {
@@ -128,7 +128,7 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeHeap(context: *kernel.Context) !void {
+    pub fn initializeHeap(current_task: *kernel.Task) !void {
         try globals.heap_address_space_arena.create(
             "heap_address_space",
             arch.paging.standard_page_size.value,
@@ -151,7 +151,7 @@ pub const init = struct {
             core.panic("no kernel heap", null);
 
         globals.heap_address_space_arena.addSpan(
-            context,
+            current_task,
             heap_range.address.value,
             heap_range.size.value,
         ) catch |err| {

@@ -55,7 +55,7 @@ pub fn stdLogImpl(
 }
 
 /// The function type for the init log implementation.
-pub const InitLogImpl = fn (context: *kernel.Context, level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void;
+pub const InitLogImpl = fn (current_task: *kernel.Task, level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void;
 
 /// Which logging implementation to use.
 ///
@@ -76,12 +76,12 @@ fn logFn(
 
     const level_and_scope = comptime " | " ++ message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
 
-    const context = kernel.Context.getCurrent(); // TODO: improve the API so this can be passed in
+    const current_task = kernel.Task.getCurrent(); // TODO: improve the API so this can be passed in
 
     switch (log_impl) {
         .init => {
             @branchHint(.unlikely);
-            @import("root").initLogImpl(context, level_and_scope, user_fmt, args);
+            @import("root").initLogImpl(current_task, level_and_scope, user_fmt, args);
         },
         .full => core.panic("UNIMPLEMENTED", null), // TODO: full log implementation
     }

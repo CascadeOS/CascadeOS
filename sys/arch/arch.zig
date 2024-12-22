@@ -60,7 +60,7 @@ pub const interrupts = struct {
 
     pub const InterruptHandler = *const fn (
         interrupt_context: InterruptContext,
-        context: *kernel.Context,
+        current_task: *kernel.Task,
     ) void;
 
     pub const InterruptContext = current.interrupts.InterruptContext;
@@ -291,14 +291,14 @@ pub const init = struct {
     /// Prepares the provided `Executor` for use.
     ///
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
-    pub fn prepareExecutor(executor: *kernel.Executor, context: *kernel.Context) callconv(core.inline_in_non_debug) void {
+    pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.init,
             "prepareExecutor",
-            fn (*kernel.Executor, *kernel.Context) void,
+            fn (*kernel.Executor, *kernel.Task) void,
         );
 
-        current.init.prepareExecutor(executor, context);
+        current.init.prepareExecutor(executor, current_task);
     }
 
     /// Load the provided `Executor` as the current executor.
@@ -459,28 +459,28 @@ pub const scheduling = struct {
 
     /// Prepares the executor for jumping to the idle state.
     pub fn prepareForJumpToIdleFromTask(
-        context: *kernel.Context,
+        executor: *kernel.Executor,
         old_task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(current.scheduling, "prepareForJumpToIdleFromTask", fn (
-            *kernel.Context,
+            *kernel.Executor,
             *kernel.Task,
         ) void);
 
-        current.scheduling.prepareForJumpToIdleFromTask(context, old_task);
+        current.scheduling.prepareForJumpToIdleFromTask(executor, old_task);
     }
 
     /// Prepares the executor for jumping to the given task from the idle state.
     pub fn prepareForJumpToTaskFromIdle(
-        context: *kernel.Context,
+        executor: *kernel.Executor,
         new_task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(current.scheduling, "prepareForJumpToTaskFromIdle", fn (
-            *kernel.Context,
+            *kernel.Executor,
             *kernel.Task,
         ) void);
 
-        current.scheduling.prepareForJumpToTaskFromIdle(context, new_task);
+        current.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
     }
 
     /// Jumps to the given task from the idle state.
@@ -498,17 +498,17 @@ pub const scheduling = struct {
 
     /// Prepares the executor for jumping from `old_task` to `new_task`.
     pub fn prepareForJumpToTaskFromTask(
-        context: *kernel.Context,
+        executor: *kernel.Executor,
         old_task: *kernel.Task,
         new_task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(current.scheduling, "prepareForJumpToTaskFromTask", fn (
-            *kernel.Context,
+            *kernel.Executor,
             *kernel.Task,
             *kernel.Task,
         ) void);
 
-        current.scheduling.prepareForJumpToTaskFromTask(context, old_task, new_task);
+        current.scheduling.prepareForJumpToTaskFromTask(executor, old_task, new_task);
     }
 
     /// Jumps from `old_task` to `new_task`.
@@ -526,7 +526,7 @@ pub const scheduling = struct {
     }
 
     pub const NewTaskFunction = *const fn (
-        context: *kernel.Context,
+        current_task: *kernel.Task,
         arg: u64,
     ) noreturn;
 

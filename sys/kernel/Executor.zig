@@ -11,11 +11,7 @@ panicked: std.atomic.Value(bool) = .init(false),
 
 current_task: *kernel.Task,
 
-current_context: ?*kernel.Context,
-
 /// Tracks the depth of nested intertupt disables.
-///
-/// Must be in sync with `kernel.Context.interrupt_disable_count`.
 interrupt_disable_count: u32,
 
 idle_task: kernel.Task,

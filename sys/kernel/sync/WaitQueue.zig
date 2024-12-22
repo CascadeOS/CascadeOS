@@ -8,16 +8,18 @@ waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 /// Wake one task from the wait queue.
 ///
 /// Asserts that interrupts are disabled.
-pub fn wakeOne(self: *WaitQueue, context: *kernel.Context) void {
-    std.debug.assert(context.interrupt_disable_count > 0);
+pub fn wakeOne(self: *WaitQueue, current_task: *kernel.Task) void {
+    const executor = current_task.executor.?;
+
+    std.debug.assert(executor.interrupt_disable_count > 0);
 
     const task_to_wake_node = self.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
 
-    kernel.scheduler.lock(context);
-    defer kernel.scheduler.unlock(context);
+    kernel.scheduler.lock(current_task);
+    defer kernel.scheduler.unlock(current_task);
 
-    kernel.scheduler.queueTask(context, task_to_wake);
+    kernel.scheduler.queueTask(executor, task_to_wake);
 }
 
 /// Add the current task to the wait queue.
@@ -25,19 +27,20 @@ pub fn wakeOne(self: *WaitQueue, context: *kernel.Context) void {
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     self: *WaitQueue,
-    context: *kernel.Context,
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
-    std.debug.assert(context.interrupt_disable_count > 0);
-    std.debug.assert(spinlock.isLockedBy(context.executor.?.id));
+    const executor = current_task.executor.?;
+
+    std.debug.assert(executor.interrupt_disable_count > 0);
+    std.debug.assert(spinlock.isLockedBy(executor.id));
 
     self.waiting_tasks.push(&current_task.next_task_node);
 
-    kernel.scheduler.lock(context);
-    defer kernel.scheduler.unlock(context);
+    kernel.scheduler.lock(current_task);
+    defer kernel.scheduler.unlock(current_task);
 
-    kernel.scheduler.block(context, spinlock);
+    kernel.scheduler.block(current_task, spinlock);
 }
 
 const core = @import("core");

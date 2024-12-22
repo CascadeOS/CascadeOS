@@ -8,20 +8,18 @@ wait_queue: kernel.sync.WaitQueue = .{},
 
 locked_by: ?*kernel.Task = null,
 
-pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
+pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
     while (true) {
-        context.incrementInterruptDisable();
-        mutex.spinlock.lock(context);
-
-        const current_task = context.task;
+        current_task.incrementInterruptDisable();
+        mutex.spinlock.lock(current_task);
 
         const locked_by = mutex.locked_by orelse {
             mutex.locked_by = current_task;
 
-            context.incrementPreemptionDisable();
+            current_task.incrementPreemptionDisable();
 
-            mutex.spinlock.unlock(context);
-            context.decrementInterruptDisable();
+            mutex.spinlock.unlock(current_task);
+            current_task.decrementInterruptDisable();
 
             return;
         };
@@ -29,30 +27,25 @@ pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
         std.debug.assert(!current_task.is_idle_task); // block during idle
         std.debug.assert(locked_by == current_task); // recursive lock
 
-        mutex.wait_queue.wait(context, current_task, &mutex.spinlock);
+        mutex.wait_queue.wait(current_task, &mutex.spinlock);
 
         continue;
     }
 }
 
-pub fn unlock(mutex: *Mutex, context: *kernel.Context) void {
-    context.incrementInterruptDisable();
-    defer context.decrementInterruptDisable();
+pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
+    current_task.incrementInterruptDisable();
+    defer current_task.decrementInterruptDisable();
 
-    mutex.spinlock.lock(context);
-    defer mutex.spinlock.unlock(context);
+    mutex.spinlock.lock(current_task);
+    defer mutex.spinlock.unlock(current_task);
 
-    std.debug.assert(mutex.locked_by == context.task);
+    std.debug.assert(mutex.locked_by == current_task);
     mutex.locked_by = null;
 
-    mutex.wait_queue.wakeOne(context);
+    mutex.wait_queue.wakeOne(current_task);
 
-    context.decrementPreemptionDisable();
-}
-
-/// Returns true if the mutex is locked by the current task.
-pub fn isLockedByCurrent(mutex: *const Mutex, context: *const kernel.Context) bool {
-    return context.task == mutex.locked_by;
+    current_task.decrementPreemptionDisable();
 }
 
 const core = @import("core");

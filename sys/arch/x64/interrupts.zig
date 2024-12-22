@@ -84,6 +84,7 @@ pub const Interrupt = enum(u8) {
 };
 
 pub const InterruptFrame = extern struct {
+    interrupt_disable_count: u32,
     es: extern union {
         full: u64,
         selector: Gdt.Selector,
@@ -312,11 +313,13 @@ pub const init = struct {
                             \\push %%rax
                             \\mov %%es, %%rax
                             \\push %%rax
+                            \\push %%rax // make space for interrupt_disable_count
                             \\mov %%rsp, %%rdi
                         ++ "\n" ++ data_selector_asm ++ "\n" ++
                             \\mov %%ax, %%es
                             \\mov %%ax, %%ds
                             \\call interruptHandler
+                            \\pop %%rax // pop interrupt_disable_count
                             \\pop %%rax
                             \\mov %%rax, %%es
                             \\pop %%rax
@@ -351,40 +354,30 @@ pub const init = struct {
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     const executor = arch.rawGetCurrentExecutor();
+    interrupt_frame.interrupt_disable_count = executor.interrupt_disable_count;
+    defer arch.rawGetCurrentExecutor().interrupt_disable_count = interrupt_frame.interrupt_disable_count;
 
-    if (executor.current_context) |current_context| {
-        const restore = current_context.onInterruptEntry(executor);
-        defer restore.interruptExit();
-
-        interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, current_context);
-        return;
-    }
-
-    var context: kernel.Context = undefined;
-    context.createNew(executor);
-    defer executor.current_context = null;
-
-    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, &context);
+    interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, executor.current_task);
 }
 
 const handlers = struct {
     fn unhandledInterrupt(
         interrupt_frame: *InterruptFrame,
-        context: *kernel.Context,
+        current_task: *kernel.Task,
     ) void {
-        _ = context;
+        _ = current_task;
         core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
     }
 
     fn perExecutorPeriodic(
         interrupt_frame: *InterruptFrame,
-        context: *kernel.Context,
+        current_task: *kernel.Task,
     ) void {
         _ = interrupt_frame;
 
         x64.apic.eoi();
 
-        kernel.entry.onPerExecutorPeriodic(context);
+        kernel.entry.onPerExecutorPeriodic(current_task);
     }
 };
 

@@ -197,12 +197,10 @@ pub fn callTwoArgs(
 }
 
 /// Prepares the executor for jumping to the idle state.
-pub fn prepareForJumpToIdleFromTask(context: *kernel.Context, old_task: *kernel.Task) void {
+pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kernel.Task) void {
     _ = old_task;
 
     // TODO: switch page table
-
-    const executor = context.executor.?;
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -211,10 +209,8 @@ pub fn prepareForJumpToIdleFromTask(context: *kernel.Context, old_task: *kernel.
 }
 
 /// Prepares the executor for jumping to the given task from the idle state.
-pub fn prepareForJumpToTaskFromIdle(context: *kernel.Context, new_task: *kernel.Task) void {
+pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) void {
     // TODO: switch page tables
-
-    const executor = context.executor.?;
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -259,14 +255,12 @@ pub fn jumpToTaskFromIdle(
 
 /// Prepares the executor for jumping from `old_task` to `new_task`.
 pub fn prepareForJumpToTaskFromTask(
-    context: *kernel.Context,
+    executor: *kernel.Executor,
     old_task: *kernel.Task,
     new_task: *kernel.Task,
 ) void {
     _ = old_task;
     // TODO: switch page tables
-
-    const executor = context.executor.?;
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -351,17 +345,14 @@ pub fn prepareNewTaskForScheduling(
             task_arg: u64,
             target_function_addr: *const anyopaque,
         ) callconv(.C) void {
-            var context: kernel.Context = undefined;
-            context.createNew(arch.rawGetCurrentExecutor());
-            std.debug.assert(context.task == current_task);
+            kernel.scheduler.unlock(current_task);
+            current_task.decrementInterruptDisable();
 
-            kernel.scheduler.unlock(&context);
-            context.decrementInterruptDisable();
-            std.debug.assert(context.interrupt_disable_count == 0);
-            std.debug.assert(context.preemption_disable_count == 0);
+            std.debug.assert(current_task.executor == null);
+            std.debug.assert(current_task.preemption_disable_count == 0);
 
             const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
-            func(&context, task_arg);
+            func(current_task, task_arg);
             core.panic("task returned to entry point", null);
         }
     };
