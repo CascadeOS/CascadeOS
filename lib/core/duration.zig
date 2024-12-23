@@ -6,7 +6,8 @@ pub const Duration = extern struct {
     /// The duration in nanoseconds.
     value: u64,
 
-    pub usingnamespace ValueTypeMixin(@This());
+    pub const zero: Duration = .{ .value = 0 };
+    pub const one: Duration = .{ .value = 1 };
 
     pub const Unit = enum(u64) {
         nanosecond = 1,
@@ -22,6 +23,80 @@ pub const Duration = extern struct {
         return .{
             .value = amount * @intFromEnum(unit),
         };
+    }
+
+    pub inline fn equal(self: Duration, other: Duration) bool {
+        return self.value == other.value;
+    }
+
+    pub inline fn lessThan(self: Duration, other: Duration) bool {
+        return self.value < other.value;
+    }
+
+    pub inline fn lessThanOrEqual(self: Duration, other: Duration) bool {
+        return self.value <= other.value;
+    }
+
+    pub inline fn greaterThan(self: Duration, other: Duration) bool {
+        return self.value > other.value;
+    }
+
+    pub inline fn greaterThanOrEqual(self: Duration, other: Duration) bool {
+        return self.value >= other.value;
+    }
+
+    pub fn compare(self: Duration, other: Duration) core.OrderedComparison {
+        if (self.lessThan(other)) return .less;
+        if (self.greaterThan(other)) return .greater;
+        return .match;
+    }
+
+    pub inline fn add(self: Duration, other: Duration) Duration {
+        return .{ .value = self.value + other.value };
+    }
+
+    pub inline fn addInPlace(self: *Duration, other: Duration) void {
+        self.value += other.value;
+    }
+
+    pub inline fn subtract(self: Duration, other: Duration) Duration {
+        return .{ .value = self.value - other.value };
+    }
+
+    pub inline fn subtractInPlace(self: *Duration, other: Duration) void {
+        self.value -= other.value;
+    }
+
+    pub inline fn multiply(self: Duration, other: Duration) Duration {
+        return .{ .value = self.value * other.value };
+    }
+
+    pub inline fn multiplyInPlace(self: *Duration, other: Duration) void {
+        self.value *= other.value;
+    }
+
+    pub inline fn multiplyScalar(self: Duration, value: u64) Duration {
+        return .{ .value = self.value * value };
+    }
+
+    pub inline fn multiplyScalarInPlace(self: *Duration, value: u64) void {
+        self.value *= value;
+    }
+
+    pub inline fn divide(self: Duration, other: Duration) Duration {
+        return .{ .value = self.value / other.value };
+    }
+
+    pub inline fn divideInPlace(self: *Duration, other: Duration) void {
+        self.value /= other.value;
+    }
+
+    pub inline fn divideScalar(self: Duration, value: u64) Duration {
+        return self.value / value;
+    }
+
+    pub inline fn divideScalarInPlace(self: *Duration, value: u64) Duration {
+        self.value /= value;
     }
 
     // Must be kept in descending order due to the logic in `print`
@@ -111,4 +186,3 @@ comptime {
 
 const std = @import("std");
 const core = @import("core");
-const ValueTypeMixin = @import("value_type_mixin.zig").ValueTypeMixin;

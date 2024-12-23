@@ -5,7 +5,8 @@
 pub const Size = extern struct {
     value: u64,
 
-    pub usingnamespace ValueTypeMixin(@This());
+    pub const zero: Size = .{ .value = 0 };
+    pub const one: Size = .{ .value = 1 };
 
     pub const Unit = enum(u64) {
         byte = 1,
@@ -102,6 +103,80 @@ pub const Size = extern struct {
         }
     }
 
+    pub inline fn equal(self: Size, other: Size) bool {
+        return self.value == other.value;
+    }
+
+    pub inline fn lessThan(self: Size, other: Size) bool {
+        return self.value < other.value;
+    }
+
+    pub inline fn lessThanOrEqual(self: Size, other: Size) bool {
+        return self.value <= other.value;
+    }
+
+    pub inline fn greaterThan(self: Size, other: Size) bool {
+        return self.value > other.value;
+    }
+
+    pub inline fn greaterThanOrEqual(self: Size, other: Size) bool {
+        return self.value >= other.value;
+    }
+
+    pub fn compare(self: Size, other: Size) core.OrderedComparison {
+        if (self.lessThan(other)) return .less;
+        if (self.greaterThan(other)) return .greater;
+        return .match;
+    }
+
+    pub inline fn add(self: Size, other: Size) Size {
+        return .{ .value = self.value + other.value };
+    }
+
+    pub inline fn addInPlace(self: *Size, other: Size) void {
+        self.value += other.value;
+    }
+
+    pub inline fn subtract(self: Size, other: Size) Size {
+        return .{ .value = self.value - other.value };
+    }
+
+    pub inline fn subtractInPlace(self: *Size, other: Size) void {
+        self.value -= other.value;
+    }
+
+    pub inline fn multiply(self: Size, other: Size) Size {
+        return .{ .value = self.value * other.value };
+    }
+
+    pub inline fn multiplyInPlace(self: *Size, other: Size) void {
+        self.value *= other.value;
+    }
+
+    pub inline fn multiplyScalar(self: Size, value: u64) Size {
+        return .{ .value = self.value * value };
+    }
+
+    pub inline fn multiplyScalarInPlace(self: *Size, value: u64) void {
+        self.value *= value;
+    }
+
+    pub inline fn divide(self: Size, other: Size) Size {
+        return .{ .value = self.value / other.value };
+    }
+
+    pub inline fn divideInPlace(self: *Size, other: Size) void {
+        self.value /= other.value;
+    }
+
+    pub inline fn divideScalar(self: Size, value: u64) Size {
+        return self.value / value;
+    }
+
+    pub inline fn divideScalarInPlace(self: *Size, value: u64) Size {
+        self.value /= value;
+    }
+
     // Must be kept in descending size order due to the logic in `print`
     const unit_table = .{
         .{ .value = @intFromEnum(Unit.tib), .name = "TiB" },
@@ -167,4 +242,3 @@ comptime {
 
 const std = @import("std");
 const core = @import("core");
-const ValueTypeMixin = @import("value_type_mixin.zig").ValueTypeMixin;
