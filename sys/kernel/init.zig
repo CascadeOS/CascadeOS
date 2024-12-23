@@ -190,8 +190,8 @@ fn initStage4(current_task: *kernel.Task) callconv(.c) noreturn {
 
 /// The log implementation during init.
 pub fn handleLog(current_task: *kernel.Task, level_and_scope: []const u8, comptime fmt: []const u8, args: anytype) void {
-    current_task.incrementInterruptDisable();
-    defer current_task.decrementInterruptDisable();
+    const incremented = current_task.incrementInterruptDisable();
+    defer if (incremented) current_task.decrementInterruptDisable();
 
     globals.early_output_lock.lock(current_task);
     defer globals.early_output_lock.unlock(current_task);

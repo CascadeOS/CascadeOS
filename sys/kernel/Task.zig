@@ -49,7 +49,26 @@ pub fn getCurrent() *Task {
     return current_task;
 }
 
-pub fn incrementInterruptDisable(self: *Task) void {
+/// Increment the interrupt disable count if it is zero and return true if it was incremented.
+pub fn incrementInterruptDisable(self: *Task) bool {
+    arch.interrupts.disableInterrupts();
+
+    const executor = self.state.running;
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
+    std.debug.assert(executor.current_task == self);
+
+    if (executor.interrupt_disable_count == 0) {
+        executor.interrupt_disable_count = 1;
+        return true;
+    }
+
+    return false;
+}
+
+/// Increment the interrupt disable count.
+///
+/// This function should be rarely used with `incrementInterruptDisable` being preferred.
+pub fn forceIncrementInterruptDisable(self: *Task) void {
     arch.interrupts.disableInterrupts();
 
     const executor = self.state.running;

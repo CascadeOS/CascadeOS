@@ -26,8 +26,8 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
         return;
     }
 
-    current_task.incrementInterruptDisable();
-    defer current_task.decrementInterruptDisable();
+    const incremented = current_task.incrementInterruptDisable();
+    defer if (incremented) current_task.decrementInterruptDisable();
 
     const executor = current_task.state.running;
     std.debug.assert(executor == arch.rawGetCurrentExecutor());
@@ -136,9 +136,10 @@ fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.
     executor.idle_task.state = .{ .running = executor };
     executor.current_task = &executor.idle_task;
 
-    arch.scheduling.callZeroArgs(
+    arch.scheduling.callOneArgs(
         current_task,
         executor.idle_task.stack,
+        &executor.idle_task,
         idle,
     ) catch |err| {
         switch (err) {
@@ -156,9 +157,14 @@ fn switchToIdleWithLock(
     const static = struct {
         fn idleEntryWithLock(
             inner_spinlock: *kernel.sync.TicketSpinLock,
+            idle_task: *kernel.Task,
         ) callconv(.C) noreturn {
+            std.debug.assert(idle_task.is_idle_task);
+
             inner_spinlock.unsafeUnlock();
-            idle();
+            idle_task.decrementInterruptDisable();
+
+            idle(idle_task);
             core.panic("idle returned", null);
         }
     };
@@ -174,10 +180,11 @@ fn switchToIdleWithLock(
     executor.idle_task.state = .{ .running = executor };
     executor.current_task = &executor.idle_task;
 
-    arch.scheduling.callOneArgs(
+    arch.scheduling.callTwoArgs(
         current_task,
         executor.idle_task.stack,
         spinlock,
+        &executor.idle_task,
         static.idleEntryWithLock,
     ) catch |err| {
         switch (err) {
@@ -238,6 +245,8 @@ fn switchToTaskFromTaskWithLock(
             new_task_inner: *kernel.Task,
         ) callconv(.C) noreturn {
             inner_spinlock.unlock(new_task_inner);
+            new_task_inner.decrementInterruptDisable();
+
             arch.scheduling.jumpToTaskFromIdle(new_task_inner);
             core.panic("task returned", null);
         }
@@ -273,9 +282,7 @@ fn switchToTaskFromTaskWithLock(
     };
 }
 
-fn idle() callconv(.C) noreturn {
-    const current_task = kernel.Task.getCurrent();
-
+fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
     globals.lock.unlock(current_task);
 
     log.debug("entering idle", .{});
@@ -287,7 +294,8 @@ fn idle() callconv(.C) noreturn {
 
     while (true) {
         {
-            current_task.incrementInterruptDisable();
+            const incremented = current_task.incrementInterruptDisable();
+            std.debug.assert(incremented);
             defer current_task.decrementInterruptDisable();
 
             globals.lock.lock(current_task);

@@ -357,6 +357,8 @@ export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     interrupt_frame.interrupt_disable_count = executor.interrupt_disable_count;
     defer arch.rawGetCurrentExecutor().interrupt_disable_count = interrupt_frame.interrupt_disable_count;
 
+    executor.interrupt_disable_count += 1;
+
     interrupt_handlers[@intFromEnum(interrupt_frame.vector_number.interrupt)](interrupt_frame, executor.current_task);
 }
 

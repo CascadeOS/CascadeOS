@@ -10,7 +10,7 @@ locked_by: ?*kernel.Task = null,
 
 pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
     while (true) {
-        current_task.incrementInterruptDisable();
+        current_task.forceIncrementInterruptDisable();
         mutex.spinlock.lock(current_task);
 
         const locked_by = mutex.locked_by orelse {
@@ -34,8 +34,8 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
 }
 
 pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
-    current_task.incrementInterruptDisable();
-    defer current_task.decrementInterruptDisable();
+    const incremented = current_task.incrementInterruptDisable();
+    defer if (incremented) current_task.decrementInterruptDisable();
 
     mutex.spinlock.lock(current_task);
     defer mutex.spinlock.unlock(current_task);
