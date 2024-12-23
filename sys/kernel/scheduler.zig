@@ -5,6 +5,7 @@
 ///
 /// Must be called with the scheduler lock held.
 pub fn queueTask(executor: *kernel.Executor, task: *kernel.Task) void {
+    std.debug.assert(task.state == .ready);
     std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(task.next_task_node.next == null);
     std.debug.assert(!task.is_idle_task); // cannot queue an idle task
@@ -83,7 +84,8 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
     const current_task_new_state = blk: switch (mode) {
         .requeue => {
             log.debug("yielding {}", .{current_task});
-            queueTask(executor, current_task);
+            // can't call `queueTask` here because the `current_task.state` is not yet set to `.ready`
+            globals.ready_to_run.push(&current_task.next_task_node);
             break :blk .ready;
         },
         .drop => {
