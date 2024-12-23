@@ -196,8 +196,7 @@ pub fn handleLog(current_task: *kernel.Task, level_and_scope: []const u8, compti
     globals.early_output_lock.lock(current_task);
     defer globals.early_output_lock.unlock(current_task);
 
-    // TODO: make the log output look nicer
-    current_task.state.running.format("", .{}, arch.init.early_output_writer) catch {};
+    current_task.format("{}", .{}, arch.init.early_output_writer) catch {};
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch {};
 }
