@@ -5,19 +5,21 @@
 ///
 /// Must be called with the scheduler lock held.
 pub fn queueTask(executor: *kernel.Executor, task: *kernel.Task) void {
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(task.next_task_node.next == null);
     std.debug.assert(!task.is_idle_task); // cannot queue an idle task
 
     std.debug.assert(globals.lock.isLockedBy(executor.id));
 
-    task.state = .ready;
     globals.ready_to_run.push(&task.next_task_node);
 }
 
 /// Maybe preempt the current task.
 ///
-/// The scheduler lock must be *not* be held.
+/// The scheduler lock must *not* be held.
 pub fn maybePreempt(current_task: *kernel.Task) void {
+    std.debug.assert(current_task.state == .running);
+
     if (current_task.preemption_disable_count != 0) {
         current_task.preemption_skipped = true;
         log.debug("preemption skipped for {}", .{current_task});
@@ -27,7 +29,9 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
     current_task.incrementInterruptDisable();
     defer current_task.decrementInterruptDisable();
 
-    std.debug.assert(!globals.lock.isLockedBy(current_task.executor.?.id));
+    const executor = current_task.state.running;
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
+    std.debug.assert(!globals.lock.isLockedBy(executor.id));
 
     globals.lock.lock(current_task);
     defer globals.lock.unlock(current_task);
@@ -43,10 +47,11 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
 ///
 /// This function must be called with the scheduler lock held.
 pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) void {
-    const executor = current_task.executor.?;
-
+    const executor = current_task.state.running;
     std.debug.assert(globals.lock.isLockedBy(executor.id));
-    std.debug.assert(current_task.state == .running);
+
+    std.debug.assert(current_task.preemption_disable_count == 0);
+    std.debug.assert(current_task.preemption_skipped == false);
 
     const new_task_node = globals.ready_to_run.pop() orelse {
         switch (mode) {
@@ -55,9 +60,8 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
                 std.debug.assert(!current_task.is_idle_task); // drop during idle
 
                 log.debug("dropping {}", .{current_task});
-                current_task.state = .dropped;
 
-                switchToIdle(current_task);
+                switchToIdle(current_task, .dropped);
                 core.panic("idle returned", null);
             },
         }
@@ -76,18 +80,19 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
     std.debug.assert(current_task.preemption_disable_count == 0);
     std.debug.assert(current_task.preemption_skipped == false);
 
-    switch (mode) {
+    const current_task_new_state = blk: switch (mode) {
         .requeue => {
             log.debug("yielding {}", .{current_task});
             queueTask(executor, current_task);
+            break :blk .ready;
         },
         .drop => {
             log.debug("dropping {}", .{current_task});
-            current_task.state = .dropped;
+            break :blk .dropped;
         },
-    }
+    };
 
-    switchToTaskFromTask(current_task, new_task);
+    switchToTaskFromTask(current_task, new_task, current_task_new_state);
 }
 
 /// Blocks the currently running task.
@@ -99,21 +104,17 @@ pub fn block(
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
-    const executor = current_task.executor.?;
-
+    const executor = current_task.state.running;
     std.debug.assert(globals.lock.isLockedBy(executor.id));
 
     std.debug.assert(!current_task.is_idle_task); // block during idle
-
-    std.debug.assert(current_task.state == .running);
     std.debug.assert(current_task.preemption_disable_count == 0);
     std.debug.assert(current_task.preemption_skipped == false);
 
     log.debug("blocking {}", .{current_task});
-    current_task.state = .blocked;
 
     const new_task_node = globals.ready_to_run.pop() orelse {
-        switchToIdleWithLock(current_task, spinlock);
+        switchToIdleWithLock(current_task, spinlock, .blocked);
         return;
     };
 
@@ -121,18 +122,18 @@ pub fn block(
     std.debug.assert(current_task != new_task);
     std.debug.assert(new_task.state == .ready);
 
-    switchToTaskFromTaskWithLock(current_task, new_task, spinlock);
+    switchToTaskFromTaskWithLock(current_task, new_task, spinlock, .blocked);
 }
 
-fn switchToIdle(current_task: *kernel.Task) void {
+fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
     std.debug.assert(!current_task.is_idle_task);
-
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
 
-    current_task.executor = null;
-    executor.idle_task.state = .running;
+    current_task.state = current_task_new_state;
+
+    executor.idle_task.state = .{ .running = executor };
     executor.current_task = &executor.idle_task;
 
     arch.scheduling.callZeroArgs(
@@ -150,6 +151,7 @@ fn switchToIdle(current_task: *kernel.Task) void {
 fn switchToIdleWithLock(
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
+    current_task_new_state: kernel.Task.State,
 ) void {
     const static = struct {
         fn idleEntryWithLock(
@@ -163,12 +165,13 @@ fn switchToIdleWithLock(
 
     std.debug.assert(!current_task.is_idle_task);
 
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
 
-    current_task.executor = null;
-    executor.idle_task.state = .running;
+    current_task.state = current_task_new_state;
+
+    executor.idle_task.state = .{ .running = executor };
     executor.current_task = &executor.idle_task;
 
     arch.scheduling.callOneArgs(
@@ -191,20 +194,19 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) nore
 
     std.debug.assert(new_task.next_task_node.next == null);
 
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     arch.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
 
+    new_task.state = .{ .running = executor };
     executor.current_task = new_task;
-    new_task.state = .running;
-    new_task.executor = executor;
     executor.idle_task.state = .ready;
 
     arch.scheduling.jumpToTaskFromIdle(new_task);
     core.panic("task returned", null);
 }
 
-fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task) void {
+fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
     std.debug.assert(!current_task.is_idle_task);
     std.debug.assert(!new_task.is_idle_task);
 
@@ -212,14 +214,14 @@ fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task) void
 
     std.debug.assert(new_task.next_task_node.next == null);
 
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
 
-    current_task.executor = null;
+    current_task.state = current_task_new_state;
+
+    new_task.state = .{ .running = executor };
     executor.current_task = new_task;
-    new_task.executor = executor;
-    new_task.state = .running;
 
     arch.scheduling.jumpToTaskFromTask(current_task, new_task);
 }
@@ -228,6 +230,7 @@ fn switchToTaskFromTaskWithLock(
     current_task: *kernel.Task,
     new_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
+    current_task_new_state: kernel.Task.State,
 ) void {
     const static = struct {
         fn switchToTaskWithLock(
@@ -247,14 +250,14 @@ fn switchToTaskFromTaskWithLock(
 
     std.debug.assert(new_task.next_task_node.next == null);
 
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
 
-    current_task.executor = null;
+    current_task.state = current_task_new_state;
+
+    new_task.state = .{ .running = executor };
     executor.current_task = new_task;
-    new_task.executor = executor;
-    new_task.state = .running;
 
     arch.scheduling.callTwoArgs(
         current_task,
@@ -271,22 +274,16 @@ fn switchToTaskFromTaskWithLock(
 }
 
 fn idle() callconv(.C) noreturn {
-    const current_task = blk: {
-        const executor = arch.rawGetCurrentExecutor();
-        const current_task = executor.current_task;
-        std.debug.assert(current_task.executor == executor);
-        std.debug.assert(current_task == &executor.idle_task);
-
-        break :blk current_task;
-    };
+    const current_task = kernel.Task.getCurrent();
 
     globals.lock.unlock(current_task);
 
     log.debug("entering idle", .{});
 
-    current_task.decrementInterruptDisable();
-    std.debug.assert(current_task.executor == null);
+    std.debug.assert(current_task.state.running.interrupt_disable_count == 1);
     std.debug.assert(current_task.preemption_disable_count == 0);
+
+    current_task.decrementInterruptDisable();
 
     while (true) {
         {

@@ -9,7 +9,7 @@ waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 ///
 /// Asserts that interrupts are disabled.
 pub fn wakeOne(self: *WaitQueue, current_task: *kernel.Task) void {
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     std.debug.assert(executor.interrupt_disable_count > 0);
 
@@ -30,7 +30,7 @@ pub fn wait(
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     std.debug.assert(executor.interrupt_disable_count > 0);
     std.debug.assert(spinlock.isLockedBy(executor.id));

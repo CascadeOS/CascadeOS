@@ -12,7 +12,7 @@ current_holder: kernel.Executor.Id = .none,
 ///
 /// Asserts that interrupts are disabled.
 pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
     std.debug.assert(executor.interrupt_disable_count > 0);
 
     std.debug.assert(!self.isLockedBy(executor.id));
@@ -28,7 +28,7 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 ///
 /// Asserts that interrupts are disabled and that the current executor is the one that locked the spinlock.
 pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     std.debug.assert(executor.interrupt_disable_count > 0);
     std.debug.assert(self.current_holder == executor.id);

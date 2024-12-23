@@ -21,21 +21,17 @@ preemption_disable_count: u32 = 0,
 /// Then when we re-enable preemption, we check this flag.
 preemption_skipped: bool = false,
 
-/// The executor that this task is running on.
-///
-/// This is only set when the task is running and when either `preemption_disable_count == 0` or
-/// `executor.interrupt_disable_count == 0`.
-executor: ?*kernel.Executor = null,
-
 is_idle_task: bool,
 
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();
 }
 
-pub const State = enum {
+pub const State = union(enum) {
     ready,
-    running,
+    /// It is the accessors responsibility to ensure that the executor does not change by either disabling
+    /// interrupts or preemption.
+    running: *kernel.Executor,
     blocked,
     dropped,
 };
@@ -48,45 +44,31 @@ pub fn getCurrent() *Task {
 
     if (executor.interrupt_disable_count == 0) {
         arch.interrupts.enableInterrupts();
-    } else {
-        current_task.executor = executor;
     }
 
     return current_task;
 }
 
 pub fn incrementInterruptDisable(self: *Task) void {
-    if (self.executor) |executor| {
-        std.debug.assert(!arch.interrupts.areEnabled());
-        std.debug.assert(executor.current_task == self);
-
-        executor.interrupt_disable_count += 1;
-
-        return;
-    }
-
     arch.interrupts.disableInterrupts();
 
-    const executor = arch.rawGetCurrentExecutor();
+    const executor = self.state.running;
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == self);
 
     executor.interrupt_disable_count += 1;
-    self.executor = executor;
 }
 
 pub fn decrementInterruptDisable(self: *Task) void {
-    std.debug.assert(self.executor != null);
     std.debug.assert(!arch.interrupts.areEnabled());
 
-    const executor = self.executor.?;
+    const executor = self.state.running;
     std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == self);
 
     executor.interrupt_disable_count -= 1;
 
     if (executor.interrupt_disable_count == 0) {
-        if (self.preemption_disable_count == 0) self.executor = null;
-
         arch.interrupts.enableInterrupts();
     }
 }
@@ -94,25 +76,20 @@ pub fn decrementInterruptDisable(self: *Task) void {
 pub fn incrementPreemptionDisable(self: *Task) void {
     self.preemption_disable_count += 1;
 
-    const executor = self.executor orelse blk: {
-        const executor = arch.rawGetCurrentExecutor();
-        self.executor = executor;
-        break :blk executor;
-    };
+    const executor = self.state.running;
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == self);
-    std.debug.assert(self.executor == executor);
 }
 
 pub fn decrementPreemptionDisable(self: *Task) void {
-    const executor = self.executor.?;
+    const executor = self.state.running;
     std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == self);
 
     self.preemption_disable_count -= 1;
 
-    if (self.preemption_disable_count == 0) {
-        if (executor.interrupt_disable_count == 0) self.executor = null;
-        if (self.preemption_skipped) kernel.scheduler.maybePreempt(self);
+    if (self.preemption_disable_count == 0 and self.preemption_skipped) {
+        kernel.scheduler.maybePreempt(self);
     }
 }
 

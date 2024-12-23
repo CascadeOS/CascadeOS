@@ -37,33 +37,34 @@ pub fn initStage1() !noreturn {
         comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n",
     );
 
-    globals.bootstrap_executor = .{
+    var bootstrap_init_task: kernel.Task = .{
+        ._name = kernel.Task.Name.fromSlice("init bootstrap") catch unreachable,
+        .state = undefined, // set after declaration of `bootstrap_executor`
+        .stack = undefined, // never used
+        .is_idle_task = false,
+    };
+
+    var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
         .idle_task = undefined, // never used
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
-        .current_task = &globals.bootstrap_init_task,
+        .current_task = &bootstrap_init_task,
         .interrupt_disable_count = 1, // interrupts start disabled
     };
 
-    globals.bootstrap_init_task = .{
-        ._name = kernel.Task.Name.fromSlice("init bootstrap") catch unreachable,
-        .state = .running,
-        .stack = undefined, // never used
-        .is_idle_task = false,
-        .executor = &globals.bootstrap_executor,
-    };
+    bootstrap_init_task.state = .{ .running = &bootstrap_executor };
 
-    kernel.executors = @as([*]kernel.Executor, @ptrCast(&globals.bootstrap_executor))[0..1];
+    kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
 
-    arch.init.prepareBootstrapExecutor(&globals.bootstrap_executor);
-    arch.init.loadExecutor(&globals.bootstrap_executor);
+    arch.init.prepareBootstrapExecutor(&bootstrap_executor);
+    arch.init.loadExecutor(&bootstrap_executor);
 
     // now that the executor is loaded we can switch to the full init panic implementation and start logging
     kernel.debug.panic_impl = handlePanic;
 
     log.debug("bootstrap executor initialized", .{});
 
-    try initStage2(globals.bootstrap_executor.current_task);
+    try initStage2(&bootstrap_init_task);
     core.panic("`init.initStage2` returned", null);
 }
 
@@ -118,7 +119,7 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
 /// All executors are using the bootloader provided stack.
 fn initStage3(current_task: *kernel.Task) !noreturn {
     kernel.mem.globals.core_page_table.load();
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     arch.init.loadExecutor(executor);
 
@@ -133,7 +134,7 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
 
     try arch.scheduling.callOneArgs(
         null,
-        executor.current_task.stack,
+        current_task.stack,
         current_task,
         initStage4,
     );
@@ -165,7 +166,7 @@ fn initStage4(current_task: *kernel.Task) callconv(.c) noreturn {
             }
         }
     };
-    const executor = current_task.executor.?;
+    const executor = current_task.state.running;
 
     if (executor.id == .bootstrap) {
         barrier.waitForOthers();
@@ -196,7 +197,7 @@ pub fn handleLog(current_task: *kernel.Task, level_and_scope: []const u8, compti
     defer globals.early_output_lock.unlock(current_task);
 
     // TODO: make the log output look nicer
-    current_task.executor.?.format("", .{}, arch.init.early_output_writer) catch {};
+    current_task.state.running.format("", .{}, arch.init.early_output_writer) catch {};
     arch.init.writeToEarlyOutput(level_and_scope);
     arch.init.early_output_writer.print(fmt, args) catch {};
 }
@@ -216,8 +217,9 @@ fn handlePanic(
         var nested_panic_count = std.atomic.Value(usize).init(0);
     };
 
-    const current_task = kernel.Task.getCurrent();
-    const executor = current_task.executor.?;
+    arch.interrupts.disableInterrupts();
+
+    const executor = arch.rawGetCurrentExecutor();
 
     executor.interrupt_disable_count += 1;
     executor.panicked.store(true, .release);
@@ -306,10 +308,9 @@ fn allocateAndPrepareExecutors(current_task: *kernel.Task) !void {
 
         init_task.* = .{
             ._name = .{}, // set below
-            .state = .running,
+            .state = .{ .running = executor },
             .stack = try kernel.Stack.createStack(current_task),
             .is_idle_task = false,
-            .executor = executor, // interrupts start disabled
         };
 
         try init_task._name.writer().print("init {}", .{i});
@@ -324,7 +325,6 @@ fn allocateAndPrepareExecutors(current_task: *kernel.Task) !void {
                 .state = .ready,
                 .stack = try kernel.Stack.createStack(current_task),
                 .is_idle_task = true,
-                .executor = executor,
             },
         };
 
@@ -359,9 +359,6 @@ fn bootNonBootstrapExecutors() !void {
 }
 
 const globals = struct {
-    var bootstrap_executor: kernel.Executor = undefined; // set by `initStage1`
-    var bootstrap_init_task: kernel.Task = undefined; // set by `initStage1`
-
     var early_output_lock: kernel.sync.TicketSpinLock = .{};
 
     var init_tasks: []kernel.Task = undefined; // set by `allocateAndPrepareExecutors`

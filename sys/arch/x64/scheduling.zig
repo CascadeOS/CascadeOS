@@ -346,10 +346,11 @@ pub fn prepareNewTaskForScheduling(
             target_function_addr: *const anyopaque,
         ) callconv(.C) void {
             kernel.scheduler.unlock(current_task);
-            current_task.decrementInterruptDisable();
 
-            std.debug.assert(current_task.executor == null);
+            std.debug.assert(current_task.state.running.interrupt_disable_count == 1);
             std.debug.assert(current_task.preemption_disable_count == 0);
+
+            current_task.decrementInterruptDisable();
 
             const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
             func(current_task, task_arg);
