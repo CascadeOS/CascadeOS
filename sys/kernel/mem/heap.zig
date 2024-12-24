@@ -5,8 +5,9 @@
 //!
 //! Each allocation is a multiple of the standard page size.
 
-pub fn allocate(len: usize) !core.VirtualRange {
+pub fn allocate(current_task: *kernel.Task, len: usize) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
+        current_task,
         len,
         .instant_fit,
     );
@@ -17,8 +18,8 @@ pub fn allocate(len: usize) !core.VirtualRange {
     };
 }
 
-pub fn deallocate(range: core.VirtualRange) void {
-    globals.heap_arena.deallocate(.{
+pub fn deallocate(current_task: *kernel.Task, range: core.VirtualRange) void {
+    globals.heap_arena.deallocate(current_task, .{
         .base = range.address.value,
         .len = range.size.value,
     });
