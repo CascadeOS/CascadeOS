@@ -10,11 +10,11 @@ pub const dependencies: []const LibraryDependency = &[_]LibraryDependency{
 };
 
 pub const arm64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
-    .{ .name = "arm64", .import_name = "lib_arm64" },
+    .{ .name = "arm64" },
 };
 
 pub const x64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
-    .{ .name = "x64", .import_name = "lib_x64" },
+    .{ .name = "x64" },
 };
 
 const LibraryDependency = @import("../build/LibraryDependency.zig");

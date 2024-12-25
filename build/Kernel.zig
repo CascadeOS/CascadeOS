@@ -218,7 +218,8 @@ fn constructKernelExe(
     });
 
     // self reference
-    kernel_module.addImport("kernel", kernel_module);
+    // TODO: restore this once ZLS is fixed
+    // kernel_module.addImport("kernel", kernel_module);
 
     for (dependencies) |dep| {
         const library_module = dep.library.cascade_modules.get(target) orelse

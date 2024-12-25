@@ -7,4 +7,4 @@ pub const interrupts = struct {
 
 const std = @import("std");
 const kernel = @import("kernel");
-const lib_arm64 = @import("lib_arm64");
+const lib_arm64 = @import("arm64");

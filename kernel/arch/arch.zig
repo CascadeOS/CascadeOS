@@ -18,5 +18,5 @@ const current = switch (cascade_target) {
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("kernel");
+const kernel = @import("../kernel.zig");
 const cascade_target = @import("cascade_target").arch;
