@@ -147,7 +147,7 @@ fn create(
     const stripped_kernel = blk: {
         const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
             .basename = kernel_exe.out_filename,
-            .strip = .debug,
+            .strip = .debug_and_symbols,
         });
         break :blk copy.getOutput();
     };
@@ -170,14 +170,6 @@ fn create(
         stripped_kernel_with_sdf,
         b.pathJoin(&.{ @tagName(target), "kernel" }),
     );
-
-    // const stripped_kernel = if (target != .riscv) blk: {
-    //     const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
-    //         .basename = kernel_exe.out_filename,
-    //         .strip = .debug,
-    //     });
-    //     break :blk copy.getOutput();
-    // } else kernel_exe.getEmittedBin();
 
     const install_both_kernel_binaries = try b.allocator.create(Step);
     install_both_kernel_binaries.* = Step.init(.{
