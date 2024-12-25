@@ -3,7 +3,10 @@
 
 pub const dependencies: []const LibraryDependency = &[_]LibraryDependency{
     .{ .name = "acpi" },
+    .{ .name = "containers" },
     .{ .name = "core" },
+    .{ .name = "limine" },
+    .{ .name = "sdf" },
 };
 
 pub const arm64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
@@ -14,4 +17,4 @@ pub const x64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
     .{ .name = "x64", .import_name = "lib_x64" },
 };
 
-const LibraryDependency = @import("../../build/LibraryDependency.zig");
+const LibraryDependency = @import("../build/LibraryDependency.zig");

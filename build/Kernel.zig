@@ -16,9 +16,7 @@ final_kernel_binary_path: std.Build.LazyPath,
 install_kernel_binaries: *Step,
 
 /// only used for generating a dependency graph
-///
-/// merges all the dependencies from the different kernel modules into one list
-all_dependencies: []const Library.Dependency,
+dependencies: []const Library.Dependency,
 
 pub fn getKernels(
     b: *std.Build,
@@ -48,42 +46,39 @@ pub fn getKernels(
     return kernels;
 }
 
-fn getAllDependencies(
+fn getDependencies(
     b: *std.Build,
     target: CascadeTarget,
     libraries: Library.Collection,
-    comptime dependency_imports: []const type,
 ) ![]const Library.Dependency {
     var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
     errdefer dependencies.deinit();
 
-    inline for (dependency_imports) |module_dependencies| {
-        for (module_dependencies.dependencies) |dep| {
-            const library = libraries.get(dep.name) orelse
-                std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
+    for (kernel_dependencies.dependencies) |dep| {
+        const library = libraries.get(dep.name) orelse
+            std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
 
-            const import_name = dep.import_name orelse library.name;
+        const import_name = dep.import_name orelse library.name;
 
-            try dependencies.append(.{ .import_name = import_name, .library = library });
-        }
+        try dependencies.append(.{ .import_name = import_name, .library = library });
+    }
 
-        // target specific dependencies
-        switch (target) {
-            inline else => |tag| {
-                const decl_name = comptime @tagName(tag) ++ "_dependencies";
+    // target specific dependencies
+    switch (target) {
+        inline else => |tag| {
+            const decl_name = comptime @tagName(tag) ++ "_dependencies";
 
-                if (@hasDecl(module_dependencies, decl_name)) {
-                    for (@field(module_dependencies, decl_name)) |dep| {
-                        const library = libraries.get(dep.name) orelse
-                            std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
+            if (@hasDecl(kernel_dependencies, decl_name)) {
+                for (@field(kernel_dependencies, decl_name)) |dep| {
+                    const library = libraries.get(dep.name) orelse
+                        std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
 
-                        const import_name = dep.import_name orelse library.name;
+                    const import_name = dep.import_name orelse library.name;
 
-                        try dependencies.append(.{ .import_name = import_name, .library = library });
-                    }
+                    try dependencies.append(.{ .import_name = import_name, .library = library });
                 }
-            },
-        }
+            }
+        },
     }
 
     return try dependencies.toOwnedSlice();
@@ -97,15 +92,15 @@ fn create(
     options: Options,
     step_collection: StepCollection,
 ) !Kernel {
-    const all_dependencies = try getAllDependencies(b, target, libraries, all_module_dependencies);
+    const dependencies = try getDependencies(b, target, libraries);
 
-    const source_file_modules = try getSourceFileModules(b, options, all_dependencies);
+    const source_file_modules = try getSourceFileModules(b, options, dependencies);
 
     {
         const check_exe = try constructKernelExe(
             b,
             target,
-            libraries,
+            dependencies,
             source_file_modules,
             options,
         );
@@ -115,7 +110,7 @@ fn create(
     const kernel_exe = try constructKernelExe(
         b,
         target,
-        libraries,
+        dependencies,
         source_file_modules,
         options,
     );
@@ -205,127 +200,54 @@ fn create(
 
         .final_kernel_binary_path = stripped_kernel_with_sdf,
 
-        .all_dependencies = all_dependencies,
+        .dependencies = dependencies,
     };
 }
 
 fn constructKernelExe(
     b: *std.Build,
     target: CascadeTarget,
-    libraries: Library.Collection,
+    dependencies: []const Library.Dependency,
     source_file_modules: []const SourceFileModule,
     options: Options,
 ) !*std.Build.Step.Compile {
-    const arch_module = blk: {
-        const arch_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "sys", "arch", "arch.zig" })),
-        });
-
-        const deps = try getAllDependencies(b, target, libraries, &.{arch_module_dependencies});
-        defer b.allocator.free(deps);
-
-        for (deps) |dep| {
-            const library_module = dep.library.cascade_modules.get(target) orelse
-                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
-
-            arch_module.addImport(dep.import_name, library_module);
-        }
-
-        // self reference
-        arch_module.addImport("arch", arch_module);
-
-        // target options
-        arch_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
-
-        // kernel options
-        arch_module.addImport("kernel_options", options.kernel_option_module);
-
-        break :blk arch_module;
-    };
-
-    const boot_module = blk: {
-        const boot_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "sys", "boot", "boot.zig" })),
-        });
-
-        const deps = try getAllDependencies(b, target, libraries, &.{boot_module_dependencies});
-        defer b.allocator.free(deps);
-
-        for (deps) |dep| {
-            const library_module = dep.library.cascade_modules.get(target) orelse
-                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
-
-            boot_module.addImport(dep.import_name, library_module);
-        }
-
-        // self reference
-        boot_module.addImport("boot", boot_module);
-
-        // target options
-        boot_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
-
-        // kernel options
-        boot_module.addImport("kernel_options", options.kernel_option_module);
-
-        break :blk boot_module;
-    };
-
-    const kernel_module = blk: {
-        const kernel_module = b.createModule(.{
-            .root_source_file = b.path(b.pathJoin(&.{ "sys", "kernel", "kernel.zig" })),
-        });
-
-        const deps = try getAllDependencies(b, target, libraries, &.{kernel_module_dependencies});
-        defer b.allocator.free(deps);
-
-        for (deps) |dep| {
-            const library_module = dep.library.cascade_modules.get(target) orelse
-                std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
-
-            kernel_module.addImport(dep.import_name, library_module);
-        }
-
-        // self reference
-        kernel_module.addImport("kernel", kernel_module);
-
-        // target options
-        kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
-
-        // kernel options
-        kernel_module.addImport("kernel_options", options.kernel_option_module);
-
-        // source file modules
-        for (source_file_modules) |module| {
-            kernel_module.addImport(module.name, module.module);
-        }
-
-        break :blk kernel_module;
-    };
-
-    arch_module.addImport("kernel", kernel_module);
-    boot_module.addImport("arch", arch_module);
-    kernel_module.addImport("arch", arch_module);
-    kernel_module.addImport("boot", boot_module);
-
-    const root_module = b.createModule(.{
-        .root_source_file = b.path(b.pathJoin(&.{ "sys", "root.zig" })),
+    const kernel_module = b.createModule(.{
+        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
         .target = getKernelCrossTarget(target, b),
         .optimize = options.optimize,
     });
 
-    root_module.addImport("boot", boot_module);
-    root_module.addImport("kernel", kernel_module);
+    // self reference
+    kernel_module.addImport("kernel", kernel_module);
+
+    for (dependencies) |dep| {
+        const library_module = dep.library.cascade_modules.get(target) orelse
+            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
+
+        kernel_module.addImport(dep.import_name, library_module);
+    }
+
+    // target options
+    kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
+
+    // kernel options
+    kernel_module.addImport("kernel_options", options.kernel_option_module);
+
+    // source file modules
+    for (source_file_modules) |module| {
+        kernel_module.addImport(module.name, module.module);
+    }
 
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
-    root_module.strip = false;
-    root_module.omit_frame_pointer = false;
+    kernel_module.strip = false;
+    kernel_module.omit_frame_pointer = false;
 
     // apply target-specific configuration to the kernel
     switch (target) {
         .arm64 => {},
         .x64 => {
-            root_module.code_model = .kernel;
-            root_module.red_zone = false;
+            kernel_module.code_model = .kernel;
+            kernel_module.red_zone = false;
         },
     }
 
@@ -351,13 +273,13 @@ fn constructKernelExe(
             }
 
             const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
-            root_module.addAssemblyFile(b.path(file_path));
+            kernel_module.addAssemblyFile(b.path(file_path));
         }
     }
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
-        .root_module = root_module,
+        .root_module = kernel_module,
     });
 
     kernel_exe.entry = .disabled;
@@ -367,7 +289,7 @@ fn constructKernelExe(
 
     kernel_exe.setLinkerScript(b.path(
         b.pathJoin(&.{
-            "sys",
+            "kernel",
             "arch",
             @tagName(target),
             "linker.ld",
@@ -455,7 +377,7 @@ fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const L
     defer file_paths.deinit();
 
     // add the kernel's files
-    try addFilesRecursive(b, &modules, &file_paths, options.root_path, b.pathJoin(&.{"sys"}));
+    try addFilesRecursive(b, &modules, &file_paths, options.root_path, b.pathJoin(&.{"kernel"}));
 
     // add each dependencies files
     var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
@@ -550,12 +472,4 @@ const Options = @import("Options.zig");
 const Tool = @import("Tool.zig");
 const StepCollection = @import("StepCollection.zig");
 
-const arch_module_dependencies = @import("../sys/arch/dependencies.zig");
-const boot_module_dependencies = @import("../sys/boot/dependencies.zig");
-const kernel_module_dependencies = @import("../sys/kernel/dependencies.zig");
-
-const all_module_dependencies = &.{
-    arch_module_dependencies,
-    boot_module_dependencies,
-    kernel_module_dependencies,
-};
+const kernel_dependencies = @import("../kernel/dependencies.zig");
