@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn initStage1() !void {
-    kernel.arch.interrupts.disableInterruptsAndHalt();
+    core.panic("NOT IMPLEMENTED", null);
 }
 
 const std = @import("std");
