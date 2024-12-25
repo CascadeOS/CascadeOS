@@ -5,6 +5,9 @@
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !void {
+    // we want the direct map to be available as early as possible
+    try kernel.mem.init.earlyPartialMemoryLayout();
+
     kernel.arch.init.setupEarlyOutput();
 
     kernel.debug.setPanicMode(.simple_init_panic);
