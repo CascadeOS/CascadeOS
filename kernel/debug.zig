@@ -3,7 +3,7 @@
 
 /// The panic mode the kernel is in.
 ///
-/// The mode will be moved through each mode in order as the kernel is initialized.
+/// The kernel will move through each mode in order as initialization is performed.
 ///
 /// No modes will be skipped and must be in strict increasing order.
 pub const PanicMode = enum(u8) {
@@ -19,7 +19,7 @@ pub const PanicMode = enum(u8) {
 pub fn setPanicMode(mode: PanicMode) void {
     if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
         core.panicFmt(
-            "attempt to switch from panic mode '{s}' directly to '{s}'",
+            "invalid panic mode transition '{s}' -> '{s}'",
             .{ @tagName(globals.panic_mode), @tagName(mode) },
             null,
         );
@@ -28,51 +28,37 @@ pub fn setPanicMode(mode: PanicMode) void {
     globals.panic_mode = mode;
 }
 
-/// Zig panic interface.
-pub const Panic = struct {
-    /// Entry point from the Zig language upon a panic.
-    pub fn call(
-        msg: []const u8,
-        error_return_trace: ?*const std.builtin.StackTrace,
-        return_address_opt: ?usize,
-    ) noreturn {
-        @branchHint(.cold);
+/// Entry point from the Zig language upon a panic.
+fn zigPanic(
+    msg: []const u8,
+    error_return_trace: ?*const std.builtin.StackTrace,
+    return_address_opt: ?usize,
+) noreturn {
+    @branchHint(.cold);
 
-        kernel.arch.interrupts.disableInterrupts();
+    kernel.arch.interrupts.disableInterrupts();
 
-        const return_address = return_address_opt orelse @returnAddress();
+    const return_address = return_address_opt orelse @returnAddress();
 
-        switch (globals.panic_mode) {
-            .no_op => {
-                @branchHint(.cold);
-            },
-            .simple_init_panic => {
-                @branchHint(.unlikely);
-                formatting.printPanic(
-                    kernel.arch.init.early_output_writer,
-                    msg,
-                    error_return_trace,
-                    return_address,
-                ) catch {};
-            },
-        }
-
-        while (true) {
-            kernel.arch.interrupts.disableInterruptsAndHalt();
-        }
+    switch (globals.panic_mode) {
+        .no_op => {
+            @branchHint(.cold);
+        },
+        .simple_init_panic => {
+            @branchHint(.unlikely);
+            formatting.printPanic(
+                kernel.arch.init.early_output_writer,
+                msg,
+                error_return_trace,
+                return_address,
+            ) catch {};
+        },
     }
 
-    pub const sentinelMismatch = std.debug.FormattedPanic.sentinelMismatch;
-    pub const unwrapError = std.debug.FormattedPanic.unwrapError;
-    pub const outOfBounds = std.debug.FormattedPanic.outOfBounds;
-    pub const startGreaterThanEnd = std.debug.FormattedPanic.startGreaterThanEnd;
-    pub const inactiveUnionField = std.debug.FormattedPanic.inactiveUnionField;
-    pub const messages = std.debug.FormattedPanic.messages;
-};
-
-const globals = struct {
-    var panic_mode: PanicMode = .no_op;
-};
+    while (true) {
+        kernel.arch.interrupts.disableInterruptsAndHalt();
+    }
+}
 
 const formatting = struct {
     pub fn printPanic(
@@ -463,6 +449,22 @@ pub fn sdfSlice() ![]const u8 {
     static.opt_sdf_slice = slice;
     return slice;
 }
+
+/// Zig panic interface.
+pub const Panic = struct {
+    pub const call = zigPanic;
+
+    pub const sentinelMismatch = std.debug.FormattedPanic.sentinelMismatch;
+    pub const unwrapError = std.debug.FormattedPanic.unwrapError;
+    pub const outOfBounds = std.debug.FormattedPanic.outOfBounds;
+    pub const startGreaterThanEnd = std.debug.FormattedPanic.startGreaterThanEnd;
+    pub const inactiveUnionField = std.debug.FormattedPanic.inactiveUnionField;
+    pub const messages = std.debug.FormattedPanic.messages;
+};
+
+const globals = struct {
+    var panic_mode: PanicMode = .no_op;
+};
 
 const std = @import("std");
 const core = @import("core");
