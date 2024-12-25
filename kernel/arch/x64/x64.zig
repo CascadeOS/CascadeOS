@@ -5,6 +5,8 @@ pub const interrupts = struct {
     pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
 };
 
+pub const init = @import("init.zig");
+
 const std = @import("std");
-const kernel = @import("kernel");
+const kernel = @import("../../kernel.zig");
 const lib_x64 = @import("x64");
