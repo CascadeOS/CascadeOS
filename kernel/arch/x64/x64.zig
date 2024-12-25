@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const interrupts = struct {
-    pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
-};
+pub const interrupts = @import("interrupts.zig");
 
 pub const init = @import("init.zig");
 
