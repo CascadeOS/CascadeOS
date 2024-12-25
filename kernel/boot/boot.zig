@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+/// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
+pub fn kernelBaseAddress() ?KernelBaseAddress {
+    return switch (bootloader_api) {
+        .limine => limine.kernelBaseAddress(),
+        .unknown => null,
+    };
+}
+
+pub const KernelBaseAddress = struct {
+    virtual: core.VirtualAddress,
+    physical: core.PhysicalAddress,
+};
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.
