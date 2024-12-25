@@ -151,11 +151,8 @@ const formatting = struct {
             return;
         }
 
-        // TODO: use real kernel virtual offset
-        const opt_kernel_virtual_offset = null;
-
         // we can't use `VirtualAddress` here as it is possible this subtraction results in a non-canonical address
-        const kernel_source_address = address - (opt_kernel_virtual_offset orelse 0);
+        const kernel_source_address = address - kernel.mem.globals.virtual_offset.value;
 
         const symbol = blk: {
             const symbol_source = opt_symbol_source orelse break :blk null;
@@ -170,19 +167,15 @@ const formatting = struct {
                 writer,
             );
 
-            if (opt_kernel_virtual_offset == null) {
-                try writer.writeAll(" - ??? (address may be incorrect)\n");
-            } else {
-                try writer.writeAll(" - ???\n");
-            }
+            try writer.writeAll(" - ???\n");
 
             return;
         };
 
-        try printSymbol(writer, symbol, opt_kernel_virtual_offset == null);
+        try printSymbol(writer, symbol);
     }
 
-    fn printSymbol(writer: anytype, symbol: SymbolSource.Symbol, kernel_virtual_offset_is_null: bool) !void {
+    fn printSymbol(writer: anytype, symbol: SymbolSource.Symbol) !void {
         try writer.writeAll(indent);
 
         // kernel/setup.zig:43:15 in setup
@@ -232,10 +225,6 @@ const formatting = struct {
         // kernel/setup.zig:43:15 in setup
         //                           ^^^^^
         try writer.writeAll(symbol.name);
-
-        if (kernel_virtual_offset_is_null) {
-            try writer.writeAll(" (address and symbol may be incorrect)");
-        }
 
         const line = switch (symbol.line_source) {
             .source => |s| s,
@@ -308,7 +297,6 @@ const formatting = struct {
         );
         printSymbol(
             @as(std.fs.File.Writer, undefined),
-            undefined,
             undefined,
         );
     }
