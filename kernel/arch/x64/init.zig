@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-var opt_early_output_serial_port: ?SerialPort = null;
-
 /// Attempt to set up some form of early output.
 pub fn setupEarlyOutput() void {
     for (std.meta.tags(SerialPort.COMPort)) |com_port| {
         if (SerialPort.init(com_port, .Baud115200)) |serial_port| {
-            opt_early_output_serial_port = serial_port;
+            globals.opt_early_output_serial_port = serial_port;
             return;
         }
     }
@@ -17,10 +15,14 @@ pub fn setupEarlyOutput() void {
 ///
 /// Cannot fail, any errors are ignored.
 pub fn writeToEarlyOutput(bytes: []const u8) void {
-    if (opt_early_output_serial_port) |early_output_serial_port| {
+    if (globals.opt_early_output_serial_port) |early_output_serial_port| {
         early_output_serial_port.write(bytes);
     }
 }
+
+const globals = struct {
+    var opt_early_output_serial_port: ?SerialPort = null;
+};
 
 /// A *very* basic write only serial port.
 const SerialPort = struct {
