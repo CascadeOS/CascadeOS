@@ -285,7 +285,7 @@ fn constructKernelExe(
 
     kernel_exe.entry = .disabled;
     kernel_exe.want_lto = false;
-    kernel_exe.pie = false;
+    kernel_exe.pie = true; // allow kaslr
     kernel_exe.linkage = .static;
 
     kernel_exe.setLinkerScript(b.path(
