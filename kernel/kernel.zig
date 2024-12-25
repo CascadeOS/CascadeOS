@@ -4,6 +4,8 @@
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
 
+pub const init = @import("init.zig");
+
 comptime {
     boot.exportEntryPoints();
 }
