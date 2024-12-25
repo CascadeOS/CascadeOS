@@ -7,6 +7,10 @@
 pub fn initStage1() !void {
     kernel.arch.init.setupEarlyOutput();
 
+    kernel.arch.init.writeToEarlyOutput(
+        comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n",
+    );
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
