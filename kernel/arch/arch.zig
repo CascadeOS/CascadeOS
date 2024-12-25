@@ -8,6 +8,13 @@ pub const interrupts = struct {
     ///
     /// This is a decl not a wrapper function like the other functions so that it can be inlined into a naked function.
     pub const disableInterruptsAndHalt = current.interrupts.disableInterruptsAndHalt;
+
+    /// Disable interrupts.
+    pub fn disableInterrupts() callconv(core.inline_in_non_debug) void {
+        // `checkSupport` intentionally not called - mandatory function
+
+        current.interrupts.disableInterrupts();
+    }
 };
 
 /// Functionality that is used during kernel init only.
