@@ -18,6 +18,15 @@ pub const init = struct {
 
         current.init.setupEarlyOutput();
     }
+
+    /// Write to early output.
+    ///
+    /// Cannot fail, any errors are ignored.
+    pub fn writeToEarlyOutput(bytes: []const u8) callconv(core.inline_in_non_debug) void {
+        // `checkSupport` intentionally not called - mandatory function
+
+        current.init.writeToEarlyOutput(bytes);
+    }
 };
 
 const current = switch (cascade_target) {

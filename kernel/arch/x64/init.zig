@@ -13,6 +13,15 @@ pub fn setupEarlyOutput() void {
     }
 }
 
+/// Write to early output.
+///
+/// Cannot fail, any errors are ignored.
+pub fn writeToEarlyOutput(bytes: []const u8) void {
+    if (opt_early_output_serial_port) |early_output_serial_port| {
+        early_output_serial_port.write(bytes);
+    }
+}
+
 /// A *very* basic write only serial port.
 const SerialPort = struct {
     _data_port: u16,
