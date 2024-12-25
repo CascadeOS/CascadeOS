@@ -72,6 +72,13 @@ pub const MemoryMapIterator = struct {
     }
 };
 
+pub fn directMapAddress() ?core.VirtualAddress {
+    const resp = requests.hhdm.response orelse
+        return null;
+
+    return resp.offset;
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     kernel.boot.bootloader_api = .limine;
 
@@ -104,6 +111,7 @@ const requests = struct {
     var entry_point: limine.EntryPoint = .{ .entry = limineEntryPoint };
     var kernel_address: limine.ExecutableAddress = .{};
     var memmap: limine.Memmap = .{};
+    var hhdm: limine.HHDM = .{};
 };
 
 const std = @import("std");

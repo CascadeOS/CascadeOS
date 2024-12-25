@@ -99,6 +99,14 @@ pub const MemoryMap = struct {
     );
 };
 
+/// Returns the direct map address provided by the bootloader, if any.
+pub fn directMapAddress() ?core.VirtualAddress {
+    return switch (bootloader_api) {
+        .limine => limine.directMapAddress(),
+        .unknown => null,
+    };
+}
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.
@@ -130,3 +138,4 @@ pub const BootloaderAPI = enum {
 const std = @import("std");
 const kernel = @import("../kernel.zig");
 const limine = @import("limine.zig");
+const core = @import("core");
