@@ -18,8 +18,17 @@ pub fn exportEntryPoints() void {
 
     comptime {
         @export(&unknownBootloaderEntryPoint, .{ .name = "_start" });
+        limine.exportRequests();
     }
 }
 
+pub var bootloader_api: BootloaderAPI = .unknown;
+
+pub const BootloaderAPI = enum {
+    unknown,
+    limine,
+};
+
 const std = @import("std");
 const kernel = @import("../kernel.zig");
+const limine = @import("limine.zig");
