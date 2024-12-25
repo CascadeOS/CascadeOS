@@ -17,6 +17,11 @@ pub const interrupts = struct {
     }
 };
 
+pub const paging = struct {
+    /// The virtual address of the start of the higher half.
+    pub const higher_half_start: core.VirtualAddress = current.paging.higher_half_start;
+};
+
 /// Functionality that is used during kernel init only.
 pub const init = struct {
     /// Attempt to set up some form of early output.
