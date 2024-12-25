@@ -3,6 +3,7 @@
 
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
+pub const config = @import("config.zig");
 pub const debug = @import("debug.zig");
 
 pub const init = @import("init.zig");
