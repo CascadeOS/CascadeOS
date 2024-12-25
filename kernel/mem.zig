@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+/// Returns the virtual address corresponding to this physical address in the direct map.
+pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + globals.direct_map.address.value };
+}
+
 pub const globals = struct {
     /// The virtual base address that the kernel was loaded at.
     ///
