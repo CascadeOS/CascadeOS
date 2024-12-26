@@ -19,6 +19,7 @@ pub fn registerImageSteps(
     kernels: Kernel.Collection,
     tools: Tool.Collection,
     step_collection: StepCollection,
+    options: Options,
     targets: []const CascadeTarget,
 ) !Collection {
     const image_builder_tool = tools.get("image_builder").?;
@@ -53,7 +54,13 @@ pub fn registerImageSteps(
 
         const kernel = kernels.get(target).?;
 
-        const image_description_step = try ImageDescriptionStep.create(b, kernel, target, limine_dep);
+        const image_description_step = try ImageDescriptionStep.create(
+            b,
+            kernel,
+            target,
+            limine_dep,
+            options.qemu_remote_debug,
+        );
 
         const image_build_step = b.addRunArtifact(image_builder_compile_step);
         image_build_step.addFileArg(image_description_step.image_description_file);
@@ -121,11 +128,14 @@ const ImageDescriptionStep = struct {
     kernel: Kernel,
     limine_dep: *std.Build.Dependency,
 
+    disable_kaslr: bool,
+
     fn create(
         b: *std.Build,
         kernel: Kernel,
         target: CascadeTarget,
         limine_dep: *std.Build.Dependency,
+        disable_kaslr: bool,
     ) !*ImageDescriptionStep {
         const step_name = try std.fmt.allocPrint(
             b.allocator,
@@ -147,6 +157,8 @@ const ImageDescriptionStep = struct {
             .target = target,
             .generated_image_description_file = .{ .step = &self.step },
             .image_description_file = .{ .generated = .{ .file = &self.generated_image_description_file } },
+
+            .disable_kaslr = disable_kaslr,
         };
 
         self.step.dependOn(kernel.install_kernel_binaries);
@@ -258,13 +270,23 @@ const ImageDescriptionStep = struct {
 
         const efi_partition = try builder.addPartition("EFI", 0, .fat32, .efi);
 
-        try efi_partition.addFile(.{
-            .destination_path = "/limine.conf",
-            .source_path = self.b.pathJoin(&.{
-                "build",
-                "limine.conf",
-            }),
-        });
+        if (self.disable_kaslr) {
+            try efi_partition.addFile(.{
+                .destination_path = "/limine.conf",
+                .source_path = self.b.pathJoin(&.{
+                    "build",
+                    "limine_no_kaslr.conf",
+                }),
+            });
+        } else {
+            try efi_partition.addFile(.{
+                .destination_path = "/limine.conf",
+                .source_path = self.b.pathJoin(&.{
+                    "build",
+                    "limine.conf",
+                }),
+            });
+        }
 
         switch (self.target) {
             .arm64 => {
@@ -306,3 +328,4 @@ const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const Kernel = @import("Kernel.zig");
 const Tool = @import("Tool.zig");
 const StepCollection = @import("StepCollection.zig");
+const Options = @import("Options.zig");
