@@ -7,5 +7,5 @@ pub const paging = @import("paging.zig");
 pub const init = @import("init.zig");
 
 const std = @import("std");
-const kernel = @import("../../kernel.zig");
+const kernel = @import("kernel");
 const lib_x64 = @import("x64");

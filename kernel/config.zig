@@ -11,6 +11,6 @@ pub const kernel_base_address: core.VirtualAddress = .fromInt(0xffffffff80000000
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("kernel.zig");
+const kernel = @import("kernel");
 const builtin = @import("builtin");
 const kernel_options = @import("kernel_options");

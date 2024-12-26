@@ -117,5 +117,5 @@ const requests = struct {
 const std = @import("std");
 const core = @import("core");
 const limine = @import("limine");
-const kernel = @import("../kernel.zig");
+const kernel = @import("kernel");
 const boot = @import("boot.zig");

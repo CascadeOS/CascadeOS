@@ -6,6 +6,6 @@ pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("../../kernel.zig");
+const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");

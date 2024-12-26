@@ -136,6 +136,6 @@ pub const BootloaderAPI = enum {
 };
 
 const std = @import("std");
-const kernel = @import("../kernel.zig");
+const kernel = @import("kernel");
 const limine = @import("limine.zig");
 const core = @import("core");

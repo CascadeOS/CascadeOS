@@ -209,16 +209,15 @@ fn constructKernelExe(
         .optimize = options.optimize,
     });
 
-    // self reference
-    // TODO: restore this once ZLS is fixed
-    // kernel_module.addImport("kernel", kernel_module);
-
     for (dependencies) |dep| {
         const library_module = dep.library.cascade_modules.get(target) orelse
             std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
 
         kernel_module.addImport(dep.import_name, library_module);
     }
+
+    // self reference
+    kernel_module.addImport("kernel", kernel_module);
 
     // target options
     kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
