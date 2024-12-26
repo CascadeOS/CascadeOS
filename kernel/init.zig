@@ -11,6 +11,7 @@ pub fn initStage1() !void {
     kernel.arch.init.setupEarlyOutput();
 
     kernel.debug.setPanicMode(.simple_init_panic);
+    kernel.log.setLogMode(.simple_init_log);
 
     kernel.arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
@@ -20,3 +21,4 @@ pub fn initStage1() !void {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const log = kernel.log.scoped(.init);
