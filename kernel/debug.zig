@@ -1,33 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
-/// The panic mode the kernel is in.
-///
-/// The kernel will move through each mode in order as initialization is performed.
-///
-/// No modes will be skipped and must be in strict increasing order.
-pub const PanicMode = enum(u8) {
-    /// Panic does nothing other than halt the executor.
-    no_op,
-
-    /// Panic will print using the early output.
-    ///
-    /// Does not support multiple executors.
-    simple_init_panic,
-};
-
-pub fn setPanicMode(mode: PanicMode) void {
-    if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
-        core.panicFmt(
-            "invalid panic mode transition '{s}' -> '{s}'",
-            .{ @tagName(globals.panic_mode), @tagName(mode) },
-            null,
-        );
-    }
-
-    globals.panic_mode = mode;
-}
-
 /// Entry point from the Zig language upon a panic.
 fn zigPanic(
     msg: []const u8,
@@ -58,6 +31,33 @@ fn zigPanic(
     while (true) {
         kernel.arch.interrupts.disableInterruptsAndHalt();
     }
+}
+
+/// The panic mode the kernel is in.
+///
+/// The kernel will move through each mode in order as initialization is performed.
+///
+/// No modes will be skipped and must be in strict increasing order.
+pub const PanicMode = enum(u8) {
+    /// Panic does nothing other than halt the executor.
+    no_op,
+
+    /// Panic will print using the early output.
+    ///
+    /// Does not support multiple executors.
+    simple_init_panic,
+};
+
+pub fn setPanicMode(mode: PanicMode) void {
+    if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
+        core.panicFmt(
+            "invalid panic mode transition '{s}' -> '{s}'",
+            .{ @tagName(globals.panic_mode), @tagName(mode) },
+            null,
+        );
+    }
+
+    globals.panic_mode = mode;
 }
 
 const formatting = struct {
