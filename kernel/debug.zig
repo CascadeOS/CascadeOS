@@ -14,18 +14,8 @@ fn zigPanic(
     const return_address = return_address_opt orelse @returnAddress();
 
     switch (globals.panic_mode) {
-        .no_op => {
-            @branchHint(.cold);
-        },
-        .simple_init_panic => {
-            @branchHint(.unlikely);
-            formatting.printPanic(
-                kernel.arch.init.early_output_writer,
-                msg,
-                error_return_trace,
-                return_address,
-            ) catch {};
-        },
+        .no_op => {},
+        .simple_init_panic => simpleInitPanic(msg, error_return_trace, return_address),
     }
 
     while (true) {
@@ -33,31 +23,28 @@ fn zigPanic(
     }
 }
 
-/// The panic mode the kernel is in.
-///
-/// The kernel will move through each mode in order as initialization is performed.
-///
-/// No modes will be skipped and must be in strict increasing order.
-pub const PanicMode = enum(u8) {
-    /// Panic does nothing other than halt the executor.
-    no_op,
+fn simpleInitPanic(
+    msg: []const u8,
+    error_return_trace: ?*const std.builtin.StackTrace,
+    return_address: usize,
+) void {
+    const static = struct {
+        var nested_panic_count: std.atomic.Value(usize) = .init(0);
+    };
 
-    /// Panic will print using the early output.
-    ///
-    /// Does not support multiple executors.
-    simple_init_panic,
-};
-
-pub fn setPanicMode(mode: PanicMode) void {
-    if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
-        core.panicFmt(
-            "invalid panic mode transition '{s}' -> '{s}'",
-            .{ @tagName(globals.panic_mode), @tagName(mode) },
-            null,
-        );
+    switch (static.nested_panic_count.fetchAdd(1, .acq_rel)) {
+        // on first panic attempt to print the full panic message
+        0 => formatting.printPanic(
+            kernel.arch.init.early_output_writer,
+            msg,
+            error_return_trace,
+            return_address,
+        ) catch {},
+        // on second panic print a shorter message using only `writeToEarlyOutput`
+        1 => kernel.arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n"),
+        // don't trigger any more panics
+        else => {},
     }
-
-    globals.panic_mode = mode;
 }
 
 const formatting = struct {
@@ -417,7 +404,7 @@ const SymbolSource = struct {
     });
 };
 
-pub fn sdfSlice() ![]const u8 {
+fn sdfSlice() ![]const u8 {
     const static = struct {
         const sdf = @import("sdf");
 
@@ -436,6 +423,33 @@ pub fn sdfSlice() ![]const u8 {
 
     static.opt_sdf_slice = slice;
     return slice;
+}
+
+/// The panic mode the kernel is in.
+///
+/// The kernel will move through each mode in order as initialization is performed.
+///
+/// No modes will be skipped and must be in strict increasing order.
+pub const PanicMode = enum(u8) {
+    /// Panic does nothing other than halt the executor.
+    no_op,
+
+    /// Panic will print using the early output.
+    ///
+    /// Does not support multiple executors.
+    simple_init_panic,
+};
+
+pub fn setPanicMode(mode: PanicMode) void {
+    if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
+        core.panicFmt(
+            "invalid panic mode transition '{s}' -> '{s}'",
+            .{ @tagName(globals.panic_mode), @tagName(mode) },
+            null,
+        );
+    }
+
+    globals.panic_mode = mode;
 }
 
 /// Zig panic interface.
