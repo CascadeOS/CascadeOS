@@ -29,13 +29,15 @@ pub fn prepareBootstrapExecutor(
 
 /// Load the provided `Executor` as the current executor.
 pub fn loadExecutor(executor: *kernel.Executor) void {
-    // TODO: idt
-
     executor.arch.gdt.load();
     executor.arch.gdt.setTss(&executor.arch.tss);
 
+    x64.interrupts.init.loadIdt();
+
     lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
+
+pub const initializeInterrupts = x64.interrupts.init.initializeInterrupts;
 
 const globals = struct {
     var opt_early_output_serial_port: ?SerialPort = null;

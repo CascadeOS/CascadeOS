@@ -78,6 +78,13 @@ pub const init = struct {
 
         current.init.loadExecutor(executor);
     }
+
+    /// Ensure that any exceptions/faults that occur are handled.
+    pub fn initializeInterrupts() callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "initializeInterrupts", fn () void);
+
+        current.init.initializeInterrupts();
+    }
 };
 
 const current = switch (cascade_target) {

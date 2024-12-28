@@ -23,6 +23,8 @@ pub fn initStage1() !void {
     kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
     kernel.arch.init.loadExecutor(&bootstrap_executor);
 
+    kernel.arch.init.initializeInterrupts();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
