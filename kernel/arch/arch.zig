@@ -3,6 +3,9 @@
 
 //! Defines the interface of the architecture specific code.
 
+/// Architecture specific per-executor data.
+pub const PerExecutor = current.PerExecutor;
+
 pub const interrupts = struct {
     /// Disable interrupts and halt the CPU.
     ///
@@ -59,6 +62,22 @@ pub const init = struct {
             }
         }.writeFn,
     ){ .context = {} };
+
+    /// Prepares the provided `Executor` for the bootstrap executor.
+    pub fn prepareBootstrapExecutor(
+        bootstrap_executor: *kernel.Executor,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "prepareBootstrapExecutor", fn (*kernel.Executor) void);
+
+        current.init.prepareBootstrapExecutor(bootstrap_executor);
+    }
+
+    /// Load the provided `Executor` as the current executor.
+    pub fn loadExecutor(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);
+
+        current.init.loadExecutor(executor);
+    }
 };
 
 const current = switch (cascade_target) {

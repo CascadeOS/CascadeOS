@@ -20,6 +20,22 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
     }
 }
 
+/// Prepares the provided `Executor` for the bootstrap executor.
+pub fn prepareBootstrapExecutor(
+    bootstrap_executor: *kernel.Executor,
+) callconv(core.inline_in_non_debug) void {
+    bootstrap_executor.arch = .{};
+}
+
+/// Load the provided `Executor` as the current executor.
+pub fn loadExecutor(executor: *kernel.Executor) void {
+    // TODO: gdt
+    // TODO: tss
+    // TODO: idt
+
+    lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
+}
+
 const globals = struct {
     var opt_early_output_serial_port: ?SerialPort = null;
 };

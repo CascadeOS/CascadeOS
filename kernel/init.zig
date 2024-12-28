@@ -15,6 +15,14 @@ pub fn initStage1() !void {
 
     kernel.arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
+    var bootstrap_executor: kernel.Executor = .{
+        .id = .bootstrap,
+        .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+    };
+
+    kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
+    kernel.arch.init.loadExecutor(&bootstrap_executor);
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
