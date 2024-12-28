@@ -29,9 +29,10 @@ pub fn prepareBootstrapExecutor(
 
 /// Load the provided `Executor` as the current executor.
 pub fn loadExecutor(executor: *kernel.Executor) void {
-    // TODO: gdt
-    // TODO: tss
     // TODO: idt
+
+    executor.arch.gdt.load();
+    executor.arch.gdt.setTss(&executor.arch.tss);
 
     lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
