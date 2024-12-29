@@ -6,6 +6,15 @@
 /// Architecture specific per-executor data.
 pub const PerExecutor = current.PerExecutor;
 
+/// Get the current `Executor`.
+///
+/// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
+pub fn rawGetCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
+    checkSupport(current, "getCurrentExecutor", fn () *kernel.Executor);
+
+    return current.getCurrentExecutor();
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and halt the CPU.
     ///
