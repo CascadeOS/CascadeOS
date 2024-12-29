@@ -5,8 +5,8 @@
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !void {
-    // we want the direct map to be available as early as possible
-    try kernel.vmm.init.earlyPartialMemoryLayout();
+    // we need the direct map to be available as early as possible
+    try kernel.vmm.init.buildMemoryLayout();
 
     kernel.arch.init.setupEarlyOutput();
 
@@ -26,9 +26,6 @@ pub fn initStage1() !void {
 
     log.debug("initializing interrupts", .{});
     kernel.arch.init.initializeInterrupts();
-
-    log.debug("building memory layout", .{});
-    try kernel.vmm.init.buildMemoryLayout();
 
     log.debug("initializing physical memory", .{});
     try kernel.pmm.init.initializePhysicalMemory();

@@ -50,22 +50,22 @@ pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalA
 pub const globals = struct {
     /// The virtual base address that the kernel was loaded at.
     ///
-    /// Initialized during `init.earlyPartialMemoryLayout`.
+    /// Initialized during `init.buildMemoryLayout`.
     pub var virtual_base_address: core.VirtualAddress = undefined;
 
     /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
     ///
-    /// Initialized during `init.earlyPartialMemoryLayout`.
+    /// Initialized during `init.buildMemoryLayout`.
     pub var virtual_offset: core.Size = undefined;
 
     /// Offset from the virtual address of kernel sections to the physical address of the section.
     ///
-    /// Initialized during `init.earlyPartialMemoryLayout`.
+    /// Initialized during `init.buildMemoryLayout`.
     pub var physical_to_virtual_offset: core.Size = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
-    /// Initialized during `init.earlyPartialMemoryLayout`.
+    /// Initialized during `init.buildMemoryLayout`.
     pub var direct_map: core.VirtualRange = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
@@ -84,10 +84,7 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    /// Ensures that the kernel base address, virtual offset and the direct map are set up.
-    ///
-    /// Called very early so cannot log.
-    pub fn earlyPartialMemoryLayout() !void {
+    pub fn buildMemoryLayout() !void {
         const base_address = kernel.boot.kernelBaseAddress() orelse return error.NoKernelBaseAddress;
         globals.virtual_base_address = base_address.virtual;
 
@@ -101,45 +98,10 @@ pub const init = struct {
             .byte,
         );
 
-        const direct_map_size = direct_map_size: {
-            const last_memory_map_entry = last_memory_map_entry: {
-                var memory_map_iterator = kernel.boot.memoryMap(.backward) orelse return error.NoMemoryMap;
-                break :last_memory_map_entry memory_map_iterator.next() orelse return error.NoMemoryMapEntries;
-            };
-
-            var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
-
-            // We ensure that the lowest 4GiB are always mapped.
-            const four_gib = core.Size.from(4, .gib);
-            if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
-
-            // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-            direct_map_size.alignForwardInPlace(kernel.arch.paging.largest_page_size);
-
-            break :direct_map_size direct_map_size;
-        };
-
-        globals.direct_map = core.VirtualRange.fromAddr(
-            kernel.boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
-            direct_map_size,
-        );
-    }
-
-    pub fn buildMemoryLayout() !void {
-        log.debug("registering kernel sections", .{});
         try registerKernelSections();
-        log.debug("registering direct maps", .{});
         try registerDirectMaps();
 
         sortKernelMemoryRegions();
-
-        if (log.levelEnabled(.debug)) {
-            log.debug("kernel memory layout:", .{});
-
-            for (globals.regions.constSlice()) |region| {
-                log.debug("\t{}", .{region});
-            }
-        }
     }
 
     fn sortKernelMemoryRegions() void {
@@ -212,17 +174,34 @@ pub const init = struct {
     }
 
     fn registerDirectMaps() !void {
+        const direct_map_size = direct_map_size: {
+            const last_memory_map_entry = last_memory_map_entry: {
+                var memory_map_iterator = kernel.boot.memoryMap(.backward) orelse return error.NoMemoryMap;
+                break :last_memory_map_entry memory_map_iterator.next() orelse return error.NoMemoryMapEntries;
+            };
+
+            var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
+
+            // We ensure that the lowest 4GiB are always mapped.
+            const four_gib = core.Size.from(4, .gib);
+            if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
+
+            // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+            direct_map_size.alignForwardInPlace(kernel.arch.paging.largest_page_size);
+
+            break :direct_map_size direct_map_size;
+        };
+
+        globals.direct_map = core.VirtualRange.fromAddr(
+            kernel.boot.directMapAddress() orelse return error.DirectMapAddressNotProvided,
+            direct_map_size,
+        );
+
         const direct_map = globals.direct_map;
 
         // does the direct map range overlap a pre-existing region?
         for (globals.regions.constSlice()) |region| {
             if (region.range.containsRange(direct_map)) {
-                log.err(
-                    \\direct map overlaps another memory region:
-                    \\  direct map: {}
-                    \\  other region: {}
-                , .{ direct_map, region });
-
                 return error.DirectMapOverlapsRegion;
             }
         }
@@ -297,5 +276,4 @@ pub const init = struct {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const log = kernel.log.scoped(.vmm);
 const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
