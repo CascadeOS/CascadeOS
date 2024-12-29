@@ -32,6 +32,9 @@ pub const paging = struct {
 
     /// The virtual address of the start of the higher half.
     pub const higher_half_start: core.VirtualAddress = current.paging.higher_half_start;
+
+    /// The largest possible higher half virtual address.
+    pub const largest_higher_half_virtual_address: core.VirtualAddress = current.paging.largest_higher_half_virtual_address;
 };
 
 /// Functionality that is used during kernel init only.

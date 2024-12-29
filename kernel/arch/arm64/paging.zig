@@ -13,6 +13,9 @@ pub const all_page_sizes = &.{
 
 pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
 
+/// The largest possible higher half virtual address.
+pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
