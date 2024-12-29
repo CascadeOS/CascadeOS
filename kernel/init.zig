@@ -27,6 +27,9 @@ pub fn initStage1() !void {
     log.debug("initializing interrupts", .{});
     kernel.arch.init.initializeInterrupts();
 
+    log.debug("initializing physical memory", .{});
+    try kernel.pmm.init.initializePhysicalMemory();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 

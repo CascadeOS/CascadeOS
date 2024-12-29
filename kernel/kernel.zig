@@ -7,6 +7,7 @@ pub const config = @import("config.zig");
 pub const debug = @import("debug.zig");
 pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
+pub const pmm = @import("pmm.zig");
 pub const Stack = @import("Stack.zig");
 pub const vmm = @import("vmm.zig");
 
