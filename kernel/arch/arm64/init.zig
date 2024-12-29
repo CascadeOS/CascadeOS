@@ -4,7 +4,7 @@
 /// Attempt to set up some form of early output.
 pub fn setupEarlyOutput() void {
     // TODO: we can't assume the UART is actually at this address unless we are on qemu virt.
-    globals.opt_early_output_uart = Uart.init(kernel.mem.directMapFromPhysical(core.PhysicalAddress.fromInt(0x09000000)));
+    globals.opt_early_output_uart = Uart.init(kernel.vmm.directMapFromPhysical(core.PhysicalAddress.fromInt(0x09000000)));
 }
 
 /// Write to early output.
