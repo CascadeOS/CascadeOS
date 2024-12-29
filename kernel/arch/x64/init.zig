@@ -24,7 +24,30 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
 pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
 ) callconv(core.inline_in_non_debug) void {
-    bootstrap_executor.arch = .{};
+    const static = struct {
+        var bootstrap_double_fault_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+    };
+
+    bootstrap_executor.arch = .{
+        .double_fault_stack = .fromRange(
+            .fromSlice(u8, &static.bootstrap_double_fault_stack),
+            .fromSlice(u8, &static.bootstrap_double_fault_stack),
+        ),
+        .non_maskable_interrupt_stack = .fromRange(
+            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
+            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
+        ),
+    };
+
+    bootstrap_executor.arch.tss.setInterruptStack(
+        @intFromEnum(x64.interrupts.InterruptStackSelector.double_fault),
+        bootstrap_executor.arch.double_fault_stack.stack_pointer,
+    );
+    bootstrap_executor.arch.tss.setInterruptStack(
+        @intFromEnum(x64.interrupts.InterruptStackSelector.non_maskable_interrupt),
+        bootstrap_executor.arch.non_maskable_interrupt_stack.stack_pointer,
+    );
 }
 
 /// Load the provided `Executor` as the current executor.

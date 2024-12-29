@@ -235,6 +235,11 @@ pub const InterruptFrame = extern struct {
     }
 };
 
+pub const InterruptStackSelector = enum(u3) {
+    double_fault,
+    non_maskable_interrupt,
+};
+
 const globals = struct {
     var idt: Idt = .{};
     const raw_interrupt_handlers = init.makeRawHandlers();
@@ -250,6 +255,12 @@ pub const init = struct {
                 raw_handler,
             );
         }
+
+        globals.idt.handlers[@intFromEnum(Interrupt.double_fault)]
+            .setStack(@intFromEnum(InterruptStackSelector.double_fault));
+
+        globals.idt.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)]
+            .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
     }
 
     pub fn loadIdt() void {
