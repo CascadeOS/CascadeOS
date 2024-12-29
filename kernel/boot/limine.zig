@@ -93,9 +93,7 @@ fn limineEntryPoint() callconv(.C) noreturn {
     core.panic("`initStage1` returned", null);
 }
 
-// TODO: update to 3, needs annoying changes as things like the ACPI RSDP are not mapped in the
-//       HHDM from that revision onwards
-const target_limine_revison: limine.BaseRevison.Revison = .@"2";
+const target_limine_revison: limine.BaseRevison.Revison = .@"3";
 var limine_revison: limine.BaseRevison.Revison = .@"0";
 
 pub fn exportRequests() void {
