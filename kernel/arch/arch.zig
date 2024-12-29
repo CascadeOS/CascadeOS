@@ -110,6 +110,17 @@ pub const init = struct {
 
         return current.init.captureEarlySystemInformation();
     }
+
+    /// Configure any per-executor system features.
+    ///
+    /// **WARNING**: The `executor` provided must be the current executor.
+    pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "configurePerExecutorSystemFeatures", fn (*const kernel.Executor) void);
+
+        std.debug.assert(executor == rawGetCurrentExecutor());
+
+        current.init.configurePerExecutorSystemFeatures(executor);
+    }
 };
 
 const current = switch (cascade_target) {

@@ -30,6 +30,9 @@ pub fn initStage1() !void {
     log.debug("capturing early system information", .{});
     try kernel.arch.init.captureEarlySystemInformation();
 
+    log.debug("configuring per-executor system features", .{});
+    kernel.arch.init.configurePerExecutorSystemFeatures(&bootstrap_executor);
+
     log.debug("initializing physical memory", .{});
     try kernel.pmm.init.initializePhysicalMemory();
 
