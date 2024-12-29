@@ -9,7 +9,7 @@ pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
 pub const Stack = @import("Stack.zig");
-pub const vmm = @import("vmm.zig");
+pub const vmm = @import("vmm/vmm.zig");
 
 pub const init = @import("init.zig");
 
