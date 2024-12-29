@@ -8,6 +8,7 @@ pub const debug = @import("debug.zig");
 pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
 pub const mem = @import("mem.zig");
+pub const Stack = @import("Stack.zig");
 
 pub const init = @import("init.zig");
 
