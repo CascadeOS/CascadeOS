@@ -27,6 +27,9 @@ pub fn initStage1() !void {
     log.debug("initializing interrupts", .{});
     kernel.arch.init.initializeInterrupts();
 
+    log.debug("capturing early system information", .{});
+    try kernel.arch.init.captureEarlySystemInformation();
+
     log.debug("initializing physical memory", .{});
     try kernel.pmm.init.initializePhysicalMemory();
 

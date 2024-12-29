@@ -62,6 +62,26 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 
 pub const initializeInterrupts = x64.interrupts.init.initializeInterrupts;
 
+/// Capture any system information that can be without using mmio.
+///
+/// For example, on x64 this should capture CPUID but not APIC or ACPI information.
+pub fn captureEarlySystemInformation() !void {
+    log.debug("capturing cpuid information", .{});
+    try x64.info.cpu_id.capture();
+
+    if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
+        const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
+        x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
+        log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
+    }
+
+    if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
+        const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
+        x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
+        log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
+    }
+}
+
 const globals = struct {
     var opt_early_output_serial_port: ?SerialPort = null;
 };
@@ -166,3 +186,4 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
+const log = kernel.log.scoped(.init_x64);
