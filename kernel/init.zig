@@ -20,9 +20,11 @@ pub fn initStage1() !void {
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
     };
 
+    log.debug("loading bootstrap executor", .{});
     kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
     kernel.arch.init.loadExecutor(&bootstrap_executor);
 
+    log.debug("initializing interrupts", .{});
     kernel.arch.init.initializeInterrupts();
 
     core.panic("NOT IMPLEMENTED", null);
