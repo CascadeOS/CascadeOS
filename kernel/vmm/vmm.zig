@@ -67,6 +67,20 @@ pub const globals = struct {
     ///
     /// Initialized during `init.earlyPartialMemoryLayout`.
     pub var direct_map: core.VirtualRange = undefined;
+
+    /// Provides an identity mapping between virtual and physical addresses.
+    ///
+    /// Caching is disabled for this mapping.
+    ///
+    /// Initialized during `init.buildMemoryLayout`.
+    pub var non_cached_direct_map: core.VirtualRange = undefined;
+
+    /// The layout of the memory regions of the kernel.
+    ///
+    /// Initialized during `init.buildMemoryLayout`.
+    pub var regions: Regions = undefined;
+
+    const Regions = std.BoundedArray(KernelMemoryRegion, std.meta.tags(KernelMemoryRegion.Type).len);
 };
 
 pub const init = struct {
@@ -110,8 +124,178 @@ pub const init = struct {
             direct_map_size,
         );
     }
+
+    pub fn buildMemoryLayout() !void {
+        log.debug("registering kernel sections", .{});
+        try registerKernelSections();
+        log.debug("registering direct maps", .{});
+        try registerDirectMaps();
+
+        sortKernelMemoryRegions();
+
+        if (log.levelEnabled(.debug)) {
+            log.debug("kernel memory layout:", .{});
+
+            for (globals.regions.constSlice()) |region| {
+                log.debug("\t{}", .{region});
+            }
+        }
+    }
+
+    fn sortKernelMemoryRegions() void {
+        std.mem.sort(KernelMemoryRegion, globals.regions.slice(), {}, struct {
+            fn lessThanFn(context: void, region: KernelMemoryRegion, other_region: KernelMemoryRegion) bool {
+                _ = context;
+                return region.range.address.lessThan(other_region.range.address);
+            }
+        }.lessThanFn);
+    }
+
+    fn registerKernelSections() !void {
+        const linker_symbols = struct {
+            extern const __text_start: u8;
+            extern const __text_end: u8;
+            extern const __rodata_start: u8;
+            extern const __rodata_end: u8;
+            extern const __data_start: u8;
+            extern const __data_end: u8;
+        };
+
+        const sdf_slice = try kernel.debug.sdfSlice();
+        const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
+
+        const sections: []const struct {
+            core.VirtualAddress,
+            core.VirtualAddress,
+            KernelMemoryRegion.Type,
+        } = &.{
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+                .executable_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+                .readonly_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+                .writeable_section,
+            },
+            .{
+                sdf_range.address,
+                sdf_range.endBound(),
+                .sdf_section,
+            },
+        };
+
+        for (sections) |section| {
+            const start_address = section[0];
+            const end_address = section[1];
+            const region_type = section[2];
+
+            std.debug.assert(end_address.greaterThan(start_address));
+
+            const virtual_range: core.VirtualRange = .fromAddr(
+                start_address,
+                core.Size.from(end_address.value - start_address.value, .byte)
+                    .alignForward(kernel.arch.paging.standard_page_size),
+            );
+
+            try globals.regions.append(.{
+                .range = virtual_range,
+                .type = region_type,
+            });
+        }
+    }
+
+    fn registerDirectMaps() !void {
+        const direct_map = globals.direct_map;
+
+        // does the direct map range overlap a pre-existing region?
+        for (globals.regions.constSlice()) |region| {
+            if (region.range.containsRange(direct_map)) {
+                log.err(
+                    \\direct map overlaps another memory region:
+                    \\  direct map: {}
+                    \\  other region: {}
+                , .{ direct_map, region });
+
+                return error.DirectMapOverlapsRegion;
+            }
+        }
+
+        try globals.regions.append(.{
+            .range = direct_map,
+            .type = .direct_map,
+        });
+
+        const non_cached_direct_map = findFreeRange(
+            direct_map.size,
+            kernel.arch.paging.largest_page_size,
+        ) orelse return error.NoFreeRangeForDirectMap;
+
+        globals.non_cached_direct_map = non_cached_direct_map;
+
+        try globals.regions.append(.{
+            .range = non_cached_direct_map,
+            .type = .non_cached_direct_map,
+        });
+    }
+
+    fn findFreeRange(size: core.Size, alignment: core.Size) ?core.VirtualRange {
+        // needs the regions to be sorted
+        sortKernelMemoryRegions();
+
+        const regions = globals.regions.constSlice();
+
+        var current_address = kernel.arch.paging.higher_half_start;
+        current_address.alignForwardInPlace(alignment);
+
+        var i: usize = 0;
+
+        while (true) {
+            const region = if (i < regions.len) regions[i] else {
+                const size_of_free_range = core.Size.from(
+                    (kernel.arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                    .byte,
+                );
+
+                if (size_of_free_range.lessThan(size)) return null;
+
+                return core.VirtualRange.fromAddr(current_address, size);
+            };
+
+            const region_address = region.range.address;
+
+            if (region_address.lessThanOrEqual(current_address)) {
+                current_address = region.range.endBound();
+                current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            const size_of_free_range = core.Size.from(
+                (region_address.value - 1) - current_address.value,
+                .byte,
+            );
+
+            if (size_of_free_range.lessThan(size)) {
+                current_address = region.range.endBound();
+                current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            return core.VirtualRange.fromAddr(current_address, size);
+        }
+    }
 };
 
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const log = kernel.log.scoped(.vmm);
+const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
