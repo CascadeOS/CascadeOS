@@ -82,6 +82,41 @@ pub fn captureEarlySystemInformation() !void {
     }
 }
 
+pub const CaptureSystemInformationOptions = struct {
+    x2apic_enabled: bool,
+};
+
+/// Capture any system information that needs mmio.
+///
+/// For example, on x64 this should capture APIC and ACPI information.
+pub fn captureSystemInformation(
+    options: CaptureSystemInformationOptions,
+) !void {
+    _ = options;
+    const madt = kernel.acpi.getTable(acpi.MADT, 0) orelse return error.NoMADT;
+    const fadt = kernel.acpi.getTable(acpi.FADT, 0) orelse return error.NoFADT;
+
+    log.debug("capturing FADT information", .{});
+    {
+        const flags = fadt.IA_PC_BOOT_ARCH;
+
+        x64.info.have_ps2_controller = flags.@"8042";
+        log.debug("have ps2 controller: {}", .{x64.info.have_ps2_controller});
+
+        x64.info.msi_supported = !flags.msi_not_supported;
+        log.debug("message signaled interrupts supported: {}", .{x64.info.msi_supported});
+
+        x64.info.have_cmos_rtc = !flags.cmos_rtc_not_present;
+        log.debug("have cmos rtc: {}", .{x64.info.have_cmos_rtc});
+    }
+
+    log.debug("capturing MADT information", .{});
+    {
+        x64.info.have_pic = madt.flags.PCAT_COMPAT;
+        log.debug("have pic: {}", .{x64.info.have_pic});
+    }
+}
+
 /// Configure any per-executor system features.
 ///
 /// **WARNING**: The `executor` provided must be the current executor.
@@ -218,3 +253,4 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
 const log = kernel.log.scoped(.init_x64);
+const acpi = @import("acpi");
