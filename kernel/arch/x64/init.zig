@@ -189,9 +189,7 @@ const SerialPort = struct {
 
     inline fn writeByte(self: SerialPort, byte: u8) void {
         // wait for output ready
-        while (portReadU8(self._line_status_port) & OUTPUT_READY == 0) {
-            lib_x64.instructions.pause();
-        }
+        while (portReadU8(self._line_status_port) & OUTPUT_READY == 0) {}
         portWriteU8(self._data_port, byte);
     }
 
