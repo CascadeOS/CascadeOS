@@ -217,7 +217,7 @@ pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) voi
         }
     }
 
-    const mask = ~(@as(TargetType, 1) << bit);
+    const mask = comptime ~(@as(TargetType, 1) << bit);
 
     target.* = (target.* & mask) | (@as(TargetType, value) << bit);
 }
