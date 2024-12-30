@@ -151,6 +151,16 @@ pub const init = struct {
         std.debug.assert(physical_range.size.isAligned(PageTable.small_page_size));
         std.debug.assert(virtual_range.size.equal(physical_range.size));
 
+        init_log.debug("mapToPhysicalRangeAllPageSizes - virtual_range: {} - physical_range: {} - map_type: {}", .{
+            virtual_range,
+            physical_range,
+            map_type,
+        });
+
+        var large_pages_mapped: usize = 0;
+        var medium_pages_mapped: usize = 0;
+        var small_pages_mapped: usize = 0;
+
         const supports_1gib = x64.info.cpu_id.gbyte_pages;
 
         var current_virtual_address = virtual_range.address;
@@ -182,7 +192,6 @@ pub const init = struct {
                     current_virtual_address.isAligned(PageTable.large_page_size) and
                     current_physical_address.isAligned(PageTable.large_page_size))
                 {
-
                     // large 1 GiB page
                     try setEntry(
                         level3_table,
@@ -191,6 +200,8 @@ pub const init = struct {
                         map_type,
                         .large,
                     );
+
+                    large_pages_mapped += 1;
 
                     current_virtual_address.moveForwardInPlace(PageTable.large_page_size);
                     current_physical_address.moveForwardInPlace(PageTable.large_page_size);
@@ -223,6 +234,8 @@ pub const init = struct {
                             .medium,
                         );
 
+                        medium_pages_mapped += 1;
+
                         current_virtual_address.moveForwardInPlace(PageTable.medium_page_size);
                         current_physical_address.moveForwardInPlace(PageTable.medium_page_size);
                         size_remaining.subtractInPlace(PageTable.medium_page_size);
@@ -249,6 +262,8 @@ pub const init = struct {
                             .small,
                         );
 
+                        small_pages_mapped += 1;
+
                         current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
                         current_physical_address.moveForwardInPlace(PageTable.small_page_size);
                         size_remaining.subtractInPlace(PageTable.small_page_size);
@@ -256,6 +271,11 @@ pub const init = struct {
                 }
             }
         }
+
+        init_log.debug(
+            "satified using {} large pages, {} medium pages, {} small pages",
+            .{ large_pages_mapped, medium_pages_mapped, small_pages_mapped },
+        );
     }
 
     const init_log = kernel.log.scoped(.init_x64_paging);
