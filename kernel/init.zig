@@ -44,6 +44,9 @@ pub fn initStage1() !void {
     log.debug("loading core page table", .{});
     kernel.vmm.globals.core_page_table.load();
 
+    log.debug("initializing ACPI tables", .{});
+    try kernel.acpi.init.initializeACPITables();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
