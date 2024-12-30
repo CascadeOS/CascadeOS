@@ -36,6 +36,30 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
+    .eh_frame_hdr : {
+        *(.eh_frame_hdr)
+    } :rodata
+
+    .dynsym : {
+        *(.dynsym)
+    } :rodata
+
+    .gnu.hash : {
+        *(.gnu.hash)
+    } :rodata
+
+    .hash : {
+        *(.hash)
+    } :rodata
+
+    .dynstr : {
+        *(.dynstr)
+    } :rodata
+
+    .rela.dyn : {
+        *(.rela.dyn)
+    } :rodata
+
     __rodata_end = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
