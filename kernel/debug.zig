@@ -18,6 +18,8 @@ fn zigPanic(
         .simple_init_panic => simpleInitPanic(msg, error_return_trace, return_address),
     }
 
+    kernel.acpi.tryShutdown() catch {};
+
     while (true) {
         kernel.arch.interrupts.disableInterruptsAndHalt();
     }
