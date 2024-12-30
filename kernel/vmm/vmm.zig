@@ -3,6 +3,8 @@
 
 //! Virtual memory management.
 
+pub const MapType = @import("MapType.zig");
+
 /// Returns the virtual address corresponding to this physical address in the direct map.
 pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
     return .{ .value = self.value + globals.direct_map.address.value };
