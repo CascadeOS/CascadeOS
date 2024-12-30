@@ -33,44 +33,44 @@ pub const PhysicalAddress = extern struct {
     /// Returns the address rounded up to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignForward(self: PhysicalAddress, alignment: core.Size) PhysicalAddress {
+    pub fn alignForward(self: PhysicalAddress, alignment: core.Size) PhysicalAddress {
         return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
     }
 
     /// Rounds up the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignForwardInPlace(self: *PhysicalAddress, alignment: core.Size) void {
+    pub fn alignForwardInPlace(self: *PhysicalAddress, alignment: core.Size) void {
         self.value = std.mem.alignForward(u64, self.value, alignment.value);
     }
 
     /// Returns the address rounded down to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignBackward(self: PhysicalAddress, alignment: core.Size) PhysicalAddress {
+    pub fn alignBackward(self: PhysicalAddress, alignment: core.Size) PhysicalAddress {
         return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
     }
 
     /// Rounds down the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignBackwardInPlace(self: *PhysicalAddress, alignment: core.Size) void {
+    pub fn alignBackwardInPlace(self: *PhysicalAddress, alignment: core.Size) void {
         self.value = std.mem.alignBackward(u64, self.value, alignment.value);
     }
 
-    pub inline fn moveForward(self: PhysicalAddress, size: core.Size) PhysicalAddress {
+    pub fn moveForward(self: PhysicalAddress, size: core.Size) PhysicalAddress {
         return .{ .value = self.value + size.value };
     }
 
-    pub inline fn moveForwardInPlace(self: *PhysicalAddress, size: core.Size) void {
+    pub fn moveForwardInPlace(self: *PhysicalAddress, size: core.Size) void {
         self.value += size.value;
     }
 
-    pub inline fn moveBackward(self: PhysicalAddress, size: core.Size) PhysicalAddress {
+    pub fn moveBackward(self: PhysicalAddress, size: core.Size) PhysicalAddress {
         return .{ .value = self.value - size.value };
     }
 
-    pub inline fn moveBackwardInPlace(self: *PhysicalAddress, size: core.Size) void {
+    pub fn moveBackwardInPlace(self: *PhysicalAddress, size: core.Size) void {
         self.value -= size.value;
     }
 
@@ -162,44 +162,44 @@ pub const VirtualAddress = extern struct {
     /// Returns the address rounded up to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignForward(self: VirtualAddress, alignment: core.Size) VirtualAddress {
+    pub fn alignForward(self: VirtualAddress, alignment: core.Size) VirtualAddress {
         return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
     }
 
     /// Rounds up the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignForwardInPlace(self: *VirtualAddress, alignment: core.Size) void {
+    pub fn alignForwardInPlace(self: *VirtualAddress, alignment: core.Size) void {
         self.value = std.mem.alignForward(u64, self.value, alignment.value);
     }
 
     /// Returns the address rounded down to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignBackward(self: VirtualAddress, alignment: core.Size) VirtualAddress {
+    pub fn alignBackward(self: VirtualAddress, alignment: core.Size) VirtualAddress {
         return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
     }
 
     /// Rounds down the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignBackwardInPlace(self: *VirtualAddress, alignment: core.Size) void {
+    pub fn alignBackwardInPlace(self: *VirtualAddress, alignment: core.Size) void {
         self.value = std.mem.alignBackward(u64, self.value, alignment.value);
     }
 
-    pub inline fn moveForward(self: VirtualAddress, size: core.Size) VirtualAddress {
+    pub fn moveForward(self: VirtualAddress, size: core.Size) VirtualAddress {
         return .{ .value = self.value + size.value };
     }
 
-    pub inline fn moveForwardInPlace(self: *VirtualAddress, size: core.Size) void {
+    pub fn moveForwardInPlace(self: *VirtualAddress, size: core.Size) void {
         self.value += size.value;
     }
 
-    pub inline fn moveBackward(self: VirtualAddress, size: core.Size) VirtualAddress {
+    pub fn moveBackward(self: VirtualAddress, size: core.Size) VirtualAddress {
         return .{ .value = self.value - size.value };
     }
 
-    pub inline fn moveBackwardInPlace(self: *VirtualAddress, size: core.Size) void {
+    pub fn moveBackwardInPlace(self: *VirtualAddress, size: core.Size) void {
         self.value -= size.value;
     }
 
@@ -272,7 +272,7 @@ pub const PhysicalRange = extern struct {
     }
 
     /// Returns the address of the first byte __after__ the range.
-    pub inline fn endBound(self: PhysicalRange) PhysicalAddress {
+    pub fn endBound(self: PhysicalRange) PhysicalAddress {
         return self.address.moveForward(self.size);
     }
 
@@ -288,25 +288,25 @@ pub const PhysicalRange = extern struct {
         return self.address.equal(other.address) and self.size.equal(other.size);
     }
 
-    pub inline fn moveForward(self: PhysicalRange, size: core.Size) PhysicalRange {
+    pub fn moveForward(self: PhysicalRange, size: core.Size) PhysicalRange {
         return .{
             .address = self.address.moveForward(size),
             .size = self.size,
         };
     }
 
-    pub inline fn moveForwardInPlace(self: *PhysicalRange, size: core.Size) void {
+    pub fn moveForwardInPlace(self: *PhysicalRange, size: core.Size) void {
         self.address.moveForwardInPlace(size);
     }
 
-    pub inline fn moveBackward(self: PhysicalRange, size: core.Size) PhysicalRange {
+    pub fn moveBackward(self: PhysicalRange, size: core.Size) PhysicalRange {
         return .{
             .address = self.address.moveBackward(size),
             .size = self.size,
         };
     }
 
-    pub inline fn moveBackwardInPlace(self: *PhysicalRange, size: core.Size) void {
+    pub fn moveBackwardInPlace(self: *PhysicalRange, size: core.Size) void {
         self.address.moveBackwardInPlace(size);
     }
 
@@ -381,7 +381,7 @@ pub const VirtualRange = extern struct {
     }
 
     /// Returns the address of the first byte __after__ the range.
-    pub inline fn endBound(self: VirtualRange) VirtualAddress {
+    pub fn endBound(self: VirtualRange) VirtualAddress {
         return self.address.moveForward(self.size);
     }
 
@@ -397,25 +397,25 @@ pub const VirtualRange = extern struct {
         return self.address.equal(other.address) and self.size.equal(other.size);
     }
 
-    pub inline fn moveForward(self: VirtualRange, size: core.Size) VirtualRange {
+    pub fn moveForward(self: VirtualRange, size: core.Size) VirtualRange {
         return .{
             .address = self.address.moveForward(size),
             .size = self.size,
         };
     }
 
-    pub inline fn moveForwardInPlace(self: *VirtualRange, size: core.Size) void {
+    pub fn moveForwardInPlace(self: *VirtualRange, size: core.Size) void {
         self.address.moveForwardInPlace(size);
     }
 
-    pub inline fn moveBackward(self: VirtualRange, size: core.Size) VirtualRange {
+    pub fn moveBackward(self: VirtualRange, size: core.Size) VirtualRange {
         return .{
             .address = self.address.moveBackward(size),
             .size = self.size,
         };
     }
 
-    pub inline fn moveBackwardInPlace(self: *VirtualRange, size: core.Size) void {
+    pub fn moveBackwardInPlace(self: *VirtualRange, size: core.Size) void {
         self.address.moveBackwardInPlace(size);
     }
 

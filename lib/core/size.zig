@@ -20,7 +20,7 @@ pub const Size = extern struct {
         return .{ .value = @sizeOf(T) };
     }
 
-    pub inline fn from(amount: u64, unit: Unit) Size {
+    pub fn from(amount: u64, unit: Unit) Size {
         return .{
             .value = amount * @intFromEnum(unit),
         };
@@ -36,28 +36,28 @@ pub const Size = extern struct {
     /// Aligns the `Size` forward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignForward(self: Size, alignment: Size) Size {
+    pub fn alignForward(self: Size, alignment: Size) Size {
         return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
     }
 
     /// Aligns the `Size` forward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignForwardInPlace(self: *Size, alignment: Size) void {
+    pub fn alignForwardInPlace(self: *Size, alignment: Size) void {
         self.value = std.mem.alignForward(u64, self.value, alignment.value);
     }
 
     /// Aligns the `Size` backward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignBackward(self: Size, alignment: Size) Size {
+    pub fn alignBackward(self: Size, alignment: Size) Size {
         return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
     }
 
     /// Aligns the `Size` backward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn alignBackwardInPlace(self: *Size, alignment: core.Size) void {
+    pub fn alignBackwardInPlace(self: *Size, alignment: core.Size) void {
         self.value = std.mem.alignBackward(u64, self.value, alignment.value);
     }
 
@@ -129,51 +129,51 @@ pub const Size = extern struct {
         return .match;
     }
 
-    pub inline fn add(self: Size, other: Size) Size {
+    pub fn add(self: Size, other: Size) Size {
         return .{ .value = self.value + other.value };
     }
 
-    pub inline fn addInPlace(self: *Size, other: Size) void {
+    pub fn addInPlace(self: *Size, other: Size) void {
         self.value += other.value;
     }
 
-    pub inline fn subtract(self: Size, other: Size) Size {
+    pub fn subtract(self: Size, other: Size) Size {
         return .{ .value = self.value - other.value };
     }
 
-    pub inline fn subtractInPlace(self: *Size, other: Size) void {
+    pub fn subtractInPlace(self: *Size, other: Size) void {
         self.value -= other.value;
     }
 
-    pub inline fn multiply(self: Size, other: Size) Size {
+    pub fn multiply(self: Size, other: Size) Size {
         return .{ .value = self.value * other.value };
     }
 
-    pub inline fn multiplyInPlace(self: *Size, other: Size) void {
+    pub fn multiplyInPlace(self: *Size, other: Size) void {
         self.value *= other.value;
     }
 
-    pub inline fn multiplyScalar(self: Size, value: u64) Size {
+    pub fn multiplyScalar(self: Size, value: u64) Size {
         return .{ .value = self.value * value };
     }
 
-    pub inline fn multiplyScalarInPlace(self: *Size, value: u64) void {
+    pub fn multiplyScalarInPlace(self: *Size, value: u64) void {
         self.value *= value;
     }
 
-    pub inline fn divide(self: Size, other: Size) Size {
+    pub fn divide(self: Size, other: Size) Size {
         return .{ .value = self.value / other.value };
     }
 
-    pub inline fn divideInPlace(self: *Size, other: Size) void {
+    pub fn divideInPlace(self: *Size, other: Size) void {
         self.value /= other.value;
     }
 
-    pub inline fn divideScalar(self: Size, value: u64) Size {
-        return self.value / value;
+    pub fn divideScalar(self: Size, value: u64) Size {
+        return .{ .value = self.value / value };
     }
 
-    pub inline fn divideScalarInPlace(self: *Size, value: u64) Size {
+    pub fn divideScalarInPlace(self: *Size, value: u64) void {
         self.value /= value;
     }
 

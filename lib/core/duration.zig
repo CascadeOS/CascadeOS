@@ -19,7 +19,7 @@ pub const Duration = extern struct {
         day = 24 * 60 * 60 * 1000 * 1000 * 1000,
     };
 
-    pub inline fn from(amount: u64, unit: Unit) Duration {
+    pub fn from(amount: u64, unit: Unit) Duration {
         return .{
             .value = amount * @intFromEnum(unit),
         };
@@ -51,51 +51,51 @@ pub const Duration = extern struct {
         return .match;
     }
 
-    pub inline fn add(self: Duration, other: Duration) Duration {
+    pub fn add(self: Duration, other: Duration) Duration {
         return .{ .value = self.value + other.value };
     }
 
-    pub inline fn addInPlace(self: *Duration, other: Duration) void {
+    pub fn addInPlace(self: *Duration, other: Duration) void {
         self.value += other.value;
     }
 
-    pub inline fn subtract(self: Duration, other: Duration) Duration {
+    pub fn subtract(self: Duration, other: Duration) Duration {
         return .{ .value = self.value - other.value };
     }
 
-    pub inline fn subtractInPlace(self: *Duration, other: Duration) void {
+    pub fn subtractInPlace(self: *Duration, other: Duration) void {
         self.value -= other.value;
     }
 
-    pub inline fn multiply(self: Duration, other: Duration) Duration {
+    pub fn multiply(self: Duration, other: Duration) Duration {
         return .{ .value = self.value * other.value };
     }
 
-    pub inline fn multiplyInPlace(self: *Duration, other: Duration) void {
+    pub fn multiplyInPlace(self: *Duration, other: Duration) void {
         self.value *= other.value;
     }
 
-    pub inline fn multiplyScalar(self: Duration, value: u64) Duration {
+    pub fn multiplyScalar(self: Duration, value: u64) Duration {
         return .{ .value = self.value * value };
     }
 
-    pub inline fn multiplyScalarInPlace(self: *Duration, value: u64) void {
+    pub fn multiplyScalarInPlace(self: *Duration, value: u64) void {
         self.value *= value;
     }
 
-    pub inline fn divide(self: Duration, other: Duration) Duration {
+    pub fn divide(self: Duration, other: Duration) Duration {
         return .{ .value = self.value / other.value };
     }
 
-    pub inline fn divideInPlace(self: *Duration, other: Duration) void {
+    pub fn divideInPlace(self: *Duration, other: Duration) void {
         self.value /= other.value;
     }
 
-    pub inline fn divideScalar(self: Duration, value: u64) Duration {
-        return self.value / value;
+    pub fn divideScalar(self: Duration, value: u64) Duration {
+        return .{ .value = self.value / value };
     }
 
-    pub inline fn divideScalarInPlace(self: *Duration, value: u64) Duration {
+    pub fn divideScalarInPlace(self: *Duration, value: u64) void {
         self.value /= value;
     }
 
