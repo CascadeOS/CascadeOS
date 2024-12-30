@@ -92,7 +92,6 @@ pub const CaptureSystemInformationOptions = struct {
 pub fn captureSystemInformation(
     options: CaptureSystemInformationOptions,
 ) !void {
-    _ = options;
     const madt = kernel.acpi.getTable(acpi.MADT, 0) orelse return error.NoMADT;
     const fadt = kernel.acpi.getTable(acpi.FADT, 0) orelse return error.NoFADT;
 
@@ -115,6 +114,9 @@ pub fn captureSystemInformation(
         x64.info.have_pic = madt.flags.PCAT_COMPAT;
         log.debug("have pic: {}", .{x64.info.have_pic});
     }
+
+    log.debug("capturing APIC information", .{});
+    x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
 }
 
 /// Configure any per-executor system features.
