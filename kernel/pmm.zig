@@ -101,7 +101,11 @@ pub const init = struct {
         var reclaimable_memory: core.Size = .zero;
         var unavailable_memory: core.Size = .zero;
 
+        init_log.debug("bootloader provided memory map:", .{});
+
         while (iter.next()) |entry| {
+            init_log.debug("\t{}", .{entry});
+
             total_memory.addInPlace(entry.range.size);
 
             switch (entry.type) {
@@ -137,12 +141,12 @@ pub const init = struct {
             .subtract(reclaimable_memory)
             .subtract(unavailable_memory);
 
-        log.debug("total memory:         {}", .{total_memory});
-        log.debug("  free memory:        {}", .{free_memory});
-        log.debug("  used memory:        {}", .{used_memory});
-        log.debug("  reserved memory:    {}", .{reserved_memory});
-        log.debug("  reclaimable memory: {}", .{reclaimable_memory});
-        log.debug("  unavailable memory: {}", .{unavailable_memory});
+        init_log.debug("total memory:         {}", .{total_memory});
+        init_log.debug("  free memory:        {}", .{free_memory});
+        init_log.debug("  used memory:        {}", .{used_memory});
+        init_log.debug("  reserved memory:    {}", .{reserved_memory});
+        init_log.debug("  reclaimable memory: {}", .{reclaimable_memory});
+        init_log.debug("  unavailable memory: {}", .{unavailable_memory});
 
         globals.total_memory = total_memory;
         globals.free_memory.store(free_memory.value, .release);
@@ -150,6 +154,8 @@ pub const init = struct {
         globals.reclaimable_memory = reclaimable_memory;
         globals.unavailable_memory = unavailable_memory;
     }
+
+    const init_log = kernel.log.scoped(.init_pmm);
 };
 
 const std = @import("std");
