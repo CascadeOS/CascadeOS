@@ -44,6 +44,35 @@ pub const paging = struct {
 
     /// The largest possible higher half virtual address.
     pub const largest_higher_half_virtual_address: core.VirtualAddress = current.paging.largest_higher_half_virtual_address;
+
+    pub const PageTable = struct {
+        physical_address: core.PhysicalAddress,
+        arch: *ArchPageTable,
+
+        /// Create a new page table at the given physical range.
+        ///
+        /// The range must have alignment of `page_table_alignment` and size greater than or equal to
+        /// `page_table_size`.
+        pub fn create(physical_range: core.PhysicalRange) callconv(core.inline_in_non_debug) PageTable {
+            checkSupport(current.paging, "createPageTable", fn (core.PhysicalRange) *ArchPageTable);
+
+            return .{
+                .physical_address = physical_range.address,
+                .arch = current.paging.createPageTable(physical_range),
+            };
+        }
+
+        pub fn load(page_table: PageTable) callconv(core.inline_in_non_debug) void {
+            checkSupport(current.paging, "loadPageTable", fn (core.PhysicalAddress) void);
+
+            current.paging.loadPageTable(page_table.physical_address);
+        }
+
+        pub const page_table_alignment: core.Size = current.paging.page_table_alignment;
+        pub const page_table_size: core.Size = current.paging.page_table_size;
+
+        const ArchPageTable = current.paging.ArchPageTable;
+    };
 };
 
 /// Functionality that is used during kernel init only.

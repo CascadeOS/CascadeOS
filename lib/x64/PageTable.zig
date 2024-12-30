@@ -476,7 +476,7 @@ pub const PageTable = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf([number_of_entries]Entry));
+        core.testing.expectSize(@This(), small_page_size.value);
     }
 };
 
