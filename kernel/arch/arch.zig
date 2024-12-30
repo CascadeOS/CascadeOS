@@ -73,6 +73,41 @@ pub const paging = struct {
 
         const ArchPageTable = current.paging.ArchPageTable;
     };
+
+    pub const init = struct {
+        /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual range address and size are aligned to the standard page size
+        ///  - the physical range address and size are aligned to the standard page size
+        ///  - the virtual range size is equal to the physical range size
+        ///  - the virtual range is not already mapped
+        ///
+        /// This function:
+        ///  - uses all page sizes available to the architecture
+        ///  - does not flush the TLB
+        ///  - does not rollback on error
+        pub fn mapToPhysicalRangeAllPageSizes(
+            page_table: paging.PageTable,
+            virtual_range: core.VirtualRange,
+            physical_range: core.PhysicalRange,
+            map_type: kernel.vmm.MapType,
+        ) callconv(core.inline_in_non_debug) !void {
+            checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
+                *paging.PageTable.ArchPageTable,
+                core.VirtualRange,
+                core.PhysicalRange,
+                kernel.vmm.MapType,
+            ) anyerror!void);
+
+            return current.paging.init.mapToPhysicalRangeAllPageSizes(
+                page_table.arch,
+                virtual_range,
+                physical_range,
+                map_type,
+            );
+        }
+    };
 };
 
 /// Functionality that is used during kernel init only.

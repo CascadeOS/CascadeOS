@@ -18,6 +18,8 @@ pub const largest_higher_half_virtual_address: core.VirtualAddress = core.Virtua
 
 pub const ArchPageTable = struct {};
 
+pub const init = struct {};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

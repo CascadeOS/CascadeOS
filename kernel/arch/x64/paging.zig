@@ -33,6 +33,9 @@ pub const ArchPageTable = PageTable;
 pub const page_table_alignment = PageTable.small_page_size;
 pub const page_table_size = PageTable.small_page_size;
 
+pub const init = struct {
+};
+
 const small_page_size = PageTable.small_page_size;
 const medium_page_size = PageTable.medium_page_size;
 const large_page_size = PageTable.large_page_size;
