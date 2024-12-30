@@ -20,24 +20,29 @@ SECTIONS
     /* This must be kept in sync with `kernel.config.kernel_base_address` */
     . = 0xffffffff80000000;
 
+    __text_start = .;
+
     .text : {
-        __text_start = .;
         *(.text .text.*)
-        __text_end = .;
     } :text
 
+     __text_end = .;
+
     . = ALIGN(CONSTANT(MAXPAGESIZE));
+
+     __rodata_start = .;
 
     .rodata : {
-        __rodata_start = .;
         *(.rodata .rodata.*)
-        __rodata_end = .;
     } :rodata
+
+    __rodata_end = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
+    __data_start = .;
+
     .data : {
-        __data_start = .;
         *(.data .data.*)
     } :data
 
@@ -45,10 +50,13 @@ SECTIONS
         *(COMMON)
         *(.bss .bss.*)
         *(.sbss .sbss.*)
-        __data_end = .;
     } :data
 
-    .dynamic : { *(.dynamic) } :data :dynamic
+    .dynamic : {
+        *(.dynamic)
+    } :data :dynamic
+
+    __data_end = .;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
