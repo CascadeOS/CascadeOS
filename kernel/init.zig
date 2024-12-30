@@ -53,6 +53,9 @@ pub fn initStage1() !void {
         else => .{},
     });
 
+    log.debug("configuring global system features", .{});
+    try kernel.arch.init.configureGlobalSystemFeatures();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 

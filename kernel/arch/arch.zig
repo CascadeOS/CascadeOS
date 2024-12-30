@@ -196,6 +196,13 @@ pub const init = struct {
         return current.init.captureSystemInformation(options);
     }
 
+    /// Configure any global system features.
+    pub fn configureGlobalSystemFeatures() callconv(core.inline_in_non_debug) !void {
+        checkSupport(current.init, "configureGlobalSystemFeatures", fn () anyerror!void);
+
+        return current.init.configureGlobalSystemFeatures();
+    }
+
     /// Configure any per-executor system features.
     ///
     /// **WARNING**: The `executor` provided must be the current executor.
