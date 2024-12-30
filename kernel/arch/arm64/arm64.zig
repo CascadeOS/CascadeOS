@@ -7,6 +7,8 @@ pub const PerExecutor = @import("PerExecutor.zig");
 
 pub const init = @import("init.zig");
 
+pub const spinLoopHint = lib_arm64.instructions.isb;
+
 const std = @import("std");
 const kernel = @import("kernel");
 const lib_arm64 = @import("arm64");

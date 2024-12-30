@@ -16,6 +16,8 @@ pub inline fn getCurrentExecutor() *kernel.Executor {
     return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
 }
 
+pub const spinLoopHint = lib_x64.instructions.pause;
+
 const std = @import("std");
 const kernel = @import("kernel");
 const lib_x64 = @import("x64");
