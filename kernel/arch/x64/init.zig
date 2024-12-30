@@ -119,6 +119,14 @@ pub fn captureSystemInformation(
     x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
 }
 
+/// Configure any global system features.
+pub fn configureGlobalSystemFeatures() !void {
+    if (x64.info.have_pic) {
+        log.debug("disabling pic", .{});
+        lib_x64.disablePic();
+    }
+}
+
 /// Configure any per-executor system features.
 ///
 /// **WARNING**: The `executor` provided must be the current executor.
