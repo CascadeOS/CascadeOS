@@ -60,8 +60,6 @@ pub const MemoryMap = struct {
         };
 
         pub fn print(entry: Entry, writer: std.io.AnyWriter, indent: usize) !void {
-            try writer.writeAll("Entry - ");
-
             try writer.writeAll(@tagName(entry.type));
 
             try writer.writeAll(" - ");
