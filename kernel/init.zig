@@ -38,6 +38,12 @@ pub fn initStage1() !void {
     log.debug("initializing physical memory", .{});
     try kernel.pmm.init.initializePhysicalMemory();
 
+    log.debug("building core page table", .{});
+    try kernel.vmm.init.buildCorePageTable();
+
+    log.debug("loading core page table", .{});
+    kernel.vmm.globals.core_page_table.load();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 

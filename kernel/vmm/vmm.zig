@@ -50,6 +50,13 @@ pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalA
 }
 
 pub const globals = struct {
+    /// The core page table.
+    ///
+    /// All other page tables start as a copy of this one.
+    ///
+    /// Initialized during `init.buildCorePageTable`.
+    pub var core_page_table: kernel.arch.paging.PageTable = undefined;
+
     /// The virtual base address that the kernel was loaded at.
     ///
     /// Initialized during `init.buildMemoryLayout`.
@@ -120,6 +127,44 @@ pub const init = struct {
 
         for (globals.regions.constSlice()) |region| {
             init_log.debug("\t{}", .{region});
+        }
+    }
+
+    pub fn buildCorePageTable() !void {
+        globals.core_page_table = kernel.arch.paging.PageTable.create(
+            try kernel.pmm.allocatePage(),
+        );
+
+        for (globals.regions.constSlice()) |region| {
+            const physical_range = switch (region.type) {
+                .direct_map,
+                .non_cached_direct_map,
+                => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
+                .executable_section,
+                .readonly_section,
+                .sdf_section,
+                .writeable_section,
+                => core.PhysicalRange.fromAddr(
+                    core.PhysicalAddress.fromInt(
+                        region.range.address.value - globals.physical_to_virtual_offset.value,
+                    ),
+                    region.range.size,
+                ),
+            };
+
+            const map_type: MapType = switch (region.type) {
+                .executable_section => .{ .executable = true, .global = true },
+                .readonly_section, .sdf_section => .{ .global = true },
+                .writeable_section, .direct_map => .{ .writeable = true, .global = true },
+                .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
+            };
+
+            try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                globals.core_page_table,
+                region.range,
+                physical_range,
+                map_type,
+            );
         }
     }
 
