@@ -15,6 +15,8 @@ pub fn initStage1() !void {
 
     kernel.arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
+    kernel.vmm.init.logMemoryLayout();
+
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
