@@ -105,6 +105,14 @@ pub fn directMapAddress() ?core.VirtualAddress {
     };
 }
 
+/// Returns the ACPI RSDP address provided by the bootloader, if any.
+pub fn rsdp() ?core.Address {
+    return switch (bootloader_api) {
+        .limine => limine.rsdp(),
+        .unknown => null,
+    };
+}
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.

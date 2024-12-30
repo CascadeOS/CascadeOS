@@ -79,6 +79,13 @@ pub fn directMapAddress() ?core.VirtualAddress {
     return resp.offset;
 }
 
+pub fn rsdp() ?core.Address {
+    const resp = requests.rsdp.response orelse
+        return null;
+
+    return resp.address(limine_revison);
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     kernel.boot.bootloader_api = .limine;
 
@@ -102,6 +109,7 @@ pub fn exportRequests() void {
     @export(&requests.kernel_address, .{ .name = "limine_kernel_address_request" });
     @export(&requests.memmap, .{ .name = "limine_memmap_request" });
     @export(&requests.hhdm, .{ .name = "limine_hhdm_request" });
+    @export(&requests.rsdp, .{ .name = "limine_rsdp_request" });
 }
 
 const requests = struct {
@@ -110,6 +118,7 @@ const requests = struct {
     var kernel_address: limine.ExecutableAddress = .{};
     var memmap: limine.Memmap = .{};
     var hhdm: limine.HHDM = .{};
+    var rsdp: limine.RSDP = .{};
 };
 
 const std = @import("std");
