@@ -117,6 +117,24 @@ pub const paging = struct {
     };
 };
 
+pub const io = struct {
+    pub const Port = current.io.Port;
+
+    pub const PortError = error{UnsupportedPortSize};
+
+    pub fn readPort(comptime T: type, port: Port) callconv(core.inline_in_non_debug) PortError!T {
+        checkSupport(current.io, "readPort", fn (type, Port) PortError!T);
+
+        return current.io.readPort(T, port);
+    }
+
+    pub fn writePort(comptime T: type, port: Port, value: T) callconv(core.inline_in_non_debug) PortError!void {
+        checkSupport(current.io, "writePort", fn (type, Port, T) PortError!void);
+
+        return current.io.writePort(T, port, value);
+    }
+};
+
 /// Functionality that is used during kernel init only.
 pub const init = struct {
     /// Attempt to set up some form of early output.
