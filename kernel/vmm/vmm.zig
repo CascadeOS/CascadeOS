@@ -116,14 +116,13 @@ pub const init = struct {
     pub fn logMemoryLayout() void {
         if (!init_log.levelEnabled(.debug)) return;
 
-        const base_address = kernel.boot.kernelBaseAddress() orelse unreachable;
-        init_log.debug("limine base address:       {}", .{base_address});
-
-        init_log.debug("virtual base address:       {}", .{globals.virtual_base_address});
-        init_log.debug("virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
-        init_log.debug("physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
-
         init_log.debug("kernel memory layout:", .{});
+
+        init_log.debug("  virtual base address:       {}", .{globals.virtual_base_address});
+        init_log.debug("  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
+        init_log.debug("  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
+
+        init_log.debug("  regions:", .{});
 
         for (globals.regions.constSlice()) |region| {
             init_log.debug("\t{}", .{region});
@@ -158,6 +157,8 @@ pub const init = struct {
                 .writeable_section, .direct_map => .{ .writeable = true, .global = true },
                 .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
             };
+
+            init_log.debug("mapping '{s}' into the core page table", .{@tagName(region.type)});
 
             try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
                 globals.core_page_table,
