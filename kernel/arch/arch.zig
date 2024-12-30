@@ -175,6 +175,27 @@ pub const init = struct {
         return current.init.captureEarlySystemInformation();
     }
 
+    pub const CaptureSystemInformationOptions: type =
+        if (@hasDecl(current.init, "CaptureSystemInformationOptions"))
+        current.init.CaptureSystemInformationOptions
+    else
+        struct {};
+
+    /// Capture any system information that needs mmio.
+    ///
+    /// For example, on x64 this should capture APIC and ACPI information.
+    pub fn captureSystemInformation(
+        options: CaptureSystemInformationOptions,
+    ) callconv(core.inline_in_non_debug) !void {
+        checkSupport(
+            current.init,
+            "captureSystemInformation",
+            fn (CaptureSystemInformationOptions) anyerror!void,
+        );
+
+        return current.init.captureSystemInformation(options);
+    }
+
     /// Configure any per-executor system features.
     ///
     /// **WARNING**: The `executor` provided must be the current executor.

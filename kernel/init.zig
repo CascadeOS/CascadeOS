@@ -47,6 +47,12 @@ pub fn initStage1() !void {
     log.debug("initializing ACPI tables", .{});
     try kernel.acpi.init.initializeACPITables();
 
+    log.debug("capturing system information", .{});
+    try kernel.arch.init.captureSystemInformation(switch (kernel.config.cascade_target) {
+        .x64 => .{ .x2apic_enabled = kernel.boot.x2apicEnabled() },
+        else => .{},
+    });
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
