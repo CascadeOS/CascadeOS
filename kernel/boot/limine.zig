@@ -86,6 +86,15 @@ pub fn rsdp() ?core.Address {
     return resp.address(limine_revison);
 }
 
+pub fn x2apicEnabled() bool {
+    std.debug.assert(kernel.config.cascade_target == .x64);
+
+    const resp: *const limine.MP.x86_64 = requests.smp.response orelse
+        return false;
+
+    return resp.flags.x2apic_enabled;
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     kernel.boot.bootloader_api = .limine;
 
@@ -110,6 +119,7 @@ pub fn exportRequests() void {
     @export(&requests.memmap, .{ .name = "limine_memmap_request" });
     @export(&requests.hhdm, .{ .name = "limine_hhdm_request" });
     @export(&requests.rsdp, .{ .name = "limine_rsdp_request" });
+    @export(&requests.smp, .{ .name = "limine_smp_request" });
 }
 
 const requests = struct {
@@ -119,6 +129,7 @@ const requests = struct {
     var memmap: limine.Memmap = .{};
     var hhdm: limine.HHDM = .{};
     var rsdp: limine.RSDP = .{};
+    var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
 };
 
 const std = @import("std");

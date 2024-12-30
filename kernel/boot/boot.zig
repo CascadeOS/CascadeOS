@@ -113,6 +113,17 @@ pub fn rsdp() ?core.Address {
     };
 }
 
+pub fn x2apicEnabled() bool {
+    if (kernel.config.cascade_target != .x64) {
+        @compileError("x2apicEnabled can only be called on x64");
+    }
+
+    return switch (bootloader_api) {
+        .limine => limine.x2apicEnabled(),
+        .unknown => return false,
+    };
+}
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.
