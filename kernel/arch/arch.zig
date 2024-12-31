@@ -238,6 +238,19 @@ pub const init = struct {
 
         current.init.configurePerExecutorSystemFeatures(executor);
     }
+
+    /// Register any architectural time sources.
+    ///
+    /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
+    pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.init,
+            "registerArchitecturalTimeSources",
+            fn (*kernel.time.init.CandidateTimeSources) void,
+        );
+
+        current.init.registerArchitecturalTimeSources(candidate_time_sources);
+    }
 };
 
 const current = switch (cascade_target) {

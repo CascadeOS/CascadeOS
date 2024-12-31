@@ -56,6 +56,9 @@ pub fn initStage1() !void {
     log.debug("configuring global system features", .{});
     try kernel.arch.init.configureGlobalSystemFeatures();
 
+    log.debug("initializing time", .{});
+    try kernel.time.init.initializeTime();
+
     core.panic("NOT IMPLEMENTED", null);
 }
 
