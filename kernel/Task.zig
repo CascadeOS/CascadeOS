@@ -21,6 +21,8 @@ preemption_disable_count: std.atomic.Value(u32) = .init(0),
 /// When we re-enable preemption, we check this flag.
 preemption_skipped: std.atomic.Value(bool) = .init(false),
 
+is_idle_task: bool,
+
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();
 }

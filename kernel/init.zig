@@ -22,6 +22,7 @@ pub fn initStage1() !void {
         .state = undefined, // set after declaration of `bootstrap_executor`
         .stack = undefined, // never used
         .interrupt_disable_count = .init(1), // interrupts are enabled by default
+        .is_idle_task = false,
     };
 
     var bootstrap_executor: kernel.Executor = .{
