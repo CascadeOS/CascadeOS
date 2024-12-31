@@ -33,6 +33,20 @@ pub const State = union(enum) {
     dropped,
 };
 
+pub fn getCurrent() *Task {
+    kernel.arch.interrupts.disableInterrupts();
+
+    const executor = kernel.arch.rawGetCurrentExecutor();
+    const current_task = executor.current_task;
+    std.debug.assert(current_task.state.running == executor);
+
+    if (current_task.interrupt_disable_count.load(.monotonic) == 0) {
+        kernel.arch.interrupts.enableInterrupts();
+    }
+
+    return current_task;
+}
+
 pub fn incrementInterruptDisable(self: *Task) void {
     kernel.arch.interrupts.disableInterrupts();
 
