@@ -6,6 +6,7 @@ pub const info = @import("info.zig");
 pub const interrupts = @import("interrupts.zig");
 pub const paging = @import("paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
+pub const tsc = @import("tsc.zig");
 
 pub const init = @import("init.zig");
 

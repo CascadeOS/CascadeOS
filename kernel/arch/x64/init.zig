@@ -160,6 +160,15 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
     }
 }
 
+/// Register any architectural time sources.
+///
+/// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
+pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    x64.tsc.init.registerTimeSource(candidate_time_sources);
+
+    // TODO: PIT, KVMCLOCK, HPET, APIC
+}
+
 const globals = struct {
     var opt_early_output_serial_port: ?SerialPort = null;
 };
