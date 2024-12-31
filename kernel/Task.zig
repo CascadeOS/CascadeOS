@@ -21,6 +21,9 @@ preemption_disable_count: std.atomic.Value(u32) = .init(0),
 /// When we re-enable preemption, we check this flag.
 preemption_skipped: std.atomic.Value(bool) = .init(false),
 
+/// Used for various linked lists.
+next_task_node: containers.SingleNode = .empty,
+
 is_idle_task: bool,
 
 pub fn name(self: *const Task) []const u8 {
@@ -123,6 +126,11 @@ fn __helpZls() void {
     Task.print(undefined, @as(std.fs.File.Writer, undefined), 0);
 }
 
+pub inline fn fromNode(node: *containers.SingleNode) *Task {
+    return @fieldParentPtr("next_task_node", node);
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const containers = @import("containers");
