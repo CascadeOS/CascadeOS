@@ -52,6 +52,17 @@ fn logFn(
             kernel.arch.init.writeToEarlyOutput(level_and_scope);
             kernel.arch.init.early_output_writer.print(user_fmt, args) catch {};
         },
+        .init_log => {
+            @branchHint(.unlikely);
+
+            const current_task = kernel.Task.getCurrent();
+
+            kernel.arch.init.early_output_lock.lock(current_task);
+            defer kernel.arch.init.early_output_lock.unlock(current_task);
+
+            kernel.arch.init.writeToEarlyOutput(level_and_scope);
+            kernel.arch.init.early_output_writer.print(user_fmt, args) catch {};
+        },
     }
 }
 
@@ -64,10 +75,15 @@ pub const LogMode = enum(u8) {
     /// Raises a panic.
     panic,
 
-    /// Log will print using the early output.
+    /// Log will print using the early output, does not lock the early output.
     ///
     /// Does not support multiple executors.
     single_executor_init_log,
+
+    /// Log will print using the early output, locks the early output.
+    ///
+    /// Supports multiple executors.
+    init_log,
 };
 
 pub fn setLogMode(mode: LogMode) void {
