@@ -117,6 +117,7 @@ pub const init = struct {
 
         try registerKernelSections();
         try registerDirectMaps();
+        try registerHeaps();
 
         sortKernelMemoryRegions();
     }
@@ -143,37 +144,23 @@ pub const init = struct {
         );
 
         for (globals.regions.constSlice()) |region| {
-            const physical_range = switch (region.type) {
-                .direct_map,
-                .non_cached_direct_map,
-                => core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, region.range.size),
-                .executable_section,
-                .readonly_section,
-                .sdf_section,
-                .writeable_section,
-                => core.PhysicalRange.fromAddr(
-                    core.PhysicalAddress.fromInt(
-                        region.range.address.value - globals.physical_to_virtual_offset.value,
-                    ),
-                    region.range.size,
-                ),
-            };
-
-            const map_type: MapType = switch (region.type) {
-                .executable_section => .{ .executable = true, .global = true },
-                .readonly_section, .sdf_section => .{ .global = true },
-                .writeable_section, .direct_map => .{ .writeable = true, .global = true },
-                .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
-            };
-
             init_log.debug("mapping '{s}' into the core page table", .{@tagName(region.type)});
 
-            try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                globals.core_page_table,
-                region.range,
-                physical_range,
-                map_type,
-            );
+            const map_info = region.mapInfo();
+
+            switch (map_info) {
+                .top_level => try kernel.arch.paging.init.fillTopLevel(
+                    globals.core_page_table,
+                    region.range,
+                    .{ .global = true, .writeable = true },
+                ),
+                .full => |full| try kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                    globals.core_page_table,
+                    region.range,
+                    full.physical_range,
+                    full.map_type,
+                ),
+            }
         }
     }
 
@@ -294,6 +281,19 @@ pub const init = struct {
         try globals.regions.append(.{
             .range = non_cached_direct_map,
             .type = .non_cached_direct_map,
+        });
+    }
+
+    fn registerHeaps() !void {
+        const kernel_heap_range = findFreeRange(
+            kernel.arch.paging.size_of_top_level_entry,
+            kernel.arch.paging.size_of_top_level_entry,
+        ) orelse
+            core.panic("no space in kernel memory layout for the kernel heap", null);
+
+        try globals.regions.append(.{
+            .range = kernel_heap_range,
+            .type = .kernel_heap,
         });
     }
 

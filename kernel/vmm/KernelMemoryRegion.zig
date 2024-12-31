@@ -14,7 +14,50 @@ pub const Type = enum {
 
     direct_map,
     non_cached_direct_map,
+
+    kernel_heap,
 };
+
+pub const RegionMapInfo = union(enum) {
+    top_level,
+    full: struct { physical_range: core.PhysicalRange, map_type: MapType },
+};
+
+pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
+    switch (self.type) {
+        .direct_map, .non_cached_direct_map => {
+            const physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, self.range.size);
+
+            const map_type: MapType = switch (self.type) {
+                .direct_map => .{ .writeable = true, .global = true },
+                .non_cached_direct_map => .{ .writeable = true, .global = true, .no_cache = true },
+                else => unreachable,
+            };
+
+            return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
+        },
+
+        .writeable_section, .readonly_section, .executable_section, .sdf_section => {
+            const physical_range = core.PhysicalRange.fromAddr(
+                core.PhysicalAddress.fromInt(
+                    self.range.address.value - kernel.vmm.globals.physical_to_virtual_offset.value,
+                ),
+                self.range.size,
+            );
+
+            const map_type: MapType = switch (self.type) {
+                .executable_section => .{ .executable = true, .global = true },
+                .readonly_section, .sdf_section => .{ .global = true },
+                .writeable_section => .{ .writeable = true, .global = true },
+                else => unreachable,
+            };
+
+            return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
+        },
+
+        .kernel_heap => return .{ .top_level = {} },
+    }
+}
 
 pub fn print(region: KernelMemoryRegion, writer: std.io.AnyWriter, indent: usize) !void {
     try writer.writeAll("Region{ ");
@@ -45,3 +88,4 @@ fn __helpZls() void {
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
+const MapType = kernel.vmm.MapType;
