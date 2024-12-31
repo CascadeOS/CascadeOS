@@ -9,6 +9,7 @@ pub const debug = @import("debug.zig");
 pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
+pub const ResourceArena = @import("ResourceArena.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
