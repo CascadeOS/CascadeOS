@@ -1215,4 +1215,4 @@ const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 const core = @import("core");
 const kernel = @import("kernel");
-const log = kernel.log.scoped(.resource_arena);
+const log = kernel.debug.log.scoped(.resource_arena);

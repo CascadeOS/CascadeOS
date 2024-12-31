@@ -266,11 +266,11 @@ pub const init = struct {
         globals.sdt_header = sdt_header;
     }
 
-    const init_log = kernel.log.scoped(.init_acpi);
+    const init_log = kernel.debug.log.scoped(.init_acpi);
 };
 
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const acpi = @import("acpi");
-const log = kernel.log.scoped(.acpi);
+const log = kernel.debug.log.scoped(.acpi);

@@ -345,7 +345,7 @@ pub const init = struct {
         }
     }
 
-    const init_log = kernel.log.scoped(.init_vmm);
+    const init_log = kernel.debug.log.scoped(.init_vmm);
 };
 
 const std = @import("std");

@@ -303,7 +303,7 @@ pub const init = struct {
         );
     }
 
-    const init_log = kernel.log.scoped(.init_x64_paging);
+    const init_log = kernel.debug.log.scoped(.init_x64_paging);
 };
 
 const small_page_size = PageTable.small_page_size;

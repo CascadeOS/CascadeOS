@@ -271,5 +271,5 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
-const log = kernel.log.scoped(.init_x64);
+const log = kernel.debug.log.scoped(.init_x64);
 const acpi = @import("acpi");

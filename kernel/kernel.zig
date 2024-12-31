@@ -5,9 +5,8 @@ pub const acpi = @import("acpi.zig");
 pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
 pub const config = @import("config.zig");
-pub const debug = @import("debug.zig");
+pub const debug = @import("debug/debug.zig");
 pub const Executor = @import("Executor.zig");
-pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
 pub const ResourceArena = @import("ResourceArena.zig");
 pub const Stack = @import("Stack.zig");
@@ -34,8 +33,8 @@ comptime {
 }
 
 pub const std_options: std.Options = .{
-    .log_level = log.log_level,
-    .logFn = log.stdLogImpl,
+    .log_level = debug.log.log_level,
+    .logFn = debug.log.stdLogImpl,
 };
 
 const std = @import("std");

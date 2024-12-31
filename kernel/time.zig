@@ -244,7 +244,7 @@ pub const init = struct {
         return opt_best_candidate;
     }
 
-    const init_log = kernel.log.scoped(.init_time);
+    const init_log = kernel.debug.log.scoped(.init_time);
 };
 
 const std = @import("std");

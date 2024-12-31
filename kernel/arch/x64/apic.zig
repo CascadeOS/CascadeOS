@@ -32,7 +32,7 @@ pub const init = struct {
         }
     }
 
-    const init_log = kernel.log.scoped(.init_x64_apic);
+    const init_log = kernel.debug.log.scoped(.init_x64_apic);
 };
 
 const std = @import("std");

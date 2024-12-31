@@ -155,11 +155,11 @@ pub const init = struct {
         globals.unavailable_memory = unavailable_memory;
     }
 
-    const init_log = kernel.log.scoped(.init_pmm);
+    const init_log = kernel.debug.log.scoped(.init_pmm);
 };
 
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const containers = @import("containers");
-const log = kernel.log.scoped(.pmm);
+const log = kernel.debug.log.scoped(.pmm);

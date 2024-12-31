@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const log = @import("log.zig");
+
 /// Entry point from the Zig language upon a panic.
 fn zigPanic(
     msg: []const u8,

@@ -97,7 +97,7 @@ pub const init = struct {
         return x64.info.cpu_id.invariant_tsc or x64.info.cpu_id.hypervisor == .tcg;
     }
 
-    const init_log = kernel.log.scoped(.init_x64_tsc);
+    const init_log = kernel.debug.log.scoped(.init_x64_tsc);
 };
 
 const std = @import("std");
