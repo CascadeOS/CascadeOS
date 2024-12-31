@@ -21,6 +21,7 @@ pub fn initStage1() !void {
         ._name = kernel.Task.Name.fromSlice("bootstrap init") catch unreachable,
         .state = undefined, // set after declaration of `bootstrap_executor`
         .stack = undefined, // never used
+        .interrupt_disable_count = .init(1), // interrupts are enabled by default
     };
 
     var bootstrap_executor: kernel.Executor = .{
