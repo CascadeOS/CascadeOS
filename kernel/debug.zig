@@ -15,7 +15,7 @@ fn zigPanic(
 
     switch (globals.panic_mode) {
         .no_op => {},
-        .simple_init_panic => simpleInitPanic(msg, error_return_trace, return_address),
+        .single_executor_init_panic => singleExecutorInitPanic(msg, error_return_trace, return_address),
     }
 
     kernel.acpi.tryShutdown() catch {};
@@ -25,7 +25,7 @@ fn zigPanic(
     }
 }
 
-fn simpleInitPanic(
+fn singleExecutorInitPanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
@@ -439,7 +439,7 @@ pub const PanicMode = enum(u8) {
     /// Panic will print using the early output.
     ///
     /// Does not support multiple executors.
-    simple_init_panic,
+    single_executor_init_panic,
 };
 
 pub fn setPanicMode(mode: PanicMode) void {

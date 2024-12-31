@@ -10,7 +10,7 @@ pub fn initStage1() !void {
 
     kernel.arch.init.setupEarlyOutput();
 
-    kernel.debug.setPanicMode(.simple_init_panic);
+    kernel.debug.setPanicMode(.single_executor_init_panic);
     kernel.log.setLogMode(.simple_init_log);
 
     kernel.arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
