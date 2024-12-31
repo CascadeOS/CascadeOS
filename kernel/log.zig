@@ -47,7 +47,7 @@ fn logFn(
             @branchHint(.cold);
             core.panic("log in panic mode", null);
         },
-        .simple_init_log => {
+        .single_executor_init_log => {
             @branchHint(.unlikely);
             kernel.arch.init.writeToEarlyOutput(level_and_scope);
             kernel.arch.init.early_output_writer.print(user_fmt, args) catch {};
@@ -67,7 +67,7 @@ pub const LogMode = enum(u8) {
     /// Log will print using the early output.
     ///
     /// Does not support multiple executors.
-    simple_init_log,
+    single_executor_init_log,
 };
 
 pub fn setLogMode(mode: LogMode) void {
