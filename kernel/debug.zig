@@ -16,6 +16,7 @@ fn zigPanic(
     switch (globals.panic_mode) {
         .no_op => kernel.arch.interrupts.disableInterruptsAndHalt(),
         .single_executor_init_panic => singleExecutorInitPanic(msg, error_return_trace, return_address),
+        .init_panic => initPanic(msg, error_return_trace, return_address),
     }
     unreachable;
 }
@@ -29,6 +30,87 @@ fn singleExecutorInitPanic(
         var nested_panic_count: usize = 0;
         var attempted_shutdown: bool = false;
     };
+
+    defer kernel.arch.interrupts.disableInterruptsAndHalt();
+
+    const nested_panic_count = static.nested_panic_count;
+    static.nested_panic_count += 1;
+
+    switch (nested_panic_count) {
+        // on first panic attempt to print the full panic message
+        0 => formatting.printPanic(
+            kernel.arch.init.early_output_writer,
+            msg,
+            error_return_trace,
+            return_address,
+        ) catch {},
+        // on second panic print a shorter message using only `writeToEarlyOutput`
+        1 => kernel.arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n"),
+        // don't trigger any more panics
+        else => {},
+    }
+
+    if (!static.attempted_shutdown) {
+        static.attempted_shutdown = true;
+        static.nested_panic_count = 0; // we want to print any panics that occur during shutdown
+        kernel.acpi.tryShutdown() catch {};
+    }
+}
+
+fn initPanic(
+    msg: []const u8,
+    error_return_trace: ?*const std.builtin.StackTrace,
+    return_address: usize,
+) noreturn {
+    const static = struct {
+        var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
+        var nested_panic_count: usize = 0;
+        var attempted_shutdown: bool = false;
+    };
+
+    defer kernel.arch.interrupts.disableInterruptsAndHalt();
+
+    const executor = kernel.arch.rawGetCurrentExecutor();
+    executor.panicked.store(true, .release);
+
+    if (static.panicking_executor.cmpxchgStrong(
+        .none,
+        executor.id,
+        .acq_rel,
+        .acquire,
+    )) |panicking_executor_id| {
+        if (panicking_executor_id != executor.id) return; // another executor is panicking
+    }
+
+    guarantee_exclusive_early_output_access: {
+        kernel.arch.init.early_output_lock.poison();
+
+        // FIXME: is it possible to livelock in this loop?
+
+        while (true) {
+            const current_holder_id = kernel.arch.init.early_output_lock.holding_executor.load(.acquire);
+
+            if (current_holder_id == executor.id) {
+                // we already have the lock
+                break :guarantee_exclusive_early_output_access;
+            }
+
+            if (current_holder_id == .none) {
+                // the lock is poisoned, so we can just subsume control of the lock
+                break :guarantee_exclusive_early_output_access;
+            }
+
+            const current_holder = kernel.getExecutor(current_holder_id);
+
+            if (current_holder.panicked.load(.acquire)) {
+                // the current holder has panicked but as we have set `static.panicking_executor`
+                // we can just subsume control of the lock
+                break :guarantee_exclusive_early_output_access;
+            }
+
+            kernel.arch.spinLoopHint();
+        }
+    }
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
@@ -444,10 +526,15 @@ pub const PanicMode = enum(u8) {
     /// Panic does nothing other than halt the executor.
     no_op,
 
-    /// Panic will print using the early output.
+    /// Panic will print using the early output with no locking.
     ///
     /// Does not support multiple executors.
     single_executor_init_panic,
+
+    /// Panic will print using the early output, poisons the early output lock.
+    ///
+    /// Supports multiple executors.
+    init_panic,
 };
 
 pub fn setPanicMode(mode: PanicMode) void {

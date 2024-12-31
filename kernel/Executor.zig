@@ -7,6 +7,8 @@ id: Id,
 
 current_task: *kernel.Task,
 
+panicked: std.atomic.Value(bool) = .init(false),
+
 arch: kernel.arch.PerExecutor,
 
 pub const Id = enum(u32) {

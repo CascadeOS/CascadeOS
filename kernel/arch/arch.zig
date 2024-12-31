@@ -167,6 +167,11 @@ pub const init = struct {
         current.init.writeToEarlyOutput(bytes);
     }
 
+    /// Lock used to ensure that early output is not written concurrently.
+    ///
+    /// Not used very early in the boot process when only the bootstrap executor is running.
+    pub var early_output_lock: kernel.sync.TicketSpinLock = .{};
+
     pub const early_output_writer = std.io.Writer(
         void,
         error{},

@@ -71,6 +71,7 @@ pub fn initStage1() !void {
     log.debug("initializing time", .{});
     try kernel.time.init.initializeTime();
 
+    kernel.debug.setPanicMode(.init_panic);
     core.panic("NOT IMPLEMENTED", null);
 }
 
