@@ -10,6 +10,7 @@ pub const Executor = @import("Executor.zig");
 pub const log = @import("log.zig");
 pub const pmm = @import("pmm.zig");
 pub const Stack = @import("Stack.zig");
+pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 pub const vmm = @import("vmm/vmm.zig");
