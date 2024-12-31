@@ -14,27 +14,26 @@ fn zigPanic(
     const return_address = return_address_opt orelse @returnAddress();
 
     switch (globals.panic_mode) {
-        .no_op => {},
+        .no_op => kernel.arch.interrupts.disableInterruptsAndHalt(),
         .single_executor_init_panic => singleExecutorInitPanic(msg, error_return_trace, return_address),
     }
-
-    kernel.acpi.tryShutdown() catch {};
-
-    while (true) {
-        kernel.arch.interrupts.disableInterruptsAndHalt();
-    }
+    unreachable;
 }
 
 fn singleExecutorInitPanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
-) void {
+) noreturn {
     const static = struct {
-        var nested_panic_count: std.atomic.Value(usize) = .init(0);
+        var nested_panic_count: usize = 0;
+        var attempted_shutdown: bool = false;
     };
 
-    switch (static.nested_panic_count.fetchAdd(1, .acq_rel)) {
+    const nested_panic_count = static.nested_panic_count;
+    static.nested_panic_count += 1;
+
+    switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
         0 => formatting.printPanic(
             kernel.arch.init.early_output_writer,
@@ -47,6 +46,15 @@ fn singleExecutorInitPanic(
         // don't trigger any more panics
         else => {},
     }
+
+    if (!static.attempted_shutdown) {
+        static.attempted_shutdown = true;
+        static.nested_panic_count = 0; // we want to print any panics that occur during shutdown
+        kernel.acpi.tryShutdown() catch {};
+    }
+
+    kernel.arch.interrupts.disableInterruptsAndHalt();
+    unreachable;
 }
 
 const formatting = struct {
