@@ -49,6 +49,14 @@ pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalA
     return .{ .value = self.value -% globals.physical_to_virtual_offset.value };
 }
 
+pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) ?core.VirtualRange {
+    for (globals.regions.constSlice()) |region| {
+        if (region.type == range_type) return region.range;
+    }
+
+    return null;
+}
+
 pub const globals = struct {
     /// The core page table.
     ///
