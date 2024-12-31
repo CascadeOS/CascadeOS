@@ -32,6 +32,8 @@ pub fn initStage1() !void {
 
     bootstrap_init_task.state = .{ .running = &bootstrap_executor };
 
+    kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
+
     log.debug("loading bootstrap executor", .{});
     kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
     kernel.arch.init.loadExecutor(&bootstrap_executor);

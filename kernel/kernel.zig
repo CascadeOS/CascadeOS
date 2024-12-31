@@ -15,6 +15,15 @@ pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 pub const vmm = @import("vmm/vmm.zig");
 
+pub var executors: []Executor = &.{};
+
+/// Get the executor with the given id.
+///
+/// It is the caller's responsibility to ensure the executor exists.
+pub inline fn getExecutor(id: Executor.Id) *Executor {
+    return &executors[@intFromEnum(id)];
+}
+
 pub const init = @import("init.zig");
 
 pub const Panic = debug.Panic;
