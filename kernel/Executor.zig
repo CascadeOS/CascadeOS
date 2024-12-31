@@ -5,6 +5,8 @@ const Executor = @This();
 
 id: Id,
 
+current_task: *kernel.Task,
+
 arch: kernel.arch.PerExecutor,
 
 pub const Id = enum(u32) {

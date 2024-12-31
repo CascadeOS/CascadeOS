@@ -15,6 +15,8 @@ pub const kernel_stack_size = kernel.arch.paging.standard_page_size.multiplyScal
 
 pub const maximum_number_of_time_sources = 8;
 
+pub const task_name_length = 32;
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

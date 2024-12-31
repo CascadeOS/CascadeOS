@@ -17,10 +17,19 @@ pub fn initStage1() !void {
 
     kernel.vmm.init.logMemoryLayout();
 
+    var bootstrap_init_task: kernel.Task = .{
+        ._name = kernel.Task.Name.fromSlice("bootstrap init") catch unreachable,
+        .state = undefined, // set after declaration of `bootstrap_executor`
+        .stack = undefined, // never used
+    };
+
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
+        .current_task = &bootstrap_init_task,
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
     };
+
+    bootstrap_init_task.state = .{ .running = &bootstrap_executor };
 
     log.debug("loading bootstrap executor", .{});
     kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
