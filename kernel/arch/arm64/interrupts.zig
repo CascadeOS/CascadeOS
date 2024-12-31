@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const disableInterruptsAndHalt = lib_arm64.instructions.disableInterruptsAndHalt;
+pub const enableInterrupts = lib_arm64.instructions.enableInterrupts;
+pub const areEnabled = lib_arm64.instructions.interruptsEnabled;
 pub const disableInterrupts = lib_arm64.instructions.disableInterrupts;
 
 const std = @import("std");

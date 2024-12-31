@@ -28,6 +28,20 @@ pub const interrupts = struct {
     /// This is a decl not a wrapper function like the other functions so that it can be inlined into a naked function.
     pub const disableInterruptsAndHalt = current.interrupts.disableInterruptsAndHalt;
 
+    /// Returns true if interrupts are enabled.
+    pub fn areEnabled() callconv(core.inline_in_non_debug) bool {
+        // `checkSupport` intentionally not called - mandatory function
+
+        return current.interrupts.areEnabled();
+    }
+
+    /// Enable interrupts.
+    pub fn enableInterrupts() callconv(core.inline_in_non_debug) void {
+        // `checkSupport` intentionally not called - mandatory function
+
+        current.interrupts.enableInterrupts();
+    }
+
     /// Disable interrupts.
     pub fn disableInterrupts() callconv(core.inline_in_non_debug) void {
         // `checkSupport` intentionally not called - mandatory function

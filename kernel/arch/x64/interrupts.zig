@@ -3,6 +3,8 @@
 
 pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
 pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
+pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
+pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
     switch (interrupt_frame.vector_number.interrupt) {
