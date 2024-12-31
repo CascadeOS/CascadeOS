@@ -53,7 +53,7 @@ fn singleExecutorInitPanic(
     if (!static.attempted_shutdown) {
         static.attempted_shutdown = true;
         static.nested_panic_count = 0; // we want to print any panics that occur during shutdown
-        kernel.acpi.tryShutdown() catch {};
+        kernel.acpi.tryShutdown() catch {}; // TODO: build option to disable
     }
 }
 
@@ -132,7 +132,7 @@ fn initPanic(
     if (!static.attempted_shutdown) {
         static.attempted_shutdown = true;
         static.nested_panic_count = 0; // we want to print any panics that occur during shutdown
-        kernel.acpi.tryShutdown() catch {};
+        kernel.acpi.tryShutdown() catch {}; // TODO: build option to disable
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
