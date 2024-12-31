@@ -126,6 +126,8 @@ pub const ArchPageTable = PageTable;
 pub const page_table_alignment = PageTable.small_page_size;
 pub const page_table_size = PageTable.small_page_size;
 
+pub const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
+
 pub const init = struct {
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
