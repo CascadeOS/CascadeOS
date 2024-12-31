@@ -99,6 +99,35 @@ pub const paging = struct {
     };
 
     pub const init = struct {
+        /// This function fills in the top level of the page table for the given range.
+        ///
+        /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+        ///
+        /// This function:
+        ///  - does not flush the TLB
+        ///  - does not rollback on error
+        pub fn fillTopLevel(
+            page_table: paging.PageTable,
+            range: core.VirtualRange,
+            map_type: kernel.vmm.MapType,
+        ) callconv(core.inline_in_non_debug) !void {
+            checkSupport(
+                current.paging.init,
+                "fillTopLevel",
+                fn (
+                    *paging.PageTable.ArchPageTable,
+                    core.VirtualRange,
+                    kernel.vmm.MapType,
+                ) anyerror!void,
+            );
+
+            return current.paging.init.fillTopLevel(
+                page_table.arch,
+                range,
+                map_type,
+            );
+        }
+
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
         ///
         /// Caller must ensure:

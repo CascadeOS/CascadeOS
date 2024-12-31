@@ -129,6 +129,29 @@ pub const page_table_size = PageTable.small_page_size;
 pub const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
 
 pub const init = struct {
+    /// This function fills in the top level of the page table for the given range.
+    ///
+    /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+    ///
+    /// This function:
+    ///  - does not flush the TLB
+    ///  - does not rollback on error
+    pub fn fillTopLevel(
+        page_table: *PageTable,
+        range: core.VirtualRange,
+        map_type: kernel.vmm.MapType,
+    ) !void {
+        std.debug.assert(range.size.equal(size_of_top_level_entry));
+        std.debug.assert(range.address.isAligned(size_of_top_level_entry));
+
+        const raw_entry = &page_table.entries[PageTable.p4Index(range.address)];
+
+        const entry: PageTable.Entry = .{ .raw = raw_entry.* };
+        if (entry.present.read()) core.panic("already mapped", null);
+
+        _ = try ensureNextTable(raw_entry, map_type);
+    }
+
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
     ///
     /// Caller must ensure:
