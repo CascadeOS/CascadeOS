@@ -81,10 +81,99 @@ pub fn initStage1() !noreturn {
     log.debug("initializing kernel stacks", .{});
     try kernel.Stack.init.initializeStacks();
 
+    log.debug("initializing kernel executors", .{});
+    kernel.executors = try createExecutors();
+
+    // ensure the bootstrap executor is re-loaded before we change panic and log modes
+    kernel.arch.init.loadExecutor(kernel.getExecutor(.bootstrap));
+
     kernel.debug.setPanicMode(.init_panic);
     kernel.debug.log.setLogMode(.init_log);
 
+    log.debug("booting non-bootstrap executors", .{});
+    try bootNonBootstrapExecutors();
+
+    try initStage2(kernel.Task.getCurrent());
+}
+
+/// Stage 2 of kernel initialization.
+///
+/// This function is executed by all executors, including the bootstrap executor.
+///
+/// All executors are using the bootloader provided stack.
+fn initStage2(current_task: *kernel.Task) !noreturn {
+    kernel.vmm.globals.core_page_table.load();
+    const executor = current_task.state.running;
+    kernel.arch.init.loadExecutor(executor);
+
     core.panic("NOT IMPLEMENTED", null);
+}
+
+fn createExecutors() ![]kernel.Executor {
+    const current_task = kernel.Task.getCurrent();
+
+    var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
+
+    log.debug("initializing {} executors", .{descriptors.count()});
+
+    // TODO: these init tasks need to be freed after initialization
+    const init_tasks = try kernel.heap.allocator.alloc(kernel.Task, descriptors.count());
+    const executors = try kernel.heap.allocator.alloc(kernel.Executor, descriptors.count());
+
+    var i: u32 = 0;
+    while (descriptors.next()) |desc| : (i += 1) {
+        if (i == 0) std.debug.assert(desc.processorId() == 0);
+
+        const executor = &executors[i];
+        const id: kernel.Executor.Id = @enumFromInt(i);
+
+        const init_task = &init_tasks[i];
+
+        init_task.* = .{
+            ._name = .{}, // set below
+            .state = .{ .running = executor },
+            .stack = try kernel.Stack.createStack(current_task),
+            .is_idle_task = false,
+            .interrupt_disable_count = .init(1), // interrupts start disabled
+        };
+
+        try init_task._name.writer().print("init {}", .{i});
+
+        executor.* = .{
+            .id = id,
+            .arch = undefined, // set by `arch.init.prepareExecutor`
+            .current_task = init_task,
+        };
+
+        kernel.arch.init.prepareExecutor(executor, current_task);
+    }
+
+    return executors;
+}
+
+fn bootNonBootstrapExecutors() !void {
+    var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
+    var i: u32 = 0;
+
+    while (descriptors.next()) |desc| : (i += 1) {
+        const executor = &kernel.executors[i];
+        if (executor.id == .bootstrap) continue;
+
+        desc.boot(
+            executor.current_task,
+            struct {
+                fn bootFn(user_data: *anyopaque) noreturn {
+                    initStage2(@as(*kernel.Task, @ptrCast(@alignCast(user_data)))) catch |err| {
+                        core.panicFmt(
+                            "unhandled error: {s}",
+                            .{@errorName(err)},
+                            @errorReturnTrace(),
+                        );
+                    };
+                }
+            }.bootFn,
+        );
+    }
 }
 
 const std = @import("std");
