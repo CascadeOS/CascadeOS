@@ -288,6 +288,19 @@ pub const init = struct {
         current.init.prepareBootstrapExecutor(bootstrap_executor);
     }
 
+    /// Prepares the provided `Executor` for use.
+    ///
+    /// **WARNING**: This function will panic if the cpu cannot be prepared.
+    pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.init,
+            "prepareExecutor",
+            fn (*kernel.Executor, *kernel.Task) void,
+        );
+
+        current.init.prepareExecutor(executor, current_task);
+    }
+
     /// Load the provided `Executor` as the current executor.
     pub fn loadExecutor(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
         checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);

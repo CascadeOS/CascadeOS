@@ -29,24 +29,43 @@ pub fn prepareBootstrapExecutor(
         var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
-    bootstrap_executor.arch = .{
-        .double_fault_stack = .fromRange(
-            .fromSlice(u8, &static.bootstrap_double_fault_stack),
-            .fromSlice(u8, &static.bootstrap_double_fault_stack),
-        ),
-        .non_maskable_interrupt_stack = .fromRange(
-            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
-            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
-        ),
+    prepareExecutorShared(bootstrap_executor, .fromRange(
+        .fromSlice(u8, &static.bootstrap_double_fault_stack),
+        .fromSlice(u8, &static.bootstrap_double_fault_stack),
+    ), .fromRange(
+        .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
+        .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
+    ));
+}
+
+/// Prepares the provided `Executor` for use.
+///
+/// **WARNING**: This function will panic if the cpu cannot be prepared.
+pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) void {
+    prepareExecutorShared(
+        executor,
+        kernel.Stack.createStack(current_task) catch core.panic("failed to allocate double fault stack", null),
+        kernel.Stack.createStack(current_task) catch core.panic("failed to allocate NMI stack", null),
+    );
+}
+
+fn prepareExecutorShared(
+    executor: *kernel.Executor,
+    double_fault_stack: kernel.Stack,
+    non_maskable_interrupt_stack: kernel.Stack,
+) void {
+    executor.arch = .{
+        .double_fault_stack = double_fault_stack,
+        .non_maskable_interrupt_stack = non_maskable_interrupt_stack,
     };
 
-    bootstrap_executor.arch.tss.setInterruptStack(
+    executor.arch.tss.setInterruptStack(
         @intFromEnum(x64.interrupts.InterruptStackSelector.double_fault),
-        bootstrap_executor.arch.double_fault_stack.stack_pointer,
+        executor.arch.double_fault_stack.stack_pointer,
     );
-    bootstrap_executor.arch.tss.setInterruptStack(
+    executor.arch.tss.setInterruptStack(
         @intFromEnum(x64.interrupts.InterruptStackSelector.non_maskable_interrupt),
-        bootstrap_executor.arch.non_maskable_interrupt_stack.stack_pointer,
+        executor.arch.non_maskable_interrupt_stack.stack_pointer,
     );
 }
 
