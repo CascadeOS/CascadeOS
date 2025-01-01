@@ -129,6 +129,24 @@ pub fn mapToPhysicalRange(
     // TODO: flush caches
 }
 
+/// Unmaps a virtual range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+pub fn unmapRange(
+    page_table: kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    free_backing_pages: bool,
+) void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    kernel.arch.paging.unmapRange(page_table, virtual_range, free_backing_pages);
+
+    // TODO: flush caches
+}
+
 pub const globals = struct {
     /// The core page table.
     ///
