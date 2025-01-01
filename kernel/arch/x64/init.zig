@@ -184,8 +184,9 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
     x64.tsc.init.registerTimeSource(candidate_time_sources);
+    x64.hpet.init.registerTimeSource(candidate_time_sources);
 
-    // TODO: PIT, KVMCLOCK, HPET, APIC
+    // TODO: PIT, KVMCLOCK, APIC
 }
 
 const globals = struct {
