@@ -686,6 +686,8 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
 
             source.callRelease(current_task, allocation_to_release);
 
+            log.debug("{s}: released {} to source {s}", .{ arena.name(), allocation_to_release, source.arena.name() });
+
             return;
         }
     }
