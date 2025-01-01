@@ -66,9 +66,6 @@ pub const paging = struct {
     /// The largest possible higher half virtual address.
     pub const largest_higher_half_virtual_address: core.VirtualAddress = current.paging.largest_higher_half_virtual_address;
 
-    /// The total size of the virtual address space that one entry in the top level of the page table covers.
-    pub const size_of_top_level_entry: core.Size = current.paging.size_of_top_level_entry;
-
     pub const PageTable = struct {
         physical_address: core.PhysicalAddress,
         arch: *ArchPageTable,
@@ -99,6 +96,13 @@ pub const paging = struct {
     };
 
     pub const init = struct {
+        /// The total size of the virtual address space that one entry in the top level of the page table covers.
+        pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
+            checkSupport(current.paging.init, "sizeOfTopLevelEntry", fn () core.Size);
+
+            return current.paging.init.sizeOfTopLevelEntry();
+        }
+
         /// This function fills in the top level of the page table for the given range.
         ///
         /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.

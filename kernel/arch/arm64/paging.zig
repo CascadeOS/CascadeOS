@@ -16,8 +16,6 @@ pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
 /// The largest possible higher half virtual address.
 pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
 
-pub const size_of_top_level_entry = core.Size.from(0x8000000000, .byte); // TODO: check this
-
 pub const ArchPageTable = struct {};
 
 pub const init = struct {};

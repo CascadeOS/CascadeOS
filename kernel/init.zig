@@ -6,7 +6,7 @@
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !void {
     // we need the direct map to be available as early as possible
-    try kernel.vmm.init.buildMemoryLayout();
+    try kernel.vmm.init.determineOffsets();
 
     kernel.arch.init.setupEarlyOutput();
 
@@ -15,7 +15,7 @@ pub fn initStage1() !void {
 
     kernel.arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
-    kernel.vmm.init.logMemoryLayout();
+    kernel.vmm.init.logOffsets();
 
     var bootstrap_init_task: kernel.Task = .{
         ._name = kernel.Task.Name.fromSlice("bootstrap init") catch unreachable,
@@ -47,6 +47,9 @@ pub fn initStage1() !void {
 
     log.debug("configuring per-executor system features", .{});
     kernel.arch.init.configurePerExecutorSystemFeatures(&bootstrap_executor);
+
+    log.debug("building memory layout", .{});
+    try kernel.vmm.init.buildMemoryLayout();
 
     log.debug("initializing physical memory", .{});
     try kernel.pmm.init.initializePhysicalMemory();

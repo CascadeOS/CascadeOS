@@ -126,9 +126,13 @@ pub const ArchPageTable = PageTable;
 pub const page_table_alignment = PageTable.small_page_size;
 pub const page_table_size = PageTable.small_page_size;
 
-pub const size_of_top_level_entry = core.Size.from(0x8000000000, .byte);
-
 pub const init = struct {
+    /// The total size of the virtual address space that one entry in the top level of the page table covers.
+    pub inline fn sizeOfTopLevelEntry() core.Size {
+        // TODO: Only correct for 4 level paging
+        return core.Size.from(0x8000000000, .byte);
+    }
+
     /// This function fills in the top level of the page table for the given range.
     ///
     /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
@@ -141,6 +145,7 @@ pub const init = struct {
         range: core.VirtualRange,
         map_type: kernel.vmm.MapType,
     ) !void {
+        const size_of_top_level_entry = sizeOfTopLevelEntry();
         std.debug.assert(range.size.equal(size_of_top_level_entry));
         std.debug.assert(range.address.isAligned(size_of_top_level_entry));
 
