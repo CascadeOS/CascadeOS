@@ -42,8 +42,6 @@ pub fn mapToPhysicalRange(
     const last_virtual_address = virtual_range.last();
     var current_physical_address = physical_range.address;
 
-    var kib_page_mappings: usize = 0;
-
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         mapTo4KiB(
             page_table,
@@ -56,13 +54,9 @@ pub fn mapToPhysicalRange(
             return err;
         };
 
-        kib_page_mappings += 1;
-
         current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
         current_physical_address.moveForwardInPlace(PageTable.small_page_size);
     }
-
-    log.debug("mapToPhysicalRange - satified using {} 4KiB pages", .{kib_page_mappings});
 }
 
 /// Unmaps the `virtual_range`.
