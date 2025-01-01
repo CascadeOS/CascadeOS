@@ -57,6 +57,13 @@ pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) ?core.VirtualRange {
     return null;
 }
 
+pub const MapError = error{
+    AlreadyMapped,
+
+    /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+    MappingNotValid,
+} || kernel.pmm.AllocatePageError;
+
 pub const globals = struct {
     /// The core page table.
     ///

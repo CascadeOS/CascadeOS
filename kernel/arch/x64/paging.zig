@@ -18,6 +18,117 @@ pub fn loadPageTable(physical_address: core.PhysicalAddress) void {
     lib_x64.registers.Cr3.writeAddress(physical_address);
 }
 
+/// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+///
+/// Caller must ensure:
+///  - the virtual range address and size are aligned to the standard page size
+///  - the physical range address and size are aligned to the standard page size
+///  - the virtual range size is equal to the physical range size
+///  - the virtual range is not already mapped
+///
+/// This function:
+///  - uses only the standard page size for the architecture
+///  - does not flush the TLB
+///  - on error is not required roll back any modifications to the page tables
+pub fn mapToPhysicalRange(
+    page_table: *PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: kernel.vmm.MapType,
+) kernel.vmm.MapError!void {
+    log.debug("mapToPhysicalRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+
+    var current_virtual_address = virtual_range.address;
+    const last_virtual_address = virtual_range.last();
+    var current_physical_address = physical_range.address;
+
+    var kib_page_mappings: usize = 0;
+
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+        mapTo4KiB(
+            page_table,
+            current_virtual_address,
+            current_physical_address,
+            map_type,
+        ) catch |err| {
+            // TODO: roll back any modifications to the page tables
+            log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
+            return err;
+        };
+
+        kib_page_mappings += 1;
+
+        current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
+        current_physical_address.moveForwardInPlace(PageTable.small_page_size);
+    }
+
+    log.debug("mapToPhysicalRange - satified using {} 4KiB pages", .{kib_page_mappings});
+}
+
+/// Maps a 4 KiB page.
+fn mapTo4KiB(
+    level4_table: *PageTable,
+    virtual_address: core.VirtualAddress,
+    physical_address: core.PhysicalAddress,
+    map_type: MapType,
+) kernel.vmm.MapError!void {
+    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+    std.debug.assert(physical_address.isAligned(PageTable.small_page_size));
+
+    const level4_index = PageTable.p4Index(virtual_address);
+
+    const level3_table, const created_level3_table = try ensureNextTable(
+        &level4_table.entries[level4_index],
+        map_type,
+    );
+    errdefer {
+        if (created_level3_table) {
+            var level4_entry: PageTable.Entry = .{ .raw = level4_table.entries[level4_index] };
+            const address = level4_entry.getAddress4kib();
+            level4_table.entries[level4_index] = 0;
+            kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
+        }
+    }
+
+    const level3_index = PageTable.p3Index(virtual_address);
+
+    const level2_table, const created_level2_table = try ensureNextTable(
+        &level3_table.entries[level3_index],
+        map_type,
+    );
+    errdefer {
+        if (created_level2_table) {
+            var level3_entry: PageTable.Entry = .{ .raw = level3_table.entries[level3_index] };
+            const address = level3_entry.getAddress4kib();
+            level3_table.entries[level3_index] = 0;
+            kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
+        }
+    }
+
+    const level2_index = PageTable.p2Index(virtual_address);
+
+    const level1_table, const created_level1_table = try ensureNextTable(
+        &level2_table.entries[level2_index],
+        map_type,
+    );
+    errdefer {
+        if (created_level1_table) {
+            var level2_entry: PageTable.Entry = .{ .raw = level2_table.entries[level2_index] };
+            const address = level2_entry.getAddress4kib();
+            level2_table.entries[level2_index] = 0;
+            kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
+        }
+    }
+
+    try setEntry(
+        level1_table,
+        PageTable.p1Index(virtual_address),
+        physical_address,
+        map_type,
+        .small,
+    );
+}
+
 fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
     if (map_type.user) entry.user_accessible.write(true);
 
@@ -322,3 +433,4 @@ const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
 const PageTable = lib_x64.PageTable;
 const MapType = kernel.vmm.MapType;
+const log = kernel.debug.log.scoped(.x64_paging);

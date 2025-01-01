@@ -95,6 +95,39 @@ pub const paging = struct {
         const ArchPageTable = current.paging.ArchPageTable;
     };
 
+    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the physical range address and size are aligned to the standard page size
+    ///  - the virtual range size is equal to the physical range size
+    ///  - the virtual range is not already mapped
+    ///
+    /// This function:
+    ///  - uses only the standard page size for the architecture
+    ///  - does not flush the TLB
+    ///  - on error is not required roll back any modifications to the page tables
+    pub fn mapToPhysicalRange(
+        page_table: PageTable,
+        virtual_range: core.VirtualRange,
+        physical_range: core.PhysicalRange,
+        map_type: kernel.vmm.MapType,
+    ) callconv(core.inline_in_non_debug) kernel.vmm.MapError!void {
+        checkSupport(current.paging, "mapToPhysicalRange", fn (
+            *paging.PageTable.ArchPageTable,
+            core.VirtualRange,
+            core.PhysicalRange,
+            kernel.vmm.MapType,
+        ) kernel.vmm.MapError!void);
+
+        return current.paging.mapToPhysicalRange(
+            page_table.arch,
+            virtual_range,
+            physical_range,
+            map_type,
+        );
+    }
+
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
