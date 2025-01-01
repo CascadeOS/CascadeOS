@@ -78,6 +78,9 @@ pub fn initStage1() !void {
     log.debug("initializing kernel heap", .{});
     try kernel.heap.init.initializeHeap();
 
+    log.debug("initializing kernel stacks", .{});
+    try kernel.Stack.init.initializeStacks();
+
     kernel.debug.setPanicMode(.init_panic);
     kernel.debug.log.setLogMode(.init_log);
 
