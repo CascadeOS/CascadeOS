@@ -64,6 +64,48 @@ pub const MapError = error{
     MappingNotValid,
 } || kernel.pmm.AllocatePageError;
 
+/// Maps a virtual range using the standard page size.
+///
+/// Physical pages are allocated for each page in the virtual range.
+pub fn mapRange(
+    page_table: kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    map_type: MapType,
+) MapError!void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_range = core.VirtualRange.fromAddr(
+        virtual_range.address,
+        kernel.arch.paging.standard_page_size,
+    );
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
+            unmapRange(page_table, current_virtual_range, true);
+            current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
+        }
+    }
+
+    while (current_virtual_range.address.lessThanOrEqual(last_virtual_address)) {
+        const physical_range = try kernel.pmm.allocatePage();
+        errdefer kernel.pmm.deallocatePage(physical_range);
+
+        try mapToPhysicalRange(
+            page_table,
+            current_virtual_range,
+            physical_range,
+            map_type,
+        );
+
+        current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+
+    // TODO: flush caches
+}
+
 /// Maps a virtual address range to a physical range using the standard page size.
 pub fn mapToPhysicalRange(
     page_table: kernel.arch.paging.PageTable,
