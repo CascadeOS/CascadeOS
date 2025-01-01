@@ -64,6 +64,29 @@ pub const MapError = error{
     MappingNotValid,
 } || kernel.pmm.AllocatePageError;
 
+/// Maps a virtual address range to a physical range using the standard page size.
+pub fn mapToPhysicalRange(
+    page_table: kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: MapType,
+) MapError!void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.equal(physical_range.size));
+
+    try kernel.arch.paging.mapToPhysicalRange(
+        page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+    );
+
+    // TODO: flush caches
+}
+
 pub const globals = struct {
     /// The core page table.
     ///
