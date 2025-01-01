@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Create a new page table at the given physical range.
 ///
@@ -501,7 +501,7 @@ pub const init = struct {
         );
     }
 
-    const init_log = kernel.debug.log.scoped(.init_x64_paging);
+    const init_log = kernel.debug.log.scoped(.init_paging);
 };
 
 const small_page_size = PageTable.small_page_size;
@@ -515,4 +515,4 @@ const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
 const PageTable = lib_x64.PageTable;
 const MapType = kernel.vmm.MapType;
-const log = kernel.debug.log.scoped(.x64_paging);
+const log = kernel.debug.log.scoped(.paging);

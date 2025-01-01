@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 const globals = struct {
     /// The duration of a tick in femptoseconds.
@@ -97,7 +97,7 @@ pub const init = struct {
         return x64.info.cpu_id.invariant_tsc or x64.info.cpu_id.hypervisor == .tcg;
     }
 
-    const init_log = kernel.debug.log.scoped(.init_x64_tsc);
+    const init_log = kernel.debug.log.scoped(.init_tsc);
 };
 
 const std = @import("std");

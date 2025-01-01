@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Attempt to set up some form of early output.
 pub fn setupEarlyOutput() void {
@@ -290,5 +290,5 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
-const log = kernel.debug.log.scoped(.init_x64);
+const log = kernel.debug.log.scoped(.init);
 const acpi = @import("acpi");

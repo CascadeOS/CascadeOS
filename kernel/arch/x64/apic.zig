@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 const globals = struct {
     /// Initialized in `init.captureApicInformation`.
@@ -32,7 +32,7 @@ pub const init = struct {
         }
     }
 
-    const init_log = kernel.debug.log.scoped(.init_x64_apic);
+    const init_log = kernel.debug.log.scoped(.init_apic);
 };
 
 const std = @import("std");
