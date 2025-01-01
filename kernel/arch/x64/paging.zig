@@ -65,6 +65,32 @@ pub fn mapToPhysicalRange(
     log.debug("mapToPhysicalRange - satified using {} 4KiB pages", .{kib_page_mappings});
 }
 
+/// Unmaps the `virtual_range`.
+///
+/// Caller must ensure:
+///  - the virtual range address and size are aligned to the standard page size
+///  - the virtual range is mapped
+///  - the virtual range is mapped using only the standard page size for the architecture
+///
+/// This function:
+///  - does not flush the TLB
+pub fn unmapRange(
+    page_table: *PageTable,
+    virtual_range: core.VirtualRange,
+    free_backing_pages: bool,
+) void {
+    log.debug("unmapRange - {}", .{virtual_range});
+
+    var current_virtual_address = virtual_range.address;
+    const last_virtual_address = virtual_range.last();
+
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+        unmap4KiB(page_table, current_virtual_address, free_backing_pages);
+
+        current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
+    }
+}
+
 /// Maps a 4 KiB page.
 fn mapTo4KiB(
     level4_table: *PageTable,
@@ -127,6 +153,68 @@ fn mapTo4KiB(
         map_type,
         .small,
     );
+}
+
+/// Unmaps a 4 KiB page.
+///
+/// Panics if the page is not present or is a huge page.
+fn unmap4KiB(
+    level4_table: *PageTable,
+    virtual_address: core.VirtualAddress,
+    free_backing_pages: bool,
+) void {
+    // TODO: tables are not freed when empty, could be done on defer
+    //       but this would break things like the kernel heap
+
+    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+
+    const level4_index = PageTable.p4Index(virtual_address);
+    const level4_entry: PageTable.Entry = .{ .raw = level4_table.entries[level4_index] };
+
+    const level3_table = level4_entry.getNextLevel(
+        kernel.vmm.directMapFromPhysical,
+    ) catch |err| switch (err) {
+        error.NotPresent => core.panic("page table entry is not present", null),
+        error.HugePage => core.panic("page table entry is huge", null),
+    };
+
+    const level3_index = PageTable.p3Index(virtual_address);
+    const level3_entry: PageTable.Entry = .{ .raw = level3_table.entries[level3_index] };
+
+    const level2_table = level3_entry.getNextLevel(
+        kernel.vmm.directMapFromPhysical,
+    ) catch |err| switch (err) {
+        error.NotPresent => core.panic("page table entry is not present", null),
+        error.HugePage => core.panic("page table entry is huge", null),
+    };
+
+    const level2_index = PageTable.p2Index(virtual_address);
+    const level2_entry: PageTable.Entry = .{ .raw = level2_table.entries[level2_index] };
+
+    const level1_table = level2_entry.getNextLevel(
+        kernel.vmm.directMapFromPhysical,
+    ) catch |err| switch (err) {
+        error.NotPresent => core.panic("page table entry is not present", null),
+        error.HugePage => core.panic("page table entry is huge", null),
+    };
+
+    const level1_index = PageTable.p1Index(virtual_address);
+    const level1_entry: PageTable.Entry = .{ .raw = level1_table.entries[level1_index] };
+
+    if (!level1_entry.present.read()) {
+        core.panic("page table entry is not present", null);
+    }
+
+    if (free_backing_pages) {
+        kernel.pmm.deallocatePage(
+            core.PhysicalRange.fromAddr(
+                level1_entry.getAddress4kib(),
+                PageTable.small_page_size,
+            ),
+        );
+    }
+
+    level1_table.entries[level1_index] = 0;
 }
 
 fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {

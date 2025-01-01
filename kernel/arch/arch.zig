@@ -128,6 +128,33 @@ pub const paging = struct {
         );
     }
 
+    /// Unmaps the `virtual_range`.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - the virtual range is mapped
+    ///  - the virtual range is mapped using only the standard page size for the architecture
+    ///
+    /// This function:
+    ///  - does not flush the TLB
+    pub inline fn unmapRange(
+        page_table: PageTable,
+        virtual_range: core.VirtualRange,
+        free_backing_pages: bool,
+    ) void {
+        checkSupport(
+            current.paging,
+            "unmapRange",
+            fn (*paging.PageTable.ArchPageTable, core.VirtualRange, bool) void,
+        );
+
+        current.paging.unmapRange(
+            page_table.arch,
+            virtual_range,
+            free_backing_pages,
+        );
+    }
+
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
