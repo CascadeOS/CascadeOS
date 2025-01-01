@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const apic = @import("apic.zig");
 pub const info = @import("info.zig");
 pub const interrupts = @import("interrupts.zig");
 pub const paging = @import("paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
+pub const scheduling = @import("scheduling.zig");
 pub const tsc = @import("tsc.zig");
 
 pub const init = @import("init.zig");

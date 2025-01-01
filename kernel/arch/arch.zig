@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 //! Defines the interface of the architecture specific code.
 
@@ -225,6 +225,27 @@ pub const paging = struct {
             );
         }
     };
+};
+
+pub const scheduling = struct {
+    pub const CallError = error{StackOverflow};
+
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+    pub fn callOneArgs(
+        opt_old_task: ?*kernel.Task,
+        new_stack: kernel.Stack,
+        arg1: anytype,
+        target_function: *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
+    ) callconv(core.inline_in_non_debug) CallError!void {
+        checkSupport(current.scheduling, "callOneArgs", fn (
+            ?*kernel.Task,
+            kernel.Stack,
+            *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
+            @TypeOf(arg1),
+        ) CallError!void);
+
+        try current.scheduling.callOneArgs(opt_old_task, new_stack, arg1, target_function);
+    }
 };
 
 pub const io = struct {
