@@ -98,6 +98,27 @@ pub fn decrementPreemptionDisable(self: *Task) void {
     }
 }
 
+pub const InterruptRestorer = struct {
+    previous_value: u32,
+
+    pub fn exit(self: InterruptRestorer, current_task: *Task) void {
+        current_task.interrupt_disable_count.store(self.previous_value, .monotonic);
+    }
+};
+
+pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
+    std.debug.assert(!kernel.arch.interrupts.areEnabled());
+
+    const executor = kernel.arch.rawGetCurrentExecutor();
+
+    const current_task = executor.current_task;
+    std.debug.assert(current_task.state.running == executor);
+
+    const previous_value = current_task.interrupt_disable_count.fetchAdd(1, .monotonic);
+
+    return .{ current_task, .{ .previous_value = previous_value } };
+}
+
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
 
 pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {

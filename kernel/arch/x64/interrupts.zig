@@ -7,6 +7,9 @@ pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
 pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 
 export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
+    const current_task, const restorer = kernel.Task.onInterruptEntry();
+    defer restorer.exit(current_task);
+
     switch (interrupt_frame.vector_number.interrupt) {
         else => core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null),
     }
