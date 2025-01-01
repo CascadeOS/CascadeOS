@@ -379,17 +379,25 @@ pub const init = struct {
     }
 
     fn registerHeaps() !void {
-        const size_of_top_level_entry = kernel.arch.paging.init.sizeOfTopLevelEntry();
+        const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
 
         const kernel_heap_range = findFreeRange(
-            size_of_top_level_entry,
-            size_of_top_level_entry,
+            size_of_top_level,
+            size_of_top_level,
         ) orelse
             core.panic("no space in kernel memory layout for the kernel heap", null);
 
         try globals.regions.append(.{
             .range = kernel_heap_range,
             .type = .kernel_heap,
+        });
+
+        const kernel_stacks_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
+            core.panic("no space in kernel memory layout for the kernel stacks", null);
+
+        try globals.regions.append(.{
+            .range = kernel_stacks_range,
+            .type = .kernel_stacks,
         });
     }
 

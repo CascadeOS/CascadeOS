@@ -16,6 +16,7 @@ pub const Type = enum {
     non_cached_direct_map,
 
     kernel_heap,
+    kernel_stacks,
 };
 
 pub const RegionMapInfo = union(enum) {
@@ -55,7 +56,7 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
             return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
         },
 
-        .kernel_heap => return .{ .top_level = {} },
+        .kernel_heap, .kernel_stacks => return .{ .top_level = {} },
     }
 }
 
