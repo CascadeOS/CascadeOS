@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 const Stack = @This();
 
@@ -30,6 +30,8 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
 
 /// Pushes a value onto the stack.
 pub fn push(stack: *Stack, comptime T: type, value: T) error{StackOverflow}!void {
+    comptime std.debug.assert(@sizeOf(T) == @sizeOf(usize)); // other code assumes register sized types
+
     const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
