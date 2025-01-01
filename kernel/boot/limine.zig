@@ -95,6 +95,94 @@ pub fn x2apicEnabled() bool {
     return resp.flags.x2apic_enabled;
 }
 
+pub fn cpuDescriptors() ?boot.CpuDescriptors {
+    const resp = requests.smp.response orelse
+        return null;
+
+    var result: boot.CpuDescriptors = .{
+        .backing = undefined,
+    };
+
+    const descriptor_iterator = std.mem.bytesAsValue(CpuDescriptorIterator, &result.backing);
+
+    descriptor_iterator.* = .{
+        .index = 0,
+        .entries = resp.cpus(),
+    };
+
+    return result;
+}
+
+pub const CpuDescriptorIterator = struct {
+    index: usize,
+    entries: []*limine.MP.Response.MPInfo,
+
+    pub const Descriptor = struct {
+        smp_info: *limine.MP.Response.MPInfo,
+    };
+
+    pub fn count(cpu_descriptors: *const boot.CpuDescriptors) usize {
+        const descriptor_iterator = std.mem.bytesAsValue(CpuDescriptorIterator, &cpu_descriptors.backing);
+        return descriptor_iterator.entries.len;
+    }
+
+    pub fn next(cpu_descriptors: *boot.CpuDescriptors) ?boot.CpuDescriptors.Descriptor {
+        const descriptor_iterator = std.mem.bytesAsValue(CpuDescriptorIterator, &cpu_descriptors.backing);
+
+        if (descriptor_iterator.index >= descriptor_iterator.entries.len) return null;
+
+        const smp_info = descriptor_iterator.entries[descriptor_iterator.index];
+
+        descriptor_iterator.index += 1;
+
+        var result: boot.CpuDescriptors.Descriptor = .{
+            .backing = undefined,
+        };
+
+        const descriptor = std.mem.bytesAsValue(Descriptor, &result.backing);
+
+        descriptor.* = .{ .smp_info = smp_info };
+
+        return result;
+    }
+
+    pub fn bootFn(
+        generic_descriptor: *const boot.CpuDescriptors.Descriptor,
+        user_data: *anyopaque,
+        comptime targetFn: fn (user_data: *anyopaque) noreturn,
+    ) void {
+        const trampolineFn = struct {
+            fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.C) noreturn {
+                targetFn(@ptrFromInt(smp_info.extra_argument));
+            }
+        }.trampolineFn;
+
+        const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
+        const smp_info = descriptor.smp_info;
+
+        @atomicStore(
+            usize,
+            &smp_info.extra_argument,
+            @intFromPtr(user_data),
+            .release,
+        );
+
+        @atomicStore(
+            ?*const fn (*const limine.MP.Response.MPInfo) callconv(.C) noreturn,
+            &smp_info.goto_address,
+            &trampolineFn,
+            .release,
+        );
+    }
+
+    pub fn processorId(
+        generic_descriptor: *const boot.CpuDescriptors.Descriptor,
+    ) u32 {
+        const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
+        return descriptor.smp_info.processor_id;
+    }
+};
+
 fn limineEntryPoint() callconv(.C) noreturn {
     kernel.boot.bootloader_api = .limine;
 

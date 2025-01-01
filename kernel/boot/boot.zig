@@ -124,6 +124,74 @@ pub fn x2apicEnabled() bool {
     };
 }
 
+pub fn cpuDescriptors() ?CpuDescriptors {
+    return switch (bootloader_api) {
+        .limine => limine.cpuDescriptors(),
+        .unknown => null,
+    };
+}
+
+pub const CpuDescriptors = struct {
+    backing: [descriptors_backing_size]u8 align(descriptors_backing_align),
+
+    pub fn count(self: *const CpuDescriptors) usize {
+        return switch (bootloader_api) {
+            .limine => limine.CpuDescriptorIterator.count(self),
+            .unknown => 0,
+        };
+    }
+
+    /// Returns the next cpu descriptor from the iterator, if any remain.
+    pub fn next(self: *CpuDescriptors) ?Descriptor {
+        return switch (bootloader_api) {
+            .limine => limine.CpuDescriptorIterator.next(self),
+            .unknown => null,
+        };
+    }
+
+    pub const Descriptor = struct {
+        backing: [descriptor_backing_size]u8 align(descriptor_backing_align),
+
+        pub fn boot(
+            self: *const Descriptor,
+            user_data: *anyopaque,
+            target_fn: fn (user_data: *anyopaque) noreturn,
+        ) void {
+            switch (bootloader_api) {
+                .limine => limine.CpuDescriptorIterator.bootFn(self, user_data, target_fn),
+                .unknown => unreachable,
+            }
+        }
+
+        pub fn processorId(self: *const Descriptor) u32 {
+            return switch (bootloader_api) {
+                .limine => limine.CpuDescriptorIterator.processorId(self),
+                .unknown => unreachable,
+            };
+        }
+
+        const descriptor_backing_size: usize = @max(
+            @sizeOf(limine.CpuDescriptorIterator.Descriptor),
+            0,
+        );
+
+        const descriptor_backing_align: usize = @max(
+            @alignOf(limine.CpuDescriptorIterator.Descriptor),
+            0,
+        );
+    };
+
+    const descriptors_backing_size: usize = @max(
+        @sizeOf(limine.CpuDescriptorIterator),
+        0,
+    );
+
+    const descriptors_backing_align: usize = @max(
+        @alignOf(limine.CpuDescriptorIterator),
+        0,
+    );
+};
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.
