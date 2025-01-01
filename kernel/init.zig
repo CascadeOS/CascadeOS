@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
@@ -106,7 +106,60 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
     const executor = current_task.state.running;
     kernel.arch.init.loadExecutor(executor);
 
-    core.panic("NOT IMPLEMENTED", null);
+    log.debug("configuring per-executor system features for {}", .{executor.id});
+    kernel.arch.init.configurePerExecutorSystemFeatures(executor);
+
+    try kernel.arch.scheduling.callOneArgs(
+        null,
+        current_task.stack,
+        current_task,
+        initStage3,
+    );
+    core.panic("`init.initStage3` returned", null);
+}
+
+/// Stage 3 of kernel initialization.
+///
+/// This function is executed by all executors, including the bootstrap executor.
+///
+/// All executors are using their init task's stack.
+fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
+    const barrier = struct {
+        var executor_count = std.atomic.Value(usize).init(0);
+
+        fn executorReady() void {
+            _ = executor_count.fetchAdd(1, .release);
+        }
+
+        fn waitForOthers() void {
+            while (executor_count.load(.acquire) != (kernel.executors.len - 1)) {
+                kernel.arch.spinLoopHint();
+            }
+        }
+
+        fn waitForAll() void {
+            while (executor_count.load(.acquire) != kernel.executors.len) {
+                kernel.arch.spinLoopHint();
+            }
+        }
+    };
+    const executor = current_task.state.running;
+
+    if (executor.id == .bootstrap) {
+        barrier.waitForOthers();
+
+        // as others are waiting, we can safely print
+        kernel.arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
+            kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
+        }) catch {};
+
+        core.panic("NOT IMPLEMENTED", null);
+    }
+
+    barrier.executorReady();
+    barrier.waitForAll();
+
+    core.panic("UNREACHABLE", null);
 }
 
 fn createExecutors() ![]kernel.Executor {
