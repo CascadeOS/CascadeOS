@@ -109,7 +109,10 @@ fn limineEntryPoint() callconv(.C) noreturn {
     core.panic("`initStage1` returned", null);
 }
 
-const target_limine_revison: limine.BaseRevison.Revison = .@"3";
+const target_limine_revison: limine.BaseRevison.Revison = switch (kernel.config.cascade_target) {
+    .x64 => .@"3",
+    .arm64 => .@"2", // TODO: UART is not mapped to HHDM from revision 3 onwards
+};
 var limine_revison: limine.BaseRevison.Revison = .@"0";
 
 pub fn exportRequests() void {
