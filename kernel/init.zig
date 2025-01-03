@@ -18,6 +18,7 @@ pub fn initStage1() !noreturn {
     kernel.vmm.init.logOffsets();
 
     var bootstrap_init_task: kernel.Task = .{
+        .id = @enumFromInt(0),
         ._name = kernel.Task.Name.fromSlice("bootstrap init") catch unreachable,
         .state = undefined, // set after declaration of `bootstrap_executor`
         .stack = undefined, // never used
@@ -183,6 +184,7 @@ fn createExecutors() ![]kernel.Executor {
         const init_task = &init_tasks[i];
 
         init_task.* = .{
+            .id = @enumFromInt(i + 1), // `+ 1` as `0` is the bootstrap task
             ._name = .{}, // set below
             .state = .{ .running = executor },
             .stack = try kernel.Stack.createStack(current_task),

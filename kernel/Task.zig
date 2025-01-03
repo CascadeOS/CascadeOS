@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 const Task = @This();
+
+id: Id,
 
 _name: Name,
 
@@ -118,6 +120,12 @@ pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
 
     return .{ current_task, .{ .previous_value = previous_value } };
 }
+
+pub const Id = enum(u64) {
+    none = std.math.maxInt(u64),
+
+    _,
+};
 
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
 
