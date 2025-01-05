@@ -14,7 +14,8 @@ const globals = struct {
 
 pub const init = struct {
     pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
-        if (kernel.acpi.getTable(acpi.HPET, 0) == null) return;
+        const acpi_table = kernel.acpi.getTable(acpi.HPET, 0) orelse return;
+        acpi_table.deinit();
 
         candidate_time_sources.addTimeSource(.{
             .name = "hpet",
@@ -78,15 +79,18 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        const description_table = kernel.acpi.getTable(acpi.HPET, 0) orelse {
+        const acpi_table = kernel.acpi.getTable(acpi.HPET, 0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
             core.panic("hpet table missing", null);
         };
+        defer acpi_table.deinit();
 
-        if (description_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
+        const hpet_table = acpi_table.table;
+
+        if (hpet_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
 
         return kernel.vmm
-            .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(description_table.base_address.address))
+            .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet_table.base_address.address))
             .toPtr([*]volatile u64);
     }
 

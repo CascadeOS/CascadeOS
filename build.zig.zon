@@ -25,6 +25,11 @@
             .url = "git+https://github.com/limine-bootloader/limine.git?ref=v8.6.0-binary#f90be242b6ed9657fac71aa789416f96de3dd3e7",
             .hash = "122054121d23f9f11b12e7d3982d03ed34555c97fa8806d4c91bb9dd52ed0265da3c",
         },
+
+        .uacpi = .{
+            .url = "git+https://github.com/UltraOS/uACPI.git?ref=master#1d636a34152dc82833c89175b702f2c0671f04e3",
+            .hash = "12204bb9b57bf7bfaa6a1c484c5dbbdd3ab70834b8b444697597676bc74ca681fefc",
+        },
     },
 
     .paths = .{""},
