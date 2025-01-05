@@ -23,6 +23,13 @@ pub fn disableInterruptsAndHalt() noreturn {
     }
 }
 
+pub fn invlpg(address: core.VirtualAddress) void {
+    asm volatile ("invlpg (%[address])"
+        :
+        : [address] "{rax}" (address.value),
+    );
+}
+
 pub inline fn readTsc() u64 {
     var low: u32 = undefined;
     var high: u32 = undefined;
