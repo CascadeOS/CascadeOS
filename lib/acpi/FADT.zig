@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 /// The Fixed ACPI Description Table (FADT) defines various fixed hardware ACPI information vital to an ACPI-compatible
 /// OS, such as the base address for the following hardware registers blocks:

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 2022 Diego Barria (https://github.com/xyaman/mibu/blob/main/LICENSE)
 
 pub const style = struct {

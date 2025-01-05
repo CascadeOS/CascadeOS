@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause AND 0BSD
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2015 Jiri Svoboda (https://github.com/HelenOS/helenos)
 // SPDX-FileCopyrightText: 2021 Dmitri Goutnik (https://github.com/dmgk/zig-uuid)
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 // Ensure this is kept in sync with `build.zig.zon` and `README.md`
 const min_zig_version = "0.14.0-dev.2540+f857bf72e";

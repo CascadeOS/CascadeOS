@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2024 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const disableInterruptsAndHalt = lib_arm64.instructions.disableInterruptsAndHalt;
 pub const enableInterrupts = lib_arm64.instructions.enableInterrupts;
