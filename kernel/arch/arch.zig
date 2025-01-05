@@ -155,6 +155,15 @@ pub const paging = struct {
         );
     }
 
+    /// Flushes the cache for the given virtual range.
+    ///
+    /// The `virtual_range` address and size must be aligned to the standard page size.
+    pub fn flushCache(virtual_range: core.VirtualRange, flush_target: kernel.vmm.FlushTarget) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.paging, "flushCache", fn (core.VirtualRange, kernel.vmm.FlushTarget) void);
+
+        current.paging.flushCache(virtual_range, flush_target);
+    }
+
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {

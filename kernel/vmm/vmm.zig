@@ -129,6 +129,11 @@ pub fn mapToPhysicalRange(
     // TODO: flush caches
 }
 
+pub const FlushTarget = enum {
+    kernel,
+    user,
+};
+
 /// Unmaps a virtual range.
 ///
 /// **REQUIREMENTS**:
