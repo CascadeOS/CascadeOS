@@ -34,20 +34,5 @@
                 "order": 1
             }
         },
-        { // Requires extension Native Debug (webfreak.debug)
-            "name": "GDB QEMU remote",
-            "type": "gdb",
-            "request": "attach",
-            "executable": "${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf",
-            "target": ":1234",
-            "remote": true,
-            "cwd": "${workspaceRoot}",
-            "valuesFormatting": "prettyPrinters",
-            "presentation": {
-                "hidden": false,
-                "group": "QEMU remote",
-                "order": 2
-            }
-        }
     ]
 }
