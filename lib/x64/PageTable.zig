@@ -15,7 +15,7 @@ pub const PageTable = extern struct {
     pub const level_3_address_space_size = large_page_size;
     pub const level_4_address_space_size = core.Size.from(512, .gib);
 
-    pub const RawEntry = u64;
+    pub const RawEntry = std.atomic.Value(u64);
 
     pub fn zero(self: *PageTable) void {
         @memset(std.mem.asBytes(self), 0);
@@ -168,7 +168,11 @@ pub const PageTable = extern struct {
         ///  - 4KiB
         no_execute: bitjuggle.Boolean(u64, 63),
 
-        raw: RawEntry,
+        raw: u64,
+
+        pub fn fromRaw(raw_entry: *RawEntry) Entry {
+            return .{ .raw = raw_entry.load(.acquire) };
+        }
 
         pub fn zero(self: *Entry) void {
             self.raw = 0;

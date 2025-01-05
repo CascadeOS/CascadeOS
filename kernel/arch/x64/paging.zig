@@ -103,9 +103,9 @@ fn mapTo4KiB(
     );
     errdefer {
         if (created_level3_table) {
-            var level4_entry: PageTable.Entry = .{ .raw = level4_table.entries[level4_index] };
+            var level4_entry: PageTable.Entry = .fromRaw(&level4_table.entries[level4_index]);
             const address = level4_entry.getAddress4kib();
-            level4_table.entries[level4_index] = 0;
+            level4_table.entries[level4_index].store(0, .release);
             kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
         }
     }
@@ -118,9 +118,9 @@ fn mapTo4KiB(
     );
     errdefer {
         if (created_level2_table) {
-            var level3_entry: PageTable.Entry = .{ .raw = level3_table.entries[level3_index] };
+            var level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
             const address = level3_entry.getAddress4kib();
-            level3_table.entries[level3_index] = 0;
+            level3_table.entries[level3_index].store(0, .release);
             kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
         }
     }
@@ -133,9 +133,9 @@ fn mapTo4KiB(
     );
     errdefer {
         if (created_level1_table) {
-            var level2_entry: PageTable.Entry = .{ .raw = level2_table.entries[level2_index] };
+            var level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
             const address = level2_entry.getAddress4kib();
-            level2_table.entries[level2_index] = 0;
+            level2_table.entries[level2_index].store(0, .release);
             kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
         }
     }
@@ -163,7 +163,7 @@ fn unmap4KiB(
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     const level4_index = PageTable.p4Index(virtual_address);
-    const level4_entry: PageTable.Entry = .{ .raw = level4_table.entries[level4_index] };
+    const level4_entry: PageTable.Entry = .fromRaw(&level4_table.entries[level4_index]);
 
     const level3_table = level4_entry.getNextLevel(
         kernel.vmm.directMapFromPhysical,
@@ -173,7 +173,7 @@ fn unmap4KiB(
     };
 
     const level3_index = PageTable.p3Index(virtual_address);
-    const level3_entry: PageTable.Entry = .{ .raw = level3_table.entries[level3_index] };
+    const level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
 
     const level2_table = level3_entry.getNextLevel(
         kernel.vmm.directMapFromPhysical,
@@ -183,7 +183,7 @@ fn unmap4KiB(
     };
 
     const level2_index = PageTable.p2Index(virtual_address);
-    const level2_entry: PageTable.Entry = .{ .raw = level2_table.entries[level2_index] };
+    const level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
 
     const level1_table = level2_entry.getNextLevel(
         kernel.vmm.directMapFromPhysical,
@@ -193,7 +193,7 @@ fn unmap4KiB(
     };
 
     const level1_index = PageTable.p1Index(virtual_address);
-    const level1_entry: PageTable.Entry = .{ .raw = level1_table.entries[level1_index] };
+    const level1_entry: PageTable.Entry = .fromRaw(&level1_table.entries[level1_index]);
 
     if (!level1_entry.present.read()) {
         core.panic("page table entry is not present", null);
@@ -208,7 +208,7 @@ fn unmap4KiB(
         );
     }
 
-    level1_table.entries[level1_index] = 0;
+    level1_table.entries[level1_index].store(0, .release);
 }
 
 fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
@@ -236,13 +236,13 @@ fn applyParentMapType(map_type: MapType, entry: *PageTable.Entry) void {
 }
 
 fn ensureNextTable(
-    raw_entry: *u64,
+    raw_entry: *PageTable.RawEntry,
     map_type: MapType,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 
     const next_level_physical_address = blk: {
-        var entry: PageTable.Entry = .{ .raw = raw_entry.* };
+        var entry: PageTable.Entry = .fromRaw(raw_entry);
 
         if (entry.present.read()) {
             if (entry.huge.read()) return error.MappingNotValid;
@@ -261,7 +261,7 @@ fn ensureNextTable(
         entry.present.write(true);
         applyParentMapType(map_type, &entry);
 
-        raw_entry.* = entry.raw;
+        raw_entry.store(entry.raw, .release);
 
         break :blk backing_range.address;
     };
@@ -281,7 +281,7 @@ fn setEntry(
     map_type: MapType,
     comptime page_type: enum { small, medium, large },
 ) error{AlreadyMapped}!void {
-    var entry = PageTable.Entry{ .raw = page_table.entries[index] };
+    var entry: PageTable.Entry = .fromRaw(&page_table.entries[index]);
 
     if (entry.present.read()) return error.AlreadyMapped;
 
@@ -301,7 +301,7 @@ fn setEntry(
 
     entry.present.write(true);
 
-    page_table.entries[index] = entry.raw;
+    page_table.entries[index].store(entry.raw, .release);
 }
 
 pub const all_page_sizes: []const core.Size = &.{
@@ -344,7 +344,7 @@ pub const init = struct {
 
         const raw_entry = &page_table.entries[PageTable.p4Index(range.address)];
 
-        const entry: PageTable.Entry = .{ .raw = raw_entry.* };
+        const entry: PageTable.Entry = .fromRaw(raw_entry);
         if (entry.present.read()) core.panic("already mapped", null);
 
         _ = try ensureNextTable(raw_entry, map_type);

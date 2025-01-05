@@ -67,7 +67,8 @@ pub fn disablePic() void {
 }
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    // FIXME: cannot be used due to hitting a `@compileError` for `std.atomic.Value.fence`
+    // std.testing.refAllDeclsRecursive(@This());
 }
 
 const std = @import("std");
