@@ -25,6 +25,10 @@ pub fn deallocate(range: core.VirtualRange, current_task: *kernel.Task) void {
     });
 }
 
+pub fn deallocateBase(base: core.VirtualAddress, current_task: *kernel.Task) void {
+    globals.heap_arena.deallocateBase(current_task, base.value);
+}
+
 pub const allocator = std.mem.Allocator{
     .ptr = undefined,
     .vtable = &.{
