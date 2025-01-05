@@ -151,7 +151,7 @@ fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
 
         // as others are waiting, we can safely print
         kernel.arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
-            kernel.time.wallclock.elapsed(@enumFromInt(0), kernel.time.wallclock.read()),
+            kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
         }) catch {};
 
         core.panic("NOT IMPLEMENTED", null);

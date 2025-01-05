@@ -3,7 +3,11 @@
 
 pub const wallclock = struct {
     /// This is an opaque timer tick, to acquire an actual time value, use `elapsed`.
-    pub const Tick = enum(u64) { _ };
+    pub const Tick = enum(u64) {
+        _,
+
+        pub const zero: Tick = @enumFromInt(0);
+    };
 
     /// Read the wallclock value.
     pub inline fn read() Tick {
