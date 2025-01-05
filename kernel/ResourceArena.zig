@@ -618,7 +618,9 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
     std.debug.assert(tag.kind == .allocated);
 
     if (len) |provided_len| {
-        if (provided_len != tag.len) {
+        const quantum_aligned_provided_len = std.mem.alignForward(usize, provided_len, arena.quantum);
+
+        if (quantum_aligned_provided_len != tag.len) {
             core.panicFmt(
                 "provided len '{}' does not match len '{}' of allocation at '{}'",
                 .{ provided_len, tag.len, base },
