@@ -26,7 +26,7 @@ pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
 /// Returns the physical address of the given virtual address if it is in the direct map.
 pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirectMap}!core.PhysicalAddress {
     if (globals.direct_map.contains(self)) {
-        return .{ .value = self.value -% globals.direct_map.address.value };
+        return .{ .value = self.value - globals.direct_map.address.value };
     }
     return error.AddressNotInDirectMap;
 }
@@ -35,7 +35,7 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirect
 pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDirectMap}!core.PhysicalRange {
     if (globals.direct_map.containsRange(self)) {
         return .{
-            .address = .fromInt(self.address.value -% globals.direct_map.address.value),
+            .address = .fromInt(self.address.value - globals.direct_map.address.value),
             .size = self.size,
         };
     }
@@ -46,7 +46,7 @@ pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDir
 ///
 /// It is the caller's responsibility to ensure that the given virtual address is in the kernel ELF sections.
 pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
-    return .{ .value = self.value -% globals.physical_to_virtual_offset.value };
+    return .{ .value = self.value - globals.physical_to_virtual_offset.value };
 }
 
 pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) ?core.VirtualRange {
