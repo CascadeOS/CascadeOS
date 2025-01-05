@@ -57,6 +57,7 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
         kernel.vmm.globals.core_page_table,
         stack.usable_range,
         .{ .writeable = true, .global = true },
+        .kernel,
     );
 
     return stack;

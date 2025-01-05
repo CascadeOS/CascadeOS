@@ -71,6 +71,7 @@ pub fn mapRange(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
+    flush_target: FlushTarget,
 ) MapError!void {
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
@@ -84,7 +85,12 @@ pub fn mapRange(
     errdefer {
         // Unmap all pages that have been mapped.
         while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
-            unmapRange(page_table, current_virtual_range, true);
+            unmapRange(
+                page_table,
+                current_virtual_range,
+                true,
+                flush_target,
+            );
             current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
         }
     }
@@ -102,8 +108,6 @@ pub fn mapRange(
 
         current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
     }
-
-    // TODO: flush caches
 }
 
 /// Maps a virtual address range to a physical range using the standard page size.
@@ -113,6 +117,8 @@ pub fn mapToPhysicalRange(
     physical_range: core.PhysicalRange,
     map_type: MapType,
 ) MapError!void {
+    log.debug("mapToPhysicalRange - {} {} {}", .{ virtual_range, physical_range, map_type });
+
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
@@ -125,8 +131,6 @@ pub fn mapToPhysicalRange(
         physical_range,
         map_type,
     );
-
-    // TODO: flush caches
 }
 
 pub const FlushTarget = enum {
@@ -143,13 +147,13 @@ pub fn unmapRange(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
+    flush_target: FlushTarget,
 ) void {
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     kernel.arch.paging.unmapRange(page_table, virtual_range, free_backing_pages);
-
-    // TODO: flush caches
+    kernel.arch.paging.flushCache(virtual_range, flush_target);
 }
 
 pub const globals = struct {
@@ -461,3 +465,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
+const log = kernel.debug.log.scoped(.vmm);

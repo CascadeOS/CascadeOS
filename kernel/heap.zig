@@ -88,6 +88,7 @@ fn heapArenaImport(
             .size = .from(allocation.len, .byte),
         },
         .{ .writeable = true, .global = true },
+        .kernel,
     ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
 
     return allocation;
@@ -107,6 +108,7 @@ fn heapArenaRelease(
             .size = .from(allocation.len, .byte),
         },
         true,
+        .kernel,
     );
 
     arena.deallocate(current_task, allocation);
