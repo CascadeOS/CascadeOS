@@ -134,14 +134,12 @@ fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
         kernel.arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
         }) catch {};
-
-        core.panic("NOT IMPLEMENTED", null);
     }
 
     Barrier.executorReady();
     Barrier.waitForAll();
 
-    core.panic("UNREACHABLE", null);
+    core.panic("NOT IMPLEMENTED", null);
 }
 
 fn createExecutors() ![]kernel.Executor {
