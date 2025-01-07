@@ -125,29 +125,10 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
 ///
 /// All executors are using their init task's stack.
 fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
-    const barrier = struct {
-        var executor_count = std.atomic.Value(usize).init(0);
-
-        fn executorReady() void {
-            _ = executor_count.fetchAdd(1, .release);
-        }
-
-        fn waitForOthers() void {
-            while (executor_count.load(.acquire) != (kernel.executors.len - 1)) {
-                kernel.arch.spinLoopHint();
-            }
-        }
-
-        fn waitForAll() void {
-            while (executor_count.load(.acquire) != kernel.executors.len) {
-                kernel.arch.spinLoopHint();
-            }
-        }
-    };
     const executor = current_task.state.running;
 
     if (executor.id == .bootstrap) {
-        barrier.waitForOthers();
+        Barrier.waitForOthers();
 
         // as others are waiting, we can safely print
         kernel.arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
@@ -157,8 +138,8 @@ fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
         core.panic("NOT IMPLEMENTED", null);
     }
 
-    barrier.executorReady();
-    barrier.waitForAll();
+    Barrier.executorReady();
+    Barrier.waitForAll();
 
     core.panic("UNREACHABLE", null);
 }
@@ -230,6 +211,26 @@ fn bootNonBootstrapExecutors() !void {
         );
     }
 }
+
+const Barrier = struct {
+    var executor_count = std.atomic.Value(usize).init(0);
+
+    fn executorReady() void {
+        _ = executor_count.fetchAdd(1, .release);
+    }
+
+    fn waitForOthers() void {
+        while (executor_count.load(.acquire) != (kernel.executors.len - 1)) {
+            kernel.arch.spinLoopHint();
+        }
+    }
+
+    fn waitForAll() void {
+        while (executor_count.load(.acquire) != kernel.executors.len) {
+            kernel.arch.spinLoopHint();
+        }
+    }
+};
 
 const std = @import("std");
 const core = @import("core");
