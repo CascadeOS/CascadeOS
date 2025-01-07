@@ -59,7 +59,7 @@ pub fn registerImageSteps(
             kernel,
             target,
             limine_dep,
-            options.qemu_remote_debug,
+            options.no_kaslr,
         );
 
         const image_build_step = b.addRunArtifact(image_builder_compile_step);

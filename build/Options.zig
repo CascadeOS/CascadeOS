@@ -21,7 +21,7 @@ qemu_monitor: bool,
 
 /// Enable QEMU remote debug.
 ///
-/// If true, disables acceleration.
+/// If true, disables acceleration and KASLR.
 ///
 /// Defaults to false.
 qemu_remote_debug: bool,
@@ -59,6 +59,11 @@ uefi: bool,
 ///
 /// Defaults to 256 for UEFI and 128 otherwise.
 memory: usize,
+
+/// Disable KASLR.
+///
+/// Defaults to false.
+no_kaslr: bool,
 
 /// Force the provided log scopes to be debug in the kernel (comma separated list of scope matchers).
 ///
@@ -168,6 +173,12 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         "How much memory (in MB) to request from QEMU (defaults to 256 for UEFI and 128 otherwise)",
     ) orelse if (uefi) 256 else 128;
 
+    const no_kaslr = b.option(
+        bool,
+        "no_kaslr",
+        "Disable KASLR (defaults to false)",
+    ) orelse if (qemu_remote_debug) true else false;
+
     const kernel_force_debug_log = b.option(
         bool,
         "force_debug_log",
@@ -201,6 +212,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .number_of_cpus = number_of_cpus,
         .uefi = uefi,
         .memory = memory,
+        .no_kaslr = no_kaslr,
         .kernel_force_debug_log = kernel_force_debug_log,
         .kernel_forced_debug_log_scopes = kernel_forced_debug_log_scopes,
         .kernel_option_module = try buildKernelOptionModule(
