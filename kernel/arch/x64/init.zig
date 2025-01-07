@@ -194,6 +194,13 @@ pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.ini
     // TODO: PIT, KVMCLOCK, APIC
 }
 
+/// Initialize the local interrupt controller for the current executor.
+///
+/// For example, on x86_64 this should initialize the APIC.
+pub fn initLocalInterruptController() void {
+    x64.apic.init.initApicOnCurrentExecutor();
+}
+
 const globals = struct {
     var opt_early_output_serial_port: ?SerialPort = null;
 };

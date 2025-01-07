@@ -110,6 +110,9 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
     log.debug("configuring per-executor system features for {}", .{executor.id});
     kernel.arch.init.configurePerExecutorSystemFeatures(executor);
 
+    log.debug("configuring local interrupt controller", .{});
+    kernel.arch.init.initLocalInterruptController();
+
     try kernel.arch.scheduling.callOneArgs(
         null,
         current_task.stack,

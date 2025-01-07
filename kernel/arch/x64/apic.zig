@@ -32,6 +32,16 @@ pub const init = struct {
         }
     }
 
+    pub fn initApicOnCurrentExecutor() void {
+        globals.lapic.writeSupriousInterruptRegister(.{
+            .apic_enable = true,
+            .spurious_vector = x64.interrupts.Interrupt.spurious_interrupt.toInterruptVector(),
+        });
+
+        // TODO: task priority
+        // TODO: error interrupt
+    }
+
     const init_log = kernel.debug.log.scoped(.init_apic);
 };
 

@@ -409,6 +409,15 @@ pub const init = struct {
 
         current.init.registerArchitecturalTimeSources(candidate_time_sources);
     }
+
+    /// Initialize the local interrupt controller for the current executor.
+    ///
+    /// For example, on x86_64 this should initialize the APIC.
+    pub fn initLocalInterruptController() callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "initLocalInterruptController", fn () void);
+
+        current.init.initLocalInterruptController();
+    }
 };
 
 const current = switch (cascade_target) {
