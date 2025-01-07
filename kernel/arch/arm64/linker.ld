@@ -70,15 +70,15 @@ SECTIONS
         *(.data .data.*)
     } :data
 
+    .dynamic : {
+        *(.dynamic)
+    } :data :dynamic
+
     .bss : {
         *(COMMON)
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     } :data
-
-    .dynamic : {
-        *(.dynamic)
-    } :data :dynamic
 
     __data_end = .;
 
