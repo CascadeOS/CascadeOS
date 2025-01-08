@@ -22,6 +22,13 @@ pub fn spinLoopHint() callconv(core.inline_in_non_debug) void {
     current.spinLoopHint();
 }
 
+/// Halts the current executor
+pub fn halt() callconv(core.inline_in_non_debug) void {
+    checkSupport(current, "halt", fn () void);
+
+    current.halt();
+}
+
 pub const interrupts = struct {
     /// Disable interrupts and halt the CPU.
     ///

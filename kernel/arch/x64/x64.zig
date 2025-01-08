@@ -20,6 +20,7 @@ pub inline fn getCurrentExecutor() *kernel.Executor {
 }
 
 pub const spinLoopHint = lib_x64.instructions.pause;
+pub const halt = lib_x64.instructions.halt;
 
 pub const io = struct {
     pub const Port = u16;
