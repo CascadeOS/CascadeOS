@@ -529,7 +529,7 @@ pub inline fn readMSR(comptime T: type, register: u32) T {
         u64 => {
             var low: u32 = undefined;
             var high: u32 = undefined;
-            asm volatile ("rdmsr"
+            asm ("rdmsr"
                 : [low] "={eax}" (low),
                   [high] "={edx}" (high),
                 : [register] "{ecx}" (register),
@@ -537,7 +537,7 @@ pub inline fn readMSR(comptime T: type, register: u32) T {
             return (@as(u64, high) << 32) | @as(u64, low);
         },
         u32 => {
-            return asm volatile ("rdmsr"
+            return asm ("rdmsr"
                 : [low] "={eax}" (-> u32),
                 : [register] "{ecx}" (register),
                 : "edx"
