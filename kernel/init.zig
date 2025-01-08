@@ -120,9 +120,19 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
         null,
         current_task.stack,
         current_task,
-        initStage3,
+        struct {
+            fn initStage3Wrapper(inner_current_task: *kernel.Task) callconv(.C) noreturn {
+                initStage3(inner_current_task) catch |err| {
+                    core.panicFmt(
+                        "unhandled error: {s}",
+                        .{@errorName(err)},
+                        @errorReturnTrace(),
+                    );
+                };
+            }
+        }.initStage3Wrapper,
     );
-    core.panic("`init.initStage3` returned", null);
+    unreachable;
 }
 
 /// Stage 3 of kernel initialization.
@@ -130,7 +140,7 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
+fn initStage3(current_task: *kernel.Task) !noreturn {
     const executor = current_task.state.running;
 
     if (executor.id == .bootstrap) {
