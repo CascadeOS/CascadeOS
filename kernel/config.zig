@@ -18,6 +18,8 @@ pub const maximum_number_of_time_sources = 8;
 pub const task_name_length = 32;
 pub const resource_arena_name_length = 20;
 
+pub const per_executor_interrupt_period = core.Duration.from(5, .millisecond);
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

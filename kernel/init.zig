@@ -107,11 +107,14 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
     const executor = current_task.state.running;
     kernel.arch.init.loadExecutor(executor);
 
-    log.debug("configuring per-executor system features for {}", .{executor.id});
+    log.debug("configuring per-executor system features on {}", .{executor.id});
     kernel.arch.init.configurePerExecutorSystemFeatures(executor);
 
-    log.debug("configuring local interrupt controller", .{});
+    log.debug("configuring local interrupt controller on {}", .{executor.id});
     kernel.arch.init.initLocalInterruptController();
+
+    log.debug("enabling per-executor interrupt on {}", .{executor.id});
+    kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
 
     try kernel.arch.scheduling.callOneArgs(
         null,
@@ -141,6 +144,8 @@ fn initStage3(current_task: *kernel.Task) callconv(.c) noreturn {
 
     Barrier.executorReady();
     Barrier.waitForAll();
+
+    current_task.decrementInterruptDisable();
 
     core.panic("NOT IMPLEMENTED", null);
 }
