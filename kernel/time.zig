@@ -29,6 +29,17 @@ pub const wallclock = struct {
     };
 };
 
+pub const per_executor_periodic = struct {
+    /// Enables a per-executor scheduler interrupt to be delivered every `period`.
+    pub inline fn enableInterrupt(period: core.Duration) void {
+        return globals.enableInterruptFn(period);
+    }
+
+    pub const globals = struct {
+        pub var enableInterruptFn: *const fn (period: core.Duration) void = undefined;
+    };
+};
+
 /// Femptoseconds per nanosecond.
 pub const fs_per_ns = 1000000;
 
@@ -45,6 +56,7 @@ pub const init = struct {
         const reference_counter = getReferenceCounter(time_sources);
 
         configureWallclockTimeSource(time_sources, reference_counter);
+        configurePerExecutorPeriodicTimeSource(time_sources, reference_counter);
 
         init_log.debug(
             "time initialized {} after system bootup",
@@ -80,9 +92,10 @@ pub const init = struct {
 
             init_log.debug("adding time source: {s}", .{time_source.name});
             init_log.debug("  priority: {}", .{time_source.priority});
-            init_log.debug("  reference counter: {} - wall clock: {}", .{
+            init_log.debug("  reference counter: {} - wall clock: {} - per-executor periodic: {}", .{
                 time_source.reference_counter != null,
                 time_source.wallclock != null,
+                time_source.per_executor_periodic != null,
             });
         }
     };
@@ -103,6 +116,11 @@ pub const init = struct {
 
         /// Provided if the time source is usable as a wallclock.
         wallclock: ?WallclockOptions = null,
+
+        /// Provided if the time source is usable as a per-executor periodic interrupt.
+        ///
+        /// If there is only one executor then a non per-executor time source is acceptable.
+        per_executor_periodic: ?PerExecutorPeriodicOptions = null,
 
         initialized: bool = false,
 
@@ -147,6 +165,11 @@ pub const init = struct {
             elapsedFn: *const fn (value1: Tick, value2: Tick) core.Duration,
 
             pub const Tick = kernel.time.wallclock.Tick;
+        };
+
+        pub const PerExecutorPeriodicOptions = struct {
+            /// Enables a per-executor scheduler interrupt to be delivered every `period`.
+            enableInterruptFn: *const fn (period: core.Duration) void,
         };
     };
 
@@ -210,8 +233,23 @@ pub const init = struct {
 
         const wallclock_impl = time_source.wallclock.?;
 
-        kernel.time.wallclock.globals.readFn = wallclock_impl.readFn;
-        kernel.time.wallclock.globals.elapsedFn = wallclock_impl.elapsedFn;
+        wallclock.globals.readFn = wallclock_impl.readFn;
+        wallclock.globals.elapsedFn = wallclock_impl.elapsedFn;
+    }
+
+    fn configurePerExecutorPeriodicTimeSource(
+        time_sources: []CandidateTimeSource,
+        reference_counter: ReferenceCounter,
+    ) void {
+        const time_source = findAndInitializeTimeSource(time_sources, .{
+            .per_executor_periodic = true,
+        }, reference_counter) orelse core.panic("no per-executor periodic found", null);
+
+        init_log.debug("using per-executor periodic: {s}", .{time_source.name});
+
+        const per_executor_periodic_impl = time_source.per_executor_periodic.?;
+
+        per_executor_periodic.globals.enableInterruptFn = per_executor_periodic_impl.enableInterruptFn;
     }
 
     const TimeSourceQuery = struct {
@@ -220,6 +258,8 @@ pub const init = struct {
         reference_counter: bool = false,
 
         wallclock: bool = false,
+
+        per_executor_periodic: bool = false,
     };
 
     fn findAndInitializeTimeSource(
@@ -235,6 +275,8 @@ pub const init = struct {
             if (query.reference_counter and time_source.reference_counter == null) continue;
 
             if (query.wallclock and time_source.wallclock == null) continue;
+
+            if (query.per_executor_periodic and time_source.per_executor_periodic == null) continue;
 
             if (opt_best_candidate) |best_candidate| {
                 if (time_source.priority > best_candidate.priority) opt_best_candidate = time_source;
