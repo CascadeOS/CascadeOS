@@ -66,6 +66,8 @@ pub const Interrupt = enum(u8) {
     pic_primary_ata = 46,
     pic_secondary_ata = 47,
 
+    per_executor_periodic = 48,
+
     spurious_interrupt = 255,
 
     _,
