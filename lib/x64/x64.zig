@@ -67,8 +67,25 @@ pub fn disablePic() void {
 }
 
 comptime {
-    // FIXME: cannot be used due to hitting a `@compileError` for `std.atomic.Value.fence`
-    // std.testing.refAllDeclsRecursive(@This());
+    refAllDeclsRecursive(@This());
+}
+
+fn refAllDeclsRecursive(comptime T: type) void {
+    if (!@import("builtin").is_test) return;
+    @setEvalBranchQuota(1_000_000);
+
+    inline for (comptime std.meta.declarations(T)) |decl| {
+        // FIXME: have to skip `PageTable` due to hitting a `@compileError` for `std.atomic.Value.fence`
+        if (std.mem.eql(u8, decl.name, "PageTable")) continue;
+
+        if (@TypeOf(@field(T, decl.name)) == type) {
+            switch (@typeInfo(@field(T, decl.name))) {
+                .@"struct", .@"enum", .@"union", .@"opaque" => refAllDeclsRecursive(@field(T, decl.name)),
+                else => {},
+            }
+        }
+        _ = &@field(T, decl.name);
+    }
 }
 
 const std = @import("std");
