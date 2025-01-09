@@ -8,6 +8,7 @@ pub const cpu_id = @import("cpu_id.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;
 pub const Hpet = @import("Hpet.zig");
 pub const Idt = @import("Idt.zig");
+pub const IOAPIC = @import("IOAPIC.zig");
 pub const LAPIC = @import("LAPIC.zig").LAPIC;
 pub const InterruptVector = @import("InterruptVector.zig").InterruptVector;
 pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
