@@ -65,6 +65,46 @@ pub const interrupts = struct {
 
         current.interrupts.disableInterrupts();
     }
+
+    pub fn allocateInterrupt(
+        handler: InterruptHandler,
+        context1: ?*anyopaque,
+        context2: ?*anyopaque,
+    ) callconv(core.inline_in_non_debug) !Interrupt {
+        checkSupport(
+            current.interrupts,
+            "allocateInterrupt",
+            fn (InterruptHandler, ?*anyopaque, ?*anyopaque) anyerror!Interrupt,
+        );
+
+        return current.interrupts.allocateInterrupt(handler, context1, context2);
+    }
+
+    pub fn deallocateInterrupt(interrupt: Interrupt) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.interrupts, "deallocateInterrupt", fn (Interrupt) void);
+
+        current.interrupts.deallocateInterrupt(interrupt);
+    }
+
+    pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) callconv(core.inline_in_non_debug) !void {
+        checkSupport(
+            current.interrupts,
+            "routeInterrupt",
+            fn (u32, Interrupt) anyerror!void,
+        );
+
+        return current.interrupts.routeInterrupt(external_interrupt, interrupt);
+    }
+
+    pub fn unrouteInterrupt(external_interrupt: u32) callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.interrupts,
+            "unrouteInterrupt",
+            fn (u32) void,
+        );
+
+        current.interrupts.unrouteInterrupt(external_interrupt);
+    }
 };
 
 pub const paging = struct {
