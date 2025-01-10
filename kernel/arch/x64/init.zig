@@ -141,6 +141,9 @@ pub fn captureSystemInformation(
 
     log.debug("capturing APIC information", .{});
     x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
+
+    log.debug("capturing IOAPIC information", .{});
+    try x64.ioapic.init.captureMADTInformation(madt);
 }
 
 /// Configure any global system features.
