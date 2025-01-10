@@ -6,6 +6,30 @@ pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
 pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 
+pub fn allocateInterrupt(
+    interrupt_handler: InterruptHandler,
+    context1: ?*anyopaque,
+    context2: ?*anyopaque,
+) !Interrupt {
+    for (&globals.handlers, 0..) |*handler, i| {
+        if (handler.* == null) continue;
+
+        handler.* = .{
+            .interrupt_handler = interrupt_handler,
+            .context1 = context1,
+            .context2 = context2,
+        };
+
+        return @enumFromInt(i);
+    }
+
+    return error.OutOfInterrupts;
+}
+
+pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {
+    try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
+}
+
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) void {
     const current_task, const restorer = kernel.Task.onInterruptEntry();
     defer restorer.exit(current_task);
