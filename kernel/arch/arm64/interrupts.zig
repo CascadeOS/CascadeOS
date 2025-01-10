@@ -6,6 +6,9 @@ pub const enableInterrupts = lib_arm64.instructions.enableInterrupts;
 pub const areEnabled = lib_arm64.instructions.interruptsEnabled;
 pub const disableInterrupts = lib_arm64.instructions.disableInterrupts;
 
+pub const Interrupt = enum {};
+pub const InterruptFrame = extern struct {};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

@@ -6,13 +6,15 @@ pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
 pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 
-export fn interruptHandler(interrupt_frame: *InterruptFrame) void {
+export fn interruptDispatch(interrupt_frame: *InterruptFrame) void {
     const current_task, const restorer = kernel.Task.onInterruptEntry();
     defer restorer.exit(current_task);
 
-    switch (interrupt_frame.vector_number.interrupt) {
-        else => core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null),
-    }
+    const handler = globals.handlers[interrupt_frame.vector_number.full] orelse {
+        core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
+    };
+
+    handler.call(current_task, interrupt_frame);
 }
 
 pub const Interrupt = enum(u8) {
@@ -247,9 +249,20 @@ pub const InterruptStackSelector = enum(u3) {
     non_maskable_interrupt,
 };
 
+const Handler = struct {
+    interrupt_handler: InterruptHandler,
+    context1: ?*anyopaque,
+    context2: ?*anyopaque,
+
+    inline fn call(self: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
+        self.interrupt_handler(current_task, interrupt_frame, self.context1, self.context2);
+    }
+};
+
 const globals = struct {
     var idt: Idt = .{};
     const raw_interrupt_handlers = init.makeRawHandlers();
+    var handlers: [Idt.number_of_handlers]?Handler = @splat(null);
 };
 
 pub const init = struct {
@@ -262,6 +275,23 @@ pub const init = struct {
                 raw_handler,
             );
         }
+
+        // map all exceptions and internally handled interrupts to the temporary handler
+        for (0..49) |i| {
+            kernel.debug.log.scoped(.hello).info("{}", .{i});
+            globals.handlers[i] = .{
+                .interrupt_handler = temporaryHandler,
+                .context1 = null,
+                .context2 = null,
+            };
+        }
+
+        // map spurious interrupts to the temporary handler
+        globals.handlers[255] = .{
+            .interrupt_handler = temporaryHandler,
+            .context1 = null,
+            .context2 = null,
+        };
 
         globals.idt.handlers[@intFromEnum(Interrupt.double_fault)]
             .setStack(@intFromEnum(InterruptStackSelector.double_fault));
@@ -326,7 +356,7 @@ pub const init = struct {
                             ++ data_selector_asm ++
                             \\mov %%ax, %%es
                             \\mov %%ax, %%ds
-                            \\call interruptHandler
+                            \\call interruptDispatch
                             \\pop %%rax
                             \\mov %%rax, %%es
                             \\pop %%rax
@@ -359,6 +389,11 @@ pub const init = struct {
             return raw_handlers_temp;
         }
     }
+
+    // temporary handler for all exceptions and internally handled interrupts
+    fn temporaryHandler(_: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
+        core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
+    }
 };
 
 const std = @import("std");
@@ -368,3 +403,4 @@ const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
 const Idt = lib_x64.Idt;
 const Gdt = lib_x64.Gdt;
+const InterruptHandler = kernel.arch.interrupts.InterruptHandler;

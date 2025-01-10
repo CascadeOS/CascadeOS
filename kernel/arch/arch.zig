@@ -30,6 +30,16 @@ pub fn halt() callconv(core.inline_in_non_debug) void {
 }
 
 pub const interrupts = struct {
+    pub const Interrupt = current.interrupts.Interrupt;
+    pub const InterruptFrame = current.interrupts.InterruptFrame;
+
+    pub const InterruptHandler = *const fn (
+        current_task: *kernel.Task,
+        frame: *InterruptFrame,
+        context1: ?*anyopaque,
+        context2: ?*anyopaque,
+    ) void;
+
     /// Disable interrupts and halt the CPU.
     ///
     /// This is a decl not a wrapper function like the other functions so that it can be inlined into a naked function.
