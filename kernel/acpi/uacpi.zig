@@ -394,11 +394,36 @@ const kernel_api = struct {
         out_irq_handle: *Handle,
     ) UacpiStatus {
         _ = out_irq_handle;
-        core.panicFmt(
-            "uacpi_kernel_install_interrupt_handler(irq={}, handler={}, ctx={})",
-            .{ irq, handler, ctx },
-            null,
-        );
+
+        const HandlerWrapper = struct {
+            fn HandlerWrapper(
+                _: *kernel.Task,
+                _: *kernel.arch.interrupts.InterruptFrame,
+                _handler: ?*anyopaque,
+                _ctx: ?*anyopaque,
+            ) void {
+                const inner_handler: InterruptHandler = @ptrCast(@alignCast(_handler));
+                inner_handler(@ptrCast(_ctx));
+            }
+        }.HandlerWrapper;
+
+        const interrupt = kernel.arch.interrupts.allocateInterrupt(
+            HandlerWrapper,
+            @constCast(handler),
+            ctx,
+        ) catch |err| {
+            log.err("failed to allocate interrupt: {}", .{err});
+            return UacpiStatus.INTERNAL_ERROR;
+        };
+
+        kernel.arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
+            kernel.arch.interrupts.deallocateInterrupt(interrupt);
+
+            log.err("failed to route interrupt: {}", .{err});
+            return UacpiStatus.INTERNAL_ERROR;
+        };
+
+        return .OK;
     }
 
     /// Uninstall an interrupt handler.
