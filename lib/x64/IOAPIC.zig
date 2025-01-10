@@ -37,7 +37,7 @@ pub const RedirectionTableError = error{
 pub fn setRedirectionTableEntry(
     self: IOAPIC,
     index: u8,
-    interrupt_vector: u8,
+    interrupt_vector: x64.InterruptVector,
     delivery_mode: DeliveryMode,
     destination: Destination,
     pin_polarity: Polarity,
@@ -80,7 +80,7 @@ pub fn setRedirectionEntryMask(
 }
 
 const RedirectionTableRegister = packed struct(u64) {
-    interrupt_vector: u8,
+    interrupt_vector: x64.InterruptVector,
     delivery_mode: DeliveryMode,
     destination_mode: DestinationMode,
     delivery_status: DeliveryStatus,
