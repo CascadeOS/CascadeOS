@@ -20,7 +20,7 @@ pub fn AcpiTable(comptime T: type) type {
         handle: uapci.UacpiTable,
 
         pub fn deinit(self: @This()) void {
-            uapci.unrefTable(self.handle) catch unreachable;
+            self.handle.unrefTable() catch unreachable;
         }
     };
 }

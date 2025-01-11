@@ -29,11 +29,6 @@ pub fn getTable(signature: *const [4]u8, n: usize) !UacpiTable {
     return table;
 }
 
-pub fn unrefTable(table: UacpiTable) !void {
-    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_table_unref(@constCast(@ptrCast(&table))));
-    try ret.toError();
-}
-
 pub fn initialize() UacpiError!void {
     // Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT tables. Enters ACPI mode.
     var ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_initialize(0));
@@ -674,6 +669,11 @@ pub const UacpiTable = extern struct {
         ptr: *anyopaque,
         header: *acpi.SharedHeader,
     };
+
+    pub fn unrefTable(table: UacpiTable) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_table_unref(@constCast(@ptrCast(&table))));
+        try ret.toError();
+    }
 
     comptime {
         core.testing.expectSize(c_uacpi.uacpi_table, @sizeOf(UacpiTable));
