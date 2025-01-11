@@ -158,9 +158,9 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     Barrier.executorReady();
     Barrier.waitForAll();
 
-    current_task.decrementInterruptDisable();
+    if (true) core.panic("NOT IMPLEMENTED", null);
 
-    core.panic("NOT IMPLEMENTED", null);
+    current_task.decrementInterruptDisable();
 }
 
 fn createExecutors() ![]kernel.Executor {
