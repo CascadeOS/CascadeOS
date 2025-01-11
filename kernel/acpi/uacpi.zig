@@ -123,7 +123,7 @@ const kernel_api = struct {
     }
 
     export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
-        core.panicFmt("uacpi_kernel_pci_device_close(handle={})", .{handle}, null);
+        _ = handle;
     }
 
     /// Read the configuration space of a previously open PCI device.
@@ -140,9 +140,9 @@ const kernel_api = struct {
         const address = device.config_space_address.moveForward(.from(offset, .byte));
 
         value.* = switch (byte_width) {
-            .one => address.toPtr(*volatile u8).*,
-            .two => address.toPtr(*volatile u16).*,
-            .four => address.toPtr(*volatile u32).*,
+            .one => address.toPtr(*const volatile u8).*,
+            .two => address.toPtr(*const volatile u16).*,
+            .four => address.toPtr(*const volatile u32).*,
         };
 
         return .OK;
@@ -159,11 +159,15 @@ const kernel_api = struct {
         byte_width: ByteWidth,
         value: u64,
     ) UacpiStatus {
-        core.panicFmt(
-            "uacpi_kernel_pci_write(device={}, offset={}, byte_width={}, value={})",
-            .{ device, offset, byte_width, value },
-            null,
-        );
+        const address = device.config_space_address.moveForward(.from(offset, .byte));
+
+        switch (byte_width) {
+            .one => address.toPtr(*volatile u8).* = @truncate(value),
+            .two => address.toPtr(*volatile u16).* = @truncate(value),
+            .four => address.toPtr(*volatile u32).* = @truncate(value),
+        }
+
+        return .OK;
     }
 
     /// Map a SystemIO address at [base, base + len) and return a kernel-implemented handle that can be used for reading
@@ -284,7 +288,13 @@ const kernel_api = struct {
 
     /// Spin for N microseconds.
     export fn uacpi_kernel_stall(usec: u8) void {
-        core.panicFmt("uacpi_kernel_stall(usec={})", .{usec}, null);
+        const start = kernel.time.wallclock.read();
+
+        const duration: core.Duration = .from(usec, .microsecond);
+
+        while (kernel.time.wallclock.elapsed(start, kernel.time.wallclock.read()).lessThan(duration)) {
+            kernel.arch.spinLoopHint();
+        }
     }
 
     /// Sleep for N milliseconds.
@@ -301,7 +311,7 @@ const kernel_api = struct {
 
     /// Free a opaque non-recursive kernel mutex object.
     export fn uacpi_kernel_free_mutex(mutex: *kernel.sync.Mutex) void {
-        core.panicFmt("uacpi_kernel_free_mutex(mutex={})", .{mutex}, null);
+        kernel.heap.allocator.destroy(mutex);
     }
 
     /// Create/free an opaque kernel (semaphore-like) event object.
@@ -402,8 +412,6 @@ const kernel_api = struct {
         ctx: *anyopaque,
         out_irq_handle: **anyopaque,
     ) UacpiStatus {
-        _ = out_irq_handle;
-
         const HandlerWrapper = struct {
             fn HandlerWrapper(
                 _: *kernel.Task,
@@ -432,6 +440,8 @@ const kernel_api = struct {
             return UacpiStatus.INTERNAL_ERROR;
         };
 
+        out_irq_handle.* = @ptrFromInt(@intFromEnum(interrupt));
+
         return .OK;
     }
 
@@ -439,14 +449,13 @@ const kernel_api = struct {
     ///
     /// 'irq_handle' is the value returned via 'out_irq_handle' during installation.
     export fn uacpi_kernel_uninstall_interrupt_handler(
-        handler: InterruptHandler,
+        _: InterruptHandler,
         irq_handle: *anyopaque,
     ) UacpiStatus {
-        core.panicFmt(
-            "uacpi_kernel_uninstall_interrupt_handler(handler={}, irq_handle={})",
-            .{ handler, irq_handle },
-            null,
-        );
+        const interrupt: kernel.arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
+        kernel.arch.interrupts.deallocateInterrupt(interrupt);
+
+        return .OK;
     }
 
     /// Create a kernel spinlock object.
@@ -462,7 +471,7 @@ const kernel_api = struct {
     ///
     /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
     export fn uacpi_kernel_free_spinlock(spinlock: *kernel.sync.TicketSpinLock) void {
-        core.panicFmt("uacpi_kernel_free_spinlock(spinlock={})", .{spinlock}, null);
+        kernel.heap.allocator.destroy(spinlock);
     }
 
     /// Lock a spinlock.
