@@ -114,9 +114,12 @@ const kernel_api = struct {
     /// Open a PCI device at 'address' for reading & writing.
     ///
     /// The handle returned via 'out_handle' is used to perform IO on the configuration space of the device.
-    export fn uacpi_kernel_pci_device_open(address: kernel.pci.Address, out_handle: *Handle) UacpiStatus {
-        _ = out_handle;
-        core.panicFmt("uacpi_kernel_pci_device_open(address={})", .{address}, null);
+    export fn uacpi_kernel_pci_device_open(
+        address: kernel.pci.Address,
+        out_handle: **kernel.pci.PciFunction,
+    ) UacpiStatus {
+        out_handle.* = kernel.pci.getFunction(address) orelse return UacpiStatus.NOT_FOUND;
+        return .OK;
     }
 
     export fn uacpi_kernel_pci_device_close(handle: Handle) void {
@@ -129,17 +132,20 @@ const kernel_api = struct {
     /// Since PCI registers are 32 bits wide this must be able to handle e.g. a 1-byte access by reading at the nearest
     /// 4-byte aligned offset below, then masking the value to select the target byte.
     export fn uacpi_kernel_pci_read(
-        device: Handle,
+        device: *kernel.pci.PciFunction,
         offset: usize,
         byte_width: ByteWidth,
         value: *u64,
     ) UacpiStatus {
-        _ = value;
-        core.panicFmt(
-            "uacpi_kernel_pci_read(device={}, offset={}, byte_width={})",
-            .{ device, offset, byte_width },
-            null,
-        );
+        const address = device.config_space_address.moveForward(.from(offset, .byte));
+
+        value.* = switch (byte_width) {
+            .one => address.toPtr(*volatile u8).*,
+            .two => address.toPtr(*volatile u16).*,
+            .four => address.toPtr(*volatile u32).*,
+        };
+
+        return .OK;
     }
 
     /// Write the configuration space of a previously open PCI device.
