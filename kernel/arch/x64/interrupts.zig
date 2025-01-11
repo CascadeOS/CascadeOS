@@ -12,7 +12,7 @@ pub fn allocateInterrupt(
     context2: ?*anyopaque,
 ) !Interrupt {
     for (&globals.handlers, 0..) |*handler, i| {
-        if (handler.* == null) continue;
+        if (handler.* != null) continue;
 
         handler.* = .{
             .interrupt_handler = interrupt_handler,
@@ -302,7 +302,6 @@ pub const init = struct {
 
         // map all exceptions and internally handled interrupts to the temporary handler
         for (0..49) |i| {
-            kernel.debug.log.scoped(.hello).info("{}", .{i});
             globals.handlers[i] = .{
                 .interrupt_handler = temporaryHandler,
                 .context1 = null,
