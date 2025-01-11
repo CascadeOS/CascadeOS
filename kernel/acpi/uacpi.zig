@@ -34,7 +34,7 @@ pub fn unrefTable(table: UacpiTable) !void {
     try ret.toError();
 }
 
-fn initialize() UacpiError!void { // TODO: to be called eventually
+pub fn initialize() UacpiError!void {
     // Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT tables. Enters ACPI mode.
     var ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_initialize(0));
     try ret.toError();
@@ -122,7 +122,7 @@ const kernel_api = struct {
         return .OK;
     }
 
-    export fn uacpi_kernel_pci_device_close(handle: Handle) void {
+    export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
         core.panicFmt("uacpi_kernel_pci_device_close(handle={})", .{handle}, null);
     }
 
@@ -154,7 +154,7 @@ const kernel_api = struct {
     /// Since PCI registers are 32 bits wide this must be able to handle e.g. a 1-byte access by reading at the nearest
     /// 4-byte aligned offset below, then masking the value to select the target byte.
     export fn uacpi_kernel_pci_write(
-        device: Handle,
+        device: *kernel.pci.PciFunction,
         offset: usize,
         byte_width: ByteWidth,
         value: u64,
@@ -168,13 +168,13 @@ const kernel_api = struct {
 
     /// Map a SystemIO address at [base, base + len) and return a kernel-implemented handle that can be used for reading
     /// and writing the IO range.
-    export fn uacpi_kernel_io_map(base: IOAddress, len: usize, out_handle: *Handle) UacpiStatus {
+    export fn uacpi_kernel_io_map(base: IOAddress, len: usize, out_handle: **anyopaque) UacpiStatus {
         _ = len;
         out_handle.* = @ptrFromInt(base);
         return .OK;
     }
 
-    export fn uacpi_kernel_io_unmap(handle: Handle) void {
+    export fn uacpi_kernel_io_unmap(handle: *anyopaque) void {
         _ = handle;
     }
 
@@ -184,7 +184,7 @@ const kernel_api = struct {
     /// You are NOT allowed to break e.g. a 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
     /// be of the exact width.
     export fn uacpi_kernel_io_read(
-        handle: Handle,
+        handle: *anyopaque,
         offset: usize,
         byte_width: ByteWidth,
         value: *u64,
@@ -205,7 +205,7 @@ const kernel_api = struct {
     /// You are NOT allowed to break e.g. a 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
     /// be of the exact width.
     export fn uacpi_kernel_io_write(
-        handle: Handle,
+        handle: *anyopaque,
         offset: usize,
         byte_width: ByteWidth,
         value: u64,
@@ -221,9 +221,9 @@ const kernel_api = struct {
         return .OK;
     }
 
-    export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) ?[*]u8 {
+    export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
         _ = len;
-        return kernel.vmm.nonCachedDirectMapFromPhysical(addr).toPtr(?[*]u8);
+        return kernel.vmm.nonCachedDirectMapFromPhysical(addr).toPtr([*]u8);
     }
 
     export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
@@ -293,24 +293,30 @@ const kernel_api = struct {
     }
 
     /// Create an opaque non-recursive kernel mutex object.
-    export fn uacpi_kernel_create_mutex() Handle {
+    export fn uacpi_kernel_create_mutex() *kernel.sync.Mutex {
         const mutex = kernel.heap.allocator.create(kernel.sync.Mutex) catch unreachable;
         mutex.* = .{};
         return mutex;
     }
 
     /// Free a opaque non-recursive kernel mutex object.
-    export fn uacpi_kernel_free_mutex(handle: Handle) void {
-        core.panicFmt("uacpi_kernel_free_mutex(handle={})", .{handle}, null);
+    export fn uacpi_kernel_free_mutex(mutex: *kernel.sync.Mutex) void {
+        core.panicFmt("uacpi_kernel_free_mutex(mutex={})", .{mutex}, null);
     }
 
     /// Create/free an opaque kernel (semaphore-like) event object.
-    export fn uacpi_kernel_create_event() Handle {
-        core.panic("uacpi_kernel_create_event()", null);
+    export fn uacpi_kernel_create_event() *anyopaque {
+        log.warn("uacpi_kernel_create_event called with dummy implementation", .{});
+
+        const static = struct {
+            var value: std.atomic.Value(usize) = .init(1);
+        };
+
+        return @ptrFromInt(static.value.fetchAdd(1, .acquire));
     }
 
     /// Free a previously allocated kernel (semaphore-like) event object.
-    export fn uacpi_kernel_free_event(handle: Handle) void {
+    export fn uacpi_kernel_free_event(handle: *anyopaque) void {
         core.panicFmt("uacpi_kernel_free_event(handle={})", .{handle}, null);
     }
 
@@ -333,9 +339,7 @@ const kernel_api = struct {
     /// 2. UACPI_STATUS_TIMEOUT - timeout reached while attempting to acquire (or the single attempt to acquire was not
     ///                           successful for calls with timeout=0)
     /// 3. Any other value - signifies a host internal error and is treated as such
-    export fn uacpi_kernel_acquire_mutex(handle: Handle, timeout: u16) UacpiStatus {
-        const mutex: *kernel.sync.Mutex = @ptrCast(@alignCast(handle));
-
+    export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: u16) UacpiStatus {
         const current_task = kernel.Task.getCurrent();
 
         switch (timeout) {
@@ -347,8 +351,7 @@ const kernel_api = struct {
         return .OK;
     }
 
-    export fn uacpi_kernel_release_mutex(handle: Handle) void {
-        const mutex: *kernel.sync.Mutex = @ptrCast(@alignCast(handle));
+    export fn uacpi_kernel_release_mutex(mutex: *kernel.sync.Mutex) void {
         mutex.unlock(kernel.Task.getCurrent());
     }
 
@@ -359,7 +362,7 @@ const kernel_api = struct {
     /// The internal counter is decremented by 1 if wait was successful.
     ///
     /// A successful wait is indicated by returning UACPI_TRUE.
-    export fn uacpi_kernel_wait_for_event(handle: Handle, timeout: u16) bool {
+    export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: u16) bool {
         core.panicFmt(
             "uacpi_kernel_wait_for_event(handle={}, timeout={})",
             .{ handle, timeout },
@@ -370,12 +373,12 @@ const kernel_api = struct {
     /// Signal the event object by incrementing its internal counter by 1.
     ///
     /// This function may be used in interrupt contexts.
-    export fn uacpi_kernel_signal_event(handle: Handle) void {
+    export fn uacpi_kernel_signal_event(handle: *anyopaque) void {
         core.panicFmt("uacpi_kernel_signal_event(handle={})", .{handle}, null);
     }
 
     /// Reset the event counter to 0.
-    export fn uacpi_kernel_reset_event(handle: Handle) void {
+    export fn uacpi_kernel_reset_event(handle: *anyopaque) void {
         core.panicFmt("uacpi_kernel_reset_event(handle={})", .{handle}, null);
     }
 
@@ -396,8 +399,8 @@ const kernel_api = struct {
     export fn uacpi_kernel_install_interrupt_handler(
         irq: u32,
         handler: InterruptHandler,
-        ctx: Handle,
-        out_irq_handle: *Handle,
+        ctx: *anyopaque,
+        out_irq_handle: **anyopaque,
     ) UacpiStatus {
         _ = out_irq_handle;
 
@@ -437,7 +440,7 @@ const kernel_api = struct {
     /// 'irq_handle' is the value returned via 'out_irq_handle' during installation.
     export fn uacpi_kernel_uninstall_interrupt_handler(
         handler: InterruptHandler,
-        irq_handle: Handle,
+        irq_handle: *anyopaque,
     ) UacpiStatus {
         core.panicFmt(
             "uacpi_kernel_uninstall_interrupt_handler(handler={}, irq_handle={})",
@@ -449,7 +452,7 @@ const kernel_api = struct {
     /// Create a kernel spinlock object.
     ///
     /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
-    export fn uacpi_kernel_create_spinlock() Handle {
+    export fn uacpi_kernel_create_spinlock() *kernel.sync.TicketSpinLock {
         const lock = kernel.heap.allocator.create(kernel.sync.TicketSpinLock) catch unreachable;
         lock.* = .{};
         return lock;
@@ -458,8 +461,8 @@ const kernel_api = struct {
     /// Free a kernel spinlock object.
     ///
     /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
-    export fn uacpi_kernel_free_spinlock(handle: Handle) void {
-        core.panicFmt("uacpi_kernel_free_spinlock(handle={})", .{handle}, null);
+    export fn uacpi_kernel_free_spinlock(spinlock: *kernel.sync.TicketSpinLock) void {
+        core.panicFmt("uacpi_kernel_free_spinlock(spinlock={})", .{spinlock}, null);
     }
 
     /// Lock a spinlock.
@@ -468,16 +471,14 @@ const kernel_api = struct {
     /// possibly re-enable interrupts if they were enabled before.
     ///
     /// Note that lock is infalliable.
-    export fn uacpi_kernel_lock_spinlock(handle: Handle) c_uacpi.uacpi_cpu_flags {
-        const lock: *kernel.sync.TicketSpinLock = @ptrCast(@alignCast(handle));
-        lock.lock(kernel.Task.getCurrent());
+    export fn uacpi_kernel_lock_spinlock(spinlock: *kernel.sync.TicketSpinLock) c_uacpi.uacpi_cpu_flags {
+        spinlock.lock(kernel.Task.getCurrent());
         return 0;
     }
 
-    export fn uacpi_kernel_unlock_spinlock(handle: Handle, cpu_flags: c_uacpi.uacpi_cpu_flags) void {
+    export fn uacpi_kernel_unlock_spinlock(spinlock: *kernel.sync.TicketSpinLock, cpu_flags: c_uacpi.uacpi_cpu_flags) void {
         _ = cpu_flags;
-        const lock: *kernel.sync.TicketSpinLock = @ptrCast(@alignCast(handle));
-        lock.unlock(kernel.Task.getCurrent());
+        spinlock.unlock(kernel.Task.getCurrent());
     }
 
     /// Schedules deferred work for execution.
@@ -486,7 +487,7 @@ const kernel_api = struct {
     export fn uacpi_kernel_schedule_work(
         work_type: WorkType,
         handler: WorkHandler,
-        ctx: Handle,
+        ctx: *anyopaque,
     ) UacpiStatus {
         core.panicFmt(
             "uacpi_kernel_schedule_work(work_type={}, handler={}, ctx={})",
@@ -517,8 +518,8 @@ const WorkType = enum(c_uacpi.uacpi_work_type) {
     work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
 };
 
-const InterruptHandler = *const fn (Handle) callconv(.C) void;
-const WorkHandler = *const fn (Handle) callconv(.C) void;
+const InterruptHandler = *const fn (*anyopaque) callconv(.C) void;
+const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
 
 const UacpiStatus = enum(c_uacpi.uacpi_status) {
     OK = c_uacpi.UACPI_STATUS_OK,
@@ -638,7 +639,7 @@ const FirmwareRequest = extern struct {
 
         const Breakpoint = extern struct {
             /// The context of the method currently being executed
-            ctx: Handle,
+            ctx: *anyopaque,
         };
 
         const Fatal = extern struct {
@@ -654,7 +655,6 @@ const FirmwareRequest = extern struct {
 };
 
 const IOAddress = u64;
-const Handle = *anyopaque;
 
 pub const UacpiTable = extern struct {
     table: Table,
