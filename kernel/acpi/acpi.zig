@@ -220,6 +220,10 @@ pub const init = struct {
         try uapci.setupEarlyTableAccess();
     }
 
+    pub fn initialize() !void {
+        try uapci.initialize();
+    }
+
     const init_log = kernel.debug.log.scoped(.init_acpi);
 };
 
