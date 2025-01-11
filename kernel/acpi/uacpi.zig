@@ -114,7 +114,7 @@ const kernel_api = struct {
     /// Open a PCI device at 'address' for reading & writing.
     ///
     /// The handle returned via 'out_handle' is used to perform IO on the configuration space of the device.
-    export fn uacpi_kernel_pci_device_open(address: PciAddress, out_handle: *Handle) UacpiStatus {
+    export fn uacpi_kernel_pci_device_open(address: kernel.pci.Address, out_handle: *Handle) UacpiStatus {
         _ = out_handle;
         core.panicFmt("uacpi_kernel_pci_device_open(address={})", .{address}, null);
     }
@@ -586,17 +586,6 @@ const UacpiStatus = enum(c_uacpi.uacpi_status) {
             .AML_LOOP_TIMEOUT => return UacpiError.AML_LOOP_TIMEOUT,
             .AML_CALL_STACK_DEPTH_LIMIT => return UacpiError.AML_CALL_STACK_DEPTH_LIMIT,
         }
-    }
-};
-
-const PciAddress = extern struct { // TODO: move this is pci module
-    segment: u16,
-    bus: u8,
-    device: u8,
-    function: u8,
-
-    comptime {
-        core.testing.expectSize(c_uacpi.uacpi_pci_address, @sizeOf(PciAddress));
     }
 };
 

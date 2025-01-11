@@ -146,6 +146,9 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     if (executor.id == .bootstrap) {
         Barrier.waitForOthers();
 
+        log.debug("initializing PCI", .{});
+        try kernel.pci.init.initialize();
+
         // as others are waiting, we can safely print
         kernel.arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
