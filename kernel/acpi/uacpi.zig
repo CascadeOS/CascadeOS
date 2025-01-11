@@ -658,6 +658,13 @@ const FirmwareRequest = extern struct {
     }
 };
 
+const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
+    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
+    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
+    /// Only applicable for uacpi_namespace_for_each_child
+    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+};
+
 const IOAddress = u64;
 
 pub const UacpiTable = extern struct {
@@ -702,6 +709,11 @@ const acpi = @import("acpi");
 const c_uacpi = @cImport({
     @cInclude("uacpi/uacpi.h");
     @cInclude("uacpi/event.h");
+    @cInclude("uacpi/namespace.h");
+    @cInclude("uacpi/notify.h");
+    @cInclude("uacpi/osi.h");
+    @cInclude("uacpi/resources.h");
+    @cInclude("uacpi/sleep.h");
     @cInclude("uacpi/tables.h");
     @cInclude("uacpi/utilities.h");
 });
