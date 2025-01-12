@@ -19,7 +19,7 @@
 /// static buffer for tables, "UACPI_STATIC_TABLE_ARRAY_LEN", which is configured
 /// as 16 descriptors in length by default.
 pub fn setupEarlyTableAccess(temporary_buffer: []u8) !void {
-    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_setup_early_table_access(
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_setup_early_table_access(
         temporary_buffer.ptr,
         temporary_buffer.len,
     ));
@@ -58,7 +58,9 @@ pub const InitalizeOptions = packed struct(u64) {
 ///
 /// Enters ACPI mode.
 pub fn initialize(options: InitalizeOptions) !void {
-    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_initialize(@bitCast(options)));
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_initialize(
+        @bitCast(options),
+    ));
     try ret.toError();
 }
 
@@ -66,13 +68,13 @@ pub fn initialize(options: InitalizeOptions) !void {
 ///
 /// Initializes the event subsystem.
 pub fn namespaceLoad() !void {
-    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_namespace_load());
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_load());
     try ret.toError();
 }
 
 /// Initializes all the necessary objects in the namespaces by calling _STA/_INI etc.
 pub fn namespaceInitialize() !void {
-    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_namespace_initialize());
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_initialize());
     try ret.toError();
 }
 
@@ -82,7 +84,10 @@ pub const sleep = struct {
     /// - 'addr32' is the real mode entry-point address
     /// - 'addr64' is the protected mode entry-point address
     pub fn setWakingVector(addr32: core.PhysicalAddress, addr64: core.PhysicalAddress) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_set_waking_vector(@bitCast(addr32), @bitCast(addr64)));
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_waking_vector(
+            @bitCast(addr32),
+            @bitCast(addr64),
+        ));
         try ret.toError();
     }
 
@@ -99,7 +104,9 @@ pub const sleep = struct {
     ///
     /// Must be caled with interrupts ENABLED.
     pub fn prepareForSleep(state: SleepState) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(@intFromEnum(state)));
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(
+            @intFromEnum(state),
+        ));
         try ret.toError();
     }
 
@@ -107,7 +114,9 @@ pub const sleep = struct {
     ///
     /// Must be called with interrupts DISABLED.
     pub fn sleep(state: SleepState) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(@intFromEnum(state)));
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(
+            @intFromEnum(state),
+        ));
         try ret.toError();
     }
 
@@ -115,7 +124,9 @@ pub const sleep = struct {
     ///
     /// Must be called with interrupts DISABLED.
     pub fn prepareForWake(state: SleepState) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(@intFromEnum(state)));
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(
+            @intFromEnum(state),
+        ));
         try ret.toError();
     }
 
@@ -123,13 +134,176 @@ pub const sleep = struct {
     ///
     /// Must be called with interrupts ENABLED.
     pub fn wake(state: SleepState) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(@intFromEnum(state)));
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(
+            @intFromEnum(state),
+        ));
         try ret.toError();
     }
 
     /// Attempt reset via the FADT reset register.
     pub fn reboot() !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_reboot());
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_reboot());
+        try ret.toError();
+    }
+};
+
+pub const tables = struct {
+    pub const Table = extern struct {
+        table: extern union {
+            virtual_address: core.VirtualAddress,
+            ptr: *anyopaque,
+            header: *acpi.SharedHeader,
+        },
+        index: usize,
+
+        pub fn nextWithSameSignature(table: *Table) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(
+                @ptrCast(table),
+            ));
+            try ret.toError();
+        }
+
+        pub fn refTable(table: Table) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_table_ref(
+                @constCast(@ptrCast(&table)),
+            ));
+            try ret.toError();
+        }
+
+        pub fn unrefTable(table: Table) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_table_unref(
+                @constCast(@ptrCast(&table)),
+            ));
+            try ret.toError();
+        }
+
+        comptime {
+            core.testing.expectSize(Table, @sizeOf(c_uacpi.uacpi_table));
+        }
+    };
+
+    pub fn findBySignature(signature: *const [4]u8) !Table {
+        var table: Table = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_by_signature(
+            signature,
+            @ptrCast(&table),
+        ));
+        try ret.toError();
+
+        return table;
+    }
+
+    pub fn find(table_identifiers: *const TableIdentifiers) !Table {
+        var table: Table = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find(
+            @ptrCast(table_identifiers),
+            @ptrCast(&table),
+        ));
+        try ret.toError();
+
+        return table;
+    }
+
+    pub const TableIdentifiers = extern struct {
+        signature: ObjectName,
+
+        /// if oemid[0] == 0 this field is ignored
+        oemid: [6]u8 = @splat(0),
+
+        /// if oem_table_id[0] == 0 this field is ignored
+        oem_table_id: [8]u8 = @splat(0),
+
+        comptime {
+            core.testing.expectSize(TableIdentifiers, @sizeOf(c_uacpi.uacpi_table_identifiers));
+        }
+    };
+
+    /// Install a table from a virtual address.
+    ///
+    /// The table is simply stored in the internal table array, and not loaded by the interpreter (see `load`).
+    ///
+    /// The table is optionally returned via 'out_table'.
+    ///
+    /// Manual calls to `install` are not subject to filtering via the table installation callback (if any).
+    pub fn installVirtual(address: core.VirtualAddress, out_table: ?*Table) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_install(
+            address.toPtr(?*anyopaque),
+            @ptrCast(out_table),
+        ));
+        try ret.toError();
+    }
+
+    /// Install a table from a physical address.
+    ///
+    /// The table is simply stored in the internal table array, and not loaded by the interpreter (see `load`).
+    ///
+    /// The table is optionally returned via 'out_table'.
+    ///
+    /// Manual calls to `install` are not subject to filtering via the table installation callback (if any).
+    pub fn installPhysical(address: core.PhysicalAddress, out_table: ?*Table) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_install_physical(
+            @bitCast(address),
+            @ptrCast(out_table),
+        ));
+        try ret.toError();
+    }
+
+    /// Load a previously installed table by feeding it to the interpreter.
+    pub fn load(index: usize) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_load(
+            @intCast(index),
+        ));
+        try ret.toError();
+    }
+
+    /// Returns the pointer to a sanitized internal version of FADT.
+    ///
+    /// - The revision is guaranteed to be correct.
+    /// - All of the registers are converted to GAS format.
+    /// - Fields that might contain garbage are cleared.
+    pub fn fadt() !*acpi.FADT {
+        var fadt_ptr: *acpi.FADT = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_fadt(
+            @ptrCast(&fadt_ptr),
+        ));
+        try ret.toError();
+
+        return fadt_ptr;
+    }
+
+    pub const TableInstallationDisposition = enum(c_uacpi.uacpi_table_installation_disposition) {
+        /// Allow the table to be installed as-is
+        allow = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_ALLOW,
+
+        /// Deny the table from being installed completely.
+        ///
+        /// This is useful for debugging various problems, e.g. AML loading bad SSDTs that cause the system to hang or
+        /// enter an undesired state.
+        deny = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_DENY,
+
+        /// Override the table being installed with the table at the virtual address returned in 'out_override_address'.
+        virtual_override = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_VIRTUAL_OVERRIDE,
+
+        /// Override the table being installed with the table at the physical address returned in 'out_override_address'.
+        physical_override = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_PHYSICAL_OVERRIDE,
+    };
+
+    pub const TableInstallationHandler = *const fn (
+        header: *acpi.SharedHeader,
+        out_override_address: *u64,
+    ) callconv(.C) TableInstallationDisposition;
+
+    /// Set a handler that is invoked for each table before it gets installed.
+    ///
+    /// Depending on the return value, the table is either allowed to be installed as-is, denied, or overriden with a
+    /// new one.
+    pub fn setTableInstallationHandler(handler: TableInstallationHandler) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_table_installation_handler(
+            @ptrCast(handler),
+        ));
         try ret.toError();
     }
 };
@@ -142,25 +316,19 @@ pub const utilities = struct {
     };
 
     pub fn setInterruptModel(model: InterruptModel) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(@intFromEnum(model)));
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(@intFromEnum(model)));
         try ret.toError();
     }
 };
 
-pub fn getTable(signature: *const [4]u8, n: usize) !UacpiTable {
-    var table: UacpiTable = undefined;
+pub const ObjectName = extern union {
+    text: [4]u8,
+    id: u32,
 
-    var ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_table_find_by_signature(signature, @ptrCast(&table)));
-    try ret.toError();
-
-    var i: usize = 0;
-    while (i < n) : (i += 1) {
-        ret = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(@ptrCast(&table)));
-        try ret.toError();
+    comptime {
+        core.testing.expectSize(ObjectName, @sizeOf(c_uacpi.uacpi_object_name));
     }
-
-    return table;
-}
+};
 
 pub const UacpiError = error{
     MAPPING_FAILED,
@@ -198,15 +366,175 @@ pub const UacpiError = error{
     AML_CALL_STACK_DEPTH_LIMIT,
 };
 
+const WorkType = enum(c_uacpi.uacpi_work_type) {
+    /// Schedule a GPE handler method for execution.
+    ///
+    /// This should be scheduled to run on CPU0 to avoid potential SMI-related firmware bugs.
+    gpe_execution = c_uacpi.UACPI_WORK_GPE_EXECUTION,
+
+    /// Schedule a Notify(device) firmware request for execution.
+    ///
+    /// This can run on any CPU.
+    work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
+};
+
+const InterruptHandler = *const fn (*anyopaque) callconv(.C) void;
+const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
+
+const Status = enum(c_uacpi.uacpi_status) {
+    OK = c_uacpi.UACPI_STATUS_OK,
+    MAPPING_FAILED = c_uacpi.UACPI_STATUS_MAPPING_FAILED,
+    OUT_OF_MEMORY = c_uacpi.UACPI_STATUS_OUT_OF_MEMORY,
+    BAD_CHECKSUM = c_uacpi.UACPI_STATUS_BAD_CHECKSUM,
+    INVALID_SIGNATURE = c_uacpi.UACPI_STATUS_INVALID_SIGNATURE,
+    INVALID_TABLE_LENGTH = c_uacpi.UACPI_STATUS_INVALID_TABLE_LENGTH,
+    NOT_FOUND = c_uacpi.UACPI_STATUS_NOT_FOUND,
+    INVALID_ARGUMENT = c_uacpi.UACPI_STATUS_INVALID_ARGUMENT,
+    UNIMPLEMENTED = c_uacpi.UACPI_STATUS_UNIMPLEMENTED,
+    ALREADY_EXISTS = c_uacpi.UACPI_STATUS_ALREADY_EXISTS,
+    INTERNAL_ERROR = c_uacpi.UACPI_STATUS_INTERNAL_ERROR,
+    TYPE_MISMATCH = c_uacpi.UACPI_STATUS_TYPE_MISMATCH,
+    INIT_LEVEL_MISMATCH = c_uacpi.UACPI_STATUS_INIT_LEVEL_MISMATCH,
+    NAMESPACE_NODE_DANGLING = c_uacpi.UACPI_STATUS_NAMESPACE_NODE_DANGLING,
+    NO_HANDLER = c_uacpi.UACPI_STATUS_NO_HANDLER,
+    NO_RESOURCE_END_TAG = c_uacpi.UACPI_STATUS_NO_RESOURCE_END_TAG,
+    COMPILED_OUT = c_uacpi.UACPI_STATUS_COMPILED_OUT,
+    HARDWARE_TIMEOUT = c_uacpi.UACPI_STATUS_HARDWARE_TIMEOUT,
+    TIMEOUT = c_uacpi.UACPI_STATUS_TIMEOUT,
+    OVERRIDDEN = c_uacpi.UACPI_STATUS_OVERRIDDEN,
+    DENIED = c_uacpi.UACPI_STATUS_DENIED,
+
+    // All errors that have bytecode-related origin should go here
+    AML_UNDEFINED_REFERENCE = c_uacpi.UACPI_STATUS_AML_UNDEFINED_REFERENCE,
+    AML_INVALID_NAMESTRING = c_uacpi.UACPI_STATUS_AML_INVALID_NAMESTRING,
+    AML_OBJECT_ALREADY_EXISTS = c_uacpi.UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS,
+    AML_INVALID_OPCODE = c_uacpi.UACPI_STATUS_AML_INVALID_OPCODE,
+    AML_INCOMPATIBLE_OBJECT_TYPE = c_uacpi.UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE,
+    AML_BAD_ENCODING = c_uacpi.UACPI_STATUS_AML_BAD_ENCODING,
+    AML_OUT_OF_BOUNDS_INDEX = c_uacpi.UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX,
+    AML_SYNC_LEVEL_TOO_HIGH = c_uacpi.UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH,
+    AML_INVALID_RESOURCE = c_uacpi.UACPI_STATUS_AML_INVALID_RESOURCE,
+    AML_LOOP_TIMEOUT = c_uacpi.UACPI_STATUS_AML_LOOP_TIMEOUT,
+    AML_CALL_STACK_DEPTH_LIMIT = c_uacpi.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
+
+    fn toError(self: Status) UacpiError!void {
+        switch (self) {
+            .OK => {},
+            .MAPPING_FAILED => return UacpiError.MAPPING_FAILED,
+            .OUT_OF_MEMORY => return UacpiError.OUT_OF_MEMORY,
+            .BAD_CHECKSUM => return UacpiError.BAD_CHECKSUM,
+            .INVALID_SIGNATURE => return UacpiError.INVALID_SIGNATURE,
+            .INVALID_TABLE_LENGTH => return UacpiError.INVALID_TABLE_LENGTH,
+            .NOT_FOUND => return UacpiError.NOT_FOUND,
+            .INVALID_ARGUMENT => return UacpiError.INVALID_ARGUMENT,
+            .UNIMPLEMENTED => return UacpiError.UNIMPLEMENTED,
+            .ALREADY_EXISTS => return UacpiError.ALREADY_EXISTS,
+            .INTERNAL_ERROR => return UacpiError.INTERNAL_ERROR,
+            .TYPE_MISMATCH => return UacpiError.TYPE_MISMATCH,
+            .INIT_LEVEL_MISMATCH => return UacpiError.INIT_LEVEL_MISMATCH,
+            .NAMESPACE_NODE_DANGLING => return UacpiError.NAMESPACE_NODE_DANGLING,
+            .NO_HANDLER => return UacpiError.NO_HANDLER,
+            .NO_RESOURCE_END_TAG => return UacpiError.NO_RESOURCE_END_TAG,
+            .COMPILED_OUT => return UacpiError.COMPILED_OUT,
+            .HARDWARE_TIMEOUT => return UacpiError.HARDWARE_TIMEOUT,
+            .TIMEOUT => return UacpiError.TIMEOUT,
+            .OVERRIDDEN => return UacpiError.OVERRIDDEN,
+            .DENIED => return UacpiError.DENIED,
+
+            .AML_UNDEFINED_REFERENCE => return UacpiError.AML_UNDEFINED_REFERENCE,
+            .AML_INVALID_NAMESTRING => return UacpiError.AML_INVALID_NAMESTRING,
+            .AML_OBJECT_ALREADY_EXISTS => return UacpiError.AML_OBJECT_ALREADY_EXISTS,
+            .AML_INVALID_OPCODE => return UacpiError.AML_INVALID_OPCODE,
+            .AML_INCOMPATIBLE_OBJECT_TYPE => return UacpiError.AML_INCOMPATIBLE_OBJECT_TYPE,
+            .AML_BAD_ENCODING => return UacpiError.AML_BAD_ENCODING,
+            .AML_OUT_OF_BOUNDS_INDEX => return UacpiError.AML_OUT_OF_BOUNDS_INDEX,
+            .AML_SYNC_LEVEL_TOO_HIGH => return UacpiError.AML_SYNC_LEVEL_TOO_HIGH,
+            .AML_INVALID_RESOURCE => return UacpiError.AML_INVALID_RESOURCE,
+            .AML_LOOP_TIMEOUT => return UacpiError.AML_LOOP_TIMEOUT,
+            .AML_CALL_STACK_DEPTH_LIMIT => return UacpiError.AML_CALL_STACK_DEPTH_LIMIT,
+        }
+    }
+};
+
+const ByteWidth = enum(u8) {
+    one = 1,
+    two = 2,
+    four = 4,
+};
+
+const LogLevel = enum(c_uacpi.uacpi_log_level) {
+    /// Super verbose logging, every op & uop being processed is logged.
+    /// Mostly useful for tracking down hangs/lockups.
+    DEBUG = c_uacpi.UACPI_LOG_DEBUG,
+
+    /// A little verbose, every operation region access is traced with a bit of
+    /// extra information on top.
+    TRACE = c_uacpi.UACPI_LOG_TRACE,
+
+    /// Only logs the bare minimum information about state changes and/or
+    /// initialization progress.
+    INFO = c_uacpi.UACPI_LOG_INFO,
+
+    /// Logs recoverable errors and/or non-important aborts.
+    WARN = c_uacpi.UACPI_LOG_WARN,
+
+    /// Logs only critical errors that might affect the ability to initialize or
+    /// prevent stable runtime.
+    ERROR = c_uacpi.UACPI_LOG_ERROR,
+};
+
+const FirmwareRequest = extern struct {
+    type: Type,
+
+    data: Data,
+
+    const Type = enum(c_uacpi.uacpi_firmware_request_type) {
+        breakpoint = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
+        fatal = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
+    };
+
+    const Data = extern union {
+        breakpoint: Breakpoint,
+        fatal: Fatal,
+
+        const Breakpoint = extern struct {
+            /// The context of the method currently being executed
+            ctx: *anyopaque,
+        };
+
+        const Fatal = extern struct {
+            type: u8,
+            code: u32,
+            arg: u64,
+        };
+    };
+
+    comptime {
+        core.testing.expectSize(c_uacpi.uacpi_firmware_request, @sizeOf(FirmwareRequest));
+    }
+};
+
+const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
+    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
+    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
+    /// Only applicable for uacpi_namespace_for_each_child
+    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+};
+
+comptime {
+    std.debug.assert(@sizeOf(core.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
+    std.debug.assert(@intFromPtr(c_uacpi.UACPI_THREAD_ID_NONE) == @intFromEnum(kernel.Task.Id.none));
+}
+
 const kernel_api = struct {
     /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
-    export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) UacpiStatus {
-        const address = kernel.boot.rsdp() orelse return UacpiStatus.NOT_FOUND;
+    export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) Status {
+        const address = kernel.boot.rsdp() orelse return Status.NOT_FOUND;
 
         switch (address) {
             .physical => |addr| out_rsdp_address.* = addr,
             .virtual => |addr| out_rsdp_address.* =
-                kernel.vmm.physicalFromDirectMap(addr) catch return UacpiStatus.INTERNAL_ERROR,
+                kernel.vmm.physicalFromDirectMap(addr) catch return Status.INTERNAL_ERROR,
         }
 
         return .OK;
@@ -218,8 +546,8 @@ const kernel_api = struct {
     export fn uacpi_kernel_pci_device_open(
         address: kernel.pci.Address,
         out_handle: **kernel.pci.PciFunction,
-    ) UacpiStatus {
-        out_handle.* = kernel.pci.getFunction(address) orelse return UacpiStatus.NOT_FOUND;
+    ) Status {
+        out_handle.* = kernel.pci.getFunction(address) orelse return Status.NOT_FOUND;
         return .OK;
     }
 
@@ -237,7 +565,7 @@ const kernel_api = struct {
         offset: usize,
         byte_width: ByteWidth,
         value: *u64,
-    ) UacpiStatus {
+    ) Status {
         const address = device.config_space_address.moveForward(.from(offset, .byte));
 
         value.* = switch (byte_width) {
@@ -259,7 +587,7 @@ const kernel_api = struct {
         offset: usize,
         byte_width: ByteWidth,
         value: u64,
-    ) UacpiStatus {
+    ) Status {
         const address = device.config_space_address.moveForward(.from(offset, .byte));
 
         switch (byte_width) {
@@ -273,7 +601,7 @@ const kernel_api = struct {
 
     /// Map a SystemIO address at [base, base + len) and return a kernel-implemented handle that can be used for reading
     /// and writing the IO range.
-    export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) UacpiStatus {
+    export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) Status {
         _ = len;
         out_handle.* = @ptrFromInt(base);
         return .OK;
@@ -293,7 +621,7 @@ const kernel_api = struct {
         offset: usize,
         byte_width: ByteWidth,
         value: *u64,
-    ) UacpiStatus {
+    ) Status {
         _ = offset;
         const port: u16 = @intCast(@intFromPtr(handle)); // IO ports are 16-bit
         switch (byte_width) {
@@ -314,7 +642,7 @@ const kernel_api = struct {
         offset: usize,
         byte_width: ByteWidth,
         value: u64,
-    ) UacpiStatus {
+    ) Status {
         _ = offset;
         const port: u16 = @intCast(@intFromPtr(handle)); // IO ports are 16-bit
         switch (byte_width) {
@@ -450,7 +778,7 @@ const kernel_api = struct {
     /// 2. UACPI_STATUS_TIMEOUT - timeout reached while attempting to acquire (or the single attempt to acquire was not
     ///                           successful for calls with timeout=0)
     /// 3. Any other value - signifies a host internal error and is treated as such
-    export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: u16) UacpiStatus {
+    export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: u16) Status {
         const current_task = kernel.Task.getCurrent();
 
         switch (timeout) {
@@ -496,7 +824,7 @@ const kernel_api = struct {
     /// Handle a firmware request.
     ///
     /// Currently either a Breakpoint or Fatal operators.
-    export fn uacpi_kernel_handle_firmware_request(request: *const FirmwareRequest) UacpiStatus {
+    export fn uacpi_kernel_handle_firmware_request(request: *const FirmwareRequest) Status {
         core.panicFmt(
             "uacpi_kernel_handle_firmware_request(request={})",
             .{request},
@@ -512,7 +840,7 @@ const kernel_api = struct {
         handler: InterruptHandler,
         ctx: *anyopaque,
         out_irq_handle: **anyopaque,
-    ) UacpiStatus {
+    ) Status {
         const HandlerWrapper = struct {
             fn HandlerWrapper(
                 _: *kernel.Task,
@@ -531,14 +859,14 @@ const kernel_api = struct {
             ctx,
         ) catch |err| {
             log.err("failed to allocate interrupt: {}", .{err});
-            return UacpiStatus.INTERNAL_ERROR;
+            return Status.INTERNAL_ERROR;
         };
 
         kernel.arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
             kernel.arch.interrupts.deallocateInterrupt(interrupt);
 
             log.err("failed to route interrupt: {}", .{err});
-            return UacpiStatus.INTERNAL_ERROR;
+            return Status.INTERNAL_ERROR;
         };
 
         out_irq_handle.* = @ptrFromInt(@intFromEnum(interrupt));
@@ -552,7 +880,7 @@ const kernel_api = struct {
     export fn uacpi_kernel_uninstall_interrupt_handler(
         _: InterruptHandler,
         irq_handle: *anyopaque,
-    ) UacpiStatus {
+    ) Status {
         const interrupt: kernel.arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
         kernel.arch.interrupts.deallocateInterrupt(interrupt);
 
@@ -598,7 +926,7 @@ const kernel_api = struct {
         work_type: WorkType,
         handler: WorkHandler,
         ctx: *anyopaque,
-    ) UacpiStatus {
+    ) Status {
         core.panicFmt(
             "uacpi_kernel_schedule_work(work_type={}, handler={}, ctx={})",
             .{ work_type, handler, ctx },
@@ -611,190 +939,10 @@ const kernel_api = struct {
     /// 2. All work scheduled via uacpi_kernel_schedule_work
     ///
     /// Note that the waits must be done in this order specifically.
-    export fn uacpi_kernel_wait_for_work_completion() UacpiStatus {
+    export fn uacpi_kernel_wait_for_work_completion() Status {
         core.panic("uacpi_kernel_wait_for_work_completion()", null);
     }
 };
-
-const WorkType = enum(c_uacpi.uacpi_work_type) {
-    /// Schedule a GPE handler method for execution.
-    ///
-    /// This should be scheduled to run on CPU0 to avoid potential SMI-related firmware bugs.
-    gpe_execution = c_uacpi.UACPI_WORK_GPE_EXECUTION,
-
-    /// Schedule a Notify(device) firmware request for execution.
-    ///
-    /// This can run on any CPU.
-    work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
-};
-
-const InterruptHandler = *const fn (*anyopaque) callconv(.C) void;
-const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
-
-const UacpiStatus = enum(c_uacpi.uacpi_status) {
-    OK = c_uacpi.UACPI_STATUS_OK,
-    MAPPING_FAILED = c_uacpi.UACPI_STATUS_MAPPING_FAILED,
-    OUT_OF_MEMORY = c_uacpi.UACPI_STATUS_OUT_OF_MEMORY,
-    BAD_CHECKSUM = c_uacpi.UACPI_STATUS_BAD_CHECKSUM,
-    INVALID_SIGNATURE = c_uacpi.UACPI_STATUS_INVALID_SIGNATURE,
-    INVALID_TABLE_LENGTH = c_uacpi.UACPI_STATUS_INVALID_TABLE_LENGTH,
-    NOT_FOUND = c_uacpi.UACPI_STATUS_NOT_FOUND,
-    INVALID_ARGUMENT = c_uacpi.UACPI_STATUS_INVALID_ARGUMENT,
-    UNIMPLEMENTED = c_uacpi.UACPI_STATUS_UNIMPLEMENTED,
-    ALREADY_EXISTS = c_uacpi.UACPI_STATUS_ALREADY_EXISTS,
-    INTERNAL_ERROR = c_uacpi.UACPI_STATUS_INTERNAL_ERROR,
-    TYPE_MISMATCH = c_uacpi.UACPI_STATUS_TYPE_MISMATCH,
-    INIT_LEVEL_MISMATCH = c_uacpi.UACPI_STATUS_INIT_LEVEL_MISMATCH,
-    NAMESPACE_NODE_DANGLING = c_uacpi.UACPI_STATUS_NAMESPACE_NODE_DANGLING,
-    NO_HANDLER = c_uacpi.UACPI_STATUS_NO_HANDLER,
-    NO_RESOURCE_END_TAG = c_uacpi.UACPI_STATUS_NO_RESOURCE_END_TAG,
-    COMPILED_OUT = c_uacpi.UACPI_STATUS_COMPILED_OUT,
-    HARDWARE_TIMEOUT = c_uacpi.UACPI_STATUS_HARDWARE_TIMEOUT,
-    TIMEOUT = c_uacpi.UACPI_STATUS_TIMEOUT,
-    OVERRIDDEN = c_uacpi.UACPI_STATUS_OVERRIDDEN,
-    DENIED = c_uacpi.UACPI_STATUS_DENIED,
-
-    // All errors that have bytecode-related origin should go here
-    AML_UNDEFINED_REFERENCE = c_uacpi.UACPI_STATUS_AML_UNDEFINED_REFERENCE,
-    AML_INVALID_NAMESTRING = c_uacpi.UACPI_STATUS_AML_INVALID_NAMESTRING,
-    AML_OBJECT_ALREADY_EXISTS = c_uacpi.UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS,
-    AML_INVALID_OPCODE = c_uacpi.UACPI_STATUS_AML_INVALID_OPCODE,
-    AML_INCOMPATIBLE_OBJECT_TYPE = c_uacpi.UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE,
-    AML_BAD_ENCODING = c_uacpi.UACPI_STATUS_AML_BAD_ENCODING,
-    AML_OUT_OF_BOUNDS_INDEX = c_uacpi.UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX,
-    AML_SYNC_LEVEL_TOO_HIGH = c_uacpi.UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH,
-    AML_INVALID_RESOURCE = c_uacpi.UACPI_STATUS_AML_INVALID_RESOURCE,
-    AML_LOOP_TIMEOUT = c_uacpi.UACPI_STATUS_AML_LOOP_TIMEOUT,
-    AML_CALL_STACK_DEPTH_LIMIT = c_uacpi.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
-
-    fn toError(self: UacpiStatus) UacpiError!void {
-        switch (self) {
-            .OK => {},
-            .MAPPING_FAILED => return UacpiError.MAPPING_FAILED,
-            .OUT_OF_MEMORY => return UacpiError.OUT_OF_MEMORY,
-            .BAD_CHECKSUM => return UacpiError.BAD_CHECKSUM,
-            .INVALID_SIGNATURE => return UacpiError.INVALID_SIGNATURE,
-            .INVALID_TABLE_LENGTH => return UacpiError.INVALID_TABLE_LENGTH,
-            .NOT_FOUND => return UacpiError.NOT_FOUND,
-            .INVALID_ARGUMENT => return UacpiError.INVALID_ARGUMENT,
-            .UNIMPLEMENTED => return UacpiError.UNIMPLEMENTED,
-            .ALREADY_EXISTS => return UacpiError.ALREADY_EXISTS,
-            .INTERNAL_ERROR => return UacpiError.INTERNAL_ERROR,
-            .TYPE_MISMATCH => return UacpiError.TYPE_MISMATCH,
-            .INIT_LEVEL_MISMATCH => return UacpiError.INIT_LEVEL_MISMATCH,
-            .NAMESPACE_NODE_DANGLING => return UacpiError.NAMESPACE_NODE_DANGLING,
-            .NO_HANDLER => return UacpiError.NO_HANDLER,
-            .NO_RESOURCE_END_TAG => return UacpiError.NO_RESOURCE_END_TAG,
-            .COMPILED_OUT => return UacpiError.COMPILED_OUT,
-            .HARDWARE_TIMEOUT => return UacpiError.HARDWARE_TIMEOUT,
-            .TIMEOUT => return UacpiError.TIMEOUT,
-            .OVERRIDDEN => return UacpiError.OVERRIDDEN,
-            .DENIED => return UacpiError.DENIED,
-
-            .AML_UNDEFINED_REFERENCE => return UacpiError.AML_UNDEFINED_REFERENCE,
-            .AML_INVALID_NAMESTRING => return UacpiError.AML_INVALID_NAMESTRING,
-            .AML_OBJECT_ALREADY_EXISTS => return UacpiError.AML_OBJECT_ALREADY_EXISTS,
-            .AML_INVALID_OPCODE => return UacpiError.AML_INVALID_OPCODE,
-            .AML_INCOMPATIBLE_OBJECT_TYPE => return UacpiError.AML_INCOMPATIBLE_OBJECT_TYPE,
-            .AML_BAD_ENCODING => return UacpiError.AML_BAD_ENCODING,
-            .AML_OUT_OF_BOUNDS_INDEX => return UacpiError.AML_OUT_OF_BOUNDS_INDEX,
-            .AML_SYNC_LEVEL_TOO_HIGH => return UacpiError.AML_SYNC_LEVEL_TOO_HIGH,
-            .AML_INVALID_RESOURCE => return UacpiError.AML_INVALID_RESOURCE,
-            .AML_LOOP_TIMEOUT => return UacpiError.AML_LOOP_TIMEOUT,
-            .AML_CALL_STACK_DEPTH_LIMIT => return UacpiError.AML_CALL_STACK_DEPTH_LIMIT,
-        }
-    }
-};
-
-const ByteWidth = enum(u8) {
-    one = 1,
-    two = 2,
-    four = 4,
-};
-
-const LogLevel = enum(c_uacpi.uacpi_log_level) {
-    /// Super verbose logging, every op & uop being processed is logged.
-    /// Mostly useful for tracking down hangs/lockups.
-    DEBUG = c_uacpi.UACPI_LOG_DEBUG,
-
-    /// A little verbose, every operation region access is traced with a bit of
-    /// extra information on top.
-    TRACE = c_uacpi.UACPI_LOG_TRACE,
-
-    /// Only logs the bare minimum information about state changes and/or
-    /// initialization progress.
-    INFO = c_uacpi.UACPI_LOG_INFO,
-
-    /// Logs recoverable errors and/or non-important aborts.
-    WARN = c_uacpi.UACPI_LOG_WARN,
-
-    /// Logs only critical errors that might affect the ability to initialize or
-    /// prevent stable runtime.
-    ERROR = c_uacpi.UACPI_LOG_ERROR,
-};
-
-const FirmwareRequest = extern struct {
-    type: Type,
-
-    data: Data,
-
-    const Type = enum(c_uacpi.uacpi_firmware_request_type) {
-        breakpoint = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
-        fatal = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
-    };
-
-    const Data = extern union {
-        breakpoint: Breakpoint,
-        fatal: Fatal,
-
-        const Breakpoint = extern struct {
-            /// The context of the method currently being executed
-            ctx: *anyopaque,
-        };
-
-        const Fatal = extern struct {
-            type: u8,
-            code: u32,
-            arg: u64,
-        };
-    };
-
-    comptime {
-        core.testing.expectSize(c_uacpi.uacpi_firmware_request, @sizeOf(FirmwareRequest));
-    }
-};
-
-const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
-    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
-    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
-    /// Only applicable for uacpi_namespace_for_each_child
-    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
-};
-
-pub const UacpiTable = extern struct {
-    table: Table,
-    index: usize,
-
-    const Table = extern union {
-        virtual_address: core.VirtualAddress,
-        ptr: *anyopaque,
-        header: *acpi.SharedHeader,
-    };
-
-    pub fn unrefTable(table: UacpiTable) !void {
-        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_table_unref(@constCast(@ptrCast(&table))));
-        try ret.toError();
-    }
-
-    comptime {
-        core.testing.expectSize(c_uacpi.uacpi_table, @sizeOf(UacpiTable));
-    }
-};
-
-comptime {
-    std.debug.assert(@sizeOf(core.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
-    std.debug.assert(@intFromPtr(c_uacpi.UACPI_THREAD_ID_NONE) == @intFromEnum(kernel.Task.Id.none));
-}
 
 comptime {
     _ = &kernel_api; // ensure kernel api is exported

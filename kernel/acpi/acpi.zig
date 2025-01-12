@@ -6,10 +6,16 @@
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
 pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
-    const uacpi_table = uapci.getTable(T.SIGNATURE_STRING, n) catch return null;
+    var table = uapci.tables.findBySignature(T.SIGNATURE_STRING) catch return null;
+
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        table.nextWithSameSignature() catch return null;
+    }
+
     return .{
-        .table = @ptrCast(@alignCast(uacpi_table.table.ptr)),
-        .handle = uacpi_table,
+        .table = @ptrCast(@alignCast(table.table.ptr)),
+        .handle = table,
     };
 }
 
@@ -17,7 +23,7 @@ pub fn AcpiTable(comptime T: type) type {
     return struct {
         table: *const T,
 
-        handle: uapci.UacpiTable,
+        handle: uapci.tables.Table,
 
         pub fn deinit(self: @This()) void {
             self.handle.unrefTable() catch unreachable;
