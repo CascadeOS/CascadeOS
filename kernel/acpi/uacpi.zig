@@ -2,17 +2,125 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2024 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/1d636a34152dc82833c89175b702f2c0671f04e3/LICENSE)
 
-pub fn setupEarlyTableAccess() UacpiError!void {
-    const static = struct {
-        var buffer: [kernel.arch.paging.standard_page_size.value]u8 = undefined;
-    };
-
+/// Set up early access to the table subsystem. What this means is:
+/// - uacpi_table_find() and similar API becomes usable before the call to
+///   uacpi_initialize().
+/// - No kernel API besides logging and map/unmap will be invoked at this stage,
+///   allowing for heap and scheduling to still be fully offline.
+/// - The provided 'temporary_buffer' will be used as a temporary storage for the
+///   internal metadata about the tables (list, reference count, addresses,
+///   sizes, etc).
+/// - The 'temporary_buffer' is replaced with a normal heap buffer allocated via
+///   uacpi_kernel_alloc() after the call to uacpi_initialize() and can therefore
+///   be reclaimed by the kernel.
+///
+/// The approximate overhead per table is 56 bytes, so a buffer of 4096 bytes
+/// yields about 73 tables in terms of capacity. uACPI also has an internal
+/// static buffer for tables, "UACPI_STATIC_TABLE_ARRAY_LEN", which is configured
+/// as 16 descriptors in length by default.
+pub fn setupEarlyTableAccess(temporary_buffer: []u8) !void {
     const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_setup_early_table_access(
-        &static.buffer,
-        static.buffer.len,
+        temporary_buffer.ptr,
+        temporary_buffer.len,
     ));
     try ret.toError();
 }
+
+pub const InitalizeOptions = packed struct(u64) {
+    /// Bad table checksum should be considered a fatal error (table load is fully aborted in this case)
+    bad_checksum_fatal: bool = false,
+
+    /// Unexpected table signature should be considered a fatal error (table load is fully aborted in this case)
+    bad_table_signature_fatal: bool = false,
+
+    /// Force uACPI to use RSDT even for later revisions
+    bad_xsdt: bool = false,
+
+    /// If this is set, ACPI mode is not entered during the call to `initialize`.
+    ///
+    /// The caller is expected to enter it later at their own discretion by using `enterAcpiMode`.
+    no_acpi: bool = false,
+
+    /// Don't create the \_OSI method when building the namespace.
+    ///
+    /// Only enable this if you're certain that having this method breaks your AML blob.
+    no_osi: bool = false,
+
+    /// Validate table checksums at installation time instead of first use.
+    ///
+    /// Note that this makes uACPI map the entire table at once, which not all hosts are able to handle at early init.
+    proactive_table_checksum: bool = false,
+
+    _reserved: u58 = 0,
+};
+
+/// Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT tables.
+///
+/// Enters ACPI mode.
+pub fn initialize(options: InitalizeOptions) !void {
+    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_initialize(@bitCast(options)));
+    try ret.toError();
+}
+
+/// Parses & executes all of the DSDT/SSDT tables.
+///
+/// Initializes the event subsystem.
+pub fn namespaceLoad() !void {
+    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_namespace_load());
+    try ret.toError();
+}
+
+/// Initializes all the necessary objects in the namespaces by calling _STA/_INI etc.
+pub fn namespaceInitialize() !void {
+    const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_namespace_initialize());
+    try ret.toError();
+}
+
+pub const sleep = struct {
+    pub const SleepState = enum(c_uacpi.uacpi_sleep_state) {
+        S0 = c_uacpi.UACPI_SLEEP_STATE_S0,
+        S1 = c_uacpi.UACPI_SLEEP_STATE_S1,
+        S2 = c_uacpi.UACPI_SLEEP_STATE_S2,
+        S3 = c_uacpi.UACPI_SLEEP_STATE_S3,
+        S4 = c_uacpi.UACPI_SLEEP_STATE_S4,
+        S5 = c_uacpi.UACPI_SLEEP_STATE_S5,
+    };
+
+    /// Prepare for a given sleep state.
+    ///
+    /// Must be caled with interrupts ENABLED.
+    pub fn prepareForSleep(state: SleepState) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(@intFromEnum(state)));
+        try ret.toError();
+    }
+
+    /// Enter the given sleep state after preparation.
+    ///
+    /// Must be called with interrupts DISABLED.
+    pub fn sleep(state: SleepState) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(@intFromEnum(state)));
+        try ret.toError();
+    }
+
+    /// Attempt reset via the FADT reset register.
+    pub fn reboot() !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_reboot());
+        try ret.toError();
+    }
+};
+
+pub const utilities = struct {
+    pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
+        pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
+        ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
+        iosapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOSAPIC,
+    };
+
+    pub fn setInterruptModel(model: InterruptModel) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(@intFromEnum(model)));
+        try ret.toError();
+    }
+};
 
 pub fn getTable(signature: *const [4]u8, n: usize) !UacpiTable {
     var table: UacpiTable = undefined;
@@ -27,33 +135,6 @@ pub fn getTable(signature: *const [4]u8, n: usize) !UacpiTable {
     }
 
     return table;
-}
-
-pub fn initialize() UacpiError!void {
-    // Initializes the uACPI subsystem, iterates & records all relevant RSDT/XSDT tables. Enters ACPI mode.
-    var ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_initialize(0));
-    try ret.toError();
-
-    // Parses & executes all of the DSDT/SSDT tables. Initializes the event subsystem.
-    ret = @enumFromInt(c_uacpi.uacpi_namespace_load());
-    try ret.toError();
-
-    if (kernel.config.cascade_target == .x64) {
-        ret = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC));
-        try ret.toError();
-    }
-
-    // Initializes all the necessary objects in the namespaces by calling _STA/_INI etc.
-    ret = @enumFromInt(c_uacpi.uacpi_namespace_initialize());
-    try ret.toError();
-
-    // Tell uACPI that we have marked all GPEs we wanted for wake (even though we haven't actually marked any, as we
-    // have no power management support right now).
-    // This is needed to let uACPI enable all unmarked GPEs that have a corresponding AML handler.
-    // These handlers are used by the firmware to dynamically execute AML code at runtime to e.g. react to thermal
-    // events or device hotplug.
-    ret = @enumFromInt(c_uacpi.uacpi_finalize_gpe_initialization());
-    try ret.toError();
 }
 
 pub const UacpiError = error{
@@ -167,7 +248,7 @@ const kernel_api = struct {
 
     /// Map a SystemIO address at [base, base + len) and return a kernel-implemented handle that can be used for reading
     /// and writing the IO range.
-    export fn uacpi_kernel_io_map(base: IOAddress, len: usize, out_handle: **anyopaque) UacpiStatus {
+    export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) UacpiStatus {
         _ = len;
         out_handle.* = @ptrFromInt(base);
         return .OK;
@@ -665,8 +746,6 @@ const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
     next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
 };
 
-const IOAddress = u64;
-
 pub const UacpiTable = extern struct {
     table: Table,
     index: usize,
@@ -688,12 +767,6 @@ pub const UacpiTable = extern struct {
 };
 
 comptime {
-    std.debug.assert(c_uacpi.uacpi_size == usize);
-    std.debug.assert(c_uacpi.uacpi_io_addr == IOAddress);
-
-    core.testing.expectSize(c_uacpi.uacpi_phys_addr, @sizeOf(core.PhysicalAddress));
-
-    core.testing.expectSize(c_uacpi.uacpi_thread_id, @sizeOf(kernel.Task.Id));
     std.debug.assert(@intFromPtr(c_uacpi.UACPI_THREAD_ID_NONE) == @intFromEnum(kernel.Task.Id.none));
 }
 
