@@ -126,8 +126,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
     run_qemu.addArgs(&.{ "-boot", "menu=off" });
 
-    run_qemu.addArgs(&.{"-no-reboot"});
-
     // RAM
     run_qemu.addArgs(&.{
         "-m",
