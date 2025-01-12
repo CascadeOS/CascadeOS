@@ -78,6 +78,28 @@ pub fn namespaceInitialize() !void {
     try ret.toError();
 }
 
+pub const io = struct {
+    pub fn readGas(gas: *const acpi.Address) !u64 {
+        var value: u64 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
+            @ptrCast(gas),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
+            @ptrCast(gas),
+            value,
+        ));
+        try ret.toError();
+    }
+};
+
 pub const sleep = struct {
     /// Set the firmware waking vector in FACS.
     ///
@@ -523,6 +545,7 @@ const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
 
 comptime {
     std.debug.assert(@sizeOf(core.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
+    std.debug.assert(@sizeOf(acpi.Address) == @sizeOf(c_uacpi.acpi_gas));
     std.debug.assert(@intFromPtr(c_uacpi.UACPI_THREAD_ID_NONE) == @intFromEnum(kernel.Task.Id.none));
 }
 
@@ -954,13 +977,14 @@ const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.uacpi);
 const acpi = @import("acpi");
 const c_uacpi = @cImport({
-    @cInclude("uacpi/uacpi.h");
     @cInclude("uacpi/event.h");
+    @cInclude("uacpi/io.h");
     @cInclude("uacpi/namespace.h");
     @cInclude("uacpi/notify.h");
     @cInclude("uacpi/osi.h");
     @cInclude("uacpi/resources.h");
     @cInclude("uacpi/sleep.h");
     @cInclude("uacpi/tables.h");
+    @cInclude("uacpi/uacpi.h");
     @cInclude("uacpi/utilities.h");
 });
