@@ -146,8 +146,8 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     if (executor.id == .bootstrap) {
         Barrier.waitForOthers();
 
-        log.debug("initializing PCI", .{});
-        try kernel.pci.init.initialize();
+        log.debug("initializing PCI ECAM", .{});
+        try kernel.pci.init.initializeECAM();
 
         log.debug("initializing ACPI", .{});
         try kernel.acpi.init.initialize();

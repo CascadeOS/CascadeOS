@@ -23,6 +23,31 @@ pub const Address = extern struct {
     bus: u8,
     device: u8,
     function: u8,
+
+    pub fn print(id: Address, writer: std.io.AnyWriter, indent: usize) !void {
+        _ = indent;
+
+        try writer.print("Address({x:0>4}:{x:0>2}:{x:0>2}:{x:0>1})", .{
+            id.segment,
+            id.bus,
+            id.device,
+            id.function,
+        });
+    }
+
+    pub inline fn format(
+        id: Address,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            Address.print(id, writer, 0)
+        else
+            Address.print(id, writer.any(), 0);
+    }
 };
 
 pub const ConfigurationSpace = extern struct {
@@ -378,21 +403,26 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initialize() !void {
-        init_log.debug("building PCI tree", .{});
-        try initializePCITree();
+    pub fn initializeECAM() !void {
+        init_log.debug("building PCI buses", .{});
+        try initializeBuses();
 
-        init_log.debug("scanning PCI buses", .{});
+        init_log.debug("scanning PCI buses for functions:", .{});
         for (globals.ecams) |ecam| {
             for (ecam.buses) |*bus| {
                 for (&bus.devices) |*device| {
-                    scanDevice(device, 0);
+                    scanDevice(device, .{
+                        .segment = ecam.segment_group,
+                        .bus = bus.bus,
+                        .device = device.device,
+                        .function = 0,
+                    });
                 }
             }
         }
     }
 
-    fn initializePCITree() !void {
+    fn initializeBuses() !void {
         const acpi_table = kernel.acpi.getTable(acpi.MCFG, 0) orelse return error.MCFGNotPresent;
         defer acpi_table.deinit();
         const mcfg = acpi_table.table;
@@ -420,14 +450,12 @@ pub const init = struct {
                 ecam.end_bus,
             });
 
-            // allocating all buses in advance even if there are no devices on them is wasteful
-            // at time of writing ~712KiB per ECAM
             ecam.buses = try kernel.heap.allocator.alloc(PciBus, @as(usize, ecam.end_bus) - ecam.start_bus + 1);
             errdefer kernel.heap.allocator.free(ecam.buses);
 
             for (ecam.buses, 0..) |*bus, bus_i| {
                 bus.* = .{
-                    .bus = @intCast(bus_i),
+                    .bus = @intCast(ecam.start_bus + bus_i),
                     .config_space_address = ecam.config_space_address.moveForward(.from(bus_i << 20, .byte)),
                     .ecam = ecam,
                     .devices = undefined, // set below
@@ -447,8 +475,12 @@ pub const init = struct {
         globals.ecams = try ecams.toOwnedSlice();
     }
 
-    fn scanDevice(device: *PciDevice, function: usize) void {
-        const config_space_address = device.config_space_address.moveForward(.from(function << 12, .byte));
+    fn scanDevice(device: *PciDevice, address: Address) void {
+        const function = address.function;
+
+        const config_space_address = device.config_space_address.moveForward(
+            .from(@as(usize, function) << 12, .byte),
+        );
 
         const config_space = config_space_address.toPtr(*volatile ConfigurationSpace);
 
@@ -460,14 +492,17 @@ pub const init = struct {
             .device = device,
         };
 
-        init_log.debug("  found device - {} - {}", .{
+        init_log.debug("  {} - {} - {}", .{
+            address,
             config_space.vendor_id,
             config_space.device_id,
         });
 
         if (function == 0 and config_space.header_type.multi_function) {
             for (1..FUNCTIONS_PER_DEVICE) |i| {
-                scanDevice(device, i);
+                var new_address = address;
+                new_address.function = @intCast(i);
+                scanDevice(device, new_address);
             }
         }
 
