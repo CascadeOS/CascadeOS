@@ -77,6 +77,15 @@ pub fn namespaceInitialize() !void {
 }
 
 pub const sleep = struct {
+    /// Set the firmware waking vector in FACS.
+    ///
+    /// - 'addr32' is the real mode entry-point address
+    /// - 'addr64' is the protected mode entry-point address
+    pub fn setWakingVector(addr32: core.PhysicalAddress, addr64: core.PhysicalAddress) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_set_waking_vector(@bitCast(addr32), @bitCast(addr64)));
+        try ret.toError();
+    }
+
     pub const SleepState = enum(c_uacpi.uacpi_sleep_state) {
         S0 = c_uacpi.UACPI_SLEEP_STATE_S0,
         S1 = c_uacpi.UACPI_SLEEP_STATE_S1,
@@ -99,6 +108,22 @@ pub const sleep = struct {
     /// Must be called with interrupts DISABLED.
     pub fn sleep(state: SleepState) !void {
         const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(@intFromEnum(state)));
+        try ret.toError();
+    }
+
+    /// Prepare to leave the given sleep state.
+    ///
+    /// Must be called with interrupts DISABLED.
+    pub fn prepareForWake(state: SleepState) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(@intFromEnum(state)));
+        try ret.toError();
+    }
+
+    /// Wake from the given sleep state.
+    ///
+    /// Must be called with interrupts ENABLED.
+    pub fn wake(state: SleepState) !void {
+        const ret: UacpiStatus = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(@intFromEnum(state)));
         try ret.toError();
     }
 
@@ -767,6 +792,7 @@ pub const UacpiTable = extern struct {
 };
 
 comptime {
+    std.debug.assert(@sizeOf(core.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
     std.debug.assert(@intFromPtr(c_uacpi.UACPI_THREAD_ID_NONE) == @intFromEnum(kernel.Task.Id.none));
 }
 
