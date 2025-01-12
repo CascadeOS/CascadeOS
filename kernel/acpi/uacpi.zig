@@ -178,11 +178,16 @@ pub const tables = struct {
         },
         index: usize,
 
-        pub fn nextWithSameSignature(table: *Table) !void {
+        /// Move to the next table with the same signature.
+        ///
+        /// Returns `true` if the table was found.
+        pub fn nextWithSameSignature(table: *Table) !bool {
             const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(
                 @ptrCast(table),
             ));
+            if (ret == .NOT_FOUND) return false;
             try ret.toError();
+            return true;
         }
 
         pub fn refTable(table: Table) !void {
@@ -204,25 +209,27 @@ pub const tables = struct {
         }
     };
 
-    pub fn findBySignature(signature: *const [4]u8) !Table {
+    pub fn findBySignature(signature: *const [4]u8) !?Table {
         var table: Table = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_by_signature(
             signature,
             @ptrCast(&table),
         ));
+        if (ret == .NOT_FOUND) return null;
         try ret.toError();
 
         return table;
     }
 
-    pub fn find(table_identifiers: *const TableIdentifiers) !Table {
+    pub fn find(table_identifiers: *const TableIdentifiers) !?Table {
         var table: Table = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find(
             @ptrCast(table_identifiers),
             @ptrCast(&table),
         ));
+        if (ret == .NOT_FOUND) return null;
         try ret.toError();
 
         return table;

@@ -6,11 +6,12 @@
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
 pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
-    var table = uapci.tables.findBySignature(T.SIGNATURE_STRING) catch return null;
+    var table = uapci.tables.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
 
     var i: usize = 0;
     while (i < n) : (i += 1) {
-        table.nextWithSameSignature() catch return null;
+        const found_next = table.nextWithSameSignature() catch return null;
+        if (!found_next) return null;
     }
 
     return .{
