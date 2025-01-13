@@ -7,6 +7,7 @@ const TicketSpinLock = @This();
 current: std.atomic.Value(u32) = .init(0),
 ticket: std.atomic.Value(u32) = .init(0),
 holding_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none),
+poisoned: std.atomic.Value(bool) = .init(false),
 
 /// Locks the spinlock.
 pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
@@ -18,6 +19,27 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 
     const ticket = self.ticket.fetchAdd(1, .acq_rel);
     while (self.current.load(.monotonic) != ticket) {
+        kernel.arch.spinLoopHint();
+    }
+    self.holding_executor.store(executor.id, .release);
+}
+
+/// Locks the spinlock.
+///
+/// If the spinlock is poisoned, returns an `error.Poisoned`.
+pub fn lockWithPoisonCheck(self: *TicketSpinLock, current_task: *kernel.Task) error{Poisoned}!void {
+    current_task.incrementInterruptDisable();
+    current_task.incrementPreemptionDisable();
+
+    const executor = current_task.state.running;
+    std.debug.assert(!self.isLockedBy(executor.id)); // recursive locks are not supported
+
+    if (self.poisoned.load(.acquire)) return error.Poisoned;
+
+    const ticket = self.ticket.fetchAdd(1, .acq_rel);
+    while (self.current.load(.monotonic) != ticket) {
+        if (self.poisoned.load(.acquire)) return error.Poisoned;
+
         kernel.arch.spinLoopHint();
     }
     self.holding_executor.store(executor.id, .release);
@@ -47,6 +69,7 @@ pub fn unsafeUnlock(self: *TicketSpinLock) void {
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
 pub fn poison(self: *TicketSpinLock) void {
     _ = self.current.fetchSub(1, .acq_rel);
+    self.poisoned.store(true, .release);
 }
 
 /// Returns true if the spinlock is locked by the given executor.
