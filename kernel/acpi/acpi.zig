@@ -6,7 +6,7 @@
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
 pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
-    var table = uapci.tables.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
+    var table = uacpi.tables.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
 
     var i: usize = 0;
     while (i < n) : (i += 1) {
@@ -24,7 +24,7 @@ pub fn AcpiTable(comptime T: type) type {
     return struct {
         table: *const T,
 
-        handle: uapci.tables.Table,
+        handle: uacpi.tables.Table,
 
         pub fn deinit(self: @This()) void {
             self.handle.unrefTable() catch unreachable;
@@ -34,13 +34,13 @@ pub fn AcpiTable(comptime T: type) type {
 
 pub fn tryShutdown() !void {
     if (globals.acpi_initialized) {
-        try uapci.sleep.prepareForSleep(.S5);
+        try uacpi.sleep.prepareForSleep(.S5);
 
         const interrupts_enabled = kernel.arch.interrupts.areEnabled();
         kernel.arch.interrupts.disableInterrupts();
         defer if (interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
 
-        try uapci.sleep.sleep(.S5);
+        try uacpi.sleep.sleep(.S5);
     }
 
     try hack.tryHackyShutdown();
@@ -56,22 +56,22 @@ pub const init = struct {
             var buffer: [kernel.arch.paging.standard_page_size.value]u8 = undefined;
         };
 
-        try uapci.setupEarlyTableAccess(&static.buffer);
+        try uacpi.setupEarlyTableAccess(&static.buffer);
     }
 
     pub fn initialize() !void {
         init_log.debug("entering ACPI mode", .{});
-        try uapci.initialize(.{});
+        try uacpi.initialize(.{});
 
         init_log.debug("loading namespace", .{});
-        try uapci.namespaceLoad();
+        try uacpi.namespaceLoad();
 
         if (kernel.config.cascade_target == .x64) {
-            try uapci.utilities.setInterruptModel(.ioapic);
+            try uacpi.utilities.setInterruptModel(.ioapic);
         }
 
         init_log.debug("initializing namespace", .{});
-        try uapci.namespaceInitialize();
+        try uacpi.namespaceInitialize();
 
         globals.acpi_initialized = true;
     }
@@ -272,7 +272,7 @@ const hack = struct {
 };
 
 comptime {
-    _ = &uapci; // ensure kernel api is exported
+    _ = &uacpi; // ensure kernel api is exported
 }
 
 const std = @import("std");
@@ -280,4 +280,4 @@ const core = @import("core");
 const kernel = @import("kernel");
 const acpi = @import("acpi");
 const log = kernel.debug.log.scoped(.acpi);
-const uapci = @import("uacpi.zig");
+const uacpi = @import("uacpi.zig");
