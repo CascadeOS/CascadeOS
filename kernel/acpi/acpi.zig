@@ -67,7 +67,7 @@ pub const init = struct {
         try uacpi.namespaceLoad();
 
         if (kernel.config.cascade_target == .x64) {
-            try uacpi.utilities.setInterruptModel(.ioapic);
+            try uacpi.setInterruptModel(.ioapic);
         }
 
         init_log.debug("initializing namespace", .{});

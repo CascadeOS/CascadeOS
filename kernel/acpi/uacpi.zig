@@ -78,6 +78,17 @@ pub fn namespaceInitialize() !void {
     try ret.toError();
 }
 
+pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
+    pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
+    ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
+    iosapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOSAPIC,
+};
+
+pub fn setInterruptModel(model: InterruptModel) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(@intFromEnum(model)));
+    try ret.toError();
+}
+
 pub const Node = opaque {
     pub fn root() *Node {
         return @ptrCast(c_uacpi.uacpi_namespace_root());
@@ -1017,19 +1028,6 @@ pub const tables = struct {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_set_table_installation_handler(
             @ptrCast(handler_wrapper),
         ));
-        try ret.toError();
-    }
-};
-
-pub const utilities = struct {
-    pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
-        pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
-        ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
-        iosapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOSAPIC,
-    };
-
-    pub fn setInterruptModel(model: InterruptModel) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(@intFromEnum(model)));
         try ret.toError();
     }
 };
