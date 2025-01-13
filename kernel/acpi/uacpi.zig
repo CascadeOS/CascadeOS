@@ -78,274 +78,7 @@ pub fn namespaceInitialize() !void {
     try ret.toError();
 }
 
-pub const io = struct {
-    pub fn readGas(gas: *const acpi.Address) !u64 {
-        var value: u64 = undefined;
-
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
-            @ptrCast(gas),
-            @ptrCast(&value),
-        ));
-        try ret.toError();
-
-        return value;
-    }
-
-    pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
-            @ptrCast(gas),
-            value,
-        ));
-        try ret.toError();
-    }
-};
-
-pub const namespace = struct {
-    pub const Node = opaque {
-        /// Returns `true` if the node is an alias.
-        pub fn isAlias(self: *const Node) bool {
-            return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(self)));
-        }
-
-        pub fn name(self: *const Node) ObjectName {
-            return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(self)));
-        }
-
-        /// Returns the type of object stored at the namespace node.
-        ///
-        /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
-        /// to TOCTOU bugs.
-        pub fn objectType(self: *const Node) !ObjectType {
-            var object_type: ObjectType = undefined;
-
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_type(
-                @ptrCast(self),
-                @ptrCast(&object_type),
-            ));
-            try ret.toError();
-
-            return object_type;
-        }
-
-        /// Returns `true` if the type of the object stored at the namespace node matches the provided value.
-        ///
-        /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
-        /// to TOCTOU bugs.
-        pub fn isType(self: *const Node, object_type: ObjectType) !bool {
-            var out: bool = undefined;
-
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
-                @ptrCast(self),
-                @intFromEnum(object_type),
-                @ptrCast(&out),
-            ));
-            try ret.toError();
-
-            return out;
-        }
-
-        /// Returns `true` if the type of the object stored at the namespace node matches any of the type bits in the
-        /// provided value.
-        ///
-        /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
-        /// to TOCTOU bugs.
-        pub fn isTypeOneOf(self: *const Node, object_type_bits: ObjectTypeBits) !bool {
-            var out: bool = undefined;
-
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
-                @ptrCast(self),
-                @bitCast(object_type_bits),
-                @ptrCast(&out),
-            ));
-            try ret.toError();
-
-            return out;
-        }
-
-        pub fn depth(self: *const Node) usize {
-            return c_uacpi.uacpi_namespace_node_depth(@ptrCast(self));
-        }
-
-        pub fn parent(self: *const Node) *Node {
-            return @ptrCast(c_uacpi.uacpi_namespace_node_parent(@ptrCast(@constCast(self))));
-        }
-
-        pub fn find(parent_node: *const Node, path: [:0]const u8) !?*Node {
-            var node: ?*Node = undefined;
-
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_find(
-                @ptrCast(@constCast(parent_node)),
-                path.ptr,
-                @ptrCast(&node),
-            ));
-            if (ret == .not_found) return null;
-            try ret.toError();
-
-            return node;
-        }
-
-        /// Same as `find`, except the search recurses upwards when the namepath consists of only a single nameseg.
-        ///
-        /// Usually, this behavior is only desired if resolving a namepath specified in an aml-provided object, such as
-        /// a package element.
-        pub fn resolveFromAmlNamepath(scope_node: *const Node, path: [:0]const u8) !?*Node {
-            var node: ?*Node = undefined;
-
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_resolve_from_aml_namepath(
-                @ptrCast(@constCast(scope_node)),
-                path.ptr,
-                @ptrCast(&node),
-            ));
-            if (ret == .not_found) return null;
-            try ret.toError();
-
-            return node;
-        }
-
-        pub fn IterationCallback(comptime UserContextT: type) type {
-            return fn (
-                user_context: ?*UserContextT,
-                node: *Node,
-                node_depth: u32,
-            ) IterationDecision;
-        }
-
-        /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
-        pub fn forEachChildSimple(
-            parent_node: *const Node,
-            comptime UserContextT: type,
-            callback: IterationCallback(UserContextT),
-            user_context: ?*UserContextT,
-        ) !void {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child_simple(
-                @ptrCast(@constCast(parent_node)),
-                makeIterationCallbackWrapper(UserContextT, callback),
-                user_context,
-            ));
-            try ret.toError();
-        }
-
-        /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
-        ///
-        /// 'descending_callback' is invoked the first time a node is visited when walking down.
-        ///
-        /// 'ascending_callback' is invoked the second time a node is visited after we reach the leaf node without children
-        /// and start walking up.
-        ///
-        /// Either of the callbacks may be `null`, but not both at the same time.
-        ///
-        /// Only nodes matching 'type_mask' are passed to the callbacks.
-        ///
-        /// 'max_depth' is used to limit the maximum reachable depth from 'parent', where 1 is only direct children of
-        /// 'parent', 2 is children of first-level children etc.
-        pub fn forEachChild(
-            parent_node: *const Node,
-            comptime UserContextT: type,
-            opt_descending_callback: ?IterationCallback(UserContextT),
-            opt_ascending_callback: ?IterationCallback(UserContextT),
-            type_mask: ObjectTypeBits,
-            max_depth: Depth,
-            user_context: ?*UserContextT,
-        ) !void {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child(
-                @ptrCast(@constCast(parent_node)),
-                if (opt_descending_callback) |descending_callback|
-                    makeIterationCallbackWrapper(UserContextT, descending_callback)
-                else
-                    null,
-                if (opt_ascending_callback) |ascending_callback|
-                    makeIterationCallbackWrapper(UserContextT, ascending_callback)
-                else
-                    null,
-                @bitCast(type_mask),
-                @intFromEnum(max_depth),
-                user_context,
-            ));
-            try ret.toError();
-        }
-
-        pub fn getAbsolutePath(self: *const Node) AbsoultePath {
-            const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(self));
-            return .{ .path = std.mem.sliceTo(ptr, 0) };
-        }
-
-        pub const AbsoultePath = struct {
-            path: [:0]const u8,
-
-            pub fn deinit(self: AbsoultePath) void {
-                c_uacpi.uacpi_free_absolute_path(self.path.ptr);
-            }
-        };
-
-        pub fn NotifyHandler(comptime UserContextT: type) type {
-            return fn (
-                user_context: ?*UserContextT,
-                node: *Node,
-                value: u64,
-            ) Status;
-        }
-
-        /// Install a Notify() handler to a device node.
-        ///
-        /// A handler installed to the root node will receive all notifications, even if a device already has a
-        /// dedicated Notify handler.
-        pub fn installNotifyHandler(
-            node: *Node,
-            comptime UserContextT: type,
-            handler: NotifyHandler(UserContextT),
-            user_context: ?*UserContextT,
-        ) !void {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_install_notify_handler(
-                @ptrCast(node),
-                makeNotifyHandlerWrapper(UserContextT, handler),
-                user_context,
-            ));
-            try ret.toError();
-        }
-
-        pub fn uninstallNotifyHandler(
-            node: *Node,
-            comptime UserContextT: type,
-            handler: NotifyHandler(UserContextT),
-        ) !void {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_notify_handler(
-                @ptrCast(node),
-                makeNotifyHandlerWrapper(UserContextT, handler),
-            ));
-            try ret.toError();
-        }
-
-        inline fn makeIterationCallbackWrapper(
-            comptime UserContextT: type,
-            callback: IterationCallback(UserContextT),
-        ) c_uacpi.uacpi_iteration_callback {
-            return comptime @ptrCast(&struct {
-                fn callbackWrapper(
-                    user_ctx: ?*anyopaque,
-                    node: *Node,
-                    node_depth: u32,
-                ) callconv(.C) IterationDecision {
-                    return callback(@ptrCast(user_ctx), node, node_depth);
-                }
-            }.callbackWrapper);
-        }
-
-        inline fn makeNotifyHandlerWrapper(
-            comptime UserContextT: type,
-            callback: NotifyHandler(UserContextT),
-        ) c_uacpi.uacpi_notify_handler {
-            return comptime @ptrCast(&struct {
-                fn callbackWrapper(
-                    user_ctx: ?*anyopaque,
-                    node: *Node,
-                    value: u64,
-                ) callconv(.C) Status {
-                    return callback(@ptrCast(user_ctx), node, value);
-                }
-            }.callbackWrapper);
-        }
-    };
-
+pub const Node = opaque {
     pub fn root() *Node {
         return @ptrCast(c_uacpi.uacpi_namespace_root());
     }
@@ -367,6 +100,217 @@ pub const namespace = struct {
         return @ptrCast(c_uacpi.uacpi_namespace_get_predefined(
             @intFromEnum(predefined_namespace),
         ));
+    }
+
+    /// Returns `true` if the node is an alias.
+    pub fn isAlias(self: *const Node) bool {
+        return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(self)));
+    }
+
+    pub fn name(self: *const Node) ObjectName {
+        return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(self)));
+    }
+
+    /// Returns the type of object stored at the namespace node.
+    ///
+    /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
+    /// to TOCTOU bugs.
+    pub fn objectType(self: *const Node) !ObjectType {
+        var object_type: ObjectType = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_type(
+            @ptrCast(self),
+            @ptrCast(&object_type),
+        ));
+        try ret.toError();
+
+        return object_type;
+    }
+
+    /// Returns `true` if the type of the object stored at the namespace node matches the provided value.
+    ///
+    /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
+    /// to TOCTOU bugs.
+    pub fn isType(self: *const Node, object_type: ObjectType) !bool {
+        var out: bool = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
+            @ptrCast(self),
+            @intFromEnum(object_type),
+            @ptrCast(&out),
+        ));
+        try ret.toError();
+
+        return out;
+    }
+
+    /// Returns `true` if the type of the object stored at the namespace node matches any of the type bits in the
+    /// provided value.
+    ///
+    /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
+    /// to TOCTOU bugs.
+    pub fn isTypeOneOf(self: *const Node, object_type_bits: ObjectTypeBits) !bool {
+        var out: bool = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
+            @ptrCast(self),
+            @bitCast(object_type_bits),
+            @ptrCast(&out),
+        ));
+        try ret.toError();
+
+        return out;
+    }
+
+    pub fn depth(self: *const Node) usize {
+        return c_uacpi.uacpi_namespace_node_depth(@ptrCast(self));
+    }
+
+    pub fn parent(self: *const Node) *Node {
+        return @ptrCast(c_uacpi.uacpi_namespace_node_parent(@ptrCast(@constCast(self))));
+    }
+
+    pub fn find(parent_node: *const Node, path: [:0]const u8) !?*Node {
+        var node: ?*Node = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_find(
+            @ptrCast(@constCast(parent_node)),
+            path.ptr,
+            @ptrCast(&node),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return node;
+    }
+
+    /// Same as `find`, except the search recurses upwards when the namepath consists of only a single nameseg.
+    ///
+    /// Usually, this behavior is only desired if resolving a namepath specified in an aml-provided object, such as
+    /// a package element.
+    pub fn resolveFromAmlNamepath(scope_node: *const Node, path: [:0]const u8) !?*Node {
+        var node: ?*Node = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_resolve_from_aml_namepath(
+            @ptrCast(@constCast(scope_node)),
+            path.ptr,
+            @ptrCast(&node),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return node;
+    }
+
+    /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
+    pub fn forEachChildSimple(
+        parent_node: *const Node,
+        comptime UserContextT: type,
+        callback: IterationCallback(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child_simple(
+            @ptrCast(@constCast(parent_node)),
+            makeIterationCallbackWrapper(UserContextT, callback),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
+    ///
+    /// 'descending_callback' is invoked the first time a node is visited when walking down.
+    ///
+    /// 'ascending_callback' is invoked the second time a node is visited after we reach the leaf node without children
+    /// and start walking up.
+    ///
+    /// Either of the callbacks may be `null`, but not both at the same time.
+    ///
+    /// Only nodes matching 'type_mask' are passed to the callbacks.
+    ///
+    /// 'max_depth' is used to limit the maximum reachable depth from 'parent', where 1 is only direct children of
+    /// 'parent', 2 is children of first-level children etc.
+    pub fn forEachChild(
+        parent_node: *const Node,
+        comptime UserContextT: type,
+        opt_descending_callback: ?IterationCallback(UserContextT),
+        opt_ascending_callback: ?IterationCallback(UserContextT),
+        type_mask: ObjectTypeBits,
+        max_depth: Depth,
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child(
+            @ptrCast(@constCast(parent_node)),
+            if (opt_descending_callback) |descending_callback|
+                makeIterationCallbackWrapper(UserContextT, descending_callback)
+            else
+                null,
+            if (opt_ascending_callback) |ascending_callback|
+                makeIterationCallbackWrapper(UserContextT, ascending_callback)
+            else
+                null,
+            @bitCast(type_mask),
+            @intFromEnum(max_depth),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    pub fn getAbsolutePath(self: *const Node) AbsoultePath {
+        const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(self));
+        return .{ .path = std.mem.sliceTo(ptr, 0) };
+    }
+
+    /// Install a Notify() handler to a device node.
+    ///
+    /// A handler installed to the root node will receive all notifications, even if a device already has a
+    /// dedicated Notify handler.
+    pub fn installNotifyHandler(
+        node: *Node,
+        comptime UserContextT: type,
+        handler: NotifyHandler(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_notify_handler(
+            @ptrCast(node),
+            makeNotifyHandlerWrapper(UserContextT, handler),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    pub fn uninstallNotifyHandler(
+        node: *Node,
+        comptime UserContextT: type,
+        handler: NotifyHandler(UserContextT),
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_notify_handler(
+            @ptrCast(node),
+            makeNotifyHandlerWrapper(UserContextT, handler),
+        ));
+        try ret.toError();
+    }
+};
+
+pub const io = struct {
+    pub fn readGas(gas: *const acpi.Address) !u64 {
+        var value: u64 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
+            @ptrCast(gas),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
+            @ptrCast(gas),
+            value,
+        ));
+        try ret.toError();
     }
 };
 
@@ -698,6 +642,30 @@ pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
     next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
 };
 
+pub fn IterationCallback(comptime UserContextT: type) type {
+    return fn (
+        node: *Node,
+        node_depth: u32,
+        user_context: ?*UserContextT,
+    ) IterationDecision;
+}
+
+pub fn NotifyHandler(comptime UserContextT: type) type {
+    return fn (
+        node: *Node,
+        value: u64,
+        user_context: ?*UserContextT,
+    ) Status;
+}
+
+pub const AbsoultePath = struct {
+    path: [:0]const u8,
+
+    pub fn deinit(self: AbsoultePath) void {
+        c_uacpi.uacpi_free_absolute_path(self.path.ptr);
+    }
+};
+
 pub const Depth = enum(u32) {
     any = c_uacpi.UACPI_MAX_DEPTH_ANY,
 
@@ -815,6 +783,35 @@ pub const Error = error{
     AMLCallStackDepthLimit,
 };
 
+inline fn makeIterationCallbackWrapper(
+    comptime UserContextT: type,
+    callback: IterationCallback(UserContextT),
+) c_uacpi.uacpi_iteration_callback {
+    return comptime @ptrCast(&struct {
+        fn callbackWrapper(
+            user_ctx: ?*anyopaque,
+            node: *Node,
+            node_depth: u32,
+        ) callconv(.C) IterationDecision {
+            return callback(node, node_depth, @ptrCast(user_ctx));
+        }
+    }.callbackWrapper);
+}
+
+inline fn makeNotifyHandlerWrapper(
+    comptime UserContextT: type,
+    handler: NotifyHandler(UserContextT),
+) c_uacpi.uacpi_notify_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+            node: *Node,
+            value: u64,
+        ) callconv(.C) Status {
+            return handler(node, value, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
 const WorkType = enum(c_uacpi.uacpi_work_type) {
     /// Schedule a GPE handler method for execution.
     ///
@@ -1326,6 +1323,7 @@ const c_uacpi = @cImport({
     @cInclude("uacpi/io.h");
     @cInclude("uacpi/namespace.h");
     @cInclude("uacpi/notify.h");
+    @cInclude("uacpi/opregion.h");
     @cInclude("uacpi/osi.h");
     @cInclude("uacpi/resources.h");
     @cInclude("uacpi/sleep.h");
