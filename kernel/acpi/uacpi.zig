@@ -1573,7 +1573,9 @@ const c_uacpi = @cImport({
     @cInclude("uacpi/osi.h");
     @cInclude("uacpi/resources.h");
     @cInclude("uacpi/sleep.h");
+    @cInclude("uacpi/status.h");
     @cInclude("uacpi/tables.h");
+    @cInclude("uacpi/types.h");
     @cInclude("uacpi/uacpi.h");
     @cInclude("uacpi/utilities.h");
 });
