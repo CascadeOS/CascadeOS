@@ -339,6 +339,271 @@ pub const Node = opaque {
         ));
         try ret.toError();
     }
+
+    /// Checks whether the device at 'node' matches any of the PNP ids provided in 'list'.
+    ///
+    /// This is done by first attempting to match the value returned from _HID and then the value(s) from _CID.
+    ///
+    /// Note that the presence of the device (_STA) is not verified here.
+    pub fn deviceMatchesPnpId(device_node: *const Node, list: [:null]const ?[*:0]const u8) bool {
+        return c_uacpi.uacpi_device_matches_pnp_id(
+            @ptrCast(@constCast(device_node)),
+            list.ptr,
+        );
+    }
+
+    /// Find all the devices in the namespace starting at 'parent' matching the specified 'hids' against any value from
+    /// _HID or _CID.
+    ///
+    /// Only devices reported as present via _STA are checked.
+    ///
+    /// Any matching devices are then passed to the 'callback'.
+    pub fn findDevicesAt(
+        parent_node: *const Node,
+        hids: [:null]const ?[*:0]const u8,
+        comptime UserContextT: type,
+        callback: IterationCallback(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_find_devices_at(
+            @ptrCast(@constCast(parent_node)),
+            hids.ptr,
+            makeIterationCallbackWrapper(UserContextT, callback),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    /// Same as `findDevicesAt`, except this starts at the root and only matches one hid.
+    pub fn findDevices(
+        hid: [:0]const u8,
+        comptime UserContextT: type,
+        callback: IterationCallback(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_find_devices(
+            hid.ptr,
+            makeIterationCallbackWrapper(UserContextT, callback),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    pub const PciRoutingTable = extern struct {
+        num_entries: usize,
+        _entries: Entry,
+
+        pub fn entries(self: *const PciRoutingTable) []const Entry {
+            const ptr: [*]const Entry = @ptrCast(&self._entries);
+            return ptr[0..self.num_entries];
+        }
+
+        pub fn deinit(self: *const PciRoutingTable) void {
+            c_uacpi.uacpi_free_pci_routing_table(@ptrCast(@constCast(self)));
+        }
+
+        pub const Entry = extern struct {
+            address: u32,
+            index: u32,
+            source: *Node,
+            pin: u8,
+
+            comptime {
+                core.testing.expectSize(Entry, @sizeOf(c_uacpi.uacpi_pci_routing_table_entry));
+            }
+        };
+    };
+
+    pub fn getPciRoutingTable(
+        device_node: *const Node,
+    ) !*const PciRoutingTable {
+        var table: *const PciRoutingTable = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_pci_routing_table(
+            @ptrCast(@constCast(device_node)),
+            @ptrCast(&table),
+        ));
+        try ret.toError();
+
+        return table;
+    }
+
+    pub const IdString = extern struct {
+        /// size of the string including the null byte
+        size: u32,
+        _value: [*:0]const u8,
+
+        pub fn value(self: *const IdString) [:0]const u8 {
+            return std.mem.sliceTo(self._value, 0);
+        }
+
+        pub fn deinit(self: *const IdString) void {
+            c_uacpi.uacpi_free_id_string(@ptrCast(@constCast(self)));
+        }
+
+        comptime {
+            core.testing.expectSize(IdString, @sizeOf(c_uacpi.uacpi_id_string));
+        }
+    };
+
+    /// Evaluate a device's _HID method and get its value.
+    pub fn evalHid(node: *const Node) !?*const IdString {
+        var id_string: *const IdString = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_hid(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&id_string),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return id_string;
+    }
+
+    pub const PnpIdList = extern struct {
+        num_ids: u32,
+        size: u32,
+        _ids: IdString,
+
+        pub fn ids(self: *const PnpIdList) []const IdString {
+            const ptr: [*]const IdString = @ptrCast(&self._ids);
+            return ptr[0..self.num_ids];
+        }
+
+        pub fn deinit(self: *const PnpIdList) void {
+            c_uacpi.uacpi_free_pnp_id_list(@ptrCast(@constCast(self)));
+        }
+    };
+
+    /// Evaluate a device's _CID method and get its value.
+    pub fn evalCid(node: *const Node) !?*const PnpIdList {
+        var list: *const PnpIdList = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_cid(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&list),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return list;
+    }
+
+    /// Evaluate a device's _STA method and get its value.
+    pub fn evalSta(node: *const Node) !?u32 {
+        var value: u32 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_sta(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&value),
+        ));
+        if (value == std.math.maxInt(u32)) return null;
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Evaluate a device's _ADR method and get its value.
+    pub fn evalAdr(node: *const Node) !?u64 {
+        var value: u64 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_adr(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&value),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Evaluate a device's _CLS method and get its value.
+    ///
+    /// The format of returned string is BBSSPP where:
+    /// - BB => Base Class (e.g. 01 => Mass Storage)
+    /// - SS => Sub-Class (e.g. 06 => SATA)
+    /// - PP => Programming Interface (e.g. 01 => AHCI)
+    pub fn evalCls(node: *const Node) !?*const IdString {
+        var id_string: *const IdString = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_cls(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&id_string),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return id_string;
+    }
+
+    /// Evaluate a device's _UID method and get its value.
+    pub fn evalUid(node: *const Node) !?*const IdString {
+        var id_string: *const IdString = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_uid(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&id_string),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return id_string;
+    }
+
+    pub const Info = extern struct {
+        /// Size of the entire structure
+        size: u32,
+
+        name: ObjectName,
+        type: ObjectType,
+        num_params: u8,
+
+        flags: Flags,
+
+        /// A mapping of [S1..S4] to the shallowest D state supported by the device in that S state.
+        sxd: [4]u8,
+
+        /// A mapping of [S0..S4] to the deepest D state supported by the device in that S state to be able to wake
+        /// itself.
+        sxw: [5]u8,
+
+        addr: u64,
+        hid: IdString,
+        uid: IdString,
+        cls: IdString,
+        cid: PnpIdList,
+
+        pub const Flags = packed struct(u8) {
+            has_adr: bool,
+            has_hid: bool,
+            has_uid: bool,
+            has_cid: bool,
+            has_cls: bool,
+            has_sxd: bool,
+            has_sxw: bool,
+            _reserved: u1,
+        };
+
+        pub fn deinit(self: *const Info) void {
+            c_uacpi.uacpi_free_namespace_node_info(@ptrCast(@constCast(self)));
+        }
+    };
+
+    /// Retrieve information about a namespace node.
+    ///
+    /// This includes the attached object's type, name, number of parameters (if it's a method), the result of
+    /// evaluating _ADR, _UID, _CLS, _HID, _CID, as well as _SxD and _SxW.
+    pub fn info(node: *const Node) !*const Info {
+        var info_ptr: *const Info = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_namespace_node_info(
+            @ptrCast(@constCast(node)),
+            @ptrCast(&info_ptr),
+        ));
+        try ret.toError();
+
+        return info_ptr;
+    }
 };
 
 pub const io = struct {
