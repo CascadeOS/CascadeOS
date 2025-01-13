@@ -100,6 +100,223 @@ pub const io = struct {
     }
 };
 
+pub const namespace = struct {
+    pub const Node = opaque {
+        /// Returns `true` if the node is an alias.
+        pub fn isAlias(self: *const Node) bool {
+            return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(self)));
+        }
+
+        pub fn name(self: *const Node) ObjectName {
+            return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(self)));
+        }
+
+        /// Returns the type of object stored at the namespace node.
+        ///
+        /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
+        /// to TOCTOU bugs.
+        pub fn objectType(self: *const Node) !ObjectType {
+            var object_type: ObjectType = undefined;
+
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_type(
+                @ptrCast(self),
+                @ptrCast(&object_type),
+            ));
+            try ret.toError();
+
+            return object_type;
+        }
+
+        /// Returns `true` if the type of the object stored at the namespace node matches the provided value.
+        ///
+        /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
+        /// to TOCTOU bugs.
+        pub fn isType(self: *const Node, object_type: ObjectType) !bool {
+            var out: bool = undefined;
+
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
+                @ptrCast(self),
+                @intFromEnum(object_type),
+                @ptrCast(&out),
+            ));
+            try ret.toError();
+
+            return out;
+        }
+
+        /// Returns `true` if the type of the object stored at the namespace node matches any of the type bits in the
+        /// provided value.
+        ///
+        /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
+        /// to TOCTOU bugs.
+        pub fn isTypeOneOf(self: *const Node, object_type_bits: ObjectTypeBits) !bool {
+            var out: bool = undefined;
+
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
+                @ptrCast(self),
+                @bitCast(object_type_bits),
+                @ptrCast(&out),
+            ));
+            try ret.toError();
+
+            return out;
+        }
+
+        pub fn depth(self: *const Node) usize {
+            return c_uacpi.uacpi_namespace_node_depth(@ptrCast(self));
+        }
+
+        pub fn parent(self: *const Node) *Node {
+            return @ptrCast(c_uacpi.uacpi_namespace_node_parent(@ptrCast(@constCast(self))));
+        }
+
+        pub fn find(parent_node: *const Node, path: [:0]const u8) !?*Node {
+            var node: ?*Node = undefined;
+
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_find(
+                @ptrCast(@constCast(parent_node)),
+                path.ptr,
+                @ptrCast(&node),
+            ));
+            if (ret == .NOT_FOUND) return null;
+            try ret.toError();
+
+            return node;
+        }
+
+        /// Same as `find`, except the search recurses upwards when the namepath consists of only a single nameseg.
+        ///
+        /// Usually, this behavior is only desired if resolving a namepath specified in an aml-provided object, such as
+        /// a package element.
+        pub fn resolveFromAmlNamepath(scope_node: *const Node, path: [:0]const u8) !?*Node {
+            var node: ?*Node = undefined;
+
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_resolve_from_aml_namepath(
+                @ptrCast(@constCast(scope_node)),
+                path.ptr,
+                @ptrCast(&node),
+            ));
+            if (ret == .NOT_FOUND) return null;
+            try ret.toError();
+
+            return node;
+        }
+
+        pub fn IterationCallback(comptime UserContextT: type) type {
+            return fn (
+                user_context: ?*UserContextT,
+                node: *Node,
+                node_depth: u32,
+            ) IterationDecision;
+        }
+
+        /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
+        pub fn forEachChildSimple(
+            parent_node: *const Node,
+            comptime UserContextT: type,
+            callback: IterationCallback(UserContextT),
+            user_context: ?*UserContextT,
+        ) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child_simple(
+                @ptrCast(@constCast(parent_node)),
+                makeIterationCallbackWrapper(UserContextT, callback),
+                user_context,
+            ));
+            try ret.toError();
+        }
+
+        /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
+        ///
+        /// 'descending_callback' is invoked the first time a node is visited when walking down.
+        ///
+        /// 'ascending_callback' is invoked the second time a node is visited after we reach the leaf node without children
+        /// and start walking up.
+        ///
+        /// Either of the callbacks may be `null`, but not both at the same time.
+        ///
+        /// Only nodes matching 'type_mask' are passed to the callbacks.
+        ///
+        /// 'max_depth' is used to limit the maximum reachable depth from 'parent', where 1 is only direct children of
+        /// 'parent', 2 is children of first-level children etc.
+        pub fn forEachChild(
+            parent_node: *const Node,
+            comptime UserContextT: type,
+            opt_descending_callback: ?IterationCallback(UserContextT),
+            opt_ascending_callback: ?IterationCallback(UserContextT),
+            type_mask: ObjectTypeBits,
+            max_depth: Depth,
+            user_context: ?*UserContextT,
+        ) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child(
+                @ptrCast(@constCast(parent_node)),
+                if (opt_descending_callback) |descending_callback|
+                    makeIterationCallbackWrapper(UserContextT, descending_callback)
+                else
+                    null,
+                if (opt_ascending_callback) |ascending_callback|
+                    makeIterationCallbackWrapper(UserContextT, ascending_callback)
+                else
+                    null,
+                @bitCast(type_mask),
+                @intFromEnum(max_depth),
+                user_context,
+            ));
+            try ret.toError();
+        }
+
+        pub fn getAbsolutePath(self: *const Node) AbsoultePath {
+            const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(self));
+            return .{ .path = std.mem.sliceTo(ptr, 0) };
+        }
+
+        pub const AbsoultePath = struct {
+            path: [:0]const u8,
+
+            pub fn deinit(self: AbsoultePath) void {
+                c_uacpi.uacpi_free_absolute_path(self.path.ptr);
+            }
+        };
+
+        inline fn makeIterationCallbackWrapper(
+            comptime UserContextT: type,
+            callback: IterationCallback(UserContextT),
+        ) c_uacpi.uacpi_iteration_callback {
+            return @ptrCast(&struct {
+                fn callbackWrapper(
+                    user_ctx: ?*anyopaque,
+                    node: *Node,
+                    node_depth: u32,
+                ) callconv(.C) IterationDecision {
+                    return callback(@ptrCast(user_ctx), node, node_depth);
+                }
+            }.callbackWrapper);
+        }
+    };
+
+    pub fn root() *Node {
+        return @ptrCast(c_uacpi.uacpi_namespace_root());
+    }
+
+    pub const PredefinedNamespace = enum(c_uacpi.uacpi_predefined_namespace) {
+        root = c_uacpi.UACPI_PREDEFINED_NAMESPACE_ROOT,
+        gpe = c_uacpi.UACPI_PREDEFINED_NAMESPACE_GPE,
+        pr = c_uacpi.UACPI_PREDEFINED_NAMESPACE_PR,
+        sb = c_uacpi.UACPI_PREDEFINED_NAMESPACE_SB,
+        si = c_uacpi.UACPI_PREDEFINED_NAMESPACE_SI,
+        tz = c_uacpi.UACPI_PREDEFINED_NAMESPACE_TZ,
+        gl = c_uacpi.UACPI_PREDEFINED_NAMESPACE_GL,
+        os = c_uacpi.UACPI_PREDEFINED_NAMESPACE_OS,
+        osi = c_uacpi.UACPI_PREDEFINED_NAMESPACE_OSI,
+        rev = c_uacpi.UACPI_PREDEFINED_NAMESPACE_REV,
+    };
+
+    pub fn getPredefined(predefined_namespace: PredefinedNamespace) *Node {
+        return @ptrCast(c_uacpi.uacpi_namespace_get_predefined(
+            @intFromEnum(predefined_namespace),
+        ));
+    }
+};
+
 pub const sleep = struct {
     /// Set the firmware waking vector in FACS.
     ///
@@ -320,18 +537,27 @@ pub const tables = struct {
         physical_override = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_PHYSICAL_OVERRIDE,
     };
 
-    pub const TableInstallationHandler = *const fn (
+    pub const TableInstallationHandler = fn (
         header: *acpi.SharedHeader,
         out_override_address: *u64,
-    ) callconv(.C) TableInstallationDisposition;
+    ) TableInstallationDisposition;
 
     /// Set a handler that is invoked for each table before it gets installed.
     ///
     /// Depending on the return value, the table is either allowed to be installed as-is, denied, or overriden with a
     /// new one.
     pub fn setTableInstallationHandler(handler: TableInstallationHandler) !void {
+        const handler_wrapper = struct {
+            fn handlerWrapper(
+                header: *acpi.SharedHeader,
+                out_override_address: *u64,
+            ) callconv(.C) TableInstallationDisposition {
+                return handler(header, out_override_address);
+            }
+        }.handlerWrapper;
+
         const ret: Status = @enumFromInt(c_uacpi.uacpi_set_table_installation_handler(
-            @ptrCast(handler),
+            @ptrCast(handler_wrapper),
         ));
         try ret.toError();
     }
@@ -357,6 +583,72 @@ pub const ObjectName = extern union {
     comptime {
         core.testing.expectSize(ObjectName, @sizeOf(c_uacpi.uacpi_object_name));
     }
+};
+
+pub const ObjectType = enum(c_uacpi.uacpi_object_type) {
+    uninitialized = c_uacpi.UACPI_OBJECT_UNINITIALIZED,
+    integer = c_uacpi.UACPI_OBJECT_INTEGER,
+    string = c_uacpi.UACPI_OBJECT_STRING,
+    buffer = c_uacpi.UACPI_OBJECT_BUFFER,
+    package = c_uacpi.UACPI_OBJECT_PACKAGE,
+    field_unit = c_uacpi.UACPI_OBJECT_FIELD_UNIT,
+    device = c_uacpi.UACPI_OBJECT_DEVICE,
+    event = c_uacpi.UACPI_OBJECT_EVENT,
+    method = c_uacpi.UACPI_OBJECT_METHOD,
+    mutex = c_uacpi.UACPI_OBJECT_MUTEX,
+    operation_region = c_uacpi.UACPI_OBJECT_OPERATION_REGION,
+    power_resource = c_uacpi.UACPI_OBJECT_POWER_RESOURCE,
+    processor = c_uacpi.UACPI_OBJECT_PROCESSOR,
+    thermal_zone = c_uacpi.UACPI_OBJECT_THERMAL_ZONE,
+    buffer_field = c_uacpi.UACPI_OBJECT_BUFFER_FIELD,
+    debug = c_uacpi.UACPI_OBJECT_DEBUG,
+    reference = c_uacpi.UACPI_OBJECT_REFERENCE,
+    buffer_index = c_uacpi.UACPI_OBJECT_BUFFER_INDEX,
+};
+
+pub const ObjectTypeBits = packed struct(c_uacpi.uacpi_object_type_bits) {
+    _uninitialized: u1 = 0,
+    integer: bool = false,
+    string: bool = false,
+    buffer: bool = false,
+    package: bool = false,
+    field_unit: bool = false,
+    device: bool = false,
+    event: bool = false,
+    method: bool = false,
+    mutex: bool = false,
+    operation_region: bool = false,
+    power_resource: bool = false,
+    processor: bool = false,
+    thermal_zone: bool = false,
+    buffer_field: bool = false,
+    _unused15: u1 = 0,
+    debug: bool = false,
+    _unused17_19: u3 = 0,
+    reference: bool = false,
+    buffer_index: bool = false,
+    _unused22_31: u10 = 0,
+
+    pub const any: ObjectTypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
+
+    comptime {
+        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
+    }
+};
+
+pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
+    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
+
+    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
+
+    /// Only applicable for uacpi_namespace_for_each_child
+    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+};
+
+pub const Depth = enum(u32) {
+    any = c_uacpi.UACPI_MAX_DEPTH_ANY,
+
+    _,
 };
 
 pub const UacpiError = error{
@@ -541,13 +833,6 @@ const FirmwareRequest = extern struct {
     comptime {
         core.testing.expectSize(c_uacpi.uacpi_firmware_request, @sizeOf(FirmwareRequest));
     }
-};
-
-const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
-    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
-    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
-    /// Only applicable for uacpi_namespace_for_each_child
-    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
 };
 
 comptime {
