@@ -277,17 +277,70 @@ pub const namespace = struct {
             }
         };
 
+        pub fn NotifyHandler(comptime UserContextT: type) type {
+            return fn (
+                user_context: ?*UserContextT,
+                node: *Node,
+                value: u64,
+            ) Status;
+        }
+
+        /// Install a Notify() handler to a device node.
+        ///
+        /// A handler installed to the root node will receive all notifications, even if a device already has a
+        /// dedicated Notify handler.
+        pub fn installNotifyHandler(
+            node: *Node,
+            comptime UserContextT: type,
+            handler: NotifyHandler(UserContextT),
+            user_context: ?*UserContextT,
+        ) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_install_notify_handler(
+                @ptrCast(node),
+                makeNotifyHandlerWrapper(UserContextT, handler),
+                user_context,
+            ));
+            try ret.toError();
+        }
+
+        pub fn uninstallNotifyHandler(
+            node: *Node,
+            comptime UserContextT: type,
+            handler: NotifyHandler(UserContextT),
+        ) !void {
+            const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_notify_handler(
+                @ptrCast(node),
+                makeNotifyHandlerWrapper(UserContextT, handler),
+            ));
+            try ret.toError();
+        }
+
         inline fn makeIterationCallbackWrapper(
             comptime UserContextT: type,
             callback: IterationCallback(UserContextT),
         ) c_uacpi.uacpi_iteration_callback {
-            return @ptrCast(&struct {
+            return comptime @ptrCast(&struct {
                 fn callbackWrapper(
                     user_ctx: ?*anyopaque,
                     node: *Node,
                     node_depth: u32,
                 ) callconv(.C) IterationDecision {
                     return callback(@ptrCast(user_ctx), node, node_depth);
+                }
+            }.callbackWrapper);
+        }
+
+        inline fn makeNotifyHandlerWrapper(
+            comptime UserContextT: type,
+            callback: NotifyHandler(UserContextT),
+        ) c_uacpi.uacpi_notify_handler {
+            return comptime @ptrCast(&struct {
+                fn callbackWrapper(
+                    user_ctx: ?*anyopaque,
+                    node: *Node,
+                    value: u64,
+                ) callconv(.C) Status {
+                    return callback(@ptrCast(user_ctx), node, value);
                 }
             }.callbackWrapper);
         }
