@@ -363,6 +363,153 @@ pub const io = struct {
     }
 };
 
+pub const osi = struct {
+    pub const VendorInterface = enum(c_uacpi.uacpi_vendor_interface) {
+        none = c_uacpi.UACPI_VENDOR_INTERFACE_NONE,
+        windows_2000 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_2000,
+        windows_xp = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP,
+        windows_xp_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP1,
+        windows_server_2003 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003,
+        windows_xp_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP2,
+        windows_server_2003_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003_SP1,
+        windows_vista = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA,
+        windows_server_2008 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2008,
+        windows_vista_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP1,
+        windows_vista_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP2,
+        windows_7 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_7,
+        windows_8 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8,
+        windows_8_1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8_1,
+        windows_10 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10,
+        windows_10_rs1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS1,
+        windows_10_rs2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS2,
+        windows_10_rs3 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS3,
+        windows_10_rs4 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS4,
+        windows_10_rs5 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS5,
+        windows_10_19h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_19H1,
+        windows_10_20h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_20H1,
+        windows_11 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11,
+        windows_11_22h2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11_22H2,
+    };
+
+    /// Returns the "latest" AML-queried _OSI vendor interface.
+    ///
+    /// E.g. for the following AML code:
+    /// ```
+    ///     _OSI("Windows 2021")
+    ///     _OSI("Windows 2000")
+    /// ```
+    ///
+    /// This function will return `VendorInterface.windows_11`, since this is the latest version of the interface the
+    /// code queried, even though the "Windows 2000" query came after "Windows 2021".
+    pub fn latestQueriedVendorInterface() VendorInterface {
+        return @enumFromInt(c_uacpi.uacpi_latest_queried_vendor_interface());
+    }
+
+    pub const InterfaceKind = enum(c_uacpi.uacpi_interface_kind) {
+        vendor = c_uacpi.UACPI_INTERFACE_KIND_VENDOR,
+        feature = c_uacpi.UACPI_INTERFACE_KIND_FEATURE,
+        all = c_uacpi.UACPI_INTERFACE_KIND_ALL,
+    };
+
+    /// Install or uninstall an interface.
+    ///
+    /// The interface kind is used for matching during interface enumeration in `bulkConfigureInterfaces`.
+    ///
+    /// After installing an interface, all _OSI queries report it as supported.
+    pub fn installInterface(name: [:0]const u8, kind: InterfaceKind) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_interface(
+            name.ptr,
+            @intFromEnum(kind),
+        ));
+        try ret.toError();
+    }
+
+    pub fn uninstallInterface(name: [:0]const u8) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_interface(
+            name.ptr,
+        ));
+        try ret.toError();
+    }
+
+    pub const HostInterface = enum(c_uacpi.uacpi_host_interface) {
+        module_device = c_uacpi.UACPI_HOST_INTERFACE_MODULE_DEVICE,
+        processor_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_DEVICE,
+        @"3_0_thermal_model" = c_uacpi.UACPI_HOST_INTERFACE_3_0_THERMAL_MODEL,
+        @"3_0_scp_extensions" = c_uacpi.UACPI_HOST_INTERFACE_3_0_SCP_EXTENSIONS,
+        processor_aggregator_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_AGGREGATOR_DEVICE,
+    };
+
+    /// Same as install/uninstall interface, but comes with an enum of known interfaces defined by the ACPI
+    /// specification.
+    ///
+    /// These are disabled by default as they depend on the host kernel support.
+    pub fn enableHostInterface(interface: HostInterface) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_host_interface(
+            @intFromEnum(interface),
+        ));
+        try ret.toError();
+    }
+
+    pub fn disableHostInterface(interface: HostInterface) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_host_interface(
+            @intFromEnum(interface),
+        ));
+        try ret.toError();
+    }
+
+    pub const InterfaceHandler = fn (
+        name: [:0]const u8,
+        supported: bool,
+    ) bool;
+
+    inline fn makeInterfaceHandlerWrapper(
+        handler: InterfaceHandler,
+    ) c_uacpi.uacpi_interface_handler {
+        return comptime @ptrCast(&struct {
+            fn handlerWrapper(
+                name: [*:0]const u8,
+                supported: bool,
+            ) callconv(.C) bool {
+                return handler(std.mem.sliceTo(name, 0), supported);
+            }
+        }.handlerWrapper);
+    }
+
+    /// Set a custom interface query (_OSI) handler.
+    ///
+    /// This callback will be invoked for each _OSI query with the value passed in the _OSI, as well as whether the
+    /// interface was detected as supported.
+    ///
+    /// The callback is able to override the return value dynamically or leave it untouched if desired (e.g. if it
+    /// simply wants to log something or do internal bookkeeping of some kind).
+    pub fn setInterfaceQueryHandler(handler: InterfaceHandler) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interface_query_handler(
+            makeInterfaceHandlerWrapper(handler),
+        ));
+        try ret.toError();
+    }
+
+    pub const InterfaceAction = enum(c_uacpi.uacpi_interface_action) {
+        disable = c_uacpi.UACPI_INTERFACE_ACTION_DISABLE,
+        enable = c_uacpi.UACPI_INTERFACE_ACTION_ENABLE,
+    };
+
+    /// Bulk interface configuration, used to disable or enable all interfaces that match 'kind'.
+    ///
+    /// This is generally only needed to work around buggy hardware, for example if requested from the kernel command
+    /// line.
+    ///
+    /// By default, all vendor strings (like "Windows 2000") are enabled, and all host features
+    /// (like "3.0 Thermal Model") are disabled.
+    pub fn bulkConfigureInterfaces(action: InterfaceAction, kind: InterfaceKind) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_bulk_configure_interfaces(
+            @intFromEnum(action),
+            @intFromEnum(kind),
+        ));
+        try ret.toError();
+    }
+};
+
 pub const sleep = struct {
     /// Set the firmware waking vector in FACS.
     ///
