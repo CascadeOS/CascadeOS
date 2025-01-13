@@ -30,7 +30,6 @@ fn singleExecutorInitPanic(
 ) noreturn {
     const static = struct {
         var nested_panic_count: usize = 0;
-        var attempted_shutdown: bool = false;
     };
 
     defer kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -52,11 +51,8 @@ fn singleExecutorInitPanic(
         else => {},
     }
 
-    if (!static.attempted_shutdown) {
-        static.attempted_shutdown = true;
-        static.nested_panic_count = 0; // we want to print any panics that occur during shutdown
-        kernel.acpi.tryShutdown() catch {}; // TODO: build option to disable
-    }
+    kernel.arch.interrupts.disableInterruptsAndHalt();
+    unreachable;
 }
 
 fn initPanic(
@@ -67,7 +63,6 @@ fn initPanic(
     const static = struct {
         var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
         var nested_panic_count: usize = 0;
-        var attempted_shutdown: bool = false;
     };
 
     defer kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -129,12 +124,6 @@ fn initPanic(
         1 => kernel.arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n"),
         // don't trigger any more panics
         else => {},
-    }
-
-    if (!static.attempted_shutdown) {
-        static.attempted_shutdown = true;
-        static.nested_panic_count = 0; // we want to print any panics that occur during shutdown
-        kernel.acpi.tryShutdown() catch {}; // TODO: build option to disable
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
