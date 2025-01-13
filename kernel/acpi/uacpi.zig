@@ -290,6 +290,55 @@ pub const Node = opaque {
         ));
         try ret.toError();
     }
+
+    /// Install an address space handler to a device node.
+    ///
+    /// The handler is recursively connected to all of the operation regions of type 'space' underneath 'device_node'.
+    ///
+    /// Note that this recursion stops as soon as another device node that already has an address space handler of this
+    /// type installed is encountered.
+    pub fn installAddressSpaceHandler(
+        device_node: *Node,
+        space: AddressSpace,
+        comptime UserContextT: type,
+        handler: RegionHandler(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_address_space_handler(
+            @ptrCast(device_node),
+            @intFromEnum(space),
+            makeRegionHandlerWrapper(UserContextT, handler),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    /// Uninstall the handler of type 'space' from a given device node.
+    pub fn uninstallAddressSpaceHandler(
+        device_node: *Node,
+        space: AddressSpace,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_address_space_handler(
+            @ptrCast(device_node),
+            @intFromEnum(space),
+        ));
+        try ret.toError();
+    }
+
+    /// Execute _REG(space, ACPI_REG_CONNECT) for all of the opregions with this address space underneath this device.
+    ///
+    /// This should only be called manually if you want to register an early handler that must be available before the
+    /// call to `namespaceInitialize`.
+    pub fn regAllOpregions(
+        device_node: *Node,
+        space: AddressSpace,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_reg_all_opregions(
+            @ptrCast(device_node),
+            @intFromEnum(space),
+        ));
+        try ret.toError();
+    }
 };
 
 pub const io = struct {
@@ -642,6 +691,32 @@ pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
     next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
 };
 
+pub const AddressSpace = enum(c_uacpi.uacpi_address_space) {
+    system_memory = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
+    system_io = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_IO,
+    pci_config = c_uacpi.UACPI_ADDRESS_SPACE_PCI_CONFIG,
+    embedded_controller = c_uacpi.UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
+    smbus = c_uacpi.UACPI_ADDRESS_SPACE_SMBUS,
+    system_cmos = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_CMOS,
+    pci_bar_target = c_uacpi.UACPI_ADDRESS_SPACE_PCI_BAR_TARGET,
+    ipmi = c_uacpi.UACPI_ADDRESS_SPACE_IPMI,
+    general_purpose_io = c_uacpi.UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO,
+    generic_serial_bus = c_uacpi.UACPI_ADDRESS_SPACE_GENERIC_SERIAL_BUS,
+    pcc = c_uacpi.UACPI_ADDRESS_SPACE_PCC,
+    prm = c_uacpi.UACPI_ADDRESS_SPACE_PRM,
+    ffixedhw = c_uacpi.UACPI_ADDRESS_SPACE_FFIXEDHW,
+
+    // Internal type
+    table_data = c_uacpi.UACPI_ADDRESS_SPACE_TABLE_DATA,
+};
+
+pub const RegionOperation = enum(c_uacpi.uacpi_region_op) {
+    attach = c_uacpi.UACPI_REGION_OP_ATTACH,
+    read = c_uacpi.UACPI_REGION_OP_READ,
+    write = c_uacpi.UACPI_REGION_OP_WRITE,
+    detach = c_uacpi.UACPI_REGION_OP_DETACH,
+};
+
 pub fn IterationCallback(comptime UserContextT: type) type {
     return fn (
         node: *Node,
@@ -654,6 +729,15 @@ pub fn NotifyHandler(comptime UserContextT: type) type {
     return fn (
         node: *Node,
         value: u64,
+        user_context: ?*UserContextT,
+    ) Status;
+}
+
+// FIXME: this handler is wrong, the second argument depends on the operation
+//        will be clarified by https://github.com/UltraOS/uACPI/pull/104
+pub fn RegionHandler(comptime UserContextT: type) type {
+    return fn (
+        operation: RegionOperation,
         user_context: ?*UserContextT,
     ) Status;
 }
@@ -812,6 +896,21 @@ inline fn makeNotifyHandlerWrapper(
         }
     }.handlerWrapper);
 }
+
+inline fn makeRegionHandlerWrapper(
+    comptime UserContextT: type,
+    handler: RegionHandler(UserContextT),
+) c_uacpi.uacpi_region_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            op: RegionOperation,
+            user_ctx: ?*anyopaque,
+        ) callconv(.C) Status {
+            return handler(op, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
+
 const WorkType = enum(c_uacpi.uacpi_work_type) {
     /// Schedule a GPE handler method for execution.
     ///
