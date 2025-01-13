@@ -178,7 +178,7 @@ pub const namespace = struct {
                 path.ptr,
                 @ptrCast(&node),
             ));
-            if (ret == .NOT_FOUND) return null;
+            if (ret == .not_found) return null;
             try ret.toError();
 
             return node;
@@ -196,7 +196,7 @@ pub const namespace = struct {
                 path.ptr,
                 @ptrCast(&node),
             ));
-            if (ret == .NOT_FOUND) return null;
+            if (ret == .not_found) return null;
             try ret.toError();
 
             return node;
@@ -402,7 +402,7 @@ pub const tables = struct {
             const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(
                 @ptrCast(table),
             ));
-            if (ret == .NOT_FOUND) return false;
+            if (ret == .not_found) return false;
             try ret.toError();
             return true;
         }
@@ -433,7 +433,7 @@ pub const tables = struct {
             signature,
             @ptrCast(&table),
         ));
-        if (ret == .NOT_FOUND) return null;
+        if (ret == .not_found) return null;
         try ret.toError();
 
         return table;
@@ -446,7 +446,7 @@ pub const tables = struct {
             @ptrCast(table_identifiers),
             @ptrCast(&table),
         ));
-        if (ret == .NOT_FOUND) return null;
+        if (ret == .not_found) return null;
         try ret.toError();
 
         return table;
@@ -651,40 +651,115 @@ pub const Depth = enum(u32) {
     _,
 };
 
-pub const UacpiError = error{
-    MAPPING_FAILED,
-    OUT_OF_MEMORY,
-    BAD_CHECKSUM,
-    INVALID_SIGNATURE,
-    INVALID_TABLE_LENGTH,
-    NOT_FOUND,
-    INVALID_ARGUMENT,
-    UNIMPLEMENTED,
-    ALREADY_EXISTS,
-    INTERNAL_ERROR,
-    TYPE_MISMATCH,
-    INIT_LEVEL_MISMATCH,
-    NAMESPACE_NODE_DANGLING,
-    NO_HANDLER,
-    NO_RESOURCE_END_TAG,
-    COMPILED_OUT,
-    HARDWARE_TIMEOUT,
-    TIMEOUT,
-    OVERRIDDEN,
-    DENIED,
+pub const Status = enum(c_uacpi.uacpi_status) {
+    ok = c_uacpi.UACPI_STATUS_OK,
+    mapping_failed = c_uacpi.UACPI_STATUS_MAPPING_FAILED,
+    out_of_memory = c_uacpi.UACPI_STATUS_OUT_OF_MEMORY,
+    bad_checksum = c_uacpi.UACPI_STATUS_BAD_CHECKSUM,
+    invalid_signature = c_uacpi.UACPI_STATUS_INVALID_SIGNATURE,
+    invalid_table_length = c_uacpi.UACPI_STATUS_INVALID_TABLE_LENGTH,
+    not_found = c_uacpi.UACPI_STATUS_NOT_FOUND,
+    invalid_argument = c_uacpi.UACPI_STATUS_INVALID_ARGUMENT,
+    unimplemented = c_uacpi.UACPI_STATUS_UNIMPLEMENTED,
+    already_exists = c_uacpi.UACPI_STATUS_ALREADY_EXISTS,
+    internal_error = c_uacpi.UACPI_STATUS_INTERNAL_ERROR,
+    type_mismatch = c_uacpi.UACPI_STATUS_TYPE_MISMATCH,
+    init_level_mismatch = c_uacpi.UACPI_STATUS_INIT_LEVEL_MISMATCH,
+    namespace_node_dangling = c_uacpi.UACPI_STATUS_NAMESPACE_NODE_DANGLING,
+    no_handler = c_uacpi.UACPI_STATUS_NO_HANDLER,
+    no_resource_end_tag = c_uacpi.UACPI_STATUS_NO_RESOURCE_END_TAG,
+    compiled_out = c_uacpi.UACPI_STATUS_COMPILED_OUT,
+    hardware_timeout = c_uacpi.UACPI_STATUS_HARDWARE_TIMEOUT,
+    timeout = c_uacpi.UACPI_STATUS_TIMEOUT,
+    overridden = c_uacpi.UACPI_STATUS_OVERRIDDEN,
+    denied = c_uacpi.UACPI_STATUS_DENIED,
+
+    // All errors that have bytecode-related origin should go here
+    aml_undefined_reference = c_uacpi.UACPI_STATUS_AML_UNDEFINED_REFERENCE,
+    aml_invalid_namestring = c_uacpi.UACPI_STATUS_AML_INVALID_NAMESTRING,
+    aml_object_already_exists = c_uacpi.UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS,
+    aml_invalid_opcode = c_uacpi.UACPI_STATUS_AML_INVALID_OPCODE,
+    aml_incompatible_object_type = c_uacpi.UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE,
+    aml_bad_encoding = c_uacpi.UACPI_STATUS_AML_BAD_ENCODING,
+    aml_out_of_bounds_index = c_uacpi.UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX,
+    aml_sync_level_too_high = c_uacpi.UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH,
+    aml_invalid_resource = c_uacpi.UACPI_STATUS_AML_INVALID_RESOURCE,
+    aml_loop_timeout = c_uacpi.UACPI_STATUS_AML_LOOP_TIMEOUT,
+    aml_call_stack_depth_limit = c_uacpi.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
+
+    fn toError(self: Status) Error!void {
+        return switch (self) {
+            .ok => {},
+            .mapping_failed => Error.MappingFailed,
+            .out_of_memory => Error.OutOfMemory,
+            .bad_checksum => Error.BadChecksum,
+            .invalid_signature => Error.InvalidSignature,
+            .invalid_table_length => Error.InvalidTableLength,
+            .not_found => Error.NotFound,
+            .invalid_argument => Error.InvalidArgument,
+            .unimplemented => Error.Unimplemented,
+            .already_exists => Error.AlreadyExists,
+            .internal_error => Error.InternalError,
+            .type_mismatch => Error.TypeMismatch,
+            .init_level_mismatch => Error.InitLevelMismatch,
+            .namespace_node_dangling => Error.NamespaceNodeDangling,
+            .no_handler => Error.NoHandler,
+            .no_resource_end_tag => Error.NoResourceEndTag,
+            .compiled_out => Error.CompiledOut,
+            .hardware_timeout => Error.HardwareTimeout,
+            .timeout => Error.Timeout,
+            .overridden => Error.Overriden,
+            .denied => Error.Denied,
+
+            .aml_undefined_reference => Error.AMLUndefinedReference,
+            .aml_invalid_namestring => Error.AMLInvalidNamestring,
+            .aml_object_already_exists => Error.AMLObjectAlreadyExists,
+            .aml_invalid_opcode => Error.AMLInvalidOpcode,
+            .aml_incompatible_object_type => Error.AMLIncompatibleObjectType,
+            .aml_bad_encoding => Error.AMLBadEncoding,
+            .aml_out_of_bounds_index => Error.AMLOutOfBoundsIndex,
+            .aml_sync_level_too_high => Error.AMLSyncLevelTooHigh,
+            .aml_invalid_resource => Error.AMLInvalidResource,
+            .aml_loop_timeout => Error.AMLLoopTimeout,
+            .aml_call_stack_depth_limit => Error.AMLCallStackDepthLimit,
+        };
+    }
+};
+
+pub const Error = error{
+    MappingFailed,
+    OutOfMemory,
+    BadChecksum,
+    InvalidSignature,
+    InvalidTableLength,
+    NotFound,
+    InvalidArgument,
+    Unimplemented,
+    AlreadyExists,
+    InternalError,
+    TypeMismatch,
+    InitLevelMismatch,
+    NamespaceNodeDangling,
+    NoHandler,
+    NoResourceEndTag,
+    CompiledOut,
+    HardwareTimeout,
+    Timeout,
+    Overriden,
+    Denied,
 
     // TODO: are these possible from most functions?
-    AML_UNDEFINED_REFERENCE,
-    AML_INVALID_NAMESTRING,
-    AML_OBJECT_ALREADY_EXISTS,
-    AML_INVALID_OPCODE,
-    AML_INCOMPATIBLE_OBJECT_TYPE,
-    AML_BAD_ENCODING,
-    AML_OUT_OF_BOUNDS_INDEX,
-    AML_SYNC_LEVEL_TOO_HIGH,
-    AML_INVALID_RESOURCE,
-    AML_LOOP_TIMEOUT,
-    AML_CALL_STACK_DEPTH_LIMIT,
+    AMLUndefinedReference,
+    AMLInvalidNamestring,
+    AMLObjectAlreadyExists,
+    AMLInvalidOpcode,
+    AMLIncompatibleObjectType,
+    AMLBadEncoding,
+    AMLOutOfBoundsIndex,
+    AMLSyncLevelTooHigh,
+    AMLInvalidResource,
+    AMLLoopTimeout,
+    AMLCallStackDepthLimit,
 };
 
 const WorkType = enum(c_uacpi.uacpi_work_type) {
@@ -701,81 +776,6 @@ const WorkType = enum(c_uacpi.uacpi_work_type) {
 
 const InterruptHandler = *const fn (*anyopaque) callconv(.C) void;
 const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
-
-const Status = enum(c_uacpi.uacpi_status) {
-    OK = c_uacpi.UACPI_STATUS_OK,
-    MAPPING_FAILED = c_uacpi.UACPI_STATUS_MAPPING_FAILED,
-    OUT_OF_MEMORY = c_uacpi.UACPI_STATUS_OUT_OF_MEMORY,
-    BAD_CHECKSUM = c_uacpi.UACPI_STATUS_BAD_CHECKSUM,
-    INVALID_SIGNATURE = c_uacpi.UACPI_STATUS_INVALID_SIGNATURE,
-    INVALID_TABLE_LENGTH = c_uacpi.UACPI_STATUS_INVALID_TABLE_LENGTH,
-    NOT_FOUND = c_uacpi.UACPI_STATUS_NOT_FOUND,
-    INVALID_ARGUMENT = c_uacpi.UACPI_STATUS_INVALID_ARGUMENT,
-    UNIMPLEMENTED = c_uacpi.UACPI_STATUS_UNIMPLEMENTED,
-    ALREADY_EXISTS = c_uacpi.UACPI_STATUS_ALREADY_EXISTS,
-    INTERNAL_ERROR = c_uacpi.UACPI_STATUS_INTERNAL_ERROR,
-    TYPE_MISMATCH = c_uacpi.UACPI_STATUS_TYPE_MISMATCH,
-    INIT_LEVEL_MISMATCH = c_uacpi.UACPI_STATUS_INIT_LEVEL_MISMATCH,
-    NAMESPACE_NODE_DANGLING = c_uacpi.UACPI_STATUS_NAMESPACE_NODE_DANGLING,
-    NO_HANDLER = c_uacpi.UACPI_STATUS_NO_HANDLER,
-    NO_RESOURCE_END_TAG = c_uacpi.UACPI_STATUS_NO_RESOURCE_END_TAG,
-    COMPILED_OUT = c_uacpi.UACPI_STATUS_COMPILED_OUT,
-    HARDWARE_TIMEOUT = c_uacpi.UACPI_STATUS_HARDWARE_TIMEOUT,
-    TIMEOUT = c_uacpi.UACPI_STATUS_TIMEOUT,
-    OVERRIDDEN = c_uacpi.UACPI_STATUS_OVERRIDDEN,
-    DENIED = c_uacpi.UACPI_STATUS_DENIED,
-
-    // All errors that have bytecode-related origin should go here
-    AML_UNDEFINED_REFERENCE = c_uacpi.UACPI_STATUS_AML_UNDEFINED_REFERENCE,
-    AML_INVALID_NAMESTRING = c_uacpi.UACPI_STATUS_AML_INVALID_NAMESTRING,
-    AML_OBJECT_ALREADY_EXISTS = c_uacpi.UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS,
-    AML_INVALID_OPCODE = c_uacpi.UACPI_STATUS_AML_INVALID_OPCODE,
-    AML_INCOMPATIBLE_OBJECT_TYPE = c_uacpi.UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE,
-    AML_BAD_ENCODING = c_uacpi.UACPI_STATUS_AML_BAD_ENCODING,
-    AML_OUT_OF_BOUNDS_INDEX = c_uacpi.UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX,
-    AML_SYNC_LEVEL_TOO_HIGH = c_uacpi.UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH,
-    AML_INVALID_RESOURCE = c_uacpi.UACPI_STATUS_AML_INVALID_RESOURCE,
-    AML_LOOP_TIMEOUT = c_uacpi.UACPI_STATUS_AML_LOOP_TIMEOUT,
-    AML_CALL_STACK_DEPTH_LIMIT = c_uacpi.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
-
-    fn toError(self: Status) UacpiError!void {
-        switch (self) {
-            .OK => {},
-            .MAPPING_FAILED => return UacpiError.MAPPING_FAILED,
-            .OUT_OF_MEMORY => return UacpiError.OUT_OF_MEMORY,
-            .BAD_CHECKSUM => return UacpiError.BAD_CHECKSUM,
-            .INVALID_SIGNATURE => return UacpiError.INVALID_SIGNATURE,
-            .INVALID_TABLE_LENGTH => return UacpiError.INVALID_TABLE_LENGTH,
-            .NOT_FOUND => return UacpiError.NOT_FOUND,
-            .INVALID_ARGUMENT => return UacpiError.INVALID_ARGUMENT,
-            .UNIMPLEMENTED => return UacpiError.UNIMPLEMENTED,
-            .ALREADY_EXISTS => return UacpiError.ALREADY_EXISTS,
-            .INTERNAL_ERROR => return UacpiError.INTERNAL_ERROR,
-            .TYPE_MISMATCH => return UacpiError.TYPE_MISMATCH,
-            .INIT_LEVEL_MISMATCH => return UacpiError.INIT_LEVEL_MISMATCH,
-            .NAMESPACE_NODE_DANGLING => return UacpiError.NAMESPACE_NODE_DANGLING,
-            .NO_HANDLER => return UacpiError.NO_HANDLER,
-            .NO_RESOURCE_END_TAG => return UacpiError.NO_RESOURCE_END_TAG,
-            .COMPILED_OUT => return UacpiError.COMPILED_OUT,
-            .HARDWARE_TIMEOUT => return UacpiError.HARDWARE_TIMEOUT,
-            .TIMEOUT => return UacpiError.TIMEOUT,
-            .OVERRIDDEN => return UacpiError.OVERRIDDEN,
-            .DENIED => return UacpiError.DENIED,
-
-            .AML_UNDEFINED_REFERENCE => return UacpiError.AML_UNDEFINED_REFERENCE,
-            .AML_INVALID_NAMESTRING => return UacpiError.AML_INVALID_NAMESTRING,
-            .AML_OBJECT_ALREADY_EXISTS => return UacpiError.AML_OBJECT_ALREADY_EXISTS,
-            .AML_INVALID_OPCODE => return UacpiError.AML_INVALID_OPCODE,
-            .AML_INCOMPATIBLE_OBJECT_TYPE => return UacpiError.AML_INCOMPATIBLE_OBJECT_TYPE,
-            .AML_BAD_ENCODING => return UacpiError.AML_BAD_ENCODING,
-            .AML_OUT_OF_BOUNDS_INDEX => return UacpiError.AML_OUT_OF_BOUNDS_INDEX,
-            .AML_SYNC_LEVEL_TOO_HIGH => return UacpiError.AML_SYNC_LEVEL_TOO_HIGH,
-            .AML_INVALID_RESOURCE => return UacpiError.AML_INVALID_RESOURCE,
-            .AML_LOOP_TIMEOUT => return UacpiError.AML_LOOP_TIMEOUT,
-            .AML_CALL_STACK_DEPTH_LIMIT => return UacpiError.AML_CALL_STACK_DEPTH_LIMIT,
-        }
-    }
-};
 
 const ByteWidth = enum(u8) {
     one = 1,
@@ -844,15 +844,15 @@ comptime {
 const kernel_api = struct {
     /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
     export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) Status {
-        const address = kernel.boot.rsdp() orelse return Status.NOT_FOUND;
+        const address = kernel.boot.rsdp() orelse return Status.not_found;
 
         switch (address) {
             .physical => |addr| out_rsdp_address.* = addr,
             .virtual => |addr| out_rsdp_address.* =
-                kernel.vmm.physicalFromDirectMap(addr) catch return Status.INTERNAL_ERROR,
+                kernel.vmm.physicalFromDirectMap(addr) catch return .internal_error,
         }
 
-        return .OK;
+        return .ok;
     }
 
     /// Open a PCI device at 'address' for reading & writing.
@@ -862,8 +862,8 @@ const kernel_api = struct {
         address: kernel.pci.Address,
         out_handle: **kernel.pci.PciFunction,
     ) Status {
-        out_handle.* = kernel.pci.getFunction(address) orelse return Status.NOT_FOUND;
-        return .OK;
+        out_handle.* = kernel.pci.getFunction(address) orelse return Status.not_found;
+        return .ok;
     }
 
     export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
@@ -889,7 +889,7 @@ const kernel_api = struct {
             .four => address.toPtr(*const volatile u32).*,
         };
 
-        return .OK;
+        return .ok;
     }
 
     /// Write the configuration space of a previously open PCI device.
@@ -911,7 +911,7 @@ const kernel_api = struct {
             .four => address.toPtr(*volatile u32).* = @truncate(value),
         }
 
-        return .OK;
+        return .ok;
     }
 
     /// Map a SystemIO address at [base, base + len) and return a kernel-implemented handle that can be used for reading
@@ -919,7 +919,7 @@ const kernel_api = struct {
     export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) Status {
         _ = len;
         out_handle.* = @ptrFromInt(base);
-        return .OK;
+        return .ok;
     }
 
     export fn uacpi_kernel_io_unmap(handle: *anyopaque) void {
@@ -940,11 +940,11 @@ const kernel_api = struct {
         _ = offset;
         const port: u16 = @intCast(@intFromPtr(handle)); // IO ports are 16-bit
         switch (byte_width) {
-            .one => value.* = kernel.arch.io.readPort(u8, port) catch return .INVALID_ARGUMENT,
-            .two => value.* = kernel.arch.io.readPort(u16, port) catch return .INVALID_ARGUMENT,
-            .four => value.* = kernel.arch.io.readPort(u32, port) catch return .INVALID_ARGUMENT,
+            .one => value.* = kernel.arch.io.readPort(u8, port) catch return .invalid_argument,
+            .two => value.* = kernel.arch.io.readPort(u16, port) catch return .invalid_argument,
+            .four => value.* = kernel.arch.io.readPort(u32, port) catch return .invalid_argument,
         }
-        return .OK;
+        return .ok;
     }
 
     /// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
@@ -961,12 +961,12 @@ const kernel_api = struct {
         _ = offset;
         const port: u16 = @intCast(@intFromPtr(handle)); // IO ports are 16-bit
         switch (byte_width) {
-            .one => kernel.arch.io.writePort(u8, port, @truncate(value)) catch return .INVALID_ARGUMENT,
-            .two => kernel.arch.io.writePort(u16, port, @truncate(value)) catch return .INVALID_ARGUMENT,
-            .four => kernel.arch.io.writePort(u32, port, @truncate(value)) catch return .INVALID_ARGUMENT,
+            .one => kernel.arch.io.writePort(u8, port, @truncate(value)) catch return .invalid_argument,
+            .two => kernel.arch.io.writePort(u16, port, @truncate(value)) catch return .invalid_argument,
+            .four => kernel.arch.io.writePort(u32, port, @truncate(value)) catch return .invalid_argument,
         }
 
-        return .OK;
+        return .ok;
     }
 
     export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
@@ -1102,7 +1102,7 @@ const kernel_api = struct {
             0xFFFF => mutex.lock(current_task),
         }
 
-        return .OK;
+        return .ok;
     }
 
     export fn uacpi_kernel_release_mutex(mutex: *kernel.sync.Mutex) void {
@@ -1174,19 +1174,19 @@ const kernel_api = struct {
             ctx,
         ) catch |err| {
             log.err("failed to allocate interrupt: {}", .{err});
-            return Status.INTERNAL_ERROR;
+            return .internal_error;
         };
 
         kernel.arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
             kernel.arch.interrupts.deallocateInterrupt(interrupt);
 
             log.err("failed to route interrupt: {}", .{err});
-            return Status.INTERNAL_ERROR;
+            return .internal_error;
         };
 
         out_irq_handle.* = @ptrFromInt(@intFromEnum(interrupt));
 
-        return .OK;
+        return .ok;
     }
 
     /// Uninstall an interrupt handler.
@@ -1199,7 +1199,7 @@ const kernel_api = struct {
         const interrupt: kernel.arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
         kernel.arch.interrupts.deallocateInterrupt(interrupt);
 
-        return .OK;
+        return .ok;
     }
 
     /// Create a kernel spinlock object.
