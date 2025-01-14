@@ -105,6 +105,17 @@ pub const interrupts = struct {
 
         current.interrupts.unrouteInterrupt(external_interrupt);
     }
+
+    /// Signal end of interrupt.
+    pub fn eoi() callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.interrupts,
+            "eoi",
+            fn () void,
+        );
+
+        current.interrupts.eoi();
+    }
 };
 
 pub const paging = struct {

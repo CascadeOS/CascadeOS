@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
+/// Signal end of interrupt.
+pub inline fn eoi() void {
+    globals.lapic.eoi();
+}
+
 const globals = struct {
     /// Initialized in `init.captureApicInformation`.
     var lapic: lib_x64.LAPIC = .{

@@ -5,6 +5,7 @@ pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHa
 pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
 pub const areEnabled = lib_x64.instructions.interruptsEnabled;
+pub const eoi = x64.apic.eoi;
 
 pub fn allocateInterrupt(
     interrupt_handler: InterruptHandler,
