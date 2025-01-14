@@ -78,6 +78,71 @@ pub fn namespaceInitialize() !void {
     try ret.toError();
 }
 
+/// Returns the current subsystem initialization level
+pub fn currentInitLevel() InitLevel {
+    return @enumFromInt(c_uacpi.uacpi_get_current_init_level());
+}
+
+pub const Bitness = enum(u8) {
+    @"32" = 32,
+    @"64" = 64,
+};
+
+/// Get the bitness of the currently loaded AML code according to the DSDT.
+pub fn getAmlBitness() !Bitness {
+    var value: Bitness = undefined;
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_get_aml_bitness(
+        @ptrCast(&value),
+    ));
+    try ret.toError();
+    return value;
+}
+
+/// Helper for entering ACPI mode.
+///
+/// Note that ACPI mode is entered automatically during the call to `initialize`.
+pub fn enterAcpiMode() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_acpi_mode());
+    try ret.toError();
+}
+
+/// Helper for leaving ACPI mode.
+pub fn leaveAcpiMode() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_leave_acpi_mode());
+    try ret.toError();
+}
+
+/// Attempt to acquire the global lock for 'timeout' milliseconds.
+///
+/// On success, the return value is a unique sequence number for the current acquire transaction.
+///
+/// This number is used for validation during release.
+pub fn acquireGlobalLock(timeout: Timeout) !u32 {
+    var seq: u32 = undefined;
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_acquire_global_lock(
+        @intFromEnum(timeout),
+        &seq,
+    ));
+    try ret.toError();
+    return seq;
+}
+
+pub fn releaseGlobalLock(seq: u32) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_release_global_lock(seq));
+    try ret.toError();
+}
+
+/// Reset the global uACPI state by freeing all internally allocated data structures & resetting any global variables.
+///
+/// After this call, uACPI must be re-initialized from scratch to be used again.
+///
+/// This is called by uACPI automatically if a fatal error occurs during a call to `initialize`/`namespaceLoad` etc.
+/// in order to prevent accidental use of partially uninitialized subsystems.
+pub fn acpiStateReset() void {
+    c_uacpi.uacpi_state_reset();
+}
+
+// TODO: inline one off stuff like this
 pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
     pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
     ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
@@ -593,6 +658,340 @@ pub const Node = opaque {
         return id_string;
     }
 
+    /// Evaluate an object within the namespace and get back its value.
+    ///
+    /// Either parent_node or path must be valid.
+    ///
+    /// A value of `null` for `parent_node` implies root relative lookups, unless `path` is already absolute.
+    pub fn eval(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Evaluate an object within the namespace and get back its value.
+    ///
+    /// Either parent_node or path must be valid.
+    ///
+    /// A value of `null` for `parent_node` implies root relative lookups, unless `path` is already absolute.
+    pub fn evalSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple(
+            @ptrCast(parent_node),
+            path.ptr,
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Same as `eval`, but the return value type is validated against the `ret_mask`.
+    ///
+    /// `Error.TypeMismatch` is returned on error.
+    pub fn evalTyped(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+        ret_mask: ObjectTypeBits,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_typed(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            @bitCast(ret_mask),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Same as `evalTyped`, but the return value type is validated against the `ret_mask`.
+    ///
+    /// `Error.TypeMismatch` is returned on error.
+    pub fn evalTypedSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        ret_mask: ObjectTypeBits,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_typed(
+            @ptrCast(parent_node),
+            path.ptr,
+            @bitCast(ret_mask),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Same as `eval` but without a return value.
+    pub fn execute(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_execute(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+        ));
+        try ret.toError();
+    }
+
+    /// Same as `evalSimple` but without a return value.
+    pub fn executeSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_execute_simple(
+            @ptrCast(parent_node),
+            path.ptr,
+        ));
+        try ret.toError();
+    }
+
+    /// A shorthand for `evalTyped` with `ObjectTypeBits.integer`.
+    pub fn evalInteger(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !u64 {
+        var value: u64 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_integer(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            &value,
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.integer`.
+    pub fn evalIntegerSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !u64 {
+        var value: u64 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_integer(
+            @ptrCast(parent_node),
+            path.ptr,
+            &value,
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTyped` with `ObjectTypeBits.buffer`|`ObjectTypeBits.string`.
+    ///
+    /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
+    pub fn evalBufferOrString(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_buffer_or_string(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.buffer`|`ObjectTypeBits.string`.
+    ///
+    /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
+    pub fn evalBufferOrStringSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_buffer_or_string(
+            @ptrCast(parent_node),
+            path.ptr,
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTyped` with `ObjectTypeBits.string`.
+    ///
+    /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
+    pub fn evalString(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_string(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.string`.
+    ///
+    /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
+    pub fn evalStringSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_string(
+            @ptrCast(parent_node),
+            path.ptr,
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTyped` with `ObjectTypeBits.buffer`.
+    ///
+    /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
+    pub fn evalBuffer(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_buffer(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.buffer`.
+    ///
+    /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
+    pub fn evalBufferSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_buffer(
+            @ptrCast(parent_node),
+            path.ptr,
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTyped` with `ObjectTypeBits.package`.
+    ///
+    /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
+    pub fn evalPackage(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+        objects: []const *const Object,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_package(
+            @ptrCast(parent_node),
+            path.ptr,
+            &.{
+                .objects = @ptrCast(@constCast(objects.ptr)),
+                .count = objects.len,
+            },
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.package`.
+    ///
+    /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
+    pub fn evalPackageSimple(
+        parent_node: ?*Node,
+        path: [:0]const u8,
+    ) !*Object {
+        var value: *Object = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_package(
+            @ptrCast(parent_node),
+            path.ptr,
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
     pub const Info = extern struct {
         /// Size of the entire structure
         size: u32,
@@ -918,6 +1317,8 @@ pub const Node = opaque {
         try ret.toError();
     }
 };
+
+pub const Object = opaque {};
 
 pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
     level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
@@ -1754,6 +2155,33 @@ pub const Error = error{
     AMLCallStackDepthLimit,
 };
 
+pub const InitLevel = enum(c_uacpi.uacpi_init_level) {
+    /// Reboot state, nothing is available
+    early = c_uacpi.UACPI_INIT_LEVEL_EARLY,
+
+    /// State after a successfull call to `initialize`.
+    ///
+    /// Table API and other helpers that don't depend on the ACPI namespace may be used.
+    subsystem_initialized = c_uacpi.UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED,
+
+    /// State after a successfull call to `namespaceLoad`.
+    ///
+    /// Most API may be used, namespace can be iterated, etc.
+    namespace_loaded = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_LOADED,
+
+    /// The final initialization stage, this is entered after the call to `namespaceInitialize`.
+    ///
+    /// All API is available to use.
+    namespace_initialized = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED,
+};
+
+pub const Timeout = enum(u16) {
+    none = 0,
+    infinite = 0xFFFF,
+
+    _,
+};
+
 const WorkType = enum(c_uacpi.uacpi_work_type) {
     /// Schedule a GPE handler method for execution.
     ///
@@ -2075,22 +2503,22 @@ const kernel_api = struct {
     /// Try to acquire the mutex with a millisecond timeout.
     ///
     /// The timeout value has the following meanings:
-    /// - 0x0000 - Attempt to acquire the mutex once, in a non-blocking manner
-    /// - 0x0001...0xFFFE - Attempt to acquire the mutex for at least 'timeout' milliseconds
-    /// - 0xFFFF - Infinite wait, block until the mutex is acquired
+    /// - `.none` - Attempt to acquire the mutex once, in a non-blocking manner
+    /// - `.infinite` - Infinite wait, block until the mutex is acquired
+    /// - else - Attempt to acquire the mutex for at least 'timeout' milliseconds
     ///
     /// The following are possible return values:
     /// 1. UACPI_STATUS_OK - successful acquire operation
     /// 2. UACPI_STATUS_TIMEOUT - timeout reached while attempting to acquire (or the single attempt to acquire was not
-    ///                           successful for calls with timeout=0)
+    ///                           successful for calls with timeout=.none)
     /// 3. Any other value - signifies a host internal error and is treated as such
-    export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: u16) Status {
+    export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: Timeout) Status {
         const current_task = kernel.Task.getCurrent();
 
         switch (timeout) {
-            0x0000 => core.panic("mutex try lock not implemented", null),
-            0x0001...0xFFFE => core.panic("mutex timeout lock not implemented", null),
-            0xFFFF => mutex.lock(current_task),
+            .none => core.panic("mutex try lock not implemented", null),
+            .infinite => mutex.lock(current_task),
+            else => core.panic("mutex timeout lock not implemented", null),
         }
 
         return .ok;
@@ -2102,12 +2530,10 @@ const kernel_api = struct {
 
     /// Try to wait for an event (counter > 0) with a millisecond timeout.
     ///
-    /// A timeout value of 0xFFFF implies infinite wait.
-    ///
     /// The internal counter is decremented by 1 if wait was successful.
     ///
     /// A successful wait is indicated by returning UACPI_TRUE.
-    export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: u16) bool {
+    export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: Timeout) bool {
         core.panicFmt(
             "uacpi_kernel_wait_for_event(handle={}, timeout={})",
             .{ handle, timeout },
