@@ -2,6 +2,13 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2024 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/1d636a34152dc82833c89175b702f2c0671f04e3/LICENSE)
 
+//! Provides a nice zig API wrapping uACPI.
+//!
+//! Most APIs are exposed with no loss of functionality, except for the following:
+//! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
+//!    root node.
+//!
+
 /// Set up early access to the table subsystem. What this means is:
 /// - uacpi_table_find() and similar API becomes usable before the call to
 ///   uacpi_initialize().
@@ -661,18 +668,16 @@ pub const Node = opaque {
     /// Evaluate an object within the namespace and get back its value.
     ///
     /// Either parent_node or path must be valid.
-    ///
-    /// A value of `null` for `parent_node` implies root relative lookups, unless `path` is already absolute.
     pub fn eval(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -687,17 +692,15 @@ pub const Node = opaque {
     /// Evaluate an object within the namespace and get back its value.
     ///
     /// Either parent_node or path must be valid.
-    ///
-    /// A value of `null` for `parent_node` implies root relative lookups, unless `path` is already absolute.
     pub fn evalSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -709,8 +712,8 @@ pub const Node = opaque {
     ///
     /// `Error.TypeMismatch` is returned on error.
     pub fn evalTyped(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
         ret_mask: ObjectTypeBits,
     ) !*Object {
@@ -718,7 +721,7 @@ pub const Node = opaque {
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_typed(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -735,15 +738,15 @@ pub const Node = opaque {
     ///
     /// `Error.TypeMismatch` is returned on error.
     pub fn evalTypedSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         ret_mask: ObjectTypeBits,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_typed(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             @bitCast(ret_mask),
             @ptrCast(&value),
         ));
@@ -754,13 +757,13 @@ pub const Node = opaque {
 
     /// Same as `eval` but without a return value.
     pub fn execute(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_execute(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -771,27 +774,27 @@ pub const Node = opaque {
 
     /// Same as `evalSimple` but without a return value.
     pub fn executeSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_execute_simple(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
         ));
         try ret.toError();
     }
 
     /// A shorthand for `evalTyped` with `ObjectTypeBits.integer`.
     pub fn evalInteger(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !u64 {
         var value: u64 = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_integer(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -805,14 +808,14 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.integer`.
     pub fn evalIntegerSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !u64 {
         var value: u64 = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_integer(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &value,
         ));
         try ret.toError();
@@ -824,15 +827,15 @@ pub const Node = opaque {
     ///
     /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBufferOrString(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_buffer_or_string(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -848,14 +851,14 @@ pub const Node = opaque {
     ///
     /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBufferOrStringSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_buffer_or_string(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -867,15 +870,15 @@ pub const Node = opaque {
     ///
     /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
     pub fn evalString(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_string(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -891,14 +894,14 @@ pub const Node = opaque {
     ///
     /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
     pub fn evalStringSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_string(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -910,15 +913,15 @@ pub const Node = opaque {
     ///
     /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBuffer(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_buffer(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -934,14 +937,14 @@ pub const Node = opaque {
     ///
     /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBufferSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_buffer(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -953,15 +956,15 @@ pub const Node = opaque {
     ///
     /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
     pub fn evalPackage(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
         objects: []const *const Object,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_package(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             &.{
                 .objects = @ptrCast(@constCast(objects.ptr)),
                 .count = objects.len,
@@ -977,14 +980,14 @@ pub const Node = opaque {
     ///
     /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
     pub fn evalPackageSimple(
-        parent_node: ?*Node,
-        path: [:0]const u8,
+        parent_node: *Node,
+        path: ?[:0]const u8,
     ) !*Object {
         var value: *Object = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_package(
             @ptrCast(parent_node),
-            path.ptr,
+            if (path) |p| p.ptr else null,
             @ptrCast(&value),
         ));
         try ret.toError();
