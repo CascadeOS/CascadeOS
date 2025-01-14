@@ -89,6 +89,38 @@ pub fn setInterruptModel(model: InterruptModel) !void {
     try ret.toError();
 }
 
+/// Finalize GPE initialization by enabling all GPEs not configured for wake and having a matching AML handler detected.
+///
+/// This should be called after the kernel power managment subsystem has enumerated all of the devices, executing their
+/// _PRW methods etc., and marking those it wishes to use for wake by calling `Node.setupGPEForWake` and
+/// `Node.enableGPEForWake`
+pub fn finializeGpeInitialization() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_finalize_gpe_initialization());
+    try ret.toError();
+}
+
+/// Disable all GPEs currently set up on the system.
+pub fn disableAllGPEs() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_all_gpes());
+    try ret.toError();
+}
+
+/// Enable all GPEs not marked as wake.
+///
+/// This is only needed after the system wakes from a shallow sleep state and is called automatically by wake code.
+pub fn enableAllRuntimeGPEs() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_all_runtime_gpes());
+    try ret.toError();
+}
+
+/// Enable all GPEs marked as wake.
+///
+/// This is only needed before the system goes to sleep is called automatically by sleep code.
+pub fn enableAllWakeGPEs() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_all_wake_gpes());
+    try ret.toError();
+}
+
 pub const Node = opaque {
     pub fn root() *Node {
         return @ptrCast(c_uacpi.uacpi_namespace_root());
@@ -615,6 +647,340 @@ pub const Node = opaque {
 
         return info_ptr;
     }
+
+    /// Get the info for a given GPE.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn gpeInfo(gpe_device: ?*const Node, index: u16) !EventInfo {
+        var event_info: EventInfo = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gpe_info(
+            @ptrCast(@constCast(gpe_device)),
+            index,
+            @ptrCast(&event_info),
+        ));
+        try ret.toError();
+        return event_info;
+    }
+
+    /// Installs a handler to the provided GPE at 'index' controlled by device 'gpe_device'.
+    ///
+    /// The GPE is automatically disabled & cleared according to the configured triggering upon invoking the handler.
+    ///
+    /// The event is optionally re-enabled (by returning `InterruptReturn.gpe_reenable`).
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn installGPEHandler(
+        gpe_device: ?*Node,
+        index: u16,
+        triggering: GPETriggering,
+        comptime UserContextT: type,
+        handler: GPEHandler(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_gpe_handler(
+            @ptrCast(gpe_device),
+            index,
+            @intFromEnum(triggering),
+            makeGPEHandlerWrapper(UserContextT, handler),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    /// Installs a raw handler to the provided GPE at 'index' controlled by device 'gpe_device'.
+    ///
+    /// The handler is dispatched immediately after the event is received, status & enable bits are untouched.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn installRawGPEHandler(
+        gpe_device: ?*Node,
+        index: u16,
+        comptime UserContextT: type,
+        handler: GPEHandler(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_gpe_handler_raw(
+            @ptrCast(gpe_device),
+            index,
+            makeGPEHandlerWrapper(UserContextT, handler),
+            user_context,
+        ));
+        try ret.toError();
+    }
+
+    pub fn uninstallGPEHandler(
+        gpe_device: ?*Node,
+        index: u16,
+        comptime UserContextT: type,
+        handler: GPEHandler(UserContextT),
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_gpe_handler(
+            @ptrCast(gpe_device),
+            index,
+            makeGPEHandlerWrapper(UserContextT, handler),
+        ));
+        try ret.toError();
+    }
+
+    /// Marks the GPE 'index' managed by 'gpe_device' as wake-capable.
+    ///
+    /// 'wake_device' is optional and configures the GPE to generate an implicit notification whenever an event occurs.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn setupGPEForWake(
+        gpe_device: ?*Node,
+        index: u16,
+        wake_device: ?*Node,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_setup_gpe_for_wake(
+            @ptrCast(gpe_device),
+            index,
+            @ptrCast(wake_device),
+        ));
+        try ret.toError();
+    }
+
+    /// Mark a GPE managed by 'gpe_device' as enabled for wake.
+    ///
+    /// The GPE must have previously been marked by calling `setupGPEForWake`.
+    ///
+    /// This function only affects the GPE enable register state following the call to `enableAllWakeGPEs`.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn enableGPEForWake(
+        gpe_device: ?*Node,
+        index: u16,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_gpe_for_wake(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Mark a GPE managed by 'gpe_device' as disabled for wake.
+    ///
+    /// The GPE must have previously been marked by calling `setupGPEForWake`.
+    ///
+    /// This function only affects the GPE enable register state following the call to `enableAllWakeGPEs`.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn disableGPEForWake(
+        gpe_device: ?*Node,
+        index: u16,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_gpe_for_wake(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Enable a general purpose event managed by 'gpe_device'.
+    ///
+    /// Internally this uses reference counting to make sure a GPE is not disabled until all possible users of it do so.
+    ///
+    /// GPEs not marked for wake are enabled automatically so this API is only needed for wake events or those that don't
+    /// have a corresponding AML handler.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn enableGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Disable a general purpose event managed by 'gpe_device'.
+    ///
+    /// Internally this uses reference counting to make sure a GPE is not disabled until all possible users of it do so.
+    ///
+    /// GPEs not marked for wake are enabled automatically so this API is only needed for wake events or those that don't
+    /// have a corresponding AML handler.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn disableGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Clear the status bit of the event 'index' managed by 'gpe_device'.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn clearGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_clear_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Suspend a general purpose event managed by 'gpe_device'.
+    ///
+    /// This bypasses the reference counting mechanism and unconditionally clears/sets the corresponding bit in the
+    /// enable registers.
+    ///
+    /// This is used for switching the GPE to poll mode.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn suspendGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_suspend_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Resume a general purpose event managed by 'gpe_device'.
+    ///
+    /// This bypasses the reference counting mechanism and unconditionally clears/sets the corresponding bit in the
+    /// enable registers.
+    ///
+    /// This is used for switching the GPE to poll mode.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn resumeGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_resume_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Finish handling the GPE managed by 'gpe_device' at 'index'.
+    ///
+    /// This clears the status registers if it hasn't been cleared yet and re-enables the event if it was enabled before.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn finishHandlingGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_finish_handling_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Hard mask a general purpose event at 'index' managed by 'gpe_device'.
+    ///
+    /// This is used to permanently silence an event so that further calls to enable/disable as well as suspend/resume
+    /// get ignored.
+    ///
+    /// This might be necessary for GPEs that cause an event storm due to the kernel's inability to properly handle them.
+    ///
+    /// The only way to enable a masked event is by a call to unmask.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn maskGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_mask_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Hard unmask a general purpose event at 'index' managed by 'gpe_device'.
+    ///
+    /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
+    pub fn unmaskGPE(gpe_device: ?*Node, index: u16) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_unmask_gpe(
+            @ptrCast(gpe_device),
+            index,
+        ));
+        try ret.toError();
+    }
+
+    /// Install a new GPE block, usually defined by a device in the namespace with a _HID of ACPI0006.
+    pub fn installGPEBlock(
+        gpe_device: *Node,
+        address: u64,
+        address_space: AddressSpace,
+        num_registers: u16,
+        irq: u32,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_gpe_block(
+            @ptrCast(gpe_device),
+            address,
+            @intFromEnum(address_space),
+            num_registers,
+            irq,
+        ));
+        try ret.toError();
+    }
+
+    pub fn uninstallGPEBlock(gpe_device: *Node) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_gpe_block(
+            @ptrCast(gpe_device),
+        ));
+        try ret.toError();
+    }
+};
+
+pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
+    level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
+    edge = c_uacpi.UACPI_GPE_TRIGGERING_EDGE,
+};
+
+pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
+    timer_status = c_uacpi.UACPI_FIXED_EVENT_TIMER_STATUS,
+    power_button = c_uacpi.UACPI_FIXED_EVENT_POWER_BUTTON,
+    sleep_button = c_uacpi.UACPI_FIXED_EVENT_SLEEP_BUTTON,
+    rtc = c_uacpi.UACPI_FIXED_EVENT_RTC,
+
+    pub fn installHandler(
+        event: FixedEvent,
+        comptime UserContextT: type,
+        handler: InterruptHandler(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_fixed_event_handler(
+            @intFromEnum(event),
+            makeInterruptHandlerWrapper(UserContextT, handler),
+            @ptrCast(user_context),
+        ));
+        try ret.toError();
+    }
+
+    pub fn uninstallHandler(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_fixed_event_handler(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn enable(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_fixed_event(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn disable(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_fixed_event(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn clear(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_clear_fixed_event(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn info(event: FixedEvent) !EventInfo {
+        var info_data: EventInfo = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_fixed_event_info(
+            @intFromEnum(event),
+            @ptrCast(&info_data),
+        ));
+        try ret.toError();
+        return info_data;
+    }
 };
 
 pub const io = struct {
@@ -1127,12 +1493,44 @@ pub const RegionOperation = enum(c_uacpi.uacpi_region_op) {
     detach = c_uacpi.UACPI_REGION_OP_DETACH,
 };
 
+pub const EventInfo = packed struct(c_uacpi.uacpi_event_info) {
+    /// Event is enabled in software
+    enabled: bool,
+    /// Event is enabled in software (only for wake)
+    enabled_for_wake: bool,
+    /// Event is masked
+    masked: bool,
+    /// Event has a handler attached
+    has_handler: bool,
+    /// Hardware enable bit is set
+    hardware_enabled: bool,
+    /// Hardware status bit is set
+    hardware_status: bool,
+
+    _reserved: u26,
+};
+
 pub fn IterationCallback(comptime UserContextT: type) type {
     return fn (
         node: *Node,
         node_depth: u32,
         user_context: ?*UserContextT,
     ) IterationDecision;
+}
+
+inline fn makeIterationCallbackWrapper(
+    comptime UserContextT: type,
+    callback: IterationCallback(UserContextT),
+) c_uacpi.uacpi_iteration_callback {
+    return comptime @ptrCast(&struct {
+        fn callbackWrapper(
+            user_ctx: ?*anyopaque,
+            node: *Node,
+            node_depth: u32,
+        ) callconv(.C) IterationDecision {
+            return callback(node, node_depth, @ptrCast(user_ctx));
+        }
+    }.callbackWrapper);
 }
 
 pub fn NotifyHandler(comptime UserContextT: type) type {
@@ -1143,6 +1541,71 @@ pub fn NotifyHandler(comptime UserContextT: type) type {
     ) Status;
 }
 
+inline fn makeNotifyHandlerWrapper(
+    comptime UserContextT: type,
+    handler: NotifyHandler(UserContextT),
+) c_uacpi.uacpi_notify_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+            node: *Node,
+            value: u64,
+        ) callconv(.C) Status {
+            return handler(node, value, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
+
+pub fn GPEHandler(comptime UserContextT: type) type {
+    return fn (
+        gpe_device: *Node,
+        index: u16,
+        user_context: ?*UserContextT,
+    ) InterruptReturn;
+}
+
+inline fn makeGPEHandlerWrapper(
+    comptime UserContextT: type,
+    handler: GPEHandler(UserContextT),
+) c_uacpi.uacpi_gpe_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+            gpe_device: *Node,
+            index: u16,
+        ) callconv(.C) InterruptReturn {
+            return handler(gpe_device, index, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
+
+pub const InterruptReturn = enum(c_uacpi.uacpi_interrupt_ret) {
+    not_handled = c_uacpi.UACPI_INTERRUPT_NOT_HANDLED,
+    handled = c_uacpi.UACPI_INTERRUPT_HANDLED,
+
+    /// Only valid for GPE handlers, returned if the handler wishes to reenable the GPE it just handled.
+    gpe_reenable = c_uacpi.UACPI_GPE_REENABLE,
+};
+
+pub fn InterruptHandler(comptime UserContextT: type) type {
+    return fn (
+        user_context: ?*UserContextT,
+    ) InterruptReturn;
+}
+
+inline fn makeInterruptHandlerWrapper(
+    comptime UserContextT: type,
+    handler: InterruptHandler(UserContextT),
+) c_uacpi.uacpi_interrupt_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+        ) callconv(.C) InterruptReturn {
+            return handler(@ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
+
 // FIXME: this handler is wrong, the second argument depends on the operation
 //        will be clarified by https://github.com/UltraOS/uACPI/pull/104
 pub fn RegionHandler(comptime UserContextT: type) type {
@@ -1150,6 +1613,20 @@ pub fn RegionHandler(comptime UserContextT: type) type {
         operation: RegionOperation,
         user_context: ?*UserContextT,
     ) Status;
+}
+
+inline fn makeRegionHandlerWrapper(
+    comptime UserContextT: type,
+    handler: RegionHandler(UserContextT),
+) c_uacpi.uacpi_region_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            op: RegionOperation,
+            user_ctx: ?*anyopaque,
+        ) callconv(.C) Status {
+            return handler(op, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
 }
 
 pub const AbsoultePath = struct {
@@ -1277,50 +1754,6 @@ pub const Error = error{
     AMLCallStackDepthLimit,
 };
 
-inline fn makeIterationCallbackWrapper(
-    comptime UserContextT: type,
-    callback: IterationCallback(UserContextT),
-) c_uacpi.uacpi_iteration_callback {
-    return comptime @ptrCast(&struct {
-        fn callbackWrapper(
-            user_ctx: ?*anyopaque,
-            node: *Node,
-            node_depth: u32,
-        ) callconv(.C) IterationDecision {
-            return callback(node, node_depth, @ptrCast(user_ctx));
-        }
-    }.callbackWrapper);
-}
-
-inline fn makeNotifyHandlerWrapper(
-    comptime UserContextT: type,
-    handler: NotifyHandler(UserContextT),
-) c_uacpi.uacpi_notify_handler {
-    return comptime @ptrCast(&struct {
-        fn handlerWrapper(
-            user_ctx: ?*anyopaque,
-            node: *Node,
-            value: u64,
-        ) callconv(.C) Status {
-            return handler(node, value, @ptrCast(user_ctx));
-        }
-    }.handlerWrapper);
-}
-
-inline fn makeRegionHandlerWrapper(
-    comptime UserContextT: type,
-    handler: RegionHandler(UserContextT),
-) c_uacpi.uacpi_region_handler {
-    return comptime @ptrCast(&struct {
-        fn handlerWrapper(
-            op: RegionOperation,
-            user_ctx: ?*anyopaque,
-        ) callconv(.C) Status {
-            return handler(op, @ptrCast(user_ctx));
-        }
-    }.handlerWrapper);
-}
-
 const WorkType = enum(c_uacpi.uacpi_work_type) {
     /// Schedule a GPE handler method for execution.
     ///
@@ -1333,7 +1766,6 @@ const WorkType = enum(c_uacpi.uacpi_work_type) {
     work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
 };
 
-const InterruptHandler = *const fn (*anyopaque) callconv(.C) void;
 const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
 
 const ByteWidth = enum(u8) {
@@ -1711,7 +2143,7 @@ const kernel_api = struct {
     /// 'out_irq_handle' is set to a kernel-implemented value that can be used to refer to this handler from other API.
     export fn uacpi_kernel_install_interrupt_handler(
         irq: u32,
-        handler: InterruptHandler,
+        handler: c_uacpi.uacpi_interrupt_handler,
         ctx: *anyopaque,
         out_irq_handle: **anyopaque,
     ) Status {
@@ -1722,8 +2154,8 @@ const kernel_api = struct {
                 _handler: ?*anyopaque,
                 _ctx: ?*anyopaque,
             ) void {
-                const inner_handler: InterruptHandler = @ptrCast(@alignCast(_handler));
-                inner_handler(@ptrCast(_ctx));
+                const inner_handler: c_uacpi.uacpi_interrupt_handler = @ptrCast(@alignCast(_handler));
+                _ = inner_handler.?(@ptrCast(_ctx)); // FIXME: should we do something with the return value?
             }
         }.HandlerWrapper;
 
@@ -1752,7 +2184,7 @@ const kernel_api = struct {
     ///
     /// 'irq_handle' is the value returned via 'out_irq_handle' during installation.
     export fn uacpi_kernel_uninstall_interrupt_handler(
-        _: InterruptHandler,
+        _: c_uacpi.uacpi_interrupt_handler,
         irq_handle: *anyopaque,
     ) Status {
         const interrupt: kernel.arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
