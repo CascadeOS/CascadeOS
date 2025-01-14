@@ -111,11 +111,11 @@ pub const CaptureSystemInformationOptions = struct {
 pub fn captureSystemInformation(
     options: CaptureSystemInformationOptions,
 ) !void {
-    const madt_acpi_table = kernel.acpi.getTable(acpi.MADT, 0) orelse return error.NoMADT;
+    const madt_acpi_table = kernel.acpi.getTable(kernel.acpi.MADT, 0) orelse return error.NoMADT;
     defer madt_acpi_table.deinit();
     const madt = madt_acpi_table.table;
 
-    const fadt_acpi_table = kernel.acpi.getTable(acpi.FADT, 0) orelse return error.NoFADT;
+    const fadt_acpi_table = kernel.acpi.getTable(kernel.acpi.FADT, 0) orelse return error.NoFADT;
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
 
@@ -308,4 +308,3 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
 const log = kernel.debug.log.scoped(.init);
-const acpi = @import("acpi");

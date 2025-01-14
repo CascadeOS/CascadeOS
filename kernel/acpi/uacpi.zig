@@ -1826,7 +1826,7 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.uacpi);
-const acpi = @import("acpi");
+const acpi = kernel.acpi;
 const c_uacpi = @cImport({
     @cInclude("uacpi/event.h");
     @cInclude("uacpi/io.h");

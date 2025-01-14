@@ -84,5 +84,5 @@ comptime {
 
 const std = @import("std");
 const core = @import("core");
-
-const acpi = @import("acpi");
+const kernel = @import("kernel");
+const acpi = kernel.acpi;

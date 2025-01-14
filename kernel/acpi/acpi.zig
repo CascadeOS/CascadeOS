@@ -20,18 +20,6 @@ pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
     };
 }
 
-pub fn AcpiTable(comptime T: type) type {
-    return struct {
-        table: *const T,
-
-        handle: uacpi.tables.Table,
-
-        pub fn deinit(self: @This()) void {
-            self.handle.unrefTable() catch unreachable;
-        }
-    };
-}
-
 pub fn tryShutdown() !void {
     if (globals.acpi_initialized) {
         try uacpi.sleep.prepareForSleep(.S5);
@@ -44,6 +32,27 @@ pub fn tryShutdown() !void {
     }
 
     try hack.tryHackyShutdown();
+}
+
+pub const Address = @import("Address.zig").Address;
+pub const DSDT = @import("DSDT.zig").DSDT;
+pub const FADT = @import("FADT.zig").FADT;
+pub const HPET = @import("HPET.zig").HPET;
+pub const MADT = @import("MADT.zig").MADT;
+pub const MCFG = @import("MCFG.zig").MCFG;
+pub const RSDP = @import("RSDP.zig").RSDP;
+pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
+
+pub fn AcpiTable(comptime T: type) type {
+    return struct {
+        table: *const T,
+
+        handle: uacpi.tables.Table,
+
+        pub fn deinit(self: @This()) void {
+            self.handle.unrefTable() catch unreachable;
+        }
+    };
 }
 
 const globals = struct {

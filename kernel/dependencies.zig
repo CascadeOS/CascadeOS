@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 pub const dependencies: []const LibraryDependency = &[_]LibraryDependency{
-    .{ .name = "acpi" },
     .{ .name = "containers" },
     .{ .name = "core" },
     .{ .name = "limine" },

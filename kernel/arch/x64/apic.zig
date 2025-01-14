@@ -16,8 +16,8 @@ const globals = struct {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        fadt: *const acpi.FADT,
-        madt: *const acpi.MADT,
+        fadt: *const kernel.acpi.FADT,
+        madt: *const kernel.acpi.MADT,
         x2apic_enabled: bool,
     ) void {
         if (x2apic_enabled) {
@@ -149,4 +149,3 @@ const core = @import("core");
 const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
-const acpi = @import("acpi");

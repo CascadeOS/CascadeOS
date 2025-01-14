@@ -3,12 +3,6 @@
 
 pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{
-        .name = "acpi",
-        .dependencies = &[_]LibraryDependency{
-            .{ .name = "core" },
-        },
-    },
-    .{
         .name = "arm64",
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },

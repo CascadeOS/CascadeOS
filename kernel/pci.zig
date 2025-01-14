@@ -520,4 +520,4 @@ const FUNCTIONS_PER_DEVICE = 8;
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const acpi = @import("acpi");
+const acpi = kernel.acpi;
