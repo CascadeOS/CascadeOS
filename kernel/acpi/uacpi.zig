@@ -246,7 +246,7 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn isType(self: *const Node, object_type: Object.Type) !bool {
+    pub fn is(self: *const Node, object_type: Object.Type) !bool {
         var out: bool = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
@@ -264,7 +264,7 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn isTypeOneOf(self: *const Node, object_type_bits: Object.TypeBits) !bool {
+    pub fn isOneOf(self: *const Node, object_type_bits: Object.TypeBits) !bool {
         var out: bool = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
@@ -1381,6 +1381,332 @@ pub const Object = opaque {
             core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
         }
     };
+
+    pub fn ref(self: *Object) void {
+        c_uacpi.uacpi_object_ref(@ptrCast(self));
+    }
+
+    pub fn unref(self: *Object) void {
+        c_uacpi.uacpi_object_unref(@ptrCast(self));
+    }
+
+    pub fn getType(self: *const Object) Type {
+        return @enumFromInt(c_uacpi.uacpi_object_get_type(@ptrCast(@constCast(self))));
+    }
+
+    pub fn getTypeBit(self: *const Object) TypeBits {
+        return @bitCast(c_uacpi.uacpi_object_get_type_bit(@ptrCast(@constCast(self))));
+    }
+
+    pub fn is(self: *const Object, object_type: Type) bool {
+        return c_uacpi.uacpi_object_is(@ptrCast(@constCast(self)), @intFromEnum(object_type));
+    }
+
+    pub fn isOneOf(self: *const Object, type_mask: TypeBits) bool {
+        return c_uacpi.uacpi_object_is_one_of(
+            @ptrCast(@constCast(self)),
+            @bitCast(type_mask),
+        );
+    }
+
+    /// Create an uninitialized object.
+    ///
+    /// The object can be further overwritten via uacpi_object_assign_* to anything. // TODO: correct
+    pub fn createUninitialized() error{OutOfMemory}!*Object {
+        return @ptrCast(c_uacpi.uacpi_object_create_uninitialized() orelse return error.OutOfMemory);
+    }
+
+    pub fn createInteger(value: u64) error{OutOfMemory}!*Object {
+        return @ptrCast(c_uacpi.uacpi_object_create_integer(value) orelse return error.OutOfMemory);
+    }
+
+    pub const OverflowBehavior = enum(c_uacpi.uacpi_overflow_behavior) {
+        allow = c_uacpi.UACPI_OVERFLOW_ALLOW,
+        truncate = c_uacpi.UACPI_OVERFLOW_TRUNCATE,
+        disallow = c_uacpi.UACPI_OVERFLOW_DISALLOW,
+    };
+
+    pub fn createIntegerSafe(value: u64, overflow_behavior: OverflowBehavior) !*Object {
+        var object: *Object = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_create_integer_safe(
+            value,
+            @intFromEnum(overflow_behavior),
+            @ptrCast(&object),
+        ));
+        try ret.toError();
+        return object;
+    }
+
+    pub fn assignInteger(self: *Object, value: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_integer(
+            @ptrCast(self),
+            value,
+        ));
+        try ret.toError();
+    }
+
+    pub fn getInteger(self: *const Object) !u64 {
+        var value: u64 = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_integer(
+            @ptrCast(@constCast(self)),
+            &value,
+        ));
+        try ret.toError();
+        return value;
+    }
+
+    /// Create a string object.
+    ///
+    /// Takes in a constant view of the data.
+    ///
+    /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
+    pub fn createString(str: []const u8) error{OutOfMemory}!*Object {
+        return @ptrCast(c_uacpi.uacpi_object_create_string(.{
+            .unnamed_0 = .{ .const_bytes = str.ptr },
+            .length = str.len,
+        }) orelse return error.OutOfMemory);
+    }
+
+    /// Create a buffer object.
+    ///
+    /// Takes in a constant view of the data.
+    ///
+    /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
+    pub fn createBuffer(str: []const u8) error{OutOfMemory}!*Object {
+        return @ptrCast(c_uacpi.uacpi_object_create_buffer(.{
+            .unnamed_0 = .{ .const_bytes = str.ptr },
+            .length = str.len,
+        }) orelse return error.OutOfMemory);
+    }
+
+    /// Make the provided object a string.
+    ///
+    /// Takes in a constant view of the data to be stored in the object.
+    ///
+    /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
+    pub fn assignString(self: *Object, str: []const u8) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_string(
+            @ptrCast(self),
+            .{
+                .unnamed_0 = .{ .const_bytes = str.ptr },
+                .length = str.len,
+            },
+        ));
+        try ret.toError();
+    }
+
+    /// Make the provided object a buffer.
+    ///
+    /// Takes in a constant view of the data to be stored in the object.
+    ///
+    /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
+    pub fn assignBuffer(self: *Object, str: []const u8) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_buffer(
+            @ptrCast(self),
+            .{
+                .unnamed_0 = .{ .const_bytes = str.ptr },
+                .length = str.len,
+            },
+        ));
+        try ret.toError();
+    }
+
+    /// Returns a writable view of the data stored in the string or buffer object.
+    pub fn getStringOrBuffer(self: *Object) ![]u8 {
+        var data_view: c_uacpi.uacpi_data_view = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_string_or_buffer(
+            @ptrCast(self),
+            &data_view,
+        ));
+        try ret.toError();
+        return data_view.unnamed_0.bytes[0..data_view.length];
+    }
+
+    /// Returns a writable view of the data stored in the string object.
+    pub fn getString(self: *Object) ![]u8 {
+        var data_view: c_uacpi.uacpi_data_view = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_string(
+            @ptrCast(self),
+            &data_view,
+        ));
+        try ret.toError();
+        return data_view.unnamed_0.bytes[0..data_view.length];
+    }
+
+    /// Returns a writable view of the data stored in the buffer object.
+    pub fn getBuffer(self: *Object) ![]u8 {
+        var data_view: c_uacpi.uacpi_data_view = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_buffer(
+            @ptrCast(self),
+            &data_view,
+        ));
+        try ret.toError();
+        return data_view.unnamed_0.bytes[0..data_view.length];
+    }
+
+    /// Returns `true` if the provided string object is actually an AML namepath.
+    ///
+    /// This can only be the case for package elements.
+    ///
+    /// If a package element is specified as a path to an object in AML, it's not resolved by the interpreter right away
+    /// as it might not have been defined at that point yet, and is instead stored as a special string object to be
+    /// resolved by client code when needed.
+    ///
+    /// Example usage:
+    /// ```zig
+    ///    var target_node: ?*uacpi.Node = null;
+    ///
+    ///    const obj = try scope.eval(path, &.{});
+    ///
+    ///    const arr = try obj.getPackage();
+    ///
+    ///    if (arr[0].isAmlNamepath()) {
+    ///        target_node = try arr[0].resolveAsAmlNamepath(scope);
+    ///    }
+    /// ```
+    pub fn isAmlNamepath(self: *const Object) bool {
+        return c_uacpi.uacpi_object_is_aml_namepath(@ptrCast(@constCast(self)));
+    }
+
+    /// Resolve an AML namepath contained in a string object.
+    ///
+    /// This is only applicable to objects that are package elements.
+    ///
+    /// See an explanation of how this works in the comment above the declaration of `isAmlNamepath`.
+    pub fn resolveAsAmlNamepath(self: *const Object, scope: *const Node) !*Node {
+        var target_node: *Node = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_resolve_as_aml_namepath(
+            @ptrCast(@constCast(self)),
+            @ptrCast(@constCast(scope)),
+            @ptrCast(&target_node),
+        ));
+        try ret.toError();
+        return target_node;
+    }
+
+    /// Create a package object and store all of the objects in the array inside.
+    ///
+    /// The array is allowed to be empty.
+    ///
+    /// NOTE: the reference count of each object is incremented before being stored in the object.
+    ///       Client code must remove all of the locally created references at its own discretion.
+    pub fn createPackage(objects: []const *Object) error{OutOfMemory}!*Object {
+        return @ptrCast(c_uacpi.uacpi_object_create_package(
+            .{
+                .count = objects.len,
+                .objects = @ptrCast(@constCast(objects.ptr)),
+            },
+        ) orelse return error.OutOfMemory);
+    }
+
+    /// Returns the list of objects stored in a package object.
+    ///
+    /// NOTE: the reference count of the objects stored inside is not incremented, which means destorying/overwriting
+    /// the object also potentially destroys all of the objects stored inside unless the reference count is incremented
+    /// by the client via `Object.ref`.
+    pub fn getPackage(object: *const Object) ![]const *Object {
+        var object_array: c_uacpi.uacpi_object_array = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_package(
+            @ptrCast(@constCast(object)),
+            &object_array,
+        ));
+        try ret.toError();
+
+        const ptr: [*]const *Object = @ptrCast(object_array.objects);
+        return ptr[0..object_array.count];
+    }
+
+    /// Make the provided object a package and store all of the objects in the array inside.
+    ///
+    /// The array is allowed to be empty.
+    ///
+    /// NOTE: the reference count of each object is incremented before being stored in the object.
+    ///       Client code must remove all of the locally created references at its own discretion.
+    pub fn assignPackage(object: *Object, objects: []const *Object) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_package(
+            @ptrCast(object),
+            .{
+                .count = objects.len,
+                .objects = @ptrCast(@constCast(objects.ptr)),
+            },
+        ));
+        try ret.toError();
+    }
+
+    /// Create a reference object and make it point to 'child'.
+    ///
+    /// NOTE: child's reference count is incremented by one.
+    ///       Client code must remove all of the locally created references at its own discretion.
+    pub fn createReference(child: *Object) error{OutOfMemory}!*Object {
+        return @ptrCast(c_uacpi.uacpi_object_create_reference(@ptrCast(child)) orelse return error.OutOfMemory);
+    }
+    /// Make the provided object a reference and make it point to 'child'.
+    ///
+    /// NOTE: child's reference count is incremented by one.
+    ///       Client code must remove all of the locally created references at its own discretion.
+    pub fn assignReference(object: *Object, child: *Object) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_reference(
+            @ptrCast(object),
+            @ptrCast(child),
+        ));
+        try ret.toError();
+    }
+
+    /// Retrieve the object pointed to by a reference object.
+    ///
+    /// NOTE: the reference count of the returned object is incremented by one and must be `unref`'ed by the
+    ///       client when no longer needed.
+    pub fn getReference(object: *const Object) !*Object {
+        var child: *Object = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_dereferenced(
+            @ptrCast(@constCast(object)),
+            @ptrCast(&child),
+        ));
+        try ret.toError();
+        return child;
+    }
+
+    pub const ProcessorInfo = extern struct {
+        id: u8,
+        block_address: u32,
+        block_length: u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_processor_info));
+        }
+    };
+
+    /// Returns the information about the provided processor object.
+    pub fn getProcessorInfo(object: *const Object) !ProcessorInfo {
+        var info: ProcessorInfo = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_processor_info(
+            @ptrCast(@constCast(object)),
+            @ptrCast(&info),
+        ));
+        try ret.toError();
+        return info;
+    }
+
+    pub const PowerResourceInfo = extern struct {
+        system_level: u8,
+        resource_order: u16,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_power_resource_info));
+        }
+    };
+
+    /// Returns the information about the provided power resource object.
+    pub fn getPowerResourceInfo(object: *const Object) !PowerResourceInfo {
+        var info: PowerResourceInfo = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_power_resource_info(
+            @ptrCast(@constCast(object)),
+            @ptrCast(&info),
+        ));
+        try ret.toError();
+        return info;
+    }
 };
 
 pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
@@ -1706,14 +2032,14 @@ pub const tables = struct {
             return true;
         }
 
-        pub fn refTable(table: Table) !void {
+        pub fn ref(table: Table) !void {
             const ret: Status = @enumFromInt(c_uacpi.uacpi_table_ref(
                 @constCast(@ptrCast(&table)),
             ));
             try ret.toError();
         }
 
-        pub fn unrefTable(table: Table) !void {
+        pub fn unref(table: Table) !void {
             const ret: Status = @enumFromInt(c_uacpi.uacpi_table_unref(
                 @constCast(@ptrCast(&table)),
             ));
@@ -1890,12 +2216,56 @@ pub const AddressSpace = enum(c_uacpi.uacpi_address_space) {
     table_data = c_uacpi.UACPI_ADDRESS_SPACE_TABLE_DATA,
 };
 
-pub const RegionOperation = enum(c_uacpi.uacpi_region_op) {
+pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
     attach = c_uacpi.UACPI_REGION_OP_ATTACH,
     read = c_uacpi.UACPI_REGION_OP_READ,
     write = c_uacpi.UACPI_REGION_OP_WRITE,
     detach = c_uacpi.UACPI_REGION_OP_DETACH,
 };
+
+pub fn RegionOperation(comptime UserContextT: type) type {
+    return union(RegionOperationType) {
+        attach: *Attach,
+        read: *ReadWrite,
+        write: *ReadWrite,
+        detach: *Detach,
+
+        pub const Attach = extern struct {
+            user_context: ?*UserContextT,
+            region_node: *Node,
+            out_region_context: ?*anyopaque,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
+            }
+        };
+
+        pub const ReadWrite = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            addr: extern union {
+                address: core.PhysicalAddress,
+                offset: u64,
+            },
+            value: u64,
+            byte_width: ByteWidth,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_rw_data));
+            }
+        };
+
+        pub const Detach = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            region_node: *Node,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
+            }
+        };
+    };
+}
 
 pub const EventInfo = packed struct(c_uacpi.uacpi_event_info) {
     /// Event is enabled in software
@@ -2010,13 +2380,8 @@ inline fn makeInterruptHandlerWrapper(
     }.handlerWrapper);
 }
 
-// FIXME: this handler is wrong, the second argument depends on the operation
-//        will be clarified by https://github.com/UltraOS/uACPI/pull/104
 pub fn RegionHandler(comptime UserContextT: type) type {
-    return fn (
-        operation: RegionOperation,
-        user_context: ?*UserContextT,
-    ) Status;
+    return fn (operation: RegionOperation(UserContextT)) Status;
 }
 
 inline fn makeRegionHandlerWrapper(
@@ -2025,10 +2390,15 @@ inline fn makeRegionHandlerWrapper(
 ) c_uacpi.uacpi_region_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
-            op: RegionOperation,
-            user_ctx: ?*anyopaque,
+            op: RegionOperationType,
+            op_data: *anyopaque,
         ) callconv(.C) Status {
-            return handler(op, @ptrCast(user_ctx));
+            return handler(switch (op) {
+                .attach => .{ .attach = @ptrCast(@alignCast(op_data)) },
+                .read => .{ .read = @ptrCast(@alignCast(op_data)) },
+                .write => .{ .write = @ptrCast(@alignCast(op_data)) },
+                .detach => .{ .detach = @ptrCast(@alignCast(op_data)) },
+            });
         }
     }.handlerWrapper);
 }
@@ -2085,7 +2455,9 @@ pub const Status = enum(c_uacpi.uacpi_status) {
 
     fn toError(self: Status) Error!void {
         return switch (self) {
-            .ok => {},
+            .ok => {
+                @branchHint(.likely);
+            },
             .mapping_failed => Error.MappingFailed,
             .out_of_memory => Error.OutOfMemory,
             .bad_checksum => Error.BadChecksum,
