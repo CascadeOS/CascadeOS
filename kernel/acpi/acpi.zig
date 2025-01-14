@@ -85,6 +85,11 @@ pub const init = struct {
         globals.acpi_initialized = true;
     }
 
+    pub fn finializeInitialization() !void {
+        init_log.debug("finializing GPEs", .{});
+        try uacpi.finializeGpeInitialization();
+    }
+
     const init_log = kernel.debug.log.scoped(.init_acpi);
 };
 
