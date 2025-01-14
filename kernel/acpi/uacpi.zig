@@ -222,7 +222,7 @@ pub const Node = opaque {
         return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(self)));
     }
 
-    pub fn name(self: *const Node) ObjectName {
+    pub fn name(self: *const Node) Object.Name {
         return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(self)));
     }
 
@@ -230,8 +230,8 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn objectType(self: *const Node) !ObjectType {
-        var object_type: ObjectType = undefined;
+    pub fn objectType(self: *const Node) !Object.Type {
+        var object_type: Object.Type = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_type(
             @ptrCast(self),
@@ -246,7 +246,7 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn isType(self: *const Node, object_type: ObjectType) !bool {
+    pub fn isType(self: *const Node, object_type: Object.Type) !bool {
         var out: bool = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
@@ -264,7 +264,7 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn isTypeOneOf(self: *const Node, object_type_bits: ObjectTypeBits) !bool {
+    pub fn isTypeOneOf(self: *const Node, object_type_bits: Object.TypeBits) !bool {
         var out: bool = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
@@ -350,7 +350,7 @@ pub const Node = opaque {
         comptime UserContextT: type,
         opt_descending_callback: ?IterationCallback(UserContextT),
         opt_ascending_callback: ?IterationCallback(UserContextT),
-        type_mask: ObjectTypeBits,
+        type_mask: Object.TypeBits,
         max_depth: Depth,
         user_context: ?*UserContextT,
     ) !void {
@@ -524,7 +524,7 @@ pub const Node = opaque {
             pin: u8,
 
             comptime {
-                core.testing.expectSize(Entry, @sizeOf(c_uacpi.uacpi_pci_routing_table_entry));
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_pci_routing_table_entry));
             }
         };
     };
@@ -557,7 +557,7 @@ pub const Node = opaque {
         }
 
         comptime {
-            core.testing.expectSize(IdString, @sizeOf(c_uacpi.uacpi_id_string));
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_id_string));
         }
     };
 
@@ -715,7 +715,7 @@ pub const Node = opaque {
         parent_node: *Node,
         path: ?[:0]const u8,
         objects: []const *const Object,
-        ret_mask: ObjectTypeBits,
+        ret_mask: Object.TypeBits,
     ) !*Object {
         var value: *Object = undefined;
 
@@ -740,7 +740,7 @@ pub const Node = opaque {
     pub fn evalTypedSimple(
         parent_node: *Node,
         path: ?[:0]const u8,
-        ret_mask: ObjectTypeBits,
+        ret_mask: Object.TypeBits,
     ) !*Object {
         var value: *Object = undefined;
 
@@ -784,7 +784,7 @@ pub const Node = opaque {
         try ret.toError();
     }
 
-    /// A shorthand for `evalTyped` with `ObjectTypeBits.integer`.
+    /// A shorthand for `evalTyped` with `Object.TypeBits.integer`.
     pub fn evalInteger(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -806,7 +806,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.integer`.
+    /// A shorthand for `evalTypedSimple` with `Object.TypeBits.integer`.
     pub fn evalIntegerSimple(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -823,7 +823,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTyped` with `ObjectTypeBits.buffer`|`ObjectTypeBits.string`.
+    /// A shorthand for `evalTyped` with `Object.TypeBits.buffer`|`Object.TypeBits.string`.
     ///
     /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBufferOrString(
@@ -847,7 +847,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.buffer`|`ObjectTypeBits.string`.
+    /// A shorthand for `evalTypedSimple` with `Object.TypeBits.buffer`|`Object.TypeBits.string`.
     ///
     /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBufferOrStringSimple(
@@ -866,7 +866,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTyped` with `ObjectTypeBits.string`.
+    /// A shorthand for `evalTyped` with `Object.TypeBits.string`.
     ///
     /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
     pub fn evalString(
@@ -890,7 +890,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.string`.
+    /// A shorthand for `evalTypedSimple` with `Object.TypeBits.string`.
     ///
     /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
     pub fn evalStringSimple(
@@ -909,7 +909,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTyped` with `ObjectTypeBits.buffer`.
+    /// A shorthand for `evalTyped` with `Object.TypeBits.buffer`.
     ///
     /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBuffer(
@@ -933,7 +933,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.buffer`.
+    /// A shorthand for `evalTypedSimple` with `Object.TypeBits.buffer`.
     ///
     /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
     pub fn evalBufferSimple(
@@ -952,7 +952,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTyped` with `ObjectTypeBits.package`.
+    /// A shorthand for `evalTyped` with `Object.TypeBits.package`.
     ///
     /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
     pub fn evalPackage(
@@ -976,7 +976,7 @@ pub const Node = opaque {
         return value;
     }
 
-    /// A shorthand for `evalTypedSimple` with `ObjectTypeBits.package`.
+    /// A shorthand for `evalTypedSimple` with `Object.TypeBits.package`.
     ///
     /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
     pub fn evalPackageSimple(
@@ -999,8 +999,8 @@ pub const Node = opaque {
         /// Size of the entire structure
         size: u32,
 
-        name: ObjectName,
-        type: ObjectType,
+        name: Object.Name,
+        type: Object.Type,
         num_params: u8,
 
         flags: Flags,
@@ -1321,7 +1321,67 @@ pub const Node = opaque {
     }
 };
 
-pub const Object = opaque {};
+pub const Object = opaque {
+    pub const Name = extern union {
+        text: [4]u8,
+        id: u32,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_name));
+        }
+    };
+
+    pub const Type = enum(c_uacpi.uacpi_object_type) {
+        uninitialized = c_uacpi.UACPI_OBJECT_UNINITIALIZED,
+        integer = c_uacpi.UACPI_OBJECT_INTEGER,
+        string = c_uacpi.UACPI_OBJECT_STRING,
+        buffer = c_uacpi.UACPI_OBJECT_BUFFER,
+        package = c_uacpi.UACPI_OBJECT_PACKAGE,
+        field_unit = c_uacpi.UACPI_OBJECT_FIELD_UNIT,
+        device = c_uacpi.UACPI_OBJECT_DEVICE,
+        event = c_uacpi.UACPI_OBJECT_EVENT,
+        method = c_uacpi.UACPI_OBJECT_METHOD,
+        mutex = c_uacpi.UACPI_OBJECT_MUTEX,
+        operation_region = c_uacpi.UACPI_OBJECT_OPERATION_REGION,
+        power_resource = c_uacpi.UACPI_OBJECT_POWER_RESOURCE,
+        processor = c_uacpi.UACPI_OBJECT_PROCESSOR,
+        thermal_zone = c_uacpi.UACPI_OBJECT_THERMAL_ZONE,
+        buffer_field = c_uacpi.UACPI_OBJECT_BUFFER_FIELD,
+        debug = c_uacpi.UACPI_OBJECT_DEBUG,
+        reference = c_uacpi.UACPI_OBJECT_REFERENCE,
+        buffer_index = c_uacpi.UACPI_OBJECT_BUFFER_INDEX,
+    };
+
+    pub const TypeBits = packed struct(c_uacpi.uacpi_object_type_bits) {
+        _uninitialized: u1 = 0,
+        integer: bool = false,
+        string: bool = false,
+        buffer: bool = false,
+        package: bool = false,
+        field_unit: bool = false,
+        device: bool = false,
+        event: bool = false,
+        method: bool = false,
+        mutex: bool = false,
+        operation_region: bool = false,
+        power_resource: bool = false,
+        processor: bool = false,
+        thermal_zone: bool = false,
+        buffer_field: bool = false,
+        _unused15: u1 = 0,
+        debug: bool = false,
+        _unused17_19: u3 = 0,
+        reference: bool = false,
+        buffer_index: bool = false,
+        _unused22_31: u10 = 0,
+
+        pub const any: TypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
+        }
+    };
+};
 
 pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
     level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
@@ -1661,7 +1721,7 @@ pub const tables = struct {
         }
 
         comptime {
-            core.testing.expectSize(Table, @sizeOf(c_uacpi.uacpi_table));
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table));
         }
     };
 
@@ -1692,7 +1752,7 @@ pub const tables = struct {
     }
 
     pub const TableIdentifiers = extern struct {
-        signature: ObjectName,
+        signature: Object.Name,
 
         /// if oemid[0] == 0 this field is ignored
         oemid: [6]u8 = @splat(0),
@@ -1701,7 +1761,7 @@ pub const tables = struct {
         oem_table_id: [8]u8 = @splat(0),
 
         comptime {
-            core.testing.expectSize(TableIdentifiers, @sizeOf(c_uacpi.uacpi_table_identifiers));
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table_identifiers));
         }
     };
 
@@ -1799,66 +1859,6 @@ pub const tables = struct {
             @ptrCast(handler_wrapper),
         ));
         try ret.toError();
-    }
-};
-
-pub const ObjectName = extern union {
-    text: [4]u8,
-    id: u32,
-
-    comptime {
-        core.testing.expectSize(ObjectName, @sizeOf(c_uacpi.uacpi_object_name));
-    }
-};
-
-pub const ObjectType = enum(c_uacpi.uacpi_object_type) {
-    uninitialized = c_uacpi.UACPI_OBJECT_UNINITIALIZED,
-    integer = c_uacpi.UACPI_OBJECT_INTEGER,
-    string = c_uacpi.UACPI_OBJECT_STRING,
-    buffer = c_uacpi.UACPI_OBJECT_BUFFER,
-    package = c_uacpi.UACPI_OBJECT_PACKAGE,
-    field_unit = c_uacpi.UACPI_OBJECT_FIELD_UNIT,
-    device = c_uacpi.UACPI_OBJECT_DEVICE,
-    event = c_uacpi.UACPI_OBJECT_EVENT,
-    method = c_uacpi.UACPI_OBJECT_METHOD,
-    mutex = c_uacpi.UACPI_OBJECT_MUTEX,
-    operation_region = c_uacpi.UACPI_OBJECT_OPERATION_REGION,
-    power_resource = c_uacpi.UACPI_OBJECT_POWER_RESOURCE,
-    processor = c_uacpi.UACPI_OBJECT_PROCESSOR,
-    thermal_zone = c_uacpi.UACPI_OBJECT_THERMAL_ZONE,
-    buffer_field = c_uacpi.UACPI_OBJECT_BUFFER_FIELD,
-    debug = c_uacpi.UACPI_OBJECT_DEBUG,
-    reference = c_uacpi.UACPI_OBJECT_REFERENCE,
-    buffer_index = c_uacpi.UACPI_OBJECT_BUFFER_INDEX,
-};
-
-pub const ObjectTypeBits = packed struct(c_uacpi.uacpi_object_type_bits) {
-    _uninitialized: u1 = 0,
-    integer: bool = false,
-    string: bool = false,
-    buffer: bool = false,
-    package: bool = false,
-    field_unit: bool = false,
-    device: bool = false,
-    event: bool = false,
-    method: bool = false,
-    mutex: bool = false,
-    operation_region: bool = false,
-    power_resource: bool = false,
-    processor: bool = false,
-    thermal_zone: bool = false,
-    buffer_field: bool = false,
-    _unused15: u1 = 0,
-    debug: bool = false,
-    _unused17_19: u3 = 0,
-    reference: bool = false,
-    buffer_index: bool = false,
-    _unused22_31: u10 = 0,
-
-    pub const any: ObjectTypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
-
-    comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
     }
 };
 
@@ -2253,7 +2253,7 @@ const FirmwareRequest = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(c_uacpi.uacpi_firmware_request, @sizeOf(FirmwareRequest));
+        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_firmware_request));
     }
 };
 
