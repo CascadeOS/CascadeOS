@@ -6,7 +6,7 @@
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
 pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
-    var table = uacpi.tables.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
+    var table = uacpi.Table.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
 
     var i: usize = 0;
     while (i < n) : (i += 1) {
@@ -22,13 +22,13 @@ pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
 
 pub fn tryShutdown() !void {
     if (globals.acpi_initialized) {
-        try uacpi.sleep.prepareForSleep(.S5);
+        try uacpi.prepareForSleep(.S5);
 
         const interrupts_enabled = kernel.arch.interrupts.areEnabled();
         kernel.arch.interrupts.disableInterrupts();
         defer if (interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
 
-        try uacpi.sleep.sleep(.S5);
+        try uacpi.sleep(.S5);
     }
 
     try hack.tryHackyShutdown();
@@ -47,7 +47,7 @@ pub fn AcpiTable(comptime T: type) type {
     return struct {
         table: *const T,
 
-        handle: uacpi.tables.Table,
+        handle: uacpi.Table,
 
         pub fn deinit(self: @This()) void {
             self.handle.unref() catch unreachable;
@@ -97,16 +97,16 @@ const hack = struct {
     fn tryHackyShutdown() !void {
         // this is ported from https://github.com/lowlevelmemes/acpi-shutdown-hack/blob/trunk/acpi_shutdown_hack.c
 
-        const acpi_table = getTable(acpi.FADT, 0) orelse return error.FADTNotPresent;
+        const acpi_table = getTable(FADT, 0) orelse return error.FADTNotPresent;
         defer acpi_table.deinit();
 
-        const fadt: *const acpi.FADT = acpi_table.table;
+        const fadt: *const FADT = acpi_table.table;
 
         var s5_addr: [*]const u8 = blk: {
             const dsdt = kernel.vmm
                 .nonCachedDirectMapFromPhysical(fadt.getDSDT())
-                .toPtr(*acpi.DSDT);
-            if (!dsdt.header.signatureIs(acpi.DSDT.SIGNATURE_STRING)) return error.DSDTNotPresent;
+                .toPtr(*DSDT);
+            if (!dsdt.header.signatureIs(DSDT.SIGNATURE_STRING)) return error.DSDTNotPresent;
 
             const definition_block = dsdt.definitionBlock();
 
@@ -174,7 +174,7 @@ const hack = struct {
         InvalidPort,
     } || kernel.arch.io.PortError;
 
-    fn readAddress(comptime T: type, address: acpi.Address) ReadAddressError!T {
+    fn readAddress(comptime T: type, address: Address) ReadAddressError!T {
         switch (address.address_space) {
             .io => {
                 const port = std.math.cast(
@@ -195,7 +195,7 @@ const hack = struct {
         ValueOutOfRange,
     } || kernel.arch.io.PortError;
 
-    fn writeAddress(address: acpi.Address, value: u64) WriteAddressError!void {
+    fn writeAddress(address: Address, value: u64) WriteAddressError!void {
         switch (address.address_space) {
             .io => {
                 const port = std.math.cast(
@@ -292,6 +292,5 @@ comptime {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const acpi = @import("acpi");
 const log = kernel.debug.log.scoped(.acpi);
 const uacpi = @import("uacpi.zig");

@@ -85,6 +85,26 @@ pub fn namespaceInitialize() !void {
     try ret.toError();
 }
 
+pub const InitLevel = enum(c_uacpi.uacpi_init_level) {
+    /// Reboot state, nothing is available
+    early = c_uacpi.UACPI_INIT_LEVEL_EARLY,
+
+    /// State after a successfull call to `initialize`.
+    ///
+    /// Table API and other helpers that don't depend on the ACPI namespace may be used.
+    subsystem_initialized = c_uacpi.UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED,
+
+    /// State after a successfull call to `namespaceLoad`.
+    ///
+    /// Most API may be used, namespace can be iterated, etc.
+    namespace_loaded = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_LOADED,
+
+    /// The final initialization stage, this is entered after the call to `namespaceInitialize`.
+    ///
+    /// All API is available to use.
+    namespace_initialized = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED,
+};
+
 /// Returns the current subsystem initialization level
 pub fn currentInitLevel() InitLevel {
     return @enumFromInt(c_uacpi.uacpi_get_current_init_level());
@@ -149,7 +169,6 @@ pub fn acpiStateReset() void {
     c_uacpi.uacpi_state_reset();
 }
 
-// TODO: inline one off stuff like this
 pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
     pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
     ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
@@ -192,6 +211,290 @@ pub fn enableAllWakeGPEs() !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_all_wake_gpes());
     try ret.toError();
 }
+
+pub const InterfaceKind = enum(c_uacpi.uacpi_interface_kind) {
+    vendor = c_uacpi.UACPI_INTERFACE_KIND_VENDOR,
+    feature = c_uacpi.UACPI_INTERFACE_KIND_FEATURE,
+    all = c_uacpi.UACPI_INTERFACE_KIND_ALL,
+};
+
+/// Install or uninstall an interface.
+///
+/// The interface kind is used for matching during interface enumeration in `bulkConfigureInterfaces`.
+///
+/// After installing an interface, all _OSI queries report it as supported.
+pub fn installInterface(name: [:0]const u8, kind: InterfaceKind) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_install_interface(
+        name.ptr,
+        @intFromEnum(kind),
+    ));
+    try ret.toError();
+}
+
+pub fn uninstallInterface(name: [:0]const u8) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_interface(
+        name.ptr,
+    ));
+    try ret.toError();
+}
+
+pub const InterfaceHandler = fn (
+    name: [:0]const u8,
+    supported: bool,
+) bool;
+
+/// Set a custom interface query (_OSI) handler.
+///
+/// This callback will be invoked for each _OSI query with the value passed in the _OSI, as well as whether the
+/// interface was detected as supported.
+///
+/// The callback is able to override the return value dynamically or leave it untouched if desired (e.g. if it
+/// simply wants to log something or do internal bookkeeping of some kind).
+pub fn setInterfaceQueryHandler(handler: InterfaceHandler) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interface_query_handler(
+        makeInterfaceHandlerWrapper(handler),
+    ));
+    try ret.toError();
+}
+
+/// Set the firmware waking vector in FACS.
+///
+/// - 'addr32' is the real mode entry-point address
+/// - 'addr64' is the protected mode entry-point address
+pub fn setWakingVector(addr32: core.PhysicalAddress, addr64: core.PhysicalAddress) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_set_waking_vector(
+        @bitCast(addr32),
+        @bitCast(addr64),
+    ));
+    try ret.toError();
+}
+
+pub const SleepState = enum(c_uacpi.uacpi_sleep_state) {
+    S0 = c_uacpi.UACPI_SLEEP_STATE_S0,
+    S1 = c_uacpi.UACPI_SLEEP_STATE_S1,
+    S2 = c_uacpi.UACPI_SLEEP_STATE_S2,
+    S3 = c_uacpi.UACPI_SLEEP_STATE_S3,
+    S4 = c_uacpi.UACPI_SLEEP_STATE_S4,
+    S5 = c_uacpi.UACPI_SLEEP_STATE_S5,
+};
+
+/// Prepare for a given sleep state.
+///
+/// Must be caled with interrupts ENABLED.
+pub fn prepareForSleep(state: SleepState) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(
+        @intFromEnum(state),
+    ));
+    try ret.toError();
+}
+
+/// Enter the given sleep state after preparation.
+///
+/// Must be called with interrupts DISABLED.
+pub fn sleep(state: SleepState) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(
+        @intFromEnum(state),
+    ));
+    try ret.toError();
+}
+
+/// Prepare to leave the given sleep state.
+///
+/// Must be called with interrupts DISABLED.
+pub fn prepareForWake(state: SleepState) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(
+        @intFromEnum(state),
+    ));
+    try ret.toError();
+}
+
+/// Wake from the given sleep state.
+///
+/// Must be called with interrupts ENABLED.
+pub fn wake(state: SleepState) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(
+        @intFromEnum(state),
+    ));
+    try ret.toError();
+}
+
+/// Attempt reset via the FADT reset register.
+pub fn reboot() !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_reboot());
+    try ret.toError();
+}
+
+pub fn readGas(gas: *const acpi.Address) !u64 {
+    var value: u64 = undefined;
+
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
+        @ptrCast(gas),
+        @ptrCast(&value),
+    ));
+    try ret.toError();
+
+    return value;
+}
+
+pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
+        @ptrCast(gas),
+        value,
+    ));
+    try ret.toError();
+}
+
+pub const InterfaceAction = enum(c_uacpi.uacpi_interface_action) {
+    disable = c_uacpi.UACPI_INTERFACE_ACTION_DISABLE,
+    enable = c_uacpi.UACPI_INTERFACE_ACTION_ENABLE,
+};
+
+/// Bulk interface configuration, used to disable or enable all interfaces that match 'kind'.
+///
+/// This is generally only needed to work around buggy hardware, for example if requested from the kernel command
+/// line.
+///
+/// By default, all vendor strings (like "Windows 2000") are enabled, and all host features
+/// (like "3.0 Thermal Model") are disabled.
+pub fn bulkConfigureInterfaces(kind: InterfaceKind, action: InterfaceAction) !void {
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_bulk_configure_interfaces(
+        @intFromEnum(action),
+        @intFromEnum(kind),
+    ));
+    try ret.toError();
+}
+
+pub const VendorInterface = enum(c_uacpi.uacpi_vendor_interface) {
+    none = c_uacpi.UACPI_VENDOR_INTERFACE_NONE,
+    windows_2000 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_2000,
+    windows_xp = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP,
+    windows_xp_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP1,
+    windows_server_2003 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003,
+    windows_xp_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP2,
+    windows_server_2003_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003_SP1,
+    windows_vista = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA,
+    windows_server_2008 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2008,
+    windows_vista_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP1,
+    windows_vista_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP2,
+    windows_7 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_7,
+    windows_8 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8,
+    windows_8_1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8_1,
+    windows_10 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10,
+    windows_10_rs1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS1,
+    windows_10_rs2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS2,
+    windows_10_rs3 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS3,
+    windows_10_rs4 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS4,
+    windows_10_rs5 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS5,
+    windows_10_19h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_19H1,
+    windows_10_20h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_20H1,
+    windows_11 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11,
+    windows_11_22h2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11_22H2,
+};
+
+/// Returns the "latest" AML-queried _OSI vendor interface.
+///
+/// E.g. for the following AML code:
+/// ```
+///     _OSI("Windows 2021")
+///     _OSI("Windows 2000")
+/// ```
+///
+/// This function will return `VendorInterface.windows_11`, since this is the latest version of the interface the
+/// code queried, even though the "Windows 2000" query came after "Windows 2021".
+pub fn latestQueriedVendorInterface() VendorInterface {
+    return @enumFromInt(c_uacpi.uacpi_latest_queried_vendor_interface());
+}
+
+pub const HostInterface = enum(c_uacpi.uacpi_host_interface) {
+    module_device = c_uacpi.UACPI_HOST_INTERFACE_MODULE_DEVICE,
+    processor_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_DEVICE,
+    @"3_0_thermal_model" = c_uacpi.UACPI_HOST_INTERFACE_3_0_THERMAL_MODEL,
+    @"3_0_scp_extensions" = c_uacpi.UACPI_HOST_INTERFACE_3_0_SCP_EXTENSIONS,
+    processor_aggregator_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_AGGREGATOR_DEVICE,
+
+    /// Same as install/uninstall interface, but comes with an enum of known interfaces defined by the ACPI
+    /// specification.
+    ///
+    /// These are disabled by default as they depend on the host kernel support.
+    pub fn enable(interface: HostInterface) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_host_interface(
+            @intFromEnum(interface),
+        ));
+        try ret.toError();
+    }
+
+    pub fn disable(interface: HostInterface) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_host_interface(
+            @intFromEnum(interface),
+        ));
+        try ret.toError();
+    }
+};
+
+pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
+    timer_status = c_uacpi.UACPI_FIXED_EVENT_TIMER_STATUS,
+    power_button = c_uacpi.UACPI_FIXED_EVENT_POWER_BUTTON,
+    sleep_button = c_uacpi.UACPI_FIXED_EVENT_SLEEP_BUTTON,
+    rtc = c_uacpi.UACPI_FIXED_EVENT_RTC,
+
+    pub fn InterruptHandler(comptime UserContextT: type) type {
+        return fn (
+            user_context: ?*UserContextT,
+        ) InterruptReturn;
+    }
+
+    pub fn installHandler(
+        event: FixedEvent,
+        comptime UserContextT: type,
+        handler: InterruptHandler(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_fixed_event_handler(
+            @intFromEnum(event),
+            makeInterruptHandlerWrapper(UserContextT, handler),
+            @ptrCast(user_context),
+        ));
+        try ret.toError();
+    }
+
+    pub fn uninstallHandler(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_fixed_event_handler(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn enable(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_fixed_event(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn disable(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_fixed_event(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn clear(event: FixedEvent) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_clear_fixed_event(
+            @intFromEnum(event),
+        ));
+        try ret.toError();
+    }
+
+    pub fn info(event: FixedEvent) !EventInfo {
+        var info_data: EventInfo = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_fixed_event_info(
+            @intFromEnum(event),
+            @ptrCast(&info_data),
+        ));
+        try ret.toError();
+        return info_data;
+    }
+};
 
 pub const Node = opaque {
     pub fn root() *Node {
@@ -317,6 +620,23 @@ pub const Node = opaque {
         return node;
     }
 
+    pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
+        @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
+
+        @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
+
+        /// Only applicable for uacpi_namespace_for_each_child
+        next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+    };
+
+    pub fn IterationCallback(comptime UserContextT: type) type {
+        return fn (
+            node: *Node,
+            node_depth: u32,
+            user_context: ?*UserContextT,
+        ) IterationDecision;
+    }
+
     /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
     pub fn forEachChildSimple(
         parent_node: *const Node,
@@ -331,6 +651,12 @@ pub const Node = opaque {
         ));
         try ret.toError();
     }
+
+    pub const Depth = enum(u32) {
+        any = c_uacpi.UACPI_MAX_DEPTH_ANY,
+
+        _,
+    };
 
     /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
     ///
@@ -371,9 +697,25 @@ pub const Node = opaque {
         try ret.toError();
     }
 
+    pub const AbsoultePath = struct {
+        path: [:0]const u8,
+
+        pub fn deinit(self: AbsoultePath) void {
+            c_uacpi.uacpi_free_absolute_path(self.path.ptr);
+        }
+    };
+
     pub fn getAbsolutePath(self: *const Node) AbsoultePath {
         const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(self));
         return .{ .path = std.mem.sliceTo(ptr, 0) };
+    }
+
+    pub fn NotifyHandler(comptime UserContextT: type) type {
+        return fn (
+            node: *Node,
+            value: u64,
+            user_context: ?*UserContextT,
+        ) Status;
     }
 
     /// Install a Notify() handler to a device node.
@@ -405,6 +747,80 @@ pub const Node = opaque {
         ));
         try ret.toError();
     }
+
+    pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
+        attach = c_uacpi.UACPI_REGION_OP_ATTACH,
+        read = c_uacpi.UACPI_REGION_OP_READ,
+        write = c_uacpi.UACPI_REGION_OP_WRITE,
+        detach = c_uacpi.UACPI_REGION_OP_DETACH,
+    };
+
+    pub fn RegionOperation(comptime UserContextT: type) type {
+        return union(RegionOperationType) {
+            attach: *Attach,
+            read: *ReadWrite,
+            write: *ReadWrite,
+            detach: *Detach,
+
+            pub const Attach = extern struct {
+                user_context: ?*UserContextT,
+                region_node: *Node,
+                out_region_context: ?*anyopaque,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
+                }
+            };
+
+            pub const ReadWrite = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                addr: extern union {
+                    address: core.PhysicalAddress,
+                    offset: u64,
+                },
+                value: u64,
+                byte_width: ByteWidth,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_rw_data));
+                }
+            };
+
+            pub const Detach = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                region_node: *Node,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
+                }
+            };
+        };
+    }
+
+    pub fn RegionHandler(comptime UserContextT: type) type {
+        return fn (operation: RegionOperation(UserContextT)) Status;
+    }
+
+    pub const AddressSpace = enum(c_uacpi.uacpi_address_space) {
+        system_memory = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
+        system_io = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_IO,
+        pci_config = c_uacpi.UACPI_ADDRESS_SPACE_PCI_CONFIG,
+        embedded_controller = c_uacpi.UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
+        smbus = c_uacpi.UACPI_ADDRESS_SPACE_SMBUS,
+        system_cmos = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_CMOS,
+        pci_bar_target = c_uacpi.UACPI_ADDRESS_SPACE_PCI_BAR_TARGET,
+        ipmi = c_uacpi.UACPI_ADDRESS_SPACE_IPMI,
+        general_purpose_io = c_uacpi.UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO,
+        generic_serial_bus = c_uacpi.UACPI_ADDRESS_SPACE_GENERIC_SERIAL_BUS,
+        pcc = c_uacpi.UACPI_ADDRESS_SPACE_PCC,
+        prm = c_uacpi.UACPI_ADDRESS_SPACE_PRM,
+        ffixedhw = c_uacpi.UACPI_ADDRESS_SPACE_FFIXEDHW,
+
+        // Internal type
+        table_data = c_uacpi.UACPI_ADDRESS_SPACE_TABLE_DATA,
+    };
 
     /// Install an address space handler to a device node.
     ///
@@ -1064,6 +1480,19 @@ pub const Node = opaque {
         return event_info;
     }
 
+    pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
+        level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
+        edge = c_uacpi.UACPI_GPE_TRIGGERING_EDGE,
+    };
+
+    pub fn GPEHandler(comptime UserContextT: type) type {
+        return fn (
+            gpe_device: *Node,
+            index: u16,
+            user_context: ?*UserContextT,
+        ) InterruptReturn;
+    }
+
     /// Installs a handler to the provided GPE at 'index' controlled by device 'gpe_device'.
     ///
     /// The GPE is automatically disabled & cleared according to the configured triggering upon invoking the handler.
@@ -1322,66 +1751,6 @@ pub const Node = opaque {
 };
 
 pub const Object = opaque {
-    pub const Name = extern union {
-        text: [4]u8,
-        id: u32,
-
-        comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_name));
-        }
-    };
-
-    pub const Type = enum(c_uacpi.uacpi_object_type) {
-        uninitialized = c_uacpi.UACPI_OBJECT_UNINITIALIZED,
-        integer = c_uacpi.UACPI_OBJECT_INTEGER,
-        string = c_uacpi.UACPI_OBJECT_STRING,
-        buffer = c_uacpi.UACPI_OBJECT_BUFFER,
-        package = c_uacpi.UACPI_OBJECT_PACKAGE,
-        field_unit = c_uacpi.UACPI_OBJECT_FIELD_UNIT,
-        device = c_uacpi.UACPI_OBJECT_DEVICE,
-        event = c_uacpi.UACPI_OBJECT_EVENT,
-        method = c_uacpi.UACPI_OBJECT_METHOD,
-        mutex = c_uacpi.UACPI_OBJECT_MUTEX,
-        operation_region = c_uacpi.UACPI_OBJECT_OPERATION_REGION,
-        power_resource = c_uacpi.UACPI_OBJECT_POWER_RESOURCE,
-        processor = c_uacpi.UACPI_OBJECT_PROCESSOR,
-        thermal_zone = c_uacpi.UACPI_OBJECT_THERMAL_ZONE,
-        buffer_field = c_uacpi.UACPI_OBJECT_BUFFER_FIELD,
-        debug = c_uacpi.UACPI_OBJECT_DEBUG,
-        reference = c_uacpi.UACPI_OBJECT_REFERENCE,
-        buffer_index = c_uacpi.UACPI_OBJECT_BUFFER_INDEX,
-    };
-
-    pub const TypeBits = packed struct(c_uacpi.uacpi_object_type_bits) {
-        _uninitialized: u1 = 0,
-        integer: bool = false,
-        string: bool = false,
-        buffer: bool = false,
-        package: bool = false,
-        field_unit: bool = false,
-        device: bool = false,
-        event: bool = false,
-        method: bool = false,
-        mutex: bool = false,
-        operation_region: bool = false,
-        power_resource: bool = false,
-        processor: bool = false,
-        thermal_zone: bool = false,
-        buffer_field: bool = false,
-        _unused15: u1 = 0,
-        debug: bool = false,
-        _unused17_19: u3 = 0,
-        reference: bool = false,
-        buffer_index: bool = false,
-        _unused22_31: u10 = 0,
-
-        pub const any: TypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
-
-        comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
-        }
-    };
-
     pub fn ref(self: *Object) void {
         c_uacpi.uacpi_object_ref(@ptrCast(self));
     }
@@ -1707,349 +2076,101 @@ pub const Object = opaque {
         try ret.toError();
         return info;
     }
-};
 
-pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
-    level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
-    edge = c_uacpi.UACPI_GPE_TRIGGERING_EDGE,
-};
-
-pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
-    timer_status = c_uacpi.UACPI_FIXED_EVENT_TIMER_STATUS,
-    power_button = c_uacpi.UACPI_FIXED_EVENT_POWER_BUTTON,
-    sleep_button = c_uacpi.UACPI_FIXED_EVENT_SLEEP_BUTTON,
-    rtc = c_uacpi.UACPI_FIXED_EVENT_RTC,
-
-    pub fn installHandler(
-        event: FixedEvent,
-        comptime UserContextT: type,
-        handler: InterruptHandler(UserContextT),
-        user_context: ?*UserContextT,
-    ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_fixed_event_handler(
-            @intFromEnum(event),
-            makeInterruptHandlerWrapper(UserContextT, handler),
-            @ptrCast(user_context),
-        ));
-        try ret.toError();
-    }
-
-    pub fn uninstallHandler(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_fixed_event_handler(
-            @intFromEnum(event),
-        ));
-        try ret.toError();
-    }
-
-    pub fn enable(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_fixed_event(
-            @intFromEnum(event),
-        ));
-        try ret.toError();
-    }
-
-    pub fn disable(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_fixed_event(
-            @intFromEnum(event),
-        ));
-        try ret.toError();
-    }
-
-    pub fn clear(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_clear_fixed_event(
-            @intFromEnum(event),
-        ));
-        try ret.toError();
-    }
-
-    pub fn info(event: FixedEvent) !EventInfo {
-        var info_data: EventInfo = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_fixed_event_info(
-            @intFromEnum(event),
-            @ptrCast(&info_data),
-        ));
-        try ret.toError();
-        return info_data;
-    }
-};
-
-pub const io = struct {
-    pub fn readGas(gas: *const acpi.Address) !u64 {
-        var value: u64 = undefined;
-
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
-            @ptrCast(gas),
-            @ptrCast(&value),
-        ));
-        try ret.toError();
-
-        return value;
-    }
-
-    pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
-            @ptrCast(gas),
-            value,
-        ));
-        try ret.toError();
-    }
-};
-
-pub const osi = struct {
-    pub const VendorInterface = enum(c_uacpi.uacpi_vendor_interface) {
-        none = c_uacpi.UACPI_VENDOR_INTERFACE_NONE,
-        windows_2000 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_2000,
-        windows_xp = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP,
-        windows_xp_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP1,
-        windows_server_2003 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003,
-        windows_xp_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP2,
-        windows_server_2003_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003_SP1,
-        windows_vista = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA,
-        windows_server_2008 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2008,
-        windows_vista_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP1,
-        windows_vista_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP2,
-        windows_7 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_7,
-        windows_8 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8,
-        windows_8_1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8_1,
-        windows_10 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10,
-        windows_10_rs1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS1,
-        windows_10_rs2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS2,
-        windows_10_rs3 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS3,
-        windows_10_rs4 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS4,
-        windows_10_rs5 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS5,
-        windows_10_19h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_19H1,
-        windows_10_20h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_20H1,
-        windows_11 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11,
-        windows_11_22h2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11_22H2,
-    };
-
-    /// Returns the "latest" AML-queried _OSI vendor interface.
-    ///
-    /// E.g. for the following AML code:
-    /// ```
-    ///     _OSI("Windows 2021")
-    ///     _OSI("Windows 2000")
-    /// ```
-    ///
-    /// This function will return `VendorInterface.windows_11`, since this is the latest version of the interface the
-    /// code queried, even though the "Windows 2000" query came after "Windows 2021".
-    pub fn latestQueriedVendorInterface() VendorInterface {
-        return @enumFromInt(c_uacpi.uacpi_latest_queried_vendor_interface());
-    }
-
-    pub const InterfaceKind = enum(c_uacpi.uacpi_interface_kind) {
-        vendor = c_uacpi.UACPI_INTERFACE_KIND_VENDOR,
-        feature = c_uacpi.UACPI_INTERFACE_KIND_FEATURE,
-        all = c_uacpi.UACPI_INTERFACE_KIND_ALL,
-    };
-
-    /// Install or uninstall an interface.
-    ///
-    /// The interface kind is used for matching during interface enumeration in `bulkConfigureInterfaces`.
-    ///
-    /// After installing an interface, all _OSI queries report it as supported.
-    pub fn installInterface(name: [:0]const u8, kind: InterfaceKind) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_interface(
-            name.ptr,
-            @intFromEnum(kind),
-        ));
-        try ret.toError();
-    }
-
-    pub fn uninstallInterface(name: [:0]const u8) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_interface(
-            name.ptr,
-        ));
-        try ret.toError();
-    }
-
-    pub const HostInterface = enum(c_uacpi.uacpi_host_interface) {
-        module_device = c_uacpi.UACPI_HOST_INTERFACE_MODULE_DEVICE,
-        processor_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_DEVICE,
-        @"3_0_thermal_model" = c_uacpi.UACPI_HOST_INTERFACE_3_0_THERMAL_MODEL,
-        @"3_0_scp_extensions" = c_uacpi.UACPI_HOST_INTERFACE_3_0_SCP_EXTENSIONS,
-        processor_aggregator_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_AGGREGATOR_DEVICE,
-    };
-
-    /// Same as install/uninstall interface, but comes with an enum of known interfaces defined by the ACPI
-    /// specification.
-    ///
-    /// These are disabled by default as they depend on the host kernel support.
-    pub fn enableHostInterface(interface: HostInterface) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_host_interface(
-            @intFromEnum(interface),
-        ));
-        try ret.toError();
-    }
-
-    pub fn disableHostInterface(interface: HostInterface) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_host_interface(
-            @intFromEnum(interface),
-        ));
-        try ret.toError();
-    }
-
-    pub const InterfaceHandler = fn (
-        name: [:0]const u8,
-        supported: bool,
-    ) bool;
-
-    inline fn makeInterfaceHandlerWrapper(
-        handler: InterfaceHandler,
-    ) c_uacpi.uacpi_interface_handler {
-        return comptime @ptrCast(&struct {
-            fn handlerWrapper(
-                name: [*:0]const u8,
-                supported: bool,
-            ) callconv(.C) bool {
-                return handler(std.mem.sliceTo(name, 0), supported);
-            }
-        }.handlerWrapper);
-    }
-
-    /// Set a custom interface query (_OSI) handler.
-    ///
-    /// This callback will be invoked for each _OSI query with the value passed in the _OSI, as well as whether the
-    /// interface was detected as supported.
-    ///
-    /// The callback is able to override the return value dynamically or leave it untouched if desired (e.g. if it
-    /// simply wants to log something or do internal bookkeeping of some kind).
-    pub fn setInterfaceQueryHandler(handler: InterfaceHandler) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interface_query_handler(
-            makeInterfaceHandlerWrapper(handler),
-        ));
-        try ret.toError();
-    }
-
-    pub const InterfaceAction = enum(c_uacpi.uacpi_interface_action) {
-        disable = c_uacpi.UACPI_INTERFACE_ACTION_DISABLE,
-        enable = c_uacpi.UACPI_INTERFACE_ACTION_ENABLE,
-    };
-
-    /// Bulk interface configuration, used to disable or enable all interfaces that match 'kind'.
-    ///
-    /// This is generally only needed to work around buggy hardware, for example if requested from the kernel command
-    /// line.
-    ///
-    /// By default, all vendor strings (like "Windows 2000") are enabled, and all host features
-    /// (like "3.0 Thermal Model") are disabled.
-    pub fn bulkConfigureInterfaces(action: InterfaceAction, kind: InterfaceKind) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_bulk_configure_interfaces(
-            @intFromEnum(action),
-            @intFromEnum(kind),
-        ));
-        try ret.toError();
-    }
-};
-
-pub const sleep = struct {
-    /// Set the firmware waking vector in FACS.
-    ///
-    /// - 'addr32' is the real mode entry-point address
-    /// - 'addr64' is the protected mode entry-point address
-    pub fn setWakingVector(addr32: core.PhysicalAddress, addr64: core.PhysicalAddress) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_waking_vector(
-            @bitCast(addr32),
-            @bitCast(addr64),
-        ));
-        try ret.toError();
-    }
-
-    pub const SleepState = enum(c_uacpi.uacpi_sleep_state) {
-        S0 = c_uacpi.UACPI_SLEEP_STATE_S0,
-        S1 = c_uacpi.UACPI_SLEEP_STATE_S1,
-        S2 = c_uacpi.UACPI_SLEEP_STATE_S2,
-        S3 = c_uacpi.UACPI_SLEEP_STATE_S3,
-        S4 = c_uacpi.UACPI_SLEEP_STATE_S4,
-        S5 = c_uacpi.UACPI_SLEEP_STATE_S5,
-    };
-
-    /// Prepare for a given sleep state.
-    ///
-    /// Must be caled with interrupts ENABLED.
-    pub fn prepareForSleep(state: SleepState) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(
-            @intFromEnum(state),
-        ));
-        try ret.toError();
-    }
-
-    /// Enter the given sleep state after preparation.
-    ///
-    /// Must be called with interrupts DISABLED.
-    pub fn sleep(state: SleepState) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(
-            @intFromEnum(state),
-        ));
-        try ret.toError();
-    }
-
-    /// Prepare to leave the given sleep state.
-    ///
-    /// Must be called with interrupts DISABLED.
-    pub fn prepareForWake(state: SleepState) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(
-            @intFromEnum(state),
-        ));
-        try ret.toError();
-    }
-
-    /// Wake from the given sleep state.
-    ///
-    /// Must be called with interrupts ENABLED.
-    pub fn wake(state: SleepState) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(
-            @intFromEnum(state),
-        ));
-        try ret.toError();
-    }
-
-    /// Attempt reset via the FADT reset register.
-    pub fn reboot() !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_reboot());
-        try ret.toError();
-    }
-};
-
-pub const tables = struct {
-    pub const Table = extern struct {
-        table: extern union {
-            virtual_address: core.VirtualAddress,
-            ptr: *anyopaque,
-            header: *acpi.SharedHeader,
-        },
-        index: usize,
-
-        /// Move to the next table with the same signature.
-        ///
-        /// Returns `true` if the table was found.
-        pub fn nextWithSameSignature(table: *Table) !bool {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(
-                @ptrCast(table),
-            ));
-            if (ret == .not_found) return false;
-            try ret.toError();
-            return true;
-        }
-
-        pub fn ref(table: Table) !void {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_table_ref(
-                @constCast(@ptrCast(&table)),
-            ));
-            try ret.toError();
-        }
-
-        pub fn unref(table: Table) !void {
-            const ret: Status = @enumFromInt(c_uacpi.uacpi_table_unref(
-                @constCast(@ptrCast(&table)),
-            ));
-            try ret.toError();
-        }
+    pub const Name = extern union {
+        text: [4]u8,
+        id: u32,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table));
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_name));
         }
     };
+
+    pub const Type = enum(c_uacpi.uacpi_object_type) {
+        uninitialized = c_uacpi.UACPI_OBJECT_UNINITIALIZED,
+        integer = c_uacpi.UACPI_OBJECT_INTEGER,
+        string = c_uacpi.UACPI_OBJECT_STRING,
+        buffer = c_uacpi.UACPI_OBJECT_BUFFER,
+        package = c_uacpi.UACPI_OBJECT_PACKAGE,
+        field_unit = c_uacpi.UACPI_OBJECT_FIELD_UNIT,
+        device = c_uacpi.UACPI_OBJECT_DEVICE,
+        event = c_uacpi.UACPI_OBJECT_EVENT,
+        method = c_uacpi.UACPI_OBJECT_METHOD,
+        mutex = c_uacpi.UACPI_OBJECT_MUTEX,
+        operation_region = c_uacpi.UACPI_OBJECT_OPERATION_REGION,
+        power_resource = c_uacpi.UACPI_OBJECT_POWER_RESOURCE,
+        processor = c_uacpi.UACPI_OBJECT_PROCESSOR,
+        thermal_zone = c_uacpi.UACPI_OBJECT_THERMAL_ZONE,
+        buffer_field = c_uacpi.UACPI_OBJECT_BUFFER_FIELD,
+        debug = c_uacpi.UACPI_OBJECT_DEBUG,
+        reference = c_uacpi.UACPI_OBJECT_REFERENCE,
+        buffer_index = c_uacpi.UACPI_OBJECT_BUFFER_INDEX,
+    };
+
+    pub const TypeBits = packed struct(c_uacpi.uacpi_object_type_bits) {
+        _uninitialized: u1 = 0,
+        integer: bool = false,
+        string: bool = false,
+        buffer: bool = false,
+        package: bool = false,
+        field_unit: bool = false,
+        device: bool = false,
+        event: bool = false,
+        method: bool = false,
+        mutex: bool = false,
+        operation_region: bool = false,
+        power_resource: bool = false,
+        processor: bool = false,
+        thermal_zone: bool = false,
+        buffer_field: bool = false,
+        _unused15: u1 = 0,
+        debug: bool = false,
+        _unused17_19: u3 = 0,
+        reference: bool = false,
+        buffer_index: bool = false,
+        _unused22_31: u10 = 0,
+
+        pub const any: TypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
+        }
+    };
+};
+
+pub const Table = extern struct {
+    table: extern union {
+        virtual_address: core.VirtualAddress,
+        ptr: *anyopaque,
+        header: *acpi.SharedHeader,
+    },
+    index: usize,
+
+    /// Move to the next table with the same signature.
+    ///
+    /// Returns `true` if the table was found.
+    pub fn nextWithSameSignature(table: *Table) !bool {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(
+            @ptrCast(table),
+        ));
+        if (ret == .not_found) return false;
+        try ret.toError();
+        return true;
+    }
+
+    pub fn ref(table: Table) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_ref(
+            @constCast(@ptrCast(&table)),
+        ));
+        try ret.toError();
+    }
+
+    pub fn unref(table: Table) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_unref(
+            @constCast(@ptrCast(&table)),
+        ));
+        try ret.toError();
+    }
 
     pub fn findBySignature(signature: *const [4]u8) !?Table {
         var table: Table = undefined;
@@ -2076,20 +2197,6 @@ pub const tables = struct {
 
         return table;
     }
-
-    pub const TableIdentifiers = extern struct {
-        signature: Object.Name,
-
-        /// if oemid[0] == 0 this field is ignored
-        oemid: [6]u8 = @splat(0),
-
-        /// if oem_table_id[0] == 0 this field is ignored
-        oem_table_id: [8]u8 = @splat(0),
-
-        comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table_identifiers));
-        }
-    };
 
     /// Install a table from a virtual address.
     ///
@@ -2145,6 +2252,26 @@ pub const tables = struct {
         return fadt_ptr;
     }
 
+    /// Set a handler that is invoked for each table before it gets installed.
+    ///
+    /// Depending on the return value, the table is either allowed to be installed as-is, denied, or overriden with a
+    /// new one.
+    pub fn setTableInstallationHandler(handler: TableInstallationHandler) !void {
+        const handler_wrapper = struct {
+            fn handlerWrapper(
+                header: *acpi.SharedHeader,
+                out_override_address: *u64,
+            ) callconv(.C) TableInstallationDisposition {
+                return handler(header, out_override_address);
+            }
+        }.handlerWrapper;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_table_installation_handler(
+            @ptrCast(handler_wrapper),
+        ));
+        try ret.toError();
+    }
+
     pub const TableInstallationDisposition = enum(c_uacpi.uacpi_table_installation_disposition) {
         /// Allow the table to be installed as-is
         allow = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_ALLOW,
@@ -2167,105 +2294,30 @@ pub const tables = struct {
         out_override_address: *u64,
     ) TableInstallationDisposition;
 
-    /// Set a handler that is invoked for each table before it gets installed.
-    ///
-    /// Depending on the return value, the table is either allowed to be installed as-is, denied, or overriden with a
-    /// new one.
-    pub fn setTableInstallationHandler(handler: TableInstallationHandler) !void {
-        const handler_wrapper = struct {
-            fn handlerWrapper(
-                header: *acpi.SharedHeader,
-                out_override_address: *u64,
-            ) callconv(.C) TableInstallationDisposition {
-                return handler(header, out_override_address);
-            }
-        }.handlerWrapper;
+    pub const TableIdentifiers = extern struct {
+        signature: Object.Name,
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_table_installation_handler(
-            @ptrCast(handler_wrapper),
-        ));
-        try ret.toError();
+        /// if oemid[0] == 0 this field is ignored
+        oemid: [6]u8 = @splat(0),
+
+        /// if oem_table_id[0] == 0 this field is ignored
+        oem_table_id: [8]u8 = @splat(0),
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table_identifiers));
+        }
+    };
+
+    comptime {
+        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table));
     }
 };
 
-pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
-    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
-
-    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
-
-    /// Only applicable for uacpi_namespace_for_each_child
-    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+pub const ByteWidth = enum(u8) {
+    one = 1,
+    two = 2,
+    four = 4,
 };
-
-pub const AddressSpace = enum(c_uacpi.uacpi_address_space) {
-    system_memory = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
-    system_io = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_IO,
-    pci_config = c_uacpi.UACPI_ADDRESS_SPACE_PCI_CONFIG,
-    embedded_controller = c_uacpi.UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
-    smbus = c_uacpi.UACPI_ADDRESS_SPACE_SMBUS,
-    system_cmos = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_CMOS,
-    pci_bar_target = c_uacpi.UACPI_ADDRESS_SPACE_PCI_BAR_TARGET,
-    ipmi = c_uacpi.UACPI_ADDRESS_SPACE_IPMI,
-    general_purpose_io = c_uacpi.UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO,
-    generic_serial_bus = c_uacpi.UACPI_ADDRESS_SPACE_GENERIC_SERIAL_BUS,
-    pcc = c_uacpi.UACPI_ADDRESS_SPACE_PCC,
-    prm = c_uacpi.UACPI_ADDRESS_SPACE_PRM,
-    ffixedhw = c_uacpi.UACPI_ADDRESS_SPACE_FFIXEDHW,
-
-    // Internal type
-    table_data = c_uacpi.UACPI_ADDRESS_SPACE_TABLE_DATA,
-};
-
-pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
-    attach = c_uacpi.UACPI_REGION_OP_ATTACH,
-    read = c_uacpi.UACPI_REGION_OP_READ,
-    write = c_uacpi.UACPI_REGION_OP_WRITE,
-    detach = c_uacpi.UACPI_REGION_OP_DETACH,
-};
-
-pub fn RegionOperation(comptime UserContextT: type) type {
-    return union(RegionOperationType) {
-        attach: *Attach,
-        read: *ReadWrite,
-        write: *ReadWrite,
-        detach: *Detach,
-
-        pub const Attach = extern struct {
-            user_context: ?*UserContextT,
-            region_node: *Node,
-            out_region_context: ?*anyopaque,
-
-            comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
-            }
-        };
-
-        pub const ReadWrite = extern struct {
-            user_context: ?*UserContextT,
-            region_context: ?*anyopaque,
-            addr: extern union {
-                address: core.PhysicalAddress,
-                offset: u64,
-            },
-            value: u64,
-            byte_width: ByteWidth,
-
-            comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_rw_data));
-            }
-        };
-
-        pub const Detach = extern struct {
-            user_context: ?*UserContextT,
-            region_context: ?*anyopaque,
-            region_node: *Node,
-
-            comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
-            }
-        };
-    };
-}
 
 pub const EventInfo = packed struct(c_uacpi.uacpi_event_info) {
     /// Event is enabled in software
@@ -2284,75 +2336,6 @@ pub const EventInfo = packed struct(c_uacpi.uacpi_event_info) {
     _reserved: u26,
 };
 
-pub fn IterationCallback(comptime UserContextT: type) type {
-    return fn (
-        node: *Node,
-        node_depth: u32,
-        user_context: ?*UserContextT,
-    ) IterationDecision;
-}
-
-inline fn makeIterationCallbackWrapper(
-    comptime UserContextT: type,
-    callback: IterationCallback(UserContextT),
-) c_uacpi.uacpi_iteration_callback {
-    return comptime @ptrCast(&struct {
-        fn callbackWrapper(
-            user_ctx: ?*anyopaque,
-            node: *Node,
-            node_depth: u32,
-        ) callconv(.C) IterationDecision {
-            return callback(node, node_depth, @ptrCast(user_ctx));
-        }
-    }.callbackWrapper);
-}
-
-pub fn NotifyHandler(comptime UserContextT: type) type {
-    return fn (
-        node: *Node,
-        value: u64,
-        user_context: ?*UserContextT,
-    ) Status;
-}
-
-inline fn makeNotifyHandlerWrapper(
-    comptime UserContextT: type,
-    handler: NotifyHandler(UserContextT),
-) c_uacpi.uacpi_notify_handler {
-    return comptime @ptrCast(&struct {
-        fn handlerWrapper(
-            user_ctx: ?*anyopaque,
-            node: *Node,
-            value: u64,
-        ) callconv(.C) Status {
-            return handler(node, value, @ptrCast(user_ctx));
-        }
-    }.handlerWrapper);
-}
-
-pub fn GPEHandler(comptime UserContextT: type) type {
-    return fn (
-        gpe_device: *Node,
-        index: u16,
-        user_context: ?*UserContextT,
-    ) InterruptReturn;
-}
-
-inline fn makeGPEHandlerWrapper(
-    comptime UserContextT: type,
-    handler: GPEHandler(UserContextT),
-) c_uacpi.uacpi_gpe_handler {
-    return comptime @ptrCast(&struct {
-        fn handlerWrapper(
-            user_ctx: ?*anyopaque,
-            gpe_device: *Node,
-            index: u16,
-        ) callconv(.C) InterruptReturn {
-            return handler(gpe_device, index, @ptrCast(user_ctx));
-        }
-    }.handlerWrapper);
-}
-
 pub const InterruptReturn = enum(c_uacpi.uacpi_interrupt_ret) {
     not_handled = c_uacpi.UACPI_INTERRUPT_NOT_HANDLED,
     handled = c_uacpi.UACPI_INTERRUPT_HANDLED,
@@ -2361,58 +2344,9 @@ pub const InterruptReturn = enum(c_uacpi.uacpi_interrupt_ret) {
     gpe_reenable = c_uacpi.UACPI_GPE_REENABLE,
 };
 
-pub fn InterruptHandler(comptime UserContextT: type) type {
-    return fn (
-        user_context: ?*UserContextT,
-    ) InterruptReturn;
-}
-
-inline fn makeInterruptHandlerWrapper(
-    comptime UserContextT: type,
-    handler: InterruptHandler(UserContextT),
-) c_uacpi.uacpi_interrupt_handler {
-    return comptime @ptrCast(&struct {
-        fn handlerWrapper(
-            user_ctx: ?*anyopaque,
-        ) callconv(.C) InterruptReturn {
-            return handler(@ptrCast(user_ctx));
-        }
-    }.handlerWrapper);
-}
-
-pub fn RegionHandler(comptime UserContextT: type) type {
-    return fn (operation: RegionOperation(UserContextT)) Status;
-}
-
-inline fn makeRegionHandlerWrapper(
-    comptime UserContextT: type,
-    handler: RegionHandler(UserContextT),
-) c_uacpi.uacpi_region_handler {
-    return comptime @ptrCast(&struct {
-        fn handlerWrapper(
-            op: RegionOperationType,
-            op_data: *anyopaque,
-        ) callconv(.C) Status {
-            return handler(switch (op) {
-                .attach => .{ .attach = @ptrCast(@alignCast(op_data)) },
-                .read => .{ .read = @ptrCast(@alignCast(op_data)) },
-                .write => .{ .write = @ptrCast(@alignCast(op_data)) },
-                .detach => .{ .detach = @ptrCast(@alignCast(op_data)) },
-            });
-        }
-    }.handlerWrapper);
-}
-
-pub const AbsoultePath = struct {
-    path: [:0]const u8,
-
-    pub fn deinit(self: AbsoultePath) void {
-        c_uacpi.uacpi_free_absolute_path(self.path.ptr);
-    }
-};
-
-pub const Depth = enum(u32) {
-    any = c_uacpi.UACPI_MAX_DEPTH_ANY,
+pub const Timeout = enum(u16) {
+    none = 0,
+    infinite = 0xFFFF,
 
     _,
 };
@@ -2530,104 +2464,95 @@ pub const Error = error{
     AMLCallStackDepthLimit,
 };
 
-pub const InitLevel = enum(c_uacpi.uacpi_init_level) {
-    /// Reboot state, nothing is available
-    early = c_uacpi.UACPI_INIT_LEVEL_EARLY,
+inline fn makeIterationCallbackWrapper(
+    comptime UserContextT: type,
+    callback: Node.IterationCallback(UserContextT),
+) c_uacpi.uacpi_iteration_callback {
+    return comptime @ptrCast(&struct {
+        fn callbackWrapper(
+            user_ctx: ?*anyopaque,
+            node: *Node,
+            node_depth: u32,
+        ) callconv(.C) Node.IterationDecision {
+            return callback(node, node_depth, @ptrCast(user_ctx));
+        }
+    }.callbackWrapper);
+}
 
-    /// State after a successfull call to `initialize`.
-    ///
-    /// Table API and other helpers that don't depend on the ACPI namespace may be used.
-    subsystem_initialized = c_uacpi.UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED,
+inline fn makeNotifyHandlerWrapper(
+    comptime UserContextT: type,
+    handler: Node.NotifyHandler(UserContextT),
+) c_uacpi.uacpi_notify_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+            node: *Node,
+            value: u64,
+        ) callconv(.C) Status {
+            return handler(node, value, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
 
-    /// State after a successfull call to `namespaceLoad`.
-    ///
-    /// Most API may be used, namespace can be iterated, etc.
-    namespace_loaded = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_LOADED,
+inline fn makeGPEHandlerWrapper(
+    comptime UserContextT: type,
+    handler: Node.GPEHandler(UserContextT),
+) c_uacpi.uacpi_gpe_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+            gpe_device: *Node,
+            index: u16,
+        ) callconv(.C) InterruptReturn {
+            return handler(gpe_device, index, @ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
 
-    /// The final initialization stage, this is entered after the call to `namespaceInitialize`.
-    ///
-    /// All API is available to use.
-    namespace_initialized = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED,
-};
+inline fn makeInterruptHandlerWrapper(
+    comptime UserContextT: type,
+    handler: FixedEvent.InterruptHandler(UserContextT),
+) c_uacpi.uacpi_interrupt_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            user_ctx: ?*anyopaque,
+        ) callconv(.C) InterruptReturn {
+            return handler(@ptrCast(user_ctx));
+        }
+    }.handlerWrapper);
+}
 
-pub const Timeout = enum(u16) {
-    none = 0,
-    infinite = 0xFFFF,
+inline fn makeRegionHandlerWrapper(
+    comptime UserContextT: type,
+    handler: Node.RegionHandler(UserContextT),
+) c_uacpi.uacpi_region_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            op: Node.RegionOperationType,
+            op_data: *anyopaque,
+        ) callconv(.C) Status {
+            return handler(switch (op) {
+                .attach => .{ .attach = @ptrCast(@alignCast(op_data)) },
+                .read => .{ .read = @ptrCast(@alignCast(op_data)) },
+                .write => .{ .write = @ptrCast(@alignCast(op_data)) },
+                .detach => .{ .detach = @ptrCast(@alignCast(op_data)) },
+            });
+        }
+    }.handlerWrapper);
+}
 
-    _,
-};
-
-const WorkType = enum(c_uacpi.uacpi_work_type) {
-    /// Schedule a GPE handler method for execution.
-    ///
-    /// This should be scheduled to run on CPU0 to avoid potential SMI-related firmware bugs.
-    gpe_execution = c_uacpi.UACPI_WORK_GPE_EXECUTION,
-
-    /// Schedule a Notify(device) firmware request for execution.
-    ///
-    /// This can run on any CPU.
-    work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
-};
-
-const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
-
-const ByteWidth = enum(u8) {
-    one = 1,
-    two = 2,
-    four = 4,
-};
-
-const LogLevel = enum(c_uacpi.uacpi_log_level) {
-    /// Super verbose logging, every op & uop being processed is logged.
-    /// Mostly useful for tracking down hangs/lockups.
-    DEBUG = c_uacpi.UACPI_LOG_DEBUG,
-
-    /// A little verbose, every operation region access is traced with a bit of
-    /// extra information on top.
-    TRACE = c_uacpi.UACPI_LOG_TRACE,
-
-    /// Only logs the bare minimum information about state changes and/or
-    /// initialization progress.
-    INFO = c_uacpi.UACPI_LOG_INFO,
-
-    /// Logs recoverable errors and/or non-important aborts.
-    WARN = c_uacpi.UACPI_LOG_WARN,
-
-    /// Logs only critical errors that might affect the ability to initialize or
-    /// prevent stable runtime.
-    ERROR = c_uacpi.UACPI_LOG_ERROR,
-};
-
-const FirmwareRequest = extern struct {
-    type: Type,
-
-    data: Data,
-
-    const Type = enum(c_uacpi.uacpi_firmware_request_type) {
-        breakpoint = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
-        fatal = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
-    };
-
-    const Data = extern union {
-        breakpoint: Breakpoint,
-        fatal: Fatal,
-
-        const Breakpoint = extern struct {
-            /// The context of the method currently being executed
-            ctx: *anyopaque,
-        };
-
-        const Fatal = extern struct {
-            type: u8,
-            code: u32,
-            arg: u64,
-        };
-    };
-
-    comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_firmware_request));
-    }
-};
+inline fn makeInterfaceHandlerWrapper(
+    handler: InterfaceHandler,
+) c_uacpi.uacpi_interface_handler {
+    return comptime @ptrCast(&struct {
+        fn handlerWrapper(
+            name: [*:0]const u8,
+            supported: bool,
+        ) callconv(.C) bool {
+            return handler(std.mem.sliceTo(name, 0), supported);
+        }
+    }.handlerWrapper);
+}
 
 comptime {
     std.debug.assert(@sizeOf(core.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
@@ -3049,6 +2974,72 @@ const kernel_api = struct {
     export fn uacpi_kernel_wait_for_work_completion() Status {
         core.panic("uacpi_kernel_wait_for_work_completion()", null);
     }
+
+    const WorkType = enum(c_uacpi.uacpi_work_type) {
+        /// Schedule a GPE handler method for execution.
+        ///
+        /// This should be scheduled to run on CPU0 to avoid potential SMI-related firmware bugs.
+        gpe_execution = c_uacpi.UACPI_WORK_GPE_EXECUTION,
+
+        /// Schedule a Notify(device) firmware request for execution.
+        ///
+        /// This can run on any CPU.
+        work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
+    };
+
+    const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
+
+    const LogLevel = enum(c_uacpi.uacpi_log_level) {
+        /// Super verbose logging, every op & uop being processed is logged.
+        /// Mostly useful for tracking down hangs/lockups.
+        DEBUG = c_uacpi.UACPI_LOG_DEBUG,
+
+        /// A little verbose, every operation region access is traced with a bit of
+        /// extra information on top.
+        TRACE = c_uacpi.UACPI_LOG_TRACE,
+
+        /// Only logs the bare minimum information about state changes and/or
+        /// initialization progress.
+        INFO = c_uacpi.UACPI_LOG_INFO,
+
+        /// Logs recoverable errors and/or non-important aborts.
+        WARN = c_uacpi.UACPI_LOG_WARN,
+
+        /// Logs only critical errors that might affect the ability to initialize or
+        /// prevent stable runtime.
+        ERROR = c_uacpi.UACPI_LOG_ERROR,
+    };
+
+    const FirmwareRequest = extern struct {
+        type: Type,
+
+        data: Data,
+
+        const Type = enum(c_uacpi.uacpi_firmware_request_type) {
+            breakpoint = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
+            fatal = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
+        };
+
+        const Data = extern union {
+            breakpoint: Breakpoint,
+            fatal: Fatal,
+
+            const Breakpoint = extern struct {
+                /// The context of the method currently being executed
+                ctx: *anyopaque,
+            };
+
+            const Fatal = extern struct {
+                type: u8,
+                code: u32,
+                arg: u64,
+            };
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_firmware_request));
+        }
+    };
 };
 
 comptime {
