@@ -437,10 +437,12 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, p
 }
 
 fn findInstantFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag {
-    const index = arena.indexOfNonEmptyFreelistInstantFit(quantum_aligned_len) orelse return null;
-    const tag = arena.popFromFreelist(index) orelse unreachable;
-    std.debug.assert(tag.kind == .free);
-    return tag;
+    if (arena.performStrictInstantFit(quantum_aligned_len)) |tag| {
+        @branchHint(.likely);
+        return tag;
+    }
+
+    return arena.performStrictFirstFit(quantum_aligned_len);
 }
 
 fn findBestFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag {
@@ -507,6 +509,23 @@ fn findBestFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag 
 }
 
 fn findFirstFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag {
+    if (arena.performStrictFirstFit(quantum_aligned_len)) |tag| return tag;
+    return arena.performStrictInstantFit(quantum_aligned_len);
+}
+
+/// Find a free tag in any freelist that is guaranteed to satisfy the requested size.
+fn performStrictInstantFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag {
+    const index = arena.indexOfNonEmptyFreelistInstantFit(quantum_aligned_len) orelse {
+        @branchHint(.unlikely);
+        return null;
+    };
+    const tag = arena.popFromFreelist(index) orelse unreachable;
+    std.debug.assert(tag.kind == .free);
+    return tag;
+}
+
+/// Search for the first fit tag in the freelist containing the requested size.
+fn performStrictFirstFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag {
     var opt_node: ?*KindNode = arena.freelists[indexOfFreelistContainingLen(quantum_aligned_len)].first;
 
     while (opt_node) |node| : (opt_node = node.next) {
@@ -518,7 +537,7 @@ fn findFirstFit(arena: *ResourceArena, quantum_aligned_len: usize) ?*BoundaryTag
         }
     }
 
-    return arena.findInstantFit(quantum_aligned_len);
+    return null;
 }
 
 /// Attempt to import a block of length `len` from the arena's source.
