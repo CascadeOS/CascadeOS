@@ -57,8 +57,14 @@ pub const allocator = std.mem.Allocator{
             ) bool {
                 std.debug.assert(new_len != 0);
 
-                if (new_len <= buf.len) return true;
-                if (new_len <= globals.heap_arena.quantum) return true;
+                const quantum_aligned_len = std.mem.alignForward(
+                    usize,
+                    buf.len,
+                    heap_arena_quantum,
+                );
+
+                if (new_len < quantum_aligned_len) return true;
+
                 return false;
             }
         }.resize,
@@ -69,6 +75,8 @@ pub const allocator = std.mem.Allocator{
                 _: u8,
                 _: usize,
             ) void {
+                // we have to use `deallocateBase` here because the true length of the allocation in `alloc` is not
+                // returned to the caller due to the Allocator API
                 globals.heap_arena.deallocateBase(kernel.Task.getCurrent(), @intFromPtr(buf.ptr));
             }
         }.free,
@@ -118,6 +126,8 @@ fn heapArenaRelease(
     arena.deallocate(current_task, allocation);
 }
 
+const heap_arena_quantum: usize = 16;
+
 const globals = struct {
     /// An arena managing the heap's virtual address space.
     ///
@@ -144,7 +154,7 @@ pub const init = struct {
 
         try globals.heap_arena.create(
             "heap",
-            kernel.arch.paging.standard_page_size.value,
+            heap_arena_quantum,
             .{
                 .source = .{
                     .arena = &globals.heap_address_space_arena,
