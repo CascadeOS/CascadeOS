@@ -286,7 +286,7 @@ const hack = struct {
 };
 
 comptime {
-    _ = &uacpi; // ensure kernel api is exported
+    _ = @import("uacpi_kernel_api.zig"); // ensure kernel api is exported
 }
 
 const std = @import("std");
