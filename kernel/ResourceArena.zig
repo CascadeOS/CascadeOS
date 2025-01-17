@@ -70,11 +70,20 @@ pub const Source = struct {
         allocation: Allocation,
     ) void = deallocate,
 
-    inline fn callImport(source: *const Source, current_task: *kernel.Task, len: usize, policy: Policy) AllocateError!Allocation {
+    fn callImport(
+        source: *const Source,
+        current_task: *kernel.Task,
+        len: usize,
+        policy: Policy,
+    ) callconv(core.inline_in_non_debug) AllocateError!Allocation {
         return source.import(source.arena, current_task, len, policy);
     }
 
-    inline fn callRelease(source: *const Source, current_task: *kernel.Task, allocation: Allocation) void {
+    fn callRelease(
+        source: *const Source,
+        current_task: *kernel.Task,
+        allocation: Allocation,
+    ) callconv(core.inline_in_non_debug) void {
         source.release(source.arena, current_task, allocation);
     }
 };
