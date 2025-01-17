@@ -444,10 +444,11 @@ pub const init = struct {
                 .buses = undefined, // set below
             };
 
-            init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {}", .{
+            init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {}", .{
                 ecam.segment_group,
                 ecam.start_bus,
                 ecam.end_bus,
+                base_allocation.base_address,
             });
 
             ecam.buses = try kernel.heap.allocator.alloc(PciBus, @as(usize, ecam.end_bus) - ecam.start_bus + 1);
