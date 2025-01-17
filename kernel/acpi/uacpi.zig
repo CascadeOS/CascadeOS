@@ -964,8 +964,9 @@ pub const Node = opaque {
         size: u32,
         _value: [*:0]const u8,
 
-        pub fn value(self: *const IdString) [:0]const u8 {
-            return std.mem.sliceTo(self._value, 0);
+        pub fn value(self: *const IdString) ?[:0]const u8 {
+            if (self.size == 0) return null;
+            return self._value[0 .. self.size - 1 :0];
         }
 
         pub fn deinit(self: *const IdString) void {
