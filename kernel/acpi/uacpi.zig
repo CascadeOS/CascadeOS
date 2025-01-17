@@ -1241,7 +1241,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTyped` with `Object.TypeBits.buffer`|`Object.TypeBits.string`.
     ///
-    /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
+    /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data.
     pub fn evalBufferOrString(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1265,7 +1265,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTypedSimple` with `Object.TypeBits.buffer`|`Object.TypeBits.string`.
     ///
-    /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data. // TODO
+    /// Use `Object.getStringOrBuffer` to retrieve the resulting buffer data.
     pub fn evalBufferOrStringSimple(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1284,7 +1284,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTyped` with `Object.TypeBits.string`.
     ///
-    /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
+    /// Use `Object.getString` to retrieve the resulting buffer data.
     pub fn evalString(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1308,7 +1308,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTypedSimple` with `Object.TypeBits.string`.
     ///
-    /// Use `Object.getString` to retrieve the resulting buffer data. // TODO
+    /// Use `Object.getString` to retrieve the resulting buffer data.
     pub fn evalStringSimple(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1327,7 +1327,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTyped` with `Object.TypeBits.buffer`.
     ///
-    /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
+    /// Use `Object.getBuffer` to retrieve the resulting buffer data.
     pub fn evalBuffer(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1351,7 +1351,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTypedSimple` with `Object.TypeBits.buffer`.
     ///
-    /// Use `Object.getBuffer` to retrieve the resulting buffer data. // TODO
+    /// Use `Object.getBuffer` to retrieve the resulting buffer data.
     pub fn evalBufferSimple(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1370,7 +1370,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTyped` with `Object.TypeBits.package`.
     ///
-    /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
+    /// Use `Object.getPackage` to retrieve the resulting object array.
     pub fn evalPackage(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1394,7 +1394,7 @@ pub const Node = opaque {
 
     /// A shorthand for `evalTypedSimple` with `Object.TypeBits.package`.
     ///
-    /// Use `Object.getPackage` to retrieve the resulting object array. // TODO
+    /// Use `Object.getPackage` to retrieve the resulting object array.
     pub fn evalPackageSimple(
         parent_node: *Node,
         path: ?[:0]const u8,
@@ -1480,11 +1480,6 @@ pub const Node = opaque {
         return event_info;
     }
 
-    pub const GPETriggering = enum(c_uacpi.uacpi_gpe_triggering) {
-        level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
-        edge = c_uacpi.UACPI_GPE_TRIGGERING_EDGE,
-    };
-
     pub fn GPEHandler(comptime UserContextT: type) type {
         return fn (
             gpe_device: *Node,
@@ -1503,7 +1498,7 @@ pub const Node = opaque {
     pub fn installGPEHandler(
         gpe_device: ?*Node,
         index: u16,
-        triggering: GPETriggering,
+        triggering: Triggering,
         comptime UserContextT: type,
         handler: GPEHandler(UserContextT),
         user_context: ?*UserContextT,
@@ -1748,6 +1743,64 @@ pub const Node = opaque {
         ));
         try ret.toError();
     }
+
+    pub fn getCurrentResources(device: *const Node) !?*Resources {
+        var resources: *Resources = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_current_resources(
+            @ptrCast(@constCast(device)),
+            @ptrCast(&resources),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return resources;
+    }
+
+    pub fn getPossibleResources(device: *const Node) !?*Resources {
+        var resources: *Resources = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_possible_resources(
+            @ptrCast(@constCast(device)),
+            @ptrCast(&resources),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return resources;
+    }
+
+    pub fn setResources(device: *Node, resources: *const Resources) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_resources(
+            @ptrCast(device),
+            @ptrCast(@constCast(resources)),
+        ));
+
+        try ret.toError();
+    }
+
+    pub fn ResourceIterationCallback(comptime UserContextT: type) type {
+        return fn (
+            resource: *const Resource,
+            user_context: ?*UserContextT,
+        ) IterationDecision;
+    }
+
+    pub fn forEachDeviceResource(
+        device: *const Node,
+        method: [:0]const u8,
+        comptime UserContextT: type,
+        callback: ResourceIterationCallback(UserContextT),
+        user_context: ?*UserContextT,
+    ) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_for_each_device_resource(
+            @ptrCast(@constCast(device)),
+            method.ptr,
+            makeResourceIterationCallbackWrapper(UserContextT, callback),
+            user_context,
+        ));
+        try ret.toError();
+    }
 };
 
 pub const Object = opaque {
@@ -1780,7 +1833,7 @@ pub const Object = opaque {
 
     /// Create an uninitialized object.
     ///
-    /// The object can be further overwritten via uacpi_object_assign_* to anything. // TODO: correct
+    /// The object can be further overwritten via `Object.assign*` to anything.
     pub fn createUninitialized() error{OutOfMemory}!*Object {
         return @ptrCast(c_uacpi.uacpi_object_create_uninitialized() orelse return error.OutOfMemory);
     }
@@ -2313,6 +2366,879 @@ pub const Table = extern struct {
     }
 };
 
+pub const Resources = extern struct {
+    length: usize,
+    entries: [*]const Resource,
+
+    pub fn deinit(self: *const Resources) void {
+        c_uacpi.uacpi_free_resources(@ptrCast(@constCast(self)));
+    }
+
+    // uacpi_for_each_resource not implemented as below iterator is superior
+
+    pub fn iterate(self: *const Resources) Iterator {
+        return .{
+            .data = @ptrCast(self.entries),
+        };
+    }
+
+    pub const Iterator = struct {
+        data: [*]const u8,
+
+        pub fn next(self: *Iterator) ?*const Resource {
+            const current: *const Resource = @ptrCast(@alignCast(self.data));
+
+            if (current.type == .end_tag) return null;
+
+            self.data += current.length;
+
+            return current;
+        }
+    };
+
+    comptime {
+        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resources));
+    }
+};
+
+pub const Resource = extern struct {
+    type: Type,
+    length: u32,
+
+    data: Data,
+
+    pub const Type = enum(c_uacpi.uacpi_resource_type) {
+        irq = c_uacpi.UACPI_RESOURCE_TYPE_IRQ,
+        extended_irq = c_uacpi.UACPI_RESOURCE_TYPE_EXTENDED_IRQ,
+
+        dma = c_uacpi.UACPI_RESOURCE_TYPE_DMA,
+        fixed_dma = c_uacpi.UACPI_RESOURCE_TYPE_FIXED_DMA,
+
+        io = c_uacpi.UACPI_RESOURCE_TYPE_IO,
+        fixed_io = c_uacpi.UACPI_RESOURCE_TYPE_FIXED_IO,
+
+        address16 = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS16,
+        address32 = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS32,
+        address64 = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS64,
+        address64_extended = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS64_EXTENDED,
+
+        memory24 = c_uacpi.UACPI_RESOURCE_TYPE_MEMORY24,
+        memory32 = c_uacpi.UACPI_RESOURCE_TYPE_MEMORY32,
+        fixed_memory32 = c_uacpi.UACPI_RESOURCE_TYPE_FIXED_MEMORY32,
+
+        start_dependent = c_uacpi.UACPI_RESOURCE_TYPE_START_DEPENDENT,
+
+        // internal to the C API
+        // end_dependent = c_uacpi.UACPI_RESOURCE_TYPE_END_DEPENDENT,
+
+        // Up to 7 bytes - called vendor_small in the C API
+        vendor = c_uacpi.UACPI_RESOURCE_TYPE_VENDOR_SMALL,
+
+        // Up to 2^16 - 1 bytes - called vendor_large in the C API
+        vendor_typed = c_uacpi.UACPI_RESOURCE_TYPE_VENDOR_LARGE,
+
+        generic_register = c_uacpi.UACPI_RESOURCE_TYPE_GENERIC_REGISTER,
+        gpio_connection = c_uacpi.UACPI_RESOURCE_TYPE_GPIO_CONNECTION,
+
+        // These must always be contiguous in this order
+        i2c_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_I2C_CONNECTION,
+        spi_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_SPI_CONNECTION,
+        uart_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_UART_CONNECTION,
+        csi2_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_CSI2_CONNECTION,
+
+        pin_function = c_uacpi.UACPI_RESOURCE_TYPE_PIN_FUNCTION,
+        pin_configuration = c_uacpi.UACPI_RESOURCE_TYPE_PIN_CONFIGURATION,
+        pin_group = c_uacpi.UACPI_RESOURCE_TYPE_PIN_GROUP,
+        pin_group_function = c_uacpi.UACPI_RESOURCE_TYPE_PIN_GROUP_FUNCTION,
+        pin_group_configuration = c_uacpi.UACPI_RESOURCE_TYPE_PIN_GROUP_CONFIGURATION,
+
+        clock_input = c_uacpi.UACPI_RESOURCE_TYPE_CLOCK_INPUT,
+
+        end_tag = c_uacpi.UACPI_RESOURCE_TYPE_END_TAG,
+    };
+
+    pub const Data = extern union {
+        irq: Irq,
+        extended_irq: ExtendedIrq,
+        dma: Dma,
+        fixed_dma: FixedDma,
+        io: Io,
+        fixed_io: FixedIo,
+        address16: Address16,
+        address32: Address32,
+        address64: Address64,
+        address64_extended: Address64Extended,
+        memory24: Memory24,
+        memory32: Memory32,
+        fixed_memory32: FixedMemory32,
+        start_dependent: StartDependent,
+        vendor: Vendor,
+        vendor_typed: VendorTyped,
+        generic_register: GenericRegister,
+        gpio_connection: GpioConnection,
+        i2c_connection: I2cConnection,
+        spi_connection: SpiConnection,
+        uart_connection: UartConnection,
+        csi2_connection: Csi2Connection,
+        pin_function: PinFunction,
+        pin_configuration: PinConfiguration,
+        pin_group: PinGroup,
+        pin_group_function: PinGroupFunction,
+        pin_group_configuration: PinGroupConfiguration,
+        clock_input: ClockInput,
+    };
+
+    pub const Irq = extern struct {
+        length_kind: LengthKind,
+        triggering: Triggering,
+        polarity: Polarity,
+        sharing: Sharing,
+        wake_capability: WakeCapability,
+        num_irqs: u8,
+        _irqs: u8,
+
+        pub fn irqs(self: *const Irq) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&self._irqs);
+            return ptr[0..self.num_irqs];
+        }
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_irq) + @sizeOf(u8));
+        }
+    };
+
+    pub const ExtendedIrq = extern struct {
+        direction: Direction,
+        triggering: Triggering,
+        polarity: Polarity,
+        sharing: Sharing,
+        wake_capability: WakeCapability,
+        num_irqs: u8,
+        source: Source,
+        _irqs: u32,
+
+        pub fn irqs(self: *const ExtendedIrq) []const u32 {
+            const ptr: [*]const u32 = @ptrCast(&self._irqs);
+            return ptr[0..self.num_irqs];
+        }
+
+        comptime {
+            // `u64` due to the alignment forced by the `source` field
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_extended_irq) + @sizeOf(u64));
+        }
+    };
+
+    pub const Dma = extern struct {
+        transfer_type: TransferType,
+        bus_master_status: BusMasterStatus,
+        channel_speed: ChannelSpeed,
+        num_channels: u8,
+        _channels: u8,
+
+        pub fn channels(self: *const Dma) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&self._channels);
+            return ptr[0..self.num_channels];
+        }
+
+        pub const TransferType = enum(u8) {
+            @"8_bit" = c_uacpi.UACPI_TRANSFER_TYPE_8_BIT,
+            @"8_and_16_bit" = c_uacpi.UACPI_TRANSFER_TYPE_8_AND_16_BIT,
+            @"16_bit" = c_uacpi.UACPI_TRANSFER_TYPE_16_BIT,
+        };
+
+        pub const BusMasterStatus = packed struct(u8) {
+            bus_master: bool, // c_uacpi.UACPI_BUS_MASTER
+
+            _reserved: u7,
+        };
+
+        pub const ChannelSpeed = enum(u8) {
+            compatibility = c_uacpi.UACPI_DMA_COMPATIBILITY,
+            a = c_uacpi.UACPI_DMA_TYPE_A,
+            b = c_uacpi.UACPI_DMA_TYPE_B,
+            f = c_uacpi.UACPI_DMA_TYPE_F,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_dma) + @sizeOf(u8));
+        }
+    };
+
+    pub const FixedDma = extern struct {
+        request_line: u16,
+        channel: u16,
+        transfer_width: TransferWidth,
+
+        pub const TransferWidth = enum(u8) {
+            @"8" = c_uacpi.UACPI_TRANSFER_WIDTH_8,
+            @"16" = c_uacpi.UACPI_TRANSFER_WIDTH_16,
+            @"32" = c_uacpi.UACPI_TRANSFER_WIDTH_32,
+            @"64" = c_uacpi.UACPI_TRANSFER_WIDTH_64,
+            @"128" = c_uacpi.UACPI_TRANSFER_WIDTH_128,
+            @"256" = c_uacpi.UACPI_TRANSFER_WIDTH_256,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_fixed_dma));
+        }
+    };
+
+    pub const Io = extern struct {
+        decode_type: DecodeType,
+        minimum: u16,
+        maximum: u16,
+        alignment: u8,
+        length: u8,
+
+        pub const DecodeType = enum(u8) {
+            @"16" = c_uacpi.UACPI_DECODE_16,
+            @"10" = c_uacpi.UACPI_DECODE_10,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_io));
+        }
+    };
+
+    pub const FixedIo = extern struct {
+        address: u16,
+        length: u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_fixed_io));
+        }
+    };
+
+    pub const Address16 = extern struct {
+        common: AddressCommon,
+        granularity: u16,
+        minimum: u16,
+        maximum: u16,
+        translation_offset: u16,
+        address_length: u16,
+        source: Source,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address16));
+        }
+    };
+
+    pub const Address32 = extern struct {
+        common: AddressCommon,
+        granularity: u32,
+        minimum: u32,
+        maximum: u32,
+        translation_offset: u32,
+        address_length: u32,
+        source: Source,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address32));
+        }
+    };
+
+    pub const Address64 = extern struct {
+        common: AddressCommon,
+        granularity: u64,
+        minimum: u64,
+        maximum: u64,
+        translation_offset: u64,
+        address_length: u64,
+        source: Source,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address64));
+        }
+    };
+
+    pub const Address64Extended = extern struct {
+        common: AddressCommon,
+        revision_id: u8,
+        granularity: u64,
+        minimum: u64,
+        maximum: u64,
+        translation_offset: u64,
+        address_length: u64,
+        attributes: u64,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address64_extended));
+        }
+    };
+
+    pub const Memory24 = extern struct {
+        write_status: WriteStatus,
+        minimum: u16,
+        maximum: u16,
+        alignment: u16,
+        length: u16,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_memory24));
+        }
+    };
+
+    pub const Memory32 = extern struct {
+        write_status: WriteStatus,
+        minimum: u32,
+        maximum: u32,
+        alignment: u32,
+        length: u32,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_memory32));
+        }
+    };
+
+    pub const FixedMemory32 = extern struct {
+        write_status: WriteStatus,
+        address: u32,
+        length: u32,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_fixed_memory32));
+        }
+    };
+
+    pub const StartDependent = extern struct {
+        length_kind: LengthKind,
+        compatibility: CompatibilityPerformance,
+        performance: CompatibilityPerformance,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_start_dependent));
+        }
+    };
+
+    pub const Vendor = extern struct {
+        length: u8,
+        _data: u8,
+
+        pub fn data(self: *const Vendor) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&self._data);
+            return ptr[0..self.length];
+        }
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_vendor) + @sizeOf(u8));
+        }
+    };
+
+    pub const VendorTyped = extern struct {
+        length: u16,
+        sub_type: u8,
+        uuid: [16]u8,
+        _data: u8,
+
+        pub fn data(self: *const VendorTyped) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&self._data);
+            return ptr[0..self.length];
+        }
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_vendor_typed));
+        }
+    };
+
+    pub const GenericRegister = extern struct {
+        address_space_id: u8,
+        bit_width: u8,
+        bit_offset: u8,
+        access_size: u8,
+        address: u64,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_generic_register));
+        }
+    };
+
+    pub const GpioConnection = extern struct {
+        revision_id: u8,
+        type: GpioType,
+        direction: Direction,
+        data: GpioData,
+        pull_configuration: PullConfiguration,
+        drive_strength: u16,
+        debounce_timeout: u16,
+        vendor_data_length: u16,
+        pin_table_length: u16,
+        source: Source,
+        pin_table: [*]const u16,
+        vendor_data: [*]const u8,
+
+        pub const GpioData = extern union {
+            interrupt: InterruptConnectionFlags,
+            io: IoConnectionFlags,
+            type_specific: u16,
+        };
+
+        pub const GpioType = enum(u8) {
+            interrupt = c_uacpi.UACPI_GPIO_CONNECTION_INTERRUPT,
+            io = c_uacpi.UACPI_GPIO_CONNECTION_IO,
+        };
+
+        pub const InterruptConnectionFlags = extern struct {
+            triggering: Triggering,
+            polarity: Polarity,
+            sharing: Sharing,
+            wake_capability: WakeCapability,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_interrupt_connection_flags));
+            }
+        };
+
+        pub const IoConnectionFlags = extern struct {
+            restriction: Restriction,
+            sharing: Sharing,
+
+            pub const Restriction = enum(u8) {
+                none = c_uacpi.UACPI_IO_RESTRICTION_NONE,
+                input = c_uacpi.UACPI_IO_RESTRICTION_INPUT,
+                output = c_uacpi.UACPI_IO_RESTRICTION_OUTPUT,
+                none_preserve = c_uacpi.UACPI_IO_RESTRICTION_NONE_PRESERVE,
+            };
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_io_connection_flags));
+            }
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_gpio_connection));
+        }
+    };
+
+    pub const I2cConnection = extern struct {
+        common: SerialBusCommon,
+        addressing_mode: AddressingMode,
+        slave_address: u16,
+        connection_speed: u32,
+
+        pub const AddressingMode = enum(u8) {
+            @"7bit" = c_uacpi.UACPI_I2C_7BIT,
+            @"10bit" = c_uacpi.UACPI_I2C_10BIT,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_i2c_connection));
+        }
+    };
+
+    pub const SpiConnection = extern struct {
+        common: SerialBusCommon,
+        wire_mode: WireMode,
+        device_polarity: DevicePolarity,
+        data_bit_length: u8,
+        phase: Phase,
+        polarity: SpiPolarity,
+        device_selection: u16,
+        connection_speed: u32,
+
+        pub const WireMode = enum(u8) {
+            @"4" = c_uacpi.UACPI_SPI_4_WIRES,
+            @"3" = c_uacpi.UACPI_SPI_3_WIRES,
+        };
+
+        pub const DevicePolarity = enum(u8) {
+            active_low = c_uacpi.UACPI_SPI_ACTIVE_LOW,
+            active_high = c_uacpi.UACPI_SPI_ACTIVE_HIGH,
+        };
+
+        pub const Phase = enum(u8) {
+            first = c_uacpi.UACPI_SPI_PHASE_FIRST,
+            second = 1, // FIXME: https://github.com/uACPI/uACPI/issues/112 c_uacpi.UACPI_SPI_PHASE_SECOND,
+        };
+
+        pub const SpiPolarity = enum(u8) {
+            start_low = c_uacpi.UACPI_SPI_START_LOW,
+            start_high = c_uacpi.UACPI_SPI_START_HIGH,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_spi_connection));
+        }
+    };
+
+    pub const UartConnection = extern struct {
+        common: SerialBusCommon,
+        stop_bits: StopBits,
+        data_bits: DataBits,
+        endianness: Endianness,
+        parity: Parity,
+        lines_enabled: LinesEnabled,
+        flow_control: FlowControl,
+        baud_rate: u32,
+        rx_fifo: u16,
+        tx_fifo: u16,
+
+        pub const StopBits = enum(u8) {
+            none = c_uacpi.UACPI_UART_STOP_BITS_NONE,
+            @"1" = c_uacpi.UACPI_UART_STOP_BITS_1,
+            @"1_5" = c_uacpi.UACPI_UART_STOP_BITS_1_5,
+            @"2" = c_uacpi.UACPI_UART_STOP_BITS_2,
+        };
+
+        pub const DataBits = enum(u8) {
+            @"5" = c_uacpi.UACPI_UART_DATA_5BITS,
+            @"6" = c_uacpi.UACPI_UART_DATA_6BITS,
+            @"7" = c_uacpi.UACPI_UART_DATA_7BITS,
+            @"8" = c_uacpi.UACPI_UART_DATA_8BITS,
+            @"9" = c_uacpi.UACPI_UART_DATA_9BITS,
+        };
+
+        pub const Endianness = enum(u8) {
+            little = c_uacpi.UACPI_UART_LITTLE_ENDIAN,
+            big = c_uacpi.UACPI_UART_BIG_ENDIAN,
+        };
+
+        pub const Parity = enum(u8) {
+            none = c_uacpi.UACPI_UART_PARITY_NONE,
+            even = c_uacpi.UACPI_UART_PARITY_EVEN,
+            odd = c_uacpi.UACPI_UART_PARITY_ODD,
+            mark = c_uacpi.UACPI_UART_PARITY_MARK,
+            space = c_uacpi.UACPI_UART_PARITY_SPACE,
+        };
+
+        pub const LinesEnabled = packed struct(u8) {
+            _reserved: u2,
+            data_carrier_detect: bool,
+            ring_indicator: bool,
+            data_set_ready: bool,
+            data_terminal_ready: bool,
+            clear_to_send: bool,
+            request_to_send: bool,
+        };
+
+        pub const FlowControl = enum(u8) {
+            none = c_uacpi.UACPI_UART_FLOW_CONTROL_NONE,
+            hardware = c_uacpi.UACPI_UART_FLOW_CONTROL_HW,
+            xon_xoff = c_uacpi.UACPI_UART_FLOW_CONTROL_XON_XOFF,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_uart_connection));
+        }
+    };
+
+    pub const Csi2Connection = extern struct {
+        common: SerialBusCommon,
+        phy_type: PhyType,
+        local_port: u8,
+
+        pub const PhyType = enum(u8) {
+            c = c_uacpi.UACPI_CSI2_PHY_C,
+            d = c_uacpi.UACPI_CSI2_PHY_D,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_csi2_connection));
+        }
+    };
+
+    pub const PinFunction = extern struct {
+        revision_id: u8,
+        sharing: Sharing,
+        pull_configuration: PullConfiguration,
+        function_number: u16,
+        pin_table_length: u16,
+        vendor_data_length: u16,
+        source: Source,
+        pin_table: [*]const u16,
+        vendor_data: [*]const u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_function));
+        }
+    };
+
+    pub const PinConfiguration = extern struct {
+        revision_id: u8,
+        sharing: Sharing,
+        direction: Direction,
+        type: PinConfigurationType,
+        value: u32,
+        pin_table_length: u16,
+        vendor_data_length: u16,
+        source: Source,
+        pin_table: [*]const u16,
+        vendor_data: [*]const u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_configuration));
+        }
+    };
+
+    pub const PullConfiguration = enum(u8) {
+        default = c_uacpi.UACPI_PIN_CONFIG_DEFAULT,
+        pull_up = c_uacpi.UACPI_PIN_CONFIG_PULL_UP,
+        pull_down = c_uacpi.UACPI_PIN_CONFIG_PULL_DOWN,
+        no_pull = c_uacpi.UACPI_PIN_CONFIG_NO_PULL,
+    };
+
+    pub const PinGroup = extern struct {
+        revision_id: u8,
+        direction: Direction,
+        pin_table_length: u16,
+        vendor_data_length: u16,
+        label: Label,
+        pin_table: [*]const u16,
+        vendor_data: [*]const u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_group));
+        }
+    };
+
+    pub const PinGroupFunction = extern struct {
+        revision_id: u8,
+        sharing: Sharing,
+        direction: Direction,
+        function: u16,
+        vendor_data_length: u16,
+        source: Source,
+        label: Label,
+        vendor_data: [*]const u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_group_function));
+        }
+    };
+
+    pub const PinGroupConfiguration = extern struct {
+        revision_id: u8,
+        sharing: Sharing,
+        direction: Direction,
+        type: PinConfigurationType,
+        value: u32,
+        vendor_data_length: u16,
+        source: Source,
+        label: Label,
+        vendor_data: [*]const u8,
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_group_configuration));
+        }
+    };
+
+    pub const PinConfigurationType = enum(u8) {
+        default = c_uacpi.UACPI_PIN_CONFIG_DEFAULT,
+        bias_pull_up = c_uacpi.UACPI_PIN_CONFIG_BIAS_PULL_UP,
+        bias_pull_down = c_uacpi.UACPI_PIN_CONFIG_BIAS_PULL_DOWN,
+        bias_default = c_uacpi.UACPI_PIN_CONFIG_BIAS_DEFAULT,
+        bias_disable = c_uacpi.UACPI_PIN_CONFIG_BIAS_DISABLE,
+        bias_high_impedance = c_uacpi.UACPI_PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
+        bias_bus_hold = c_uacpi.UACPI_PIN_CONFIG_BIAS_BUS_HOLD,
+        drive_open_drain = c_uacpi.UACPI_PIN_CONFIG_DRIVE_OPEN_DRAIN,
+        drive_open_source = c_uacpi.UACPI_PIN_CONFIG_DRIVE_OPEN_SOURCE,
+        drive_push_pull = c_uacpi.UACPI_PIN_CONFIG_DRIVE_PUSH_PULL,
+        drive_strength = c_uacpi.UACPI_PIN_CONFIG_DRIVE_STRENGTH,
+        slew_rate = c_uacpi.UACPI_PIN_CONFIG_SLEW_RATE,
+        input_debounce = c_uacpi.UACPI_PIN_CONFIG_INPUT_DEBOUNCE,
+        input_schmitt_trigger = c_uacpi.UACPI_PIN_CONFIG_INPUT_SCHMITT_TRIGGER,
+    };
+
+    pub const ClockInput = extern struct {
+        revision_id: u8,
+        frequency: Frequency,
+        scale: Scale,
+        divisor: u16,
+        numerator: u32,
+        source: Source,
+
+        pub const Scale = enum(u8) {
+            hz = c_uacpi.UACPI_SCALE_HZ,
+            khz = c_uacpi.UACPI_SCALE_KHZ,
+            mhz = c_uacpi.UACPI_SCALE_MHZ,
+        };
+
+        pub const Frequency = enum(u8) {
+            fixed = c_uacpi.UACPI_FREQUENCY_FIXED,
+            variable = c_uacpi.UACPI_FREQUENCY_VARIABLE,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_clock_input));
+        }
+    };
+
+    pub const SerialBusCommon = extern struct {
+        revision_id: u8,
+        type: u8,
+        mode: Mode,
+        direction: Direction,
+        sharing: Sharing,
+        type_revision_id: u8,
+        type_data_length: u16,
+        vendor_data_length: u16,
+        source: Source,
+        vendor_data: [*]const u8,
+
+        pub const Mode = enum(u8) {
+            controller_initiated = c_uacpi.UACPI_MODE_CONTROLLER_INITIATED,
+            device_initiated = c_uacpi.UACPI_MODE_DEVICE_INITIATED,
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_serial_bus_common));
+        }
+    };
+
+    pub const CompatibilityPerformance = enum(u8) {
+        good = c_uacpi.UACPI_GOOD,
+        acceptable = c_uacpi.UACPI_ACCEPTABLE,
+        sub_optimal = c_uacpi.UACPI_SUB_OPTIMAL,
+    };
+
+    pub const AddressCommon = extern struct {
+        address_attribute: AddressAttribute,
+        type: AddressType,
+        direction: Direction,
+        decode_type: DecodeType,
+        fixed_min_address: FixedAddress,
+        fixed_max_address: FixedAddress,
+
+        pub const FixedAddress = enum(u8) {
+            not_fixed = c_uacpi.UACPI_ADDRESS_NOT_FIXED,
+            fixed = c_uacpi.UACPI_ADDRESS_FIXED,
+        };
+
+        pub const AddressType = enum(u8) {
+            memory = c_uacpi.UACPI_RANGE_MEMORY,
+            io = c_uacpi.UACPI_RANGE_IO,
+            bus = c_uacpi.UACPI_RANGE_BUS,
+        };
+
+        pub const DecodeType = enum(u8) {
+            positive = c_uacpi.UACPI_POISITIVE_DECODE,
+            subtractive = c_uacpi.UACPI_SUBTRACTIVE_DECODE,
+        };
+
+        pub const AddressAttribute = extern union {
+            memory: MemoryAttribute,
+            io: IoAttribute,
+            type_specific: u8,
+
+            pub const MemoryAttribute = extern struct {
+                write_status: WriteStatus,
+                caching: Caching,
+                range_type: RangeType,
+                translation: Translation,
+
+                pub const Caching = enum(u8) {
+                    non_cacheable = c_uacpi.UACPI_NON_CACHEABLE,
+                    cacheable = c_uacpi.UACPI_CACHEABLE,
+                    write_combining = c_uacpi.UACPI_CACHEABLE_WRITE_COMBINING,
+                    prefetchable = c_uacpi.UACPI_PREFETCHABLE,
+                };
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_memory_attribute));
+                }
+            };
+
+            pub const IoAttribute = extern struct {
+                range_type: RangeType,
+                translation: Translation,
+                translation_type: TranslationType,
+
+                pub const TranslationType = enum(u8) {
+                    dense = c_uacpi.UACPI_TRANSLATION_DENSE,
+                    sparse = c_uacpi.UACPI_TRANSLATION_SPARSE,
+                };
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_io_attribute));
+                }
+            };
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_address_attribute));
+            }
+        };
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address_common));
+        }
+    };
+
+    pub const LengthKind = enum(u8) {
+        dont_care = c_uacpi.UACPI_RESOURCE_LENGTH_KIND_DONT_CARE,
+        one_less = c_uacpi.UACPI_RESOURCE_LENGTH_KIND_ONE_LESS,
+        full = c_uacpi.UACPI_RESOURCE_LENGTH_KIND_FULL,
+    };
+
+    pub const Direction = enum(u8) {
+        producer = c_uacpi.UACPI_PRODUCER,
+        consumer = c_uacpi.UACPI_CONSUMER,
+    };
+
+    pub const Polarity = enum(u8) {
+        high = c_uacpi.UACPI_POLARITY_ACTIVE_HIGH,
+        low = c_uacpi.UACPI_POLARITY_ACTIVE_LOW,
+        both = c_uacpi.UACPI_POLARITY_ACTIVE_BOTH,
+    };
+
+    pub const Sharing = enum(u8) {
+        exclusive = c_uacpi.UACPI_EXCLUSIVE,
+        shared = c_uacpi.UACPI_SHARED,
+    };
+
+    pub const WakeCapability = enum(u8) {
+        capable = c_uacpi.UACPI_WAKE_CAPABLE,
+        not_capable = c_uacpi.UACPI_NOT_WAKE_CAPABLE,
+    };
+
+    pub const Source = extern struct {
+        index: u8,
+        index_present: bool,
+        length: u16,
+        _str: [*:0]const u8,
+
+        pub fn str(self: Source) []const u8 {
+            return std.mem.sliceTo(self._str, 0);
+        }
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_source));
+        }
+    };
+
+    pub const WriteStatus = enum(u8) {
+        non_writable = c_uacpi.UACPI_NON_WRITABLE,
+        writable = c_uacpi.UACPI_WRITABLE,
+    };
+
+    pub const RangeType = enum(u8) {
+        memory = c_uacpi.UACPI_RANGE_TYPE_MEMORY,
+        reserved = c_uacpi.UACPI_RANGE_TYPE_RESERVED,
+        acpi = c_uacpi.UACPI_RANGE_TYPE_ACPI,
+        nvs = c_uacpi.UACPI_RANGE_TYPE_NVS,
+    };
+
+    pub const Translation = enum(u8) {
+        translation = c_uacpi.UACPI_IO_MEM_TRANSLATION,
+        static = c_uacpi.UACPI_IO_MEM_STATIC,
+    };
+
+    pub const Label = extern struct {
+        length: u16,
+        _string: [*]const u8,
+
+        pub fn string(self: *const Label) []const u8 {
+            return self._string[0..self.length];
+        }
+
+        comptime {
+            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_label));
+        }
+    };
+
+    comptime {
+        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource));
+    }
+};
+
 pub const ByteWidth = enum(u8) {
     one = 1,
     two = 2,
@@ -2349,6 +3275,16 @@ pub const Timeout = enum(u16) {
     infinite = 0xFFFF,
 
     _,
+};
+
+pub const Triggering = enum(u8) {
+    level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
+    edge = c_uacpi.UACPI_GPE_TRIGGERING_EDGE,
+
+    comptime {
+        std.debug.assert(c_uacpi.UACPI_GPE_TRIGGERING_LEVEL == c_uacpi.UACPI_TRIGGERING_LEVEL);
+        std.debug.assert(c_uacpi.UACPI_GPE_TRIGGERING_EDGE == c_uacpi.UACPI_TRIGGERING_EDGE);
+    }
 };
 
 pub const Status = enum(c_uacpi.uacpi_status) {
@@ -2450,7 +3386,6 @@ pub const Error = error{
     Overriden,
     Denied,
 
-    // TODO: are these possible from most functions?
     AMLUndefinedReference,
     AMLInvalidNamestring,
     AMLObjectAlreadyExists,
@@ -2547,6 +3482,17 @@ inline fn makeIterationCallbackWrapper(
     }.callbackWrapper);
 }
 
+inline fn makeResourceIterationCallbackWrapper(
+    comptime UserContextT: type,
+    callback: Node.ResourceIterationCallback(UserContextT),
+) c_uacpi.uacpi_resource_iteration_callback {
+    return comptime @ptrCast(&struct {
+        fn callbackWrapper(user_ctx: ?*anyopaque, resource: *const Resource) callconv(.C) Node.IterationDecision {
+            return callback(resource, @ptrCast(user_ctx));
+        }
+    }.callbackWrapper);
+}
+
 inline fn makeNotifyHandlerWrapper(
     comptime UserContextT: type,
     handler: Node.NotifyHandler(UserContextT),
@@ -2626,9 +3572,6 @@ comptime {
     std.debug.assert(@sizeOf(core.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
     std.debug.assert(@sizeOf(acpi.Address) == @sizeOf(c_uacpi.acpi_gas));
     std.debug.assert(@intFromPtr(c_uacpi.UACPI_THREAD_ID_NONE) == @intFromEnum(kernel.Task.Id.none));
-}
-
-comptime {
 }
 
 const std = @import("std");
