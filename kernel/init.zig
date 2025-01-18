@@ -180,6 +180,8 @@ fn createExecutors() ![]kernel.Executor {
     const executors = try kernel.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
     var i: u32 = 0;
+    var task_id: u32 = 1; // `1` as `0` is the bootstrap task
+
     while (descriptors.next()) |desc| : (i += 1) {
         if (i == 0) std.debug.assert(desc.processorId() == 0);
 
@@ -189,11 +191,12 @@ fn createExecutors() ![]kernel.Executor {
         const init_task = &init_tasks[i];
 
         init_task.* = .{
-            .id = @enumFromInt(i + 1), // `+ 1` as `0` is the bootstrap task
+            .id = @enumFromInt(task_id),
             ._name = .{}, // set below
             .state = .{ .running = executor },
             .stack = try kernel.Stack.createStack(current_task),
         };
+        task_id += 1;
 
         try init_task._name.writer().print("init {}", .{i});
 
@@ -201,7 +204,17 @@ fn createExecutors() ![]kernel.Executor {
             .id = id,
             .arch = undefined, // set by `arch.init.prepareExecutor`
             .current_task = init_task,
+            .idle_task = .{
+                .id = @enumFromInt(task_id),
+                ._name = .{}, // set below
+                .state = .ready,
+                .stack = try kernel.Stack.createStack(current_task),
+                .is_idle_task = true,
+            },
         };
+        task_id += 1;
+
+        try executor.idle_task._name.writer().print("idle {}", .{i});
 
         kernel.arch.init.prepareExecutor(executor, current_task);
     }
