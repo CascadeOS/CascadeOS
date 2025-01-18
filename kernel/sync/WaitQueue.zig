@@ -13,9 +13,14 @@ pub fn wakeOne(self: *WaitQueue, current_task: *kernel.Task) void {
 
     const task_to_wake_node = self.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
-    _ = task_to_wake;
 
-    core.panic("IMPLEMENT SCHEDULER", null);
+    std.debug.assert(task_to_wake.state == .blocked);
+    task_to_wake.state = .ready;
+
+    kernel.scheduler.lockScheduler(current_task);
+    defer kernel.scheduler.unlockScheduler(current_task);
+
+    kernel.scheduler.queueTask(current_task, task_to_wake);
 }
 
 /// Add the current task to the wait queue.
@@ -33,7 +38,10 @@ pub fn wait(
 
     self.waiting_tasks.push(&current_task.next_task_node);
 
-    core.panic("IMPLEMENT SCHEDULER", null);
+    kernel.scheduler.lockScheduler(current_task);
+    defer kernel.scheduler.unlockScheduler(current_task);
+
+    kernel.scheduler.block(current_task, spinlock);
 }
 
 const core = @import("core");

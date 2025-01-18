@@ -96,7 +96,7 @@ pub fn decrementPreemptionDisable(self: *Task) void {
     std.debug.assert(previous > 0);
 
     if (previous == 1 and self.preemption_skipped.load(.monotonic)) {
-        core.panic("PRE-EMPTION NOT IMPLEMEMENTED", null);
+        kernel.scheduler.maybePreempt(self);
     }
 }
 

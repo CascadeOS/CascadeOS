@@ -166,9 +166,11 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     Barrier.executorReady();
     Barrier.waitForAll();
 
-    if (true) core.panic("NOT IMPLEMENTED", null);
-
+    _ = kernel.scheduler.lockScheduler(current_task);
     current_task.decrementInterruptDisable();
+
+    kernel.scheduler.yield(current_task, .drop);
+    core.panic("scheduler returned to init", null);
 }
 
 fn createExecutors() ![]kernel.Executor {

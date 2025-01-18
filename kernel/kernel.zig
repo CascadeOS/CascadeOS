@@ -11,6 +11,7 @@ pub const heap = @import("heap.zig");
 pub const pci = @import("pci.zig");
 pub const pmm = @import("pmm.zig");
 pub const ResourceArena = @import("ResourceArena.zig");
+pub const scheduler = @import("scheduler.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");

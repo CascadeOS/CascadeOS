@@ -20,16 +20,15 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
 
             return;
         };
-        std.debug.assert(locked_by == current_task); // recursive lock
+        std.debug.assert(locked_by != current_task); // recursive lock
 
         mutex.wait_queue.wait(current_task, &mutex.spinlock);
-
-        continue;
     }
 }
 
 pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     mutex.spinlock.lock(current_task);
+
     std.debug.assert(mutex.locked_by == current_task);
 
     mutex.locked_by = null;
