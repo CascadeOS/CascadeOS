@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2024 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/1d636a34152dc82833c89175b702f2c0671f04e3/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI.
+//! Provides a nice zig API wrapping uACPI (765059be191db143c2ee31504915014117cd61c8).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
 //! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
@@ -2848,7 +2848,7 @@ pub const Resource = extern struct {
 
         pub const Phase = enum(u8) {
             first = c_uacpi.UACPI_SPI_PHASE_FIRST,
-            second = 1, // FIXME: https://github.com/uACPI/uACPI/issues/112 c_uacpi.UACPI_SPI_PHASE_SECOND,
+            second = c_uacpi.UACPI_SPI_PHASE_SECOND,
         };
 
         pub const SpiPolarity = enum(u8) {
