@@ -57,15 +57,24 @@ pub const allocator = std.mem.Allocator{
             ) bool {
                 std.debug.assert(new_len != 0);
 
-                const quantum_aligned_len = std.mem.alignForward(
+                // the current `ResourceArena` implementation does support arbitrary shrinking of allocations, but
+                // once we add quantum caches it no longer would be possible to peform resizes that change the
+                // quantum aligned length of the allocation
+
+                // TODO: due to how unlikely this is to actually hit maybe we should just return false?
+
+                const old_quantum_aligned_len = std.mem.alignForward(
                     usize,
                     buf.len,
                     heap_arena_quantum,
                 );
+                const new_quantum_aligned_len = std.mem.alignForward(
+                    usize,
+                    new_len,
+                    heap_arena_quantum,
+                );
 
-                if (new_len < quantum_aligned_len) return true;
-
-                return false;
+                return new_quantum_aligned_len == old_quantum_aligned_len;
             }
         }.resize,
         .free = struct {
