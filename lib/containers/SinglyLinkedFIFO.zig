@@ -26,10 +26,13 @@ pub fn isEmpty(self: *const SinglyLinkedFIFO) bool {
 ///
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedFIFO, node: *SingleNode) void {
+    std.debug.assert(node.next == null);
+
     if (self.end_node) |end| {
         std.debug.assert(self.start_node != null);
-        end.* = .{ .next = node };
+        end.next = node;
     } else {
+        node.* = .empty;
         self.start_node = node;
     }
 

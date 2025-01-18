@@ -42,6 +42,7 @@ pub fn deallocatePage(range: core.PhysicalRange) void {
 
     const page_node = kernel.vmm.directMapFromPhysical(range.address)
         .toPtr(*containers.SingleNode);
+    page_node.* = .empty;
     globals.free_pages.push(page_node);
 
     _ = globals.free_memory.fetchAdd(kernel.arch.paging.standard_page_size.value, .release);
@@ -123,9 +124,9 @@ pub const init = struct {
                     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) : ({
                         current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
                     }) {
-                        globals.free_pages.push(
-                            current_virtual_address.toPtr(*containers.SingleNode),
-                        );
+                        const node = current_virtual_address.toPtr(*containers.SingleNode);
+                        node.* = .empty;
+                        globals.free_pages.push(node);
                     }
                 },
                 .in_use => {},

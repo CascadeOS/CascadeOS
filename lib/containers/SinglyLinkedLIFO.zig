@@ -22,6 +22,8 @@ pub fn isEmpty(self: *const SinglyLinkedLIFO) bool {
 ///
 /// This operation is O(1).
 pub fn push(self: *SinglyLinkedLIFO, node: *SingleNode) void {
+    std.debug.assert(node.next == null);
+
     node.* = .{ .next = self.start_node };
     self.start_node = node;
 }
