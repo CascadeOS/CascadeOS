@@ -53,8 +53,8 @@ pub fn callOneArgs(
 
     var stack = new_stack;
 
-    try stack.push(core.VirtualAddress, .fromPtr(@ptrCast(target_function)));
-    try stack.push(@TypeOf(arg1), arg1);
+    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(arg1);
 
     if (opt_old_task) |old_task| {
         impls.callOneArgs(
