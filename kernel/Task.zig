@@ -26,8 +26,6 @@ preemption_skipped: std.atomic.Value(bool) = .init(false),
 /// Used for various linked lists.
 next_task_node: containers.SingleNode = .empty,
 
-is_idle_task: bool,
-
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();
 }

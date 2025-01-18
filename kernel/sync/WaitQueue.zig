@@ -26,7 +26,6 @@ pub fn wait(
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
-    std.debug.assert(!current_task.is_idle_task); // block during idle
     std.debug.assert(current_task.interrupt_disable_count.load(.monotonic) != 0);
 
     const executor = current_task.state.running;

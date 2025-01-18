@@ -23,7 +23,6 @@ pub fn initStage1() !noreturn {
         .state = undefined, // set after declaration of `bootstrap_executor`
         .stack = undefined, // never used
         .interrupt_disable_count = .init(1), // interrupts are enabled by default
-        .is_idle_task = false,
     };
 
     var bootstrap_executor: kernel.Executor = .{
@@ -193,7 +192,6 @@ fn createExecutors() ![]kernel.Executor {
             ._name = .{}, // set below
             .state = .{ .running = executor },
             .stack = try kernel.Stack.createStack(current_task),
-            .is_idle_task = false,
             .interrupt_disable_count = .init(1), // interrupts start disabled
         };
 
