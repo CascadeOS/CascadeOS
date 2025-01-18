@@ -413,6 +413,14 @@ pub const init = struct {
         current.init.initializeInterrupts();
     }
 
+    /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
+    /// system interrupt handlers.
+    pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
+        checkSupport(current.init, "loadStandardInterruptHandlers", fn () void);
+
+        current.init.loadStandardInterruptHandlers();
+    }
+
     /// Capture any system information that can be without using mmio.
     ///
     /// For example, on x64 this should capture CPUID but not APIC or ACPI information.

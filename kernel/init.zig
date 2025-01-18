@@ -146,6 +146,9 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     if (executor.id == .bootstrap) {
         Barrier.waitForOthers();
 
+        log.debug("loading standard interrupt handlers", .{});
+        kernel.arch.init.loadStandardInterruptHandlers();
+
         log.debug("initializing PCI ECAM", .{});
         try kernel.pci.init.initializeECAM();
 

@@ -80,6 +80,7 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 }
 
 pub const initializeInterrupts = x64.interrupts.init.initializeInterrupts;
+pub const loadStandardInterruptHandlers = x64.interrupts.init.loadStandardInterruptHandlers;
 
 /// Capture any system information that can be without using mmio.
 ///

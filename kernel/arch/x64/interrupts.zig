@@ -276,8 +276,8 @@ pub const InterruptStackSelector = enum(u3) {
 
 const Handler = struct {
     interrupt_handler: InterruptHandler,
-    context1: ?*anyopaque,
-    context2: ?*anyopaque,
+    context1: ?*anyopaque = null,
+    context2: ?*anyopaque = null,
 
     inline fn call(self: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
         self.interrupt_handler(current_task, interrupt_frame, self.context1, self.context2);
@@ -305,16 +305,12 @@ pub const init = struct {
         for (0..49) |i| {
             globals.handlers[i] = .{
                 .interrupt_handler = temporaryHandler,
-                .context1 = null,
-                .context2 = null,
             };
         }
 
         // map spurious interrupts to the temporary handler
         globals.handlers[255] = .{
             .interrupt_handler = temporaryHandler,
-            .context1 = null,
-            .context2 = null,
         };
 
         globals.idt.handlers[@intFromEnum(Interrupt.double_fault)]
@@ -322,6 +318,11 @@ pub const init = struct {
 
         globals.idt.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)]
             .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
+    }
+
+    /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
+    /// system interrupt handlers.
+    pub fn loadStandardInterruptHandlers() void {
     }
 
     pub fn loadIdt() void {
