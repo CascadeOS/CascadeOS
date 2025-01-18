@@ -305,6 +305,97 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
+    /// Prepares the executor for jumping to the idle state.
+    pub fn prepareForJumpToIdleFromTask(
+        executor: *kernel.Executor,
+        old_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "prepareForJumpToIdleFromTask", fn (
+            *kernel.Executor,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToIdleFromTask(executor, old_task);
+    }
+
+    /// Prepares the executor for jumping to the given task from the idle state.
+    pub fn prepareForJumpToTaskFromIdle(
+        executor: *kernel.Executor,
+        new_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "prepareForJumpToTaskFromIdle", fn (
+            *kernel.Executor,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
+    }
+
+    /// Jumps to the given task from the idle state.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
+    pub fn jumpToTaskFromIdle(
+        task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) noreturn {
+        checkSupport(current.scheduling, "jumpToTaskFromIdle", fn (*kernel.Task) noreturn);
+
+        current.scheduling.jumpToTaskFromIdle(task);
+    }
+
+    /// Prepares the executor for jumping from `old_task` to `new_task`.
+    pub fn prepareForJumpToTaskFromTask(
+        executor: *kernel.Executor,
+        old_task: *kernel.Task,
+        new_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "prepareForJumpToTaskFromTask", fn (
+            *kernel.Executor,
+            *kernel.Task,
+            *kernel.Task,
+        ) void);
+
+        current.scheduling.prepareForJumpToTaskFromTask(executor, old_task, new_task);
+    }
+
+    /// Jumps from `old_task` to `new_task`.
+    ///
+    /// Saves the old task's state to allow it to be resumed later.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+    pub fn jumpToTaskFromTask(
+        old_task: *kernel.Task,
+        new_task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.scheduling, "jumpToTaskFromTask", fn (*kernel.Task, *kernel.Task) void);
+
+        current.scheduling.jumpToTaskFromTask(old_task, new_task);
+    }
+
+    pub const NewTaskFunction = *const fn (
+        current_task: *kernel.Task,
+        arg: u64,
+    ) noreturn;
+
+    /// Prepares the given task for being scheduled.
+    ///
+    /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
+    /// the given `arg`.
+    pub fn prepareNewTaskForScheduling(
+        task: *kernel.Task,
+        arg: u64,
+        target_function: NewTaskFunction,
+    ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
+        checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
+            *kernel.Task,
+            u64,
+            NewTaskFunction,
+        ) error{StackOverflow}!void);
+
+        return current.scheduling.prepareNewTaskForScheduling(task, arg, target_function);
+    }
+
     pub const CallError = error{StackOverflow};
 
     /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
@@ -322,6 +413,25 @@ pub const scheduling = struct {
         ) CallError!void);
 
         try current.scheduling.callOneArgs(opt_old_task, new_stack, arg1, target_function);
+    }
+
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+    pub fn callTwoArgs(
+        opt_old_task: ?*kernel.Task,
+        new_stack: kernel.Stack,
+        arg1: anytype,
+        arg2: anytype,
+        target_function: *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
+    ) callconv(core.inline_in_non_debug) CallError!void {
+        checkSupport(current.scheduling, "callTwoArgs", fn (
+            ?*kernel.Task,
+            kernel.Stack,
+            *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
+            @TypeOf(arg1),
+            @TypeOf(arg2),
+        ) CallError!void);
+
+        try current.scheduling.callTwoArgs(opt_old_task, new_stack, arg1, arg2, target_function);
     }
 };
 
