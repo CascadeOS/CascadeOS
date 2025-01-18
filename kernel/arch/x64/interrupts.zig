@@ -323,6 +323,9 @@ pub const init = struct {
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
     pub fn loadStandardInterruptHandlers() void {
+        globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
+            .interrupt_handler = perExecutorPeriodicHandler,
+        };
     }
 
     pub fn loadIdt() void {
@@ -418,6 +421,11 @@ pub const init = struct {
     // temporary handler for all exceptions and internally handled interrupts
     fn temporaryHandler(_: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
         core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
+    }
+
+    fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
+        x64.apic.eoi();
+        kernel.entry.onPerExecutorPeriodic(current_task);
     }
 };
 

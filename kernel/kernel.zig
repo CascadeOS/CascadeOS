@@ -6,6 +6,7 @@ pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug/debug.zig");
+pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");
 pub const heap = @import("heap.zig");
 pub const pci = @import("pci.zig");
