@@ -13,7 +13,7 @@ state: State,
 stack: kernel.Stack,
 
 /// Tracks the depth of nested interrupt disables.
-interrupt_disable_count: std.atomic.Value(u32),
+interrupt_disable_count: std.atomic.Value(u32) = .init(1), // fresh tasks start with interrupts disabled
 
 /// Tracks the depth of nested preemption disables.
 preemption_disable_count: std.atomic.Value(u32) = .init(0),
@@ -25,6 +25,8 @@ preemption_skipped: std.atomic.Value(bool) = .init(false),
 
 /// Used for various linked lists.
 next_task_node: containers.SingleNode = .empty,
+
+is_idle_task: bool = false,
 
 pub fn name(self: *const Task) []const u8 {
     return self._name.constSlice();

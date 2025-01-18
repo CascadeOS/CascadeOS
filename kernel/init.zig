@@ -29,6 +29,7 @@ pub fn initStage1() !noreturn {
         .id = .bootstrap,
         .current_task = &bootstrap_init_task,
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+        .idle_task = undefined, // never used
     };
 
     bootstrap_init_task.state = .{ .running = &bootstrap_executor };
@@ -192,7 +193,6 @@ fn createExecutors() ![]kernel.Executor {
             ._name = .{}, // set below
             .state = .{ .running = executor },
             .stack = try kernel.Stack.createStack(current_task),
-            .interrupt_disable_count = .init(1), // interrupts start disabled
         };
 
         try init_task._name.writer().print("init {}", .{i});
