@@ -252,92 +252,77 @@ fn addSpanInner(
     std.debug.assert(span_tag.kind == .span or span_tag.kind == .imported_span);
     std.debug.assert(free_tag.kind == .free);
 
-    const span_previous_kind_node, const span_next_kind_node =
-        try arena.findSpanInsertionPointInSpansList(span_tag.base, span_tag.len);
+    const opt_previous_span = try arena.findSpanListPreviousSpan(span_tag.base, span_tag.len);
 
     errdefer comptime unreachable;
 
-    const span_previous_all_tag_node, const span_next_all_tag_node =
-        findSpanAllTagInsertionPoint(span_previous_kind_node, span_next_kind_node);
+    const previous_all_tag_node = findSpanAllTagInsertionPoint(opt_previous_span);
 
     // insert the new span into the list of spans
-    arena.spans.insertBetween(
+    arena.spans.insertAfter(
         &span_tag.kind_node,
-        span_previous_kind_node,
-        span_next_kind_node,
+        if (opt_previous_span) |previous_span| &previous_span.kind_node else null,
+    );
+
+    // insert the new span tag into the list of all tags
+    arena.all_tags.insertAfter(
+        &span_tag.all_tag_node,
+        previous_all_tag_node,
+    );
+
+    // insert the new free tag into the list of all tags (after the span tag)
+    arena.all_tags.insertAfter(
+        &free_tag.all_tag_node,
+        &span_tag.all_tag_node,
     );
 
     // insert the new free tag into the appropriate freelist
     if (add_free_span_to_freelist) {
         arena.pushToFreelist(free_tag);
     }
-
-    // insert the new span tag into the list of all tags
-    arena.all_tags.insertBetween(
-        &span_tag.all_tag_node,
-        span_previous_all_tag_node,
-        span_next_all_tag_node,
-    );
-
-    // insert the new free tag into the list of all tags (after the span tag)
-    arena.all_tags.insertBetween(
-        &free_tag.all_tag_node,
-        &span_tag.all_tag_node,
-        span_next_all_tag_node,
-    );
 }
 
-fn findSpanInsertionPointInSpansList(
+fn findSpanListPreviousSpan(
     arena: *const ResourceArena,
     base: usize,
     len: usize,
-) error{Overlap}!struct { ?*KindNode, ?*KindNode } {
-    var opt_previous_kind_node: ?*KindNode = null;
-    var opt_next_kind_node: ?*KindNode = arena.spans.first;
+) error{Overlap}!?*BoundaryTag {
+    const end = base + len - 1;
 
-    while (opt_next_kind_node) |next_kind_node| {
-        const next_span = next_kind_node.toTag();
+    var opt_next_span_kind_node: ?*KindNode = arena.spans.first;
+
+    var candidate_previous_span: ?*BoundaryTag = null;
+
+    while (opt_next_span_kind_node) |next_span_kind_node| : ({
+        opt_next_span_kind_node = next_span_kind_node.next;
+    }) {
+        const next_span = next_span_kind_node.toTag();
         std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
 
-        if (next_span.base > base) {
-            if (next_span.base < base + len) return error.Overlap;
-            break;
-        }
+        if (next_span.base > end) break;
 
-        opt_previous_kind_node = next_kind_node;
-        opt_next_kind_node = next_kind_node.next;
+        const next_span_end = next_span.base + next_span.len - 1;
+
+        if (next_span_end >= base) return error.Overlap;
+
+        candidate_previous_span = next_span;
     }
 
-    if (opt_previous_kind_node) |previous_kind_node| {
-        const previous_span = previous_kind_node.toTag();
-        std.debug.assert(previous_span.kind == .span or previous_span.kind == .imported_span);
-
-        if (previous_span.base + previous_span.len > base) return error.Overlap;
-    }
-
-    return .{
-        opt_previous_kind_node,
-        opt_next_kind_node,
-    };
+    return candidate_previous_span;
 }
 
 fn findSpanAllTagInsertionPoint(
-    opt_previous_kind_node: ?*KindNode,
-    opt_next_kind_node: ?*KindNode,
-) struct { ?*AllTagNode, ?*AllTagNode } {
-    if (opt_next_kind_node) |next_kind_node| {
-        const next_span = next_kind_node.toTag();
-        std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
-
-        return .{
-            next_span.all_tag_node.previous,
-            &next_span.all_tag_node,
-        };
-    }
-
-    if (opt_previous_kind_node) |previous_kind_node| {
-        const previous_span = previous_kind_node.toTag();
+    opt_previous_span: ?*BoundaryTag,
+) ?*AllTagNode {
+    if (opt_previous_span) |previous_span| {
         std.debug.assert(previous_span.kind == .span or previous_span.kind == .imported_span);
+
+        if (previous_span.kind_node.next) |next_span_kind_node| {
+            const next_span = next_span_kind_node.toTag();
+            std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
+
+            return next_span.all_tag_node.previous;
+        }
 
         var opt_candidate_node: ?*AllTagNode = &previous_span.all_tag_node;
 
@@ -347,10 +332,10 @@ fn findSpanAllTagInsertionPoint(
             opt_candidate_node = next;
         }
 
-        return .{ opt_candidate_node, null };
+        return opt_candidate_node;
     }
 
-    return .{ null, null };
+    return null;
 }
 
 pub const Policy = enum {
@@ -603,10 +588,9 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
 
     tag.len = allocation_len;
 
-    arena.all_tags.insertBetween(
+    arena.all_tags.insertAfter(
         &new_tag.all_tag_node,
         &tag.all_tag_node,
-        tag.all_tag_node.next,
     );
 
     arena.pushToFreelist(new_tag);
@@ -662,6 +646,7 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
     coalesce_previous_tag: {
         const previous_node = tag.all_tag_node.previous orelse
             unreachable; // a free tag will always have atleast its containing spans tag before it
+
         const previous_tag = previous_node.toTag();
 
         if (previous_tag.kind != .free) break :coalesce_previous_tag;
@@ -1071,14 +1056,21 @@ const SingleLinkedList = struct {
     const empty: SingleLinkedList = .{ .first = null };
 
     fn push(self: *SingleLinkedList, node: *AllTagNode) void {
+        std.debug.assert(node.previous == null and node.next == null);
+
         node.* = .{ .next = self.first, .previous = null };
+
         self.first = node;
     }
 
     fn pop(self: *SingleLinkedList) ?*AllTagNode {
         const node = self.first orelse return null;
+        std.debug.assert(node.previous == null);
+
         self.first = node.next;
+
         node.* = .empty;
+
         return node;
     }
 };
@@ -1094,11 +1086,14 @@ fn DoubleLinkedList(comptime Node: type) type {
 
         /// Push a node to the front of the list.
         fn push(self: *Self, node: *Node) void {
+            std.debug.assert(node.previous == null and node.next == null);
+
             const opt_first = self.first;
 
             node.next = opt_first;
 
             if (opt_first) |first| {
+                std.debug.assert(first.previous == null);
                 first.previous = node;
             }
 
@@ -1109,8 +1104,16 @@ fn DoubleLinkedList(comptime Node: type) type {
         /// Pop a node from the front of the list.
         fn pop(self: *Self) ?*Node {
             const first = self.first orelse return null;
+            std.debug.assert(first.previous == null);
 
-            self.first = first.next;
+            const opt_next = first.next;
+
+            if (opt_next) |next| {
+                std.debug.assert(next.previous == first);
+                next.previous = null;
+            }
+
+            self.first = opt_next;
 
             first.* = .empty;
 
@@ -1120,36 +1123,40 @@ fn DoubleLinkedList(comptime Node: type) type {
         /// Removes a node from the list.
         fn remove(self: *Self, node: *Node) void {
             if (node.previous) |previous| {
+                std.debug.assert(previous.next == node);
                 previous.next = node.next;
             } else {
                 self.first = node.next;
             }
 
             if (node.next) |next| {
+                std.debug.assert(next.previous == node);
                 next.previous = node.previous;
             }
 
             node.* = .empty;
         }
 
-        /// Inserts a node between two nodes in the list.
-        fn insertBetween(self: *Self, node: *Node, opt_previous: ?*Node, opt_next: ?*Node) void {
-            std.debug.assert(node.previous == null);
-            std.debug.assert(node.next == null);
-
-            node.previous = opt_previous;
-            node.next = opt_next;
+        pub fn insertAfter(self: *Self, node: *Node, opt_previous: ?*Node) void {
+            std.debug.assert(node.previous == null and node.next == null);
 
             if (opt_previous) |previous| {
-                std.debug.assert(previous.next == opt_next);
-                previous.next = node;
-            } else {
-                self.first = node;
-            }
+                if (previous.next) |next| {
+                    std.debug.assert(next.previous == previous);
+                    next.previous = node;
+                    node.next = next;
+                }
 
-            if (opt_next) |next| {
-                std.debug.assert(next.previous == opt_previous);
-                next.previous = node;
+                previous.next = node;
+                node.previous = previous;
+            } else {
+                if (self.first) |first| {
+                    std.debug.assert(first.previous == null);
+                    first.previous = node;
+                    node.next = first;
+                }
+
+                self.first = node;
             }
         }
 
@@ -1170,7 +1177,7 @@ const AtomicSingleLinkedList = struct {
     }
 
     fn push(self: *AtomicSingleLinkedList, node: *AllTagNode) void {
-        node.previous = null;
+        std.debug.assert(node.previous == null and node.next == null);
 
         var opt_first = self.first.load(.monotonic);
 
@@ -1204,6 +1211,7 @@ const AtomicSingleLinkedList = struct {
                 opt_first = new_value;
                 continue;
             }
+            std.debug.assert(first.previous == null);
 
             first.* = .empty;
 
