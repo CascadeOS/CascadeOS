@@ -8,23 +8,35 @@ pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 pub const eoi = x64.apic.eoi;
 
 pub fn allocateInterrupt(
+    current_task: *kernel.Task,
     interrupt_handler: InterruptHandler,
     context1: ?*anyopaque,
     context2: ?*anyopaque,
 ) !Interrupt {
-    for (&globals.handlers, 0..) |*handler, i| {
-        if (handler.* != null) continue;
+    const allocation = try globals.interrupt_arena.allocate(current_task, 1, .instant_fit);
 
-        handler.* = .{
-            .interrupt_handler = interrupt_handler,
-            .context1 = context1,
-            .context2 = context2,
-        };
+    const interrupt_number: u8 = @intCast(allocation.base);
 
-        return @enumFromInt(i);
-    }
+    globals.handlers[interrupt_number] = .{
+        .interrupt_handler = interrupt_handler,
+        .context1 = context1,
+        .context2 = context2,
+    };
 
-    return error.OutOfInterrupts;
+    return @enumFromInt(interrupt_number);
+}
+
+pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) void {
+    const interrupt_number = @intFromEnum(interrupt);
+
+    globals.interrupt_arena.deallocate(current_task, .{
+        .base = interrupt_number,
+        .len = 1,
+    });
+
+    globals.handlers[interrupt_number] = .{
+        .interrupt_handler = interrupt_handlers.unhandledInterrupt,
+    };
 }
 
 pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {
@@ -34,12 +46,7 @@ pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) void {
     const current_task, const restorer = kernel.Task.onInterruptEntry();
     defer restorer.exit(current_task);
-
-    const handler = globals.handlers[interrupt_frame.vector_number.full] orelse {
-        core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
-    };
-
-    handler.call(current_task, interrupt_frame);
+    globals.handlers[interrupt_frame.vector_number.full].call(current_task, interrupt_frame);
 }
 
 pub const Interrupt = enum(u8) {
@@ -98,6 +105,9 @@ pub const Interrupt = enum(u8) {
     spurious_interrupt = 255,
 
     _,
+
+    const first_available_interrupt = @intFromEnum(Interrupt.per_executor_periodic) + 1;
+    const last_available_interrupt = @intFromEnum(Interrupt.spurious_interrupt) - 1;
 
     pub inline fn toInterruptVector(self: Interrupt) lib_x64.InterruptVector {
         return @enumFromInt(@intFromEnum(self));
@@ -287,12 +297,15 @@ const Handler = struct {
 const globals = struct {
     var idt: Idt = .{};
     const raw_interrupt_handlers = init.makeRawHandlers();
-    var handlers: [Idt.number_of_handlers]?Handler = @splat(null);
+    var handlers: [Idt.number_of_handlers]Handler = @splat(.{ .interrupt_handler = interrupt_handlers.unhandledInterrupt });
+    var interrupt_arena: kernel.ResourceArena = undefined; // initialized by `init.initializeInterrupts`
 };
 
 pub const init = struct {
-    /// Ensure that any exceptions/faults that occur are handled.
-    pub fn initializeInterrupts() void {
+    /// Ensure that any exceptions/faults that occur during early initialization are handled.
+    ///
+    /// The handler is not expected to do anything other than panic.
+    pub fn initializeEarlyInterrupts() void {
         for (globals.raw_interrupt_handlers, 0..) |raw_handler, i| {
             globals.idt.handlers[i].init(
                 .kernel_code,
@@ -301,18 +314,6 @@ pub const init = struct {
             );
         }
 
-        // map all exceptions and internally handled interrupts to the temporary handler
-        for (0..49) |i| {
-            globals.handlers[i] = .{
-                .interrupt_handler = temporaryHandler,
-            };
-        }
-
-        // map spurious interrupts to the temporary handler
-        globals.handlers[255] = .{
-            .interrupt_handler = temporaryHandler,
-        };
-
         globals.idt.handlers[@intFromEnum(Interrupt.double_fault)]
             .setStack(@intFromEnum(InterruptStackSelector.double_fault));
 
@@ -320,11 +321,22 @@ pub const init = struct {
             .setStack(@intFromEnum(InterruptStackSelector.non_maskable_interrupt));
     }
 
+    /// Prepare interrupt allocation and routing.
+    pub fn initializeInterrupts(current_task: *kernel.Task) !void {
+        try globals.interrupt_arena.create("interrupts", 1, .{});
+
+        try globals.interrupt_arena.addSpan(
+            current_task,
+            Interrupt.first_available_interrupt,
+            Interrupt.last_available_interrupt - Interrupt.first_available_interrupt,
+        );
+    }
+
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
     pub fn loadStandardInterruptHandlers() void {
         globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
-            .interrupt_handler = perExecutorPeriodicHandler,
+            .interrupt_handler = interrupt_handlers.perExecutorPeriodicHandler,
         };
     }
 
@@ -417,23 +429,14 @@ pub const init = struct {
             return raw_handlers_temp;
         }
     }
-
-    // temporary handler for all exceptions and internally handled interrupts
-    fn temporaryHandler(_: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
-        core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
-    }
-
-    fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
-        x64.apic.eoi();
-        kernel.entry.onPerExecutorPeriodic(current_task);
-    }
 };
 
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
+const x64 = @import("../x64.zig");
 const lib_x64 = @import("x64");
 const Idt = lib_x64.Idt;
 const Gdt = lib_x64.Gdt;
 const InterruptHandler = kernel.arch.interrupts.InterruptHandler;
+const interrupt_handlers = @import("handlers.zig");

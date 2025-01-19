@@ -67,6 +67,7 @@ pub const interrupts = struct {
     }
 
     pub fn allocateInterrupt(
+        current_task: *kernel.Task,
         handler: InterruptHandler,
         context1: ?*anyopaque,
         context2: ?*anyopaque,
@@ -74,16 +75,16 @@ pub const interrupts = struct {
         checkSupport(
             current.interrupts,
             "allocateInterrupt",
-            fn (InterruptHandler, ?*anyopaque, ?*anyopaque) anyerror!Interrupt,
+            fn (*kernel.Task, InterruptHandler, ?*anyopaque, ?*anyopaque) anyerror!Interrupt,
         );
 
-        return current.interrupts.allocateInterrupt(handler, context1, context2);
+        return current.interrupts.allocateInterrupt(current_task, handler, context1, context2);
     }
 
-    pub fn deallocateInterrupt(interrupt: Interrupt) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.interrupts, "deallocateInterrupt", fn (Interrupt) void);
+    pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.interrupts, "deallocateInterrupt", fn (*kernel.Task, Interrupt) void);
 
-        current.interrupts.deallocateInterrupt(interrupt);
+        current.interrupts.deallocateInterrupt(current_task, interrupt);
     }
 
     pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) callconv(core.inline_in_non_debug) !void {
@@ -116,6 +117,32 @@ pub const interrupts = struct {
 
         current.interrupts.eoi();
     }
+
+    pub const init = struct {
+        /// Ensure that any exceptions/faults that occur during early initialization are handled.
+        ///
+        /// The handler is not expected to do anything other than panic.
+        pub fn initializeEarlyInterrupts() callconv(core.inline_in_non_debug) void {
+            checkSupport(current.interrupts.init, "initializeEarlyInterrupts", fn () void);
+
+            current.interrupts.init.initializeEarlyInterrupts();
+        }
+
+        /// Prepare interrupt allocation and routing.
+        pub fn initializeInterrupts(current_task: *kernel.Task) callconv(core.inline_in_non_debug) !void {
+            checkSupport(current.interrupts.init, "initializeInterrupts", fn (*kernel.Task) anyerror!void);
+
+            try current.interrupts.init.initializeInterrupts(current_task);
+        }
+
+        /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
+        /// system interrupt handlers.
+        pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
+            checkSupport(current.interrupts.init, "loadStandardInterruptHandlers", fn () void);
+
+            current.interrupts.init.loadStandardInterruptHandlers();
+        }
+    };
 };
 
 pub const paging = struct {
@@ -514,21 +541,6 @@ pub const init = struct {
         checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);
 
         current.init.loadExecutor(executor);
-    }
-
-    /// Ensure that any exceptions/faults that occur are handled.
-    pub fn initializeInterrupts() callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "initializeInterrupts", fn () void);
-
-        current.init.initializeInterrupts();
-    }
-
-    /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
-    /// system interrupt handlers.
-    pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "loadStandardInterruptHandlers", fn () void);
-
-        current.init.loadStandardInterruptHandlers();
     }
 
     /// Capture any system information that can be without using mmio.

@@ -79,9 +79,6 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
     lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
 
-pub const initializeInterrupts = x64.interrupts.init.initializeInterrupts;
-pub const loadStandardInterruptHandlers = x64.interrupts.init.loadStandardInterruptHandlers;
-
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.

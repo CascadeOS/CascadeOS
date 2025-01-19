@@ -11,6 +11,8 @@ pub const Interrupt = enum(u8) {
 };
 pub const InterruptFrame = extern struct {};
 
+pub const init = struct {};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

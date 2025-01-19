@@ -325,7 +325,10 @@ export fn uacpi_kernel_install_interrupt_handler(
         }
     }.HandlerWrapper;
 
+    const current_task = kernel.Task.getCurrent();
+
     const interrupt = kernel.arch.interrupts.allocateInterrupt(
+        current_task,
         HandlerWrapper,
         @constCast(handler),
         ctx,
@@ -335,7 +338,7 @@ export fn uacpi_kernel_install_interrupt_handler(
     };
 
     kernel.arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
-        kernel.arch.interrupts.deallocateInterrupt(interrupt);
+        kernel.arch.interrupts.deallocateInterrupt(current_task, interrupt);
 
         log.err("failed to route interrupt: {}", .{err});
         return .internal_error;
@@ -354,7 +357,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
     irq_handle: *anyopaque,
 ) uacpi.Status {
     const interrupt: kernel.arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
-    kernel.arch.interrupts.deallocateInterrupt(interrupt);
+    kernel.arch.interrupts.deallocateInterrupt(kernel.Task.getCurrent(), interrupt);
 
     return .ok;
 }

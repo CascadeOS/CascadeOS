@@ -40,8 +40,8 @@ pub fn initStage1() !noreturn {
     kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
     kernel.arch.init.loadExecutor(&bootstrap_executor);
 
-    log.debug("initializing interrupts", .{});
-    kernel.arch.init.initializeInterrupts();
+    log.debug("initializing early interrupts", .{});
+    kernel.arch.interrupts.init.initializeEarlyInterrupts();
 
     log.debug("capturing early system information", .{});
     try kernel.arch.init.captureEarlySystemInformation();
@@ -81,6 +81,9 @@ pub fn initStage1() !noreturn {
 
     log.debug("initializing kernel stacks", .{});
     try kernel.Stack.init.initializeStacks();
+
+    log.debug("initializing interrupts", .{});
+    try kernel.arch.interrupts.init.initializeInterrupts(&bootstrap_init_task);
 
     log.debug("initializing kernel executors", .{});
     kernel.executors = try createExecutors();
@@ -147,7 +150,7 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
         Barrier.waitForOthers();
 
         log.debug("loading standard interrupt handlers", .{});
-        kernel.arch.init.loadStandardInterruptHandlers();
+        kernel.arch.interrupts.init.loadStandardInterruptHandlers();
 
         log.debug("initializing PCI ECAM", .{});
         try kernel.pci.init.initializeECAM();
