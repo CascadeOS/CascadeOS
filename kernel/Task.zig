@@ -23,6 +23,8 @@ preemption_disable_count: std.atomic.Value(u32) = .init(0),
 /// When we re-enable preemption, we check this flag.
 preemption_skipped: std.atomic.Value(bool) = .init(false),
 
+spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked
+
 /// Used for various linked lists.
 next_task_node: containers.SingleNode = .empty,
 

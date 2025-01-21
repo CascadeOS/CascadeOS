@@ -23,6 +23,7 @@ pub fn initStage1() !noreturn {
         .state = undefined, // set after declaration of `bootstrap_executor`
         .stack = undefined, // never used
         .interrupt_disable_count = .init(1), // interrupts are enabled by default
+        .spinlocks_held = 0, // init tasks don't start with the scheduler locked
     };
 
     var bootstrap_executor: kernel.Executor = .{
@@ -203,6 +204,7 @@ fn createExecutors() ![]kernel.Executor {
             ._name = .{}, // set below
             .state = .{ .running = executor },
             .stack = try kernel.Stack.createStack(current_task),
+            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
         };
         task_id += 1;
 

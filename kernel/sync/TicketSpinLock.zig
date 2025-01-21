@@ -11,50 +11,52 @@ poisoned: std.atomic.Value(bool) = .init(false),
 
 /// Locks the spinlock.
 pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
-    current_task.incrementInterruptDisable();
-    current_task.incrementPreemptionDisable();
-
-    const executor = current_task.state.running;
-    std.debug.assert(!self.isLockedBy(executor.id)); // recursive locks are not supported
-
-    const ticket = self.ticket.fetchAdd(1, .acq_rel);
-    while (self.current.load(.monotonic) != ticket) {
-        kernel.arch.spinLoopHint();
-    }
-    self.holding_executor.store(executor.id, .release);
+    self.lockImpl(current_task, false) catch comptime unreachable;
 }
 
 /// Locks the spinlock.
 ///
 /// If the spinlock is poisoned, returns an `error.Poisoned`.
 pub fn lockWithPoisonCheck(self: *TicketSpinLock, current_task: *kernel.Task) error{Poisoned}!void {
+    try self.lockImpl(current_task, true);
+}
+
+fn lockImpl(self: *TicketSpinLock, current_task: *kernel.Task, comptime poison_check: bool) !void {
     current_task.incrementInterruptDisable();
-    current_task.incrementPreemptionDisable();
 
     const executor = current_task.state.running;
     std.debug.assert(!self.isLockedBy(executor.id)); // recursive locks are not supported
 
-    if (self.poisoned.load(.acquire)) return error.Poisoned;
+    if (comptime poison_check) {
+        if (self.poisoned.load(.acquire)) return error.Poisoned;
+    }
 
     const ticket = self.ticket.fetchAdd(1, .acq_rel);
     while (self.current.load(.monotonic) != ticket) {
-        if (self.poisoned.load(.acquire)) return error.Poisoned;
+        if (comptime poison_check) {
+            if (self.poisoned.load(.monotonic)) return error.Poisoned;
+        }
 
         kernel.arch.spinLoopHint();
     }
     self.holding_executor.store(executor.id, .release);
+
+    current_task.spinlocks_held += 1;
 }
 
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
 pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
+    std.debug.assert(current_task.spinlocks_held != 0);
+
     const executor = current_task.state.running;
     std.debug.assert(self.holding_executor.load(.acquire) == executor.id);
 
     self.unsafeUnlock();
 
-    current_task.decrementPreemptionDisable();
+    current_task.spinlocks_held -= 1;
+
     current_task.decrementInterruptDisable();
 }
 

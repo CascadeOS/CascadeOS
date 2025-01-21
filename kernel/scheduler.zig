@@ -17,6 +17,7 @@ pub fn queueTask(current_task: *kernel.Task, task: *kernel.Task) void {
 /// The scheduler lock must *not* be held.
 pub fn maybePreempt(current_task: *kernel.Task) void {
     std.debug.assert(current_task.state == .running);
+    std.debug.assert(current_task.spinlocks_held == 0);
 
     if (current_task.preemption_disable_count.load(.monotonic) != 0) {
         current_task.preemption_skipped.store(true, .monotonic);
@@ -38,6 +39,7 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
 /// Must be called with the scheduler lock held.
 pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) void {
     std.debug.assert(globals.lock.isLockedBy(current_task.state.running.id));
+    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
 
     std.debug.assert(current_task.preemption_disable_count.load(.monotonic) == 0);
     std.debug.assert(current_task.preemption_skipped.load(.monotonic) == false);
@@ -88,6 +90,8 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
 ///
 /// This function must be called with the scheduler lock held.
 pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
+    std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
+
     const executor = current_task.state.running;
     std.debug.assert(globals.lock.isLockedBy(executor.id));
 
@@ -108,6 +112,8 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
 }
 
 fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
+    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
+
     std.debug.assert(!current_task.is_idle_task);
     const executor = current_task.state.running;
 
@@ -150,12 +156,14 @@ fn switchToIdleWithLock(
         }
     };
 
+    std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
     std.debug.assert(!current_task.is_idle_task);
     const executor = current_task.state.running;
 
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
 
     current_task.state = current_task_new_state;
+    current_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.idleEntryWithLock`
 
     executor.idle_task.state = .{ .running = executor };
     executor.current_task = &executor.idle_task;
@@ -175,6 +183,7 @@ fn switchToIdleWithLock(
 }
 
 fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void {
+    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(current_task.is_idle_task);
 
     log.debug("switching to {} from idle", .{new_task});
@@ -194,6 +203,7 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void
 }
 
 fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
+    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(!current_task.is_idle_task);
     std.debug.assert(!new_task.is_idle_task);
 
@@ -224,12 +234,14 @@ fn switchToTaskFromTaskWithLock(
             inner_spinlock: *kernel.sync.TicketSpinLock,
             new_task_inner: *kernel.Task,
         ) callconv(.C) noreturn {
-            inner_spinlock.unlock(new_task_inner);
+            inner_spinlock.unsafeUnlock();
 
             kernel.arch.scheduling.jumpToTaskFromIdle(new_task_inner);
             core.panic("task returned", null);
         }
     };
+
+    std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
 
     std.debug.assert(!current_task.is_idle_task);
     std.debug.assert(!new_task.is_idle_task);
@@ -243,6 +255,7 @@ fn switchToTaskFromTaskWithLock(
     kernel.arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
 
     current_task.state = current_task_new_state;
+    current_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.switchToTaskWithLock`
 
     new_task.state = .{ .running = executor };
     executor.current_task = new_task;
@@ -289,43 +302,8 @@ fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
 }
 
 const globals = struct {
-    var lock: SchedulerSpinLock = .{};
+    var lock: kernel.sync.TicketSpinLock = .{};
     var ready_to_run: containers.SinglyLinkedFIFO = .empty;
-};
-
-/// A ticket spinlock similar to `kernel.sync.TicketSpinLock`, but does not disable preemption.
-const SchedulerSpinLock = struct {
-    current: std.atomic.Value(u32) = .init(0),
-    ticket: std.atomic.Value(u32) = .init(0),
-    holding_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none),
-
-    fn lock(self: *SchedulerSpinLock, current_task: *kernel.Task) void {
-        current_task.incrementInterruptDisable();
-
-        const executor = current_task.state.running;
-        std.debug.assert(!self.isLockedBy(executor.id)); // recursive locks are not supported
-
-        const ticket = self.ticket.fetchAdd(1, .acq_rel);
-        while (self.current.load(.monotonic) != ticket) {
-            kernel.arch.spinLoopHint();
-        }
-        self.holding_executor.store(executor.id, .release);
-    }
-
-    fn unlock(self: *SchedulerSpinLock, current_task: *kernel.Task) void {
-        const executor = current_task.state.running;
-        std.debug.assert(self.holding_executor.load(.acquire) == executor.id);
-
-        self.holding_executor.store(.none, .release);
-        _ = self.current.fetchAdd(1, .acq_rel);
-
-        current_task.decrementInterruptDisable();
-    }
-
-    /// Returns true if the spinlock is locked by the given executor.
-    fn isLockedBy(self: *const SchedulerSpinLock, executor_id: kernel.Executor.Id) bool {
-        return self.holding_executor.load(.acquire) == executor_id;
-    }
 };
 
 const std = @import("std");
