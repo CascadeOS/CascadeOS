@@ -13,7 +13,6 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - x64, ARM64 and RISC-V
 - First class Zig support
 - Userspace with GUI
-- All functionality implemented in Zig either in repo or as a package, except [uACPI](https://github.com/UltraOS/uACPI).
 
 ## Build, testing, running
 ### Prerequisites:
