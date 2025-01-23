@@ -83,8 +83,8 @@ pub fn initStage1() !noreturn {
     log.debug("initializing kernel stacks", .{});
     try kernel.Stack.init.initializeStacks();
 
-    log.debug("initializing interrupts", .{});
-    try kernel.arch.interrupts.init.initializeInterrupts(&bootstrap_init_task);
+    log.debug("initializing interrupt routing", .{});
+    try kernel.arch.interrupts.init.initializeInterruptRouting(&bootstrap_init_task);
 
     log.debug("initializing kernel executors", .{});
     kernel.executors = try createExecutors();

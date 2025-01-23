@@ -129,10 +129,10 @@ pub const interrupts = struct {
         }
 
         /// Prepare interrupt allocation and routing.
-        pub fn initializeInterrupts(current_task: *kernel.Task) callconv(core.inline_in_non_debug) !void {
-            checkSupport(current.interrupts.init, "initializeInterrupts", fn (*kernel.Task) anyerror!void);
+        pub fn initializeInterruptRouting(current_task: *kernel.Task) callconv(core.inline_in_non_debug) !void {
+            checkSupport(current.interrupts.init, "initializeInterruptRouting", fn (*kernel.Task) anyerror!void);
 
-            try current.interrupts.init.initializeInterrupts(current_task);
+            try current.interrupts.init.initializeInterruptRouting(current_task);
         }
 
         /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard

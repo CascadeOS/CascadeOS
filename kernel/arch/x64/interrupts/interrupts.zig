@@ -322,7 +322,7 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterrupts(current_task: *kernel.Task) !void {
+    pub fn initializeInterruptRouting(current_task: *kernel.Task) !void {
         try globals.interrupt_arena.create("interrupts", 1, .{});
 
         try globals.interrupt_arena.addSpan(
