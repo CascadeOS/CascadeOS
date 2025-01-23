@@ -28,6 +28,11 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
     };
 }
 
+/// Return the top of the stack.
+pub fn top(stack: Stack) core.VirtualAddress {
+    return stack.usable_range.endBound();
+}
+
 /// Pushes a value onto the stack.
 pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
     const T = @TypeOf(value);

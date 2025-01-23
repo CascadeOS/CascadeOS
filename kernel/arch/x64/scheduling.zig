@@ -9,7 +9,7 @@ pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kerne
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
-        executor.idle_task.stack.stack_pointer,
+        executor.idle_task.stack.top(),
     );
 }
 
@@ -19,7 +19,7 @@ pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kerne
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
-        new_task.stack.stack_pointer,
+        new_task.stack.top(),
     );
 }
 
@@ -70,7 +70,7 @@ pub fn prepareForJumpToTaskFromTask(
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
-        new_task.stack.stack_pointer,
+        new_task.stack.top(),
     );
 }
 
