@@ -360,7 +360,8 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
                 .cpu_arch = .x86_64,
                 .os_tag = .freestanding,
                 .abi = .none,
-                .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64 }, // TODO: As we only support modern machines maybe make this v2 or v3?
+                // TODO: Is v3 too new? v2 might be better but then we lose BMI and BMI2.
+                .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64_v3 },
             };
 
             // Remove all SSE/AVX features
@@ -369,6 +370,7 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.f16c));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.fma));
+            target_query.cpu_features_sub.addFeature(@intFromEnum(features.fxsr));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse2));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse3));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse4_1));
@@ -382,6 +384,7 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512dq));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512f));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512vl));
+            target_query.cpu_features_sub.addFeature(@intFromEnum(features.evex512));
 
             // Add soft float
             target_query.cpu_features_add.addFeature(@intFromEnum(features.soft_float));
