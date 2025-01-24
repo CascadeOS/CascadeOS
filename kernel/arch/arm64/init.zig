@@ -16,6 +16,13 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
     }
 }
 
+/// Prepares the provided `Executor` for the bootstrap executor.
+pub fn prepareBootstrapExecutor(
+    bootstrap_executor: *kernel.Executor,
+) void {
+    bootstrap_executor.arch = .{};
+}
+
 const globals = struct {
     var opt_early_output_uart: ?Uart = null;
 };
