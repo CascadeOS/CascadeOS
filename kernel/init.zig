@@ -78,10 +78,10 @@ pub fn initStage1() !noreturn {
     try kernel.time.init.initializeTime();
 
     log.debug("initializing kernel heap", .{});
-    try kernel.heap.init.initializeHeap();
+    try kernel.heap.init.initializeHeap(&bootstrap_init_task);
 
     log.debug("initializing kernel stacks", .{});
-    try kernel.Stack.init.initializeStacks();
+    try kernel.Stack.init.initializeStacks(&bootstrap_init_task);
 
     log.debug("initializing interrupt routing", .{});
     try kernel.arch.interrupts.init.initializeInterruptRouting(&bootstrap_init_task);

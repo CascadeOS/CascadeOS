@@ -154,7 +154,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeHeap() !void {
+    pub fn initializeHeap(current_task: *kernel.Task) !void {
         try globals.heap_address_space_arena.create(
             "heap_address_space",
             kernel.arch.paging.standard_page_size.value,
@@ -177,7 +177,7 @@ pub const init = struct {
             core.panic("no kernel heap", null);
 
         globals.heap_address_space_arena.addSpan(
-            kernel.Task.getCurrent(),
+            current_task,
             heap_range.address.value,
             heap_range.size.value,
         ) catch |err| {

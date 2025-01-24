@@ -105,7 +105,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeStacks() !void {
+    pub fn initializeStacks(current_task: *kernel.Task) !void {
         try globals.stack_arena.create(
             "stacks",
             kernel.arch.paging.standard_page_size.value,
@@ -116,7 +116,7 @@ pub const init = struct {
             core.panic("no kernel stacks", null);
 
         globals.stack_arena.addSpan(
-            kernel.Task.getCurrent(),
+            current_task,
             stacks_range.address.value,
             stacks_range.size.value,
         ) catch |err| {
