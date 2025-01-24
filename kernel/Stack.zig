@@ -12,25 +12,36 @@ usable_range: core.VirtualRange,
 /// The current stack pointer.
 stack_pointer: core.VirtualAddress,
 
+/// The top of the stack.
+///
+/// This is not the same as `usable_range.endBound()` as a zero return address is pushed onto the top of the stack.
+top_stack_pointer: core.VirtualAddress,
+
 /// Creates a stack from a range.
 ///
 /// Requirements:
-/// - `range` must be aligned to 16 bytes.
+/// - `usable_range` must be atleast `@sizeOf(usize)` bytes.
+/// - `range` and `usable_range` must be aligned to 16 bytes.
 /// - `range` must fully contain `usable_range`.
 pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
+    std.debug.assert(usable_range.size.greaterThanOrEqual(core.Size.of(usize)));
     std.debug.assert(range.containsRange(usable_range));
-    std.debug.assert(range.address.isAligned(.from(16, .byte)));
+    std.debug.assert(range.address.isAligned(.from(16, .byte))); // TODO: is this needed as we don't use SIMD?
+    std.debug.assert(usable_range.address.isAligned(.from(16, .byte))); // TODO: is this needed as we don't use SIMD?
 
-    return .{
+    var stack: Stack = .{
         .range = range,
         .usable_range = usable_range,
         .stack_pointer = usable_range.endBound(),
+        .top_stack_pointer = undefined,
     };
-}
 
-/// Return the top of the stack.
-pub fn top(stack: Stack) core.VirtualAddress {
-    return stack.usable_range.endBound();
+    // push a zero return address
+    stack.push(@as(usize, 0)) catch unreachable; // TODO: is this correct for non-x64?
+
+    stack.top_stack_pointer = stack.stack_pointer;
+
+    return stack;
 }
 
 /// Pushes a value onto the stack.
@@ -55,19 +66,23 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
         .instant_fit,
     );
 
-    const stack = fromRange(
-        .{ .address = .fromInt(stack_range.base), .size = stack_size_including_guard_page },
-        .{ .address = .fromInt(stack_range.base), .size = kernel.config.kernel_stack_size },
-    );
+    const range: core.VirtualRange = .{
+        .address = .fromInt(stack_range.base),
+        .size = stack_size_including_guard_page,
+    };
+    const usable_range: core.VirtualRange = .{
+        .address = .fromInt(stack_range.base),
+        .size = kernel.config.kernel_stack_size,
+    };
 
     try kernel.vmm.mapRange(
         kernel.vmm.globals.core_page_table,
-        stack.usable_range,
+        usable_range,
         .{ .writeable = true, .global = true },
         .kernel,
     );
 
-    return stack;
+    return fromRange(range, usable_range);
 }
 
 pub fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
