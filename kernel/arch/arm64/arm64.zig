@@ -8,6 +8,13 @@ pub const scheduling = @import("scheduling.zig");
 
 pub const init = @import("init.zig");
 
+/// Get the current `Executor`.
+///
+/// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
+pub fn getCurrentExecutor() *kernel.Executor {
+    return @ptrFromInt(lib_arm64.registers.TPIDR_EL1.read());
+}
+
 pub const spinLoopHint = lib_arm64.instructions.isb;
 
 pub const io = struct {
