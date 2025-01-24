@@ -184,7 +184,7 @@ pub const Framebuffer = extern struct {
     };
 
     pub const LimineFramebuffer = extern struct {
-        address: [*]u8,
+        address: core.VirtualAddress,
         /// Width and height of the framebuffer in pixels
         width: u64,
         height: u64,
@@ -218,9 +218,10 @@ pub const Framebuffer = extern struct {
             return core.VirtualRange.fromAddr(self._edid, self._edid_size).toByteSlice();
         }
 
-        /// Response revision 1 required
-        pub fn videoModes(self: *const LimineFramebuffer) []const *const VideoMode {
-            return self._video_modes[0..self._video_mode_count];
+        pub fn videoModes(self: *const LimineFramebuffer, revision: BaseRevison.Revison) []const *const VideoMode {
+            if (revision.equalToOrGreaterThan(.@"1")) return self._video_modes[0..self._video_mode_count];
+
+            return &.{};
         }
     };
 
@@ -598,6 +599,7 @@ pub const Module = extern struct {
     /// Request revision 1 required
     pub fn withInternalModules(internal_modules: []const *const InternalModule) Module {
         return .{
+            .revision = 1,
             ._internal_module_count = internal_modules.len,
             ._internal_modules = internal_modules.ptr,
         };
