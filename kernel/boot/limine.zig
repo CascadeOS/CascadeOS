@@ -183,6 +183,34 @@ pub const CpuDescriptorIterator = struct {
     }
 };
 
+pub fn framebuffer() ?boot.Framebuffer {
+    const buffer = blk: {
+        const resp = requests.framebuffer.response orelse
+            return null;
+
+        const framebuffers = resp.framebuffers();
+        if (framebuffers.len == 0) return null;
+
+        break :blk framebuffers[0];
+    };
+
+    std.debug.assert(buffer.bpp == 32);
+    std.debug.assert(buffer.memory_model == .rgb);
+    std.debug.assert(buffer.red_mask_size == 8);
+    std.debug.assert(buffer.red_mask_shift == 16);
+    std.debug.assert(buffer.green_mask_size == 8);
+    std.debug.assert(buffer.green_mask_shift == 8);
+    std.debug.assert(buffer.blue_mask_size == 8);
+    std.debug.assert(buffer.blue_mask_shift == 0);
+
+    return .{
+        .ptr = buffer.address.toPtr([*]volatile u32),
+        .width = buffer.width,
+        .height = buffer.height,
+        .pixels_per_scanline = buffer.pitch / @sizeOf(u32),
+    };
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     kernel.boot.bootloader_api = .limine;
 
@@ -211,6 +239,7 @@ pub fn exportRequests() void {
     @export(&requests.hhdm, .{ .name = "limine_hhdm_request" });
     @export(&requests.rsdp, .{ .name = "limine_rsdp_request" });
     @export(&requests.smp, .{ .name = "limine_smp_request" });
+    @export(&requests.framebuffer, .{ .name = "limine_framebuffer_request" });
 }
 
 const requests = struct {
@@ -221,6 +250,7 @@ const requests = struct {
     var hhdm: limine.HHDM = .{};
     var rsdp: limine.RSDP = .{};
     var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
+    var framebuffer: limine.Framebuffer = .{};
 };
 
 const std = @import("std");

@@ -192,6 +192,27 @@ pub const CpuDescriptors = struct {
     );
 };
 
+/// Each pixel of the framebuffer is a 32-bit RGB value (0x00RRGGBB).
+///
+/// TODO: The assumption that each pixel is 32-bit is not correct for all framebuffers. We need to handle 24-bit.
+pub const Framebuffer = struct {
+    ptr: [*]volatile u32,
+    /// Width of the framebuffer in pixels
+    width: u64,
+    /// Height of the framebuffer in pixels
+    height: u64,
+    /// Pixels per scanline (pitch)
+    pixels_per_scanline: u64,
+};
+
+/// Returns the framebuffer provided by the bootloader, if any.
+pub fn framebuffer() ?Framebuffer {
+    return switch (bootloader_api) {
+        .limine => limine.framebuffer(),
+        .unknown => null,
+    };
+}
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.
