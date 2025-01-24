@@ -23,7 +23,7 @@ pub fn writeToEarlyOutput(bytes: []const u8) void {
 /// Prepares the provided `Executor` for the bootstrap executor.
 pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
-) callconv(core.inline_in_non_debug) void {
+) void {
     const static = struct {
         var bootstrap_double_fault_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
         var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
