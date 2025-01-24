@@ -231,15 +231,7 @@ fn resolveTool(
 fn handleToolConfiguration(b: *std.Build, tool_description: ToolDescription, module: *std.Build.Module) void {
     switch (tool_description.configuration) {
         .simple => {},
-        .link_c => {
-            if (b.graph.host.result.os.tag == .linux) {
-                // Use musl to remove include of "/usr/include" that breaks watch mode on btrfs
-                module.resolved_target.?.query.abi = .musl;
-                module.resolved_target.?.result.abi = .musl;
-            }
-
-            module.link_libc = true;
-        },
+        .link_c => module.link_libc = true,
         .custom => |f| f(b, tool_description, module),
     }
 }

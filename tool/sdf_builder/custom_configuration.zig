@@ -6,12 +6,6 @@ pub fn customConfiguration(
     tool_description: ToolDescription,
     module: *std.Build.Module,
 ) void {
-    if (b.graph.host.result.os.tag == .linux) {
-        // Use musl to remove include of "/usr/include"
-        module.resolved_target.?.query.abi = .musl;
-        module.resolved_target.?.result.abi = .musl;
-    }
-
     module.link_libc = true;
 
     const lib_dwarf = b.dependency("libdwarf", .{});
