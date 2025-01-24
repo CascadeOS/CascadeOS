@@ -23,6 +23,11 @@ pub fn prepareBootstrapExecutor(
     bootstrap_executor.arch = .{};
 }
 
+/// Load the provided `Executor` as the current executor.
+pub fn loadExecutor(executor: *kernel.Executor) void {
+    lib_arm64.registers.TPIDR_EL1.write(@intFromPtr(executor));
+}
+
 const globals = struct {
     var opt_early_output_uart: ?Uart = null;
 };
