@@ -16,23 +16,22 @@ fn zigPanic(
     const return_address = return_address_opt orelse @returnAddress();
 
     switch (globals.panic_mode) {
-        .no_op => kernel.arch.interrupts.disableInterruptsAndHalt(),
+        .no_op => {},
         .single_executor_init_panic => singleExecutorInitPanic(msg, error_return_trace, return_address),
         .init_panic => initPanic(msg, error_return_trace, return_address),
     }
-    unreachable;
+
+    kernel.arch.interrupts.disableInterruptsAndHalt();
 }
 
 fn singleExecutorInitPanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
-) noreturn {
+) void {
     const static = struct {
         var nested_panic_count: usize = 0;
     };
-
-    defer kernel.arch.interrupts.disableInterruptsAndHalt();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
@@ -50,22 +49,17 @@ fn singleExecutorInitPanic(
         // don't trigger any more panics
         else => {},
     }
-
-    kernel.arch.interrupts.disableInterruptsAndHalt();
-    unreachable;
 }
 
 fn initPanic(
     msg: []const u8,
     error_return_trace: ?*const std.builtin.StackTrace,
     return_address: usize,
-) noreturn {
+) void {
     const static = struct {
         var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
         var nested_panic_count: usize = 0;
     };
-
-    defer kernel.arch.interrupts.disableInterruptsAndHalt();
 
     const executor = kernel.arch.rawGetCurrentExecutor();
     executor.panicked.store(true, .release);
@@ -125,9 +119,6 @@ fn initPanic(
         // don't trigger any more panics
         else => {},
     }
-
-    kernel.arch.interrupts.disableInterruptsAndHalt();
-    unreachable;
 }
 
 const formatting = struct {
