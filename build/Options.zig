@@ -29,7 +29,7 @@ qemu_remote_debug: bool,
 /// The QEMU display mode.
 ///
 /// Defaults to `.none`.
-display_mode: DisplayMode,
+display: DisplayMode,
 
 /// Disable usage of any virtualization acceleration.
 ///
@@ -90,10 +90,7 @@ non_cascade_os_options_module: *std.Build.Module,
 
 pub const DisplayMode = enum {
     none,
-
     gtk,
-
-    qemu_default,
 };
 
 pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const CascadeTarget) !Options {
@@ -115,9 +112,9 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         "Enable QEMU remote debug (disables acceleration) (defaults to false)",
     ) orelse false;
 
-    const display_mode = b.option(
+    const display = b.option(
         DisplayMode,
-        "display_mode",
+        "display",
         "The QEMU display mode (defaults to none)",
     ) orelse .none;
 
@@ -206,7 +203,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .build_for_host = build_for_host,
         .qemu_monitor = qemu_monitor,
         .qemu_remote_debug = qemu_remote_debug,
-        .display_mode = display_mode,
+        .display = display,
         .no_acceleration = no_acceleration,
         .interrupt_details = interrupt_details,
         .number_of_cpus = number_of_cpus,

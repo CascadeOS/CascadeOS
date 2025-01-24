@@ -115,8 +115,9 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = if (self.kernel_log_wrapper_compile) |compile| run_qemu: {
-        const run_qemu = b.addRunArtifact(compile);
+    const run_qemu = if (self.options.display == .none and self.kernel_log_wrapper_compile == null) run_qemu: {
+        const kernel_log_wrapper = self.kernel_log_wrapper_compile.?;
+        const run_qemu = b.addRunArtifact(kernel_log_wrapper);
         run_qemu.addArg(qemuExecutable(self.target));
         break :run_qemu run_qemu;
     } else b.addSystemCommand(&.{qemuExecutable(self.target)});
@@ -169,7 +170,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
     }
 
-    switch (self.options.display_mode) {
+    switch (self.options.display) {
         .none => {
             if (self.options.qemu_monitor) {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
@@ -181,16 +182,22 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         },
         .gtk => run_qemu.addArgs(&[_][]const u8{
             "-display",
-            "gtk,grab-on-hover=off,show-tabs=on,window-close=on,show-menubar=on",
+            "gtk,gl=on,show-tabs=on",
         }),
-        .qemu_default => {},
+        // .sdl => run_qemu.addArgs(&[_][]const u8{
+        //     "-display",
+        //     "sdl,gl=on",
+        // }),
+        // .spice => run_qemu.addArgs(&[_][]const u8{
+        //     "-display",
+        //     "spice-app,gl=on",
+        // }),
     }
 
     // add display device if needed
-    if (self.options.display_mode != .none) {
+    if (self.options.display != .none) {
         switch (self.target) {
-            .arm64,
-            => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .arm64 => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
             .x64 => {},
         }
     }
