@@ -10,7 +10,7 @@ pub fn initStage1() !noreturn {
     // we need the direct map to be available as early as possible
     try kernel.vmm.init.determineOffsets();
 
-    kernel.arch.init.registerEarlyOutput();
+    kernel.arch.init.registerInitOutput();
 
     Output.write(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 

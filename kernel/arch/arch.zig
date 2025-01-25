@@ -482,11 +482,11 @@ pub const io = struct {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
-    /// Attempt to register some form of early output.
-    pub fn registerEarlyOutput() callconv(core.inline_in_non_debug) void {
+    /// Attempt to register some form of init output.
+    pub fn registerInitOutput() callconv(core.inline_in_non_debug) void {
         // `checkSupport` intentionally not called - mandatory function
 
-        current.init.registerEarlyOutput();
+        current.init.registerInitOutput();
     }
 
     /// Prepares the provided `Executor` for the bootstrap executor.

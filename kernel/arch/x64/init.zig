@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-/// Attempt to set up some form of early output.
-pub fn registerEarlyOutput() void {
+/// Attempt to register some form of init output.
+pub fn registerInitOutput() void {
     const static = struct {
         var init_output_serial_port: SerialPort = undefined;
     };
