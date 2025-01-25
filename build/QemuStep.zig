@@ -179,6 +179,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             }
 
             run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
+            run_qemu.addArgs(&[_][]const u8{ "-vga", "none" });
         },
         .gtk => run_qemu.addArgs(&[_][]const u8{
             "-display",
