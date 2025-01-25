@@ -22,7 +22,6 @@ pub fn initStage1() !noreturn {
         ._name = kernel.Task.Name.fromSlice("bootstrap init") catch unreachable,
         .state = undefined, // set after declaration of `bootstrap_executor`
         .stack = undefined, // never used
-        .interrupt_disable_count = .init(1), // interrupts are enabled by default
         .spinlocks_held = 0, // init tasks don't start with the scheduler locked
     };
 
