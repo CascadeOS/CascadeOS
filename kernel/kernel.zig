@@ -28,7 +28,7 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
     return &executors[@intFromEnum(id)];
 }
 
-pub const init = @import("init.zig");
+pub const init = @import("init/init.zig");
 
 pub const Panic = debug.Panic;
 
