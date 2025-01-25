@@ -16,7 +16,6 @@ fn zigPanic(
     const return_address = return_address_opt orelse @returnAddress();
 
     switch (globals.panic_mode) {
-        .no_op => {},
         .single_executor_init_panic => singleExecutorInitPanic(msg, error_return_trace, return_address),
         .init_panic => initPanic(msg, error_return_trace, return_address),
     }
@@ -39,13 +38,13 @@ fn singleExecutorInitPanic(
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
         0 => formatting.printPanic(
-            kernel.arch.init.early_output_writer,
+            kernel.init.Output.writer,
             msg,
             error_return_trace,
             return_address,
         ) catch {},
-        // on second panic print a shorter message using only `writeToEarlyOutput`
-        1 => kernel.arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n"),
+        // on second panic print a shorter message using only `Output.write`
+        1 => kernel.init.Output.write("\nPANIC IN PANIC\n"),
         // don't trigger any more panics
         else => {},
     }
@@ -73,22 +72,22 @@ fn initPanic(
         if (panicking_executor_id != executor.id) return; // another executor is panicking
     }
 
-    guarantee_exclusive_early_output_access: {
-        kernel.arch.init.early_output_lock.poison();
+    guarantee_exclusive_init_output_access: {
+        kernel.init.Output.globals.lock.poison();
 
         // FIXME: is it possible to livelock in this loop?
 
         while (true) {
-            const current_holder_id = kernel.arch.init.early_output_lock.holding_executor.load(.acquire);
+            const current_holder_id = kernel.init.Output.globals.lock.holding_executor.load(.acquire);
 
             if (current_holder_id == executor.id) {
                 // we already have the lock
-                break :guarantee_exclusive_early_output_access;
+                break :guarantee_exclusive_init_output_access;
             }
 
             if (current_holder_id == .none) {
                 // the lock is poisoned, so we can just subsume control of the lock
-                break :guarantee_exclusive_early_output_access;
+                break :guarantee_exclusive_init_output_access;
             }
 
             const current_holder = kernel.getExecutor(current_holder_id);
@@ -96,7 +95,7 @@ fn initPanic(
             if (current_holder.panicked.load(.acquire)) {
                 // the current holder has panicked but as we have set `static.panicking_executor`
                 // we can just subsume control of the lock
-                break :guarantee_exclusive_early_output_access;
+                break :guarantee_exclusive_init_output_access;
             }
 
             kernel.arch.spinLoopHint();
@@ -109,13 +108,13 @@ fn initPanic(
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
         0 => formatting.printPanic(
-            kernel.arch.init.early_output_writer,
+            kernel.init.Output.writer,
             msg,
             error_return_trace,
             return_address,
         ) catch {},
-        // on second panic print a shorter message using only `writeToEarlyOutput`
-        1 => kernel.arch.init.writeToEarlyOutput("\nPANIC IN PANIC\n"),
+        // on second panic print a shorter message using only `Output.write`
+        1 => kernel.init.Output.write("\nPANIC IN PANIC\n"),
         // don't trigger any more panics
         else => {},
     }
@@ -505,15 +504,12 @@ pub fn sdfSlice() ![]const u8 {
 ///
 /// No modes will be skipped and must be in strict increasing order.
 pub const PanicMode = enum(u8) {
-    /// Panic does nothing other than halt the executor.
-    no_op,
-
-    /// Panic will print using the early output with no locking.
+    /// Panic will print using init output with no locking.
     ///
     /// Does not support multiple executors.
     single_executor_init_panic,
 
-    /// Panic will print using the early output, poisons the early output lock.
+    /// Panic will print using init output, poisons the init output lock.
     ///
     /// Supports multiple executors.
     init_panic,
@@ -544,7 +540,7 @@ pub const Panic = struct {
 };
 
 const globals = struct {
-    var panic_mode: PanicMode = .no_op;
+    var panic_mode: PanicMode = .single_executor_init_panic;
 };
 
 const std = @import("std");

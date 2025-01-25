@@ -482,37 +482,12 @@ pub const io = struct {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
-    /// Attempt to set up some form of early output.
-    pub fn setupEarlyOutput() callconv(core.inline_in_non_debug) void {
+    /// Attempt to register some form of early output.
+    pub fn registerEarlyOutput() callconv(core.inline_in_non_debug) void {
         // `checkSupport` intentionally not called - mandatory function
 
-        current.init.setupEarlyOutput();
+        current.init.registerEarlyOutput();
     }
-
-    /// Write to early output.
-    ///
-    /// Cannot fail, any errors are ignored.
-    pub fn writeToEarlyOutput(bytes: []const u8) callconv(core.inline_in_non_debug) void {
-        // `checkSupport` intentionally not called - mandatory function
-
-        current.init.writeToEarlyOutput(bytes);
-    }
-
-    /// Lock used to ensure that early output is not written concurrently.
-    ///
-    /// Not used very early in the boot process when only the bootstrap executor is running.
-    pub var early_output_lock: kernel.sync.TicketSpinLock = .{};
-
-    pub const early_output_writer = std.io.Writer(
-        void,
-        error{},
-        struct {
-            fn writeFn(_: void, bytes: []const u8) error{}!usize {
-                writeToEarlyOutput(bytes);
-                return bytes.len;
-            }
-        }.writeFn,
-    ){ .context = {} };
 
     /// Prepares the provided `Executor` for the bootstrap executor.
     pub fn prepareBootstrapExecutor(

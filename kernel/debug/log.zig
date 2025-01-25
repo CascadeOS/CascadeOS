@@ -43,25 +43,22 @@ fn logFn(
         format ++ "\n";
 
     switch (globals.log_mode) {
-        .panic => {
-            @branchHint(.cold);
-            core.panic("log in panic mode", null);
-        },
         .single_executor_init_log => {
             @branchHint(.unlikely);
-            kernel.arch.init.writeToEarlyOutput(level_and_scope);
-            kernel.arch.init.early_output_writer.print(user_fmt, args) catch {};
+
+            kernel.init.Output.write(level_and_scope);
+            kernel.init.Output.writer.print(user_fmt, args) catch {};
         },
         .init_log => {
             @branchHint(.unlikely);
 
             const current_task = kernel.Task.getCurrent();
 
-            kernel.arch.init.early_output_lock.lock(current_task);
-            defer kernel.arch.init.early_output_lock.unlock(current_task);
+            kernel.init.Output.globals.lock.lock(current_task);
+            defer kernel.init.Output.globals.lock.unlock(current_task);
 
-            kernel.arch.init.writeToEarlyOutput(level_and_scope);
-            kernel.arch.init.early_output_writer.print(user_fmt, args) catch {};
+            kernel.init.Output.write(level_and_scope);
+            kernel.init.Output.writer.print(user_fmt, args) catch {};
         },
     }
 }
@@ -72,15 +69,12 @@ fn logFn(
 ///
 /// No modes will be skipped and must be in strict increasing order.
 pub const LogMode = enum(u8) {
-    /// Raises a panic.
-    panic,
-
-    /// Log will print using the early output, does not lock the early output.
+    /// Log will print using init output, does not lock the init output lcok.
     ///
     /// Does not support multiple executors.
     single_executor_init_log,
 
-    /// Log will print using the early output, locks the early output.
+    /// Log will print using init output, locks the init output lock.
     ///
     /// Supports multiple executors.
     init_log,
@@ -149,7 +143,7 @@ inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.enum_literal)) bool 
 }
 
 const globals = struct {
-    var log_mode: LogMode = .panic;
+    var log_mode: LogMode = .single_executor_init_log;
 };
 
 const std = @import("std");

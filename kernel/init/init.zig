@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
+pub const Output = @import("Output.zig");
+
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
@@ -8,12 +10,9 @@ pub fn initStage1() !noreturn {
     // we need the direct map to be available as early as possible
     try kernel.vmm.init.determineOffsets();
 
-    kernel.arch.init.setupEarlyOutput();
+    kernel.arch.init.registerEarlyOutput();
 
-    kernel.debug.setPanicMode(.single_executor_init_panic);
-    kernel.debug.log.setLogMode(.single_executor_init_log);
-
-    kernel.arch.init.writeToEarlyOutput(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+    Output.write(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
     kernel.vmm.init.logOffsets();
 
@@ -160,8 +159,8 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
 
         try kernel.acpi.init.finializeInitialization();
 
-        // as others are waiting, we can safely print
-        kernel.arch.init.early_output_writer.print("initialization complete - time since boot: {}\n", .{
+        // as others are waiting, we can safely print with no lock
+        Output.writer.print("initialization complete - time since boot: {}\n", .{
             kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
         }) catch {};
     }

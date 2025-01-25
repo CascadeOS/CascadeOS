@@ -2,21 +2,27 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Attempt to set up some form of early output.
-pub fn setupEarlyOutput() void {
+pub fn registerEarlyOutput() void {
+    const static = struct {
+        var init_output_serial_port: SerialPort = undefined;
+    };
+
     for (std.meta.tags(SerialPort.COMPort)) |com_port| {
-        if (SerialPort.init(com_port, .Baud115200)) |serial_port| {
-            globals.opt_early_output_serial_port = serial_port;
+        if (SerialPort.init(com_port, .Baud115200)) |serial| {
+            static.init_output_serial_port = serial;
+
+            kernel.init.Output.registerOutput(.{
+                .writeFn = struct {
+                    fn writeFn(context: *anyopaque, str: []const u8) void {
+                        const serial_port: *SerialPort = @ptrCast(@alignCast(context));
+                        serial_port.write(str);
+                    }
+                }.writeFn,
+                .context = &static.init_output_serial_port,
+            });
+
             return;
         }
-    }
-}
-
-/// Write to early output.
-///
-/// Cannot fail, any errors are ignored.
-pub fn writeToEarlyOutput(bytes: []const u8) void {
-    if (globals.opt_early_output_serial_port) |early_output_serial_port| {
-        early_output_serial_port.write(bytes);
     }
 }
 
@@ -202,10 +208,6 @@ pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.ini
 pub fn initLocalInterruptController() void {
     x64.apic.init.initApicOnCurrentExecutor();
 }
-
-const globals = struct {
-    var opt_early_output_serial_port: ?SerialPort = null;
-};
 
 /// A *very* basic write only serial port.
 const SerialPort = struct {
