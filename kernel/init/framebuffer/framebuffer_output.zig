@@ -39,7 +39,7 @@ inline fn maybeNewLine() void {
 fn newLine() void {
     c.ssfn_dst.x = 0;
     c.ssfn_dst.y += font.height;
-    if (c.ssfn_dst.y >= c.ssfn_dst.h) {
+    if (c.ssfn_dst.y + font.height >= c.ssfn_dst.h) {
         c.ssfn_dst.y = 0;
     }
 
