@@ -500,9 +500,7 @@ pub const LAPIC = union(enum) {
                 _reserved: u24 = 0,
                 destination: u8,
             },
-            x2apic: packed struct {
-                destination: u32,
-            },
+            x2apic: u32,
         };
 
         pub const DestinationShorthand = enum(u2) {
