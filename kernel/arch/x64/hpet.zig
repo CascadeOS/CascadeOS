@@ -34,11 +34,7 @@ pub const init = struct {
 
         const general_capabilities = globals.hpet.readGeneralCapabilitiesAndIDRegister();
 
-        if (general_capabilities.counter_is_64bit) {
-            init_log.debug("counter is 64-bit", .{});
-        } else {
-            core.panic("HPET counter is not 64-bit", null);
-        }
+        init_log.debug("counter is 64-bit: {}", .{general_capabilities.counter_is_64bit});
 
         globals.number_of_timers_minus_one = general_capabilities.number_of_timers_minus_one;
 
