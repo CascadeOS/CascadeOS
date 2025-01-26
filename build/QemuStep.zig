@@ -115,7 +115,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = if (self.options.display == .none or self.kernel_log_wrapper_compile == null) run_qemu: {
+    const run_qemu = if (self.options.display == .none and self.kernel_log_wrapper_compile != null) run_qemu: {
         const kernel_log_wrapper = self.kernel_log_wrapper_compile.?;
         const run_qemu = b.addRunArtifact(kernel_log_wrapper);
         run_qemu.addArg(qemuExecutable(self.target));
