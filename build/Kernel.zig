@@ -231,6 +231,10 @@ fn constructKernelExe(
     // kernel options
     kernel_module.addImport("kernel_options", options.kernel_option_module);
 
+    // ssfn
+    kernel_module.addCSourceFile(.{ .file = b.path("kernel/init/framebuffer/ssfn.c") });
+    kernel_module.addIncludePath(b.path(("kernel/init/framebuffer")));
+
     const uacpi_log_level: []const u8 =
         if (options.kernel_force_debug_log or std.mem.indexOf(
         u8,

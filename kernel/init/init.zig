@@ -11,6 +11,7 @@ pub fn initStage1() !noreturn {
     try kernel.vmm.init.determineOffsets();
 
     kernel.arch.init.registerInitOutput();
+    @import("framebuffer/framebuffer_output.zig").registerInitOutput();
 
     Output.write(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
