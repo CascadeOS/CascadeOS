@@ -6,6 +6,23 @@ pub inline fn eoi() void {
     globals.lapic.eoi();
 }
 
+/// Send a panic IPI to all other executors.
+pub fn sendPanicIPI() void {
+    var icr = globals.lapic.readInterruptCommandRegister();
+
+    icr = .{
+        .vector = .non_maskable_interrupt,
+        .delivery_mode = .nmi,
+        .destination_mode = .physical,
+        .level = .assert,
+        .trigger_mode = .edge,
+        .destination_shorthand = .all_excluding_self,
+        .destination_field = .{ .x2apic = 0 },
+    };
+
+    globals.lapic.writeInterruptCommandRegister(icr);
+}
+
 const globals = struct {
     /// Initialized in `init.captureApicInformation`.
     var lapic: lib_x64.LAPIC = .{

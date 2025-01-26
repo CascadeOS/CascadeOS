@@ -6,6 +6,7 @@ pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
 pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
 pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 pub const eoi = x64.apic.eoi;
+pub const sendPanicIPI = x64.apic.sendPanicIPI;
 
 pub fn allocateInterrupt(
     current_task: *kernel.Task,
@@ -335,6 +336,9 @@ pub const init = struct {
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
     pub fn loadStandardInterruptHandlers() void {
+        globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
+            .interrupt_handler = interrupt_handlers.nonMaskableInterruptHandler,
+        };
         globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
             .interrupt_handler = interrupt_handlers.perExecutorPeriodicHandler,
         };

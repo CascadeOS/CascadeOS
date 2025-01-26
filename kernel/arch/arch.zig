@@ -118,6 +118,17 @@ pub const interrupts = struct {
         current.interrupts.eoi();
     }
 
+    /// Send a panic IPI to all other executors.
+    pub fn sendPanicIPI() callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.interrupts,
+            "sendPanicIPI",
+            fn () void,
+        );
+
+        current.interrupts.sendPanicIPI();
+    }
+
     pub const init = struct {
         /// Ensure that any exceptions/faults that occur during early initialization are handled.
         ///
