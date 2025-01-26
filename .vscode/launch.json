@@ -18,13 +18,10 @@
         { // Requires extension CodeLLDB (vadimcn.vscode-lldb)
             "name": "LLDB QEMU remote",
             "type": "lldb",
-            "request": "custom",
-            "targetCreateCommands": [
-                "target create ${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf"
-            ],
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf",
             "processCreateCommands": [
-                // "breakpoint set --name init.kernelInitStage1 --hardware --one-shot true",
-                "process handle SIGTRAP -p false -s false -n false",
+                // "process handle SIGTRAP -p false -s false -n false", // this breaks the extension
                 "settings set target.require-hardware-breakpoint true",
                 "gdb-remote 1234"
             ],
