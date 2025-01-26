@@ -80,7 +80,7 @@ pub fn registerInitOutput() void {
 }
 
 const font: *const c.ssfn_font_t = blk: {
-    break :blk @ptrCast(@embedFile("default8x16.sfn"));
+    break :blk @ptrCast(@embedFile("ter-v14n.sfn"));
 };
 
 const std = @import("std");

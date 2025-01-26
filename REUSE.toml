@@ -9,5 +9,11 @@ SPDX-PackageDownloadLocation = "https://github.com/CascadeOS/CascadeOS"
 [[annotations]]
 path = "**.md"
 precedence = "aggregate"
-SPDX-FileCopyrightText = "2025 Lee Cannon <leecannon@leecannon.xyz>"
 SPDX-License-Identifier = "CC0-1.0"
+SPDX-FileCopyrightText = "2025 Lee Cannon <leecannon@leecannon.xyz>"
+
+[[annotations]]
+path = "kernel/init/framebuffer/ter-v14n.sfn"
+precedence = "aggregate"
+SPDX-License-Identifier = "OFL-1.1-RFN"
+SPDX-FileCopyrightText = "Copyright (C) 2020 Dimitar Toshkov Zhekov, with Reserved Font Name \"Terminus Font\"."
