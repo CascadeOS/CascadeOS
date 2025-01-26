@@ -71,6 +71,8 @@ fn initPanic(
         if (panicking_executor_id != executor.id) return; // another executor is panicking
     }
 
+    kernel.arch.interrupts.sendPanicIPI();
+
     guarantee_exclusive_init_output_access: {
         kernel.init.Output.globals.lock.poison();
 
