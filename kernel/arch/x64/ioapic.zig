@@ -117,8 +117,6 @@ pub const init = struct {
                     const address = kernel.vmm.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
                     const ioapic = IOAPIC.init(address, io_apic_data.global_system_interrupt_base);
 
-                    if (ioapic.apicId() != io_apic_data.ioapic_id) return error.APICIdMismatch;
-
                     init_log.debug("found ioapic for gsi {}-{}", .{
                         ioapic.gsi_base,
                         ioapic.gsi_base + ioapic.number_of_redirection_entries,
