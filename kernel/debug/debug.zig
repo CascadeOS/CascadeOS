@@ -56,14 +56,13 @@ fn initPanic(
     return_address: usize,
 ) void {
     const static = struct {
-        var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
         var nested_panic_count: usize = 0;
     };
 
     const executor = kernel.arch.rawGetCurrentExecutor();
     executor.panicked.store(true, .release);
 
-    if (static.panicking_executor.cmpxchgStrong(
+    if (globals.panicking_executor.cmpxchgStrong(
         .none,
         executor.id,
         .acq_rel,
@@ -539,7 +538,12 @@ pub const Panic = struct {
     pub const messages = std.debug.FormattedPanic.messages;
 };
 
-const globals = struct {
+pub const globals = struct {
+    /// The executor that is currently panicking.
+    ///
+    /// Public to allow other executors to check after receiving a panic IPI.
+    pub var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
+
     var panic_mode: PanicMode = .single_executor_init_panic;
 };
 
