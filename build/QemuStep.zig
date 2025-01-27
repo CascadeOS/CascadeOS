@@ -126,6 +126,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     run_qemu.stdio = .inherit;
 
     run_qemu.addArgs(&.{ "-boot", "menu=off" });
+    run_qemu.addArgs(&.{ "-d", "guest_errors" });
 
     // RAM
     run_qemu.addArgs(&.{
