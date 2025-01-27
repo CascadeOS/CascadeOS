@@ -72,6 +72,7 @@ pub fn mapRange(
     virtual_range: core.VirtualRange,
     map_type: MapType,
     flush_target: FlushTarget,
+    keep_top_level: bool,
 ) MapError!void {
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
@@ -90,6 +91,7 @@ pub fn mapRange(
                 current_virtual_range,
                 true,
                 flush_target,
+                keep_top_level,
             );
             current_virtual_range.address.moveBackwardInPlace(kernel.arch.paging.standard_page_size);
         }
@@ -104,6 +106,7 @@ pub fn mapRange(
             current_virtual_range,
             physical_range,
             map_type,
+            keep_top_level,
         );
 
         current_virtual_range.address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
@@ -116,6 +119,7 @@ pub fn mapToPhysicalRange(
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: MapType,
+    keep_top_level: bool,
 ) MapError!void {
     log.debug("mapToPhysicalRange - {} {} {}", .{ virtual_range, physical_range, map_type });
 
@@ -130,6 +134,7 @@ pub fn mapToPhysicalRange(
         virtual_range,
         physical_range,
         map_type,
+        keep_top_level,
     );
 }
 
@@ -148,11 +153,12 @@ pub fn unmapRange(
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
     flush_target: FlushTarget,
+    keep_top_level: bool,
 ) void {
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
-    kernel.arch.paging.unmapRange(page_table, virtual_range, free_backing_pages);
+    kernel.arch.paging.unmapRange(page_table, virtual_range, free_backing_pages, keep_top_level);
     kernel.arch.paging.flushCache(virtual_range, flush_target);
 }
 

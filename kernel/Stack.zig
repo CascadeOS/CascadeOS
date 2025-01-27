@@ -80,6 +80,7 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
         usable_range,
         .{ .writeable = true, .global = true },
         .kernel,
+        true,
     );
 
     return fromRange(range, usable_range);

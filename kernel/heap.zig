@@ -61,8 +61,6 @@ pub const allocator = std.mem.Allocator{
                 // once we add quantum caches it no longer would be possible to peform resizes that change the
                 // quantum aligned length of the allocation
 
-                // TODO: due to how unlikely this is to actually hit maybe we should just return false?
-
                 const old_quantum_aligned_len = std.mem.alignForward(
                     usize,
                     buf.len,
@@ -110,6 +108,7 @@ fn heapArenaImport(
         },
         .{ .writeable = true, .global = true },
         .kernel,
+        true,
     ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
 
     return allocation;
@@ -130,6 +129,7 @@ fn heapArenaRelease(
         },
         true,
         .kernel,
+        true,
     );
 
     arena.deallocate(current_task, allocation);

@@ -35,10 +35,13 @@ pub fn mapToPhysicalRange(
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: kernel.vmm.MapType,
+    keep_top_level: bool,
 ) kernel.vmm.MapError!void {
     log.debug("mapToPhysicalRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
 
-    var current_virtual_address = virtual_range.address;
+    const start_virtual_address = virtual_range.address;
+
+    var current_virtual_address = start_virtual_address;
     const last_virtual_address = virtual_range.last();
     var current_physical_address = physical_range.address;
 
@@ -49,8 +52,13 @@ pub fn mapToPhysicalRange(
             current_physical_address,
             map_type,
         ) catch |err| {
-            // TODO: roll back any modifications to the page tables
-            log.err("failed to map {} to {} 4KiB", .{ current_virtual_address, current_physical_address });
+            unmapRange(
+                page_table,
+                .between(start_virtual_address, current_virtual_address),
+                false,
+                keep_top_level,
+            );
+
             return err;
         };
 
@@ -72,6 +80,7 @@ pub fn unmapRange(
     page_table: *PageTable,
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
+    keep_top_level: bool,
 ) void {
     log.debug("unmapRange - {}", .{virtual_range});
 
@@ -79,7 +88,12 @@ pub fn unmapRange(
     const last_virtual_address = virtual_range.last();
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        unmap4KiB(page_table, current_virtual_address, free_backing_pages);
+        unmap4KiB(
+            page_table,
+            current_virtual_address,
+            free_backing_pages,
+            keep_top_level,
+        );
 
         current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
     }
@@ -180,10 +194,8 @@ fn unmap4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
+    keep_top_level: bool,
 ) void {
-    // TODO: tables are not freed when empty, could be done on defer
-    //       but this would break things like the kernel heap
-
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     const level4_index = PageTable.p4Index(virtual_address);
@@ -196,6 +208,17 @@ fn unmap4KiB(
         error.HugePage => core.panic("page table entry is huge", null),
     };
 
+    defer if (!keep_top_level and level3_table.empty()) {
+        kernel.pmm.deallocatePage(
+            core.PhysicalRange.fromAddr(
+                level4_entry.getAddress4kib(),
+                PageTable.small_page_size,
+            ),
+        );
+
+        level4_table.entries[level4_index].store(0, .release);
+    };
+
     const level3_index = PageTable.p3Index(virtual_address);
     const level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
 
@@ -206,6 +229,17 @@ fn unmap4KiB(
         error.HugePage => core.panic("page table entry is huge", null),
     };
 
+    defer if (level2_table.empty()) {
+        kernel.pmm.deallocatePage(
+            core.PhysicalRange.fromAddr(
+                level3_entry.getAddress4kib(),
+                PageTable.small_page_size,
+            ),
+        );
+
+        level3_table.entries[level3_index].store(0, .release);
+    };
+
     const level2_index = PageTable.p2Index(virtual_address);
     const level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
 
@@ -214,6 +248,17 @@ fn unmap4KiB(
     ) catch |err| switch (err) {
         error.NotPresent => core.panic("page table entry is not present", null),
         error.HugePage => core.panic("page table entry is huge", null),
+    };
+
+    defer if (level1_table.empty()) {
+        kernel.pmm.deallocatePage(
+            core.PhysicalRange.fromAddr(
+                level2_entry.getAddress4kib(),
+                PageTable.small_page_size,
+            ),
+        );
+
+        level2_table.entries[level2_index].store(0, .release);
     };
 
     const level1_index = PageTable.p1Index(virtual_address);

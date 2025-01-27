@@ -218,12 +218,14 @@ pub const paging = struct {
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
         map_type: kernel.vmm.MapType,
+        keep_top_level: bool,
     ) callconv(core.inline_in_non_debug) kernel.vmm.MapError!void {
         checkSupport(current.paging, "mapToPhysicalRange", fn (
             *paging.PageTable.ArchPageTable,
             core.VirtualRange,
             core.PhysicalRange,
             kernel.vmm.MapType,
+            bool,
         ) kernel.vmm.MapError!void);
 
         return current.paging.mapToPhysicalRange(
@@ -231,6 +233,7 @@ pub const paging = struct {
             virtual_range,
             physical_range,
             map_type,
+            keep_top_level,
         );
     }
 
@@ -247,17 +250,19 @@ pub const paging = struct {
         page_table: PageTable,
         virtual_range: core.VirtualRange,
         free_backing_pages: bool,
+        keep_top_level: bool,
     ) void {
         checkSupport(
             current.paging,
             "unmapRange",
-            fn (*paging.PageTable.ArchPageTable, core.VirtualRange, bool) void,
+            fn (*paging.PageTable.ArchPageTable, core.VirtualRange, bool, bool) void,
         );
 
         current.paging.unmapRange(
             page_table.arch,
             virtual_range,
             free_backing_pages,
+            keep_top_level,
         );
     }
 
