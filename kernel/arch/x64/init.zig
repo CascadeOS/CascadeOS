@@ -7,6 +7,19 @@ pub fn registerInitOutput() void {
         var init_output_serial_port: SerialPort = undefined;
     };
 
+    if (DebugCon.detect()) {
+        kernel.init.Output.registerOutput(.{
+            .writeFn = struct {
+                fn writeFn(_: *anyopaque, str: []const u8) void {
+                    DebugCon.write(str);
+                }
+            }.writeFn,
+            .context = undefined,
+        });
+
+        return;
+    }
+
     for (std.meta.tags(SerialPort.COMPort)) |com_port| {
         if (SerialPort.init(com_port, .Baud115200)) |serial| {
             static.init_output_serial_port = serial;
@@ -300,6 +313,20 @@ const SerialPort = struct {
     const portReadU8 = lib_x64.instructions.portReadU8;
     const portWriteU8 = lib_x64.instructions.portWriteU8;
     const OUTPUT_READY: u8 = 1 << 5;
+};
+
+const DebugCon = struct {
+    const port = 0xe9;
+
+    pub fn detect() bool {
+        return lib_x64.instructions.portReadU8(port) == port;
+    }
+
+    pub fn write(bytes: []const u8) void {
+        for (bytes) |byte| {
+            lib_x64.instructions.portWriteU8(port, byte);
+        }
+    }
 };
 
 const std = @import("std");
