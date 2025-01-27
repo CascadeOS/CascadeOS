@@ -193,16 +193,14 @@ pub const CpuDescriptors = struct {
 };
 
 /// Each pixel of the framebuffer is a 32-bit RGB value (0x00RRGGBB).
-///
-/// TODO: The assumption that each pixel is 32-bit is not correct for all framebuffers. We need to handle 24-bit.
 pub const Framebuffer = struct {
-    ptr: [*]volatile u8,
+    ptr: [*]volatile u32,
     /// Width of the framebuffer in pixels
     width: u64,
     /// Height of the framebuffer in pixels
     height: u64,
-    /// Bytes per scanline
-    pitch: u64,
+    /// Pixels per row (pitch / @sizeOf(u32))
+    pixels_per_row: u64,
 };
 
 /// Returns the framebuffer provided by the bootloader, if any.

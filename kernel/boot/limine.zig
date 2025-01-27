@@ -204,10 +204,10 @@ pub fn framebuffer() ?boot.Framebuffer {
     std.debug.assert(buffer.blue_mask_shift == 0);
 
     return .{
-        .ptr = buffer.address.toPtr([*]volatile u8),
+        .ptr = buffer.address.toPtr([*]volatile u32),
         .width = buffer.width,
         .height = buffer.height,
-        .pitch = buffer.pitch,
+        .pixels_per_row = buffer.pitch / @sizeOf(u32),
     };
 }
 

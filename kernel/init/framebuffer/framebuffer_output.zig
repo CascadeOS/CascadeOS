@@ -61,7 +61,7 @@ pub fn registerInitOutput() void {
             .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
             .w = @intCast(framebuffer.width),
             .h = @intCast(framebuffer.height),
-            .p = @intCast(framebuffer.pitch),
+            .p = @intCast(framebuffer.pixels_per_row * @sizeOf(u32)),
             .x = 0,
             .y = 0,
             .fg = 0x00FFFFFF,
