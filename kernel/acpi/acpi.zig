@@ -121,7 +121,7 @@ const hack = struct {
 
         s5_addr += 4; // skip the last part of NameSeg
 
-        if (s5_addr[0] != 0x12) return error.S5NotPackageOp; // TODO: this code only supports PackageOp
+        if (s5_addr[0] != 0x12) return error.S5NotPackageOp;
         s5_addr += 1;
 
         s5_addr += ((s5_addr[0] & 0xc0) >> 6) + 1; // skip PkgLength
@@ -184,7 +184,7 @@ const hack = struct {
 
                 return kernel.arch.io.readPort(T, port);
             },
-            else => return ReadAddressError.UnsupportedAddressSpace, // TODO: support more address spaces
+            else => return ReadAddressError.UnsupportedAddressSpace,
         }
     }
 
@@ -218,9 +218,9 @@ const hack = struct {
                     return;
                 };
 
-                return WriteAddressError.UnsupportedPortSize; // TODO: support more register bit widths
+                return WriteAddressError.UnsupportedPortSize;
             },
-            else => return WriteAddressError.UnsupportedAddressSpace, // TODO: support more address spaces
+            else => return WriteAddressError.UnsupportedAddressSpace,
         }
     }
 
