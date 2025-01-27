@@ -21,6 +21,13 @@ pub const PageTable = extern struct {
         @memset(std.mem.asBytes(self), 0);
     }
 
+    pub fn empty(self: *const PageTable) bool {
+        for (self.entries) |entry| {
+            if (entry.load(.acquire) != 0) return false;
+        }
+        return true;
+    }
+
     pub const Entry = extern union {
         /// Specifies whether the mapped physical page or page table is loaded in memory.
         ///
