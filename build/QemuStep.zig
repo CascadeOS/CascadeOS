@@ -173,10 +173,18 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
     switch (self.options.display) {
         .none => {
-            if (self.options.qemu_monitor) {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
+            if (self.target == .x64) {
+                if (self.options.qemu_monitor) {
+                    run_qemu.addArgs(&[_][]const u8{ "-debugcon", "mon:stdio" });
+                } else {
+                    run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
+                }
             } else {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
+                if (self.options.qemu_monitor) {
+                    run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
+                } else {
+                    run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
+                }
             }
 
             run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
