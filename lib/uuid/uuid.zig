@@ -76,7 +76,6 @@ pub const UUID = extern struct {
             const characters_needed = comptime section.charactersNeededToStoreField();
             const ptr: *align(1) const section.field_type = @ptrCast(&self.bytes[section.start_index]);
 
-            // TODO: Don't use `std.fmt`
             _ = std.fmt.formatIntBuf(
                 buf[i..][0..characters_needed],
                 ptr.*,
