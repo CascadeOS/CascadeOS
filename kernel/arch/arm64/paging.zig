@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const small_page_size = core.Size.from(4, .kib); // TODO: check this
+// TODO: small page size should be 16kb
+//       the other sizes are probably wrong as well
+
+pub const small_page_size = core.Size.from(4, .kib);
 pub const medium_page_size = core.Size.from(2, .mib);
 pub const large_page_size = core.Size.from(1, .gib);
 
