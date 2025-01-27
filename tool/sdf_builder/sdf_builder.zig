@@ -176,7 +176,7 @@ fn updateElf(
     if (!std.mem.eql(u8, elf_header_elf32.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
     if (elf_header_elf32.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
 
-    if (elf_header_elf32.e_ident[std.elf.EI_DATA] != std.elf.ELFDATA2LSB) return error.BigEndianElf; // TODO: Support big endian
+    if (elf_header_elf32.e_ident[std.elf.EI_DATA] != std.elf.ELFDATA2LSB) return error.BigEndianElf;
 
     const is_64: bool = switch (elf_header_elf32.e_ident[std.elf.EI_CLASS]) {
         std.elf.ELFCLASS32 => false,
