@@ -26,8 +26,10 @@ top_stack_pointer: core.VirtualAddress,
 pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
     std.debug.assert(usable_range.size.greaterThanOrEqual(core.Size.of(usize)));
     std.debug.assert(range.containsRange(usable_range));
-    std.debug.assert(range.address.isAligned(.from(16, .byte))); // TODO: is this needed as we don't use SIMD?
-    std.debug.assert(usable_range.address.isAligned(.from(16, .byte))); // TODO: is this needed as we don't use SIMD?
+
+    // TODO: are these two checks needed needed as we don't use SIMD? non-x64?
+    std.debug.assert(range.address.isAligned(.from(16, .byte)));
+    std.debug.assert(usable_range.address.isAligned(.from(16, .byte)));
 
     var stack: Stack = .{
         .range = range,
