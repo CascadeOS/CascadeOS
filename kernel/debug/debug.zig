@@ -72,36 +72,7 @@ fn initPanic(
     }
 
     kernel.arch.interrupts.sendPanicIPI();
-
-    guarantee_exclusive_init_output_access: {
-        kernel.init.Output.globals.lock.poison();
-
-        // FIXME: is it possible to livelock in this loop?
-
-        while (true) {
-            const current_holder_id = kernel.init.Output.globals.lock.holding_executor.load(.acquire);
-
-            if (current_holder_id == executor.id) {
-                // we already have the lock
-                break :guarantee_exclusive_init_output_access;
-            }
-
-            if (current_holder_id == .none) {
-                // the lock is poisoned, so we can just subsume control of the lock
-                break :guarantee_exclusive_init_output_access;
-            }
-
-            const current_holder = kernel.getExecutor(current_holder_id);
-
-            if (current_holder.panicked.load(.acquire)) {
-                // the current holder has panicked but as we have set `static.panicking_executor`
-                // we can just subsume control of the lock
-                break :guarantee_exclusive_init_output_access;
-            }
-
-            kernel.arch.spinLoopHint();
-        }
-    }
+    kernel.init.Output.globals.lock.poison();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
