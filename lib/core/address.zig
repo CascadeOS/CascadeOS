@@ -380,6 +380,16 @@ pub const VirtualRange = extern struct {
         };
     }
 
+    /// Returns a virtual range between the given addresses exclusive of the end address.
+    pub fn between(start: VirtualAddress, end: VirtualAddress) VirtualRange {
+        std.debug.assert(start.lessThan(end));
+
+        return .{
+            .address = start,
+            .size = .from(end.value - start.value, .byte),
+        };
+    }
+
     /// Returns the address of the first byte __after__ the range.
     pub fn endBound(self: VirtualRange) VirtualAddress {
         return self.address.moveForward(self.size);
