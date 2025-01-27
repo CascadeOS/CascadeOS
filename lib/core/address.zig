@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-// TODO: Support u32 sized addresses
-
 pub const Address = union(enum) {
     physical: core.PhysicalAddress,
     virtual: core.VirtualAddress,
