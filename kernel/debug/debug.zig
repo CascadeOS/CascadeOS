@@ -35,19 +35,23 @@ fn singleExecutorInitPanic(
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
+    const writer = globals.init_panic_buffered_writer.writer();
+
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
         0 => formatting.printPanic(
-            kernel.init.Output.writer,
+            writer,
             msg,
             error_return_trace,
             return_address,
         ) catch {},
-        // on second panic print a shorter message using only `Output.write`
-        1 => kernel.init.Output.write("\nPANIC IN PANIC\n"),
+        // on second panic print a shorter message
+        1 => writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
-        else => {},
+        else => return,
     }
+
+    globals.init_panic_buffered_writer.flush() catch {};
 }
 
 fn initPanic(
@@ -77,19 +81,23 @@ fn initPanic(
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
+    const writer = globals.init_panic_buffered_writer.writer();
+
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
         0 => formatting.printPanic(
-            kernel.init.Output.writer,
+            writer,
             msg,
             error_return_trace,
             return_address,
         ) catch {},
-        // on second panic print a shorter message using only `Output.write`
-        1 => kernel.init.Output.write("\nPANIC IN PANIC\n"),
+        // on second panic print a shorter message
+        1 => writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
-        else => {},
+        else => return,
     }
+
+    globals.init_panic_buffered_writer.flush() catch {};
 }
 
 const formatting = struct {
@@ -518,6 +526,9 @@ pub const globals = struct {
     pub var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
 
     var panic_mode: PanicMode = .single_executor_init_panic;
+
+    /// Buffered writer used only during init.
+    var init_panic_buffered_writer = std.io.bufferedWriter(kernel.init.Output.writer);
 };
 
 const std = @import("std");
