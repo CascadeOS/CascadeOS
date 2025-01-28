@@ -46,8 +46,12 @@ fn logFn(
         .single_executor_init_log => {
             @branchHint(.unlikely);
 
-            kernel.init.Output.write(level_and_scope);
-            kernel.init.Output.writer.print(user_fmt, args) catch {};
+            const writer = globals.init_log_buffered_writer.writer();
+
+            writer.writeAll(level_and_scope) catch {};
+            writer.print(user_fmt, args) catch {};
+
+            globals.init_log_buffered_writer.flush() catch {};
         },
         .init_log => {
             @branchHint(.unlikely);
@@ -57,8 +61,12 @@ fn logFn(
             kernel.init.Output.globals.lock.lock(current_task);
             defer kernel.init.Output.globals.lock.unlock(current_task);
 
-            kernel.init.Output.write(level_and_scope);
-            kernel.init.Output.writer.print(user_fmt, args) catch {};
+            const writer = globals.init_log_buffered_writer.writer();
+
+            writer.writeAll(level_and_scope) catch {};
+            writer.print(user_fmt, args) catch {};
+
+            globals.init_log_buffered_writer.flush() catch {};
         },
     }
 }
@@ -144,6 +152,9 @@ inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.enum_literal)) bool 
 
 const globals = struct {
     var log_mode: LogMode = .single_executor_init_log;
+
+    /// Buffered writer used only during init.
+    var init_log_buffered_writer = std.io.bufferedWriter(kernel.init.Output.writer);
 };
 
 const std = @import("std");
