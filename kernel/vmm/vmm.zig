@@ -203,6 +203,15 @@ pub const globals = struct {
     pub var regions: Regions = undefined;
 
     const Regions = std.BoundedArray(KernelMemoryRegion, std.meta.tags(KernelMemoryRegion.Type).len);
+
+    /// An arena managing the special use region's virtual address space.
+    ///
+    /// Has no source arena, provided with a single span representing the entire range.
+    ///
+    /// Initialized during `init.initializeSpecialUseRegion`.
+    ///
+    /// TODO: this alone is not enough as we need to protect the page table region from being concurrently modified
+    pub var special_use_arena: kernel.ResourceArena = undefined;
 };
 
 pub const init = struct {
@@ -258,6 +267,7 @@ pub const init = struct {
         try registerKernelSections();
         try registerDirectMaps();
         try registerHeaps();
+        try registerSpecialUseRegion();
 
         sortKernelMemoryRegions();
 
@@ -294,6 +304,29 @@ pub const init = struct {
                 ),
             }
         }
+    }
+
+    pub fn initializeSpecialUseRegion(current_task: *kernel.Task) !void {
+        try globals.special_use_arena.create(
+            "special_use_arena",
+            kernel.arch.paging.standard_page_size.value,
+            .{},
+        );
+
+        const special_use_range = kernel.vmm.getKernelRegion(.special_use) orelse
+            core.panic("no special use region", null);
+
+        globals.special_use_arena.addSpan(
+            current_task,
+            special_use_range.address.value,
+            special_use_range.size.value,
+        ) catch |err| {
+            core.panicFmt(
+                "failed to add special use range to `special_use_arena`: {s}",
+                .{@errorName(err)},
+                @errorReturnTrace(),
+            );
+        };
     }
 
     fn sortKernelMemoryRegions() void {
@@ -413,6 +446,18 @@ pub const init = struct {
         try globals.regions.append(.{
             .range = kernel_stacks_range,
             .type = .kernel_stacks,
+        });
+    }
+
+    fn registerSpecialUseRegion() !void {
+        const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
+
+        const special_use_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
+            core.panic("no space in kernel memory layout for the special use region", null);
+
+        try globals.regions.append(.{
+            .range = special_use_range,
+            .type = .special_use,
         });
     }
 
