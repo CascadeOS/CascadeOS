@@ -11,7 +11,7 @@ pub fn initStage1() !noreturn {
     try kernel.vmm.init.determineOffsets();
 
     kernel.arch.init.registerInitOutput();
-    @import("framebuffer/framebuffer_output.zig").registerInitOutput();
+    framebuffer.registerInitOutput();
 
     Output.write(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
@@ -60,6 +60,8 @@ pub fn initStage1() !noreturn {
 
     log.debug("loading core page table", .{});
     kernel.vmm.globals.core_page_table.load();
+
+    try framebuffer.updateFramebufferPtr();
 
     log.debug("initializing ACPI tables", .{});
     try kernel.acpi.init.initializeACPITables();
@@ -280,3 +282,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.init);
+const framebuffer = @import("framebuffer/framebuffer.zig");

@@ -54,6 +54,14 @@ fn newLine() void {
     }
 }
 
+/// Update the framebuffer pointer to use the non-cached direct map.
+pub fn updateFramebufferPtr() !void {
+    if (c.ssfn_dst.ptr == null) return;
+
+    const physical_address = try kernel.vmm.physicalFromDirectMap(.fromPtr(c.ssfn_dst.ptr));
+    c.ssfn_dst.ptr = kernel.vmm.nonCachedDirectMapFromPhysical(physical_address).toPtr([*]u8);
+}
+
 pub fn registerInitOutput() void {
     if (kernel.boot.framebuffer()) |framebuffer| {
         c.ssfn_src = @constCast(font);
@@ -76,6 +84,9 @@ pub fn registerInitOutput() void {
             }.writeFn,
             .context = undefined,
         });
+    } else {
+        // ensure `c.ssfn_dst.ptr` is `null` so that `updateFramebufferPtr` doesn't try to update it
+        c.ssfn_dst.ptr = null;
     }
 }
 
