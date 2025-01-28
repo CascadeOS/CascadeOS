@@ -33,6 +33,12 @@ pub var have_cmos_rtc: bool = true;
 /// Assumed to be false until proven otherwise.
 pub var msi_supported: bool = false;
 
+/// The number of MTRR variable range registers.
+pub var mtrr_number_of_variable_registers: u8 = 0;
+
+/// Are write combining memory types supported?
+pub var mtrr_write_combining_supported: bool = false;
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

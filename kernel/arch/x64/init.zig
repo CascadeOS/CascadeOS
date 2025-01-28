@@ -105,6 +105,16 @@ pub fn captureEarlySystemInformation() !void {
     log.debug("capturing cpuid information", .{});
     try x64.info.cpu_id.capture();
 
+    if (!x64.info.cpu_id.mtrr) {
+        core.panic("MTRRs not supported", null);
+    }
+
+    const mtrr_cap = lib_x64.registers.IA32_MTRRCAP.read();
+    x64.info.mtrr_number_of_variable_registers = mtrr_cap.number_of_variable_range_registers;
+    x64.info.mtrr_write_combining_supported = mtrr_cap.write_combining_supported;
+    log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
+    log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
+
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
         const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
