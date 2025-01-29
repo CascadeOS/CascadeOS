@@ -6,7 +6,7 @@
 // TODO: This entire thing needs to be rewritten.
 
 /// Writes the given string to the framebuffer using the SSFN console bitmap font.
-fn write(str: []const u8) void {
+fn write(_: *anyopaque, str: []const u8) void {
     var iter: std.unicode.Utf8Iterator = .{
         .bytes = str,
         .i = 0,
@@ -54,41 +54,69 @@ fn newLine() void {
     }
 }
 
-/// Update the framebuffer pointer to use the non-cached direct map.
-pub fn updateFramebufferPtr() !void {
-    if (c.ssfn_dst.ptr == null) return;
+/// Map the framebuffer into the special use region.
+pub fn remapFramebufferToSpecialUseRegion(current_task: *kernel.Task) !void {
+    const framebuffer = kernel.boot.framebuffer() orelse return;
 
-    const physical_address = try kernel.vmm.physicalFromDirectMap(.fromPtr(c.ssfn_dst.ptr));
-    c.ssfn_dst.ptr = kernel.vmm.nonCachedDirectMapFromPhysical(physical_address).toPtr([*]u8);
+    const exact_framebuffer_physical_base: core.PhysicalAddress = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
+    const aligned_framebuffer_physical_base = exact_framebuffer_physical_base.alignBackward(kernel.arch.paging.standard_page_size);
+
+    const offset: core.Size = .from(exact_framebuffer_physical_base.value - aligned_framebuffer_physical_base.value, .byte);
+
+    const exact_framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
+    const aligned_framebuffer_size = exact_framebuffer_size.alignForward(kernel.arch.paging.standard_page_size);
+
+    const allocation = try kernel.vmm.globals.special_use_arena.allocate(
+        current_task,
+        aligned_framebuffer_size.value,
+        .instant_fit,
+    );
+    errdefer kernel.vmm.globals.special_use_arena.deallocate(current_task, allocation);
+
+    const virtual_range: core.VirtualRange = .{
+        .address = .fromInt(allocation.base),
+        .size = .from(allocation.len, .byte),
+    };
+
+    try kernel.vmm.mapToPhysicalRange(
+        kernel.vmm.globals.core_page_table,
+        virtual_range,
+        .fromAddr(
+            aligned_framebuffer_physical_base,
+            aligned_framebuffer_size,
+        ),
+        .{ .writeable = true, .global = true, .write_combining = true },
+        true,
+    );
+
+    global.frame_buffer_range = virtual_range;
+    c.ssfn_dst.ptr = virtual_range.address.moveForward(offset).toPtr([*]u8);
 }
 
 pub fn registerInitOutput() void {
-    if (kernel.boot.framebuffer()) |framebuffer| {
-        c.ssfn_src = @constCast(font);
-        c.ssfn_dst = .{
-            .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
-            .w = @intCast(framebuffer.width),
-            .h = @intCast(framebuffer.height),
-            .p = @intCast(framebuffer.pixels_per_row * @sizeOf(u32)),
-            .x = 0,
-            .y = 0,
-            .fg = 0x00FFFFFF,
-            .bg = 0xFF000000,
-        };
+    const framebuffer = kernel.boot.framebuffer() orelse return;
 
-        kernel.init.Output.registerOutput(.{
-            .writeFn = struct {
-                fn writeFn(_: *anyopaque, str: []const u8) void {
-                    write(str);
-                }
-            }.writeFn,
-            .context = undefined,
-        });
-    } else {
-        // ensure `c.ssfn_dst.ptr` is `null` so that `updateFramebufferPtr` doesn't try to update it
-        c.ssfn_dst.ptr = null;
-    }
+    c.ssfn_src = @constCast(font);
+    c.ssfn_dst = .{
+        .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
+        .w = @intCast(framebuffer.width),
+        .h = @intCast(framebuffer.height),
+        .p = @intCast(framebuffer.pixels_per_row * @sizeOf(u32)),
+        .x = 0,
+        .y = 0,
+        .fg = 0x00FFFFFF,
+        .bg = 0xFF000000,
+    };
+
+    kernel.init.Output.registerOutput(.{
+        .writeFn = write,
+        .context = undefined,
+    });
 }
+
+const global = struct {
+    var frame_buffer_range: ?core.VirtualRange = null;
+};
 
 const font: *const c.ssfn_font_t = blk: {
     break :blk @ptrCast(@embedFile("ter-v14n.sfn"));

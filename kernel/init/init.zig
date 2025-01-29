@@ -61,7 +61,17 @@ pub fn initStage1() !noreturn {
     log.debug("loading core page table", .{});
     kernel.vmm.globals.core_page_table.load();
 
-    try framebuffer.updateFramebufferPtr();
+    log.debug("initializing special use region", .{});
+    try kernel.vmm.init.initializeSpecialUseRegion(&bootstrap_init_task);
+
+    // update the framebuffer to use the correct mapping using the special use region
+    try framebuffer.remapFramebufferToSpecialUseRegion(&bootstrap_init_task);
+
+    log.debug("initializing kernel heap", .{});
+    try kernel.heap.init.initializeHeap(&bootstrap_init_task);
+
+    log.debug("initializing kernel stacks", .{});
+    try kernel.Stack.init.initializeStacks(&bootstrap_init_task);
 
     log.debug("initializing ACPI tables", .{});
     try kernel.acpi.init.initializeACPITables();
@@ -77,15 +87,6 @@ pub fn initStage1() !noreturn {
 
     log.debug("initializing time", .{});
     try kernel.time.init.initializeTime();
-
-    log.debug("initializing kernel heap", .{});
-    try kernel.heap.init.initializeHeap(&bootstrap_init_task);
-
-    log.debug("initializing kernel stacks", .{});
-    try kernel.Stack.init.initializeStacks(&bootstrap_init_task);
-
-    log.debug("initializing special use region", .{});
-    try kernel.vmm.init.initializeSpecialUseRegion(&bootstrap_init_task);
 
     log.debug("initializing interrupt routing", .{});
     try kernel.arch.interrupts.init.initializeInterruptRouting(&bootstrap_init_task);
