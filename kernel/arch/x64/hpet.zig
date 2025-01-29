@@ -77,13 +77,13 @@ pub const init = struct {
     fn getHpetBase() [*]volatile u64 {
         const acpi_table = kernel.acpi.getTable(kernel.acpi.HPET, 0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
-            core.panic("hpet table missing", null);
+            @panic("hpet table missing");
         };
         defer acpi_table.deinit();
 
         const hpet_table = acpi_table.table;
 
-        if (hpet_table.base_address.address_space != .memory) core.panic("HPET base address is not memory mapped", null);
+        if (hpet_table.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
 
         return kernel.vmm
             .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet_table.base_address.address))

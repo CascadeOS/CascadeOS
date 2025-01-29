@@ -3,7 +3,7 @@
 
 pub fn nonMaskableInterruptHandler(_: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
     if (kernel.debug.globals.panicking_executor.load(.acquire) == .none) {
-        core.panicFmt("non-maskable interrupt\n{}", .{interrupt_frame}, null);
+        std.debug.panic("non-maskable interrupt\n{}", .{interrupt_frame});
     }
 
     // an executor is panicking so this NMI is a panic IPI
@@ -19,7 +19,7 @@ pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: *InterruptFrame
 ///
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(_: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
-    core.panicFmt("unhandled interrupt\n{}", .{interrupt_frame}, null);
+    std.debug.panic("unhandled interrupt\n{}", .{interrupt_frame});
 }
 
 const std = @import("std");

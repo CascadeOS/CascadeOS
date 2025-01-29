@@ -90,10 +90,9 @@ pub const LogMode = enum(u8) {
 
 pub fn setLogMode(mode: LogMode) void {
     if (@intFromEnum(globals.log_mode) + 1 != @intFromEnum(mode)) {
-        core.panicFmt(
+        std.debug.panic(
             "invalid log mode transition '{s}' -> '{s}'",
             .{ @tagName(globals.log_mode), @tagName(mode) },
-            null,
         );
     }
 

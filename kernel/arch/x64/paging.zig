@@ -108,7 +108,7 @@ pub fn flushCache(virtual_range: core.VirtualRange, flush_target: kernel.vmm.Flu
 
     switch (flush_target) {
         .kernel => {},
-        .user => core.panic("NOT IMPLEMENTED", null),
+        .user => @panic("NOT IMPLEMENTED"),
     }
 
     // TODO: flush caches on other executors
@@ -210,8 +210,8 @@ fn unmap4KiB(
     const level3_table = level4_entry.getNextLevel(
         kernel.vmm.directMapFromPhysical,
     ) catch |err| switch (err) {
-        error.NotPresent => core.panic("page table entry is not present", null),
-        error.HugePage => core.panic("page table entry is huge", null),
+        error.NotPresent => @panic("page table entry is not present"),
+        error.HugePage => @panic("page table entry is huge"),
     };
 
     defer if (!keep_top_level and level3_table.empty()) {
@@ -231,8 +231,8 @@ fn unmap4KiB(
     const level2_table = level3_entry.getNextLevel(
         kernel.vmm.directMapFromPhysical,
     ) catch |err| switch (err) {
-        error.NotPresent => core.panic("page table entry is not present", null),
-        error.HugePage => core.panic("page table entry is huge", null),
+        error.NotPresent => @panic("page table entry is not present"),
+        error.HugePage => @panic("page table entry is huge"),
     };
 
     defer if (level2_table.empty()) {
@@ -252,8 +252,8 @@ fn unmap4KiB(
     const level1_table = level2_entry.getNextLevel(
         kernel.vmm.directMapFromPhysical,
     ) catch |err| switch (err) {
-        error.NotPresent => core.panic("page table entry is not present", null),
-        error.HugePage => core.panic("page table entry is huge", null),
+        error.NotPresent => @panic("page table entry is not present"),
+        error.HugePage => @panic("page table entry is huge"),
     };
 
     defer if (level1_table.empty()) {
@@ -271,7 +271,7 @@ fn unmap4KiB(
     const level1_entry: PageTable.Entry = .fromRaw(&level1_table.entries[level1_index]);
 
     if (!level1_entry.present.read()) {
-        core.panic("page table entry is not present", null);
+        @panic("page table entry is not present");
     }
 
     if (free_backing_pages) {
@@ -436,7 +436,7 @@ pub const init = struct {
         const raw_entry = &page_table.entries[PageTable.p4Index(range.address)];
 
         const entry: PageTable.Entry = .fromRaw(raw_entry);
-        if (entry.present.read()) core.panic("already mapped", null);
+        if (entry.present.read()) @panic("already mapped");
 
         _ = try ensureNextTable(raw_entry, map_type);
     }

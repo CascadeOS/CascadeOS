@@ -26,7 +26,7 @@ pub const writer = std.io.Writer(
 
 pub fn registerOutput(output: Output) void {
     globals.outputs.append(output) catch {
-        core.panic("exceeded maximum number of init outputs", null);
+        @panic("exceeded maximum number of init outputs");
     };
 }
 

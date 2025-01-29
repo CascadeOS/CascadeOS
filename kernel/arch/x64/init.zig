@@ -63,8 +63,8 @@ pub fn prepareBootstrapExecutor(
 pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) void {
     prepareExecutorShared(
         executor,
-        kernel.Stack.createStack(current_task) catch core.panic("failed to allocate double fault stack", null),
-        kernel.Stack.createStack(current_task) catch core.panic("failed to allocate NMI stack", null),
+        kernel.Stack.createStack(current_task) catch @panic("failed to allocate double fault stack"),
+        kernel.Stack.createStack(current_task) catch @panic("failed to allocate NMI stack"),
     );
 }
 
@@ -106,7 +106,7 @@ pub fn captureEarlySystemInformation() !void {
     try x64.info.cpu_id.capture();
 
     if (!x64.info.cpu_id.mtrr) {
-        core.panic("MTRRs not supported", null);
+        @panic("MTRRs not supported");
     }
 
     const mtrr_cap = lib_x64.registers.IA32_MTRRCAP.read();
@@ -116,7 +116,7 @@ pub fn captureEarlySystemInformation() !void {
     log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
 
     if (!x64.info.cpu_id.pat) {
-        core.panic("PAT not supported", null);
+        @panic("PAT not supported");
     }
 
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
@@ -200,10 +200,10 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         var cr0 = lib_x64.registers.Cr0.read();
 
         if (!cr0.protected_mode_enable) {
-            core.panic("protected mode not enabled", null);
+            @panic("protected mode not enabled");
         }
         if (!cr0.paging) {
-            core.panic("paging not enabled", null);
+            @panic("paging not enabled");
         }
 
         cr0.write_protect = true;
@@ -216,7 +216,7 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         var cr4 = lib_x64.registers.Cr4.read();
 
         if (!cr4.physical_address_extension) {
-            core.panic("physical address extension not enabled", null);
+            @panic("physical address extension not enabled");
         }
 
         cr4.time_stamp_disable = false;
@@ -242,7 +242,7 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         var efer = lib_x64.registers.EFER.read();
 
         if (!efer.long_mode_active or !efer.long_mode_enable) {
-            core.panic("not in long mode", null);
+            @panic("not in long mode");
         }
 
         efer.syscall_enable = x64.info.cpu_id.syscall_sysret;

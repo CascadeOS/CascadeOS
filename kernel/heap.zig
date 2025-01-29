@@ -241,17 +241,16 @@ pub const init = struct {
             );
 
             const heap_range = kernel.vmm.getKernelRegion(.kernel_heap) orelse
-                core.panic("no kernel heap", null);
+                @panic("no kernel heap");
 
             globals.heap_address_space_arena.addSpan(
                 current_task,
                 heap_range.address.value,
                 heap_range.size.value,
             ) catch |err| {
-                core.panicFmt(
+                std.debug.panic(
                     "failed to add heap range to `heap_address_space_arena`: {s}",
                     .{@errorName(err)},
-                    @errorReturnTrace(),
                 );
             };
         }
@@ -265,17 +264,16 @@ pub const init = struct {
             );
 
             const special_use_range = kernel.vmm.getKernelRegion(.special_use) orelse
-                core.panic("no special use region", null);
+                @panic("no special use region");
 
             globals.special_use_arena.addSpan(
                 current_task,
                 special_use_range.address.value,
                 special_use_range.size.value,
             ) catch |err| {
-                core.panicFmt(
+                std.debug.panic(
                     "failed to add special use range to `special_use_arena`: {s}",
                     .{@errorName(err)},
-                    @errorReturnTrace(),
                 );
             };
         }

@@ -6,7 +6,6 @@ pub const log = @import("log.zig");
 /// Entry point from the Zig language upon a panic.
 fn zigPanic(
     msg: []const u8,
-    error_return_trace: ?*const std.builtin.StackTrace,
     return_address_opt: ?usize,
 ) noreturn {
     @branchHint(.cold);
@@ -16,8 +15,8 @@ fn zigPanic(
     const return_address = return_address_opt orelse @returnAddress();
 
     switch (globals.panic_mode) {
-        .single_executor_init_panic => singleExecutorInitPanic(msg, error_return_trace, return_address),
-        .init_panic => initPanic(msg, error_return_trace, return_address),
+        .single_executor_init_panic => singleExecutorInitPanic(msg, @errorReturnTrace(), return_address),
+        .init_panic => initPanic(msg, @errorReturnTrace(), return_address),
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -298,7 +297,7 @@ const formatting = struct {
         try writer.writeByte('\n');
         try writer.writeAll(comptime indent ** 2);
 
-        //     core.panic("some message");
+        //     @panic("some message");
         //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
         try writer.writeAll(line[blank_spaces..]);
 
@@ -497,27 +496,16 @@ pub const PanicMode = enum(u8) {
 
 pub fn setPanicMode(mode: PanicMode) void {
     if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
-        core.panicFmt(
+        std.debug.panic(
             "invalid panic mode transition '{s}' -> '{s}'",
             .{ @tagName(globals.panic_mode), @tagName(mode) },
-            null,
         );
     }
 
     globals.panic_mode = mode;
 }
 
-/// Zig panic interface.
-pub const Panic = struct {
-    pub const call = zigPanic;
-
-    pub const sentinelMismatch = std.debug.FormattedPanic.sentinelMismatch;
-    pub const unwrapError = std.debug.FormattedPanic.unwrapError;
-    pub const outOfBounds = std.debug.FormattedPanic.outOfBounds;
-    pub const startGreaterThanEnd = std.debug.FormattedPanic.startGreaterThanEnd;
-    pub const inactiveUnionField = std.debug.FormattedPanic.inactiveUnionField;
-    pub const messages = std.debug.FormattedPanic.messages;
-};
+pub const panic_interface = std.debug.FullPanic(zigPanic);
 
 pub const globals = struct {
     /// The executor that is currently panicking.

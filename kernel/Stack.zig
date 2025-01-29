@@ -116,17 +116,16 @@ pub const init = struct {
         );
 
         const stacks_range = kernel.vmm.getKernelRegion(.kernel_stacks) orelse
-            core.panic("no kernel stacks", null);
+            @panic("no kernel stacks");
 
         globals.stack_arena.addSpan(
             current_task,
             stacks_range.address.value,
             stacks_range.size.value,
         ) catch |err| {
-            core.panicFmt(
+            std.debug.panic(
                 "failed to add stack range to `stack_arena`: {s}",
                 .{@errorName(err)},
-                @errorReturnTrace(),
             );
         };
     }

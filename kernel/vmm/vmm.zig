@@ -401,7 +401,7 @@ pub const init = struct {
             size_of_top_level,
             size_of_top_level,
         ) orelse
-            core.panic("no space in kernel memory layout for the kernel heap", null);
+            @panic("no space in kernel memory layout for the kernel heap");
 
         try globals.regions.append(.{
             .range = kernel_heap_range,
@@ -409,7 +409,7 @@ pub const init = struct {
         });
 
         const kernel_stacks_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
-            core.panic("no space in kernel memory layout for the kernel stacks", null);
+            @panic("no space in kernel memory layout for the kernel stacks");
 
         try globals.regions.append(.{
             .range = kernel_stacks_range,
@@ -421,7 +421,7 @@ pub const init = struct {
         const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
 
         const special_use_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
-            core.panic("no space in kernel memory layout for the special use region", null);
+            @panic("no space in kernel memory layout for the special use region");
 
         try globals.regions.append(.{
             .range = special_use_range,

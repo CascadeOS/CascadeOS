@@ -202,7 +202,7 @@ export fn uacpi_kernel_stall(usec: u8) void {
 
 /// Sleep for N milliseconds.
 export fn uacpi_kernel_sleep(msec: u64) void {
-    core.panicFmt("uacpi_kernel_sleep(msec={})", .{msec}, null);
+    std.debug.panic("uacpi_kernel_sleep(msec={})", .{msec});
 }
 
 /// Create an opaque non-recursive kernel mutex object.
@@ -230,7 +230,7 @@ export fn uacpi_kernel_create_event() *anyopaque {
 
 /// Free a previously allocated kernel (semaphore-like) event object.
 export fn uacpi_kernel_free_event(handle: *anyopaque) void {
-    core.panicFmt("uacpi_kernel_free_event(handle={})", .{handle}, null);
+    std.debug.panic("uacpi_kernel_free_event(handle={})", .{handle});
 }
 
 /// Returns a unique identifier of the currently executing thread.
@@ -256,9 +256,9 @@ export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: uacpi.T
     const current_task = kernel.Task.getCurrent();
 
     switch (timeout) {
-        .none => core.panic("mutex try lock not implemented", null),
+        .none => @panic("mutex try lock not implemented"),
         .infinite => mutex.lock(current_task),
-        else => core.panic("mutex timeout lock not implemented", null),
+        else => @panic("mutex timeout lock not implemented"),
     }
 
     return .ok;
@@ -274,10 +274,9 @@ export fn uacpi_kernel_release_mutex(mutex: *kernel.sync.Mutex) void {
 ///
 /// A successful wait is indicated by returning UACPI_TRUE.
 export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: uacpi.Timeout) bool {
-    core.panicFmt(
+    std.debug.panic(
         "uacpi_kernel_wait_for_event(handle={}, timeout={})",
         .{ handle, timeout },
-        null,
     );
 }
 
@@ -285,22 +284,21 @@ export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: uacpi.Timeout
 ///
 /// This function may be used in interrupt contexts.
 export fn uacpi_kernel_signal_event(handle: *anyopaque) void {
-    core.panicFmt("uacpi_kernel_signal_event(handle={})", .{handle}, null);
+    std.debug.panic("uacpi_kernel_signal_event(handle={})", .{handle});
 }
 
 /// Reset the event counter to 0.
 export fn uacpi_kernel_reset_event(handle: *anyopaque) void {
-    core.panicFmt("uacpi_kernel_reset_event(handle={})", .{handle}, null);
+    std.debug.panic("uacpi_kernel_reset_event(handle={})", .{handle});
 }
 
 /// Handle a firmware request.
 ///
 /// Currently either a Breakpoint or Fatal operators.
 export fn uacpi_kernel_handle_firmware_request(request: *const uacpi.FirmwareRequest) uacpi.Status {
-    core.panicFmt(
+    std.debug.panic(
         "uacpi_kernel_handle_firmware_request(request={})",
         .{request},
-        null,
     );
 }
 
@@ -402,10 +400,9 @@ export fn uacpi_kernel_schedule_work(
     handler: uacpi.WorkHandler,
     ctx: *anyopaque,
 ) uacpi.Status {
-    core.panicFmt(
+    std.debug.panic(
         "uacpi_kernel_schedule_work(work_type={}, handler={}, ctx={})",
         .{ work_type, handler, ctx },
-        null,
     );
 }
 
@@ -415,7 +412,7 @@ export fn uacpi_kernel_schedule_work(
 ///
 /// Note that the waits must be done in this order specifically.
 export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
-    core.panic("uacpi_kernel_wait_for_work_completion()", null);
+    @panic("uacpi_kernel_wait_for_work_completion()");
 }
 
 const std = @import("std");

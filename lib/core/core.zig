@@ -16,23 +16,9 @@ pub const VirtualRange = address.VirtualRange;
 
 pub const testing = @import("testing.zig");
 
-/// This function is the same as `std.builtin.panic` except it passes `@returnAddress()`
-/// meaning the stack trace will not include any panic functions.
-pub fn panic(comptime msg: []const u8, error_return_trace: ?*std.builtin.StackTrace) noreturn {
-    @branchHint(.cold);
-    std.builtin.Panic.call(msg, error_return_trace, @returnAddress());
-}
-
-/// This function is the same as `std.debug.panicExtra` except it passes `@returnAddress()`
-/// meaning the stack trace will not include any panic functions.
-pub fn panicFmt(comptime format: []const u8, args: anytype, error_return_trace: ?*std.builtin.StackTrace) noreturn {
-    @branchHint(.cold);
-    std.debug.panicExtra(error_return_trace, @returnAddress(), format, args);
-}
-
 pub inline fn require(value: anytype, comptime msg: []const u8) @TypeOf(value catch unreachable) {
     return value catch |err| {
-        panicFmt(comptime msg ++ ": {s}", .{@errorName(err)}, @errorReturnTrace());
+        std.debug.panic(comptime msg ++ ": {s}", .{@errorName(err)});
     };
 }
 

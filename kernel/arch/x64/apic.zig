@@ -55,7 +55,7 @@ pub const init = struct {
         init_log.debug("lapic in mode: {s}", .{@tagName(globals.lapic)});
 
         if (fadt.fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) {
-            core.panic("physical destination mode is forced", null);
+            @panic("physical destination mode is forced");
         }
     }
 
@@ -158,7 +158,7 @@ pub const init = struct {
         const ticks = std.math.cast(
             u32,
             (period.value * kernel.time.fs_per_ns) / globals.tick_duration_fs,
-        ) orelse core.panic("period is too long", null);
+        ) orelse @panic("period is too long");
 
         globals.lapic.writeInitialCountRegister(ticks);
     }

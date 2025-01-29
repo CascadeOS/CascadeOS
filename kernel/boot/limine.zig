@@ -220,9 +220,9 @@ fn limineEntryPoint() callconv(.C) noreturn {
     }
 
     @call(.never_inline, kernel.init.initStage1, .{}) catch |err| {
-        core.panicFmt("unhandled error: {s}", .{@errorName(err)}, @errorReturnTrace());
+        std.debug.panic("unhandled error: {s}", .{@errorName(err)});
     };
-    core.panic("`initStage1` returned", null);
+    @panic("`initStage1` returned");
 }
 
 const target_limine_revison: limine.BaseRevison.Revison = switch (kernel.config.cascade_target) {

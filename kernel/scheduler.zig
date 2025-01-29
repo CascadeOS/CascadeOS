@@ -53,7 +53,7 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
                 log.debug("dropping {}", .{current_task});
 
                 switchToIdle(current_task, .dropped);
-                core.panic("idle returned", null);
+                @panic("idle returned");
             },
         }
     };
@@ -63,7 +63,7 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
 
     if (current_task.is_idle_task) {
         switchToTaskFromIdle(current_task, new_task);
-        core.panic("idle returned", null);
+        @panic("idle returned");
     }
 
     std.debug.assert(current_task != new_task);
@@ -132,7 +132,7 @@ fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
-            error.StackOverflow => core.panic("insufficent space on the idle task stack", null),
+            error.StackOverflow => @panic("insufficent space on the idle task stack"),
         }
     };
 }
@@ -152,7 +152,7 @@ fn switchToIdleWithLock(
             inner_spinlock.unsafeUnlock();
 
             idle(idle_task);
-            core.panic("idle returned", null);
+            @panic("idle returned");
         }
     };
 
@@ -177,7 +177,7 @@ fn switchToIdleWithLock(
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
-            error.StackOverflow => core.panic("insufficent space on the idle task stack", null),
+            error.StackOverflow => @panic("insufficent space on the idle task stack"),
         }
     };
 }
@@ -199,7 +199,7 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void
     executor.idle_task.state = .ready;
 
     kernel.arch.scheduling.jumpToTaskFromIdle(new_task);
-    core.panic("task returned", null);
+    @panic("task returned");
 }
 
 fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
@@ -237,7 +237,7 @@ fn switchToTaskFromTaskWithLock(
             inner_spinlock.unsafeUnlock();
 
             kernel.arch.scheduling.jumpToTaskFromIdle(new_task_inner);
-            core.panic("task returned", null);
+            @panic("task returned");
         }
     };
 
@@ -269,7 +269,7 @@ fn switchToTaskFromTaskWithLock(
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
-            error.StackOverflow => core.panic("insufficent space on the idle task stack", null),
+            error.StackOverflow => @panic("insufficent space on the idle task stack"),
         }
     };
 }

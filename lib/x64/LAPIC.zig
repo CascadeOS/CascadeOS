@@ -757,7 +757,7 @@ pub const LAPIC = union(enum) {
             },
             .x2apic => {
                 std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
-                if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register", null);
+                if (register == .interrupt_command_0_31) @panic("this is a 64-bit register");
 
                 return x64.registers.readMSR(u32, register.x2apicRegister());
             },
@@ -777,7 +777,7 @@ pub const LAPIC = union(enum) {
             },
             .x2apic => {
                 std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
-                if (register == .interrupt_command_0_31) core.panic("this is a 64-bit register", null);
+                if (register == .interrupt_command_0_31) @panic("this is a 64-bit register");
 
                 x64.registers.writeMSR(u32, register.x2apicRegister(), value);
             },

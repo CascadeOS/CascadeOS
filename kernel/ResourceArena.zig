@@ -167,10 +167,9 @@ pub fn destory(arena: *ResourceArena) void {
 
     if (any_allocations) {
         // TODO: log instead?
-        core.panicFmt(
+        std.debug.panic(
             "leaks detected when deinitializing arena '{s}'",
             .{arena.name()},
-            null,
         );
     }
 
@@ -621,10 +620,9 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
     defer if (need_to_unlock_mutex) arena.mutex.unlock(current_task);
 
     const tag = arena.removeFromAllocationTable(base) orelse {
-        core.panicFmt(
+        std.debug.panic(
             "no allocation at '{}' found",
             .{base},
-            null,
         );
     };
     std.debug.assert(tag.kind == .allocated);
@@ -633,10 +631,9 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
         const quantum_aligned_provided_len = std.mem.alignForward(usize, provided_len, arena.quantum);
 
         if (quantum_aligned_provided_len != tag.len) {
-            core.panicFmt(
+            std.debug.panic(
                 "provided len '{}' does not match len '{}' of allocation at '{}'",
                 .{ provided_len, tag.len, base },
-                null,
             );
         }
     }

@@ -78,16 +78,15 @@ pub const init = struct {
         pub fn addTimeSource(self: *CandidateTimeSources, time_source: CandidateTimeSource) void {
             if (time_source.reference_counter != null) {
                 if (time_source.initialization == .calibration_required) {
-                    core.panicFmt(
+                    std.debug.panic(
                         "reference counter cannot require calibration: {s}",
                         .{time_source.name},
-                        null,
                     );
                 }
             }
 
             self.candidate_time_sources.append(time_source) catch {
-                core.panic("exceeded maximum number of time sources", null);
+                @panic("exceeded maximum number of time sources");
             };
 
             init_log.debug("adding time source: {s}", .{time_source.name});
@@ -209,7 +208,7 @@ pub const init = struct {
         const time_source = findAndInitializeTimeSource(time_sources, .{
             .pre_calibrated = true,
             .reference_counter = true,
-        }, undefined) orelse core.panic("no reference counter found", null);
+        }, undefined) orelse @panic("no reference counter found");
 
         init_log.debug("using reference counter: {s}", .{time_source.name});
 
@@ -227,7 +226,7 @@ pub const init = struct {
     ) void {
         const time_source = findAndInitializeTimeSource(time_sources, .{
             .wallclock = true,
-        }, reference_counter) orelse core.panic("no wallclock found", null);
+        }, reference_counter) orelse @panic("no wallclock found");
 
         init_log.debug("using wallclock: {s}", .{time_source.name});
 
@@ -243,7 +242,7 @@ pub const init = struct {
     ) void {
         const time_source = findAndInitializeTimeSource(time_sources, .{
             .per_executor_periodic = true,
-        }, reference_counter) orelse core.panic("no per-executor periodic found", null);
+        }, reference_counter) orelse @panic("no per-executor periodic found");
 
         init_log.debug("using per-executor periodic: {s}", .{time_source.name});
 

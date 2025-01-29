@@ -56,7 +56,7 @@ pub const RSDP = extern struct {
         return switch (self.revision) {
             0 => core.PhysicalAddress.fromInt(self.rsdt_addr),
             2 => self.xsdt_addr,
-            else => core.panicFmt("unknown ACPI revision: {d}", .{self.revision}, null),
+            else => std.debug.panic("unknown ACPI revision: {d}", .{self.revision}),
         };
     }
 

@@ -55,7 +55,7 @@ pub fn jumpToTaskFromIdle(
     };
 
     impls.jumpToTaskFromIdle(task.stack.stack_pointer);
-    core.panic("task returned to idle", null);
+    @panic("task returned to idle");
 }
 
 /// Prepares the executor for jumping from `old_task` to `new_task`.
@@ -155,7 +155,7 @@ pub fn prepareNewTaskForScheduling(
 
             const func: kernel.arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
             func(current_task, task_arg);
-            core.panic("task returned to entry point", null);
+            @panic("task returned to entry point");
         }
     };
 

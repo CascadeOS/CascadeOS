@@ -129,10 +129,9 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
         struct {
             fn initStage3Wrapper(inner_current_task: *kernel.Task) callconv(.C) noreturn {
                 initStage3(inner_current_task) catch |err| {
-                    core.panicFmt(
+                    std.debug.panic(
                         "unhandled error: {s}",
                         .{@errorName(err)},
-                        @errorReturnTrace(),
                     );
                 };
             }
@@ -176,7 +175,7 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     current_task.decrementInterruptDisable();
 
     kernel.scheduler.yield(current_task, .drop);
-    core.panic("scheduler returned to init", null);
+    @panic("scheduler returned to init");
 }
 
 fn createExecutors() ![]kernel.Executor {
@@ -247,10 +246,9 @@ fn bootNonBootstrapExecutors() !void {
             struct {
                 fn bootFn(user_data: *anyopaque) noreturn {
                     initStage2(@as(*kernel.Task, @ptrCast(@alignCast(user_data)))) catch |err| {
-                        core.panicFmt(
+                        std.debug.panic(
                             "unhandled error: {s}",
                             .{@errorName(err)},
-                            @errorReturnTrace(),
                         );
                     };
                 }

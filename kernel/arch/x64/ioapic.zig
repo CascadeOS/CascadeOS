@@ -14,10 +14,9 @@ pub fn routeInterrupt(interrupt: u8, vector: x64.interrupts.Interrupt) !void {
         mapping.trigger_mode,
         false,
     ) catch |err|
-        core.panicFmt(
-        "failed to route interrupt {}: {}",
-        .{ interrupt, err },
-        @errorReturnTrace(),
+        std.debug.panic(
+        "failed to route interrupt {}: {s}",
+        .{ interrupt, @errorName(err) },
     );
 }
 
@@ -53,10 +52,9 @@ const SourceOverride = struct {
             .conforms => .active_high,
             .active_high => .active_high,
             .active_low => .active_low,
-            else => core.panicFmt(
+            else => std.debug.panic(
                 "unsupported polarity: {}",
                 .{source_override.flags.polarity},
-                null,
             ),
         };
 
@@ -64,10 +62,9 @@ const SourceOverride = struct {
             .conforms => .edge,
             .edge_triggered => .edge,
             .level_triggered => .level,
-            else => core.panicFmt(
+            else => std.debug.panic(
                 "unsupported trigger mode: {}",
                 .{source_override.flags.trigger_mode},
-                null,
             ),
         };
 
