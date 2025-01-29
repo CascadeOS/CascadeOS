@@ -22,46 +22,6 @@ pub const PrivilegeLevel = enum(u2) {
     ring3 = 3,
 };
 
-pub const MemoryType = enum(u8) {
-    /// All accesses are uncacheable.
-    ///
-    /// Write combining is not allowed.
-    ///
-    /// Speculative accesses are not allowed
-    unchacheable = 0x0,
-
-    /// All accesses are uncacheable.
-    ///
-    /// Write combining is allowed.
-    ///
-    /// Speculative reads are allowed
-    write_combining = 0x1,
-
-    /// Reads allocate cache lines on a cache miss.
-    ///
-    /// Cache lines are not allocated on a write miss.
-    ///
-    /// Write hits update the cache and main memory.
-    write_through = 0x4,
-
-    /// Reads allocate cache lines on a cache miss.
-    ///
-    /// All writes update main memory.
-    ///
-    /// Cache lines are not allocated on a write miss.
-    ///
-    /// Write hits invalidate the cache line and update main memory.
-    write_protected = 0x5,
-
-    /// Reads allocate cache lines on a cache miss, and can allocate to either the shared, exclusive, or modified
-    /// state
-    ///
-    /// Writes allocate to the modified state on a cache miss.
-    write_back = 0x6,
-
-    _,
-};
-
 /// Remaps the PIC interrupts to 0x20-0x2f and masks all of them.
 pub fn disablePic() void {
     const portWriteU8 = instructions.portWriteU8;
