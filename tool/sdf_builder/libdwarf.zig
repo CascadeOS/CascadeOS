@@ -44,6 +44,8 @@ pub const DwarfDebug = struct {
     pub fn nextCompileUnit(self: DwarfDebug) ?CompileUnit {
         var cu: CompileUnit = undefined;
 
+        var dw_length_size: c.Dwarf_Half = undefined;
+
         toResult(c.dwarf_next_cu_header_e(
             self.dwarf_debug,
             1,
@@ -52,7 +54,7 @@ pub const DwarfDebug = struct {
             &cu.version,
             null,
             &cu.address_size,
-            null,
+            &dw_length_size,
             null,
             null,
             null,
