@@ -115,6 +115,10 @@ pub fn captureEarlySystemInformation() !void {
     log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
     log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
 
+    if (!x64.info.cpu_id.pat) {
+        core.panic("PAT not supported", null);
+    }
+
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
         const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
@@ -243,6 +247,32 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         if (x64.info.cpu_id.execute_disable) efer.no_execute_enable = true;
 
         efer.write();
+    }
+
+    // PAT
+    {
+        // Match the default PAT configuration on power up as per the SDM, except for entry 6.
+        // Using entry 6 as write combining allows us to access it using `PAT = 1 PCD = 1` in the page table, which
+        // during the small window after starting an executor and before setting the PAT means accesses to it will be
+        // uncached.
+        var pat = lib_x64.registers.PAT.read();
+
+        pat.entry0 = .write_back;
+        pat.entry1 = .write_through;
+        pat.entry2 = .uncached;
+        pat.entry3 = .unchacheable;
+        pat.entry4 = .write_back;
+        pat.entry5 = .write_through;
+        pat.entry6 = .write_combining; // defaults to uncached
+        pat.entry7 = .unchacheable;
+        lib_x64.registers.PAT.write(pat);
+
+        // flip the page global bit to ensure the PAT is applied
+        var cr4 = lib_x64.registers.Cr4.read();
+        cr4.page_global = false;
+        cr4.write();
+        cr4.page_global = true;
+        cr4.write();
     }
 }
 
