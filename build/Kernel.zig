@@ -99,19 +99,7 @@ fn create(
 
     const source_file_modules = try getSourceFileModules(b, options, dependencies);
 
-    {
-        const check_exe = try constructKernelExe(
-            b,
-            target,
-            dependencies,
-            source_file_modules,
-            options,
-            uacpi_dep,
-        );
-        step_collection.registerCheck(check_exe);
-    }
-
-    const kernel_exe = try constructKernelExe(
+    const kernel_module = try constructKernelModule(
         b,
         target,
         dependencies,
@@ -119,6 +107,33 @@ fn create(
         options,
         uacpi_dep,
     );
+
+    {
+        const check_exe = b.addExecutable(.{
+            .name = "kernel",
+            .root_module = kernel_module,
+        });
+        step_collection.registerCheck(check_exe);
+    }
+
+    const kernel_exe = b.addExecutable(.{
+        .name = "kernel",
+        .root_module = kernel_module,
+    });
+
+    kernel_exe.entry = .disabled;
+    kernel_exe.want_lto = false;
+    kernel_exe.pie = true; // allow kaslr
+    kernel_exe.linkage = .static;
+
+    kernel_exe.setLinkerScript(b.path(
+        b.pathJoin(&.{
+            "kernel",
+            "arch",
+            @tagName(target),
+            "linker.ld",
+        }),
+    ));
 
     const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
     // action
@@ -201,14 +216,14 @@ fn create(
     };
 }
 
-fn constructKernelExe(
+fn constructKernelModule(
     b: *std.Build,
     target: CascadeTarget,
     dependencies: []const Library.Dependency,
     source_file_modules: []const SourceFileModule,
     options: Options,
     uacpi_dep: *std.Build.Dependency,
-) !*std.Build.Step.Compile {
+) !*std.Build.Module {
     const kernel_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
         .target = getKernelCrossTarget(target, b),
@@ -317,26 +332,7 @@ fn constructKernelExe(
         }
     }
 
-    const kernel_exe = b.addExecutable(.{
-        .name = "kernel",
-        .root_module = kernel_module,
-    });
-
-    kernel_exe.entry = .disabled;
-    kernel_exe.want_lto = false;
-    kernel_exe.pie = true; // allow kaslr
-    kernel_exe.linkage = .static;
-
-    kernel_exe.setLinkerScript(b.path(
-        b.pathJoin(&.{
-            "kernel",
-            "arch",
-            @tagName(target),
-            "linker.ld",
-        }),
-    ));
-
-    return kernel_exe;
+    return kernel_module;
 }
 
 /// Returns a CrossTarget for building the kernel for the given target.
