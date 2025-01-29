@@ -18,6 +18,9 @@ executable: bool = false,
 /// Uncached.
 no_cache: bool = false,
 
+/// Write combining.
+write_combining: bool = false,
+
 pub fn equal(a: MapType, b: MapType) bool {
     return a.user == b.user and
         a.global == b.global and

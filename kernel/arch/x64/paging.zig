@@ -178,13 +178,19 @@ fn mapTo4KiB(
         }
     }
 
-    try setEntry(
+    setEntry(
         level1_table,
         PageTable.p1Index(virtual_address),
         physical_address,
         map_type,
         .small,
-    );
+    ) catch |err| switch (err) {
+        error.WriteCombiningAndNoCache => {
+            log.err("write combining and no cache not supported", .{});
+            return kernel.vmm.MapError.MappingNotValid;
+        },
+        else => |e| return e,
+    };
 }
 
 /// Unmaps a 4 KiB page.
@@ -280,7 +286,7 @@ fn unmap4KiB(
     level1_table.entries[level1_index].store(0, .release);
 }
 
-fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
+fn applyMapType(map_type: MapType, comptime page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
     if (map_type.user) entry.user_accessible.write(true);
 
     if (map_type.global) entry.global.write(true);
@@ -293,9 +299,17 @@ fn applyMapType(map_type: MapType, entry: *PageTable.Entry) void {
 
     if (map_type.writeable) entry.writeable.write(true);
 
+    if (map_type.write_combining) {
+        switch (page_type) {
+            .small => entry.pat.write(true),
+            .medium, .large => entry.pat_huge.write(true),
+        }
+
+        if (map_type.no_cache) return error.WriteCombiningAndNoCache;
+    }
+
     if (map_type.no_cache) {
         entry.no_cache.write(true);
-        entry.write_through.write(true);
     }
 }
 
@@ -343,13 +357,15 @@ fn ensureNextTable(
     };
 }
 
+const PageType = enum { small, medium, large };
+
 fn setEntry(
     page_table: *PageTable,
     index: usize,
     physical_address: core.PhysicalAddress,
     map_type: MapType,
-    comptime page_type: enum { small, medium, large },
-) error{AlreadyMapped}!void {
+    comptime page_type: PageType,
+) error{ AlreadyMapped, WriteCombiningAndNoCache }!void {
     var entry: PageTable.Entry = .fromRaw(&page_table.entries[index]);
 
     if (entry.present.read()) return error.AlreadyMapped;
@@ -366,7 +382,7 @@ fn setEntry(
         },
     }
 
-    applyMapType(map_type, &entry);
+    try applyMapType(map_type, page_type, &entry);
 
     entry.present.write(true);
 
