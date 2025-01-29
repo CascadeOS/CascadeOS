@@ -189,6 +189,8 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         lib_x64.registers.IA32_TSC_AUX.write(@intFromEnum(executor.id));
     }
 
+    // TODO: be more thorough with setting up these registers
+
     // CR0
     {
         var cr0 = lib_x64.registers.Cr0.read();
@@ -199,6 +201,36 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         cr0.write_protect = true;
 
         cr0.write();
+    }
+
+    // CR4
+    {
+        var cr4 = lib_x64.registers.Cr4.read();
+
+        if (!cr4.physical_address_extension) core.panic("physical address extension not enabled", null);
+
+        cr4.virtual_8086_mode_extensions = false;
+        cr4.protected_mode_virtual_interrupts = false;
+        cr4.time_stamp_disable = false;
+        cr4.debugging_extensions = true;
+        cr4.page_size_extension = false;
+        cr4.physical_address_extension = true;
+        cr4.machine_check_exception = x64.info.cpu_id.mce;
+        cr4.page_global = true;
+        cr4.performance_monitoring_counter = true;
+        cr4.os_fxsave = false; // TODO
+        cr4.unmasked_exception_support = false; // TODO
+        cr4.usermode_instruction_prevention = true;
+        cr4.level_5_paging = false;
+        cr4.fsgsbase = true;
+        cr4.pcid = false; // TODO
+        cr4.osxsave = false; // TODO
+        cr4.supervisor_mode_execution_prevention = true;
+        cr4.supervisor_mode_access_prevention = true;
+        cr4.protection_key_user = false;
+        cr4.control_flow_enforcement = false;
+
+        cr4.write();
     }
 
     // EFER
