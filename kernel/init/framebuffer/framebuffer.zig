@@ -66,27 +66,14 @@ pub fn remapFramebufferToSpecialUseRegion(current_task: *kernel.Task) !void {
     const exact_framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
     const aligned_framebuffer_size = exact_framebuffer_size.alignForward(kernel.arch.paging.standard_page_size);
 
-    const allocation = try kernel.vmm.globals.special_use_arena.allocate(
+    const virtual_range = try kernel.heap.allocateSpecialUse(
         current_task,
-        aligned_framebuffer_size.value,
-        .instant_fit,
-    );
-    errdefer kernel.vmm.globals.special_use_arena.deallocate(current_task, allocation);
-
-    const virtual_range: core.VirtualRange = .{
-        .address = .fromInt(allocation.base),
-        .size = .from(allocation.len, .byte),
-    };
-
-    try kernel.vmm.mapToPhysicalRange(
-        kernel.vmm.globals.core_page_table,
-        virtual_range,
+        aligned_framebuffer_size,
         .fromAddr(
-            aligned_framebuffer_physical_base,
-            aligned_framebuffer_size,
+            exact_framebuffer_physical_base,
+            exact_framebuffer_size,
         ),
         .{ .writeable = true, .global = true, .write_combining = true },
-        true,
     );
 
     global.frame_buffer_range = virtual_range;

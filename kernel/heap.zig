@@ -135,6 +135,61 @@ fn heapArenaRelease(
     arena.deallocate(current_task, allocation);
 }
 
+pub fn allocateSpecialUse(
+    current_task: *kernel.Task,
+    size: core.Size,
+    physical_range: core.PhysicalRange,
+    map_type: kernel.vmm.MapType,
+) !core.VirtualRange {
+    const allocation = try globals.special_use_arena.allocate(
+        current_task,
+        size.value,
+        .instant_fit,
+    );
+    errdefer globals.special_use_arena.deallocate(current_task, allocation);
+
+    const virtual_range: core.VirtualRange = .{
+        .address = .fromInt(allocation.base),
+        .size = .from(allocation.len, .byte),
+    };
+
+    globals.special_use_mutex.lock(current_task);
+    defer globals.special_use_mutex.unlock(current_task);
+
+    try kernel.vmm.mapToPhysicalRange(
+        kernel.vmm.globals.core_page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+        true,
+    );
+
+    return virtual_range;
+}
+
+pub fn deallocateSpecialUse(
+    current_task: *kernel.Task,
+    virtual_range: core.VirtualRange,
+) void {
+    {
+        globals.special_use_mutex.lock(current_task);
+        defer globals.special_use_mutex.unlock(current_task);
+
+        kernel.vmm.unmapRange(
+            kernel.vmm.globals.core_page_table,
+            virtual_range,
+            true,
+            .kernel,
+            true,
+        );
+    }
+
+    globals.special_use_arena.deallocate(
+        current_task,
+        .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
+    );
+}
+
 const heap_arena_quantum: usize = 16;
 
 const globals = struct {
@@ -151,42 +206,79 @@ const globals = struct {
     ///
     /// Initialized during `init.initializeResourceArenasAndHeap`.
     var heap_arena: ResourceArena = undefined;
+
+    /// An arena managing the special use region's virtual address space.
+    ///
+    /// Has no source arena, provided with a single span representing the entire range.
+    ///
+    /// Initialized during `init.initializeSpecialUseRegion`.
+    var special_use_arena: kernel.ResourceArena = undefined;
+
+    /// Used to protect the special use region while the page mapping is being modified.
+    var special_use_mutex: kernel.sync.Mutex = .{};
 };
 
 pub const init = struct {
-    pub fn initializeHeap(current_task: *kernel.Task) !void {
-        try globals.heap_address_space_arena.create(
-            "heap_address_space",
-            kernel.arch.paging.standard_page_size.value,
-            .{},
-        );
-
-        try globals.heap_arena.create(
-            "heap",
-            heap_arena_quantum,
-            .{
-                .source = .{
-                    .arena = &globals.heap_address_space_arena,
-                    .import = heapArenaImport,
-                    .release = heapArenaRelease,
-                },
-            },
-        );
-
-        const heap_range = kernel.vmm.getKernelRegion(.kernel_heap) orelse
-            core.panic("no kernel heap", null);
-
-        globals.heap_address_space_arena.addSpan(
-            current_task,
-            heap_range.address.value,
-            heap_range.size.value,
-        ) catch |err| {
-            core.panicFmt(
-                "failed to add heap range to `heap_address_space_arena`: {s}",
-                .{@errorName(err)},
-                @errorReturnTrace(),
+    pub fn initializeHeapAndSpecialUse(current_task: *kernel.Task) !void {
+        // heap
+        {
+            try globals.heap_address_space_arena.create(
+                "heap_address_space",
+                kernel.arch.paging.standard_page_size.value,
+                .{},
             );
-        };
+
+            try globals.heap_arena.create(
+                "heap",
+                heap_arena_quantum,
+                .{
+                    .source = .{
+                        .arena = &globals.heap_address_space_arena,
+                        .import = heapArenaImport,
+                        .release = heapArenaRelease,
+                    },
+                },
+            );
+
+            const heap_range = kernel.vmm.getKernelRegion(.kernel_heap) orelse
+                core.panic("no kernel heap", null);
+
+            globals.heap_address_space_arena.addSpan(
+                current_task,
+                heap_range.address.value,
+                heap_range.size.value,
+            ) catch |err| {
+                core.panicFmt(
+                    "failed to add heap range to `heap_address_space_arena`: {s}",
+                    .{@errorName(err)},
+                    @errorReturnTrace(),
+                );
+            };
+        }
+
+        // special use region
+        {
+            try globals.special_use_arena.create(
+                "special_use_arena",
+                kernel.arch.paging.standard_page_size.value,
+                .{},
+            );
+
+            const special_use_range = kernel.vmm.getKernelRegion(.special_use) orelse
+                core.panic("no special use region", null);
+
+            globals.special_use_arena.addSpan(
+                current_task,
+                special_use_range.address.value,
+                special_use_range.size.value,
+            ) catch |err| {
+                core.panicFmt(
+                    "failed to add special use range to `special_use_arena`: {s}",
+                    .{@errorName(err)},
+                    @errorReturnTrace(),
+                );
+            };
+        }
     }
 };
 
