@@ -286,7 +286,7 @@ fn unmap4KiB(
     level1_table.entries[level1_index].store(0, .release);
 }
 
-fn applyMapType(map_type: MapType, comptime page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
+fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
     if (map_type.user) entry.user_accessible.write(true);
 
     if (map_type.global) entry.global.write(true);
@@ -300,12 +300,16 @@ fn applyMapType(map_type: MapType, comptime page_type: PageType, entry: *PageTab
     if (map_type.writeable) entry.writeable.write(true);
 
     if (map_type.write_combining) {
+        if (map_type.no_cache) return error.WriteCombiningAndNoCache;
+
+        // PAT entry 6 is the one set to write combining
+        // to select entry 6 `pat[_huge]` and `no_cache` (pcd) must be set to `true`
+
         switch (page_type) {
             .small => entry.pat.write(true),
             .medium, .large => entry.pat_huge.write(true),
         }
-
-        if (map_type.no_cache) return error.WriteCombiningAndNoCache;
+        entry.no_cache.write(true);
     }
 
     if (map_type.no_cache) {
@@ -364,11 +368,13 @@ fn setEntry(
     index: usize,
     physical_address: core.PhysicalAddress,
     map_type: MapType,
-    comptime page_type: PageType,
+    page_type: PageType,
 ) error{ AlreadyMapped, WriteCombiningAndNoCache }!void {
     var entry: PageTable.Entry = .fromRaw(&page_table.entries[index]);
 
     if (entry.present.read()) return error.AlreadyMapped;
+
+    entry.zero();
 
     switch (page_type) {
         .small => entry.setAddress4kib(physical_address),
