@@ -454,6 +454,95 @@ pub const IA32_MTRRCAP = packed struct(u64) {
     const msr = MSR(u64, 0xFE);
 };
 
+pub const PAT = packed struct(u64) {
+    entry0: MemoryType,
+
+    _reserved3_7: u5 = 0,
+
+    entry1: MemoryType,
+
+    _reserved11_15: u5 = 0,
+
+    entry2: MemoryType,
+
+    _reserved19_23: u5 = 0,
+
+    entry3: MemoryType,
+
+    _reserved27_31: u5 = 0,
+
+    entry4: MemoryType,
+
+    _reserved35_39: u5 = 0,
+
+    entry5: MemoryType,
+
+    _reserved43_47: u5 = 0,
+
+    entry6: MemoryType,
+
+    _reserved51_55: u5 = 0,
+
+    entry7: MemoryType,
+
+    _reserved59_63: u5 = 0,
+
+    pub const MemoryType = enum(u3) {
+        unchacheable = 0x0,
+        write_combining = 0x1,
+        write_through = 0x4,
+        write_protected = 0x5,
+        write_back = 0x6,
+        uncached = 0x7,
+    };
+
+    pub inline fn read() PAT {
+        return @bitCast(msr.read());
+    }
+
+    pub inline fn write(value: PAT) void {
+        msr.write(@bitCast(value));
+    }
+
+    pub fn print(pat: PAT, writer: std.io.AnyWriter, indent: usize) !void {
+        _ = indent;
+
+        try writer.writeAll("PAT{ entry0: ");
+        try writer.writeAll(@tagName(pat.entry0));
+        try writer.writeAll(", entry1: ");
+        try writer.writeAll(@tagName(pat.entry1));
+        try writer.writeAll(", entry2: ");
+        try writer.writeAll(@tagName(pat.entry2));
+        try writer.writeAll(", entry3: ");
+        try writer.writeAll(@tagName(pat.entry3));
+        try writer.writeAll(", entry4: ");
+        try writer.writeAll(@tagName(pat.entry4));
+        try writer.writeAll(", entry5: ");
+        try writer.writeAll(@tagName(pat.entry5));
+        try writer.writeAll(", entry6: ");
+        try writer.writeAll(@tagName(pat.entry6));
+        try writer.writeAll(", entry7: ");
+        try writer.writeAll(@tagName(pat.entry7));
+        try writer.writeAll(" }");
+    }
+
+    pub inline fn format(
+        pat: PAT,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            PAT.print(pat, writer, 0)
+        else
+            PAT.print(pat, writer.any(), 0);
+    }
+
+    const msr = MSR(u64, 0x277);
+};
+
 pub const DR0 = DebugAddressRegister(.DR0);
 pub const DR1 = DebugAddressRegister(.DR1);
 pub const DR2 = DebugAddressRegister(.DR2);
