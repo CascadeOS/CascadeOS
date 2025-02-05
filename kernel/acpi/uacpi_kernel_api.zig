@@ -30,45 +30,79 @@ export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
 }
 
 /// Read the configuration space of a previously open PCI device.
-///
-/// NOTE:
-/// Since PCI registers are 32 bits wide this must be able to handle e.g. a 1-byte access by reading at the nearest
-/// 4-byte aligned offset below, then masking the value to select the target byte.
-export fn uacpi_kernel_pci_read(
+export fn uacpi_kernel_pci_read8(
     device: *kernel.pci.PciFunction,
     offset: usize,
-    byte_width: uacpi.ByteWidth,
-    value: *u64,
+    value: *u8,
 ) uacpi.Status {
     const address = device.config_space_address.moveForward(.from(offset, .byte));
 
-    value.* = switch (byte_width) {
-        .one => address.toPtr(*const volatile u8).*,
-        .two => address.toPtr(*const volatile u16).*,
-        .four => address.toPtr(*const volatile u32).*,
-    };
+    value.* = address.toPtr(*const volatile u8).*;
+
+    return .ok;
+}
+
+/// Read the configuration space of a previously open PCI device.
+export fn uacpi_kernel_pci_read16(
+    device: *kernel.pci.PciFunction,
+    offset: usize,
+    value: *u16,
+) uacpi.Status {
+    const address = device.config_space_address.moveForward(.from(offset, .byte));
+
+    value.* = address.toPtr(*const volatile u16).*;
+
+    return .ok;
+}
+
+/// Read the configuration space of a previously open PCI device.
+export fn uacpi_kernel_pci_read32(
+    device: *kernel.pci.PciFunction,
+    offset: usize,
+    value: *u32,
+) uacpi.Status {
+    const address = device.config_space_address.moveForward(.from(offset, .byte));
+
+    value.* = address.toPtr(*const volatile u32).*;
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
-///
-/// NOTE:
-/// Since PCI registers are 32 bits wide this must be able to handle e.g. a 1-byte access by reading at the nearest
-/// 4-byte aligned offset below, then masking the value to select the target byte.
-export fn uacpi_kernel_pci_write(
+export fn uacpi_kernel_pci_write8(
     device: *kernel.pci.PciFunction,
     offset: usize,
-    byte_width: uacpi.ByteWidth,
-    value: u64,
+    value: u8,
 ) uacpi.Status {
     const address = device.config_space_address.moveForward(.from(offset, .byte));
 
-    switch (byte_width) {
-        .one => address.toPtr(*volatile u8).* = @truncate(value),
-        .two => address.toPtr(*volatile u16).* = @truncate(value),
-        .four => address.toPtr(*volatile u32).* = @truncate(value),
-    }
+    address.toPtr(*volatile u8).* = value;
+
+    return .ok;
+}
+
+/// Write the configuration space of a previously open PCI device.
+export fn uacpi_kernel_pci_write16(
+    device: *kernel.pci.PciFunction,
+    offset: usize,
+    value: u16,
+) uacpi.Status {
+    const address = device.config_space_address.moveForward(.from(offset, .byte));
+
+    address.toPtr(*volatile u16).* = value;
+
+    return .ok;
+}
+
+/// Write the configuration space of a previously open PCI device.
+export fn uacpi_kernel_pci_write32(
+    device: *kernel.pci.PciFunction,
+    offset: usize,
+    value: u32,
+) uacpi.Status {
+    const address = device.config_space_address.moveForward(.from(offset, .byte));
+
+    address.toPtr(*volatile u32).* = value;
 
     return .ok;
 }
@@ -77,6 +111,7 @@ export fn uacpi_kernel_pci_write(
 /// and writing the IO range.
 export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) uacpi.Status {
     _ = len;
+
     out_handle.* = @ptrFromInt(base);
     return .ok;
 }
@@ -86,45 +121,90 @@ export fn uacpi_kernel_io_unmap(handle: *anyopaque) void {
 }
 
 /// Read the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
-///
-/// NOTE:
-/// You are NOT allowed to break e.g. a 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
-/// be of the exact width.
-export fn uacpi_kernel_io_read(
+export fn uacpi_kernel_io_read8(
     handle: *anyopaque,
     offset: usize,
-    byte_width: uacpi.ByteWidth,
-    value: *u64,
+    value: *u8,
 ) uacpi.Status {
-    _ = offset;
-    const port: u16 = @intCast(@intFromPtr(handle)); // IO ports are 16-bit
-    switch (byte_width) {
-        .one => value.* = kernel.arch.io.readPort(u8, port) catch return .invalid_argument,
-        .two => value.* = kernel.arch.io.readPort(u16, port) catch return .invalid_argument,
-        .four => value.* = kernel.arch.io.readPort(u32, port) catch return .invalid_argument,
-    }
+    // TODO: only supports x86 ports
+
+    const port: u16 = @intCast(@intFromPtr(handle) + offset);
+
+    value.* = kernel.arch.io.readPort(u8, port) catch return .invalid_argument;
+    return .ok;
+}
+
+/// Read the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+export fn uacpi_kernel_io_read16(
+    handle: *anyopaque,
+    offset: usize,
+    value: *u16,
+) uacpi.Status {
+    // TODO: only supports x86 ports
+
+    const port: u16 = @intCast(@intFromPtr(handle) + offset);
+    std.debug.assert(std.mem.isAligned(port, @sizeOf(u16)));
+
+    value.* = kernel.arch.io.readPort(u16, port) catch return .invalid_argument;
+    return .ok;
+}
+
+/// Read the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+export fn uacpi_kernel_io_read32(
+    handle: *anyopaque,
+    offset: usize,
+    value: *u32,
+) uacpi.Status {
+    // TODO: only supports x86 ports
+
+    const port: u16 = @intCast(@intFromPtr(handle) + offset);
+    std.debug.assert(std.mem.isAligned(port, @sizeOf(u32)));
+
+    value.* = kernel.arch.io.readPort(u32, port) catch return .invalid_argument;
     return .ok;
 }
 
 /// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
-///
-/// NOTE:
-/// You are NOT allowed to break e.g. a 4-byte access into four 1-byte accesses. Hardware ALWAYS expects accesses to
-/// be of the exact width.
-export fn uacpi_kernel_io_write(
+export fn uacpi_kernel_io_write8(
     handle: *anyopaque,
     offset: usize,
-    byte_width: uacpi.ByteWidth,
-    value: u64,
+    value: u8,
 ) uacpi.Status {
-    _ = offset;
-    const port: u16 = @intCast(@intFromPtr(handle)); // IO ports are 16-bit
-    switch (byte_width) {
-        .one => kernel.arch.io.writePort(u8, port, @truncate(value)) catch return .invalid_argument,
-        .two => kernel.arch.io.writePort(u16, port, @truncate(value)) catch return .invalid_argument,
-        .four => kernel.arch.io.writePort(u32, port, @truncate(value)) catch return .invalid_argument,
-    }
+    // TODO: only supports x86 ports
 
+    const port: u16 = @intCast(@intFromPtr(handle) + offset);
+
+    kernel.arch.io.writePort(u8, port, value) catch return .invalid_argument;
+    return .ok;
+}
+
+/// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+export fn uacpi_kernel_io_write16(
+    handle: *anyopaque,
+    offset: usize,
+    value: u16,
+) uacpi.Status {
+    // TODO: only supports x86 ports
+
+    const port: u16 = @intCast(@intFromPtr(handle) + offset);
+    std.debug.assert(std.mem.isAligned(port, @sizeOf(u16)));
+
+    kernel.arch.io.writePort(u16, port, value) catch return .invalid_argument;
+    return .ok;
+}
+
+/// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+export fn uacpi_kernel_io_write32(
+    handle: *anyopaque,
+    offset: usize,
+    value: u32,
+) uacpi.Status {
+    // TODO: only supports x86 ports
+
+    const port: u16 = @intCast(@intFromPtr(handle) + offset);
+    std.debug.assert(std.mem.isAligned(port, @sizeOf(u32)));
+
+    kernel.arch.io.writePort(u32, port, value) catch return .invalid_argument;
     return .ok;
 }
 

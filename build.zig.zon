@@ -27,8 +27,8 @@
         },
 
         .uacpi = .{
-            .url = "git+https://github.com/UltraOS/uACPI.git?ref=master#765059be191db143c2ee31504915014117cd61c8",
-            .hash = "1220444ec9880229e6e21072977e9b92e3bfa114fa727dbaaf8299e8dc7d09e02a74",
+            .url = "git+https://github.com/CascadeOS/uACPI.git?ref=master#757dcece1a9f1c069355b23f7feaf21656728f94",
+            .hash = "12200468fb671c04225f04d87e0fe1131e49ccd153e870be6e858dc80e39cb4e18df",
         },
     },
 
