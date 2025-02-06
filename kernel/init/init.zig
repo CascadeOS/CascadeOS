@@ -61,11 +61,11 @@ pub fn initStage1() !noreturn {
     log.debug("loading core page table", .{});
     kernel.vmm.globals.core_page_table.load();
 
-    log.debug("initializing kernel heap and special use region", .{});
-    try kernel.heap.init.initializeHeapAndSpecialUse(&bootstrap_init_task);
+    log.debug("initializing kernel and special heap", .{});
+    try kernel.heap.init.initializeHeaps(&bootstrap_init_task);
 
-    // update the framebuffer to use the correct mapping using the special use region
-    try framebuffer.remapFramebufferToSpecialUseRegion(&bootstrap_init_task);
+    // update the framebuffer to use the correct mapping
+    try framebuffer.remapFramebuffer(&bootstrap_init_task);
 
     log.debug("initializing kernel stacks", .{});
     try kernel.Stack.init.initializeStacks(&bootstrap_init_task);

@@ -30,14 +30,14 @@ pub fn allocateInterrupt(
 pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) void {
     const interrupt_number = @intFromEnum(interrupt);
 
-    globals.interrupt_arena.deallocate(current_task, .{
-        .base = interrupt_number,
-        .len = 1,
-    });
-
     globals.handlers[interrupt_number] = .{
         .interrupt_handler = interrupt_handlers.unhandledInterrupt,
     };
+
+    globals.interrupt_arena.deallocate(current_task, .{
+        .base = interrupt_number,
+        .len = 1,
+    }, .{});
 }
 
 pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {

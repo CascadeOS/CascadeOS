@@ -68,6 +68,7 @@ pub const Source = struct {
         arena: *ResourceArena,
         current_task: *kernel.Task,
         allocation: Allocation,
+        options: DeallocateOptions,
     ) void = deallocate,
 
     fn callImport(
@@ -83,8 +84,9 @@ pub const Source = struct {
         source: *const Source,
         current_task: *kernel.Task,
         allocation: Allocation,
+        options: DeallocateOptions,
     ) callconv(core.inline_in_non_debug) void {
-        source.release(source.arena, current_task, allocation);
+        source.release(source.arena, current_task, allocation, options);
     }
 };
 
@@ -383,6 +385,13 @@ pub const AllocateError = error{
 
 pub const AllocateOptions = struct {
     policy: Policy = .instant_fit,
+
+    /// Whether to unlock the mutex before returning.
+    ///
+    /// It is the caller's responsibility to unlock the mutex if this is `false`
+    ///
+    /// The mutex is always unlocked if the allocation fails.
+    unlock_mutex: bool = true,
 };
 
 /// Allocate a block of length `len` from the arena.
@@ -399,7 +408,7 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
     });
 
     try arena.ensureBoundaryTags(current_task);
-    defer arena.mutex.unlock(current_task);
+    errdefer arena.mutex.unlock(current_task); // unlock mutex on error
 
     const target_tag: *BoundaryTag = while (true) {
         break switch (options.policy) {
@@ -429,6 +438,8 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
     };
 
     log.debug("{s}: allocated {}", .{ arena.name(), allocation });
+
+    if (options.unlock_mutex) arena.mutex.unlock(current_task);
 
     return allocation;
 }
@@ -554,7 +565,7 @@ fn importFromSource(
     defer if (need_to_lock_mutex) arena.mutex.lock(current_task);
 
     const allocation = try source.callImport(current_task, len, .{});
-    errdefer source.callRelease(current_task, allocation);
+    errdefer source.callRelease(current_task, allocation, .{});
 
     try arena.ensureBoundaryTags(current_task);
     need_to_lock_mutex = false;
@@ -599,26 +610,33 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
     arena.pushToFreelist(new_tag);
 }
 
+pub const DeallocateOptions = struct {
+    /// Whether the arena's mutex is locked upon entry.
+    ///
+    /// The mutex will be unlocked upon return.
+    mutex_locked: bool = false,
+};
+
 /// Deallocate the allocation.
 ///
 /// Panics if the allocation does not match a previous call to `allocate`.
-pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation) void {
+pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation, options: DeallocateOptions) void {
     log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
 
-    arena.deallocateInner(current_task, allocation.base, allocation.len);
+    arena.deallocateInner(current_task, allocation.base, allocation.len, options);
 }
 
 /// Deallocate the allocation at `base`.
 ///
 /// Panics if the `base` does not match a previous call to `allocate`.
-pub fn deallocateBase(arena: *ResourceArena, current_task: *kernel.Task, base: usize) void {
+pub fn deallocateBase(arena: *ResourceArena, current_task: *kernel.Task, base: usize, options: DeallocateOptions) void {
     log.debug("{s}: deallocating base 0x{x}", .{ arena.name(), base });
 
-    arena.deallocateInner(current_task, base, null);
+    arena.deallocateInner(current_task, base, null, options);
 }
 
-fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usize, len: ?usize) void {
-    arena.mutex.lock(current_task);
+fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usize, len: ?usize, options: DeallocateOptions) void {
+    if (!options.mutex_locked) arena.mutex.lock(current_task);
 
     var need_to_unlock_mutex = true;
     defer if (need_to_unlock_mutex) arena.mutex.unlock(current_task);
@@ -700,7 +718,7 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
             arena.mutex.unlock(current_task);
             need_to_unlock_mutex = false;
 
-            source.callRelease(current_task, allocation_to_release);
+            source.callRelease(current_task, allocation_to_release, .{});
 
             log.debug("{s}: released {} to source {s}", .{ arena.name(), allocation_to_release, source.arena.name() });
 

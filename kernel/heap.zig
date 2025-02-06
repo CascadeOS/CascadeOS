@@ -22,11 +22,11 @@ pub fn deallocate(range: core.VirtualRange, current_task: *kernel.Task) void {
     globals.heap_arena.deallocate(current_task, .{
         .base = range.address.value,
         .len = range.size.value,
-    });
+    }, .{});
 }
 
 pub fn deallocateBase(base: core.VirtualAddress, current_task: *kernel.Task) void {
-    globals.heap_arena.deallocateBase(current_task, base.value);
+    globals.heap_arena.deallocateBase(current_task, base.value, .{});
 }
 
 pub const allocator = std.mem.Allocator{
@@ -84,7 +84,11 @@ pub const allocator = std.mem.Allocator{
             ) void {
                 // we have to use `deallocateBase` here because the true length of the allocation in `alloc` is not
                 // returned to the caller due to the Allocator API
-                globals.heap_arena.deallocateBase(kernel.Task.getCurrent(), @intFromPtr(buf.ptr));
+                globals.heap_arena.deallocateBase(
+                    kernel.Task.getCurrent(),
+                    @intFromPtr(buf.ptr),
+                    .{},
+                );
             }
         }.free,
     },
@@ -96,7 +100,12 @@ fn heapArenaImport(
     len: usize,
     options: ResourceArena.AllocateOptions,
 ) ResourceArena.AllocateError!ResourceArena.Allocation {
-    const allocation = try arena.allocate(current_task, len, options);
+    const allocation = try arena.allocate(
+        current_task,
+        len,
+        .{ .policy = options.policy, .unlock_mutex = false },
+    );
+    errdefer arena.deallocate(current_task, allocation, .{ .mutex_locked = true });
 
     log.debug("mapping {} into heap", .{allocation});
 
@@ -111,6 +120,8 @@ fn heapArenaImport(
         true,
     ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
 
+    arena.mutex.unlock(current_task);
+
     return allocation;
 }
 
@@ -118,8 +129,11 @@ fn heapArenaRelease(
     arena: *ResourceArena,
     current_task: *kernel.Task,
     allocation: ResourceArena.Allocation,
+    _: ResourceArena.DeallocateOptions,
 ) void {
     log.debug("unmapping {} from heap", .{allocation});
+
+    arena.mutex.lock(current_task);
 
     kernel.vmm.unmapRange(
         kernel.vmm.globals.core_page_table,
@@ -132,29 +146,34 @@ fn heapArenaRelease(
         true,
     );
 
-    arena.deallocate(current_task, allocation);
+    arena.deallocate(
+        current_task,
+        allocation,
+        .{ .mutex_locked = true },
+    );
 }
 
-pub fn allocateSpecialUse(
+pub fn allocateSpecial(
     current_task: *kernel.Task,
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: kernel.vmm.MapType,
 ) !core.VirtualRange {
-    const allocation = try globals.special_use_arena.allocate(
+    const allocation = try globals.special_heap_address_space_arena.allocate(
         current_task,
         size.value,
-        .{},
+        .{ .unlock_mutex = false },
     );
-    errdefer globals.special_use_arena.deallocate(current_task, allocation);
+    errdefer globals.special_heap_address_space_arena.deallocate(
+        current_task,
+        allocation,
+        .{ .mutex_locked = true },
+    );
 
     const virtual_range: core.VirtualRange = .{
         .address = .fromInt(allocation.base),
         .size = .from(allocation.len, .byte),
     };
-
-    globals.special_use_mutex.lock(current_task);
-    defer globals.special_use_mutex.unlock(current_task);
 
     try kernel.vmm.mapToPhysicalRange(
         kernel.vmm.globals.core_page_table,
@@ -164,29 +183,29 @@ pub fn allocateSpecialUse(
         true,
     );
 
+    globals.special_heap_address_space_arena.mutex.unlock(current_task);
+
     return virtual_range;
 }
 
-pub fn deallocateSpecialUse(
+pub fn deallocateSpecial(
     current_task: *kernel.Task,
     virtual_range: core.VirtualRange,
 ) void {
-    {
-        globals.special_use_mutex.lock(current_task);
-        defer globals.special_use_mutex.unlock(current_task);
+    globals.special_heap_address_space_arena.mutex.lock(current_task);
 
-        kernel.vmm.unmapRange(
-            kernel.vmm.globals.core_page_table,
-            virtual_range,
-            true,
-            .kernel,
-            true,
-        );
-    }
+    kernel.vmm.unmapRange(
+        kernel.vmm.globals.core_page_table,
+        virtual_range,
+        true,
+        .kernel,
+        true,
+    );
 
-    globals.special_use_arena.deallocate(
+    globals.special_heap_address_space_arena.deallocate(
         current_task,
         .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
+        .{ .mutex_locked = true },
     );
 }
 
@@ -197,29 +216,26 @@ const globals = struct {
     ///
     /// Has no source arena, provided with a single span representing the entire heap.
     ///
-    /// Initialized during `init.initializeResourceArenasAndHeap`.
+    /// Initialized during `init.initializeHeaps`.
     var heap_address_space_arena: ResourceArena = undefined;
 
     /// The heap arena.
     ///
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
-    /// Initialized during `init.initializeResourceArenasAndHeap`.
+    /// Initialized during `init.initializeHeaps`.
     var heap_arena: ResourceArena = undefined;
 
-    /// An arena managing the special use region's virtual address space.
+    /// An arena managing the special heap region's virtual address space.
     ///
     /// Has no source arena, provided with a single span representing the entire range.
     ///
-    /// Initialized during `init.initializeSpecialUseRegion`.
-    var special_use_arena: kernel.ResourceArena = undefined;
-
-    /// Used to protect the special use region while the page mapping is being modified.
-    var special_use_mutex: kernel.sync.Mutex = .{};
+    /// Initialized during `init.initializeHeaps`.
+    var special_heap_address_space_arena: kernel.ResourceArena = undefined;
 };
 
 pub const init = struct {
-    pub fn initializeHeapAndSpecialUse(current_task: *kernel.Task) !void {
+    pub fn initializeHeaps(current_task: *kernel.Task) !void {
         // heap
         {
             try globals.heap_address_space_arena.create(
@@ -255,24 +271,24 @@ pub const init = struct {
             };
         }
 
-        // special use region
+        // special heap
         {
-            try globals.special_use_arena.create(
-                "special_use_arena",
+            try globals.special_heap_address_space_arena.create(
+                "special_heap_address_space",
                 kernel.arch.paging.standard_page_size.value,
                 .{},
             );
 
-            const special_use_range = kernel.vmm.getKernelRegion(.special_use) orelse
-                @panic("no special use region");
+            const special_heap_range = kernel.vmm.getKernelRegion(.special_heap) orelse
+                @panic("no special heap region");
 
-            globals.special_use_arena.addSpan(
+            globals.special_heap_address_space_arena.addSpan(
                 current_task,
-                special_use_range.address.value,
-                special_use_range.size.value,
+                special_heap_range.address.value,
+                special_heap_range.size.value,
             ) catch |err| {
                 std.debug.panic(
-                    "failed to add special use range to `special_use_arena`: {s}",
+                    "failed to add special heap range to `special_heap_address_space_arena`: {s}",
                     .{@errorName(err)},
                 );
             };

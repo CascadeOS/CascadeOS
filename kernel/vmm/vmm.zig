@@ -258,7 +258,6 @@ pub const init = struct {
         try registerKernelSections();
         try registerDirectMaps();
         try registerHeaps();
-        try registerSpecialUseRegion();
 
         sortKernelMemoryRegions();
 
@@ -408,24 +407,26 @@ pub const init = struct {
             .type = .kernel_heap,
         });
 
-        const kernel_stacks_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
+        const special_heap_range = findFreeRange(
+            size_of_top_level,
+            size_of_top_level,
+        ) orelse
+            @panic("no space in kernel memory layout for the special heap");
+
+        try globals.regions.append(.{
+            .range = special_heap_range,
+            .type = .special_heap,
+        });
+
+        const kernel_stacks_range = findFreeRange(
+            size_of_top_level,
+            size_of_top_level,
+        ) orelse
             @panic("no space in kernel memory layout for the kernel stacks");
 
         try globals.regions.append(.{
             .range = kernel_stacks_range,
             .type = .kernel_stacks,
-        });
-    }
-
-    fn registerSpecialUseRegion() !void {
-        const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
-
-        const special_use_range = findFreeRange(size_of_top_level, size_of_top_level) orelse
-            @panic("no space in kernel memory layout for the special use region");
-
-        try globals.regions.append(.{
-            .range = special_use_range,
-            .type = .special_use,
         });
     }
 

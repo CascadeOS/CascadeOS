@@ -54,8 +54,8 @@ fn newLine() void {
     }
 }
 
-/// Map the framebuffer into the special use region.
-pub fn remapFramebufferToSpecialUseRegion(current_task: *kernel.Task) !void {
+/// Map the framebuffer into the special heap as write combining.
+pub fn remapFramebuffer(current_task: *kernel.Task) !void {
     const framebuffer = kernel.boot.framebuffer() orelse return;
 
     const exact_framebuffer_physical_base: core.PhysicalAddress = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
@@ -66,7 +66,7 @@ pub fn remapFramebufferToSpecialUseRegion(current_task: *kernel.Task) !void {
     const exact_framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
     const aligned_framebuffer_size = exact_framebuffer_size.alignForward(kernel.arch.paging.standard_page_size);
 
-    const virtual_range = try kernel.heap.allocateSpecialUse(
+    const virtual_range = try kernel.heap.allocateSpecial(
         current_task,
         aligned_framebuffer_size,
         .fromAddr(
