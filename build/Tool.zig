@@ -86,12 +86,12 @@ fn resolveTool(
     addDependenciesToModule(normal_module, tool_description, dependencies);
     handleToolConfiguration(b, tool_description, normal_module);
 
-    {
-        const check_exe = b.addExecutable(.{
-            .name = tool_description.name,
-            .root_module = normal_module,
-        });
-        step_collection.registerCheck(check_exe);
+    { // FIXME: `-fno-emit-bin` + c files is broken https://github.com/CascadeOS/CascadeOS/issues/96
+        // const check_exe = b.addExecutable(.{
+        //     .name = tool_description.name,
+        //     .root_module = normal_module,
+        // });
+        // step_collection.registerCheck(check_exe);
     }
 
     const normal_exe = b.addExecutable(.{
@@ -146,18 +146,20 @@ fn resolveTool(
     const build_step = b.step(build_step_name, build_step_description);
     build_step.dependOn(&exe_install_step.step);
 
-    {
-        const check_test_exe = b.addTest(.{
-            .name = test_name,
-            .root_module = normal_module,
-        });
-        step_collection.registerCheck(check_test_exe);
+    { // FIXME: `-fno-emit-bin` + c files is broken https://github.com/CascadeOS/CascadeOS/issues/96
+        // const check_test_exe = b.addTest(.{
+        //     .name = test_name,
+        //     .root_module = normal_module,
+        // });
+        // step_collection.registerCheck(check_test_exe);
     }
 
+    // FIXME: workaround for `-fno-emit-bin` + c files is broken https://github.com/CascadeOS/CascadeOS/issues/96
     const test_exe = b.addTest(.{
         .name = test_name,
         .root_module = normal_module,
     });
+    step_collection.registerCheck(test_exe);
 
     const test_install_step = b.addInstallArtifact(
         test_exe,
