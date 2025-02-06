@@ -36,26 +36,42 @@ pub const allocator = std.mem.Allocator{
             fn alloc(
                 _: *anyopaque,
                 len: usize,
-                _: u8,
+                log2_align: u8,
                 _: usize,
             ) ?[*]u8 {
+                // Overallocate to account for alignment padding and store the original pointer before
+                // the aligned address.
+
+                const alignment = @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
+                const full_len = len + alignment - 1 + @sizeOf(usize);
+
                 const allocation = globals.heap_arena.allocate(
                     kernel.Task.getCurrent(),
-                    len,
+                    full_len,
                     .{},
                 ) catch return null;
-                return @ptrFromInt(allocation.base);
+
+                const aligned_addr = std.mem.alignForward(usize, allocation.base + @sizeOf(usize), alignment);
+
+                const unaligned_ptr: [*]u8 = @ptrFromInt(allocation.base);
+                const aligned_ptr = unaligned_ptr + (aligned_addr - allocation.base);
+                getHeader(aligned_ptr).* = unaligned_ptr;
+
+                return aligned_ptr;
             }
         }.alloc,
         .resize = struct {
             fn resize(
                 _: *anyopaque,
                 buf: []u8,
-                _: u8,
+                log2_align: u8,
                 new_len: usize,
                 _: usize,
             ) bool {
                 std.debug.assert(new_len != 0);
+
+                const alignment = @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
+                const full_new_len = buf.len + alignment - 1 + @sizeOf(usize);
 
                 // the current `ResourceArena` implementation does support arbitrary shrinking of allocations, but
                 // once we add quantum caches it no longer would be possible to peform resizes that change the
@@ -68,7 +84,7 @@ pub const allocator = std.mem.Allocator{
                 );
                 const new_quantum_aligned_len = std.mem.alignForward(
                     usize,
-                    new_len,
+                    full_new_len,
                     heap_arena_quantum,
                 );
 
@@ -86,13 +102,17 @@ pub const allocator = std.mem.Allocator{
                 // returned to the caller due to the Allocator API
                 globals.heap_arena.deallocateBase(
                     kernel.Task.getCurrent(),
-                    @intFromPtr(buf.ptr),
+                    @intFromPtr(getHeader(buf.ptr).*),
                     .{},
                 );
             }
         }.free,
     },
 };
+
+fn getHeader(ptr: [*]u8) *[*]u8 {
+    return @as(*[*]u8, @ptrFromInt(@intFromPtr(ptr) - @sizeOf(usize)));
+}
 
 fn heapArenaImport(
     arena: *ResourceArena,
