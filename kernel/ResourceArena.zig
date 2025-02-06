@@ -61,7 +61,7 @@ pub const Source = struct {
         arena: *ResourceArena,
         current_task: *kernel.Task,
         len: usize,
-        policy: Policy,
+        options: AllocateOptions,
     ) AllocateError!Allocation = allocate,
 
     release: *const fn (
@@ -74,9 +74,9 @@ pub const Source = struct {
         source: *const Source,
         current_task: *kernel.Task,
         len: usize,
-        policy: Policy,
+        options: AllocateOptions,
     ) callconv(core.inline_in_non_debug) AllocateError!Allocation {
-        return source.import(source.arena, current_task, len, policy);
+        return source.import(source.arena, current_task, len, options);
     }
 
     fn callRelease(
@@ -381,8 +381,12 @@ pub const AllocateError = error{
     RequestedLengthUnavailable,
 } || EnsureBoundaryTagsError;
 
-/// Allocate a block of length `len` from the arena, using the provided policy.
-pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, policy: Policy) AllocateError!Allocation {
+pub const AllocateOptions = struct {
+    policy: Policy = .instant_fit,
+};
+
+/// Allocate a block of length `len` from the arena.
+pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, options: AllocateOptions) AllocateError!Allocation {
     if (len == 0) return AllocateError.ZeroLength;
 
     const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
@@ -391,14 +395,14 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, p
         arena.name(),
         len,
         quantum_aligned_len,
-        @tagName(policy),
+        @tagName(options.policy),
     });
 
     try arena.ensureBoundaryTags(current_task);
     defer arena.mutex.unlock(current_task);
 
     const target_tag: *BoundaryTag = while (true) {
-        break switch (policy) {
+        break switch (options.policy) {
             .instant_fit => arena.findInstantFit(quantum_aligned_len),
             .best_fit => arena.findBestFit(quantum_aligned_len),
             .first_fit => arena.findFirstFit(quantum_aligned_len),
@@ -549,7 +553,7 @@ fn importFromSource(
     var need_to_lock_mutex = true;
     defer if (need_to_lock_mutex) arena.mutex.lock(current_task);
 
-    const allocation = try source.callImport(current_task, len, .instant_fit);
+    const allocation = try source.callImport(current_task, len, .{});
     errdefer source.callRelease(current_task, allocation);
 
     try arena.ensureBoundaryTags(current_task);

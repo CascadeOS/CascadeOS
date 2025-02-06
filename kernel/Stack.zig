@@ -65,7 +65,7 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
     const stack_range = try globals.stack_arena.allocate(
         current_task,
         stack_size_including_guard_page.value,
-        .instant_fit,
+        .{},
     );
 
     const range: core.VirtualRange = .{

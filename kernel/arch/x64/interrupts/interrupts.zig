@@ -14,7 +14,7 @@ pub fn allocateInterrupt(
     context1: ?*anyopaque,
     context2: ?*anyopaque,
 ) !Interrupt {
-    const allocation = try globals.interrupt_arena.allocate(current_task, 1, .instant_fit);
+    const allocation = try globals.interrupt_arena.allocate(current_task, 1, .{});
 
     const interrupt_number: u8 = @intCast(allocation.base);
 

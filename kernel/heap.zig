@@ -9,7 +9,7 @@ pub fn allocate(len: usize, current_task: *kernel.Task) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         current_task,
         len,
-        .instant_fit,
+        .{},
     );
 
     return .{
@@ -42,7 +42,7 @@ pub const allocator = std.mem.Allocator{
                 const allocation = globals.heap_arena.allocate(
                     kernel.Task.getCurrent(),
                     len,
-                    .instant_fit,
+                    .{},
                 ) catch return null;
                 return @ptrFromInt(allocation.base);
             }
@@ -94,9 +94,9 @@ fn heapArenaImport(
     arena: *ResourceArena,
     current_task: *kernel.Task,
     len: usize,
-    policy: ResourceArena.Policy,
+    options: ResourceArena.AllocateOptions,
 ) ResourceArena.AllocateError!ResourceArena.Allocation {
-    const allocation = try arena.allocate(current_task, len, policy);
+    const allocation = try arena.allocate(current_task, len, options);
 
     log.debug("mapping {} into heap", .{allocation});
 
@@ -144,7 +144,7 @@ pub fn allocateSpecialUse(
     const allocation = try globals.special_use_arena.allocate(
         current_task,
         size.value,
-        .instant_fit,
+        .{},
     );
     errdefer globals.special_use_arena.deallocate(current_task, allocation);
 
