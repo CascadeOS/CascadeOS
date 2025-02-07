@@ -139,6 +139,7 @@ fn heapArenaImport(
         .kernel,
         true,
     ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
+    errdefer comptime unreachable;
 
     arena.mutex.unlock(current_task);
 
@@ -202,6 +203,7 @@ pub fn allocateSpecial(
         map_type,
         true,
     );
+    errdefer comptime unreachable;
 
     globals.special_heap_address_space_arena.mutex.unlock(current_task);
 
@@ -217,7 +219,7 @@ pub fn deallocateSpecial(
     kernel.vmm.unmapRange(
         kernel.vmm.globals.core_page_table,
         virtual_range,
-        true,
+        false,
         .kernel,
         true,
     );
