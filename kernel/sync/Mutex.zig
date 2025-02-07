@@ -67,6 +67,10 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     mutex.wait_queue.wakeOne(current_task);
 }
 
+pub fn isLockedBy(mutex: *const Mutex, task: *const kernel.Task) bool {
+    return mutex.locked_by.load(.acquire) == task;
+}
+
 const spins = 10;
 
 const core = @import("core");
