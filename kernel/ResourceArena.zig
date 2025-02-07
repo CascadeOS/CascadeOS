@@ -386,12 +386,12 @@ pub const AllocateError = error{
 pub const AllocateOptions = struct {
     policy: Policy = .instant_fit,
 
-    /// Whether to unlock the mutex before returning.
+    /// Whether to leave the mutex locked on successful return.
     ///
-    /// It is the caller's responsibility to unlock the mutex if this is `false`
+    /// It is the caller's responsibility to unlock the mutex when this is set to `true`.
     ///
     /// The mutex is always unlocked if the allocation fails.
-    unlock_mutex: bool = true,
+    leave_mutex_locked: bool = false,
 };
 
 /// Allocate a block of length `len` from the arena.
@@ -408,7 +408,7 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
     });
 
     try arena.ensureBoundaryTags(current_task);
-    errdefer arena.mutex.unlock(current_task); // unlock mutex on error
+    errdefer arena.mutex.unlock(current_task); // unconditionally unlock mutex on error
 
     const target_tag: *BoundaryTag = while (true) {
         break switch (options.policy) {
@@ -439,7 +439,7 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
 
     log.debug("{s}: allocated {}", .{ arena.name(), allocation });
 
-    if (options.unlock_mutex) arena.mutex.unlock(current_task);
+    if (!options.leave_mutex_locked) arena.mutex.unlock(current_task);
 
     return allocation;
 }
@@ -611,10 +611,10 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
 }
 
 pub const DeallocateOptions = struct {
-    /// Whether the arena's mutex is locked upon entry.
+    /// Whether the arena's mutex is already locked upon entry.
     ///
-    /// The mutex will be unlocked upon return.
-    mutex_locked: bool = false,
+    /// The mutex will always be unlocked upon return.
+    mutex_already_locked: bool = false,
 };
 
 /// Deallocate the allocation.
@@ -636,7 +636,11 @@ pub fn deallocateBase(arena: *ResourceArena, current_task: *kernel.Task, base: u
 }
 
 fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usize, len: ?usize, options: DeallocateOptions) void {
-    if (!options.mutex_locked) arena.mutex.lock(current_task);
+    if (options.mutex_already_locked) {
+        std.debug.assert(arena.mutex.isLockedBy(current_task));
+    } else {
+        arena.mutex.lock(current_task);
+    }
 
     var need_to_unlock_mutex = true;
     defer if (need_to_unlock_mutex) arena.mutex.unlock(current_task);

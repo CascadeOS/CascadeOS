@@ -123,9 +123,9 @@ fn heapArenaImport(
     const allocation = try arena.allocate(
         current_task,
         len,
-        .{ .policy = options.policy, .unlock_mutex = false },
+        .{ .policy = options.policy, .leave_mutex_locked = true },
     );
-    errdefer arena.deallocate(current_task, allocation, .{ .mutex_locked = true });
+    errdefer arena.deallocate(current_task, allocation, .{ .mutex_already_locked = true });
 
     log.debug("mapping {} into heap", .{allocation});
 
@@ -169,7 +169,7 @@ fn heapArenaRelease(
     arena.deallocate(
         current_task,
         allocation,
-        .{ .mutex_locked = true },
+        .{ .mutex_already_locked = true },
     );
 }
 
@@ -182,12 +182,12 @@ pub fn allocateSpecial(
     const allocation = try globals.special_heap_address_space_arena.allocate(
         current_task,
         size.value,
-        .{ .unlock_mutex = false },
+        .{ .leave_mutex_locked = true },
     );
     errdefer globals.special_heap_address_space_arena.deallocate(
         current_task,
         allocation,
-        .{ .mutex_locked = true },
+        .{ .mutex_already_locked = true },
     );
 
     const virtual_range: core.VirtualRange = .{
