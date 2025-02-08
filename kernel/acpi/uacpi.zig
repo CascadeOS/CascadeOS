@@ -2024,7 +2024,7 @@ pub const Object = opaque {
 
     /// Returns the list of objects stored in a package object.
     ///
-    /// NOTE: the reference count of the objects stored inside is not incremented, which means destorying/overwriting
+    /// NOTE: the reference count of the objects stored inside is not incremented, which means destroying/overwriting
     /// the object also potentially destroys all of the objects stored inside unless the reference count is incremented
     /// by the client via `Object.ref`.
     pub fn getPackage(object: *const Object) ![]const *Object {
