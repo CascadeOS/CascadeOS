@@ -127,12 +127,12 @@ pub fn create(
     };
 }
 
-/// Destory the resource arena.
+/// Destroy the resource arena.
 ///
 /// Assumes that no concurrent access to the resource arena is happening, does not lock.
 ///
 /// Panics if there are any allocations in the resource arena.
-pub fn destory(arena: *ResourceArena) void {
+pub fn destroy(arena: *ResourceArena) void {
     log.debug("{s}: destroying arena", .{arena.name()});
 
     var tags_to_release: SingleLinkedList = .empty;
@@ -432,14 +432,14 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
 
     arena.insertIntoAllocationTable(target_tag);
 
+    if (!options.leave_mutex_locked) arena.mutex.unlock(current_task);
+
     const allocation: Allocation = .{
         .base = target_tag.base,
         .len = quantum_aligned_len,
     };
 
     log.debug("{s}: allocated {}", .{ arena.name(), allocation });
-
-    if (!options.leave_mutex_locked) arena.mutex.unlock(current_task);
 
     return allocation;
 }
