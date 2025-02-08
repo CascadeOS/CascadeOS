@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2024 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/1d636a34152dc82833c89175b702f2c0671f04e3/LICENSE)
+// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/757dcece1a9f1c069355b23f7feaf21656728f94/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI (765059be191db143c2ee31504915014117cd61c8).
+//! Provides a nice zig API wrapping uACPI (757dcece1a9f1c069355b23f7feaf21656728f94).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
 //! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
@@ -324,6 +324,9 @@ pub fn reboot() !void {
     try ret.toError();
 }
 
+/// Read a GAS.
+///
+/// Prefer `mapGas` + `MappedGas.read`.
 pub fn readGas(gas: *const acpi.Address) !u64 {
     var value: u64 = undefined;
 
@@ -336,12 +339,60 @@ pub fn readGas(gas: *const acpi.Address) !u64 {
     return value;
 }
 
+/// Write a GAS.
+///
+/// Prefer `mapGas` + `MappedGas.write`.
 pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
         @ptrCast(gas),
         value,
     ));
     try ret.toError();
+}
+
+pub const MappedGas = opaque {
+    /// Same as `readGas` but operates on a pre-mapped handle for faster access and/or ability to use in critical
+    /// sections/irq contexts.
+    pub fn read(self: *const MappedGas) !u64 {
+        var value: u64 = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
+            @ptrCast(self),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+
+        return value;
+    }
+
+    /// Same as `writeGas` but operates on a pre-mapped handle for faster access and/or ability to use in critical
+    /// sections/irq contexts.
+    pub fn write(self: *const MappedGas, value: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
+            @ptrCast(self),
+            value,
+        ));
+        try ret.toError();
+    }
+
+    pub fn unmap(self: *MappedGas) void {
+        c_uacpi.uacpi_unmap_gas(@ptrCast(self));
+    }
+};
+
+/// Map a GAS for faster access in the future.
+///
+/// The handle returned must be freed & unmapped using `MappedGas.unmap` when no longer needed.
+pub fn mapGas(gas: *const acpi.Address) !*MappedGas {
+    var mapped_gas: *MappedGas = undefined;
+
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_map_gas(
+        @ptrCast(gas),
+        @ptrCast(&mapped_gas),
+    ));
+    try ret.toError();
+
+    return mapped_gas;
 }
 
 pub const InterfaceAction = enum(c_uacpi.uacpi_interface_action) {
@@ -750,25 +801,92 @@ pub const Node = opaque {
 
     pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
         attach = c_uacpi.UACPI_REGION_OP_ATTACH,
+
+        detach = c_uacpi.UACPI_REGION_OP_DETACH,
+
         read = c_uacpi.UACPI_REGION_OP_READ,
         write = c_uacpi.UACPI_REGION_OP_WRITE,
-        detach = c_uacpi.UACPI_REGION_OP_DETACH,
+
+        pcc_send = c_uacpi.UACPI_REGION_OP_PCC_SEND,
+
+        gpio_read = c_uacpi.UACPI_REGION_OP_GPIO_READ,
+        gpio_write = c_uacpi.UACPI_REGION_OP_GPIO_WRITE,
+
+        ipmi_command = c_uacpi.UACPI_REGION_OP_IPMI_COMMAND,
+
+        ffixedhw_command = c_uacpi.UACPI_REGION_OP_FFIXEDHW_COMMAND,
+
+        prm_command = c_uacpi.UACPI_REGION_OP_PRM_COMMAND,
+
+        serial_read = c_uacpi.UACPI_REGION_OP_SERIAL_READ,
+        serial_write = c_uacpi.UACPI_REGION_OP_SERIAL_WRITE,
     };
 
     pub fn RegionOperation(comptime UserContextT: type) type {
         return union(RegionOperationType) {
             attach: *Attach,
+            detach: *Detach,
             read: *ReadWrite,
             write: *ReadWrite,
-            detach: *Detach,
+            pcc_send: *PccSend,
+            gpio_read: *GpioReadWrite,
+            gpio_write: *GpioReadWrite,
+            ipmi_command: *IpmiCommand,
+            ffixedhw_command: *FixedHardwareCommand,
+            prm_command: *PrmReadWrite,
+            serial_read: *SerialReadWrite,
+            serial_write: *SerialReadWrite,
 
             pub const Attach = extern struct {
                 user_context: ?*UserContextT,
                 region_node: *Node,
+                region_info: RegionInfo,
                 out_region_context: ?*anyopaque,
+
+                pub const RegionInfo = extern union {
+                    generic: Generic,
+                    pcc: Pcc,
+                    gpio: Gpio,
+
+                    pub const Generic = extern struct {
+                        base: u64,
+                        length: u64,
+
+                        comptime {
+                            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_generic_region_info));
+                        }
+                    };
+
+                    pub const Pcc = extern struct {
+                        buffer: DataView,
+                        subspace_id: u8,
+
+                        comptime {
+                            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_pcc_region_info));
+                        }
+                    };
+
+                    pub const Gpio = extern struct {
+                        num_pins: u64,
+
+                        comptime {
+                            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_gpio_region_info));
+                        }
+                    };
+                };
 
                 comptime {
                     core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
+                }
+            };
+
+            pub const Detach = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                region_node: *Node,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
                 }
             };
 
@@ -787,13 +905,90 @@ pub const Node = opaque {
                 }
             };
 
-            pub const Detach = extern struct {
+            pub const PccSend = extern struct {
                 user_context: ?*UserContextT,
                 region_context: ?*anyopaque,
-                region_node: *Node,
+                buffer: DataView,
 
                 comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_pcc_send_data));
+                }
+            };
+
+            pub const GpioReadWrite = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                connection: DataView,
+                pin_offset: u32,
+                num_pins: u32,
+                value: u64,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_gpio_rw_data));
+                }
+            };
+
+            pub const IpmiCommand = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                in_out_message: DataView,
+                command: u64,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ipmi_rw_data));
+                }
+            };
+
+            pub const FixedHardwareCommand = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                in_out_message: DataView,
+                command: u64,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ffixedhw_rw_data));
+                }
+            };
+
+            pub const PrmReadWrite = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                in_out_message: DataView,
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_prm_rw_data));
+                }
+            };
+
+            pub const SerialReadWrite = extern struct {
+                user_context: ?*UserContextT,
+                region_context: ?*anyopaque,
+                command: u64,
+                connection: DataView,
+                in_out_buffer: DataView,
+                access_attribute: AccessAttribute,
+
+                /// Applicable only is `access_attribute` is one of:
+                ///  - `bytes`
+                ///  - `raw_bytes`
+                ///  - `raw_process_bytes`
+                access_length: u8,
+
+                pub const AccessAttribute = enum(c_uacpi.uacpi_access_attribute) {
+                    quick = c_uacpi.UACPI_ACCESS_ATTRIBUTE_QUICK,
+                    send_receive = c_uacpi.UACPI_ACCESS_ATTRIBUTE_SEND_RECEIVE,
+                    byte = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTE,
+                    word = c_uacpi.UACPI_ACCESS_ATTRIBUTE_WORD,
+                    block = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK,
+                    bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTES,
+                    process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_PROCESS_CALL,
+                    block_process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK_PROCESS_CALL,
+                    raw_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_BYTES,
+                    raw_process_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES,
+                };
+
+                comptime {
+                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_serial_rw_data));
                 }
             };
         };
@@ -1745,6 +1940,9 @@ pub const Node = opaque {
         try ret.toError();
     }
 
+    /// Evaluate the _CRS method for a 'device' and get the returned resource list.
+    ///
+    /// NOTE: the returned buffer must be released via `Resources.deinit` when no longer needed.
     pub fn getCurrentResources(device: *const Node) !?*Resources {
         var resources: *Resources = undefined;
 
@@ -1758,6 +1956,9 @@ pub const Node = opaque {
         return resources;
     }
 
+    /// Evaluate the _PRS method for a 'device' and get the returned resource list.
+    ///
+    /// NOTE: the returned buffer must be released via `Resources.deinit` when no longer needed.
     pub fn getPossibleResources(device: *const Node) !?*Resources {
         var resources: *Resources = undefined;
 
@@ -1771,6 +1972,30 @@ pub const Node = opaque {
         return resources;
     }
 
+    /// Evaluate an arbitrary method that is expected to return an AML resource buffer for a 'device' and get the
+    /// returned resource list.
+    ///
+    /// NOTE: the returned buffer must be released via `Resources.deinit` when no longer needed.
+    pub fn getResources(device: *const Node, method: [:0]const u8) !?*Resources {
+        var resources: *Resources = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_device_resources(
+            @ptrCast(@constCast(device)),
+            method.ptr,
+            @ptrCast(&resources),
+        ));
+        if (ret == .not_found) return null;
+        try ret.toError();
+
+        return resources;
+    }
+
+    /// Set the configuration to be used by the 'device' by calling its _SRS method.
+    ///
+    /// Note that this expects 'resources' in the normal 'Resources' format, and not the raw AML resources bytestream,
+    /// the conversion to the latter is done automatically by this API.
+    ///
+    /// If you want to _SRS a raw AML resources bytestream, use 'Node.execute' or similar API directly.
     pub fn setResources(device: *Node, resources: *const Resources) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_set_resources(
             @ptrCast(device),
@@ -2407,6 +2632,31 @@ pub const Resource = extern struct {
     length: u32,
 
     data: Data,
+
+    /// Convert a single AML-encoded resource to native format.
+    ///
+    /// This should be used for converting Connection() fields (passed during IO on GeneralPurposeIO or GenericSerialBus
+    /// operation regions) or other similar buffers with only one resource to native format.
+    ///
+    /// NOTE: the returned buffer must be released via `Resource.deinit` when no longer needed.
+    pub fn fromBuffer(buffer: []const u8) !*Resource {
+        var resource: *Resource = undefined;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_resource_from_buffer(
+            .{
+                .unnamed_0 = .{ .const_bytes = buffer.ptr },
+                .length = buffer.len,
+            },
+            @ptrCast(&resource),
+        ));
+        try ret.toError();
+
+        return resource;
+    }
+
+    pub fn deinit(self: *Resource) void {
+        c_uacpi.uacpi_free_resource(@ptrCast(self));
+    }
 
     pub const Type = enum(c_uacpi.uacpi_resource_type) {
         irq = c_uacpi.UACPI_RESOURCE_TYPE_IRQ,
@@ -3468,6 +3718,19 @@ pub const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
 pub const RawInterruptHandler = *const fn (?*anyopaque) callconv(.C) InterruptReturn;
 pub const CpuFlags = c_uacpi.uacpi_cpu_flags;
 
+pub const DataView = extern struct {
+    bytes: [*]const u8,
+    length: usize,
+
+    pub fn slice(self: *const DataView) []const u8 {
+        return self.bytes[0..self.length];
+    }
+
+    comptime {
+        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_data_view));
+    }
+};
+
 inline fn makeIterationCallbackWrapper(
     comptime UserContextT: type,
     callback: Node.IterationCallback(UserContextT),
@@ -3548,9 +3811,17 @@ inline fn makeRegionHandlerWrapper(
         ) callconv(.C) Status {
             return handler(switch (op) {
                 .attach => .{ .attach = @ptrCast(@alignCast(op_data)) },
+                .detach => .{ .detach = @ptrCast(@alignCast(op_data)) },
                 .read => .{ .read = @ptrCast(@alignCast(op_data)) },
                 .write => .{ .write = @ptrCast(@alignCast(op_data)) },
-                .detach => .{ .detach = @ptrCast(@alignCast(op_data)) },
+                .pcc_send => .{ .pcc_send = @ptrCast(@alignCast(op_data)) },
+                .gpio_read => .{ .gpio_read = @ptrCast(@alignCast(op_data)) },
+                .gpio_write => .{ .gpio_write = @ptrCast(@alignCast(op_data)) },
+                .ipmi_command => .{ .ipmi_command = @ptrCast(@alignCast(op_data)) },
+                .ffixedhw_command => .{ .ffixedhw_command = @ptrCast(@alignCast(op_data)) },
+                .prm_command => .{ .prm_command = @ptrCast(@alignCast(op_data)) },
+                .serial_read => .{ .serial_read = @ptrCast(@alignCast(op_data)) },
+                .serial_write => .{ .serial_write = @ptrCast(@alignCast(op_data)) },
             });
         }
     }.handlerWrapper);
