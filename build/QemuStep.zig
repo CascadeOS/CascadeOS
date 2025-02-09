@@ -107,6 +107,7 @@ fn create(
 fn needsUefi(self: CascadeTarget) bool {
     return switch (self) {
         .arm64 => true,
+        .riscv64 => true,
         .x64 => false,
     };
 }
@@ -208,6 +209,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     if (self.options.display != .none) {
         switch (self.target) {
             .arm64 => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .riscv64 => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
             .x64 => {},
         }
     }
@@ -215,12 +217,20 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // set target cpu
     switch (self.target) {
         .arm64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
+        .riscv64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }),
     }
 
     // set target machine
     switch (self.target) {
         .arm64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
+        .riscv64 => {
+            if (self.firmware == .uefi) {
+                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off,pflash0=pflash0,pflash1=pflash1" });
+            } else {
+                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" });
+            }
+        },
         .x64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
     }
 
@@ -244,24 +254,48 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             const firmware_code = edk2.path(uefiFirmwareCodeFileName(self.target));
             const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
 
-            run_qemu.addArgs(&[_][]const u8{
-                "-drive",
-                try std.fmt.allocPrint(
-                    b.allocator,
-                    "if=pflash,format=raw,unit=0,readonly=on,file={s}",
-                    .{firmware_code.getPath2(b, step)},
-                ),
-            });
+            switch (self.target) {
+                .riscv64 => {
+                    run_qemu.addArgs(&[_][]const u8{
+                        "-blockdev",
+                        try std.fmt.allocPrint(
+                            b.allocator,
+                            "node-name=pflash0,driver=file,read-only=on,filename={s}",
+                            .{firmware_code.getPath2(b, step)},
+                        ),
+                    });
 
-            // this being readonly is not correct but preventing modifcation of a file in the cache is good
-            run_qemu.addArgs(&[_][]const u8{
-                "-drive",
-                try std.fmt.allocPrint(
-                    b.allocator,
-                    "if=pflash,format=raw,unit=1,readonly=on,file={s}",
-                    .{firmware_var.getPath2(b, step)},
-                ),
-            });
+                    // this being readonly is not correct but preventing modifcation of a file in the cache is good
+                    run_qemu.addArgs(&[_][]const u8{
+                        "-blockdev",
+                        try std.fmt.allocPrint(
+                            b.allocator,
+                            "node-name=pflash1,driver=file,read-only=on,filename={s}",
+                            .{firmware_var.getPath2(b, step)},
+                        ),
+                    });
+                },
+                else => {
+                    run_qemu.addArgs(&[_][]const u8{
+                        "-drive",
+                        try std.fmt.allocPrint(
+                            b.allocator,
+                            "if=pflash,format=raw,unit=0,readonly=on,file={s}",
+                            .{firmware_code.getPath2(b, step)},
+                        ),
+                    });
+
+                    // this being readonly is not correct but preventing modification of a file in the cache is good
+                    run_qemu.addArgs(&[_][]const u8{
+                        "-drive",
+                        try std.fmt.allocPrint(
+                            b.allocator,
+                            "if=pflash,format=raw,unit=1,readonly=on,file={s}",
+                            .{firmware_var.getPath2(b, step)},
+                        ),
+                    });
+                },
+            }
         },
     }
 
@@ -275,6 +309,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
         .arm64 => "aarch64/code.fd",
+        .riscv64 => "riscv64/code.fd",
         .x64 => "x64/code.fd",
     };
 }
@@ -282,6 +317,7 @@ fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
 fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
         .arm64 => "aarch64/vars.fd",
+        .riscv64 => "riscv64/vars.fd",
         .x64 => "x64/vars.fd",
     };
 }
@@ -290,6 +326,7 @@ fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
 fn qemuExecutable(self: CascadeTarget) []const u8 {
     return switch (self) {
         .arm64 => "qemu-system-aarch64",
+        .riscv64 => "qemu-system-riscv64",
         .x64 => "qemu-system-x86_64",
     };
 }

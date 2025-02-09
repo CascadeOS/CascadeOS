@@ -32,6 +32,14 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
             .{ .name = "core" },
         },
     },
+    .{
+        .name = "riscv64",
+        .dependencies = &[_]LibraryDependency{
+            .{ .name = "core" },
+            .{ .name = "bitjuggle" },
+        },
+        .supported_targets = &.{.riscv64},
+    },
     .{ .name = "sdf" },
     .{
         .name = "uuid",

@@ -3,12 +3,14 @@
 
 pub const CascadeTarget = enum {
     arm64,
+    riscv64,
     x64,
 
     /// Returns a CrossTarget for building targeting the host system.
     pub fn getNonCascadeCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         const target_query: std.Target.Query = switch (self) {
             .arm64 => .{ .cpu_arch = .aarch64 },
+            .riscv64 => .{ .cpu_arch = .riscv64 },
             .x64 => .{ .cpu_arch = .x86_64 },
         };
 
@@ -19,6 +21,7 @@ pub const CascadeTarget = enum {
     pub fn getCascadeCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         const target_query: std.Target.Query = switch (self) {
             .arm64 => .{ .cpu_arch = .aarch64, .os_tag = .other },
+            .riscv64 => .{ .cpu_arch = .riscv64, .os_tag = .other },
             .x64 => .{ .cpu_arch = .x86_64, .os_tag = .other },
         };
 
@@ -29,6 +32,7 @@ pub const CascadeTarget = enum {
     pub fn isNative(self: CascadeTarget, b: *std.Build) bool {
         return switch (b.graph.host.result.cpu.arch) {
             .aarch64 => self == .arm64,
+            .riscv64 => self == .riscv64,
             .x86_64 => self == .x64,
             else => false,
         };

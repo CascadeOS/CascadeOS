@@ -302,6 +302,7 @@ fn constructKernelModule(
     // apply target-specific configuration to the kernel
     switch (target) {
         .arm64 => {},
+        .riscv64 => {},
         .x64 => {
             kernel_module.code_model = .kernel;
             kernel_module.red_zone = false;
@@ -353,6 +354,23 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.neon));
             target_query.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
 
+            return b.resolveTargetQuery(target_query);
+        },
+
+        .riscv64 => {
+            const features = std.Target.riscv.Feature;
+            var target_query = std.Target.Query{
+                .cpu_arch = .riscv64,
+                .os_tag = .freestanding,
+                .abi = .none,
+                .cpu_model = .{ .explicit = &std.Target.riscv.cpu.generic_rv64 },
+            };
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.a));
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.m));
+            // The compiler will not emit instructions from the below features but it is better to be explicit.
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.zicsr));
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.zifencei));
+            target_query.cpu_features_add.addFeature(@intFromEnum(features.zihintpause));
             return b.resolveTargetQuery(target_query);
         },
 

@@ -12,6 +12,10 @@ pub const arm64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
     .{ .name = "arm64" },
 };
 
+pub const riscv64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
+    .{ .name = "riscv64" },
+};
+
 pub const x64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
     .{ .name = "x64" },
 };
