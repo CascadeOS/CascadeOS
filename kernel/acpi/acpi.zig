@@ -60,12 +60,12 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeACPITables() !void {
+    pub fn initializeACPITables() void {
         const static = struct {
             var buffer: [kernel.arch.paging.standard_page_size.value]u8 = undefined;
         };
 
-        try uacpi.setupEarlyTableAccess(&static.buffer);
+        uacpi.setupEarlyTableAccess(&static.buffer) catch return; // suppress error to allow non-ACPI systems to boot
     }
 
     pub fn initialize() !void {

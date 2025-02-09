@@ -10,6 +10,9 @@ pub fn initStage1() !noreturn {
     // we need the direct map to be available as early as possible
     try kernel.vmm.init.determineOffsets();
 
+    // initialize ACPI tables early to allow discovery of debug output mechanisms
+    kernel.acpi.init.initializeACPITables();
+
     kernel.arch.init.registerInitOutput();
     framebuffer.registerInitOutput();
 
@@ -66,9 +69,6 @@ pub fn initStage1() !noreturn {
 
     log.debug("initializing kernel stacks", .{});
     try kernel.Stack.init.initializeStacks(&bootstrap_init_task);
-
-    log.debug("initializing ACPI tables", .{});
-    try kernel.acpi.init.initializeACPITables();
 
     log.debug("capturing system information", .{});
     try kernel.arch.init.captureSystemInformation(switch (kernel.config.cascade_target) {
