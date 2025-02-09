@@ -56,10 +56,7 @@ pub fn initStage1() !noreturn {
     try kernel.pmm.init.initializePhysicalMemory();
 
     log.debug("building core page table", .{});
-    try kernel.vmm.init.buildCorePageTable();
-
-    log.debug("loading core page table", .{});
-    kernel.vmm.globals.core_page_table.load();
+    try kernel.vmm.init.buildAndLoadCorePageTable();
 
     log.debug("initializing kernel and special heap", .{});
     try kernel.heap.init.initializeHeaps(&bootstrap_init_task);
