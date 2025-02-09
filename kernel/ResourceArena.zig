@@ -61,32 +61,30 @@ pub const Source = struct {
         arena: *ResourceArena,
         current_task: *kernel.Task,
         len: usize,
-        options: AllocateOptions,
+        policy: Policy,
     ) AllocateError!Allocation = allocate,
 
     release: *const fn (
         arena: *ResourceArena,
         current_task: *kernel.Task,
         allocation: Allocation,
-        options: DeallocateOptions,
     ) void = deallocate,
 
     fn callImport(
         source: *const Source,
         current_task: *kernel.Task,
         len: usize,
-        options: AllocateOptions,
+        policy: Policy,
     ) callconv(core.inline_in_non_debug) AllocateError!Allocation {
-        return source.import(source.arena, current_task, len, options);
+        return source.import(source.arena, current_task, len, policy);
     }
 
     fn callRelease(
         source: *const Source,
         current_task: *kernel.Task,
         allocation: Allocation,
-        options: DeallocateOptions,
     ) callconv(core.inline_in_non_debug) void {
-        source.release(source.arena, current_task, allocation, options);
+        source.release(source.arena, current_task, allocation);
     }
 };
 
@@ -383,19 +381,8 @@ pub const AllocateError = error{
     RequestedLengthUnavailable,
 } || EnsureBoundaryTagsError;
 
-pub const AllocateOptions = struct {
-    policy: Policy = .instant_fit,
-
-    /// Whether to leave the mutex locked on successful return.
-    ///
-    /// It is the caller's responsibility to unlock the mutex when this is set to `true`.
-    ///
-    /// The mutex is always unlocked if the allocation fails.
-    leave_mutex_locked: bool = false,
-};
-
 /// Allocate a block of length `len` from the arena.
-pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, options: AllocateOptions) AllocateError!Allocation {
+pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, policy: Policy) AllocateError!Allocation {
     if (len == 0) return AllocateError.ZeroLength;
 
     const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
@@ -404,14 +391,14 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
         arena.name(),
         len,
         quantum_aligned_len,
-        @tagName(options.policy),
+        @tagName(policy),
     });
 
     try arena.ensureBoundaryTags(current_task);
     errdefer arena.mutex.unlock(current_task); // unconditionally unlock mutex on error
 
     const target_tag: *BoundaryTag = while (true) {
-        break switch (options.policy) {
+        break switch (policy) {
             .instant_fit => arena.findInstantFit(quantum_aligned_len),
             .best_fit => arena.findBestFit(quantum_aligned_len),
             .first_fit => arena.findFirstFit(quantum_aligned_len),
@@ -432,7 +419,7 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, o
 
     arena.insertIntoAllocationTable(target_tag);
 
-    if (!options.leave_mutex_locked) arena.mutex.unlock(current_task);
+    arena.mutex.unlock(current_task);
 
     const allocation: Allocation = .{
         .base = target_tag.base,
@@ -564,8 +551,8 @@ fn importFromSource(
     var need_to_lock_mutex = true;
     defer if (need_to_lock_mutex) arena.mutex.lock(current_task);
 
-    const allocation = try source.callImport(current_task, len, .{});
-    errdefer source.callRelease(current_task, allocation, .{});
+    const allocation = try source.callImport(current_task, len, .instant_fit);
+    errdefer source.callRelease(current_task, allocation);
 
     try arena.ensureBoundaryTags(current_task);
     need_to_lock_mutex = false;
@@ -610,37 +597,26 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
     arena.pushToFreelist(new_tag);
 }
 
-pub const DeallocateOptions = struct {
-    /// Whether the arena's mutex is already locked upon entry.
-    ///
-    /// The mutex will always be unlocked upon return.
-    mutex_already_locked: bool = false,
-};
-
 /// Deallocate the allocation.
 ///
 /// Panics if the allocation does not match a previous call to `allocate`.
-pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation, options: DeallocateOptions) void {
+pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation) void {
     log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
 
-    arena.deallocateInner(current_task, allocation.base, allocation.len, options);
+    arena.deallocateInner(current_task, allocation.base, allocation.len);
 }
 
 /// Deallocate the allocation at `base`.
 ///
 /// Panics if the `base` does not match a previous call to `allocate`.
-pub fn deallocateBase(arena: *ResourceArena, current_task: *kernel.Task, base: usize, options: DeallocateOptions) void {
+pub fn deallocateBase(arena: *ResourceArena, current_task: *kernel.Task, base: usize) void {
     log.debug("{s}: deallocating base 0x{x}", .{ arena.name(), base });
 
-    arena.deallocateInner(current_task, base, null, options);
+    arena.deallocateInner(current_task, base, null);
 }
 
-fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usize, len: ?usize, options: DeallocateOptions) void {
-    if (options.mutex_already_locked) {
-        std.debug.assert(arena.mutex.isLockedBy(current_task));
-    } else {
-        arena.mutex.lock(current_task);
-    }
+fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usize, len: ?usize) void {
+    arena.mutex.lock(current_task);
 
     var need_to_unlock_mutex = true;
     defer if (need_to_unlock_mutex) arena.mutex.unlock(current_task);
@@ -722,7 +698,7 @@ fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usiz
             arena.mutex.unlock(current_task);
             need_to_unlock_mutex = false;
 
-            source.callRelease(current_task, allocation_to_release, .{});
+            source.callRelease(current_task, allocation_to_release);
 
             log.debug("{s}: released {} to source {s}", .{ arena.name(), allocation_to_release, source.arena.name() });
 

@@ -65,9 +65,9 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
     const stack_range = try globals.stack_arena.allocate(
         current_task,
         stack_size_including_guard_page.value,
-        .{ .leave_mutex_locked = true },
+        .instant_fit,
     );
-    defer globals.stack_arena.mutex.unlock(current_task);
+    errdefer globals.stack_arena.deallocate(current_task, stack_range);
 
     const range: core.VirtualRange = .{
         .address = .fromInt(stack_range.base),
@@ -78,38 +78,47 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
         .size = kernel.config.kernel_stack_size,
     };
 
-    try kernel.vmm.mapRange(
-        kernel.vmm.globals.core_page_table,
-        usable_range,
-        .{ .writeable = true, .global = true },
-        .kernel,
-        true,
-    );
+    {
+        globals.stack_page_table_mutex.lock(current_task);
+        defer globals.stack_page_table_mutex.unlock(current_task);
+
+        try kernel.vmm.mapRange(
+            kernel.vmm.globals.core_page_table,
+            usable_range,
+            .{ .writeable = true, .global = true },
+            .kernel,
+            true,
+        );
+    }
 
     return fromRange(range, usable_range);
 }
 
 pub fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
-    globals.stack_arena.mutex.lock(current_task);
+    {
+        globals.stack_page_table_mutex.lock(current_task);
+        defer globals.stack_page_table_mutex.unlock(current_task);
 
-    kernel.vmm.unmapRange(
-        kernel.vmm.globals.core_page_table,
-        stack.usable_range,
-        true,
-        .kernel,
-        true,
-    );
+        kernel.vmm.unmapRange(
+            kernel.vmm.globals.core_page_table,
+            stack.usable_range,
+            true,
+            .kernel,
+            true,
+        );
+    }
 
     globals.stack_arena.deallocate(current_task, .{
         .base = stack.range.address.value,
         .len = stack.range.size.value,
-    }, .{ .mutex_already_locked = true });
+    });
 }
 
 const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 
 const globals = struct {
     var stack_arena: kernel.ResourceArena = undefined;
+    var stack_page_table_mutex: kernel.sync.Mutex = .{};
 };
 
 pub const init = struct {

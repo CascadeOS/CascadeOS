@@ -9,7 +9,7 @@ pub fn allocate(len: usize, current_task: *kernel.Task) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         current_task,
         len,
-        .{},
+        .instant_fit,
     );
 
     return .{
@@ -22,11 +22,11 @@ pub fn deallocate(range: core.VirtualRange, current_task: *kernel.Task) void {
     globals.heap_arena.deallocate(current_task, .{
         .base = range.address.value,
         .len = range.size.value,
-    }, .{});
+    });
 }
 
 pub fn deallocateBase(base: core.VirtualAddress, current_task: *kernel.Task) void {
-    globals.heap_arena.deallocateBase(current_task, base.value, .{});
+    globals.heap_arena.deallocateBase(current_task, base.value);
 }
 
 pub const allocator = std.mem.Allocator{
@@ -48,7 +48,7 @@ pub const allocator = std.mem.Allocator{
                 const allocation = globals.heap_arena.allocate(
                     kernel.Task.getCurrent(),
                     full_len,
-                    .{},
+                    .instant_fit,
                 ) catch return null;
 
                 const aligned_addr = std.mem.alignForward(usize, allocation.base + @sizeOf(usize), alignment);
@@ -103,7 +103,6 @@ pub const allocator = std.mem.Allocator{
                 globals.heap_arena.deallocateBase(
                     kernel.Task.getCurrent(),
                     @intFromPtr(getHeader(buf.ptr).*),
-                    .{},
                 );
             }
         }.free,
@@ -118,16 +117,19 @@ fn heapArenaImport(
     arena: *ResourceArena,
     current_task: *kernel.Task,
     len: usize,
-    options: ResourceArena.AllocateOptions,
+    policy: ResourceArena.Policy,
 ) ResourceArena.AllocateError!ResourceArena.Allocation {
     const allocation = try arena.allocate(
         current_task,
         len,
-        .{ .policy = options.policy, .leave_mutex_locked = true },
+        policy,
     );
-    errdefer arena.deallocate(current_task, allocation, .{ .mutex_already_locked = true });
+    errdefer arena.deallocate(current_task, allocation);
 
     log.debug("mapping {} into heap", .{allocation});
+
+    globals.heap_page_table_mutex.lock(current_task);
+    defer globals.heap_page_table_mutex.unlock(current_task);
 
     kernel.vmm.mapRange(
         kernel.vmm.globals.core_page_table,
@@ -141,8 +143,6 @@ fn heapArenaImport(
     ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
     errdefer comptime unreachable;
 
-    arena.mutex.unlock(current_task);
-
     return allocation;
 }
 
@@ -150,27 +150,28 @@ fn heapArenaRelease(
     arena: *ResourceArena,
     current_task: *kernel.Task,
     allocation: ResourceArena.Allocation,
-    _: ResourceArena.DeallocateOptions,
 ) void {
     log.debug("unmapping {} from heap", .{allocation});
 
-    arena.mutex.lock(current_task);
+    {
+        globals.heap_page_table_mutex.lock(current_task);
+        defer globals.heap_page_table_mutex.unlock(current_task);
 
-    kernel.vmm.unmapRange(
-        kernel.vmm.globals.core_page_table,
-        .{
-            .address = .fromInt(allocation.base),
-            .size = .from(allocation.len, .byte),
-        },
-        true,
-        .kernel,
-        true,
-    );
+        kernel.vmm.unmapRange(
+            kernel.vmm.globals.core_page_table,
+            .{
+                .address = .fromInt(allocation.base),
+                .size = .from(allocation.len, .byte),
+            },
+            true,
+            .kernel,
+            true,
+        );
+    }
 
     arena.deallocate(
         current_task,
         allocation,
-        .{ .mutex_already_locked = true },
     );
 }
 
@@ -183,18 +184,17 @@ pub fn allocateSpecial(
     const allocation = try globals.special_heap_address_space_arena.allocate(
         current_task,
         size.value,
-        .{ .leave_mutex_locked = true },
+        .instant_fit,
     );
-    errdefer globals.special_heap_address_space_arena.deallocate(
-        current_task,
-        allocation,
-        .{ .mutex_already_locked = true },
-    );
+    errdefer globals.special_heap_address_space_arena.deallocate(current_task, allocation);
 
     const virtual_range: core.VirtualRange = .{
         .address = .fromInt(allocation.base),
         .size = .from(allocation.len, .byte),
     };
+
+    globals.special_heap_page_table_mutex.lock(current_task);
+    defer globals.special_heap_page_table_mutex.unlock(current_task);
 
     try kernel.vmm.mapToPhysicalRange(
         kernel.vmm.globals.core_page_table,
@@ -203,9 +203,6 @@ pub fn allocateSpecial(
         map_type,
         true,
     );
-    errdefer comptime unreachable;
-
-    globals.special_heap_address_space_arena.mutex.unlock(current_task);
 
     return virtual_range;
 }
@@ -214,20 +211,22 @@ pub fn deallocateSpecial(
     current_task: *kernel.Task,
     virtual_range: core.VirtualRange,
 ) void {
-    globals.special_heap_address_space_arena.mutex.lock(current_task);
+    {
+        globals.special_heap_page_table_mutex.lock(current_task);
+        defer globals.special_heap_page_table_mutex.unlock(current_task);
 
-    kernel.vmm.unmapRange(
-        kernel.vmm.globals.core_page_table,
-        virtual_range,
-        false,
-        .kernel,
-        true,
-    );
+        kernel.vmm.unmapRange(
+            kernel.vmm.globals.core_page_table,
+            virtual_range,
+            false,
+            .kernel,
+            true,
+        );
+    }
 
     globals.special_heap_address_space_arena.deallocate(
         current_task,
         .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
-        .{ .mutex_locked = true },
     );
 }
 
@@ -248,12 +247,16 @@ const globals = struct {
     /// Initialized during `init.initializeHeaps`.
     var heap_arena: ResourceArena = undefined;
 
+    var heap_page_table_mutex: kernel.sync.Mutex = .{};
+
     /// An arena managing the special heap region's virtual address space.
     ///
     /// Has no source arena, provided with a single span representing the entire range.
     ///
     /// Initialized during `init.initializeHeaps`.
     var special_heap_address_space_arena: kernel.ResourceArena = undefined;
+
+    var special_heap_page_table_mutex: kernel.sync.Mutex = .{};
 };
 
 pub const init = struct {

@@ -14,7 +14,7 @@ pub fn allocateInterrupt(
     context1: ?*anyopaque,
     context2: ?*anyopaque,
 ) !Interrupt {
-    const allocation = try globals.interrupt_arena.allocate(current_task, 1, .{});
+    const allocation = try globals.interrupt_arena.allocate(current_task, 1, .instant_fit);
 
     const interrupt_number: u8 = @intCast(allocation.base);
 
@@ -37,7 +37,7 @@ pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) voi
     globals.interrupt_arena.deallocate(current_task, .{
         .base = interrupt_number,
         .len = 1,
-    }, .{});
+    });
 }
 
 pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {
