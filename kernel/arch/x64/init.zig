@@ -14,6 +14,11 @@ pub fn registerInitOutput() void {
                     DebugCon.write(str);
                 }
             }.writeFn,
+            .remapFn = struct {
+                fn remapFn(_: *anyopaque, _: *kernel.Task) anyerror!void {
+                    return;
+                }
+            }.remapFn,
             .context = undefined,
         });
 
@@ -31,6 +36,11 @@ pub fn registerInitOutput() void {
                         serial_port.write(str);
                     }
                 }.writeFn,
+                .remapFn = struct {
+                    fn remapFn(_: *anyopaque, _: *kernel.Task) anyerror!void {
+                        return;
+                    }
+                }.remapFn,
                 .context = &static.init_output_serial_port,
             });
 

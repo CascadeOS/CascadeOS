@@ -49,35 +49,10 @@ fn newLine() void {
     defer c.ssfn_dst.x = x;
     defer c.ssfn_dst.y = y;
 
+    // TODO: this should be a @memset
     while (c.ssfn_dst.x < c.ssfn_dst.w) {
         _ = c.ssfn_putc(' ');
     }
-}
-
-/// Map the framebuffer into the special heap as write combining.
-pub fn remapFramebuffer(current_task: *kernel.Task) !void {
-    const framebuffer = kernel.boot.framebuffer() orelse return;
-
-    const exact_framebuffer_physical_base: core.PhysicalAddress = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
-    const aligned_framebuffer_physical_base = exact_framebuffer_physical_base.alignBackward(kernel.arch.paging.standard_page_size);
-
-    const offset: core.Size = .from(exact_framebuffer_physical_base.value - aligned_framebuffer_physical_base.value, .byte);
-
-    const exact_framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
-    const aligned_framebuffer_size = exact_framebuffer_size.alignForward(kernel.arch.paging.standard_page_size);
-
-    const virtual_range = try kernel.heap.allocateSpecial(
-        current_task,
-        aligned_framebuffer_size,
-        .fromAddr(
-            exact_framebuffer_physical_base,
-            exact_framebuffer_size,
-        ),
-        .{ .writeable = true, .global = true, .write_combining = true },
-    );
-
-    global.frame_buffer_range = virtual_range;
-    c.ssfn_dst.ptr = virtual_range.address.moveForward(offset).toPtr([*]u8);
 }
 
 pub fn registerInitOutput() void {
@@ -97,13 +72,32 @@ pub fn registerInitOutput() void {
 
     kernel.init.Output.registerOutput(.{
         .writeFn = write,
+        .remapFn = remapFramebuffer,
         .context = undefined,
     });
 }
 
-const global = struct {
-    var frame_buffer_range: ?core.VirtualRange = null;
-};
+/// Map the framebuffer into the special heap as write combining.
+fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
+    const framebuffer = kernel.boot.framebuffer().?;
+
+    const physical_address: core.PhysicalAddress = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
+    if (!physical_address.isAligned(kernel.arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
+
+    const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
+
+    const virtual_range = try kernel.heap.allocateSpecial(
+        current_task,
+        framebuffer_size,
+        .fromAddr(
+            physical_address,
+            framebuffer_size,
+        ),
+        .{ .writeable = true, .global = true, .write_combining = true },
+    );
+
+    c.ssfn_dst.ptr = virtual_range.address.toPtr([*]u8);
+}
 
 const font: *const c.ssfn_font_t = blk: {
     break :blk @ptrCast(@embedFile("ter-v14n.sfn"));

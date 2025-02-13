@@ -17,6 +17,13 @@ pub fn registerInitOutput() void {
                 uart.write(str);
             }
         }.writeFn,
+        .remapFn = struct {
+            fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
+                const uart: *Uart = @ptrCast(@alignCast(context));
+                const physical_address = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(uart.ptr)));
+                uart.ptr = kernel.vmm.nonCachedDirectMapFromPhysical(physical_address).toPtr(*volatile u8);
+            }
+        }.remapFn,
         .context = &static.init_output_uart,
     });
 }

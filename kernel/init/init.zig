@@ -64,8 +64,8 @@ pub fn initStage1() !noreturn {
     log.debug("initializing kernel and special heap", .{});
     try kernel.heap.init.initializeHeaps(&bootstrap_init_task);
 
-    // update the framebuffer to use the correct mapping
-    try framebuffer.remapFramebuffer(&bootstrap_init_task);
+    log.debug("remapping init outputs", .{});
+    try Output.remapOutputs(&bootstrap_init_task);
 
     log.debug("initializing kernel stacks", .{});
     try kernel.Stack.init.initializeStacks(&bootstrap_init_task);
