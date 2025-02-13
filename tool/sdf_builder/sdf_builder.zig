@@ -105,7 +105,7 @@ fn embed(embed_arguments: Arguments.EmbedArguments) !void {
 
 fn updateElfSpecific(
     comptime is_64: bool,
-    elf_mem: []align(std.mem.page_size) u8,
+    elf_mem: []align(std.heap.page_size_min) u8,
     sdf_pos: u64,
     sdf_size: u64,
 ) !void {
@@ -167,7 +167,7 @@ fn updateElfSpecific(
 }
 
 fn updateElf(
-    elf_mem: []align(std.mem.page_size) u8,
+    elf_mem: []align(std.heap.page_size_min) u8,
     sdf_pos: u64,
     sdf_size: u64,
 ) !void {

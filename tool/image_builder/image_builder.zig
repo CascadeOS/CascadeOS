@@ -665,7 +665,7 @@ const FATContext = struct {
     };
 };
 
-fn createAndMapDiskImage(disk_image_path: []const u8, disk_size: core.Size) ![]align(std.mem.page_size) u8 {
+fn createAndMapDiskImage(disk_image_path: []const u8, disk_size: core.Size) ![]align(std.heap.page_size_min) u8 {
     var parent_directory = try std.fs.cwd().makeOpenPath(std.fs.path.dirname(disk_image_path).?, .{});
     defer parent_directory.close();
 

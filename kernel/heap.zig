@@ -29,89 +29,104 @@ pub fn deallocateBase(base: core.VirtualAddress, current_task: *kernel.Task) voi
     globals.heap_arena.deallocateBase(current_task, base.value);
 }
 
-pub const allocator = std.mem.Allocator{
+pub const allocator: std.mem.Allocator = .{
     .ptr = undefined,
     .vtable = &.{
-        .alloc = struct {
-            fn alloc(
-                _: *anyopaque,
-                len: usize,
-                log2_align: u8,
-                _: usize,
-            ) ?[*]u8 {
-                // Overallocate to account for alignment padding and store the original pointer before
-                // the aligned address.
-
-                const alignment = @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
-                const full_len = len + alignment - 1 + @sizeOf(usize);
-
-                const allocation = globals.heap_arena.allocate(
-                    kernel.Task.getCurrent(),
-                    full_len,
-                    .instant_fit,
-                ) catch return null;
-
-                const aligned_addr = std.mem.alignForward(usize, allocation.base + @sizeOf(usize), alignment);
-
-                const unaligned_ptr: [*]u8 = @ptrFromInt(allocation.base);
-                const aligned_ptr = unaligned_ptr + (aligned_addr - allocation.base);
-                getHeader(aligned_ptr).* = unaligned_ptr;
-
-                return aligned_ptr;
-            }
-        }.alloc,
-        .resize = struct {
-            fn resize(
-                _: *anyopaque,
-                buf: []u8,
-                log2_align: u8,
-                new_len: usize,
-                _: usize,
-            ) bool {
-                std.debug.assert(new_len != 0);
-
-                const alignment = @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
-                const full_new_len = buf.len + alignment - 1 + @sizeOf(usize);
-
-                // the current `ResourceArena` implementation does support arbitrary shrinking of allocations, but
-                // once we add quantum caches it no longer would be possible to peform resizes that change the
-                // quantum aligned length of the allocation
-
-                const old_quantum_aligned_len = std.mem.alignForward(
-                    usize,
-                    buf.len,
-                    heap_arena_quantum,
-                );
-                const new_quantum_aligned_len = std.mem.alignForward(
-                    usize,
-                    full_new_len,
-                    heap_arena_quantum,
-                );
-
-                return new_quantum_aligned_len == old_quantum_aligned_len;
-            }
-        }.resize,
-        .free = struct {
-            fn free(
-                _: *anyopaque,
-                buf: []u8,
-                _: u8,
-                _: usize,
-            ) void {
-                // we have to use `deallocateBase` here because the true length of the allocation in `alloc` is not
-                // returned to the caller due to the Allocator API
-                globals.heap_arena.deallocateBase(
-                    kernel.Task.getCurrent(),
-                    @intFromPtr(getHeader(buf.ptr).*),
-                );
-            }
-        }.free,
+        .alloc = allocator_impl.alloc,
+        .resize = allocator_impl.resize,
+        .remap = allocator_impl.remap,
+        .free = allocator_impl.free,
     },
 };
 
-fn getHeader(ptr: [*]u8) *[*]u8 {
-    return @as(*[*]u8, @ptrFromInt(@intFromPtr(ptr) - @sizeOf(usize)));
-}
+const allocator_impl = struct {
+    fn alloc(
+        _: *anyopaque,
+        len: usize,
+        alignment: std.mem.Alignment,
+        _: usize,
+    ) ?[*]u8 {
+        // Overallocate to account for alignment padding and store the original pointer before
+        // the aligned address.
+
+        const alignment_bytes = alignment.toByteUnits();
+        const full_len = len + alignment_bytes - 1 + @sizeOf(usize);
+
+        const allocation = globals.heap_arena.allocate(
+            kernel.Task.getCurrent(),
+            full_len,
+            .instant_fit,
+        ) catch return null;
+
+        const aligned_addr = std.mem.alignForward(usize, allocation.base + @sizeOf(usize), alignment_bytes);
+
+        const unaligned_ptr: [*]u8 = @ptrFromInt(allocation.base);
+        const aligned_ptr = unaligned_ptr + (aligned_addr - allocation.base);
+        getHeader(aligned_ptr).* = unaligned_ptr;
+
+        return aligned_ptr;
+    }
+
+    fn resize(
+        _: *anyopaque,
+        memory: []u8,
+        alignment: std.mem.Alignment,
+        new_len: usize,
+        _: usize,
+    ) bool {
+        std.debug.assert(new_len != 0);
+
+        const alignment_bytes = alignment.toByteUnits();
+        const full_new_len = memory.len + alignment_bytes - 1 + @sizeOf(usize);
+
+        // the current `ResourceArena` implementation does support arbitrary shrinking of allocations, but
+        // once we add quantum caches it no longer would be possible to peform resizes that change the
+        // quantum aligned length of the allocation
+
+        const old_quantum_aligned_len = std.mem.alignForward(
+            usize,
+            memory.len,
+            heap_arena_quantum,
+        );
+        const new_quantum_aligned_len = std.mem.alignForward(
+            usize,
+            full_new_len,
+            heap_arena_quantum,
+        );
+
+        return new_quantum_aligned_len == old_quantum_aligned_len;
+    }
+
+    fn remap(
+        context: *anyopaque,
+        memory: []u8,
+        alignment: std.mem.Alignment,
+        new_len: usize,
+        return_address: usize,
+    ) ?[*]u8 {
+        // TODO: resource arena can support this, find allocation and check if next tag is free
+
+        return if (resize(context, memory, alignment, new_len, return_address)) memory.ptr else null;
+    }
+
+    fn free(
+        _: *anyopaque,
+        memory: []u8,
+        _: std.mem.Alignment,
+        _: usize,
+    ) void {
+        // we have to use `deallocateBase` here because the true length of the allocation in `alloc` is not
+        // returned to the caller due to the Allocator API
+        globals.heap_arena.deallocateBase(
+            kernel.Task.getCurrent(),
+            @intFromPtr(getHeader(memory.ptr).*),
+        );
+    }
+
+    fn getHeader(ptr: [*]u8) *[*]u8 {
+        return @as(*[*]u8, @ptrFromInt(@intFromPtr(ptr) - @sizeOf(usize)));
+    }
+};
 
 fn heapArenaImport(
     arena: *ResourceArena,
