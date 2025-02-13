@@ -226,7 +226,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         .arm64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
         .riscv64 => {
             if (self.firmware == .uefi) {
-                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off,pflash0=pflash0,pflash1=pflash1" });
+                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1" });
             } else {
                 run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" });
             }
