@@ -38,4 +38,4 @@ comptime {
 
 const std = @import("std");
 const core = @import("core");
-const riscv = @import("riscv64");
+const riscv = @import("riscv");

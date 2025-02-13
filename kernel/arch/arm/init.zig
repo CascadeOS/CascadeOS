@@ -37,7 +37,7 @@ pub fn prepareBootstrapExecutor(
 
 /// Load the provided `Executor` as the current executor.
 pub fn loadExecutor(executor: *kernel.Executor) void {
-    lib_arm64.registers.TPIDR_EL1.write(@intFromPtr(executor));
+    lib_arm.registers.TPIDR_EL1.write(@intFromPtr(executor));
 }
 
 /// A basic write only UART.
@@ -69,5 +69,5 @@ const Uart = struct {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const arm64 = @import("arm64.zig");
-const lib_arm64 = @import("arm64");
+const arm = @import("arm.zig");
+const lib_arm = @import("arm");

@@ -47,4 +47,4 @@ comptime {
 const core = @import("core");
 const std = @import("std");
 
-const arm64 = @import("arm64");
+const arm = @import("arm");

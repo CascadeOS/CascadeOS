@@ -8,12 +8,12 @@ pub const dependencies: []const LibraryDependency = &[_]LibraryDependency{
     .{ .name = "sdf" },
 };
 
-pub const arm64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
-    .{ .name = "arm64" },
+pub const arm_dependencies: []const LibraryDependency = &[_]LibraryDependency{
+    .{ .name = "arm" },
 };
 
-pub const riscv64_dependencies: []const LibraryDependency = &[_]LibraryDependency{
-    .{ .name = "riscv64" },
+pub const riscv_dependencies: []const LibraryDependency = &[_]LibraryDependency{
+    .{ .name = "riscv" },
 };
 
 pub const x64_dependencies: []const LibraryDependency = &[_]LibraryDependency{

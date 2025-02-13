@@ -3,12 +3,12 @@
 
 pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{
-        .name = "arm64",
+        .name = "arm",
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
-        .supported_targets = &.{.arm64},
+        .supported_targets = &.{.arm},
     },
     .{ .name = "bitjuggle" },
     .{
@@ -33,12 +33,12 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
         },
     },
     .{
-        .name = "riscv64",
+        .name = "riscv",
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
-        .supported_targets = &.{.riscv64},
+        .supported_targets = &.{.riscv},
     },
     .{ .name = "sdf" },
     .{

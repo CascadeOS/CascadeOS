@@ -10,7 +10,7 @@ Cascade is a general purpose operating system targeting standard desktops and la
 - ext2 on NVMe
 
 ## Planned Features
-- x64, ARM64 and RISC-V
+- x64, ARM64 and RISCV64
 - First class Zig support
 - Userspace with GUI
 

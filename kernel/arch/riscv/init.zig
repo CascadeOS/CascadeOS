@@ -37,7 +37,7 @@ pub fn prepareBootstrapExecutor(
 
 /// Load the provided `Executor` as the current executor.
 pub fn loadExecutor(executor: *kernel.Executor) void {
-    lib_riscv64.registers.SupervisorScratch.write(@intFromPtr(executor));
+    lib_riscv.registers.SupervisorScratch.write(@intFromPtr(executor));
 }
 
 /// A basic write only UART.
@@ -69,5 +69,5 @@ const Uart = struct {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const riscv64 = @import("riscv64.zig");
-const lib_riscv64 = @import("riscv64");
+const riscv = @import("riscv.zig");
+const lib_riscv = @import("riscv");

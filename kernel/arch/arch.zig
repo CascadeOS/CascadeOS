@@ -612,8 +612,8 @@ pub const init = struct {
 const current = switch (cascade_target) {
     // x64 is first to help zls, atleast while x64 is the main target.
     .x64 => @import("x64/x64.zig"),
-    .arm64 => @import("arm64/arm64.zig"),
-    .riscv64 => @import("riscv64/riscv64.zig"),
+    .arm => @import("arm/arm.zig"),
+    .riscv => @import("riscv/riscv.zig"),
 };
 
 /// Checks if the current architecture implements the given function.

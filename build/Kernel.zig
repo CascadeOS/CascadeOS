@@ -301,8 +301,8 @@ fn constructKernelModule(
 
     // apply target-specific configuration to the kernel
     switch (target) {
-        .arm64 => {},
-        .riscv64 => {},
+        .arm => {},
+        .riscv => {},
         .x64 => {
             kernel_module.code_model = .kernel;
             kernel_module.red_zone = false;
@@ -341,7 +341,7 @@ fn constructKernelModule(
 /// Returns a CrossTarget for building the kernel for the given target.
 fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
     switch (self) {
-        .arm64 => {
+        .arm => {
             const features = std.Target.aarch64.Feature;
             var target_query = std.Target.Query{
                 .cpu_arch = .aarch64,
@@ -357,7 +357,7 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
             return b.resolveTargetQuery(target_query);
         },
 
-        .riscv64 => {
+        .riscv => {
             const features = std.Target.riscv.Feature;
             var target_query = std.Target.Query{
                 .cpu_arch = .riscv64,

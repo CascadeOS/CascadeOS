@@ -106,8 +106,8 @@ fn create(
 /// Returns true if the target needs UEFI to boot.
 fn needsUefi(self: CascadeTarget) bool {
     return switch (self) {
-        .arm64 => true,
-        .riscv64 => true,
+        .arm => true,
+        .riscv => true,
         .x64 => false,
     };
 }
@@ -208,23 +208,23 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // add display device if needed
     if (self.options.display != .none) {
         switch (self.target) {
-            .arm64 => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
-            .riscv64 => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .arm => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
+            .riscv => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
             .x64 => {},
         }
     }
 
     // set target cpu
     switch (self.target) {
-        .arm64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
-        .riscv64 => run_qemu.addArgs(&.{ "-cpu", "max" }),
+        .arm => run_qemu.addArgs(&.{ "-cpu", "max" }),
+        .riscv => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }),
     }
 
     // set target machine
     switch (self.target) {
-        .arm64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
-        .riscv64 => {
+        .arm => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
+        .riscv => {
             if (self.firmware == .uefi) {
                 run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1" });
             } else {
@@ -255,7 +255,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
 
             switch (self.target) {
-                .riscv64 => {
+                .riscv => {
                     run_qemu.addArgs(&[_][]const u8{
                         "-blockdev",
                         try std.fmt.allocPrint(
@@ -308,16 +308,16 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
 fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
-        .arm64 => "aarch64/code.fd",
-        .riscv64 => "riscv64/code.fd",
+        .arm => "aarch64/code.fd",
+        .riscv => "riscv64/code.fd",
         .x64 => "x64/code.fd",
     };
 }
 
 fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
     return switch (self) {
-        .arm64 => "aarch64/vars.fd",
-        .riscv64 => "riscv64/vars.fd",
+        .arm => "aarch64/vars.fd",
+        .riscv => "riscv64/vars.fd",
         .x64 => "x64/vars.fd",
     };
 }
@@ -325,8 +325,8 @@ fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
 /// Returns the name of the QEMU system executable for the given target.
 fn qemuExecutable(self: CascadeTarget) []const u8 {
     return switch (self) {
-        .arm64 => "qemu-system-aarch64",
-        .riscv64 => "qemu-system-riscv64",
+        .arm => "qemu-system-aarch64",
+        .riscv => "qemu-system-riscv64",
         .x64 => "qemu-system-x86_64",
     };
 }

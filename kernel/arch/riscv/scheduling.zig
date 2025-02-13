@@ -4,5 +4,5 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const riscv64 = @import("riscv64.zig");
-const lib_riscv64 = @import("riscv64");
+const riscv = @import("riscv.zig");
+const lib_riscv = @import("riscv");

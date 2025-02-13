@@ -26,5 +26,5 @@ pub const init = struct {};
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const arm64 = @import("arm64.zig");
-const lib_arm64 = @import("arm64");
+const riscv = @import("riscv.zig");
+const lib_riscv = @import("riscv");

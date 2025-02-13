@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+
+pub const disableInterruptsAndHalt = lib_arm.instructions.disableInterruptsAndHalt;
+pub const enableInterrupts = lib_arm.instructions.enableInterrupts;
+pub const areEnabled = lib_arm.instructions.interruptsEnabled;
+pub const disableInterrupts = lib_arm.instructions.disableInterrupts;
+
+pub const Interrupt = enum(u8) {
+    _,
+};
+pub const InterruptFrame = extern struct {};
+
+pub const init = struct {};
+
+const std = @import("std");
+const core = @import("core");
+const kernel = @import("kernel");
+const arm = @import("arm.zig");
+const lib_arm = @import("arm");

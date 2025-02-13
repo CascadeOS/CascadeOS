@@ -4,5 +4,5 @@
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const arm64 = @import("arm64.zig");
-const lib_arm64 = @import("arm64");
+const arm = @import("arm.zig");
+const lib_arm = @import("arm");

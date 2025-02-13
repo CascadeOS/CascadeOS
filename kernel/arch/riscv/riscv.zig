@@ -12,10 +12,10 @@ pub const init = @import("init.zig");
 ///
 /// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
 pub fn getCurrentExecutor() *kernel.Executor {
-    return @ptrFromInt(lib_arm64.registers.TPIDR_EL1.read());
+    return @ptrFromInt(lib_riscv.registers.SupervisorScratch.read());
 }
 
-pub const spinLoopHint = lib_arm64.instructions.isb;
+pub const spinLoopHint = lib_riscv.instructions.pause;
 
 pub const io = struct {
     pub const Port = u64;
@@ -23,4 +23,4 @@ pub const io = struct {
 
 const std = @import("std");
 const kernel = @import("kernel");
-const lib_arm64 = @import("arm64");
+const lib_riscv = @import("riscv");

@@ -5,7 +5,7 @@ It is possible for these links or the text regarding versions to become out of d
 
 ---
 
-* ARM64 - [Arm Architecture Reference Manual for A-profile architecture](https://developer.arm.com/documentation/ddi0487/ja/?lang=en)
+* ARM - [Arm Architecture Reference Manual for A-profile architecture](https://developer.arm.com/documentation/ddi0487/ja/?lang=en)
 * ACPI/UEFI/GPT
   * [Specifications](https://uefi.org/specifications) (GPT is specified in the UEFI spec) 
   * [ACPI related documents](https://uefi.org/acpi)
@@ -31,7 +31,7 @@ It is possible for these links or the text regarding versions to become out of d
 * System-V/ELF
   * [Generic ABI (gABI)](https://www.sco.com/developers/devspecs/) latest at time of writing: Edition 4.1
   * [Generic ABI (gABI) updates](https://www.sco.com/developers/gabi/) updates to chapter 4 and 5 of the above. Latest at time of writing: DRAFT 10 June 2013 (under the "Latest (in progress) snapshot" link)
-  * [ARM64 psABI](https://github.com/ARM-software/abi-aa)
+  * [ARM psABI](https://github.com/ARM-software/abi-aa)
   * [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc)
   * [x64 psABI](https://gitlab.com/x86-psABIs/x86-64-ABI)
 * UUID - [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)
