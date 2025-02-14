@@ -47,7 +47,7 @@ const SourceOverride = struct {
     polarity: IOAPIC.Polarity,
     trigger_mode: IOAPIC.TriggerMode,
 
-    fn fromMADT(source_override: kernel.acpi.MADT.InterruptControllerEntry.InterruptSourceOverride) SourceOverride {
+    fn fromMADT(source_override: kernel.acpi.tables.MADT.InterruptControllerEntry.InterruptSourceOverride) SourceOverride {
         const polarity: IOAPIC.Polarity = switch (source_override.flags.polarity) {
             .conforms => .active_high,
             .active_high => .active_high,
@@ -103,7 +103,7 @@ const SourceOverride = struct {
 };
 
 pub const init = struct {
-    pub fn captureMADTInformation(madt: *const kernel.acpi.MADT) !void {
+    pub fn captureMADTInformation(madt: *const kernel.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {

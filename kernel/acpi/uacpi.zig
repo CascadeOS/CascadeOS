@@ -2421,7 +2421,7 @@ pub const Table = extern struct {
     table: extern union {
         virtual_address: core.VirtualAddress,
         ptr: *anyopaque,
-        header: *acpi.SharedHeader,
+        header: *acpi.tables.SharedHeader,
     },
     index: usize,
 
@@ -2538,7 +2538,7 @@ pub const Table = extern struct {
     pub fn setTableInstallationHandler(handler: TableInstallationHandler) !void {
         const handler_wrapper = struct {
             fn handlerWrapper(
-                header: *acpi.SharedHeader,
+                header: *acpi.tables.SharedHeader,
                 out_override_address: *u64,
             ) callconv(.C) TableInstallationDisposition {
                 return handler(header, out_override_address);
@@ -2569,7 +2569,7 @@ pub const Table = extern struct {
     };
 
     pub const TableInstallationHandler = fn (
-        header: *acpi.SharedHeader,
+        header: *acpi.tables.SharedHeader,
         out_override_address: *u64,
     ) TableInstallationDisposition;
 

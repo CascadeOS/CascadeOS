@@ -38,8 +38,8 @@ const globals = struct {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        fadt: *const kernel.acpi.FADT,
-        madt: *const kernel.acpi.MADT,
+        fadt: *const kernel.acpi.tables.FADT,
+        madt: *const kernel.acpi.tables.MADT,
         x2apic_enabled: bool,
     ) void {
         if (x2apic_enabled) {

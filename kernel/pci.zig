@@ -423,7 +423,8 @@ pub const init = struct {
     }
 
     fn initializeBuses() !void {
-        const acpi_table = kernel.acpi.getTable(acpi.MCFG, 0) orelse return error.MCFGNotPresent;
+        const acpi_table = kernel.acpi.getTable(acpi.tables.MCFG, 0) orelse
+            return error.MCFGNotPresent;
         defer acpi_table.deinit();
         const mcfg = acpi_table.table;
 

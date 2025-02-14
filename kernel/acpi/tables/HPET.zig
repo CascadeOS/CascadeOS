@@ -5,7 +5,7 @@
 ///
 /// [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
 pub const HPET = extern struct {
-    header: acpi.SharedHeader align(1),
+    header: acpi.tables.SharedHeader align(1),
 
     /// Hardware ID of Event Timer Block.
     ///

@@ -14,7 +14,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
-        const acpi_table = kernel.acpi.getTable(kernel.acpi.HPET, 0) orelse return;
+        const acpi_table = kernel.acpi.getTable(kernel.acpi.tables.HPET, 0) orelse return;
         acpi_table.deinit();
 
         candidate_time_sources.addTimeSource(.{
@@ -75,7 +75,7 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        const acpi_table = kernel.acpi.getTable(kernel.acpi.HPET, 0) orelse {
+        const acpi_table = kernel.acpi.getTable(kernel.acpi.tables.HPET, 0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
             @panic("hpet table missing");
         };

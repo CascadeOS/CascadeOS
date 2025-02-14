@@ -38,7 +38,7 @@
 ///
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#multiple-apic-description-table-madt)
 pub const MADT = extern struct {
-    header: acpi.SharedHeader align(1),
+    header: acpi.tables.SharedHeader align(1),
 
     /// The 32-bit physical address at which each processor can access its local interrupt controller.
     local_interrupt_controller_address: u32 align(1),
@@ -1229,7 +1229,10 @@ pub const MADT = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(acpi.SharedHeader) + @sizeOf(MultipleAPICFlags) + @sizeOf(u32) + 1);
+        core.testing.expectSize(
+            @This(),
+            @sizeOf(acpi.tables.SharedHeader) + @sizeOf(MultipleAPICFlags) + @sizeOf(u32) + 1,
+        );
     }
 };
 

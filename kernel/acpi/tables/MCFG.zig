@@ -3,7 +3,7 @@
 
 /// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {
-    header: acpi.SharedHeader align(1),
+    header: acpi.tables.SharedHeader align(1),
 
     _reserved: u64 align(1),
 
@@ -12,7 +12,7 @@ pub const MCFG = extern struct {
     pub fn baseAllocations(self: *const MCFG) []const BaseAllocation {
         const base_allocations_ptr: [*]const BaseAllocation = @ptrCast(&self._base_allocations_start);
 
-        const size_of_base_allocations = self.header.length - (@sizeOf(acpi.SharedHeader) + @sizeOf(u64));
+        const size_of_base_allocations = self.header.length - (@sizeOf(acpi.tables.SharedHeader) + @sizeOf(u64));
 
         std.debug.assert(size_of_base_allocations % @sizeOf(BaseAllocation) == 0);
 
@@ -38,7 +38,10 @@ pub const MCFG = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(acpi.SharedHeader) + @sizeOf(BaseAllocation) + @sizeOf(u64));
+        core.testing.expectSize(
+            @This(),
+            @sizeOf(acpi.tables.SharedHeader) + @sizeOf(BaseAllocation) + @sizeOf(u64),
+        );
     }
 };
 

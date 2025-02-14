@@ -35,13 +35,7 @@ pub fn tryShutdown() !void {
 }
 
 pub const Address = @import("Address.zig").Address;
-pub const DSDT = @import("DSDT.zig").DSDT;
-pub const FADT = @import("FADT.zig").FADT;
-pub const HPET = @import("HPET.zig").HPET;
-pub const MADT = @import("MADT.zig").MADT;
-pub const MCFG = @import("MCFG.zig").MCFG;
-pub const RSDP = @import("RSDP.zig").RSDP;
-pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
+pub const tables = @import("tables/tables.zig");
 
 pub fn AcpiTable(comptime T: type) type {
     return struct {
@@ -97,16 +91,16 @@ const hack = struct {
     fn tryHackyShutdown() !void {
         // this is ported from https://github.com/lowlevelmemes/acpi-shutdown-hack/blob/trunk/acpi_shutdown_hack.c
 
-        const acpi_table = getTable(FADT, 0) orelse return error.FADTNotPresent;
+        const acpi_table = getTable(tables.FADT, 0) orelse return error.FADTNotPresent;
         defer acpi_table.deinit();
 
-        const fadt: *const FADT = acpi_table.table;
+        const fadt: *const tables.FADT = acpi_table.table;
 
         var s5_addr: [*]const u8 = blk: {
             const dsdt = kernel.vmm
                 .nonCachedDirectMapFromPhysical(fadt.getDSDT())
-                .toPtr(*DSDT);
-            if (!dsdt.header.signatureIs(DSDT.SIGNATURE_STRING)) return error.DSDTNotPresent;
+                .toPtr(*tables.DSDT);
+            if (!dsdt.header.signatureIs(tables.DSDT.SIGNATURE_STRING)) return error.DSDTNotPresent;
 
             const definition_block = dsdt.definitionBlock();
 

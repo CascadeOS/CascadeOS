@@ -19,7 +19,7 @@
 ///
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#fixed-acpi-description-table-fadt)
 pub const FADT = extern struct {
-    header: acpi.SharedHeader align(1),
+    header: acpi.tables.SharedHeader align(1),
 
     /// Physical memory address of the FACS, where OSPM and Firmware exchange control information.
     ///
