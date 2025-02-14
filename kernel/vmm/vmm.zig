@@ -170,13 +170,6 @@ pub const globals = struct {
     /// Initialized during `init.buildCorePageTable`.
     pub var core_page_table: kernel.arch.paging.PageTable = undefined;
 
-    /// Whether the core page table with all expected regions has been loaded.
-    ///
-    /// This is needed to allow the ACPI subsystem to provide access to tables very early in the boot process.
-    ///
-    /// Set to `true` during `init.buildCorePageTable`.
-    pub var core_page_table_loaded: bool = false;
-
     /// The virtual base address that the kernel was loaded at.
     ///
     /// Initialized during `init.determineOffsets`.
@@ -303,8 +296,6 @@ pub const init = struct {
         }
 
         globals.core_page_table.load();
-
-        globals.core_page_table_loaded = true;
     }
 
     fn sortKernelMemoryRegions() void {

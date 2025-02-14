@@ -245,13 +245,7 @@ export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
 
     _ = len;
 
-    if (kernel.vmm.globals.core_page_table_loaded) {
-        @branchHint(.likely);
-        return kernel.vmm.nonCachedDirectMapFromPhysical(addr).toPtr([*]u8);
-    } else {
-        // this allows the ACPI subsystem to provide access to tables early in the boot process
-        return kernel.vmm.directMapFromPhysical(addr).toPtr([*]u8);
-    }
+    return kernel.vmm.directMapFromPhysical(addr).toPtr([*]u8);
 }
 
 export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
