@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-pub const Output = @import("Output.zig");
-
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
@@ -14,7 +12,7 @@ pub fn initStage1() !noreturn {
     kernel.acpi.init.initializeACPITables();
 
     kernel.arch.init.registerInitOutput();
-    framebuffer.registerInitOutput();
+    @import("framebuffer/framebuffer.zig").registerInitOutput();
 
     Output.write(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
@@ -254,6 +252,8 @@ fn bootNonBootstrapExecutors() !void {
     }
 }
 
+pub const Output = @import("Output.zig");
+
 const Barrier = struct {
     var executor_count = std.atomic.Value(usize).init(0);
 
@@ -278,4 +278,3 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.init);
-const framebuffer = @import("framebuffer/framebuffer.zig");
