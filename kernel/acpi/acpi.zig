@@ -6,6 +6,8 @@
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
 pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
+    if (!globals.acpi_tables_initialized) return null;
+
     var table = uacpi.Table.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
 
     var i: usize = 0;
@@ -50,6 +52,7 @@ pub fn AcpiTable(comptime T: type) type {
 }
 
 const globals = struct {
+    var acpi_tables_initialized: bool = false;
     var acpi_initialized: bool = false;
 };
 
@@ -60,6 +63,8 @@ pub const init = struct {
         };
 
         uacpi.setupEarlyTableAccess(&static.buffer) catch return; // suppress error to allow non-ACPI systems to boot
+
+        globals.acpi_tables_initialized = true;
     }
 
     pub fn initialize() !void {
