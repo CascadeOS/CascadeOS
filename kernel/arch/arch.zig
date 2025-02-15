@@ -498,11 +498,11 @@ pub const io = struct {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
-    /// Attempt to register some form of init output.
-    pub fn registerInitOutput() callconv(core.inline_in_non_debug) void {
+    /// Attempt to get some form of init output.
+    pub fn tryGetOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
         // `checkSupport` intentionally not called - mandatory function
 
-        current.init.registerInitOutput();
+        return current.init.tryGetOutput();
     }
 
     /// Prepares the provided `Executor` for the bootstrap executor.

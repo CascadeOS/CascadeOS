@@ -2,51 +2,23 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 /// Attempt to register some form of init output.
-pub fn registerInitOutput() void {
+pub fn tryGetOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
+    if (DebugCon.detect()) return DebugCon.output;
+
+    if (kernel.init.Output.tryGetOutputFromAcpiTables()) |output| return output;
+
     const static = struct {
         var init_output_serial_port: SerialPort = undefined;
     };
 
-    if (DebugCon.detect()) {
-        kernel.init.Output.registerOutput(.{
-            .writeFn = struct {
-                fn writeFn(_: *anyopaque, str: []const u8) void {
-                    DebugCon.write(str);
-                }
-            }.writeFn,
-            .remapFn = struct {
-                fn remapFn(_: *anyopaque, _: *kernel.Task) anyerror!void {
-                    return;
-                }
-            }.remapFn,
-            .context = undefined,
-        });
-
-        return;
-    }
-
     for (std.meta.tags(SerialPort.COMPort)) |com_port| {
         if (SerialPort.init(com_port, .Baud115200)) |serial| {
             static.init_output_serial_port = serial;
-
-            kernel.init.Output.registerOutput(.{
-                .writeFn = struct {
-                    fn writeFn(context: *anyopaque, str: []const u8) void {
-                        const serial_port: *SerialPort = @ptrCast(@alignCast(context));
-                        serial_port.write(str);
-                    }
-                }.writeFn,
-                .remapFn = struct {
-                    fn remapFn(_: *anyopaque, _: *kernel.Task) anyerror!void {
-                        return;
-                    }
-                }.remapFn,
-                .context = &static.init_output_serial_port,
-            });
-
-            return;
+            return static.init_output_serial_port.output();
         }
     }
+
+    return null;
 }
 
 /// Prepares the provided `Executor` for the bootstrap executor.
@@ -360,20 +332,35 @@ const SerialPort = struct {
         };
     }
 
-    /// Write to the serial port.
-    pub fn write(self: SerialPort, bytes: []const u8) void {
-        var previous_byte: u8 = 0;
+    pub fn output(self: *SerialPort) kernel.init.Output {
+        return .{
+            .writeFn = struct {
+                fn writeFn(context: *anyopaque, str: []const u8) void {
+                    const serial_port: *SerialPort = @ptrCast(@alignCast(context));
 
-        for (bytes) |byte| {
-            defer previous_byte = byte;
+                    for (0..str.len) |i| {
+                        const byte = str[i];
 
-            if (byte == '\n' and previous_byte != '\r') {
-                @branchHint(.unlikely);
-                self.writeByte('\r');
-            }
+                        if (byte == '\n') {
+                            @branchHint(.unlikely);
 
-            self.writeByte(byte);
-        }
+                            if (i != 0 and str[i - 1] != '\r') {
+                                @branchHint(.likely);
+                                serial_port.writeByte('\r');
+                            }
+                        }
+
+                        serial_port.writeByte(byte);
+                    }
+                }
+            }.writeFn,
+            .remapFn = struct {
+                fn remapFn(_: *anyopaque, _: *kernel.Task) !void {
+                    return;
+                }
+            }.remapFn,
+            .context = self,
+        };
     }
 
     inline fn writeByte(self: SerialPort, byte: u8) void {
@@ -404,15 +391,25 @@ const SerialPort = struct {
 const DebugCon = struct {
     const port = 0xe9;
 
-    pub fn detect() bool {
+    fn detect() bool {
         return lib_x64.instructions.portReadU8(port) == port;
     }
 
-    pub fn write(bytes: []const u8) void {
-        for (bytes) |byte| {
-            lib_x64.instructions.portWriteU8(port, byte);
-        }
-    }
+    const output: kernel.init.Output = .{
+        .writeFn = struct {
+            fn writeFn(_: *anyopaque, str: []const u8) void {
+                for (str) |b| {
+                    lib_x64.instructions.portWriteU8(port, b);
+                }
+            }
+        }.writeFn,
+        .remapFn = struct {
+            fn remapFn(_: *anyopaque, _: *kernel.Task) !void {
+                return;
+            }
+        }.remapFn,
+        .context = undefined,
+    };
 };
 
 const std = @import("std");

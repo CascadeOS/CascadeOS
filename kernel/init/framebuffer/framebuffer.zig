@@ -5,6 +5,28 @@
 // Due to this is needs to clear the entire line with when a new line is started.
 // TODO: This entire thing needs to be rewritten.
 
+pub fn tryGetOutput() ?kernel.init.Output {
+    const framebuffer = kernel.boot.framebuffer() orelse return null;
+
+    c.ssfn_src = @constCast(font);
+    c.ssfn_dst = .{
+        .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
+        .w = @intCast(framebuffer.width),
+        .h = @intCast(framebuffer.height),
+        .p = @intCast(framebuffer.pixels_per_row * @sizeOf(u32)),
+        .x = 0,
+        .y = 0,
+        .fg = 0x00FFFFFF,
+        .bg = 0xFF000000,
+    };
+
+    return .{
+        .writeFn = write,
+        .remapFn = remapFramebuffer,
+        .context = undefined,
+    };
+}
+
 /// Writes the given string to the framebuffer using the SSFN console bitmap font.
 fn write(_: *anyopaque, str: []const u8) void {
     var iter: std.unicode.Utf8Iterator = .{
@@ -53,28 +75,6 @@ fn newLine() void {
     while (c.ssfn_dst.x < c.ssfn_dst.w) {
         _ = c.ssfn_putc(' ');
     }
-}
-
-pub fn registerInitOutput() void {
-    const framebuffer = kernel.boot.framebuffer() orelse return;
-
-    c.ssfn_src = @constCast(font);
-    c.ssfn_dst = .{
-        .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
-        .w = @intCast(framebuffer.width),
-        .h = @intCast(framebuffer.height),
-        .p = @intCast(framebuffer.pixels_per_row * @sizeOf(u32)),
-        .x = 0,
-        .y = 0,
-        .fg = 0x00FFFFFF,
-        .bg = 0xFF000000,
-    };
-
-    kernel.init.Output.registerOutput(.{
-        .writeFn = write,
-        .remapFn = remapFramebuffer,
-        .context = undefined,
-    });
 }
 
 /// Map the framebuffer into the special heap as write combining.

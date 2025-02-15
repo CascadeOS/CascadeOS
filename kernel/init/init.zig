@@ -11,10 +11,9 @@ pub fn initStage1() !noreturn {
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     kernel.acpi.init.initializeACPITables();
 
-    kernel.arch.init.registerInitOutput();
-    @import("framebuffer/framebuffer.zig").registerInitOutput();
+    Output.registerOutputs();
 
-    Output.write(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+    try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
     kernel.vmm.init.logOffsets();
 
