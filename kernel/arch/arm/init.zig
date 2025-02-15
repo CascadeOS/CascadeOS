@@ -51,14 +51,16 @@ const Uart = struct {
     }
 
     pub fn write(self: Uart, bytes: []const u8) void {
-        var previous_byte: u8 = 0;
+        for (0..bytes.len) |i| {
+            const byte = bytes[i];
 
-        for (bytes) |byte| {
-            defer previous_byte = byte;
-
-            if (byte == '\n' and previous_byte != '\r') {
+            if (byte == '\n') {
                 @branchHint(.unlikely);
-                self.ptr.* = '\r';
+
+                if (i != 0 and bytes[i - 1] != '\r') {
+                    @branchHint(.likely);
+                    self.ptr.* = '\r';
+                }
             }
 
             self.ptr.* = byte;
