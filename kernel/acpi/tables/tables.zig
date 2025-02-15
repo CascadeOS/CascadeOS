@@ -8,6 +8,7 @@ pub const MADT = @import("MADT.zig").MADT;
 pub const MCFG = @import("MCFG.zig").MCFG;
 pub const RSDP = @import("RSDP.zig").RSDP;
 pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
+pub const SPCR = @import("SPCR.zig").SPCR;
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());
