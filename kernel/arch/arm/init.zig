@@ -7,8 +7,13 @@ pub fn registerInitOutput() void {
         var init_output_uart: Uart = undefined;
     };
 
-    // TODO: we can't assume the UART is actually at this address unless we are on qemu virt.
-    static.init_output_uart = Uart.init(kernel.vmm.directMapFromPhysical(core.PhysicalAddress.fromInt(0x09000000)));
+    const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return;
+    defer spcr.deinit();
+    std.debug.assert(spcr.table.base_address.address_space == .memory);
+
+    static.init_output_uart = Uart.init(
+        kernel.vmm.directMapFromPhysical(core.PhysicalAddress.fromInt(spcr.table.base_address.address)),
+    );
 
     kernel.init.Output.registerOutput(.{
         .writeFn = struct {
