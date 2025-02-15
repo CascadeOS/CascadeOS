@@ -38,9 +38,9 @@ pub fn registerOutputs() void {
         }
     }.registerOutput;
 
-    if (kernel.arch.init.tryGetOutput()) |output| registerOutput(output);
-
     if (@import("framebuffer/framebuffer.zig").tryGetOutput()) |output| registerOutput(output);
+
+    if (kernel.arch.init.tryGetOutput()) |output| registerOutput(output);
 }
 
 pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
