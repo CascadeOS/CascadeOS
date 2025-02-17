@@ -251,7 +251,7 @@ fn bootNonBootstrapExecutors() !void {
     }
 }
 
-pub const Output = @import("Output.zig");
+pub const Output = @import("output/Output.zig");
 
 const Barrier = struct {
     var executor_count = std.atomic.Value(usize).init(0);

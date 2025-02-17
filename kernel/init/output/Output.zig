@@ -38,7 +38,7 @@ pub fn registerOutputs() void {
         }
     }.registerOutput;
 
-    if (@import("framebuffer/framebuffer.zig").tryGetOutput()) |output| registerOutput(output);
+    if (@import("framebuffer.zig").tryGetOutput()) |output| registerOutput(output);
 
     if (kernel.arch.init.tryGetOutput()) |output| registerOutput(output);
 }
