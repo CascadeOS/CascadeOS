@@ -412,10 +412,37 @@ pub const LocationProgram = struct {
 
             switch (instruction) {
                 .offset_address => |offset| state.address += offset,
+                .increment_address_two => state.address += 2,
+                .increment_address_three => state.address += 3,
                 .increment_address_four => state.address += 4,
+                .increment_address_five => state.address += 5,
+                .increment_address_six => state.address += 6,
+                .increment_address_seven => state.address += 7,
                 .increment_address_eight => state.address += 8,
+                .increment_address_nine => state.address += 9,
+                .increment_address_ten => state.address += 10,
+                .increment_address_eleven => state.address += 11,
                 .increment_address_twelve => state.address += 12,
+                .increment_address_thirteen => state.address += 13,
+                .increment_address_fourteen => state.address += 14,
+                .increment_address_fifteen => state.address += 15,
                 .increment_address_sixteen => state.address += 16,
+                .increment_address_seventeen => state.address += 17,
+                .increment_address_eighteen => state.address += 18,
+                .increment_address_nineteen => state.address += 19,
+                .increment_address_twenty => state.address += 20,
+                .increment_address_twenty_one => state.address += 21,
+                .increment_address_twenty_two => state.address += 22,
+                .increment_address_twenty_three => state.address += 23,
+                .increment_address_twenty_four => state.address += 24,
+                .increment_address_twenty_five => state.address += 25,
+                .increment_address_twenty_six => state.address += 26,
+                .increment_address_twenty_seven => state.address += 27,
+                .increment_address_twenty_eight => state.address += 28,
+                .increment_address_twenty_nine => state.address += 29,
+                .increment_address_thirty => state.address += 30,
+                .increment_address_thirty_one => state.address += 31,
+                .increment_address_thirty_two => state.address += 32,
                 .set_symbol_offset => |offset| state.symbol_offset = offset,
                 .set_file_index => |index| state.file_index = index,
                 .offset_column => |offset| if (offset > 0) {
@@ -433,11 +460,25 @@ pub const LocationProgram = struct {
                 .increment_line_three => state.line += 3,
                 .increment_line_four => state.line += 4,
                 .increment_line_five => state.line += 5,
+                .increment_line_six => state.line += 6,
+                .increment_line_seven => state.line += 7,
+                .increment_line_eight => state.line += 8,
+                .increment_line_nine => state.line += 9,
+                .increment_line_ten => state.line += 10,
+                .increment_line_eleven => state.line += 11,
+                .increment_line_twelve => state.line += 12,
                 .decrement_line_one => state.line -= 1,
                 .decrement_line_two => state.line -= 2,
                 .decrement_line_three => state.line -= 3,
                 .decrement_line_four => state.line -= 4,
                 .decrement_line_five => state.line -= 5,
+                .decrement_line_six => state.line -= 6,
+                .decrement_line_seven => state.line -= 7,
+                .decrement_line_eight => state.line -= 8,
+                .decrement_line_nine => state.line -= 9,
+                .decrement_line_ten => state.line -= 10,
+                .decrement_line_eleven => state.line -= 11,
+                .decrement_line_twelve => state.line -= 12,
             }
         }
 
@@ -472,67 +513,217 @@ pub const LocationProgramOpcode = enum(u8) {
     /// Add the subsequent ULEB128 encoded number to the `address` register.
     offset_address = 0x1,
 
+    /// Increment the `address` register by two.
+    increment_address_two = 0x2,
+
+    /// Increment the `address` register by three.
+    increment_address_three = 0x3,
+
     /// Increment the `address` register by four.
-    increment_address_four = 0x2,
+    increment_address_four = 0x4,
+
+    /// Increment the `address` register by five.
+    increment_address_five = 0x5,
+
+    /// Increment the `address` register by six.
+    increment_address_six = 0x6,
+
+    /// Increment the `address` register by seven.
+    increment_address_seven = 0x7,
 
     /// Increment the `address` register by eight.
-    increment_address_eight = 0x3,
+    increment_address_eight = 0x8,
+
+    /// Increment the `address` register by nine.
+    increment_address_nine = 0x9,
+
+    /// Increment the `address` register by ten.
+    increment_address_ten = 0xA,
+
+    /// Increment the `address` register by eleven.
+    increment_address_eleven = 0xB,
 
     /// Increment the `address` register by twelve.
-    increment_address_twelve = 0x4,
+    increment_address_twelve = 0xC,
+
+    /// Increment the `address` register by thirteen.
+    increment_address_thirteen = 0xD,
+
+    /// Increment the `address` register by fourteen.
+    increment_address_fourteen = 0xE,
+
+    /// Increment the `address` register by fifteen.
+    increment_address_fifteen = 0xF,
 
     /// Increment the `address` register by sixteen.
-    increment_address_sixteen = 0x5,
+    increment_address_sixteen = 0x10,
+
+    /// Increment the `address` register by seventeen.
+    increment_address_seventeen = 0x11,
+
+    /// Increment the `address` register by eighteen.
+    increment_address_eighteen = 0x12,
+
+    /// Increment the `address` register by nineteen.
+    increment_address_nineteen = 0x13,
+
+    /// Increment the `address` register by twenty.
+    increment_address_twenty = 0x14,
+
+    /// Increment the `address` register by twenty one.
+    increment_address_twenty_one = 0x15,
+
+    /// Increment the `address` register by twenty two.
+    increment_address_twenty_two = 0x16,
+
+    /// Increment the `address` register by twenty three.
+    increment_address_twenty_three = 0x17,
+
+    /// Increment the `address` register by twenty four.
+    increment_address_twenty_four = 0x18,
+
+    /// Increment the `address` register by twenty five.
+    increment_address_twenty_five = 0x19,
+
+    /// Increment the `address` register by twenty six.
+    increment_address_twenty_six = 0x1A,
+
+    /// Increment the `address` register by twenty seven.
+    increment_address_twenty_seven = 0x1B,
+
+    /// Increment the `address` register by twenty eight.
+    increment_address_twenty_eight = 0x1C,
+
+    /// Increment the `address` register by twenty nine.
+    increment_address_twenty_nine = 0x1D,
+
+    /// Increment the `address` register by thirty.
+    increment_address_thirty = 0x1E,
+
+    /// Increment the `address` register by thirty one.
+    increment_address_thirty_one = 0x1F,
+
+    /// Increment the `address` register by thirty two.
+    increment_address_thirty_two = 0x20,
 
     /// Set the `symbol_offset` register to the subsequent ULEB128 encoded number.
-    set_symbol_offset = 0x6,
+    set_symbol_offset = 0x21,
 
     /// Set the `file_index` register to the subsequent ULEB128 encoded number.
-    set_file_index = 0x7,
+    set_file_index = 0x22,
 
     /// Add the subsequent SLEB128 encoded number to the `column` register using a wrapping operation.
-    offset_column = 0x8,
+    offset_column = 0x23,
 
     /// Add the subsequent SLEB128 encoded number to the `line` register using a wrapping operation.
-    offset_line = 0x9,
+    offset_line = 0x24,
 
     /// Increment the `line` register by one.
-    increment_line_one = 0xa,
+    increment_line_one = 0x25,
 
     /// Increment the `line` register by two.
-    increment_line_two = 0xb,
+    increment_line_two = 0x26,
 
     /// Increment the `line` register by three.
-    increment_line_three = 0xc,
+    increment_line_three = 0x27,
 
     /// Increment the `line` register by four.
-    increment_line_four = 0xd,
+    increment_line_four = 0x28,
 
     /// Increment the `line` register by five.
-    increment_line_five = 0xe,
+    increment_line_five = 0x29,
+
+    /// Increment the `line` register by six.
+    increment_line_six = 0x2A,
+
+    /// Increment the `line` register by seven.
+    increment_line_seven = 0x2B,
+
+    /// Increment the `line` register by eight.
+    increment_line_eight = 0x2C,
+
+    /// Increment the `line` register by nine.
+    increment_line_nine = 0x2D,
+
+    /// Increment the `line` register by ten.
+    increment_line_ten = 0x2E,
+
+    /// Increment the `line` register by eleven.
+    increment_line_eleven = 0x2F,
+
+    /// Increment the `line` register by twelve.
+    increment_line_twelve = 0x30,
 
     /// Decrement the `line` register by one.
-    decrement_line_one = 0xf,
+    decrement_line_one = 0x31,
 
     /// Decrement the `line` register by two.
-    decrement_line_two = 0x10,
+    decrement_line_two = 0x32,
 
     /// Decrement the `line` register by three.
-    decrement_line_three = 0x11,
+    decrement_line_three = 0x33,
 
     /// Decrement the `line` register by four.
-    decrement_line_four = 0x12,
+    decrement_line_four = 0x34,
 
     /// Decrement the `line` register by five.
-    decrement_line_five = 0x13,
+    decrement_line_five = 0x35,
+
+    /// Decrement the `line` register by six.
+    decrement_line_six = 0x36,
+
+    /// Decrement the `line` register by seven.
+    decrement_line_seven = 0x37,
+
+    /// Decrement the `line` register by eight.
+    decrement_line_eight = 0x38,
+
+    /// Decrement the `line` register by nine.
+    decrement_line_nine = 0x39,
+
+    /// Decrement the `line` register by ten.
+    decrement_line_ten = 0x3A,
+
+    /// Decrement the `line` register by eleven.
+    decrement_line_eleven = 0x3B,
+
+    /// Decrement the `line` register by twelve.
+    decrement_line_twelve = 0x3C,
 };
 
 pub const LocationProgramInstruction = union(LocationProgramOpcode) {
     offset_address: u64,
+    increment_address_two,
+    increment_address_three,
     increment_address_four,
+    increment_address_five,
+    increment_address_six,
+    increment_address_seven,
     increment_address_eight,
+    increment_address_nine,
+    increment_address_ten,
+    increment_address_eleven,
     increment_address_twelve,
+    increment_address_thirteen,
+    increment_address_fourteen,
+    increment_address_fifteen,
     increment_address_sixteen,
+    increment_address_seventeen,
+    increment_address_eighteen,
+    increment_address_nineteen,
+    increment_address_twenty,
+    increment_address_twenty_one,
+    increment_address_twenty_two,
+    increment_address_twenty_three,
+    increment_address_twenty_four,
+    increment_address_twenty_five,
+    increment_address_twenty_six,
+    increment_address_twenty_seven,
+    increment_address_twenty_eight,
+    increment_address_twenty_nine,
+    increment_address_thirty,
+    increment_address_thirty_one,
+    increment_address_thirty_two,
     set_symbol_offset: u64,
     set_file_index: u64,
     offset_column: i64,
@@ -542,11 +733,25 @@ pub const LocationProgramInstruction = union(LocationProgramOpcode) {
     increment_line_three,
     increment_line_four,
     increment_line_five,
+    increment_line_six,
+    increment_line_seven,
+    increment_line_eight,
+    increment_line_nine,
+    increment_line_ten,
+    increment_line_eleven,
+    increment_line_twelve,
     decrement_line_one,
     decrement_line_two,
     decrement_line_three,
     decrement_line_four,
     decrement_line_five,
+    decrement_line_six,
+    decrement_line_seven,
+    decrement_line_eight,
+    decrement_line_nine,
+    decrement_line_ten,
+    decrement_line_eleven,
+    decrement_line_twelve,
 
     pub fn read(reader: anytype) !LocationProgramInstruction {
         const opcode: LocationProgramOpcode = @enumFromInt(try reader.readByte());
@@ -570,20 +775,61 @@ pub const LocationProgramInstruction = union(LocationProgramOpcode) {
             .set_file_index => |value| try std.leb.writeULEB128(writer, value),
             .offset_column => |value| try std.leb.writeILEB128(writer, value),
             .offset_line => |value| try std.leb.writeILEB128(writer, value),
+            .increment_address_two,
+            .increment_address_three,
             .increment_address_four,
+            .increment_address_five,
+            .increment_address_six,
+            .increment_address_seven,
             .increment_address_eight,
+            .increment_address_nine,
+            .increment_address_ten,
+            .increment_address_eleven,
             .increment_address_twelve,
+            .increment_address_thirteen,
+            .increment_address_fourteen,
+            .increment_address_fifteen,
             .increment_address_sixteen,
+            .increment_address_seventeen,
+            .increment_address_eighteen,
+            .increment_address_nineteen,
+            .increment_address_twenty,
+            .increment_address_twenty_one,
+            .increment_address_twenty_two,
+            .increment_address_twenty_three,
+            .increment_address_twenty_four,
+            .increment_address_twenty_five,
+            .increment_address_twenty_six,
+            .increment_address_twenty_seven,
+            .increment_address_twenty_eight,
+            .increment_address_twenty_nine,
+            .increment_address_thirty,
+            .increment_address_thirty_one,
+            .increment_address_thirty_two,
             .increment_line_one,
             .increment_line_two,
             .increment_line_three,
             .increment_line_four,
             .increment_line_five,
+            .increment_line_six,
+            .increment_line_seven,
+            .increment_line_eight,
+            .increment_line_nine,
+            .increment_line_ten,
+            .increment_line_eleven,
+            .increment_line_twelve,
             .decrement_line_one,
             .decrement_line_two,
             .decrement_line_three,
             .decrement_line_four,
             .decrement_line_five,
+            .decrement_line_six,
+            .decrement_line_seven,
+            .decrement_line_eight,
+            .decrement_line_nine,
+            .decrement_line_ten,
+            .decrement_line_eleven,
+            .decrement_line_twelve,
             => {},
         }
     }
