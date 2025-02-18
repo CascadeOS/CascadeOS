@@ -337,7 +337,7 @@ fn getDwarfLineDebugInfo(allocator: std.mem.Allocator, input_path: [:0]const u8)
                 var opt_best_candidate: ?FunctionLowHigh = null;
 
                 for (function_low_highs) |function_low_high| {
-                    if (address >= function_low_high.low_pc and address < function_low_high.high_pc) {
+                    if (address >= function_low_high.low_pc and address <= function_low_high.high_pc) {
                         opt_best_candidate = function_low_high;
                     }
                 }
