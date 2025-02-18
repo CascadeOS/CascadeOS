@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v8.7.0/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v9.0.0/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of v8.7.0.
+//! This module contains the definitions of the Limine protocol as of v9.0.0.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v8.7.0/PROTOCOL.md)
-//! da43c70a2d0c25af41bdd60e14e80c100a16fda7 2024-12-05
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v9.0.0/PROTOCOL.md)
+//! 99738edd072a14fdedba822359daee754c8fe193 2025-02-17
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
@@ -583,6 +583,33 @@ pub const ExecutableFile = extern struct {
     };
 };
 
+/// Executable Command Line Feature
+pub const ExecutableCommandLine = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x4b161536e598651e, 0xb390ad4a2f1f303a },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// String containing the command line associated with the booted executable.
+        ///
+        /// This is equivalent to the `string` member of the `executable_file` structure of the Executable File feature.
+        _cmdline: ?[*:0]const u8,
+
+        /// String containing the command line associated with the booted executable.
+        ///
+        /// This is equivalent to the `string` member of the `executable_file` structure of the Executable File feature.
+        pub fn cmdline(self: *const Response) ?[:0]const u8 {
+            return if (self._cmdline) |c|
+                std.mem.sliceTo(c, 0)
+            else
+                null;
+        }
+    };
+};
+
 /// Module Feature
 pub const Module = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x3e7e279702be32af, 0xca1c4f3bd1280cee },
@@ -623,11 +650,19 @@ pub const Module = extern struct {
         /// This path is relative to the location of the executable.
         path: [*:0]const u8,
 
-        /// Command line for the given module.
-        cmdline: [*:0]const u8,
+        /// String associated with the given module.
+        _string: ?[*:0]const u8,
 
         /// Flags changing module loading behaviour
         flags: Flags,
+
+        /// String associated with the given module.
+        pub fn string(self: *const InternalModule) ?[:0]const u8 {
+            return if (self._string) |s|
+                std.mem.sliceTo(s, 0)
+            else
+                null;
+        }
 
         pub const Flags = packed struct(u64) {
             /// If `true` then fail if the requested module is not found.
@@ -743,8 +778,8 @@ pub const EFIMemoryMap = extern struct {
     };
 };
 
-/// Boot Time Feature
-pub const BootTime = extern struct {
+/// Date at Boot Feature
+pub const DateAtBoot = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x502746e184c088aa, 0xfbc5ec83e6327893 },
     revision: u64 = 0,
 
@@ -753,8 +788,8 @@ pub const BootTime = extern struct {
     pub const Response = extern struct {
         revision: u64,
 
-        /// The UNIX time on boot, in seconds, taken from the system RTC.
-        boot_time: i64,
+        /// The UNIX timestamp, in seconds, taken from the system RTC, representing the date and time of boot.
+        timestamp: i64,
     };
 };
 
@@ -826,8 +861,8 @@ pub const File = extern struct {
     /// The path of the file within the volume, with a leading slash
     _path: [*:0]const u8,
 
-    /// A command line associated with the file
-    _cmdline: ?[*:0]const u8,
+    /// A string associated with the file
+    _string: ?[*:0]const u8,
 
     media_type: MediaType,
 
@@ -860,9 +895,9 @@ pub const File = extern struct {
         return std.mem.sliceTo(self._path, 0);
     }
 
-    /// A command line associated with the file
-    pub fn cmdline(self: *const File) ?[:0]const u8 {
-        return if (self._cmdline) |s|
+    /// A string associated with the file
+    pub fn string(self: *const File) ?[:0]const u8 {
+        return if (self._string) |s|
             std.mem.sliceTo(s, 0)
         else
             null;
