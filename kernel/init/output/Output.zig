@@ -47,14 +47,107 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
     // TODO: DBG2 https://github.com/MicrosoftDocs/windows-driver-docs/blob/staging/windows-driver-docs-pr/bringup/acpi-debug-port-table.md
 
     const static = struct {
-        var init_output_uart: Uart = undefined;
+        var init_output_uart: uart.Uart = undefined;
     };
 
     const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return null;
     defer spcr.deinit();
-    std.debug.assert(spcr.table.base_address.address_space == .memory);
 
-    static.init_output_uart = Uart.init(kernel.vmm.directMapFromPhysical(.fromInt(spcr.table.base_address.address)));
+    if (kernel.config.cascade_target == .arm) {
+        std.debug.assert(spcr.table.base_address.address_space == .memory);
+        // TODO: implement ARM PL011 UART
+        static.init_output_uart = .{
+            .old_uart = uart.OldUart.init(kernel.vmm.directMapFromPhysical(
+                .fromInt(spcr.table.base_address.address),
+            )),
+        };
+    } else {
+        const baud_rate: ?uart.BaudRate = switch (spcr.table.configured_baud_rate) {
+            .as_is => null,
+            .@"9600" => .@"9600",
+            .@"19200" => .@"19200",
+            .@"57600" => .@"57600",
+            .@"115200" => .@"115200",
+        };
+
+        if (spcr.table.header.revision < 2) {
+            switch (spcr.table.interface_type.revision_1) {
+                .@"16550" => switch (spcr.table.base_address.address_space) {
+                    .memory => static.init_output_uart = .{
+                        .memory_16550 = uart.Memory16550.init(
+                            kernel.vmm.directMapFromPhysical(
+                                .fromInt(spcr.table.base_address.address),
+                            ).toPtr([*]volatile u8),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    .io => static.init_output_uart = .{
+                        .io_port_16550 = uart.IoPort16550.init(
+                            @intCast(spcr.table.base_address.address),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    else => return null,
+                },
+                .@"16450" => switch (spcr.table.base_address.address_space) {
+                    .memory => static.init_output_uart = .{
+                        .memory_16450 = uart.Memory16450.init(
+                            kernel.vmm.directMapFromPhysical(
+                                .fromInt(spcr.table.base_address.address),
+                            ).toPtr([*]volatile u8),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    .io => static.init_output_uart = .{
+                        .io_port_16450 = uart.IoPort16450.init(
+                            @intCast(spcr.table.base_address.address),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    else => return null,
+                },
+            }
+        } else {
+            switch (spcr.table.interface_type.revision_2_or_higher) {
+                .@"16550" => switch (spcr.table.base_address.address_space) {
+                    .memory => static.init_output_uart = .{
+                        .memory_16550 = uart.Memory16550.init(
+                            kernel.vmm.directMapFromPhysical(
+                                .fromInt(spcr.table.base_address.address),
+                            ).toPtr([*]volatile u8),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    .io => static.init_output_uart = .{
+                        .io_port_16550 = uart.IoPort16550.init(
+                            @intCast(spcr.table.base_address.address),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    else => return null,
+                },
+                .@"16450" => switch (spcr.table.base_address.address_space) {
+                    .memory => static.init_output_uart = .{
+                        .memory_16450 = uart.Memory16450.init(
+                            kernel.vmm.directMapFromPhysical(
+                                .fromInt(spcr.table.base_address.address),
+                            ).toPtr([*]volatile u8),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    .io => static.init_output_uart = .{
+                        .io_port_16450 = uart.IoPort16450.init(
+                            @intCast(spcr.table.base_address.address),
+                            baud_rate,
+                        ) orelse return null,
+                    },
+                    else => return null,
+                },
+                else => return null, // TODO: implement other UARTs
+            }
+        }
+    }
+
     return static.init_output_uart.output();
 }
 
@@ -69,52 +162,7 @@ pub const globals = struct {
 
 const maximum_number_of_outputs = 8;
 
-/// A basic write only UART.
-///
-/// TODO: a write only implementation covering memory mapped 16550, io port 16550 and Arm PL011
-/// [PC16550D Universal Asynchronous Receiver/Transmitter with FIFOs](https://media.digikey.com/pdf/Data%20Sheets/Texas%20Instruments%20PDFs/PC16550D.pdf)
-/// [or this one](https://caro.su/msx/ocm_de1/16550.pdf)
-const Uart = struct {
-    ptr: *volatile u8,
-
-    pub fn init(address: core.VirtualAddress) Uart {
-        return .{
-            .ptr = address.toPtr(*volatile u8),
-        };
-    }
-
-    pub fn output(self: *Uart) kernel.init.Output {
-        return .{
-            .writeFn = struct {
-                fn writeFn(context: *anyopaque, str: []const u8) void {
-                    const uart: *Uart = @ptrCast(@alignCast(context));
-                    for (0..str.len) |i| {
-                        const byte = str[i];
-
-                        if (byte == '\n') {
-                            @branchHint(.unlikely);
-
-                            if (i != 0 and str[i - 1] != '\r') {
-                                @branchHint(.likely);
-                                uart.ptr.* = '\r';
-                            }
-                        }
-
-                        uart.ptr.* = byte;
-                    }
-                }
-            }.writeFn,
-            .remapFn = struct {
-                fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
-                    const uart: *Uart = @ptrCast(@alignCast(context));
-                    const physical_address = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(uart.ptr)));
-                    uart.ptr = kernel.vmm.nonCachedDirectMapFromPhysical(physical_address).toPtr(*volatile u8);
-                }
-            }.remapFn,
-            .context = self,
-        };
-    }
-};
+pub const uart = @import("uart.zig");
 
 const std = @import("std");
 const core = @import("core");
