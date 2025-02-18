@@ -50,105 +50,114 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
         var init_output_uart: uart.Uart = undefined;
     };
 
+    blk: {
+        if (tryGetOutputFromSPCR()) |output_uart| {
+            static.init_output_uart = output_uart;
+            break :blk;
+        }
+
+        return null;
+    }
+
+    return static.init_output_uart.output();
+}
+
+fn tryGetOutputFromSPCR() ?uart.Uart {
     const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return null;
     defer spcr.deinit();
 
     if (kernel.config.cascade_target == .arm) {
         std.debug.assert(spcr.table.base_address.address_space == .memory);
         // TODO: implement ARM PL011 UART
-        static.init_output_uart = .{
-            .old_uart = uart.OldUart.init(kernel.vmm.directMapFromPhysical(
-                .fromInt(spcr.table.base_address.address),
-            )),
+        return .{
+            .old_uart = .init(kernel.vmm.directMapFromPhysical(.fromInt(spcr.table.base_address.address))),
         };
-    } else {
-        const baud_rate: ?uart.BaudRate = switch (spcr.table.configured_baud_rate) {
-            .as_is => null,
-            .@"9600" => .@"9600",
-            .@"19200" => .@"19200",
-            .@"57600" => .@"57600",
-            .@"115200" => .@"115200",
-        };
+    }
 
-        if (spcr.table.header.revision < 2) {
-            switch (spcr.table.interface_type.revision_1) {
-                .@"16550" => switch (spcr.table.base_address.address_space) {
-                    .memory => static.init_output_uart = .{
-                        .memory_16550 = uart.Memory16550.init(
-                            kernel.vmm.directMapFromPhysical(
-                                .fromInt(spcr.table.base_address.address),
-                            ).toPtr([*]volatile u8),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    .io => static.init_output_uart = .{
-                        .io_port_16550 = uart.IoPort16550.init(
-                            @intCast(spcr.table.base_address.address),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    else => return null,
+    const baud_rate: ?uart.BaudRate = switch (spcr.table.configured_baud_rate) {
+        .as_is => null,
+        .@"9600" => .@"9600",
+        .@"19200" => .@"19200",
+        .@"57600" => .@"57600",
+        .@"115200" => .@"115200",
+    };
+
+    if (spcr.table.header.revision < 2) {
+        switch (spcr.table.interface_type.revision_1) {
+            .@"16550" => switch (spcr.table.base_address.address_space) {
+                .memory => return .{
+                    .memory_16550 = uart.Memory16550.init(
+                        kernel.vmm.directMapFromPhysical(
+                            .fromInt(spcr.table.base_address.address),
+                        ).toPtr([*]volatile u8),
+                        baud_rate,
+                    ) orelse return null,
                 },
-                .@"16450" => switch (spcr.table.base_address.address_space) {
-                    .memory => static.init_output_uart = .{
-                        .memory_16450 = uart.Memory16450.init(
-                            kernel.vmm.directMapFromPhysical(
-                                .fromInt(spcr.table.base_address.address),
-                            ).toPtr([*]volatile u8),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    .io => static.init_output_uart = .{
-                        .io_port_16450 = uart.IoPort16450.init(
-                            @intCast(spcr.table.base_address.address),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    else => return null,
+                .io => return .{
+                    .io_port_16550 = uart.IoPort16550.init(
+                        @intCast(spcr.table.base_address.address),
+                        baud_rate,
+                    ) orelse return null,
                 },
-            }
-        } else {
-            switch (spcr.table.interface_type.revision_2_or_higher) {
-                .@"16550" => switch (spcr.table.base_address.address_space) {
-                    .memory => static.init_output_uart = .{
-                        .memory_16550 = uart.Memory16550.init(
-                            kernel.vmm.directMapFromPhysical(
-                                .fromInt(spcr.table.base_address.address),
-                            ).toPtr([*]volatile u8),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    .io => static.init_output_uart = .{
-                        .io_port_16550 = uart.IoPort16550.init(
-                            @intCast(spcr.table.base_address.address),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    else => return null,
+                else => return null,
+            },
+            .@"16450" => switch (spcr.table.base_address.address_space) {
+                .memory => return .{
+                    .memory_16450 = uart.Memory16450.init(
+                        kernel.vmm.directMapFromPhysical(
+                            .fromInt(spcr.table.base_address.address),
+                        ).toPtr([*]volatile u8),
+                        baud_rate,
+                    ) orelse return null,
                 },
-                .@"16450" => switch (spcr.table.base_address.address_space) {
-                    .memory => static.init_output_uart = .{
-                        .memory_16450 = uart.Memory16450.init(
-                            kernel.vmm.directMapFromPhysical(
-                                .fromInt(spcr.table.base_address.address),
-                            ).toPtr([*]volatile u8),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    .io => static.init_output_uart = .{
-                        .io_port_16450 = uart.IoPort16450.init(
-                            @intCast(spcr.table.base_address.address),
-                            baud_rate,
-                        ) orelse return null,
-                    },
-                    else => return null,
+                .io => return .{
+                    .io_port_16450 = uart.IoPort16450.init(
+                        @intCast(spcr.table.base_address.address),
+                        baud_rate,
+                    ) orelse return null,
                 },
-                else => return null, // TODO: implement other UARTs
-            }
+                else => return null,
+            },
         }
     }
 
-    return static.init_output_uart.output();
+    switch (spcr.table.interface_type.revision_2_or_higher) {
+        .@"16550" => switch (spcr.table.base_address.address_space) {
+            .memory => return .{
+                .memory_16550 = uart.Memory16550.init(
+                    kernel.vmm.directMapFromPhysical(
+                        .fromInt(spcr.table.base_address.address),
+                    ).toPtr([*]volatile u8),
+                    baud_rate,
+                ) orelse return null,
+            },
+            .io => return .{
+                .io_port_16550 = uart.IoPort16550.init(
+                    @intCast(spcr.table.base_address.address),
+                    baud_rate,
+                ) orelse return null,
+            },
+            else => return null,
+        },
+        .@"16450" => switch (spcr.table.base_address.address_space) {
+            .memory => return .{
+                .memory_16450 = uart.Memory16450.init(
+                    kernel.vmm.directMapFromPhysical(
+                        .fromInt(spcr.table.base_address.address),
+                    ).toPtr([*]volatile u8),
+                    baud_rate,
+                ) orelse return null,
+            },
+            .io => return .{
+                .io_port_16450 = uart.IoPort16450.init(
+                    @intCast(spcr.table.base_address.address),
+                    baud_rate,
+                ) orelse return null,
+            },
+            else => return null,
+        },
+        else => return null, // TODO: implement other UARTs
+    }
 }
 
 pub const globals = struct {
