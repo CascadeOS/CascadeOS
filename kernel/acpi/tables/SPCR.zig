@@ -136,6 +136,17 @@ pub const SPCR = extern struct {
         return std.mem.sliceTo(null_ptr, 0);
     }
 
+    pub fn pciAddress(self: *const SPCR) ?kernel.pci.Address {
+        if (self.pci_vendor_id == .none or self.pci_device_id == .none) return null;
+
+        return .{
+            .segment = self.pci_segment_number,
+            .bus = self.pci_bus_number,
+            .device = self.pci_device_number,
+            .function = self.pci_function_number,
+        };
+    }
+
     pub const SIGNATURE_STRING = "SPCR";
 
     pub const Type = extern union {
@@ -213,6 +224,14 @@ pub const SPCR = extern struct {
         riscv_plic: bool,
 
         _: u3,
+
+        pub fn hasIrq(self: InterruptType) bool {
+            return self.pic;
+        }
+
+        pub fn hasGlobalSystemInterrupt(self: InterruptType) bool {
+            return self.ioapic or self.iosapic or self.armh_gic or self.riscv_plic;
+        }
     };
 
     pub const BaudRate = enum(u8) {
