@@ -110,10 +110,6 @@ pub const PageFaultErrorCode = packed struct(u64) {
         else
             print(self, writer.any(), 0);
     }
-
-    fn __helpZls() void {
-        PageFaultErrorCode.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
 };
 
 comptime {

@@ -164,10 +164,6 @@ pub const RFlags = packed struct(u64) {
             print(self, writer.any(), 0);
     }
 
-    fn __helpZls() void {
-        RFlags.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
-
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }

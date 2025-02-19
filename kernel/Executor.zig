@@ -63,10 +63,6 @@ pub inline fn format(
         print(executor, writer.any(), 0);
 }
 
-fn __helpZls() void {
-    Executor.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-}
-
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

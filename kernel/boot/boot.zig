@@ -80,10 +80,6 @@ pub const MemoryMap = struct {
             else
                 print(value, writer.any(), 0);
         }
-
-        fn __helpZls() void {
-            Entry.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-        }
     };
 
     const backing_size: usize = @max(

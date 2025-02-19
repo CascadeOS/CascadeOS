@@ -153,10 +153,6 @@ pub inline fn format(
         print(task, writer.any(), 0);
 }
 
-fn __helpZls() void {
-    Task.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-}
-
 pub inline fn fromNode(node: *containers.SingleNode) *Task {
     return @fieldParentPtr("next_task_node", node);
 }

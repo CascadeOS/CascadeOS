@@ -370,10 +370,6 @@ pub const Allocation = struct {
         else
             print(self, writer.any(), 0);
     }
-
-    fn __helpZls() void {
-        Allocation.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
 };
 
 pub const AllocateError = error{
@@ -930,10 +926,6 @@ const BoundaryTag = struct {
         else
             print(self, writer.any(), 0);
     }
-
-    fn __helpZls() void {
-        BoundaryTag.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
 };
 
 const AllTagNode = struct {
@@ -977,10 +969,6 @@ const AllTagNode = struct {
         else
             print(self, writer.any(), 0);
     }
-
-    fn __helpZls() void {
-        AllTagNode.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
 };
 
 const KindNode = struct {
@@ -1023,10 +1011,6 @@ const KindNode = struct {
             print(self, writer, 0)
         else
             print(self, writer.any(), 0);
-    }
-
-    fn __helpZls() void {
-        KindNode.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 };
 

@@ -84,10 +84,6 @@ pub inline fn format(
         print(region, writer.any(), 0);
 }
 
-fn __helpZls() void {
-    KernelMemoryRegion.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-}
-
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");

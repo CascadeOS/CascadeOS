@@ -120,10 +120,6 @@ pub const PhysicalAddress = extern struct {
             print(self, writer.any(), 0);
     }
 
-    fn __helpZls() void {
-        PhysicalAddress.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
-
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }
@@ -249,10 +245,6 @@ pub const VirtualAddress = extern struct {
             print(self, writer.any(), 0);
     }
 
-    fn __helpZls() void {
-        VirtualAddress.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
-
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }
@@ -343,10 +335,6 @@ pub const PhysicalRange = extern struct {
             print(value, writer, 0)
         else
             print(value, writer.any(), 0);
-    }
-
-    fn __helpZls() void {
-        PhysicalRange.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 };
 
@@ -462,10 +450,6 @@ pub const VirtualRange = extern struct {
             print(value, writer, 0)
         else
             print(value, writer.any(), 0);
-    }
-
-    fn __helpZls() void {
-        VirtualRange.print(undefined, @as(std.fs.File.Writer, undefined), 0);
     }
 };
 

@@ -171,10 +171,6 @@ pub const Duration = extern struct {
             print(duration, writer.any(), 0);
     }
 
-    fn __helpZls() void {
-        Duration.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
-
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }

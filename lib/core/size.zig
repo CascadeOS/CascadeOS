@@ -227,10 +227,6 @@ pub const Size = extern struct {
             print(size, writer.any(), 0);
     }
 
-    fn __helpZls() void {
-        Size.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
-
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64));
     }

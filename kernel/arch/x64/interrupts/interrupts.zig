@@ -274,10 +274,6 @@ pub const InterruptFrame = extern struct {
         else
             print(value, writer.any(), 0);
     }
-
-    fn __helpZls() void {
-        InterruptFrame.print(undefined, @as(std.fs.File.Writer, undefined), 0);
-    }
 };
 
 pub const InterruptStackSelector = enum(u3) {
