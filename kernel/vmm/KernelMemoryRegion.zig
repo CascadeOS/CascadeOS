@@ -63,11 +63,11 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
 }
 
 pub fn print(region: KernelMemoryRegion, writer: std.io.AnyWriter, indent: usize) !void {
-    try writer.writeAll("Region{ ");
-    try region.range.print(writer, indent);
-    try writer.writeAll(" - ");
-    try writer.writeAll(@tagName(region.type));
-    try writer.writeAll(" }");
+    _ = indent;
+    try writer.print("Region{{ {} - {s} }}", .{
+        region.range,
+        @tagName(region.type),
+    });
 }
 
 pub inline fn format(

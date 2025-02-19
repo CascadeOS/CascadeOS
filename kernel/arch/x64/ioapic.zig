@@ -78,13 +78,11 @@ const SourceOverride = struct {
     pub fn print(id: SourceOverride, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
-        try writer.writeAll("SourceOverride{ .gsi = ");
-        try std.fmt.formatInt(id.gsi, 10, .lower, .{}, writer);
-        try writer.writeAll(", .polarity = ");
-        try writer.writeAll(@tagName(id.polarity));
-        try writer.writeAll(", .trigger_mode = ");
-        try writer.writeAll(@tagName(id.trigger_mode));
-        try writer.writeAll(" }");
+        try writer.print("SourceOverride{{ .gsi = {d}, .polarity = {s}, .trigger_mode = {s} }}", .{
+            id.gsi,
+            @tagName(id.polarity),
+            @tagName(id.trigger_mode),
+        });
     }
 
     pub inline fn format(

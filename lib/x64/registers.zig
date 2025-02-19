@@ -501,25 +501,36 @@ pub const PAT = packed struct(u64) {
     }
 
     pub fn print(pat: PAT, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
+        const new_indent = indent + 2;
 
-        try writer.writeAll("PAT{ entry0: ");
-        try writer.writeAll(@tagName(pat.entry0));
-        try writer.writeAll(", entry1: ");
-        try writer.writeAll(@tagName(pat.entry1));
-        try writer.writeAll(", entry2: ");
-        try writer.writeAll(@tagName(pat.entry2));
-        try writer.writeAll(", entry3: ");
-        try writer.writeAll(@tagName(pat.entry3));
-        try writer.writeAll(", entry4: ");
-        try writer.writeAll(@tagName(pat.entry4));
-        try writer.writeAll(", entry5: ");
-        try writer.writeAll(@tagName(pat.entry5));
-        try writer.writeAll(", entry6: ");
-        try writer.writeAll(@tagName(pat.entry6));
-        try writer.writeAll(", entry7: ");
-        try writer.writeAll(@tagName(pat.entry7));
-        try writer.writeAll(" }");
+        try writer.writeAll("PAT{\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry0: {s},\n", .{@tagName(pat.entry0)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry1: {s},\n", .{@tagName(pat.entry1)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry2: {s},\n", .{@tagName(pat.entry2)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry3: {s},\n", .{@tagName(pat.entry3)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry4: {s},\n", .{@tagName(pat.entry4)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry5: {s},\n", .{@tagName(pat.entry5)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry6: {s},\n", .{@tagName(pat.entry6)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("entry7: {s},\n", .{@tagName(pat.entry7)});
+
+        try writer.writeByteNTimes(' ', indent);
+        try writer.writeByte('}');
     }
 
     pub inline fn format(

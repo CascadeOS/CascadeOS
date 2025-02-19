@@ -349,12 +349,7 @@ pub const Allocation = struct {
 
     pub fn print(self: Allocation, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
-
-        try writer.writeAll("Allocation{ base: 0x");
-        try std.fmt.formatInt(self.base, 16, .lower, .{}, writer);
-        try writer.writeAll(", len: 0x");
-        try std.fmt.formatInt(self.len, 16, .lower, .{}, writer);
-        try writer.writeAll(" }");
+        try writer.print("Allocation{{ base: 0x{x}, len: 0x{x} }}", .{ self.base, self.len });
     }
 
     pub inline fn format(
@@ -900,17 +895,31 @@ const BoundaryTag = struct {
     }
 
     pub fn print(self: BoundaryTag, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
+        const new_indent = indent + 2;
 
-        try writer.writeAll("BoundaryTag{ base: 0x");
-        try std.fmt.formatInt(self.base, 16, .lower, .{}, writer);
-        try writer.writeAll(", len: 0x");
-        try std.fmt.formatInt(self.len, 16, .lower, .{}, writer);
-        try writer.print(", kind: {s}, all_tag_node: ", .{@tagName(self.kind)});
-        try self.all_tag_node.print(writer, 0);
-        try writer.writeAll(", kind_node: ");
-        try self.kind_node.print(writer, 0);
-        try writer.writeAll(" }");
+        try writer.writeAll("BoundaryTag{\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("base: 0x{x},\n", .{self.base});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("len: 0x{x},\n", .{self.len});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("kind: {s},\n", .{@tagName(self.kind)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.writeAll("all_tag_node: ");
+        try self.all_tag_node.print(writer, new_indent);
+        try writer.writeAll(",\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.writeAll("kind_node: ");
+        try self.kind_node.print(writer, new_indent);
+        try writer.writeAll(",\n");
+
+        try writer.writeByteNTimes(' ', indent);
+        try writer.writeByte('}');
     }
 
     pub inline fn format(

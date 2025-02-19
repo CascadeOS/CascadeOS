@@ -302,13 +302,8 @@ pub const VendorID = enum(u16) {
     _,
 
     pub fn print(id: VendorID, writer: std.io.AnyWriter, indent: usize) !void {
-        // VendorID(id)
-
         _ = indent;
-
-        try writer.writeAll("VendorID(0x");
-        try std.fmt.formatInt(@intFromEnum(id), 16, .upper, .{}, writer);
-        try writer.writeByte(')');
+        try writer.print("VendorID(0x{x:0>4})", .{@intFromEnum(id)});
     }
 
     pub inline fn format(
@@ -327,16 +322,13 @@ pub const VendorID = enum(u16) {
 };
 
 pub const DeviceID = enum(u16) {
+    none = 0xFFFF, // TODO: This is not `none` by the spec unlike with VendorID however sometimes it is used like this
+
     _,
 
     pub fn print(id: DeviceID, writer: std.io.AnyWriter, indent: usize) !void {
-        // DeviceID(id)
-
         _ = indent;
-
-        try writer.writeAll("DeviceID(0x");
-        try std.fmt.formatInt(@intFromEnum(id), 16, .upper, .{}, writer);
-        try writer.writeByte(')');
+        try writer.print("DeviceID(0x{x:0>4})", .{@intFromEnum(id)});
     }
 
     pub inline fn format(

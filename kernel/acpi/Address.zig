@@ -94,6 +94,44 @@ pub const Address = extern struct {
         _,
     };
 
+    pub fn print(self: Address, writer: std.io.AnyWriter, indent: usize) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("Address{\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("address_space: {s},\n", .{@tagName(self.address_space)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("bit_width: {d},\n", .{self.register_bit_width});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("bit_offset: {d},\n", .{self.register_bit_offset});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("access_size: {s},\n", .{@tagName(self.access_size)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("address: 0x{x},\n", .{self.address});
+
+        try writer.writeByteNTimes(' ', indent);
+        try writer.writeByte('}');
+    }
+
+    pub inline fn format(
+        self: Address,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            print(self, writer, 0)
+        else
+            print(self, writer.any(), 0);
+    }
+
     comptime {
         core.testing.expectSize(@This(), @sizeOf(u64) + @sizeOf(u8) * 4);
     }

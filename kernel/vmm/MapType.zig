@@ -32,8 +32,6 @@ pub fn equal(a: MapType, b: MapType) bool {
 pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
     _ = indent;
 
-    try writer.writeAll("Type{ ");
-
     const buffer: []const u8 = &[_]u8{
         if (value.user) 'U' else 'K',
         if (value.writeable) 'W' else 'R',
@@ -42,8 +40,7 @@ pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
         if (value.no_cache) 'C' else '-',
     };
 
-    try writer.writeAll(buffer);
-    try writer.writeAll(" }");
+    try writer.print("Type{{ {s} }}", .{buffer});
 }
 
 pub inline fn format(

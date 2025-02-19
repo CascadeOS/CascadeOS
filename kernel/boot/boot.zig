@@ -60,11 +60,8 @@ pub const MemoryMap = struct {
         };
 
         pub fn print(entry: Entry, writer: std.io.AnyWriter, indent: usize) !void {
-            try writer.writeAll(@tagName(entry.type));
-
-            try writer.writeAll(" - ");
-
-            try entry.range.print(writer, indent);
+            _ = indent;
+            try writer.print("{s} - {}", .{ @tagName(entry.type), entry.range });
         }
 
         pub inline fn format(

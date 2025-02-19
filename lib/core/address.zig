@@ -100,10 +100,7 @@ pub const PhysicalAddress = extern struct {
 
     pub fn print(self: PhysicalAddress, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
-
-        try writer.writeAll("PhysicalAddress{ 0x");
-        try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
-        try writer.writeAll(" }");
+        try writer.print("PhysicalAddress{{ 0x{x:0>16} }}", .{self.value});
     }
 
     pub inline fn format(
@@ -225,10 +222,7 @@ pub const VirtualAddress = extern struct {
 
     pub fn print(self: VirtualAddress, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
-
-        try writer.writeAll("VirtualAddress{ 0x");
-        try std.fmt.formatInt(self.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
-        try writer.writeAll(" }");
+        try writer.print("VirtualAddress{{ 0x{x:0>16} }}", .{self.value});
     }
 
     pub inline fn format(
@@ -312,15 +306,12 @@ pub const PhysicalRange = extern struct {
     }
 
     pub fn print(value: PhysicalRange, writer: std.io.AnyWriter, indent: usize) !void {
-        try writer.writeAll("PhysicalRange{ 0x");
-        try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
-
-        try writer.writeAll(" - 0x");
-        try std.fmt.formatInt(value.last().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
-        try writer.writeAll(" - ");
-
-        try value.size.print(writer, indent);
-        try writer.writeAll(" }");
+        _ = indent;
+        try writer.print("PhysicalRange{{ 0x{x:0>16} - 0x{x:0>16} - {} }}", .{
+            value.address.value,
+            value.last().value,
+            value.size,
+        });
     }
 
     pub inline fn format(
@@ -427,15 +418,12 @@ pub const VirtualRange = extern struct {
     }
 
     pub fn print(value: VirtualRange, writer: std.io.AnyWriter, indent: usize) !void {
-        try writer.writeAll("VirtualRange{ 0x");
-        try std.fmt.formatInt(value.address.value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
-
-        try writer.writeAll(" - 0x");
-        try std.fmt.formatInt(value.last().value, 16, .lower, .{ .width = 16, .fill = '0' }, writer);
-        try writer.writeAll(" - ");
-
-        try value.size.print(writer, indent);
-        try writer.writeAll(" }");
+        _ = indent;
+        try writer.print("VirtualRange{{ 0x{x:0>16} - 0x{x:0>16} - {} }}", .{
+            value.address.value,
+            value.last().value,
+            value.size,
+        });
     }
 
     pub inline fn format(

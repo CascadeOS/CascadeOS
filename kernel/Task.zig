@@ -132,11 +132,7 @@ pub const Id = enum(u64) {
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
 
 pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
-    // Task(task.name)
-
-    try writer.writeAll("Task(");
-    try writer.writeAll(task.name());
-    try writer.writeByte(')');
+    try writer.print("Task({s})", .{task.name()});
 }
 
 pub inline fn format(
