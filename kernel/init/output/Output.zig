@@ -51,7 +51,17 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
     };
 
     blk: {
-        if (tryGetOutputFromSPCR()) |output_uart| {
+        const maybe_output_uart: ?uart.Uart = tryGetOutputFromSPCR() catch |err| maybe_output_uart: switch (err) {
+            error.BaudDivisorTooLarge => {
+                log.warn("baud divisor from SPCR too large", .{});
+                break :maybe_output_uart null;
+            },
+            error.BaudDivisorNotExact => {
+                log.warn("baud divisor from SPCR not exact", .{});
+                break :maybe_output_uart null;
+            },
+        };
+        if (maybe_output_uart) |output_uart| {
             static.init_output_uart = output_uart;
             break :blk;
         }
@@ -62,7 +72,7 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
     return static.init_output_uart.output();
 }
 
-fn tryGetOutputFromSPCR() ?uart.Uart {
+fn tryGetOutputFromSPCR() uart.Baud.DivisorError!?uart.Uart {
     const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return null;
     defer spcr.deinit();
 
@@ -74,7 +84,7 @@ fn tryGetOutputFromSPCR() ?uart.Uart {
         };
     }
 
-    const baud_rate: ?uart.BaudRate = switch (spcr.table.configured_baud_rate) {
+    const baud_rate: ?uart.Baud.BaudRate = switch (spcr.table.configured_baud_rate) {
         .as_is => null,
         .@"9600" => .@"9600",
         .@"19200" => .@"19200",
@@ -84,77 +94,105 @@ fn tryGetOutputFromSPCR() ?uart.Uart {
 
     if (spcr.table.header.revision < 2) {
         switch (spcr.table.interface_type.revision_1) {
-            .@"16550" => switch (spcr.table.base_address.address_space) {
-                .memory => return .{
-                    .memory_16550 = uart.Memory16550.init(
-                        kernel.vmm.directMapFromPhysical(
-                            .fromInt(spcr.table.base_address.address),
-                        ).toPtr([*]volatile u8),
-                        baud_rate,
-                    ) orelse return null,
-                },
-                .io => return .{
-                    .io_port_16550 = uart.IoPort16550.init(
-                        @intCast(spcr.table.base_address.address),
-                        baud_rate,
-                    ) orelse return null,
-                },
-                else => return null,
+            .@"16550" => {
+                const baud: ?uart.Baud = if (baud_rate) |br| .{
+                    .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
+                    .baud_rate = br,
+                } else null;
+
+                switch (spcr.table.base_address.address_space) {
+                    .memory => return .{
+                        .memory_16550 = try uart.Memory16550.init(
+                            kernel.vmm.directMapFromPhysical(
+                                .fromInt(spcr.table.base_address.address),
+                            ).toPtr([*]volatile u8),
+                            baud,
+                        ) orelse return null,
+                    },
+                    .io => return .{
+                        .io_port_16550 = try uart.IoPort16550.init(
+                            @intCast(spcr.table.base_address.address),
+                            baud,
+                        ) orelse return null,
+                    },
+                    else => return null,
+                }
             },
-            .@"16450" => switch (spcr.table.base_address.address_space) {
-                .memory => return .{
-                    .memory_16450 = uart.Memory16450.init(
-                        kernel.vmm.directMapFromPhysical(
-                            .fromInt(spcr.table.base_address.address),
-                        ).toPtr([*]volatile u8),
-                        baud_rate,
-                    ) orelse return null,
-                },
-                .io => return .{
-                    .io_port_16450 = uart.IoPort16450.init(
-                        @intCast(spcr.table.base_address.address),
-                        baud_rate,
-                    ) orelse return null,
-                },
-                else => return null,
+            .@"16450" => {
+                const baud: ?uart.Baud = if (baud_rate) |br| .{
+                    .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
+                    .baud_rate = br,
+                } else null;
+
+                switch (spcr.table.base_address.address_space) {
+                    .memory => return .{
+                        .memory_16450 = try uart.Memory16450.init(
+                            kernel.vmm.directMapFromPhysical(
+                                .fromInt(spcr.table.base_address.address),
+                            ).toPtr([*]volatile u8),
+                            baud,
+                        ) orelse return null,
+                    },
+                    .io => return .{
+                        .io_port_16450 = try uart.IoPort16450.init(
+                            @intCast(spcr.table.base_address.address),
+                            baud,
+                        ) orelse return null,
+                    },
+                    else => return null,
+                }
             },
         }
     }
 
     switch (spcr.table.interface_type.revision_2_or_higher) {
-        .@"16550" => switch (spcr.table.base_address.address_space) {
-            .memory => return .{
-                .memory_16550 = uart.Memory16550.init(
-                    kernel.vmm.directMapFromPhysical(
-                        .fromInt(spcr.table.base_address.address),
-                    ).toPtr([*]volatile u8),
-                    baud_rate,
-                ) orelse return null,
-            },
-            .io => return .{
-                .io_port_16550 = uart.IoPort16550.init(
-                    @intCast(spcr.table.base_address.address),
-                    baud_rate,
-                ) orelse return null,
-            },
-            else => return null,
+        .@"16550" => {
+            const baud: ?uart.Baud = if (baud_rate) |br| .{
+                .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
+                .baud_rate = br,
+            } else null;
+
+            switch (spcr.table.base_address.address_space) {
+                .memory => return .{
+                    .memory_16550 = try uart.Memory16550.init(
+                        kernel.vmm.directMapFromPhysical(
+                            .fromInt(spcr.table.base_address.address),
+                        ).toPtr([*]volatile u8),
+                        baud,
+                    ) orelse return null,
+                },
+                .io => return .{
+                    .io_port_16550 = try uart.IoPort16550.init(
+                        @intCast(spcr.table.base_address.address),
+                        baud,
+                    ) orelse return null,
+                },
+                else => return null,
+            }
         },
-        .@"16450" => switch (spcr.table.base_address.address_space) {
-            .memory => return .{
-                .memory_16450 = uart.Memory16450.init(
-                    kernel.vmm.directMapFromPhysical(
-                        .fromInt(spcr.table.base_address.address),
-                    ).toPtr([*]volatile u8),
-                    baud_rate,
-                ) orelse return null,
-            },
-            .io => return .{
-                .io_port_16450 = uart.IoPort16450.init(
-                    @intCast(spcr.table.base_address.address),
-                    baud_rate,
-                ) orelse return null,
-            },
-            else => return null,
+        .@"16450" => {
+            const baud: ?uart.Baud = if (baud_rate) |br| .{
+                .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
+                .baud_rate = br,
+            } else null;
+
+            switch (spcr.table.base_address.address_space) {
+                .memory => return .{
+                    .memory_16450 = try uart.Memory16450.init(
+                        kernel.vmm.directMapFromPhysical(
+                            .fromInt(spcr.table.base_address.address),
+                        ).toPtr([*]volatile u8),
+                        baud,
+                    ) orelse return null,
+                },
+                .io => return .{
+                    .io_port_16450 = try uart.IoPort16450.init(
+                        @intCast(spcr.table.base_address.address),
+                        baud,
+                    ) orelse return null,
+                },
+                else => return null,
+            }
         },
         else => return null, // TODO: implement other UARTs
     }
@@ -176,3 +214,4 @@ pub const uart = @import("uart.zig");
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const log = kernel.debug.log.scoped(.init_output);

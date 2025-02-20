@@ -19,7 +19,10 @@ pub fn tryGetOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
     };
 
     for (std.meta.tags(static.COMPort)) |com_port| {
-        if (SerialPort.init(@intFromEnum(com_port), .@"115200")) |serial| {
+        if (SerialPort.init(
+            @intFromEnum(com_port),
+            .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
+        ) catch continue) |serial| {
             static.init_output_serial_port = serial;
             return static.init_output_serial_port.output();
         }

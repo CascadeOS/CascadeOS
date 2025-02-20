@@ -21,13 +21,6 @@ pub const Memory16550 = Uart16X50(.memory, true);
 pub const IoPort16450 = Uart16X50(.io_port, false);
 pub const Memory16450 = Uart16X50(.memory, false);
 
-pub const BaudRate = enum(u16) {
-    @"115200" = 1,
-    @"57600" = 2,
-    @"19200" = 6,
-    @"9600" = 12,
-};
-
 /// A basic write only 16550/16450 UART.
 ///
 /// Assumes the UART clock is 115200 Hz matching the PC serial port clock.
@@ -47,7 +40,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
             .io_port => u16,
         };
 
-        pub fn init(base: AddressT, baud_rate: ?BaudRate) ?Self {
+        pub fn init(base: AddressT, baud: ?Baud) Baud.DivisorError!?Self {
             // write to scratch register to check if the UART is connected
             writeRegister(base + @intFromEnum(RegisterOffset.scratch), 0xBA);
 
@@ -78,7 +71,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
             );
 
             // set baudrate
-            if (baud_rate) |rate| {
+            if (baud) |b| {
                 writeRegister(
                     base + @intFromEnum(RegisterOffset.line_control),
                     @bitCast(LineControlRegister{
@@ -91,14 +84,16 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                         .divisor_latch_access = true,
                     }),
                 );
-                const baud_divisor = @intFromEnum(rate);
+
+                const divisor = try b.integerDivisor();
+
                 writeRegister(
                     base + @intFromEnum(RegisterOffset.divisor_latch_lsb),
-                    @truncate(baud_divisor),
+                    @truncate(divisor),
                 );
                 writeRegister(
                     base + @intFromEnum(RegisterOffset.divisor_latch_msb),
-                    @truncate(baud_divisor >> 8),
+                    @truncate(divisor >> 8),
                 );
             }
 
@@ -380,6 +375,60 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
         };
     };
 }
+
+pub const Baud = struct {
+    /// The clock frequency of the UART in Hz.
+    ///
+    /// Cannot be zero.
+    clock_frequency: Frequency,
+
+    /// The baud rate of the UART in bits per second.
+    ///
+    /// Cannot be zero.
+    baud_rate: BaudRate,
+
+    exact: bool = true,
+
+    pub const BaudRate = enum(u64) {
+        @"115200" = 115200,
+        @"57600" = 57600,
+        @"19200" = 19200,
+        @"9600" = 9600,
+        _,
+    };
+
+    pub const Frequency = enum(u64) {
+        @"1.8432 MHz" = 1843200,
+        _,
+    };
+
+    pub const DivisorError = error{
+        BaudDivisorTooLarge,
+        BaudDivisorNotExact,
+    };
+
+    pub fn integerDivisor(self: Baud) DivisorError!u16 {
+        const baud_rate = @intFromEnum(self.baud_rate);
+        const clock_frequency = @intFromEnum(self.clock_frequency);
+
+        std.debug.assert(baud_rate != 0);
+        std.debug.assert(clock_frequency != 0);
+
+        const divisor = if (self.exact)
+            std.math.divExact(
+                u64,
+                clock_frequency,
+                baud_rate * 16,
+            ) catch |err| switch (err) {
+                error.UnexpectedRemainder => return error.BaudDivisorNotExact,
+                error.DivisionByZero => unreachable,
+            }
+        else
+            clock_frequency / (baud_rate * 16);
+
+        return std.math.cast(u16, divisor) orelse return error.BaudDivisorTooLarge;
+    }
+};
 
 /// A basic write only UART.
 ///
