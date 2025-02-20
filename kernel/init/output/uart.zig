@@ -629,8 +629,6 @@ pub const Baud = struct {
     /// Cannot be zero.
     baud_rate: BaudRate,
 
-    exact: bool = true,
-
     pub const BaudRate = enum(u64) {
         @"115200" = 115200,
         @"57600" = 57600,
@@ -646,8 +644,7 @@ pub const Baud = struct {
     };
 
     pub const DivisorError = error{
-        BaudDivisorTooLarge,
-        BaudDivisorNotExact,
+        DivisorTooLarge,
     };
 
     pub fn integerDivisor(self: Baud) DivisorError!u16 {
@@ -657,19 +654,8 @@ pub const Baud = struct {
         std.debug.assert(baud_rate != 0);
         std.debug.assert(clock_frequency != 0);
 
-        const divisor = if (self.exact)
-            std.math.divExact(
-                u64,
-                clock_frequency,
-                baud_rate * 16,
-            ) catch |err| switch (err) {
-                error.UnexpectedRemainder => return error.BaudDivisorNotExact,
-                error.DivisionByZero => unreachable,
-            }
-        else
-            clock_frequency / (baud_rate * 16);
-
-        return std.math.cast(u16, divisor) orelse return error.BaudDivisorTooLarge;
+        const divisor = clock_frequency / (baud_rate * 16);
+        return std.math.cast(u16, divisor) orelse return error.DivisorTooLarge;
     }
 
     pub const Fractional = packed struct(u22) {

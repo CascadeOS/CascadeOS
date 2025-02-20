@@ -52,12 +52,8 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
 
     blk: {
         const maybe_output_uart: ?uart.Uart = tryGetOutputFromSPCR() catch |err| maybe_output_uart: switch (err) {
-            error.BaudDivisorTooLarge => {
+            error.DivisorTooLarge => {
                 log.warn("baud divisor from SPCR too large", .{});
-                break :maybe_output_uart null;
-            },
-            error.BaudDivisorNotExact => {
-                log.warn("baud divisor from SPCR not exact", .{});
                 break :maybe_output_uart null;
             },
         };
