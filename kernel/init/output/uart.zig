@@ -27,6 +27,7 @@ pub const Memory16450 = Uart16X50(.memory, false);
 ///
 /// Always sets 8 bits, no parity, one stop bit and disables interrupts.
 ///
+/// [UART 16550](https://caro.su/msx/ocm_de1/16550.pdf)
 /// [PC16550D Universal Asynchronous Receiver/Transmitter with FIFOs](https://media.digikey.com/pdf/Data%20Sheets/Texas%20Instruments%20PDFs/PC16550D.pdf)
 fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type {
     return struct {
@@ -156,7 +157,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
             );
 
             return .{
-                .write_register = base,
+                .write_register = base + @intFromEnum(RegisterOffset.write),
                 .line_status_register = base + @intFromEnum(RegisterOffset.line_status),
             };
         }
@@ -264,7 +265,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
         inline fn waitForOutputReady(self: Self) void {
             while (true) {
                 const line_status: LineStatusRegister = @bitCast(readRegister(self.line_status_register));
-                if (line_status.transmitter_holding_register_empty) break;
+                if (line_status.transmitter_holding_register_empty) return;
                 // TODO: should there be a spinloop hint here?
             }
         }
