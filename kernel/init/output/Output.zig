@@ -76,14 +76,6 @@ fn tryGetOutputFromSPCR() uart.Baud.DivisorError!?uart.Uart {
     const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return null;
     defer spcr.deinit();
 
-    if (kernel.config.cascade_target == .arm) {
-        std.debug.assert(spcr.table.base_address.address_space == .memory);
-        // TODO: implement ARM PL011 UART
-        return .{
-            .old_uart = .init(kernel.vmm.directMapFromPhysical(.fromInt(spcr.table.base_address.address))),
-        };
-    }
-
     const baud_rate: ?uart.Baud.BaudRate = switch (spcr.table.configured_baud_rate) {
         .as_is => null,
         .@"9600" => .@"9600",
@@ -193,6 +185,24 @@ fn tryGetOutputFromSPCR() uart.Baud.DivisorError!?uart.Uart {
                 },
                 else => return null,
             }
+        },
+        .ArmPL011 => {
+            const baud: ?uart.Baud = if (baud_rate) |br| .{
+                .clock_frequency = .@"24 MHz", // TODO: we assume the clock frequency is 24 MHz
+                .baud_rate = br,
+            } else null;
+
+            std.debug.assert(spcr.table.base_address.address_space == .memory);
+            std.debug.assert(spcr.table.base_address.access_size == .dword);
+
+            return .{
+                .pl011 = try uart.PL011.init(
+                    kernel.vmm.directMapFromPhysical(
+                        .fromInt(spcr.table.base_address.address),
+                    ).toPtr([*]volatile u32),
+                    baud,
+                ) orelse return null,
+            };
         },
         else => return null, // TODO: implement other UARTs
     }

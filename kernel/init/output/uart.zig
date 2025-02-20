@@ -7,7 +7,7 @@ pub const Uart = union(enum) {
     io_port_16450: IoPort16450,
     memory_16450: Memory16450,
 
-    old_uart: OldUart, // TODO: implement other UARTs - arm PL011 first
+    pl011: PL011,
 
     pub fn output(self: *Uart) kernel.init.Output {
         switch (self.*) {
@@ -376,6 +376,248 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
     };
 }
 
+/// A basic write only PrimeCell PL011 UART.
+///
+/// 24 Mhz?
+///
+/// [Technical Reference Manual](https://developer.arm.com/documentation/ddi0183/latest/)
+pub const PL011 = struct {
+    write_register: [*]volatile u32,
+    flag_register: [*]volatile u32,
+
+    pub fn init(base: [*]volatile u32, baud: ?Baud) Baud.DivisorError!?PL011 {
+        // FIXME: qemu does not seem to implement loopback mode, it still outputs the transmitted bytes
+
+        const identification =
+            readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification3)) << 24 |
+            readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification2)) << 16 |
+            readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification1)) << 8 |
+            readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification0));
+
+        if (identification != 0xB105F00D) return null;
+
+        // disable UART
+        {
+            var control: ControlRegister = @bitCast(readRegister(base + @intFromEnum(RegisterOffset.Control)));
+            control.enable = false;
+            control.transmit_enable = false;
+            control.receive_enable = false;
+            writeRegister(base + @intFromEnum(RegisterOffset.Control), @bitCast(control));
+        }
+
+        // disable interrupts
+        {
+            var interrupt_mask: InterruptMaskRegister = @bitCast(readRegister(base + @intFromEnum(RegisterOffset.InterruptMask)));
+            interrupt_mask.masks = 0;
+            writeRegister(base + @intFromEnum(RegisterOffset.InterruptMask), @bitCast(interrupt_mask));
+        }
+
+        // set baudrate
+        if (baud) |b| {
+            const divisor = try b.fractionalDivisor();
+
+            writeRegister(
+                base + @intFromEnum(RegisterOffset.IntegerBaudRate),
+                @bitCast(IntegerBaudRateRegister{
+                    .integer = divisor.integer,
+                }),
+            );
+            writeRegister(
+                base + @intFromEnum(RegisterOffset.FractionalBaudRate),
+                @bitCast(FractionalBaudRateRegister{
+                    .fractional = divisor.fractional,
+                }),
+            );
+        }
+
+        // 8 bits, no parity, one stop bit
+        {
+            var line_control: LineControlRegister = @bitCast(readRegister(base + @intFromEnum(RegisterOffset.LineControl)));
+            line_control.word_length = .@"8";
+            line_control.two_stop_bits = false;
+            line_control.parity = false;
+            line_control.enable_fifo = false; // clear fifo
+            writeRegister(base + @intFromEnum(RegisterOffset.LineControl), @bitCast(line_control));
+
+            line_control.enable_fifo = true; // enable fifo
+            writeRegister(base + @intFromEnum(RegisterOffset.LineControl), @bitCast(line_control));
+        }
+
+        // enable UART
+        {
+            var control: ControlRegister = @bitCast(readRegister(base + @intFromEnum(RegisterOffset.Control)));
+            control.enable = true;
+            control.transmit_enable = true;
+            writeRegister(base + @intFromEnum(RegisterOffset.Control), @bitCast(control));
+        }
+
+        return .{
+            .write_register = base + @intFromEnum(RegisterOffset.Write),
+            .flag_register = base + @intFromEnum(RegisterOffset.Flag),
+        };
+    }
+
+    fn writeSlice(self: PL011, str: []const u8) void {
+        var i: usize = 0;
+
+        var last_byte_carridge_return = false;
+
+        while (i < str.len) {
+            self.waitForOutputReady();
+
+            // FIFO is empty meaning we can write 32 bytes
+            var bytes_to_write = @min(str.len - i, 32);
+
+            while (bytes_to_write > 0) {
+                const byte = str[i];
+
+                switch (byte) {
+                    '\r' => {
+                        @branchHint(.unlikely);
+                        last_byte_carridge_return = true;
+                    },
+                    '\n' => {
+                        @branchHint(.unlikely);
+
+                        if (!last_byte_carridge_return) {
+                            @branchHint(.likely);
+
+                            writeRegister(self.write_register, '\r');
+                            bytes_to_write -= 1;
+
+                            if (bytes_to_write == 0) {
+                                @branchHint(.unlikely);
+
+                                last_byte_carridge_return = true;
+
+                                break;
+                            }
+                        }
+
+                        last_byte_carridge_return = false;
+                    },
+                    else => {
+                        @branchHint(.likely);
+                        last_byte_carridge_return = false;
+                    },
+                }
+
+                writeRegister(self.write_register, byte);
+                bytes_to_write -= 1;
+                i += 1;
+            }
+        }
+    }
+
+    pub fn output(self: *PL011) kernel.init.Output {
+        return .{
+            .writeFn = struct {
+                fn writeFn(context: *anyopaque, str: []const u8) void {
+                    const uart: *PL011 = @ptrCast(@alignCast(context));
+                    uart.writeSlice(str);
+                }
+            }.writeFn,
+            .remapFn = struct {
+                fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
+                    const uart: *PL011 = @ptrCast(@alignCast(context));
+                    const write_register_physical_address = try kernel.vmm.physicalFromDirectMap(
+                        .fromPtr(@volatileCast(uart.write_register)),
+                    );
+                    uart.write_register = kernel.vmm
+                        .nonCachedDirectMapFromPhysical(write_register_physical_address)
+                        .toPtr([*]volatile u32);
+                    uart.flag_register = uart.write_register + @intFromEnum(RegisterOffset.Flag);
+                }
+            }.remapFn,
+            .context = self,
+        };
+    }
+
+    inline fn waitForOutputReady(self: PL011) void {
+        while (true) {
+            const flags: FlagRegister = @bitCast(readRegister(self.flag_register));
+            if (flags.transmit_fifo_empty) return;
+            // TODO: should there be a spinloop hint here?
+        }
+    }
+
+    inline fn writeRegister(target: [*]volatile u32, value: u32) void {
+        target[0] = value;
+    }
+
+    inline fn readRegister(target: [*]volatile u32) u32 {
+        return target[0];
+    }
+
+    const RegisterOffset = enum(usize) {
+        ReadWrite = 0x000 / 4,
+        Flag = 0x018 / 4,
+        IntegerBaudRate = 0x024 / 4,
+        FractionalBaudRate = 0x028 / 4,
+        LineControl = 0x02c / 4,
+        Control = 0x030 / 4,
+        InterruptMask = 0x038 / 4,
+        PrimeCellIdentification0 = 0xFF0 / 4,
+        PrimeCellIdentification1 = 0xFF4 / 4,
+        PrimeCellIdentification2 = 0xFF8 / 4,
+        PrimeCellIdentification3 = 0xFFC / 4,
+
+        pub const Read: RegisterOffset = .ReadWrite;
+        pub const Write: RegisterOffset = .ReadWrite;
+    };
+
+    const ControlRegister = packed struct(u32) {
+        enable: bool,
+
+        _1: u7,
+
+        transmit_enable: bool,
+        receive_enable: bool,
+
+        _2: u22,
+    };
+
+    const InterruptMaskRegister = packed struct(u32) {
+        masks: u10,
+        _: u22,
+    };
+
+    const LineControlRegister = packed struct(u32) {
+        _1: u1,
+        parity: bool,
+        _2: u1,
+        two_stop_bits: bool,
+        enable_fifo: bool,
+        word_length: WordLength,
+        _3: u25,
+
+        pub const WordLength = enum(u2) {
+            @"5" = 0b00,
+            @"6" = 0b01,
+            @"7" = 0b10,
+            @"8" = 0b11,
+        };
+    };
+
+    const IntegerBaudRateRegister = packed struct(u32) {
+        integer: u16,
+        _: u16 = 0,
+    };
+
+    const FractionalBaudRateRegister = packed struct(u32) {
+        fractional: u6,
+        _: u26 = 0,
+    };
+
+    const FlagRegister = packed struct(u32) {
+        _1: u7,
+
+        transmit_fifo_empty: bool,
+
+        _2: u24,
+    };
+};
+
 pub const Baud = struct {
     /// The clock frequency of the UART in Hz.
     ///
@@ -399,6 +641,7 @@ pub const Baud = struct {
 
     pub const Frequency = enum(u64) {
         @"1.8432 MHz" = 1843200,
+        @"24 MHz" = 24000000,
         _,
     };
 
@@ -428,50 +671,21 @@ pub const Baud = struct {
 
         return std.math.cast(u16, divisor) orelse return error.BaudDivisorTooLarge;
     }
-};
 
-/// A basic write only UART.
-///
-/// TODO: a write only implementation compatible with Arm PL011
-pub const OldUart = struct {
-    ptr: *volatile u8,
+    pub const Fractional = packed struct(u22) {
+        fractional: u6,
+        integer: u16,
+    };
 
-    pub fn init(address: core.VirtualAddress) OldUart {
-        return .{
-            .ptr = address.toPtr(*volatile u8),
-        };
-    }
+    pub fn fractionalDivisor(self: Baud) DivisorError!Fractional {
+        const baud_rate = @intFromEnum(self.baud_rate);
+        const clock_frequency = @intFromEnum(self.clock_frequency);
 
-    pub fn output(self: *OldUart) kernel.init.Output {
-        return .{
-            .writeFn = struct {
-                fn writeFn(context: *anyopaque, str: []const u8) void {
-                    const uart: *OldUart = @ptrCast(@alignCast(context));
-                    for (0..str.len) |i| {
-                        const byte = str[i];
+        std.debug.assert(baud_rate != 0);
+        std.debug.assert(clock_frequency != 0);
 
-                        if (byte == '\n') {
-                            @branchHint(.unlikely);
-
-                            if (i != 0 and str[i - 1] != '\r') {
-                                @branchHint(.likely);
-                                uart.ptr.* = '\r';
-                            }
-                        }
-
-                        uart.ptr.* = byte;
-                    }
-                }
-            }.writeFn,
-            .remapFn = struct {
-                fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
-                    const uart: *OldUart = @ptrCast(@alignCast(context));
-                    const physical_address = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(uart.ptr)));
-                    uart.ptr = kernel.vmm.nonCachedDirectMapFromPhysical(physical_address).toPtr(*volatile u8);
-                }
-            }.remapFn,
-            .context = self,
-        };
+        const divisor = (64 * clock_frequency) / (baud_rate * 16);
+        return @bitCast(std.math.cast(u22, divisor) orelse return error.DivisorTooLarge);
     }
 };
 
