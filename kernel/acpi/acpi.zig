@@ -48,6 +48,29 @@ pub fn AcpiTable(comptime T: type) type {
         pub fn deinit(self: @This()) void {
             self.handle.unref() catch unreachable;
         }
+
+        pub fn print(self: @This(), writer: std.io.AnyWriter, indent: usize) !void {
+            _ = indent;
+
+            try writer.print(
+                "AcpiTable{{ signature: {s}, revision: {d} }}",
+                .{ self.table.header.signatureAsString(), self.table.header.revision },
+            );
+        }
+
+        pub inline fn format(
+            self: @This(),
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = options;
+            _ = fmt;
+            return if (@TypeOf(writer) == std.io.AnyWriter)
+                print(self, writer, 0)
+            else
+                print(self, writer.any(), 0);
+        }
     };
 }
 
