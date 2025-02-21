@@ -151,59 +151,13 @@ pub const SPCR = extern struct {
 
     pub const Type = extern union {
         revision_1: Revision1,
-        revision_2_or_higher: SerialSubType,
+        revision_2_or_higher: acpi.tables.DBG2.DebugDevice.PortType.SerialSubType,
 
         pub const Revision1 = enum(u8) {
             /// Full 16550 interface
             @"16550" = 0,
             /// Full 16450 interface (must also accept writing to the 16550 FCR register)
             @"16450" = 1,
-        };
-
-        /// [Debug port types and subtypes](https://github.com/MicrosoftDocs/windows-driver-docs/blob/staging/windows-driver-docs-pr/bringup/acpi-debug-port-table.md#table-3-debug-port-types-and-subtypes)
-        pub const SerialSubType = enum(u16) {
-            /// Fully 16550-compatible
-            @"16550" = 0x0000,
-            /// 16550 subset compatible with DBGP Revision 1
-            @"16450" = 0x0001,
-            /// MAX311xE SPI UART
-            MAX311xE = 0x0002,
-            /// Arm PL011 UART
-            ArmPL011 = 0x0003,
-            /// MSM8x60 (e.g. 8960)
-            MSM8x60 = 0x0004,
-            /// Nvidia 16550
-            Nvidia16550 = 0x0005,
-            /// TI OMAP
-            TI_OMAP = 0x0006,
-            /// APM88xxxx
-            APM88xxxx = 0x0008,
-            /// MSM8974
-            MSM8974 = 0x0009,
-            /// SAM5250
-            SAM5250 = 0x000A,
-            /// Intel USIF
-            IntelUSIF = 0x000B,
-            /// i.MX 6
-            @"i.MX6" = 0x000C,
-            /// (deprecated) Arm SBSA (2.x only) Generic UART supporting only 32-bit accesses
-            ArmSBSA32bit = 0x000D,
-            /// Arm SBSA Generic UART
-            ArmSBSA = 0x000E,
-            /// Arm DCC
-            ArmDCC = 0x000F,
-            /// BCM2835
-            BCM2835 = 0x0010,
-            /// SDM845 with clock rate of 1.8432 MHz
-            SDM845_18432 = 0x0011,
-            /// 16550-compatible with parameters defined in Generic Address Structure
-            @"16550-GAS" = 0x0012,
-            /// SDM845 with clock rate of 7.372 MHz
-            SDM845_7372 = 0x0013,
-            /// Intel LPSS
-            IntelLPSS = 0x0014,
-            /// RISC-V SBI console (any supported SBI mechanism)
-            RISCVSBI = 0x0015,
         };
 
         comptime {
@@ -350,7 +304,7 @@ pub const SPCR = extern struct {
         _: u31,
     };
 
-    pub fn print(self: SPCR, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(self: *const SPCR, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
         const revision = self.header.revision;
@@ -431,7 +385,7 @@ pub const SPCR = extern struct {
     }
 
     pub inline fn format(
-        self: SPCR,
+        self: *const SPCR,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
