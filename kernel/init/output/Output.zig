@@ -44,20 +44,12 @@ pub fn registerOutputs() void {
 }
 
 pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
-    // TODO: DBG2 https://github.com/MicrosoftDocs/windows-driver-docs/blob/staging/windows-driver-docs-pr/bringup/acpi-debug-port-table.md
-
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
 
     blk: {
-        const maybe_output_uart: ?uart.Uart = tryGetOutputFromSPCR() catch |err| maybe_output_uart: switch (err) {
-            error.DivisorTooLarge => {
-                log.warn("baud divisor from SPCR too large", .{});
-                break :maybe_output_uart null;
-            },
-        };
-        if (maybe_output_uart) |output_uart| {
+        if (tryGetOutputFromSPCR()) |output_uart| {
             static.init_output_uart = output_uart;
             break :blk;
         }
@@ -68,7 +60,18 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
     return static.init_output_uart.output();
 }
 
-fn tryGetOutputFromSPCR() uart.Baud.DivisorError!?uart.Uart {
+fn tryGetOutputFromSPCR() ?uart.Uart {
+    const output_uart = tryGetOutputFromSPCRInner() catch |err| switch (err) {
+        error.DivisorTooLarge => {
+            log.warn("baud divisor from SPCR too large", .{});
+            return null;
+        },
+    } orelse return null;
+
+    return output_uart;
+}
+
+fn tryGetOutputFromSPCRInner() uart.Baud.DivisorError!?uart.Uart {
     const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return null;
     defer spcr.deinit();
 
