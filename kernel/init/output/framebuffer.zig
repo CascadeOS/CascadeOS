@@ -65,16 +65,16 @@ fn newLine() void {
         c.ssfn_dst.y = 0;
     }
 
-    const x = c.ssfn_dst.x;
-    const y = c.ssfn_dst.y;
+    const y: usize = @intCast(c.ssfn_dst.y);
+    const height: usize = @intCast(font.height);
 
-    defer c.ssfn_dst.x = x;
-    defer c.ssfn_dst.y = y;
+    const offset = (y * c.ssfn_dst.p) / @sizeOf(u32);
+    const len = (height * c.ssfn_dst.p) / @sizeOf(u32);
 
-    // TODO: this should be a @memset
-    while (c.ssfn_dst.x < c.ssfn_dst.w) {
-        _ = c.ssfn_putc(' ');
-    }
+    const ptr: [*]volatile u32 = @ptrCast(@alignCast(c.ssfn_dst.ptr));
+    const slice: []volatile u32 = ptr[offset..][0..len];
+
+    @memset(slice, 0);
 }
 
 /// Map the framebuffer into the special heap as write combining.
