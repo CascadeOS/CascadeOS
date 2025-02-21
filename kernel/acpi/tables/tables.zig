@@ -10,9 +10,5 @@ pub const RSDP = @import("RSDP.zig").RSDP;
 pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 pub const SPCR = @import("SPCR.zig").SPCR;
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const core = @import("core");
 const std = @import("std");

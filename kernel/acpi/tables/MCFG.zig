@@ -45,10 +45,6 @@ pub const MCFG = extern struct {
     }
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const core = @import("core");
 const std = @import("std");
 const kernel = @import("kernel");

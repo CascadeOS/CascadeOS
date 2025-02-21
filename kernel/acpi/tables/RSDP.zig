@@ -90,9 +90,5 @@ pub const RSDP = extern struct {
     }
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const std = @import("std");
 const core = @import("core");

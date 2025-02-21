@@ -77,9 +77,5 @@ pub const SharedHeader = extern struct {
     }
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const core = @import("core");
 const std = @import("std");

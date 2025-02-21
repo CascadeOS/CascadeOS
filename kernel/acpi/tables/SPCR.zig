@@ -449,10 +449,6 @@ pub const SPCR = extern struct {
     }
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
