@@ -172,6 +172,9 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
     }
 
+    // disable parallel port
+    run_qemu.addArgs(&[_][]const u8{ "-parallel", "none" });
+
     switch (self.options.display) {
         .none => {
             if (self.target == .x64) {
@@ -180,6 +183,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
                 } else {
                     run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
                 }
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
             } else {
                 if (self.options.qemu_monitor) {
                     run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
@@ -191,18 +195,19 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
             run_qemu.addArgs(&[_][]const u8{ "-vga", "none" });
         },
-        .gtk => run_qemu.addArgs(&[_][]const u8{
-            "-display",
-            "gtk,gl=on,show-tabs=on",
-        }),
-        // .sdl => run_qemu.addArgs(&[_][]const u8{
-        //     "-display",
-        //     "sdl,gl=on",
-        // }),
-        // .spice => run_qemu.addArgs(&[_][]const u8{
-        //     "-display",
-        //     "spice-app,gl=on",
-        // }),
+        .gtk => {
+            if (self.target == .x64) {
+                run_qemu.addArgs(&[_][]const u8{ "-debugcon", "vc" });
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
+            } else {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
+            }
+
+            run_qemu.addArgs(&[_][]const u8{
+                "-display",
+                "gtk,gl=on,show-tabs=on",
+            });
+        },
     }
 
     // add display device if needed
