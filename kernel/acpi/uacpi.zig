@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/757dcece1a9f1c069355b23f7feaf21656728f94/LICENSE)
+// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI (757dcece1a9f1c069355b23f7feaf21656728f94).
+//! Provides a nice zig API wrapping uACPI 2.0.0 (4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
 //! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
@@ -456,6 +456,110 @@ pub fn latestQueriedVendorInterface() VendorInterface {
     return @enumFromInt(c_uacpi.uacpi_latest_queried_vendor_interface());
 }
 
+pub const Register = enum(c_uacpi.uacpi_register) {
+    pm1_sts = c_uacpi.UACPI_REGISTER_PM1_STS,
+    pm1_en = c_uacpi.UACPI_REGISTER_PM1_EN,
+    pm1_cnt = c_uacpi.UACPI_REGISTER_PM1_CNT,
+    pm_tmr = c_uacpi.UACPI_REGISTER_PM_TMR,
+    pm2_cnt = c_uacpi.UACPI_REGISTER_PM2_CNT,
+    slp_cnt = c_uacpi.UACPI_REGISTER_SLP_CNT,
+    spl_sts = c_uacpi.UACPI_REGISTER_SLP_STS,
+    reset = c_uacpi.UACPI_REGISTER_RESET,
+    smi_cmd = c_uacpi.UACPI_REGISTER_SMI_CMD,
+
+    /// Read a register from FADT
+    ///
+    /// NOTE: write-only bits (if any) are cleared automatically
+    pub fn read(self: Register) !u64 {
+        var value: u64 = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_read_register(
+            @intFromEnum(self),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+        return value;
+    }
+
+    /// Write a register from FADT
+    ///
+    /// NOTE:
+    /// - Preserved bits (if any) are preserved automatically
+    /// - If a register is made up of two (e.g. PM1a and PM1b) parts, the input is written to both at the same time
+    pub fn write(self: Register, value: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_write_register(
+            @intFromEnum(self),
+            value,
+        ));
+        try ret.toError();
+    }
+
+    /// Write a register from FADT
+    ///
+    /// NOTE:
+    /// - Preserved bits (if any) are preserved automatically
+    /// - If a register is made up of two (e.g. PM1a and PM1b) parts, the input is written to both at the same time
+    pub fn writeRegisters(self: Register, value1: u64, value2: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_write_registers(
+            @intFromEnum(self),
+            value1,
+            value2,
+        ));
+        try ret.toError();
+    }
+};
+
+pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
+    tmr_sts = c_uacpi.UACPI_REGISTER_FIELD_TMR_STS,
+    bm_sts = c_uacpi.UACPI_REGISTER_FIELD_BM_STS,
+    gbl_sts = c_uacpi.UACPI_REGISTER_FIELD_GBL_STS,
+    pwrbtn_sts = c_uacpi.UACPI_REGISTER_FIELD_PWRBTN_STS,
+    slpbtn_sts = c_uacpi.UACPI_REGISTER_FIELD_SLPBTN_STS,
+    rtc_sts = c_uacpi.UACPI_REGISTER_FIELD_RTC_STS,
+    pciex_wake_sts = c_uacpi.UACPI_REGISTER_FIELD_PCIEX_WAKE_STS,
+    hwr_wak_sts = c_uacpi.UACPI_REGISTER_FIELD_HWR_WAK_STS,
+    wak_sts = c_uacpi.UACPI_REGISTER_FIELD_WAK_STS,
+    tmr_en = c_uacpi.UACPI_REGISTER_FIELD_TMR_EN,
+    gbl_en = c_uacpi.UACPI_REGISTER_FIELD_GBL_EN,
+    pwrbtn_en = c_uacpi.UACPI_REGISTER_FIELD_PWRBTN_EN,
+    slpbtn_en = c_uacpi.UACPI_REGISTER_FIELD_SLPBTN_EN,
+    rtc_en = c_uacpi.UACPI_REGISTER_FIELD_RTC_EN,
+    pciexp_wake_dis = c_uacpi.UACPI_REGISTER_FIELD_PCIEXP_WAKE_DIS,
+    sci_en = c_uacpi.UACPI_REGISTER_FIELD_SCI_EN,
+    bm_rld = c_uacpi.UACPI_REGISTER_FIELD_BM_RLD,
+    gbl_rls = c_uacpi.UACPI_REGISTER_FIELD_GBL_RLS,
+    slp_typ = c_uacpi.UACPI_REGISTER_FIELD_SLP_TYP,
+    hwr_slp_typ = c_uacpi.UACPI_REGISTER_FIELD_HWR_SLP_TYP,
+    slp_en = c_uacpi.UACPI_REGISTER_FIELD_SLP_EN,
+    hwr_slp_en = c_uacpi.UACPI_REGISTER_FIELD_HWR_SLP_EN,
+    arb_dis = c_uacpi.UACPI_REGISTER_FIELD_ARB_DIS,
+
+    /// Read a field from a FADT register
+    ///
+    /// NOTE: The value is automatically masked and shifted down as appropriate,the client code doesn't have to do any
+    /// bit manipulation. E.g. for a field at 0b???XX??? the returned value will contain just the 0bXX
+    pub fn read(self: RegisterField) !u64 {
+        var value: u64 = undefined;
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_read_register_field(
+            @intFromEnum(self),
+            @ptrCast(&value),
+        ));
+        try ret.toError();
+        return value;
+    }
+
+    /// Write to a field of a FADT register
+    ///
+    /// NOTE: The value is automatically masked and shifted up as appropriate, the client code doesn't have to do any
+    /// bit manipulation. E.g. for a field at 0b???XX??? the passed value should be just 0bXX
+    pub fn write(self: RegisterField, value: u64) !void {
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_write_register_field(
+            @intFromEnum(self),
+            value,
+        ));
+        try ret.toError();
+    }
+};
+
 pub const HostInterface = enum(c_uacpi.uacpi_host_interface) {
     module_device = c_uacpi.UACPI_HOST_INTERFACE_MODULE_DEVICE,
     processor_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_DEVICE,
@@ -747,6 +851,83 @@ pub const Node = opaque {
         ));
         try ret.toError();
     }
+
+    /// Returns an iterator over the immediate children of a node.
+    pub fn childIterator(parent_node: *const Node) !ChildIterator {
+        var child: ?*Node = null;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_next(
+            @ptrCast(@constCast(parent_node)),
+            @ptrCast(&child),
+        ));
+        if (ret == .not_found) return .{
+            .parent = parent_node,
+            .current_child = null,
+            .type_mask = null,
+        };
+        try ret.toError();
+
+        return .{
+            .parent = parent_node,
+            .current_child = child,
+            .type_mask = null,
+        };
+    }
+
+    /// Returns an iterator over the immediate children of a node.
+    ///
+    /// Only nodes matching 'type_mask' are returned.
+    pub fn childIteratorTyped(parent_node: *const Node, type_mask: Object.TypeBits) !ChildIterator {
+        var child: ?*Node = null;
+
+        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_next_typed(
+            @ptrCast(@constCast(parent_node)),
+            @ptrCast(&child),
+            @bitCast(type_mask),
+        ));
+        if (ret == .not_found) return .{
+            .parent = parent_node,
+            .current_child = null,
+            .type_mask = type_mask,
+        };
+        try ret.toError();
+
+        return .{
+            .parent = parent_node,
+            .current_child = child,
+            .type_mask = type_mask,
+        };
+    }
+
+    pub const ChildIterator = struct {
+        parent: *const Node,
+        current_child: ?*Node,
+        type_mask: ?Object.TypeBits,
+
+        pub fn next(self: *ChildIterator) !?*Node {
+            const child = self.current_child orelse return null;
+
+            const ret: Status = if (self.type_mask) |type_mask|
+                @enumFromInt(c_uacpi.uacpi_namespace_node_next_typed(
+                    @ptrCast(@constCast(self.parent)),
+                    @ptrCast(&self.current_child),
+                    @bitCast(type_mask),
+                ))
+            else
+                @enumFromInt(c_uacpi.uacpi_namespace_node_next(
+                    @ptrCast(@constCast(self.parent)),
+                    @ptrCast(&self.current_child),
+                ));
+
+            if (ret == .not_found) {
+                self.current_child = null;
+                return child;
+            }
+            try ret.toError();
+
+            return child;
+        }
+    };
 
     pub const AbsoultePath = struct {
         path: [:0]const u8,
@@ -3857,6 +4038,7 @@ const c_uacpi = @cImport({
     @cInclude("uacpi/notify.h");
     @cInclude("uacpi/opregion.h");
     @cInclude("uacpi/osi.h");
+    @cInclude("uacpi/registers.h");
     @cInclude("uacpi/resources.h");
     @cInclude("uacpi/sleep.h");
     @cInclude("uacpi/status.h");

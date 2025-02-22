@@ -286,7 +286,10 @@ fn constructKernelModule(
             "uacpi.c",
             "utilities.c",
         },
-        .flags = &.{uacpi_log_level},
+        .flags = &.{
+            uacpi_log_level,
+            "-fno-sanitize=undefined", // FIXME: investigate - seems to have been introduced sometime around uACPI 2.0.0
+        },
     });
     kernel_module.addIncludePath(uacpi_dep.path("include"));
 

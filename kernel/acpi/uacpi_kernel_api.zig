@@ -19,6 +19,8 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.S
 /// Open a PCI device at 'address' for reading & writing.
 ///
 /// The handle returned via 'out_handle' is used to perform IO on the configuration space of the device.
+///
+/// Note that this must be able to open any arbitrary PCI device, not just those detected during kernel PCI enumeration.
 export fn uacpi_kernel_pci_device_open(
     address: kernel.pci.Address,
     out_handle: **kernel.pci.PciFunction,
@@ -126,6 +128,8 @@ export fn uacpi_kernel_pci_write32(
 
 /// Map a SystemIO address at [base, base + len) and return a kernel-implemented handle that can be used for reading
 /// and writing the IO range.
+///
+/// NOTE: The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) uacpi.Status {
     log.debug("uacpi_kernel_io_map called", .{});
 
@@ -141,6 +145,8 @@ export fn uacpi_kernel_io_unmap(handle: *anyopaque) void {
 }
 
 /// Read the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+///
+/// The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_read8(
     handle: *anyopaque,
     offset: usize,
@@ -157,6 +163,8 @@ export fn uacpi_kernel_io_read8(
 }
 
 /// Read the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+///
+/// The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_read16(
     handle: *anyopaque,
     offset: usize,
@@ -174,6 +182,8 @@ export fn uacpi_kernel_io_read16(
 }
 
 /// Read the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+///
+/// The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_read32(
     handle: *anyopaque,
     offset: usize,
@@ -191,6 +201,8 @@ export fn uacpi_kernel_io_read32(
 }
 
 /// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+///
+/// The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_write8(
     handle: *anyopaque,
     offset: usize,
@@ -207,6 +219,8 @@ export fn uacpi_kernel_io_write8(
 }
 
 /// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+///
+/// The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_write16(
     handle: *anyopaque,
     offset: usize,
@@ -224,6 +238,8 @@ export fn uacpi_kernel_io_write16(
 }
 
 /// Write the IO range mapped via `uacpi_kernel_io_map` at a 0-based 'offset' within the range.
+///
+/// The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_write32(
     handle: *anyopaque,
     offset: usize,
