@@ -190,37 +190,37 @@ pub const InterruptFrame = extern struct {
         try writer.print("error code: {},\n", .{value.error_code});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("cs: {s}, ss {s},\n", .{ @tagName(value.cs.selector), @tagName(value.ss.selector) });
+        try writer.print("cs: {s}, ss: {s},\n", .{ @tagName(value.cs.selector), @tagName(value.ss.selector) });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("ds: {s}, es {s},\n", .{ @tagName(value.ds.selector), @tagName(value.es.selector) });
+        try writer.print("ds: {s}, es: {s},\n", .{ @tagName(value.ds.selector), @tagName(value.es.selector) });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("rsp: 0x{x}, rip: 0x{x},\n", .{ value.rsp, value.rip });
+        try writer.print("rsp: 0x{x:0>16}, rip: 0x{x:0>16},\n", .{ value.rsp, value.rip });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("rax: 0x{x}, rbx: 0x{x},\n", .{ value.rax, value.rbx });
+        try writer.print("rax: 0x{x:0>16}, rbx: 0x{x:0>16},\n", .{ value.rax, value.rbx });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("rcx: 0x{x}, rdx: 0x{x},\n", .{ value.rcx, value.rdx });
+        try writer.print("rcx: 0x{x:0>16}, rdx: 0x{x:0>16},\n", .{ value.rcx, value.rdx });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("rbp: 0x{x}, rsi: 0x{x},\n", .{ value.rbp, value.rsi });
+        try writer.print("rbp: 0x{x:0>16}, rsi: 0x{x:0>16},\n", .{ value.rbp, value.rsi });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("rdi: 0x{x},  r8: 0x{x},\n", .{ value.rdi, value.r8 });
+        try writer.print("rdi: 0x{x:0>16}, r8: 0x{x:0>16},\n", .{ value.rdi, value.r8 });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("r9: 0x{x},   r10: 0x{x},\n", .{ value.r9, value.r10 });
+        try writer.print("r9:  0x{x:0>16}, r10: 0x{x:0>16},\n", .{ value.r9, value.r10 });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("r11: 0x{x},  r12: 0x{x},\n", .{ value.r11, value.r12 });
+        try writer.print("r11: 0x{x:0>16}, r12: 0x{x:0>16},\n", .{ value.r11, value.r12 });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("r13: 0x{x},  r14: 0x{x},\n", .{ value.r13, value.r14 });
+        try writer.print("r13: 0x{x:0>16}, r14: 0x{x:0>16},\n", .{ value.r13, value.r14 });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("r15: 0x{x},\n", .{value.r15});
+        try writer.print("r15: 0x{x:0>16},\n", .{value.r15});
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.writeAll("rflags: ");
