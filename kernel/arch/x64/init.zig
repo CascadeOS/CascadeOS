@@ -300,8 +300,19 @@ const DebugCon = struct {
     const output: kernel.init.Output = .{
         .writeFn = struct {
             fn writeFn(_: *anyopaque, str: []const u8) void {
-                for (str) |b| {
-                    lib_x64.instructions.portWriteU8(port, b);
+                for (0..str.len) |i| {
+                    const byte = str[i];
+
+                    if (byte == '\n') {
+                        @branchHint(.unlikely);
+
+                        if (i != 0 and str[i - 1] != '\r') {
+                            @branchHint(.likely);
+                            lib_x64.instructions.portWriteU8(port, '\r');
+                        }
+                    }
+
+                    lib_x64.instructions.portWriteU8(port, byte);
                 }
             }
         }.writeFn,
