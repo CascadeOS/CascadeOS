@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-pub fn getFunction(address: Address) ?*PciFunction {
+/// Returns the PCI function at 'address'.
+///
+/// If `present_required` is `true` then only returns functions that are discovered to be present during enumeration.
+pub fn getFunction(address: Address, present_required: bool) ?*PciFunction {
     for (globals.ecams) |ecam| {
         if (ecam.segment_group != address.segment) continue;
         if (ecam.start_bus < address.bus or address.bus >= ecam.end_bus) continue;
 
         const bus_offset = address.bus - ecam.start_bus;
 
-        if (ecam.buses[bus_offset].devices[address.device].functions[address.function]) |*function| {
-            return function;
-        }
+        const function = &ecam.buses[bus_offset].devices[address.device].functions[address.function];
 
-        return null;
+        if (present_required and !function.present) return null;
+
+        return function;
     }
 
     return null;
@@ -346,11 +349,12 @@ pub const DeviceID = enum(u16) {
     }
 };
 
-// if this gets larger, we need to change the `PciDevice.functions` field to a pointer
 pub const PciFunction = struct {
     function: u8,
 
     config_space_address: core.VirtualAddress,
+
+    present: bool,
 
     /// The PCI device this function belongs to.
     device: *PciDevice,
@@ -361,7 +365,7 @@ const PciDevice = struct {
 
     config_space_address: core.VirtualAddress,
 
-    functions: [FUNCTIONS_PER_DEVICE]?PciFunction, // make this a pointer if `PciFunction` gets larger
+    functions: [FUNCTIONS_PER_DEVICE]PciFunction,
 
     /// The PCI bus this device belongs to.
     bus: *PciBus,
@@ -396,22 +400,8 @@ const globals = struct {
 
 pub const init = struct {
     pub fn initializeECAM() !void {
-        init_log.debug("building PCI buses", .{});
+        init_log.debug("enumerating PCI buses", .{});
         try initializeBuses();
-
-        init_log.debug("scanning PCI buses for functions:", .{});
-        for (globals.ecams) |ecam| {
-            for (ecam.buses) |*bus| {
-                for (&bus.devices) |*device| {
-                    scanDevice(device, .{
-                        .segment = ecam.segment_group,
-                        .bus = bus.bus,
-                        .device = device.device,
-                        .function = 0,
-                    });
-                }
-            }
-        }
     }
 
     fn initializeBuses() !void {
@@ -460,49 +450,49 @@ pub const init = struct {
                         .device = @intCast(device_i),
                         .config_space_address = bus.config_space_address.moveForward(.from(device_i << 15, .byte)),
                         .bus = bus,
-                        .functions = @splat(null),
+                        .functions = undefined, // set below
                     };
+
+                    for (&device.functions, 0..) |*function, function_i| {
+                        const function_config_space_address = device.config_space_address.moveForward(
+                            .from(@as(usize, function_i) << 12, .byte),
+                        );
+
+                        const config_space = function_config_space_address.toPtr(*volatile ConfigurationSpace);
+
+                        const present = config_space.vendor_id != .none;
+
+                        if (present) {
+                            const address: Address = .{
+                                .segment = ecam.segment_group,
+                                .bus = bus.bus,
+                                .device = device.device,
+                                .function = @intCast(function_i),
+                            };
+
+                            init_log.debug("found function - {} - {} - {}", .{
+                                address,
+                                config_space.vendor_id,
+                                config_space.device_id,
+                            });
+
+                            if (config_space.header_type.header_type == .pci_to_pci_bridge) {
+                                init_log.warn("encountered PCI-to-PCI bridge - not implemented", .{});
+                            }
+                        }
+
+                        function.* = .{
+                            .function = @intCast(function_i),
+                            .config_space_address = function_config_space_address,
+                            .device = device,
+                            .present = present,
+                        };
+                    }
                 }
             }
         }
 
         globals.ecams = try ecams.toOwnedSlice();
-    }
-
-    fn scanDevice(device: *PciDevice, address: Address) void {
-        const function = address.function;
-
-        const config_space_address = device.config_space_address.moveForward(
-            .from(@as(usize, function) << 12, .byte),
-        );
-
-        const config_space = config_space_address.toPtr(*volatile ConfigurationSpace);
-
-        if (config_space.vendor_id == .none) return;
-
-        device.functions[function] = .{
-            .function = @intCast(function),
-            .config_space_address = config_space_address,
-            .device = device,
-        };
-
-        init_log.debug("  {} - {} - {}", .{
-            address,
-            config_space.vendor_id,
-            config_space.device_id,
-        });
-
-        if (function == 0 and config_space.header_type.multi_function) {
-            for (1..FUNCTIONS_PER_DEVICE) |i| {
-                var new_address = address;
-                new_address.function = @intCast(i);
-                scanDevice(device, new_address);
-            }
-        }
-
-        if (config_space.header_type.header_type == .pci_to_pci_bridge) {
-            init_log.warn("encountered PCI-to-PCI bridge - not implemented", .{});
-        }
     }
 
     const init_log = kernel.debug.log.scoped(.init_pci);
