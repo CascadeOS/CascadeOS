@@ -12,8 +12,8 @@
 
     .dependencies = .{
         .edk2 = .{
-            .url = "https://github.com/CascadeOS/ovmf-prebuilt/releases/download/edk2-stable202411-r1/edk2-stable202411-r1-bin.tar.xz",
-            .hash = "122043814f90b421b3c9652c1ad05e03466aa1c969b92b0af643e369d26867a824dc",
+            .url = "https://github.com/CascadeOS/ovmf-prebuilt/releases/download/edk2-stable202502-r1/edk2-stable202502-r1-bin.tar.xz",
+            .hash = "1220438abe04b2648e3e0b30cc262a4223a6881266539a2e97d5b501a4dcb882b299",
         },
 
         .libdwarf = .{
