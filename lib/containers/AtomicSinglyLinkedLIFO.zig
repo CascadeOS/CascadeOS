@@ -3,11 +3,11 @@
 
 //! Singly linked LIFO (last in first out).
 //!
-//! Provides thread-saftey using atomic operations.
+//! Provides thread-safety using atomic operations.
 
 const AtomicSinglyLinkedLIFO = @This();
 
-start_node: std.atomic.Value(?*SingleNode),
+start_node: std.atomic.Value(?*SingleNode) = .init(null),
 
 pub const empty: AtomicSinglyLinkedLIFO = .{ .start_node = .init(null) };
 
