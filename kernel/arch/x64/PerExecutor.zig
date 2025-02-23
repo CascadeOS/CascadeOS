@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
+apic_id: u32,
+
 gdt: lib_x64.Gdt = .{},
 tss: lib_x64.Tss = .{},
 

@@ -34,13 +34,14 @@ pub fn tryGetOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
 /// Prepares the provided `Executor` for the bootstrap executor.
 pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
+    architecture_processor_id: u64,
 ) void {
     const static = struct {
         var bootstrap_double_fault_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
         var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
-    prepareExecutorShared(bootstrap_executor, .fromRange(
+    prepareExecutorShared(bootstrap_executor, @intCast(architecture_processor_id), .fromRange(
         .fromSlice(u8, &static.bootstrap_double_fault_stack),
         .fromSlice(u8, &static.bootstrap_double_fault_stack),
     ), .fromRange(
@@ -52,9 +53,10 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) void {
+pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u64, current_task: *kernel.Task) void {
     prepareExecutorShared(
         executor,
+        @intCast(architecture_processor_id),
         kernel.Stack.createStack(current_task) catch @panic("failed to allocate double fault stack"),
         kernel.Stack.createStack(current_task) catch @panic("failed to allocate NMI stack"),
     );
@@ -62,10 +64,12 @@ pub fn prepareExecutor(executor: *kernel.Executor, current_task: *kernel.Task) v
 
 fn prepareExecutorShared(
     executor: *kernel.Executor,
+    apic_id: u32,
     double_fault_stack: kernel.Stack,
     non_maskable_interrupt_stack: kernel.Stack,
 ) void {
     executor.arch = .{
+        .apic_id = apic_id,
         .double_fault_stack = double_fault_stack,
         .non_maskable_interrupt_stack = non_maskable_interrupt_stack,
     };

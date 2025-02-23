@@ -37,7 +37,10 @@ pub fn initStage1() !noreturn {
     kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
 
     log.debug("loading bootstrap executor", .{});
-    kernel.arch.init.prepareBootstrapExecutor(&bootstrap_executor);
+    kernel.arch.init.prepareBootstrapExecutor(
+        &bootstrap_executor,
+        kernel.boot.bootstrapArchitectureProcessorId(),
+    );
     kernel.arch.init.loadExecutor(&bootstrap_executor);
 
     log.debug("initializing early interrupts", .{});
@@ -221,7 +224,11 @@ fn createExecutors() ![]kernel.Executor {
 
         try executor.idle_task._name.writer().print("idle {}", .{i});
 
-        kernel.arch.init.prepareExecutor(executor, current_task);
+        kernel.arch.init.prepareExecutor(
+            executor,
+            desc.architectureProcessorId(),
+            current_task,
+        );
     }
 
     return executors;
