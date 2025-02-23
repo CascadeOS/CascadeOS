@@ -180,6 +180,13 @@ fn createExecutors() ![]kernel.Executor {
 
     var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
+    if (descriptors.count() > kernel.config.maximum_number_of_executors) {
+        std.debug.panic(
+            "number of executors '{d}' exceeds maximum '{d}'",
+            .{ descriptors.count(), kernel.config.maximum_number_of_executors },
+        );
+    }
+
     log.debug("initializing {} executors", .{descriptors.count()});
 
     // TODO: these init tasks need to be freed after initialization
