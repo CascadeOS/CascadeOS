@@ -117,6 +117,13 @@ pub fn x2apicEnabled() bool {
     };
 }
 
+pub fn bootstrapArchitectureProcessorId() u64 {
+    return switch (bootloader_api) {
+        .limine => limine.bootstrapArchitectureProcessorId(),
+        .unknown => unreachable,
+    };
+}
+
 pub fn cpuDescriptors() ?CpuDescriptors {
     return switch (bootloader_api) {
         .limine => limine.cpuDescriptors(),
@@ -156,9 +163,16 @@ pub const CpuDescriptors = struct {
             }
         }
 
-        pub fn processorId(self: *const Descriptor) u32 {
+        pub fn acpiProcessorId(self: *const Descriptor) u32 {
             return switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.processorId(self),
+                .limine => limine.CpuDescriptorIterator.acpiProcessorId(self),
+                .unknown => unreachable,
+            };
+        }
+
+        pub fn architectureProcessorId(self: *const Descriptor) u64 {
+            return switch (bootloader_api) {
+                .limine => limine.CpuDescriptorIterator.architectureProcessorId(self),
                 .unknown => unreachable,
             };
         }

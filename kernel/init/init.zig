@@ -187,7 +187,7 @@ fn createExecutors() ![]kernel.Executor {
     var task_id: u32 = 1; // `1` as `0` is the bootstrap task
 
     while (descriptors.next()) |desc| : (i += 1) {
-        if (i == 0) std.debug.assert(desc.processorId() == 0);
+        if (i == 0) std.debug.assert(desc.acpiProcessorId() == 0);
 
         const executor = &executors[i];
         const id: kernel.Executor.Id = @enumFromInt(i);

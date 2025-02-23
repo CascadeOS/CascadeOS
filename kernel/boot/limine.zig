@@ -95,6 +95,17 @@ pub fn x2apicEnabled() bool {
     return resp.flags.x2apic_enabled;
 }
 
+pub fn bootstrapArchitectureProcessorId() u64 {
+    const resp = requests.smp.response orelse
+        return 0;
+
+    return switch (kernel.config.cascade_target) {
+        .arm => resp.bsp_mpidr,
+        .riscv => resp.bsp_hartid,
+        .x64 => resp.bsp_lapic_id,
+    };
+}
+
 pub fn cpuDescriptors() ?boot.CpuDescriptors {
     const resp = requests.smp.response orelse
         return null;
@@ -175,11 +186,23 @@ pub const CpuDescriptorIterator = struct {
         );
     }
 
-    pub fn processorId(
+    pub fn acpiProcessorId(
         generic_descriptor: *const boot.CpuDescriptors.Descriptor,
     ) u32 {
         const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
         return descriptor.smp_info.processor_id;
+    }
+
+    pub fn architectureProcessorId(
+        generic_descriptor: *const boot.CpuDescriptors.Descriptor,
+    ) u64 {
+        const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
+
+        return switch (kernel.config.cascade_target) {
+            .arm => descriptor.smp_info.mpidr,
+            .riscv => descriptor.smp_info.hartid,
+            .x64 => descriptor.smp_info.lapic_id,
+        };
     }
 };
 
