@@ -104,8 +104,7 @@ pub const log_level: std.log.Level = blk: {
 
     break :blk switch (builtin.mode) {
         .Debug => .info,
-        .ReleaseSafe => .warn,
-        .ReleaseFast, .ReleaseSmall => .err,
+        .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .warn,
     };
 };
 
