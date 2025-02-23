@@ -83,6 +83,7 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
         defer globals.stack_page_table_mutex.unlock(current_task);
 
         try kernel.vmm.mapRange(
+            current_task,
             kernel.vmm.globals.core_page_table,
             usable_range,
             .{ .writeable = true, .global = true },

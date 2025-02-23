@@ -129,6 +129,17 @@ pub const interrupts = struct {
         current.interrupts.sendPanicIPI();
     }
 
+    /// Send a flush IPI to the given executor.
+    pub fn sendFlushIPI(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
+        checkSupport(
+            current.interrupts,
+            "sendFlushIPI",
+            fn (*kernel.Executor) void,
+        );
+
+        current.interrupts.sendFlushIPI(executor);
+    }
+
     pub const init = struct {
         /// Ensure that any exceptions/faults that occur during early initialization are handled.
         ///
@@ -266,13 +277,13 @@ pub const paging = struct {
         );
     }
 
-    /// Flushes the cache for the given virtual range.
+    /// Flushes the cache for the given virtual range on the current executor.
     ///
     /// The `virtual_range` address and size must be aligned to the standard page size.
-    pub fn flushCache(virtual_range: core.VirtualRange, flush_target: kernel.vmm.FlushTarget) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.paging, "flushCache", fn (core.VirtualRange, kernel.vmm.FlushTarget) void);
+    pub fn flushCache(virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
+        checkSupport(current.paging, "flushCache", fn (core.VirtualRange) void);
 
-        current.paging.flushCache(virtual_range, flush_target);
+        current.paging.flushCache(virtual_range);
     }
 
     pub const init = struct {

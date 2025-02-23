@@ -13,6 +13,9 @@ idle_task: kernel.Task,
 
 arch: kernel.arch.PerExecutor,
 
+/// List of `kernel.vmm.FlushRequest` objects that need to be actioned.
+flush_requests: containers.AtomicSinglyLinkedLIFO = .{},
+
 pub const Id = enum(u32) {
     bootstrap = 0,
 
@@ -66,3 +69,4 @@ pub inline fn format(
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const containers = @import("containers");

@@ -147,6 +147,7 @@ fn heapArenaImport(
     defer globals.heap_page_table_mutex.unlock(current_task);
 
     kernel.vmm.mapRange(
+        current_task,
         kernel.vmm.globals.core_page_table,
         .{
             .address = .fromInt(allocation.base),
@@ -173,6 +174,7 @@ fn heapArenaRelease(
         defer globals.heap_page_table_mutex.unlock(current_task);
 
         kernel.vmm.unmapRange(
+            current_task,
             kernel.vmm.globals.core_page_table,
             .{
                 .address = .fromInt(allocation.base),

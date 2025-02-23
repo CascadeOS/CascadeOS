@@ -68,6 +68,7 @@ pub const MapError = error{
 ///
 /// Physical pages are allocated for each page in the virtual range.
 pub fn mapRange(
+    current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
@@ -84,9 +85,12 @@ pub fn mapRange(
     );
 
     errdefer {
+        // TODO: do one unmap instead of one per page
+
         // Unmap all pages that have been mapped.
         while (current_virtual_range.address.greaterThanOrEqual(virtual_range.address)) {
             unmapRange(
+                current_task,
                 page_table,
                 current_virtual_range,
                 true,
@@ -149,6 +153,7 @@ pub const FlushTarget = enum {
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapRange(
+    current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
@@ -159,8 +164,80 @@ pub fn unmapRange(
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
     kernel.arch.paging.unmapRange(page_table, virtual_range, free_backing_pages, keep_top_level);
-    kernel.arch.paging.flushCache(virtual_range, flush_target);
+    performCacheFlush(current_task, virtual_range, flush_target);
 }
+
+fn performCacheFlush(current_task: *kernel.Task, virtual_range: core.VirtualRange, flush_target: FlushTarget) void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    current_task.incrementPreemptionDisable();
+    defer current_task.decrementPreemptionDisable();
+
+    var request: FlushRequest = .{
+        .range = virtual_range,
+        .flush_target = flush_target,
+    };
+
+    switch (flush_target) {
+        .kernel => {
+            for (kernel.executors) |*executor| {
+                if (executor == current_task.state.running) continue;
+                request.requestExecutor(executor);
+            }
+        },
+        .user => @panic("NOT IMPLEMENTED"),
+    }
+
+    request.performFlush(current_task);
+    request.waitForCompletion();
+}
+
+pub const FlushRequest = struct {
+    range: core.VirtualRange,
+    flush_target: FlushTarget,
+    count: std.atomic.Value(usize) = .init(1), // starts at `1` to account for the current executor
+    nodes: std.BoundedArray(Node, kernel.config.maximum_number_of_executors) = .{},
+
+    pub const Node = struct {
+        request: *FlushRequest,
+        node: containers.SingleNode,
+    };
+
+    pub fn performFlush(self: *FlushRequest, current_task: *const kernel.Task) void {
+        _ = current_task;
+
+        switch (self.flush_target) {
+            .kernel => {},
+            .user => @panic("NOT IMPLEMENTED"),
+        }
+
+        kernel.arch.paging.flushCache(self.range);
+
+        _ = self.count.fetchSub(1, .acq_rel);
+    }
+
+    fn requestExecutor(self: *FlushRequest, executor: *kernel.Executor) void {
+        _ = self.count.fetchAdd(1, .acq_rel);
+
+        const node = self.nodes.addOne() catch @panic("exceeded maximum number of executors");
+        node.* = .{
+            .request = self,
+            .node = .empty,
+        };
+        executor.flush_requests.push(&node.node);
+
+        kernel.arch.interrupts.sendFlushIPI(executor);
+    }
+
+    fn waitForCompletion(self: *FlushRequest) void {
+        while (self.count.load(.acquire) > 0) {
+            kernel.arch.spinLoopHint();
+        }
+    }
+
+    const containers = @import("containers");
+};
 
 pub const globals = struct {
     /// The core page table.

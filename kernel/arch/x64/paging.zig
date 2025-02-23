@@ -99,19 +99,12 @@ pub fn unmapRange(
     }
 }
 
-/// Flushes the cache for the given virtual range.
+/// Flushes the cache for the given virtual range on the current executor.
 ///
 /// The `virtual_range` address and size must be aligned to the standard page size.
-pub fn flushCache(virtual_range: core.VirtualRange, flush_target: kernel.vmm.FlushTarget) void {
+pub fn flushCache(virtual_range: core.VirtualRange) void {
     std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
     std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
-
-    switch (flush_target) {
-        .kernel => {},
-        .user => @panic("NOT IMPLEMENTED"),
-    }
-
-    // TODO: flush caches on other executors
 
     var current_virtual_address = virtual_range.address;
     const last_virtual_address = virtual_range.last();

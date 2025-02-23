@@ -23,6 +23,30 @@ pub fn sendPanicIPI() void {
     globals.lapic.writeInterruptCommandRegister(icr);
 }
 
+/// Send a flush IPI to the given executor.
+pub fn sendFlushIPI(executor: *kernel.Executor) void {
+    var icr = globals.lapic.readInterruptCommandRegister();
+
+    icr = .{
+        .vector = x64.interrupts.Interrupt.flush_request.toInterruptVector(),
+        .delivery_mode = .fixed,
+        .destination_mode = .physical,
+        .level = .assert,
+        .trigger_mode = .edge,
+        .destination_shorthand = .no_shorthand,
+        .destination_field = undefined, // set below
+    };
+
+    switch (globals.lapic) {
+        .xapic => icr.destination_field = .{ .xapic = .{
+            .destination = @intCast(executor.arch.apic_id),
+        } },
+        .x2apic => icr.destination_field = .{ .x2apic = executor.arch.apic_id },
+    }
+
+    globals.lapic.writeInterruptCommandRegister(icr);
+}
+
 const globals = struct {
     /// Initialized in `init.captureApicInformation`.
     var lapic: lib_x64.LAPIC = .{

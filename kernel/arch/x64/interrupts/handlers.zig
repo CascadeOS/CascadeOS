@@ -10,6 +10,17 @@ pub fn nonMaskableInterruptHandler(_: *kernel.Task, interrupt_frame: *InterruptF
     kernel.arch.interrupts.disableInterruptsAndHalt();
 }
 
+pub fn flushRequestHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
+    const executor = current_task.state.running;
+
+    while (executor.flush_requests.pop()) |node| {
+        const request_node: *const kernel.vmm.FlushRequest.Node = @fieldParentPtr("node", node);
+        request_node.request.performFlush(current_task);
+    }
+
+    x64.apic.eoi();
+}
+
 pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
     x64.apic.eoi();
     kernel.entry.onPerExecutorPeriodic(current_task);

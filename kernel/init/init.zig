@@ -159,14 +159,27 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
 
         try kernel.acpi.init.finializeInitialization();
 
-        // as others are waiting, we can safely print with no lock
-        Output.writer.print("initialization complete - time since boot: {}\n", .{
-            kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
-        }) catch {};
-    }
+        {
+            Output.globals.lock.lock(current_task);
+            defer Output.globals.lock.unlock(current_task);
 
-    Barrier.executorReady();
-    Barrier.waitForAll();
+            Output.writer.print("initialization complete - time since boot: {}\n", .{
+                kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
+            }) catch {};
+        }
+
+        Barrier.executorReady();
+        Barrier.waitForAll();
+    } else {
+        Barrier.executorReady();
+
+        // enable interrupts so we can service IPIs
+        current_task.decrementInterruptDisable();
+
+        Barrier.waitForAll();
+
+        current_task.incrementInterruptDisable();
+    }
 
     _ = kernel.scheduler.lockScheduler(current_task);
     current_task.decrementInterruptDisable();

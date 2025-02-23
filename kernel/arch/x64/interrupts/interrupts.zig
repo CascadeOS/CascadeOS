@@ -7,6 +7,7 @@ pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
 pub const areEnabled = lib_x64.instructions.interruptsEnabled;
 pub const eoi = x64.apic.eoi;
 pub const sendPanicIPI = x64.apic.sendPanicIPI;
+pub const sendFlushIPI = x64.apic.sendFlushIPI;
 
 pub fn allocateInterrupt(
     current_task: *kernel.Task,
@@ -103,6 +104,7 @@ pub const Interrupt = enum(u8) {
 
     per_executor_periodic = 48,
 
+    flush_request = 254,
     spurious_interrupt = 255,
 
     _,
@@ -304,6 +306,9 @@ pub const init = struct {
     pub fn loadStandardInterruptHandlers() void {
         globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
             .interrupt_handler = interrupt_handlers.nonMaskableInterruptHandler,
+        };
+        globals.handlers[@intFromEnum(Interrupt.flush_request)] = .{
+            .interrupt_handler = interrupt_handlers.flushRequestHandler,
         };
         globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
             .interrupt_handler = interrupt_handlers.perExecutorPeriodicHandler,
