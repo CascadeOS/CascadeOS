@@ -167,22 +167,16 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
                 kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
             }) catch {};
         }
-
-        Barrier.executorReady();
-        Barrier.waitForAll();
-    } else {
-        Barrier.executorReady();
-
-        // enable interrupts so we can service IPIs
-        current_task.decrementInterruptDisable();
-
-        Barrier.waitForAll();
-
-        current_task.incrementInterruptDisable();
     }
 
-    _ = kernel.scheduler.lockScheduler(current_task);
+    Barrier.executorReady();
+
+    // enabling interrupts so we can service IPIs on non-bootstrap executors
     current_task.decrementInterruptDisable();
+
+    Barrier.waitForAll();
+
+    _ = kernel.scheduler.lockScheduler(current_task);
 
     kernel.scheduler.yield(current_task, .drop);
     @panic("scheduler returned to init");
