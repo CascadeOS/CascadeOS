@@ -17,6 +17,11 @@ It is possible for these links or the text regarding versions to become out of d
   * 16550
     * [UART 16550](https://caro.su/msx/ocm_de1/16550.pdf)
     * [PC16550D Universal Asynchronous Receiver/Transmitter with FIFOs](https://media.digikey.com/pdf/Data%20Sheets/Texas%20Instruments%20PDFs/PC16550D.pdf)
+* Device Tree
+  * [Specification](https://github.com/devicetree-org/devicetree-specification)
+  * [Bindings](https://www.kernel.org/doc/Documentation/devicetree/bindings/)
+  * [Device Tree Reference](https://elinux.org/Device_Tree_Reference)
+  * [Device Tree Usage](https://elinux.org/Device_Tree_Usage)
 * Ext
   * [ext2-doc](https://www.nongnu.org/ext2-doc/)
   * [Linux Ext4 documentation](https://www.kernel.org/doc/html/latest/filesystems/ext4/index.html)
