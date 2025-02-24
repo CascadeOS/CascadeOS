@@ -29,7 +29,7 @@ qemu_remote_debug: bool,
 /// Provide a graphical display in QEMU.
 ///
 /// Defaults to false.
-graphic: bool,
+display: bool,
 
 /// Disable usage of any virtualization acceleration.
 ///
@@ -107,9 +107,9 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         "Enable QEMU remote debug (disables acceleration) (defaults to false)",
     ) orelse false;
 
-    const graphic = b.option(
+    const display = b.option(
         bool,
-        "graphic",
+        "display",
         "Provide a graphical display in QEMU.",
     ) orelse false;
 
@@ -198,7 +198,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .build_for_host = build_for_host,
         .qemu_monitor = qemu_monitor,
         .qemu_remote_debug = qemu_remote_debug,
-        .graphic = graphic,
+        .display = display,
         .no_acceleration = no_acceleration,
         .interrupt_details = interrupt_details,
         .number_of_cpus = number_of_cpus,

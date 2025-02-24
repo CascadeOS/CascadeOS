@@ -116,7 +116,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = if (!self.options.graphic and self.kernel_log_wrapper_compile != null) run_qemu: {
+    const run_qemu = if (!self.options.display and self.kernel_log_wrapper_compile != null) run_qemu: {
         const kernel_log_wrapper = self.kernel_log_wrapper_compile.?;
         const run_qemu = b.addRunArtifact(kernel_log_wrapper);
         run_qemu.addArg(qemuExecutable(self.target));
@@ -175,7 +175,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // disable parallel port
     run_qemu.addArgs(&[_][]const u8{ "-parallel", "none" });
 
-    if (self.options.graphic) {
+    if (self.options.display) {
         switch (self.target) {
             .arm => {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
