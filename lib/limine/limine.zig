@@ -897,10 +897,11 @@ pub const File = extern struct {
 
     /// A string associated with the file
     pub fn string(self: *const File) ?[:0]const u8 {
-        return if (self._string) |s|
-            std.mem.sliceTo(s, 0)
-        else
-            null;
+        const str = std.mem.sliceTo(
+            self._string orelse return null,
+            0,
+        );
+        return if (str.len == 0) null else str;
     }
 
     pub fn getContents(self: *const File) []const u8 {
