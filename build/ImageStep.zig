@@ -121,14 +121,13 @@ const ImageDescriptionStep = struct {
     step: std.Build.Step,
 
     target: CascadeTarget,
+    limine_conf: []const u8,
 
     generated_image_description_file: std.Build.GeneratedFile,
     image_description_file: std.Build.LazyPath,
 
     kernel: Kernel,
     limine_dep: *std.Build.Dependency,
-
-    disable_kaslr: bool,
 
     fn create(
         b: *std.Build,
@@ -143,11 +142,23 @@ const ImageDescriptionStep = struct {
             .{@tagName(target)},
         );
 
+        const limine_conf = switch (target) {
+            .arm => if (disable_kaslr)
+                b.pathJoin(&.{ "build", "limine_no_kaslr_arm.conf" })
+            else
+                b.pathJoin(&.{ "build", "limine_arm.conf" }),
+            else => if (disable_kaslr)
+                b.pathJoin(&.{ "build", "limine_no_kaslr.conf" })
+            else
+                b.pathJoin(&.{ "build", "limine.conf" }),
+        };
+
         const self = try b.allocator.create(ImageDescriptionStep);
         self.* = .{
             .b = b,
             .kernel = kernel,
             .limine_dep = limine_dep,
+            .limine_conf = limine_conf,
             .step = Step.init(.{
                 .id = .custom,
                 .name = step_name,
@@ -157,10 +168,9 @@ const ImageDescriptionStep = struct {
             .target = target,
             .generated_image_description_file = .{ .step = &self.step },
             .image_description_file = .{ .generated = .{ .file = &self.generated_image_description_file } },
-
-            .disable_kaslr = disable_kaslr,
         };
 
+        try self.step.addWatchInput(b.path(limine_conf));
         self.step.dependOn(kernel.install_kernel_binaries);
 
         return self;
@@ -186,7 +196,7 @@ const ImageDescriptionStep = struct {
         var hash = self.b.graph.cache.hash;
         // Random bytes to make unique. Refresh this with new random bytes when
         // implementation is modified in a non-backwards-compatible way.
-        hash.add(@as(u32, 0xde92a823));
+        hash.add(@as(u32, 0xde92a821));
         hash.addBytes(image_description.items);
         const sub_path =
             "cascade" ++ std.fs.path.sep_str ++
@@ -270,23 +280,10 @@ const ImageDescriptionStep = struct {
 
         const efi_partition = try builder.addPartition("EFI", 0, .fat32, .efi);
 
-        if (self.disable_kaslr) {
-            try efi_partition.addFile(.{
-                .destination_path = "/limine.conf",
-                .source_path = self.b.pathJoin(&.{
-                    "build",
-                    "limine_no_kaslr.conf",
-                }),
-            });
-        } else {
-            try efi_partition.addFile(.{
-                .destination_path = "/limine.conf",
-                .source_path = self.b.pathJoin(&.{
-                    "build",
-                    "limine.conf",
-                }),
-            });
-        }
+        try efi_partition.addFile(.{
+            .destination_path = "/limine.conf",
+            .source_path = self.limine_conf,
+        });
 
         switch (self.target) {
             .arm => {
