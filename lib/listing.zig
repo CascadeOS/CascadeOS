@@ -30,6 +30,7 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
         .name = "limine",
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
+            .{ .name = "uuid" },
         },
     },
     .{

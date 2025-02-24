@@ -882,13 +882,13 @@ pub const File = extern struct {
     mbr_disk_id: u32,
 
     /// If non-0, this is the UUID of the disk the file was loaded from as reported in its GPT.
-    gpt_disk_uuid: LimineUUID,
+    gpt_disk_uuid: UUID,
 
     /// If non-0, this is the UUID of the partition the file was loaded from as reported in the GPT.
-    gpt_part_uuid: LimineUUID,
+    gpt_part_uuid: UUID,
 
     /// If non-0, this is the UUID of the filesystem of the partition the file was loaded from.
-    part_uuid: LimineUUID,
+    part_uuid: UUID,
 
     /// The path of the file within the volume, with a leading slash
     pub fn path(self: *const File) [:0]const u8 {
@@ -912,13 +912,6 @@ pub const File = extern struct {
         optical = 1,
         tftp = 2,
         _,
-    };
-
-    pub const LimineUUID = extern struct {
-        a: u32,
-        b: u16,
-        c: u16,
-        d: [8]u8,
     };
 };
 
@@ -945,3 +938,4 @@ comptime {
 
 const core = @import("core");
 const std = @import("std");
+const UUID = @import("uuid").UUID;
