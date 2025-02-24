@@ -387,8 +387,6 @@ pub const PL011 = struct {
     flag_register: [*]volatile u32,
 
     pub fn init(base: [*]volatile u32, baud: ?Baud) Baud.DivisorError!?PL011 {
-        // FIXME: qemu does not seem to implement loopback mode, it still outputs the transmitted bytes
-
         const identification =
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification3)) << 24 |
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification2)) << 16 |
@@ -444,11 +442,25 @@ pub const PL011 = struct {
             writeRegister(base + @intFromEnum(RegisterOffset.LineControl), @bitCast(line_control));
         }
 
-        // enable UART
+        // enable UART with loopback
         {
             var control: ControlRegister = @bitCast(readRegister(base + @intFromEnum(RegisterOffset.Control)));
             control.enable = true;
+            control.loopback = true;
             control.transmit_enable = true;
+            writeRegister(base + @intFromEnum(RegisterOffset.Control), @bitCast(control));
+        }
+
+        // send `\r` to the UART
+        writeRegister(base + @intFromEnum(RegisterOffset.Write), '\r');
+
+        // check that the `\r` was received due to loopback
+        if (readRegister(base + @intFromEnum(RegisterOffset.Read)) != '\r') return null;
+
+        // disable loopback
+        {
+            var control: ControlRegister = @bitCast(readRegister(base + @intFromEnum(RegisterOffset.Control)));
+            control.loopback = false;
             writeRegister(base + @intFromEnum(RegisterOffset.Control), @bitCast(control));
         }
 
@@ -570,7 +582,9 @@ pub const PL011 = struct {
     const ControlRegister = packed struct(u32) {
         enable: bool,
 
-        _1: u7,
+        _1: u6,
+
+        loopback: bool,
 
         transmit_enable: bool,
         receive_enable: bool,
