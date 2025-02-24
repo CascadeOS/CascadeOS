@@ -26,6 +26,10 @@ pub const UUID = extern struct {
         return uuid;
     }
 
+    pub fn eql(a: UUID, b: UUID) bool {
+        return std.mem.eql(u8, &a.bytes, &b.bytes);
+    }
+
     pub const ParseError = error{InvalidUUID};
 
     /// Parses a UUID from its string representation.
