@@ -267,10 +267,10 @@ fn resolveLibrary(
 
             const host_test_step_description =
                 try std.fmt.allocPrint(
-                b.allocator,
-                "Build and attempt to run the tests for {s} on {s} targeting the host os",
-                .{ library_description.name, @tagName(target) },
-            );
+                    b.allocator,
+                    "Build and attempt to run the tests for {s} on {s} targeting the host os",
+                    .{ library_description.name, @tagName(target) },
+                );
 
             const host_test_step = b.step(host_test_step_name, host_test_step_description);
             host_test_step.dependOn(&host_test_run_step.step);

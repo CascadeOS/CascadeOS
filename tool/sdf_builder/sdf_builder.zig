@@ -384,9 +384,9 @@ fn collectFunctionLowHighs(
 
     const compile_unit_ranges_base: u64 =
         if (compile_unit_die.getAttribute(.rnglists_base)) |rnglists_base_attribute|
-        rnglists_base_attribute.sectionRelativeOffset()
-    else
-        0;
+            rnglists_base_attribute.sectionRelativeOffset()
+        else
+            0;
 
     try collectFunctionLowHighsRecurse(
         &result,

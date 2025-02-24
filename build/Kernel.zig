@@ -254,13 +254,13 @@ fn constructKernelModule(
 
     const uacpi_log_level: []const u8 =
         if (options.kernel_force_debug_log or std.mem.indexOf(
-        u8,
-        options.kernel_forced_debug_log_scopes,
-        "uacpi",
-    ) != null)
-        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
-    else
-        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
+            u8,
+            options.kernel_forced_debug_log_scopes,
+            "uacpi",
+        ) != null)
+            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
+        else
+            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
 
     // uacpi
     kernel_module.addCSourceFiles(.{

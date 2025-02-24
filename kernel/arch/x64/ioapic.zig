@@ -15,9 +15,9 @@ pub fn routeInterrupt(interrupt: u8, vector: x64.interrupts.Interrupt) !void {
         false,
     ) catch |err|
         std.debug.panic(
-        "failed to route interrupt {}: {s}",
-        .{ interrupt, @errorName(err) },
-    );
+            "failed to route interrupt {}: {s}",
+            .{ interrupt, @errorName(err) },
+        );
 }
 
 fn getMapping(interrupt: u8) SourceOverride {

@@ -138,10 +138,10 @@ fn resolveTool(
 
     const build_step_description =
         try std.fmt.allocPrint(
-        b.allocator,
-        "Build the {s} tool",
-        .{tool_description.name},
-    );
+            b.allocator,
+            "Build the {s} tool",
+            .{tool_description.name},
+        );
 
     const build_step = b.step(build_step_name, build_step_description);
     build_step.dependOn(&exe_install_step.step);
@@ -186,10 +186,10 @@ fn resolveTool(
 
     const test_step_description =
         try std.fmt.allocPrint(
-        b.allocator,
-        "Run the tests for {s} on the host os",
-        .{tool_description.name},
-    );
+            b.allocator,
+            "Run the tests for {s} on the host os",
+            .{tool_description.name},
+        );
 
     const test_step = b.step(test_step_name, test_step_description);
     test_step.dependOn(&run_test.step);
@@ -204,10 +204,10 @@ fn resolveTool(
 
     const run_step_description =
         try std.fmt.allocPrint(
-        b.allocator,
-        "Run {s}",
-        .{tool_description.name},
-    );
+            b.allocator,
+            "Run {s}",
+            .{tool_description.name},
+        );
 
     const run = b.addRunArtifact(normal_exe);
     run.step.dependOn(&exe_install_step.step);

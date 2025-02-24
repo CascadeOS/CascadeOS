@@ -565,9 +565,9 @@ pub const init = struct {
 
     pub const CaptureSystemInformationOptions: type =
         if (@hasDecl(current.init, "CaptureSystemInformationOptions"))
-        current.init.CaptureSystemInformationOptions
-    else
-        struct {};
+            current.init.CaptureSystemInformationOptions
+        else
+            struct {};
 
     /// Capture any system information that needs mmio.
     ///
