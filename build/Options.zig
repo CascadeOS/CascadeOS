@@ -31,6 +31,11 @@ qemu_remote_debug: bool,
 /// Defaults to false.
 display: bool,
 
+/// Disable ACPI in QEMU if the target supports it.
+///
+/// Defaults to false.
+no_acpi: bool,
+
 /// Disable usage of any virtualization acceleration.
 ///
 /// Defaults to false.
@@ -105,6 +110,12 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         bool,
         "debug",
         "Enable QEMU remote debug (disables acceleration) (defaults to false)",
+    ) orelse false;
+
+    const no_acpi = b.option(
+        bool,
+        "no_acpi",
+        "Disable ACPI in QEMU if the target supports it (defaults to false)",
     ) orelse false;
 
     const display = b.option(
@@ -198,6 +209,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .build_for_host = build_for_host,
         .qemu_monitor = qemu_monitor,
         .qemu_remote_debug = qemu_remote_debug,
+        .no_acpi = no_acpi,
         .display = display,
         .no_acceleration = no_acceleration,
         .interrupt_details = interrupt_details,

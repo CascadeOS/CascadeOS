@@ -228,15 +228,34 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
     // set target machine
     switch (self.target) {
-        .arm => run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" }),
+        .arm => if (self.options.no_acpi) {
+            run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
+        } else {
+            run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=on" });
+        },
         .riscv => {
             if (self.firmware == .uefi) {
-                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1" });
+                if (self.options.no_acpi) {
+                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=off" });
+                } else {
+                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=on" });
+                }
             } else {
-                run_qemu.addArgs(&[_][]const u8{ "-machine", "virt" });
+                if (self.options.no_acpi) {
+                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
+                } else {
+                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=on" });
+                }
             }
         },
-        .x64 => run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" }),
+        .x64 => {
+            if (self.options.no_acpi) {
+                std.debug.print("ACPI cannot be disabled on x64\n", .{});
+                std.process.exit(1);
+            }
+
+            run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" });
+        },
     }
 
     // qemu acceleration
