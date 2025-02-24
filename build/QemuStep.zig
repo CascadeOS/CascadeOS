@@ -116,7 +116,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
     const self: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = if (self.options.display == .none and self.kernel_log_wrapper_compile != null) run_qemu: {
+    const run_qemu = if (!self.options.graphic and self.kernel_log_wrapper_compile != null) run_qemu: {
         const kernel_log_wrapper = self.kernel_log_wrapper_compile.?;
         const run_qemu = b.addRunArtifact(kernel_log_wrapper);
         run_qemu.addArg(qemuExecutable(self.target));
@@ -175,48 +175,48 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // disable parallel port
     run_qemu.addArgs(&[_][]const u8{ "-parallel", "none" });
 
-    switch (self.options.display) {
-        .none => {
-            if (self.target == .x64) {
-                if (self.options.qemu_monitor) {
-                    run_qemu.addArgs(&[_][]const u8{ "-debugcon", "mon:stdio" });
-                } else {
-                    run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
-                }
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
-            } else {
-                if (self.options.qemu_monitor) {
-                    run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
-                } else {
-                    run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
-                }
-            }
+    if (self.options.graphic) {
+        switch (self.target) {
+            .arm => {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
 
-            run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
-            run_qemu.addArgs(&[_][]const u8{ "-vga", "none" });
-        },
-        .gtk => {
-            if (self.target == .x64) {
+                run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" });
+            },
+            .riscv => {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
+
+                run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
+            },
+            .x64 => {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "vc" });
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
-            } else {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
-            }
 
-            run_qemu.addArgs(&[_][]const u8{
-                "-display",
-                "gtk,gl=on,show-tabs=on",
-            });
-        },
-    }
-
-    // add display device if needed
-    if (self.options.display != .none) {
-        switch (self.target) {
-            .arm => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
-            .riscv => run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" }),
-            .x64 => {},
+                run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
+            },
         }
+
+        run_qemu.addArgs(&[_][]const u8{
+            "-display",
+            "gtk,gl=on,show-tabs=on,zoom-to-fit=off",
+        });
+    } else {
+        if (self.target == .x64) {
+            if (self.options.qemu_monitor) {
+                run_qemu.addArgs(&[_][]const u8{ "-debugcon", "mon:stdio" });
+            } else {
+                run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
+            }
+            run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
+        } else {
+            if (self.options.qemu_monitor) {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
+            } else {
+                run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
+            }
+        }
+
+        run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
+        run_qemu.addArgs(&[_][]const u8{ "-vga", "none" });
     }
 
     // set target cpu
