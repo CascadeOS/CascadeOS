@@ -238,11 +238,6 @@ pub fn uninstallInterface(name: [:0]const u8) !void {
     try ret.toError();
 }
 
-pub const InterfaceHandler = fn (
-    name: [:0]const u8,
-    supported: bool,
-) bool;
-
 /// Set a custom interface query (_OSI) handler.
 ///
 /// This callback will be invoked for each _OSI query with the value passed in the _OSI, as well as whether the
@@ -592,12 +587,6 @@ pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
     sleep_button = c_uacpi.UACPI_FIXED_EVENT_SLEEP_BUTTON,
     rtc = c_uacpi.UACPI_FIXED_EVENT_RTC,
 
-    pub fn InterruptHandler(comptime UserContextT: type) type {
-        return fn (
-            user_context: ?*UserContextT,
-        ) InterruptReturn;
-    }
-
     pub fn installHandler(
         event: FixedEvent,
         comptime UserContextT: type,
@@ -775,23 +764,6 @@ pub const Node = opaque {
         return node;
     }
 
-    pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
-        @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
-
-        @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
-
-        /// Only applicable for uacpi_namespace_for_each_child
-        next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
-    };
-
-    pub fn IterationCallback(comptime UserContextT: type) type {
-        return fn (
-            node: *Node,
-            node_depth: u32,
-            user_context: ?*UserContextT,
-        ) IterationDecision;
-    }
-
     /// Depth-first iterate the namespace starting at the first child of 'parent_node'.
     pub fn forEachChildSimple(
         parent_node: *const Node,
@@ -942,14 +914,6 @@ pub const Node = opaque {
         return .{ .path = std.mem.sliceTo(ptr, 0) };
     }
 
-    pub fn NotifyHandler(comptime UserContextT: type) type {
-        return fn (
-            node: *Node,
-            value: u64,
-            user_context: ?*UserContextT,
-        ) Status;
-    }
-
     /// Install a Notify() handler to a device node.
     ///
     /// A handler installed to the root node will receive all notifications, even if a device already has a
@@ -978,205 +942,6 @@ pub const Node = opaque {
             makeNotifyHandlerWrapper(UserContextT, handler),
         ));
         try ret.toError();
-    }
-
-    pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
-        attach = c_uacpi.UACPI_REGION_OP_ATTACH,
-
-        detach = c_uacpi.UACPI_REGION_OP_DETACH,
-
-        read = c_uacpi.UACPI_REGION_OP_READ,
-        write = c_uacpi.UACPI_REGION_OP_WRITE,
-
-        pcc_send = c_uacpi.UACPI_REGION_OP_PCC_SEND,
-
-        gpio_read = c_uacpi.UACPI_REGION_OP_GPIO_READ,
-        gpio_write = c_uacpi.UACPI_REGION_OP_GPIO_WRITE,
-
-        ipmi_command = c_uacpi.UACPI_REGION_OP_IPMI_COMMAND,
-
-        ffixedhw_command = c_uacpi.UACPI_REGION_OP_FFIXEDHW_COMMAND,
-
-        prm_command = c_uacpi.UACPI_REGION_OP_PRM_COMMAND,
-
-        serial_read = c_uacpi.UACPI_REGION_OP_SERIAL_READ,
-        serial_write = c_uacpi.UACPI_REGION_OP_SERIAL_WRITE,
-    };
-
-    pub fn RegionOperation(comptime UserContextT: type) type {
-        return union(RegionOperationType) {
-            attach: *Attach,
-            detach: *Detach,
-            read: *ReadWrite,
-            write: *ReadWrite,
-            pcc_send: *PccSend,
-            gpio_read: *GpioReadWrite,
-            gpio_write: *GpioReadWrite,
-            ipmi_command: *IpmiCommand,
-            ffixedhw_command: *FixedHardwareCommand,
-            prm_command: *PrmReadWrite,
-            serial_read: *SerialReadWrite,
-            serial_write: *SerialReadWrite,
-
-            pub const Attach = extern struct {
-                user_context: ?*UserContextT,
-                region_node: *Node,
-                region_info: RegionInfo,
-                out_region_context: ?*anyopaque,
-
-                pub const RegionInfo = extern union {
-                    generic: Generic,
-                    pcc: Pcc,
-                    gpio: Gpio,
-
-                    pub const Generic = extern struct {
-                        base: u64,
-                        length: u64,
-
-                        comptime {
-                            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_generic_region_info));
-                        }
-                    };
-
-                    pub const Pcc = extern struct {
-                        buffer: DataView,
-                        subspace_id: u8,
-
-                        comptime {
-                            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_pcc_region_info));
-                        }
-                    };
-
-                    pub const Gpio = extern struct {
-                        num_pins: u64,
-
-                        comptime {
-                            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_gpio_region_info));
-                        }
-                    };
-                };
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
-                }
-            };
-
-            pub const Detach = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                region_node: *Node,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
-                }
-            };
-
-            pub const ReadWrite = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                addr: extern union {
-                    address: core.PhysicalAddress,
-                    offset: u64,
-                },
-                value: u64,
-                byte_width: ByteWidth,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_rw_data));
-                }
-            };
-
-            pub const PccSend = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                buffer: DataView,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_pcc_send_data));
-                }
-            };
-
-            pub const GpioReadWrite = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                connection: DataView,
-                pin_offset: u32,
-                num_pins: u32,
-                value: u64,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_gpio_rw_data));
-                }
-            };
-
-            pub const IpmiCommand = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                in_out_message: DataView,
-                command: u64,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ipmi_rw_data));
-                }
-            };
-
-            pub const FixedHardwareCommand = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                in_out_message: DataView,
-                command: u64,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ffixedhw_rw_data));
-                }
-            };
-
-            pub const PrmReadWrite = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                in_out_message: DataView,
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_prm_rw_data));
-                }
-            };
-
-            pub const SerialReadWrite = extern struct {
-                user_context: ?*UserContextT,
-                region_context: ?*anyopaque,
-                command: u64,
-                connection: DataView,
-                in_out_buffer: DataView,
-                access_attribute: AccessAttribute,
-
-                /// Applicable only is `access_attribute` is one of:
-                ///  - `bytes`
-                ///  - `raw_bytes`
-                ///  - `raw_process_bytes`
-                access_length: u8,
-
-                pub const AccessAttribute = enum(c_uacpi.uacpi_access_attribute) {
-                    quick = c_uacpi.UACPI_ACCESS_ATTRIBUTE_QUICK,
-                    send_receive = c_uacpi.UACPI_ACCESS_ATTRIBUTE_SEND_RECEIVE,
-                    byte = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTE,
-                    word = c_uacpi.UACPI_ACCESS_ATTRIBUTE_WORD,
-                    block = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK,
-                    bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTES,
-                    process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_PROCESS_CALL,
-                    block_process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK_PROCESS_CALL,
-                    raw_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_BYTES,
-                    raw_process_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES,
-                };
-
-                comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_serial_rw_data));
-                }
-            };
-        };
-    }
-
-    pub fn RegionHandler(comptime UserContextT: type) type {
-        return fn (operation: RegionOperation(UserContextT)) Status;
     }
 
     pub const AddressSpace = enum(c_uacpi.uacpi_address_space) {
@@ -1857,14 +1622,6 @@ pub const Node = opaque {
         return event_info;
     }
 
-    pub fn GPEHandler(comptime UserContextT: type) type {
-        return fn (
-            gpe_device: *Node,
-            index: u16,
-            user_context: ?*UserContextT,
-        ) InterruptReturn;
-    }
-
     /// Installs a handler to the provided GPE at 'index' controlled by device 'gpe_device'.
     ///
     /// The GPE is automatically disabled & cleared according to the configured triggering upon invoking the handler.
@@ -2184,13 +1941,6 @@ pub const Node = opaque {
         ));
 
         try ret.toError();
-    }
-
-    pub fn ResourceIterationCallback(comptime UserContextT: type) type {
-        return fn (
-            resource: *const Resource,
-            user_context: ?*UserContextT,
-        ) IterationDecision;
     }
 
     pub fn forEachDeviceResource(
@@ -3912,24 +3662,48 @@ pub const DataView = extern struct {
     }
 };
 
+pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
+    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
+
+    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
+
+    /// Only applicable for uacpi_namespace_for_each_child
+    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+};
+
+pub fn IterationCallback(comptime UserContextT: type) type {
+    return fn (
+        node: *Node,
+        node_depth: u32,
+        user_context: ?*UserContextT,
+    ) IterationDecision;
+}
+
 inline fn makeIterationCallbackWrapper(
     comptime UserContextT: type,
-    callback: Node.IterationCallback(UserContextT),
+    callback: IterationCallback(UserContextT),
 ) c_uacpi.uacpi_iteration_callback {
     return comptime @ptrCast(&struct {
         fn callbackWrapper(
             user_ctx: ?*anyopaque,
             node: *Node,
             node_depth: u32,
-        ) callconv(.C) Node.IterationDecision {
+        ) callconv(.C) IterationDecision {
             return callback(node, node_depth, @ptrCast(user_ctx));
         }
     }.callbackWrapper);
 }
 
+pub fn ResourceIterationCallback(comptime UserContextT: type) type {
+    return fn (
+        resource: *const Resource,
+        user_context: ?*UserContextT,
+    ) IterationDecision;
+}
+
 inline fn makeResourceIterationCallbackWrapper(
     comptime UserContextT: type,
-    callback: Node.ResourceIterationCallback(UserContextT),
+    callback: ResourceIterationCallback(UserContextT),
 ) c_uacpi.uacpi_resource_iteration_callback {
     return comptime @ptrCast(&struct {
         fn callbackWrapper(user_ctx: ?*anyopaque, resource: *const Resource) callconv(.C) Node.IterationDecision {
@@ -3938,9 +3712,17 @@ inline fn makeResourceIterationCallbackWrapper(
     }.callbackWrapper);
 }
 
+pub fn NotifyHandler(comptime UserContextT: type) type {
+    return fn (
+        node: *Node,
+        value: u64,
+        user_context: ?*UserContextT,
+    ) Status;
+}
+
 inline fn makeNotifyHandlerWrapper(
     comptime UserContextT: type,
-    handler: Node.NotifyHandler(UserContextT),
+    handler: NotifyHandler(UserContextT),
 ) c_uacpi.uacpi_notify_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
@@ -3953,9 +3735,17 @@ inline fn makeNotifyHandlerWrapper(
     }.handlerWrapper);
 }
 
+pub fn GPEHandler(comptime UserContextT: type) type {
+    return fn (
+        gpe_device: *Node,
+        index: u16,
+        user_context: ?*UserContextT,
+    ) InterruptReturn;
+}
+
 inline fn makeGPEHandlerWrapper(
     comptime UserContextT: type,
-    handler: Node.GPEHandler(UserContextT),
+    handler: GPEHandler(UserContextT),
 ) c_uacpi.uacpi_gpe_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
@@ -3968,9 +3758,15 @@ inline fn makeGPEHandlerWrapper(
     }.handlerWrapper);
 }
 
+pub fn InterruptHandler(comptime UserContextT: type) type {
+    return fn (
+        user_context: ?*UserContextT,
+    ) InterruptReturn;
+}
+
 inline fn makeInterruptHandlerWrapper(
     comptime UserContextT: type,
-    handler: FixedEvent.InterruptHandler(UserContextT),
+    handler: InterruptHandler(UserContextT),
 ) c_uacpi.uacpi_interrupt_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
@@ -3981,13 +3777,212 @@ inline fn makeInterruptHandlerWrapper(
     }.handlerWrapper);
 }
 
+pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
+    attach = c_uacpi.UACPI_REGION_OP_ATTACH,
+
+    detach = c_uacpi.UACPI_REGION_OP_DETACH,
+
+    read = c_uacpi.UACPI_REGION_OP_READ,
+    write = c_uacpi.UACPI_REGION_OP_WRITE,
+
+    pcc_send = c_uacpi.UACPI_REGION_OP_PCC_SEND,
+
+    gpio_read = c_uacpi.UACPI_REGION_OP_GPIO_READ,
+    gpio_write = c_uacpi.UACPI_REGION_OP_GPIO_WRITE,
+
+    ipmi_command = c_uacpi.UACPI_REGION_OP_IPMI_COMMAND,
+
+    ffixedhw_command = c_uacpi.UACPI_REGION_OP_FFIXEDHW_COMMAND,
+
+    prm_command = c_uacpi.UACPI_REGION_OP_PRM_COMMAND,
+
+    serial_read = c_uacpi.UACPI_REGION_OP_SERIAL_READ,
+    serial_write = c_uacpi.UACPI_REGION_OP_SERIAL_WRITE,
+};
+
+pub fn RegionOperation(comptime UserContextT: type) type {
+    return union(RegionOperationType) {
+        attach: *Attach,
+        detach: *Detach,
+        read: *ReadWrite,
+        write: *ReadWrite,
+        pcc_send: *PccSend,
+        gpio_read: *GpioReadWrite,
+        gpio_write: *GpioReadWrite,
+        ipmi_command: *IpmiCommand,
+        ffixedhw_command: *FixedHardwareCommand,
+        prm_command: *PrmReadWrite,
+        serial_read: *SerialReadWrite,
+        serial_write: *SerialReadWrite,
+
+        pub const Attach = extern struct {
+            user_context: ?*UserContextT,
+            region_node: *Node,
+            region_info: RegionInfo,
+            out_region_context: ?*anyopaque,
+
+            pub const RegionInfo = extern union {
+                generic: Generic,
+                pcc: Pcc,
+                gpio: Gpio,
+
+                pub const Generic = extern struct {
+                    base: u64,
+                    length: u64,
+
+                    comptime {
+                        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_generic_region_info));
+                    }
+                };
+
+                pub const Pcc = extern struct {
+                    buffer: DataView,
+                    subspace_id: u8,
+
+                    comptime {
+                        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_pcc_region_info));
+                    }
+                };
+
+                pub const Gpio = extern struct {
+                    num_pins: u64,
+
+                    comptime {
+                        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_gpio_region_info));
+                    }
+                };
+            };
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
+            }
+        };
+
+        pub const Detach = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            region_node: *Node,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
+            }
+        };
+
+        pub const ReadWrite = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            addr: extern union {
+                address: core.PhysicalAddress,
+                offset: u64,
+            },
+            value: u64,
+            byte_width: ByteWidth,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_rw_data));
+            }
+        };
+
+        pub const PccSend = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            buffer: DataView,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_pcc_send_data));
+            }
+        };
+
+        pub const GpioReadWrite = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            connection: DataView,
+            pin_offset: u32,
+            num_pins: u32,
+            value: u64,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_gpio_rw_data));
+            }
+        };
+
+        pub const IpmiCommand = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            in_out_message: DataView,
+            command: u64,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ipmi_rw_data));
+            }
+        };
+
+        pub const FixedHardwareCommand = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            in_out_message: DataView,
+            command: u64,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ffixedhw_rw_data));
+            }
+        };
+
+        pub const PrmReadWrite = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            in_out_message: DataView,
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_prm_rw_data));
+            }
+        };
+
+        pub const SerialReadWrite = extern struct {
+            user_context: ?*UserContextT,
+            region_context: ?*anyopaque,
+            command: u64,
+            connection: DataView,
+            in_out_buffer: DataView,
+            access_attribute: AccessAttribute,
+
+            /// Applicable only is `access_attribute` is one of:
+            ///  - `bytes`
+            ///  - `raw_bytes`
+            ///  - `raw_process_bytes`
+            access_length: u8,
+
+            pub const AccessAttribute = enum(c_uacpi.uacpi_access_attribute) {
+                quick = c_uacpi.UACPI_ACCESS_ATTRIBUTE_QUICK,
+                send_receive = c_uacpi.UACPI_ACCESS_ATTRIBUTE_SEND_RECEIVE,
+                byte = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTE,
+                word = c_uacpi.UACPI_ACCESS_ATTRIBUTE_WORD,
+                block = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK,
+                bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTES,
+                process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_PROCESS_CALL,
+                block_process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK_PROCESS_CALL,
+                raw_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_BYTES,
+                raw_process_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES,
+            };
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_serial_rw_data));
+            }
+        };
+    };
+}
+
+pub fn RegionHandler(comptime UserContextT: type) type {
+    return fn (operation: RegionOperation(UserContextT)) Status;
+}
+
 inline fn makeRegionHandlerWrapper(
     comptime UserContextT: type,
-    handler: Node.RegionHandler(UserContextT),
+    handler: RegionHandler(UserContextT),
 ) c_uacpi.uacpi_region_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
-            op: Node.RegionOperationType,
+            op: RegionOperationType,
             op_data: *anyopaque,
         ) callconv(.C) Status {
             return handler(switch (op) {
@@ -4007,6 +4002,11 @@ inline fn makeRegionHandlerWrapper(
         }
     }.handlerWrapper);
 }
+
+pub const InterfaceHandler = fn (
+    name: [:0]const u8,
+    supported: bool,
+) bool;
 
 inline fn makeInterfaceHandlerWrapper(
     handler: InterfaceHandler,
