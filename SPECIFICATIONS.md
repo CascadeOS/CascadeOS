@@ -8,10 +8,15 @@ It is possible for these links or the text regarding versions to become out of d
 * ARM - [Arm Architecture Reference Manual for A-profile architecture](https://developer.arm.com/documentation/ddi0487/ja/?lang=en)
 * ACPI/UEFI/GPT
   * [Specifications](https://uefi.org/specifications) (GPT is specified in the UEFI spec) 
-  * [ACPI related documents](https://uefi.org/acpi)
-  * [UEFI Related documents](https://uefi.org/uefi)
-  * [UEFI Demystified](https://kovmir.eu/posts/uefi_demystified.html)
-* DWARF - [DWARF Version 5](https://dwarfstd.org/dwarf5std.html)
+  * [Microsoft Debug Port Table 2 (DBG2)](https://github.com/MicrosoftDocs/windows-driver-docs/blob/staging/windows-driver-docs-pr/bringup/acpi-debug-port-table.md)
+  * [Serial Port Console Redirection Table](https://github.com/MicrosoftDocs/windows-driver-docs/blob/staging/windows-driver-docs-pr/serports/serial-port-console-redirection-table.md)
+* Devices
+  * [ARM PL011](https://developer.arm.com/documentation/ddi0183/latest/)
+  * [HPET](http://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
+  * [I/O APIC](http://web.archive.org/web/20161130153145/http://download.intel.com/design/chipsets/datashts/29056601.pdf)
+  * 16550
+    * [UART 16550](https://caro.su/msx/ocm_de1/16550.pdf)
+    * [PC16550D Universal Asynchronous Receiver/Transmitter with FIFOs](https://media.digikey.com/pdf/Data%20Sheets/Texas%20Instruments%20PDFs/PC16550D.pdf)
 * Ext
   * [ext2-doc](https://www.nongnu.org/ext2-doc/)
   * [Linux Ext4 documentation](https://www.kernel.org/doc/html/latest/filesystems/ext4/index.html)
@@ -38,6 +43,5 @@ It is possible for these links or the text regarding versions to become out of d
 * VirtIO - [VirtIO Specs](https://docs.oasis-open.org/virtio/virtio/)
 * x64
   * [AMD](https://www.amd.com/en/search/documentation/hub.html#q=AMD64%20Architecture%20Programmer's%20Manual&f-amd_document_type=Programmer%20References) link is to a search as AMD don't provide an always up to date link to the documents
-  * [HPET](http://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
   * [Intel](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
-  * [I/O APIC](http://web.archive.org/web/20161130153145/http://download.intel.com/design/chipsets/datashts/29056601.pdf)
+
