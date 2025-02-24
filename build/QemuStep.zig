@@ -126,6 +126,9 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
 
+    run_qemu.addArg("-nodefaults");
+    run_qemu.addArg("-no-user-config");
+
     run_qemu.addArgs(&.{ "-boot", "menu=off" });
     run_qemu.addArgs(&.{ "-d", "guest_errors" });
 
@@ -172,10 +175,9 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
     }
 
-    // disable parallel port
-    run_qemu.addArgs(&[_][]const u8{ "-parallel", "none" });
-
     if (self.options.display) {
+        run_qemu.addArgs(&[_][]const u8{ "-monitor", "vc" });
+
         switch (self.target) {
             .arm => {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
@@ -189,7 +191,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             },
             .x64 => {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "vc" });
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
 
                 run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
             },
@@ -206,7 +207,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             } else {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
             }
-            run_qemu.addArgs(&[_][]const u8{ "-serial", "none" });
         } else {
             if (self.options.qemu_monitor) {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
@@ -216,7 +216,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         }
 
         run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
-        run_qemu.addArgs(&[_][]const u8{ "-vga", "none" });
     }
 
     // set target cpu
