@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
 .{
-    .name = "CascadeOS",
+    .name = .CascadeOS,
 
     // Ensure this is kept in sync with `build.zig`
     .version = "0.0.3",
 
     // Ensure this is kept in sync with `build.zig` and `README.md`
-    .minimum_zig_version = "0.14.0-dev.3356+5e20e9b44",
+    .minimum_zig_version = "0.14.0-dev.3445+6c3cbb0c8",
 
     .dependencies = .{
         .edk2 = .{
@@ -33,4 +33,6 @@
     },
 
     .paths = .{""},
+
+    .fingerprint = 0x953e58ed07a831c1,
 }
