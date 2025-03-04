@@ -13,22 +13,22 @@
     .dependencies = .{
         .edk2 = .{
             .url = "https://github.com/CascadeOS/ovmf-prebuilt/releases/download/edk2-stable202502-r1/edk2-stable202502-r1-bin.tar.xz",
-            .hash = "1220438abe04b2648e3e0b30cc262a4223a6881266539a2e97d5b501a4dcb882b299",
+            .hash = "N-V-__8AAECatwxDir4EsmSOPgswzCYqQiOmiBJmU5oul9W1",
         },
 
         .libdwarf = .{
             .url = "git+https://github.com/CascadeOS/libdwarf-code.git?ref=v0.11.1#909af3e46b68335df6c4a901ddd256ffa0d193d2",
-            .hash = "1220c702071ea83add1f11a15a7a6e5e9378711346966867324eaeca800d5808ff9e",
+            .hash = "N-V-__8AAOsenwDHAgceqDrdHxGhWnpuXpN4cRNGlmhnMk6u",
         },
 
         .limine = .{
             .url = "git+https://github.com/limine-bootloader/limine.git?ref=v9.0.0-binary#c5df5d5cd1eb2a600cfa90628b243ffc7f849604",
-            .hash = "12202b853547b15bee83729be72dca9eb3168172fdec54c581fc3c7330714798353d",
+            .hash = "N-V-__8AAGUIRwArhTVHsVvug3Kb5y3KnrMWgXL97FTFgfw8",
         },
 
         .uacpi = .{
             .url = "git+https://github.com/CascadeOS/uACPI.git?ref=master#4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d",
-            .hash = "1220172694f04b562cf0f09ab554ca7bbd30babed7071ff1b9391f26dc98c14055e5",
+            .hash = "N-V-__8AAIIGEwAXJpTwS1Ys8PCatVTKe70wur7XBx_xuTkf",
         },
     },
 
