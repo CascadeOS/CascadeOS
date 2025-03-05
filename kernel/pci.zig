@@ -325,8 +325,6 @@ pub const VendorID = enum(u16) {
 };
 
 pub const DeviceID = enum(u16) {
-    none = 0xFFFF, // TODO: This is not `none` by the spec unlike with VendorID however sometimes it is used like this
-
     _,
 
     pub fn print(id: DeviceID, writer: std.io.AnyWriter, indent: usize) !void {

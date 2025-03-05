@@ -137,7 +137,11 @@ pub const SPCR = extern struct {
     }
 
     pub fn pciAddress(self: *const SPCR) ?kernel.pci.Address {
-        if (self.pci_vendor_id == .none or self.pci_device_id == .none) return null;
+        if (self.pci_vendor_id == .none) {
+            // FIXME: SPCR says if device id is 0xFFFF then it is not present but the PCI spec does not say that it is
+            //        not a valid device ID
+            return null;
+        }
 
         return .{
             .segment = self.pci_segment_number,
