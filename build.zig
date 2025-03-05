@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-// Ensure this is kept in sync with `build.zig.zon` and `README.md`
-const min_zig_version = "0.14.0";
-
-// Ensure this is kept in sync with `build.zig.zon`
-const cascade_version: std.SemanticVersion = .{ .major = 0, .minor = 0, .patch = 3 };
-
 pub fn build(b: *std.Build) !void {
     try disableUnsupportedSteps(b);
 
@@ -115,7 +109,7 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
 
 comptime {
     const current_zig = builtin.zig_version;
-    const min_zig = std.SemanticVersion.parse(min_zig_version) catch unreachable;
+    const min_zig = std.SemanticVersion.parse(build_zig_zon.minimum_zig_version) catch unreachable;
     if (current_zig.order(min_zig) == .lt) {
         @compileError(std.fmt.comptimePrint(
             "Your Zig version {} does not meet the minimum build requirement of {}",
@@ -123,6 +117,32 @@ comptime {
         ));
     }
 }
+
+const cascade_version = std.SemanticVersion.parse(build_zig_zon.version) catch unreachable;
+
+const build_zig_zon: BuildZigZon = @import("build.zig.zon");
+
+// requirement to have a type will be removed by https://github.com/ziglang/zig/pull/22907
+const BuildZigZon = struct {
+    name: @TypeOf(.enum_literal),
+    version: []const u8,
+    minimum_zig_version: []const u8,
+    dependencies: Deps,
+    paths: []const []const u8,
+    fingerprint: u64,
+
+    pub const Deps = struct {
+        edk2: UrlDep,
+        libdwarf: UrlDep,
+        limine: UrlDep,
+        uacpi: UrlDep,
+
+        const UrlDep = struct {
+            url: []const u8,
+            hash: []const u8,
+        };
+    };
+};
 
 const builtin = @import("builtin");
 const std = @import("std");

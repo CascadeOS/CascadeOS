@@ -4,10 +4,9 @@
 .{
     .name = .CascadeOS,
 
-    // Ensure this is kept in sync with `build.zig`
     .version = "0.0.3",
 
-    // Ensure this is kept in sync with `build.zig` and `README.md`
+    // Ensure this is kept in sync with `README.md`
     .minimum_zig_version = "0.14.0",
 
     .dependencies = .{
