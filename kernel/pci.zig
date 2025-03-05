@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
 
-/// Returns the PCI function at 'address'.
-///
-/// If `present_required` is `true` then only returns functions that are discovered to be present during enumeration.
-pub fn getFunction(address: Address, present_required: bool) ?*PciFunction {
+/// Returns the `PCIEConfigurationSpace` of the function at 'address'.
+pub fn getFunction(address: Address) ?FunctionConfigurationSpacePtr {
     for (globals.ecams) |ecam| {
         if (ecam.segment_group != address.segment) continue;
         if (ecam.start_bus < address.bus or address.bus >= ecam.end_bus) continue;
 
         const bus_offset = address.bus - ecam.start_bus;
 
-        const function = &ecam.buses[bus_offset].devices[address.device].functions[address.function];
+        const config_space_offset: usize =
+            @as(usize, bus_offset) << 20 |
+            @as(usize, address.device) << 15 |
+            @as(usize, address.function) << 12;
 
-        if (present_required and !function.present) return null;
-
-        return function;
+        return ecam.config_space_address
+            .moveForward(.from(config_space_offset, .byte))
+            .toPtr(FunctionConfigurationSpacePtr);
     }
 
     return null;
@@ -347,50 +348,14 @@ pub const DeviceID = enum(u16) {
     }
 };
 
-pub const PciFunction = struct {
-    function: u8,
-
-    config_space_address: core.VirtualAddress,
-
-    present: bool,
-
-    /// The PCI device this function belongs to.
-    device: *PciDevice,
-};
-
-const PciDevice = struct {
-    device: u8,
-
-    config_space_address: core.VirtualAddress,
-
-    functions: [FUNCTIONS_PER_DEVICE]PciFunction,
-
-    /// The PCI bus this device belongs to.
-    bus: *PciBus,
-};
-
-const PciBus = struct {
-    bus: u8,
-
-    config_space_address: core.VirtualAddress,
-
-    devices: [DEVICES_PER_BUS]PciDevice,
-
-    /// The ECAM this bus belongs to.
-    ecam: *ECAM,
-};
-
 const ECAM = struct {
-    ecam_number: u8,
-
-    config_space_address: core.VirtualAddress,
-
     segment_group: u16,
     start_bus: u8,
     end_bus: u8,
-
-    buses: []PciBus,
+    config_space_address: core.VirtualAddress,
 };
+
+pub const FunctionConfigurationSpacePtr = *volatile [4096]u8;
 
 const globals = struct {
     var ecams: []ECAM = undefined;
@@ -398,13 +363,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn initializeECAM() !void {
-        init_log.debug("enumerating PCI buses", .{});
-        try initializeBuses();
-    }
-
-    fn initializeBuses() !void {
-        const acpi_table = kernel.acpi.getTable(acpi.tables.MCFG, 0) orelse
-            return error.MCFGNotPresent;
+        const acpi_table = kernel.acpi.getTable(acpi.tables.MCFG, 0) orelse return error.MCFGNotPresent;
         defer acpi_table.deinit();
         const mcfg = acpi_table.table;
 
@@ -413,16 +372,13 @@ pub const init = struct {
         var ecams: std.ArrayList(ECAM) = try .initCapacity(kernel.heap.allocator, base_allocations.len);
         defer ecams.deinit();
 
-        for (mcfg.baseAllocations(), 0..) |base_allocation, ecam_i| {
+        for (mcfg.baseAllocations()) |base_allocation| {
             const ecam = try ecams.addOne();
             ecam.* = .{
-                .ecam_number = @intCast(ecam_i),
                 .start_bus = base_allocation.start_pci_bus,
                 .end_bus = base_allocation.end_pci_bus,
                 .segment_group = base_allocation.segment_group,
                 .config_space_address = kernel.vmm.nonCachedDirectMapFromPhysical(base_allocation.base_address),
-
-                .buses = undefined, // set below
             };
 
             init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {}", .{
@@ -431,63 +387,6 @@ pub const init = struct {
                 ecam.end_bus,
                 base_allocation.base_address,
             });
-
-            ecam.buses = try kernel.heap.allocator.alloc(PciBus, @as(usize, ecam.end_bus) - ecam.start_bus + 1);
-            errdefer kernel.heap.allocator.free(ecam.buses);
-
-            for (ecam.buses, 0..) |*bus, bus_i| {
-                bus.* = .{
-                    .bus = @intCast(ecam.start_bus + bus_i),
-                    .config_space_address = ecam.config_space_address.moveForward(.from(bus_i << 20, .byte)),
-                    .ecam = ecam,
-                    .devices = undefined, // set below
-                };
-
-                for (&bus.devices, 0..) |*device, device_i| {
-                    device.* = .{
-                        .device = @intCast(device_i),
-                        .config_space_address = bus.config_space_address.moveForward(.from(device_i << 15, .byte)),
-                        .bus = bus,
-                        .functions = undefined, // set below
-                    };
-
-                    for (&device.functions, 0..) |*function, function_i| {
-                        const function_config_space_address = device.config_space_address.moveForward(
-                            .from(@as(usize, function_i) << 12, .byte),
-                        );
-
-                        const config_space = function_config_space_address.toPtr(*volatile ConfigurationSpace);
-
-                        const present = config_space.vendor_id != .none;
-
-                        if (present) {
-                            const address: Address = .{
-                                .segment = ecam.segment_group,
-                                .bus = bus.bus,
-                                .device = device.device,
-                                .function = @intCast(function_i),
-                            };
-
-                            init_log.debug("found function - {} - {} - {}", .{
-                                address,
-                                config_space.vendor_id,
-                                config_space.device_id,
-                            });
-
-                            if (config_space.header_type.header_type == .pci_to_pci_bridge) {
-                                init_log.warn("encountered PCI-to-PCI bridge - not implemented", .{});
-                            }
-                        }
-
-                        function.* = .{
-                            .function = @intCast(function_i),
-                            .config_space_address = function_config_space_address,
-                            .device = device,
-                            .present = present,
-                        };
-                    }
-                }
-            }
         }
 
         globals.ecams = try ecams.toOwnedSlice();

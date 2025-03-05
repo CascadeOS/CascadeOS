@@ -23,11 +23,11 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.S
 /// Note that this must be able to open any arbitrary PCI device, not just those detected during kernel PCI enumeration.
 export fn uacpi_kernel_pci_device_open(
     address: kernel.pci.Address,
-    out_handle: **kernel.pci.PciFunction,
+    out_handle: *kernel.pci.FunctionConfigurationSpacePtr,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_device_open called with address {}", .{address});
 
-    out_handle.* = kernel.pci.getFunction(address, false) orelse return uacpi.Status.not_found;
+    out_handle.* = kernel.pci.getFunction(address) orelse return uacpi.Status.not_found;
     return .ok;
 }
 
@@ -38,90 +38,82 @@ export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read8(
-    device: *kernel.pci.PciFunction,
+    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
     offset: usize,
     value: *u8,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_read8 called", .{});
 
-    const address = device.config_space_address.moveForward(.from(offset, .byte));
-
-    value.* = address.toPtr(*const volatile u8).*;
+    value.* = function_config_space[offset];
 
     return .ok;
 }
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read16(
-    device: *kernel.pci.PciFunction,
+    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
     offset: usize,
     value: *u16,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_read16 called", .{});
 
-    const address = device.config_space_address.moveForward(.from(offset, .byte));
-
-    value.* = address.toPtr(*const volatile u16).*;
+    const ptr: *const volatile u16 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
+    value.* = ptr.*;
 
     return .ok;
 }
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read32(
-    device: *kernel.pci.PciFunction,
+    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
     offset: usize,
     value: *u32,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_read32 called", .{});
 
-    const address = device.config_space_address.moveForward(.from(offset, .byte));
-
-    value.* = address.toPtr(*const volatile u32).*;
+    const ptr: *const volatile u32 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
+    value.* = ptr.*;
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write8(
-    device: *kernel.pci.PciFunction,
+    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
     offset: usize,
     value: u8,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_write8 called", .{});
 
-    const address = device.config_space_address.moveForward(.from(offset, .byte));
-
-    address.toPtr(*volatile u8).* = value;
+    function_config_space[offset] = value;
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write16(
-    device: *kernel.pci.PciFunction,
+    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
     offset: usize,
     value: u16,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_write16 called", .{});
 
-    const address = device.config_space_address.moveForward(.from(offset, .byte));
-
-    address.toPtr(*volatile u16).* = value;
+    const ptr: *volatile u16 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
+    ptr.* = value;
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write32(
-    device: *kernel.pci.PciFunction,
+    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
     offset: usize,
     value: u32,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_write32 called", .{});
 
-    const address = device.config_space_address.moveForward(.from(offset, .byte));
-
-    address.toPtr(*volatile u32).* = value;
+    const ptr: *volatile u32 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
+    ptr.* = value;
 
     return .ok;
 }
