@@ -23,7 +23,7 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.S
 /// Note that this must be able to open any arbitrary PCI device, not just those detected during kernel PCI enumeration.
 export fn uacpi_kernel_pci_device_open(
     address: kernel.pci.Address,
-    out_handle: *kernel.pci.FunctionConfigurationSpacePtr,
+    out_handle: **volatile kernel.pci.Function,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_device_open called with address {}", .{address});
 
@@ -38,82 +38,78 @@ export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read8(
-    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
+    function: *volatile kernel.pci.Function,
     offset: usize,
     value: *u8,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_read8 called", .{});
 
-    value.* = function_config_space[offset];
+    value.* = function.read(u8, offset);
 
     return .ok;
 }
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read16(
-    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
+    function: *volatile kernel.pci.Function,
     offset: usize,
     value: *u16,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_read16 called", .{});
 
-    const ptr: *const volatile u16 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
-    value.* = ptr.*;
+    value.* = function.read(u16, offset);
 
     return .ok;
 }
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read32(
-    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
+    function: *volatile kernel.pci.Function,
     offset: usize,
     value: *u32,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_read32 called", .{});
 
-    const ptr: *const volatile u32 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
-    value.* = ptr.*;
+    value.* = function.read(u32, offset);
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write8(
-    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
+    function: *volatile kernel.pci.Function,
     offset: usize,
     value: u8,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_write8 called", .{});
 
-    function_config_space[offset] = value;
+    function.write(u8, offset, value);
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write16(
-    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
+    function: *volatile kernel.pci.Function,
     offset: usize,
     value: u16,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_write16 called", .{});
 
-    const ptr: *volatile u16 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
-    ptr.* = value;
+    function.write(u16, offset, value);
 
     return .ok;
 }
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write32(
-    function_config_space: kernel.pci.FunctionConfigurationSpacePtr,
+    function: *volatile kernel.pci.Function,
     offset: usize,
     value: u32,
 ) uacpi.Status {
     log.debug("uacpi_kernel_pci_write32 called", .{});
 
-    const ptr: *volatile u32 = @ptrCast(@alignCast(function_config_space[offset..].ptr));
-    ptr.* = value;
+    function.write(u32, offset, value);
 
     return .ok;
 }
