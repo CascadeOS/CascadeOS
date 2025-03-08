@@ -319,6 +319,86 @@ pub const DBG2 = extern struct {
     comptime {
         core.testing.expectSize(@This(), 44);
     }
+
+    pub const init = struct {
+        const uart = kernel.init.Output.uart;
+        const log = kernel.debug.log.scoped(.init_output);
+
+        pub fn tryGetSerialOutput() ?uart.Uart {
+            const dbg2 = kernel.acpi.getTable(kernel.acpi.tables.DBG2, 0) orelse return null;
+            defer dbg2.deinit();
+
+            var devices: kernel.acpi.tables.DBG2.DebugDeviceIterator = dbg2.table.debugDevices();
+
+            while (devices.next()) |device| {
+                const address = blk: {
+                    var addresses = device.addresses();
+                    const first_address = addresses.next() orelse continue;
+                    break :blk first_address.address;
+                };
+
+                switch (device.portType()) {
+                    .serial => |subtype| switch (subtype) {
+                        .@"16550", .@"16550-GAS" => {
+                            switch (address.address_space) {
+                                .memory => return .{
+                                    .memory_16550 = (uart.Memory16550.init(
+                                        kernel.vmm.directMapFromPhysical(
+                                            .fromInt(address.address),
+                                        ).toPtr([*]volatile u8),
+                                        null,
+                                    ) catch unreachable) orelse continue,
+                                },
+                                .io => return .{
+                                    .io_port_16550 = (uart.IoPort16550.init(
+                                        @intCast(address.address),
+                                        null,
+                                    ) catch unreachable) orelse continue,
+                                },
+                                else => {},
+                            }
+                        },
+                        .@"16450" => {
+                            switch (address.address_space) {
+                                .memory => return .{
+                                    .memory_16450 = (uart.Memory16450.init(
+                                        kernel.vmm.directMapFromPhysical(
+                                            .fromInt(address.address),
+                                        ).toPtr([*]volatile u8),
+                                        null,
+                                    ) catch unreachable) orelse continue,
+                                },
+                                .io => return .{
+                                    .io_port_16450 = (uart.IoPort16450.init(
+                                        @intCast(address.address),
+                                        null,
+                                    ) catch unreachable) orelse continue,
+                                },
+                                else => {},
+                            }
+                        },
+                        .ArmPL011 => {
+                            std.debug.assert(address.address_space == .memory);
+                            std.debug.assert(address.access_size == .dword);
+
+                            return .{
+                                .pl011 = (uart.PL011.init(
+                                    kernel.vmm.directMapFromPhysical(
+                                        .fromInt(address.address),
+                                    ).toPtr([*]volatile u32),
+                                    null,
+                                ) catch unreachable) orelse continue,
+                            };
+                        },
+                        else => {}, // TODO: implement other serial subtypes
+                    },
+                    else => {}, // TODO: implement other port types
+                }
+            }
+
+            return null;
+        }
+    };
 };
 
 const std = @import("std");
