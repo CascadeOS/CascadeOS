@@ -654,6 +654,7 @@ pub const Baud = struct {
 
     pub const Frequency = enum(u64) {
         @"1.8432 MHz" = 1843200,
+        @"3.6864 MHz" = 3686400,
         @"24 MHz" = 24000000,
         _,
     };
