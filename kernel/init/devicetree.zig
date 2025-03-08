@@ -39,9 +39,11 @@ fn tryGetSerialOutputInner() GetSerialOutputError!?uart.Uart {
     if (try getSerialOutputFromChosenNode(dt)) |output_uart| return output_uart;
 
     // TODO: doing a iteration per supported UART is not ideal
-
-    if (try dt.findNodeWithCompatible("ns16550a")) |node_with_name| {
-        if (try getSerialOutputFromNS16550a(dt, node_with_name.node)) |output_uart| return output_uart;
+    for (compatible_lookup.keys()) |key| {
+        if (try dt.findNodeWithCompatible(key)) |node_with_name| {
+            const func = compatible_lookup.get(key).?;
+            if (try func(dt, node_with_name.node)) |output_uart| return output_uart;
+        }
     }
 
     return null;
@@ -83,7 +85,7 @@ fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart
 
     var compatible_list = compatible_property.value.stringListIterator();
     while (try compatible_list.next()) |compatible| {
-        if (lookup.get(compatible)) |getSerialOutputFn| {
+        if (compatible_lookup.get(compatible)) |getSerialOutputFn| {
             return getSerialOutputFn(dt, node.node);
         }
     }
@@ -110,8 +112,6 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
         const ptr: *align(1) const u64 = @ptrCast(reg_property.value._raw);
         break :blk std.mem.bigToNative(u64, ptr.*);
     };
-    log.debug("address: 0x{x}", .{address});
-    log.debug("clock_frequency: {}", .{clock_frequency});
 
     return .{
         .memory_16550 = (try uart.Memory16550.init(
@@ -126,7 +126,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
     };
 }
 
-const lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
+const compatible_lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
     .{ "ns16550a", getSerialOutputFromNS16550a },
 });
 
