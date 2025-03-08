@@ -39,7 +39,8 @@ pub fn registerOutputs() void {
     }
 }
 
-pub fn tryGetSerialOutputFromAcpiTables() ?kernel.init.Output {
+/// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
+pub fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };

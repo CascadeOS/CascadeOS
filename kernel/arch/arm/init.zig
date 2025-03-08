@@ -4,9 +4,9 @@
 /// Attempt to get some form of init output.
 ///
 /// This function can return an architecture specific output if it is available and if not is expected to call into
-/// `kernel.init.Output.tryGetSerialOutputFromAcpiTables` to find a serial output.
+/// `kernel.init.Output.tryGetSerialOutputFromGenericSources`.
 pub fn tryGetSerialOutput() ?kernel.init.Output {
-    return kernel.init.Output.tryGetSerialOutputFromAcpiTables();
+    return kernel.init.Output.tryGetSerialOutputFromGenericSources();
 }
 
 /// Prepares the provided `Executor` for the bootstrap executor.

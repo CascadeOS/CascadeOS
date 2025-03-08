@@ -4,11 +4,11 @@
 /// Attempt to get some form of init output.
 ///
 /// This function can return an architecture specific output if it is available and if not is expected to call into
-/// `kernel.init.Output.tryGetSerialOutputFromAcpiTables` to find a serial output.
+/// `kernel.init.Output.tryGetSerialOutputFromGenericSources`.
 pub fn tryGetSerialOutput() ?kernel.init.Output {
     if (DebugCon.detect()) return DebugCon.output;
 
-    if (kernel.init.Output.tryGetSerialOutputFromAcpiTables()) |output| return output;
+    if (kernel.init.Output.tryGetSerialOutputFromGenericSources()) |output| return output;
 
     const static = struct {
         var init_output_serial_port: SerialPort = undefined;
