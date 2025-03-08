@@ -126,8 +126,56 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
     };
 }
 
+fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+    const address = blk: {
+        var iter = try node.propertyIterator(dt, .{ .name = "reg" });
+        const reg_property = (try iter.next()) orelse {
+            log.warn("no reg property found for pl011", .{});
+            return null;
+        };
+        // FIXME: remove this once zig-devicetree has support for integer property iteration
+        const ptr: *align(1) const u64 = @ptrCast(reg_property.value._raw);
+        break :blk std.mem.bigToNative(u64, ptr.*);
+    };
+    const clock_frequency = clock_frequency: {
+        const clocks_property = blk: {
+            var iter = try node.propertyIterator(dt, .{ .name = "clocks" });
+            break :blk (try iter.next()) orelse {
+                log.warn("no clocks property found for pl011", .{});
+                return null;
+            };
+        };
+        // there are multiple clocks, but the first one happens to be the one we want
+        const clock_phandle = clocks_property.value.toPHandle();
+        const clock_node = (try clock_phandle.node(dt)) orelse {
+            log.warn("no clock node found for pl011", .{});
+            return null;
+        };
+
+        var iter = try clock_node.node.propertyIterator(dt, .{ .name = "clock-frequency" });
+        const clock_frequency_property = (try iter.next()) orelse {
+            log.warn("no clock-frequency property found for ns16550a", .{});
+            return null;
+        };
+        break :clock_frequency clock_frequency_property.value.toU32();
+    };
+
+    return .{
+        .pl011 = (try uart.PL011.init(
+            kernel.vmm.directMapFromPhysical(
+                .fromInt(address),
+            ).toPtr([*]volatile u32),
+            .{
+                .clock_frequency = @enumFromInt(clock_frequency),
+                .baud_rate = .@"115200",
+            },
+        )) orelse return null,
+    };
+}
+
 const compatible_lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
     .{ "ns16550a", getSerialOutputFromNS16550a },
+    .{ "arm,pl011", getSerialOutputFromPL011 },
 });
 
 const GetSerialOutputError = DeviceTree.IteratorError || uart.Baud.DivisorError;
