@@ -510,10 +510,13 @@ pub const io = struct {
 /// Functionality that is used during kernel init only.
 pub const init = struct {
     /// Attempt to get some form of init output.
-    pub fn tryGetOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
+    ///
+    /// This function can return an architecture specific output if it is available and if not is expected to call into
+    /// `kernel.init.Output.tryGetSerialOutputFromAcpiTables` to find a serial output.
+    pub fn tryGetSerialOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
         // `checkSupport` intentionally not called - mandatory function
 
-        return current.init.tryGetOutput();
+        return current.init.tryGetSerialOutput();
     }
 
     /// Prepares the provided `Executor` for the bootstrap executor.

@@ -16,9 +16,8 @@ pub const writer = std.io.GenericWriter(
     error{},
     struct {
         fn writeFn(_: void, bytes: []const u8) error{}!usize {
-            for (globals.outputs.constSlice()) |output| {
-                output.writeFn(output.context, bytes);
-            }
+            if (globals.framebuffer_output) |output| output.writeFn(output.context, bytes);
+            if (globals.serial_output) |output| output.writeFn(output.context, bytes);
             return bytes.len;
         }
     }.writeFn,
@@ -26,35 +25,32 @@ pub const writer = std.io.GenericWriter(
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
 pub fn remapOutputs(current_task: *kernel.Task) !void {
-    for (globals.outputs.constSlice()) |output| {
-        try output.remapFn(output.context, current_task);
-    }
+    if (globals.framebuffer_output) |output| try output.remapFn(output.context, current_task);
+    if (globals.serial_output) |output| try output.remapFn(output.context, current_task);
 }
 
 pub fn registerOutputs() void {
-    const registerOutput = struct {
-        fn registerOutput(output: Output) void {
-            globals.outputs.append(output) catch @panic("exceeded maximum number of init outputs");
-        }
-    }.registerOutput;
+    if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
+        globals.framebuffer_output = output;
+    }
 
-    if (@import("framebuffer.zig").tryGetOutput()) |output| registerOutput(output);
-
-    if (kernel.arch.init.tryGetOutput()) |output| registerOutput(output);
+    if (kernel.arch.init.tryGetSerialOutput()) |output| {
+        globals.serial_output = output;
+    }
 }
 
-pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
+pub fn tryGetSerialOutputFromAcpiTables() ?kernel.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
 
     blk: {
-        if (tryGetOutputFromSPCR()) |output_uart| {
+        if (tryGetSerialOutputFromSPCR()) |output_uart| {
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (tryGetOutputFromDBG2()) |output_uart| {
+        if (tryGetSerialOutputFromDBG2()) |output_uart| {
             static.init_output_uart = output_uart;
             break :blk;
         }
@@ -65,8 +61,17 @@ pub fn tryGetOutputFromAcpiTables() ?kernel.init.Output {
     return static.init_output_uart.output();
 }
 
-fn tryGetOutputFromSPCR() ?uart.Uart {
-    const output_uart = tryGetOutputFromSPCRInner() catch |err| switch (err) {
+pub const globals = struct {
+    pub var lock: kernel.sync.TicketSpinLock = .{};
+
+    var framebuffer_output: ?Output = null;
+    var serial_output: ?Output = null;
+};
+
+pub const uart = @import("uart.zig");
+
+fn tryGetSerialOutputFromSPCR() ?uart.Uart {
+    const output_uart = tryGetSerialOutputFromSPCRInner() catch |err| switch (err) {
         error.DivisorTooLarge => {
             log.warn("baud divisor from SPCR too large", .{});
             return null;
@@ -76,7 +81,7 @@ fn tryGetOutputFromSPCR() ?uart.Uart {
     return output_uart;
 }
 
-fn tryGetOutputFromSPCRInner() uart.Baud.DivisorError!?uart.Uart {
+fn tryGetSerialOutputFromSPCRInner() uart.Baud.DivisorError!?uart.Uart {
     const spcr = kernel.acpi.getTable(kernel.acpi.tables.SPCR, 0) orelse return null;
     defer spcr.deinit();
 
@@ -212,7 +217,7 @@ fn tryGetOutputFromSPCRInner() uart.Baud.DivisorError!?uart.Uart {
     }
 }
 
-fn tryGetOutputFromDBG2() ?uart.Uart {
+fn tryGetSerialOutputFromDBG2() ?uart.Uart {
     const dbg2 = kernel.acpi.getTable(kernel.acpi.tables.DBG2, 0) orelse return null;
     defer dbg2.deinit();
 
@@ -286,19 +291,6 @@ fn tryGetOutputFromDBG2() ?uart.Uart {
 
     return null;
 }
-
-pub const globals = struct {
-    pub var lock: kernel.sync.TicketSpinLock = .{};
-
-    var outputs: std.BoundedArray(
-        Output,
-        maximum_number_of_outputs,
-    ) = .{};
-};
-
-const maximum_number_of_outputs = 8;
-
-pub const uart = @import("uart.zig");
 
 const std = @import("std");
 const core = @import("core");

@@ -3,9 +3,8 @@
 
 // Does not scroll instead wraps to the top of the screen.
 // Due to this is needs to clear the entire line with when a new line is started.
-// TODO: This entire thing needs to be rewritten.
 
-pub fn tryGetOutput() ?kernel.init.Output {
+pub fn tryGetFramebufferOutput() ?kernel.init.Output {
     const framebuffer = kernel.boot.framebuffer() orelse return null;
 
     c.ssfn_src = @constCast(font);
