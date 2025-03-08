@@ -26,8 +26,8 @@
         },
 
         .uacpi = .{
-            .url = "git+https://github.com/CascadeOS/uACPI.git?ref=master#4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d",
-            .hash = "N-V-__8AAIIGEwAXJpTwS1Ys8PCatVTKe70wur7XBx_xuTkf",
+            .url = "git+https://github.com/CascadeOS/uACPI.git?ref=master#8f95a9f0b5301f16d99dc02c10d58e63f7f5c5b9",
+            .hash = "N-V-__8AAPUGEwCy72_8paoqOlsZTqvvMKObZrwANgq40cTO",
         },
     },
 
