@@ -218,6 +218,14 @@ pub fn framebuffer() ?Framebuffer {
     };
 }
 
+/// Returns the device tree blob provided by the bootloader, if any.
+pub fn deviceTreeBlob() ?core.VirtualAddress {
+    return switch (bootloader_api) {
+        .limine => limine.deviceTreeBlob(),
+        .unknown => null,
+    };
+}
+
 /// Exports bootloader entry points and any other required exported symbols.
 ///
 /// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.

@@ -234,6 +234,12 @@ pub fn framebuffer() ?boot.Framebuffer {
     };
 }
 
+pub fn deviceTreeBlob() ?core.VirtualAddress {
+    const resp = requests.device_tree_blob.response orelse
+        return null;
+    return resp.address;
+}
+
 fn limineEntryPoint() callconv(.C) noreturn {
     kernel.boot.bootloader_api = .limine;
 
@@ -261,6 +267,7 @@ pub fn exportRequests() void {
     @export(&requests.rsdp, .{ .name = "limine_rsdp_request" });
     @export(&requests.smp, .{ .name = "limine_smp_request" });
     @export(&requests.framebuffer, .{ .name = "limine_framebuffer_request" });
+    @export(&requests.device_tree_blob, .{ .name = "limine_device_tree_blob_request" });
 }
 
 const requests = struct {
@@ -272,6 +279,7 @@ const requests = struct {
     var rsdp: limine.RSDP = .{};
     var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
     var framebuffer: limine.Framebuffer = .{};
+    var device_tree_blob: limine.DeviceTreeBlob = .{};
 };
 
 const std = @import("std");
