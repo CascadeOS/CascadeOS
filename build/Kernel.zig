@@ -252,46 +252,51 @@ fn constructKernelModule(
     kernel_module.addCSourceFile(.{ .file = b.path("kernel/init/output/ssfn.c") });
     kernel_module.addIncludePath(b.path(("kernel/init/output")));
 
-    const uacpi_log_level: []const u8 =
-        if (options.kernel_force_debug_log or std.mem.indexOf(
-            u8,
-            options.kernel_forced_debug_log_scopes,
-            "uacpi",
-        ) != null)
-            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
-        else
-            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
-
     // uacpi
-    kernel_module.addCSourceFiles(.{
-        .root = uacpi_dep.path("source"),
-        .files = &.{
-            "default_handlers.c",
-            "event.c",
-            "interpreter.c",
-            "io.c",
-            "mutex.c",
-            "namespace.c",
-            "notify.c",
-            "opcodes.c",
-            "opregion.c",
-            "osi.c",
-            "registers.c",
-            "resources.c",
-            "shareable.c",
-            "sleep.c",
-            "stdlib.c",
-            "tables.c",
-            "types.c",
-            "uacpi.c",
-            "utilities.c",
-        },
-        .flags = &.{
-            uacpi_log_level,
-            "-fno-sanitize=undefined", // FIXME: investigate - seems to have been introduced sometime around uACPI 2.0.0
-        },
-    });
-    kernel_module.addIncludePath(uacpi_dep.path("include"));
+    {
+        const uacpi_log_level: []const u8 =
+            if (options.kernel_force_debug_log or std.mem.indexOf(
+                u8,
+                options.kernel_forced_debug_log_scopes,
+                "uacpi",
+            ) != null)
+                "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
+            else
+                "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
+
+        kernel_module.addCSourceFiles(.{
+            .root = uacpi_dep.path("source"),
+            .files = &.{
+                "default_handlers.c",
+                "event.c",
+                "interpreter.c",
+                "io.c",
+                "mutex.c",
+                "namespace.c",
+                "notify.c",
+                "opcodes.c",
+                "opregion.c",
+                "osi.c",
+                "registers.c",
+                "resources.c",
+                "shareable.c",
+                "sleep.c",
+                "stdlib.c",
+                "tables.c",
+                "types.c",
+                "uacpi.c",
+                "utilities.c",
+            },
+            .flags = &.{
+                uacpi_log_level,
+                "-fno-sanitize=undefined", // FIXME: investigate - seems to have been introduced sometime around uACPI 2.0.0
+            },
+        });
+        kernel_module.addIncludePath(uacpi_dep.path("include"));
+    }
+
+    // devicetree
+    kernel_module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
 
     // source file modules
     for (source_file_modules) |module| {

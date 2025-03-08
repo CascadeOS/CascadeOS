@@ -132,6 +132,7 @@ const BuildZigZon = struct {
     fingerprint: u64,
 
     pub const Deps = struct {
+        devicetree: UrlDep,
         edk2: UrlDep,
         libdwarf: UrlDep,
         limine: UrlDep,

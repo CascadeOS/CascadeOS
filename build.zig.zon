@@ -10,6 +10,11 @@
     .minimum_zig_version = "0.14.0",
 
     .dependencies = .{
+        .devicetree = .{
+            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#3cf57ed8fa5dd8e1679a1903aa36308aa10174d5",
+            .hash = "devicetree-2.0.0-cZRcrL8QAQD8xchDjtSQ0aDf0cxXvAxqGQs07PWxSkO1",
+        },
+
         .edk2 = .{
             .url = "https://github.com/CascadeOS/ovmf-prebuilt/releases/download/edk2-stable202502-r1/edk2-stable202502-r1-bin.tar.xz",
             .hash = "N-V-__8AAECatwxDir4EsmSOPgswzCYqQiOmiBJmU5oul9W1",
