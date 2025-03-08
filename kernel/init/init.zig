@@ -272,6 +272,7 @@ fn bootNonBootstrapExecutors() !void {
     }
 }
 
+pub const devicetree = @import("devicetree.zig");
 pub const Output = @import("output/Output.zig");
 
 const Barrier = struct {

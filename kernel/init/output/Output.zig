@@ -56,6 +56,11 @@ pub fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
             break :blk;
         }
 
+        if (kernel.init.devicetree.tryGetSerialOutput()) |output_uart| {
+            static.init_output_uart = output_uart;
+            break :blk;
+        }
+
         return null;
     }
 
