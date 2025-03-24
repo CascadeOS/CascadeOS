@@ -108,20 +108,18 @@ fn create(
         uacpi_dep,
     );
 
-    { // FIXME: `-fno-emit-bin` + c files is broken https://github.com/CascadeOS/CascadeOS/issues/96
-        // const check_exe = b.addExecutable(.{
-        //     .name = "kernel",
-        //     .root_module = kernel_module,
-        // });
-        // step_collection.registerCheck(check_exe);
+    {
+        const check_exe = b.addExecutable(.{
+            .name = "kernel",
+            .root_module = kernel_module,
+        });
+        step_collection.registerCheck(check_exe);
     }
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
         .root_module = kernel_module,
     });
-    // FIXME: `-fno-emit-bin` + c files is broken https://github.com/CascadeOS/CascadeOS/issues/96
-    step_collection.registerCheck(kernel_exe);
 
     kernel_exe.entry = .disabled;
     kernel_exe.want_lto = false;
