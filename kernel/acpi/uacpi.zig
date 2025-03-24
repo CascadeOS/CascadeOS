@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d/LICENSE)
+// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/3bd2a570104ae95e555131765888d9038ec4322b/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI 2.0.0 (4ab3a78006a930e2cda5a92f33fc84e1ec6b4a3d).
+//! Provides a nice zig API wrapping uACPI 2.1.0 (3bd2a570104ae95e555131765888d9038ec4322b).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
 //! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
