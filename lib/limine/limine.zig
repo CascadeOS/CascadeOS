@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v9.0.0/COPYING)
+// SPDX-FileCopyrightText: 2019-2024 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v9.2.0/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of v9.0.0.
+//! This module contains the definitions of the Limine protocol as of v9.2.0.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v9.0.0/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v9.2.0/PROTOCOL.md)
 //! 99738edd072a14fdedba822359daee754c8fe193 2025-02-17
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol

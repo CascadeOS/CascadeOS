@@ -26,8 +26,8 @@
         },
 
         .limine = .{
-            .url = "git+https://github.com/limine-bootloader/limine.git?ref=v9.1.0-binary#905bdad33c55acf8cbaa1fae3c485fea685eb136",
-            .hash = "N-V-__8AAPc8RwDzEVa5sCf2oaqmTjFOcwDMgmOZ1ljFO23U",
+            .url = "git+https://github.com/limine-bootloader/limine.git?ref=v9.2.0-binary#6708e47f80005c42a3d5ea6608250f22fcc6f54c",
+            .hash = "N-V-__8AAOxcRwD_8nEgTH-PMj-YS3D7b7CJ4I44a9CU7e4v",
         },
 
         .uacpi = .{
