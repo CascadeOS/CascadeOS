@@ -386,8 +386,7 @@ fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTa
                 .cpu_arch = .x86_64,
                 .os_tag = .freestanding,
                 .abi = .none,
-                // TODO: Is v3 too new? v2 might be better but then we lose BMI and BMI2.
-                .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64_v3 },
+                .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64_v2 },
             };
 
             // Remove all SSE/AVX features
