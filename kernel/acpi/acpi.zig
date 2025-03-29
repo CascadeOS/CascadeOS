@@ -94,6 +94,12 @@ pub const init = struct {
         init_log.debug("entering ACPI mode", .{});
         try uacpi.initialize(.{});
 
+        try uacpi.FixedEvent.power_button.installHandler(
+            void,
+            earlyPowerButtonHandler,
+            null,
+        );
+
         init_log.debug("loading namespace", .{});
         try uacpi.namespaceLoad();
 
@@ -110,6 +116,14 @@ pub const init = struct {
     pub fn finializeInitialization() !void {
         init_log.debug("finializing GPEs", .{});
         try uacpi.finializeGpeInitialization();
+    }
+
+    fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
+        init_log.warn("power button pressed", .{});
+        tryShutdown() catch |err| {
+            std.debug.panic("failed to shutdown: {s}", .{@errorName(err)});
+        };
+        @panic("shutdown failed");
     }
 
     const init_log = kernel.debug.log.scoped(.init_acpi);
