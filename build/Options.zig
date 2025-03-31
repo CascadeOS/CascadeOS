@@ -11,9 +11,6 @@ optimize: std.builtin.OptimizeMode,
 /// CascadeOS version.
 cascade_version_string: []const u8,
 
-/// If true, library tests are built for the host and execution is attempted.
-build_for_host: bool,
-
 /// Enable QEMU monitor.
 ///
 /// Defaults to false.
@@ -94,12 +91,6 @@ cascade_os_options_module: *std.Build.Module,
 non_cascade_os_options_module: *std.Build.Module,
 
 pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const CascadeTarget) !Options {
-    const build_for_host = b.option(
-        bool,
-        "build_for_host",
-        "Library tests are built for the host and execution is attempted (defaults to false)",
-    ) orelse false;
-
     const qemu_monitor = b.option(
         bool,
         "monitor",
@@ -206,7 +197,6 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .root_path = root_path,
         .optimize = b.standardOptimizeOption(.{}),
         .cascade_version_string = cascade_version_string,
-        .build_for_host = build_for_host,
         .qemu_monitor = qemu_monitor,
         .qemu_remote_debug = qemu_remote_debug,
         .no_acpi = no_acpi,
