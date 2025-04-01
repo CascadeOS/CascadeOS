@@ -27,20 +27,25 @@ pub fn registerImageSteps(
 
     const limine_dep = b.dependency("limine", .{});
 
-    const limine_exe = b.addExecutable(.{
-        .name = "limine",
-        .link_libc = true,
-        .target = b.graph.host,
-        .optimize = .ReleaseSafe,
-    });
-    limine_exe.addIncludePath(limine_dep.path(""));
-    limine_exe.addCSourceFile(.{
-        .file = limine_dep.path("limine.c"),
-        .flags = &.{
-            "-std=c99",
-            "-fno-sanitize=undefined",
-        },
-    });
+    const limine_exe = blk: {
+        const limine_c_module = b.createModule(.{
+            .target = b.graph.host,
+            .optimize = .ReleaseSafe,
+            .link_libc = true,
+        });
+        limine_c_module.addIncludePath(limine_dep.path(""));
+        limine_c_module.addCSourceFile(.{
+            .file = limine_dep.path("limine.c"),
+            .flags = &.{
+                "-std=c99",
+                "-fno-sanitize=undefined",
+            },
+        });
+        break :blk b.addExecutable(.{
+            .name = "limine",
+            .root_module = limine_c_module,
+        });
+    };
 
     var image_steps: Collection = .{};
     try image_steps.ensureTotalCapacity(b.allocator, @intCast(targets.len));
