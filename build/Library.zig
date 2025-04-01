@@ -232,6 +232,7 @@ fn resolveLibrary(
                 false,
                 true,
             );
+            host_test_module.optimize = options.optimize;
 
             const host_test_exe = b.addTest(.{
                 .name = library_description.name,
@@ -307,33 +308,12 @@ fn createModule(
 ) !*std.Build.Module {
     const module = b.createModule(.{
         .root_source_file = lazy_path,
-        .optimize = options.optimize,
     });
 
     if (is_exe_root_module) {
         module.resolved_target = if (build_for_cascade) target.getCascadeCrossTarget(b) else target.getNonCascadeCrossTarget(b);
     }
 
-    addDependenciesToModule(
-        module,
-        library_description,
-        options,
-        target,
-        dependencies,
-        build_for_cascade,
-    );
-
-    return module;
-}
-
-fn addDependenciesToModule(
-    module: *std.Build.Module,
-    library_description: LibraryDescription,
-    options: Options,
-    target: CascadeTarget,
-    dependencies: []const Dependency,
-    build_for_cascade: bool,
-) void {
     // self reference
     module.addImport(library_description.name, module);
 
@@ -351,6 +331,8 @@ fn addDependenciesToModule(
 
         module.addImport(dependency.import_name, dependency_module);
     }
+
+    return module;
 }
 
 const std = @import("std");
