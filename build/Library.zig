@@ -199,7 +199,7 @@ fn resolveLibrary(
                 true,
             );
             const check_test_exe = b.addTest(.{
-                .name = library_description.name,
+                .name = try std.mem.concat(b.allocator, u8, &.{ library_description.name, "_check" }),
                 .root_module = check_module,
             });
             step_collection.registerCheck(check_test_exe);

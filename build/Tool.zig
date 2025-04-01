@@ -70,8 +70,6 @@ fn resolveTool(
 
     const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{tool_description.name});
 
-    const test_name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_test" });
-
     const lazy_path = b.path(b.pathJoin(&.{
         "tool",
         tool_description.name,
@@ -88,7 +86,7 @@ fn resolveTool(
 
     {
         const check_exe = b.addExecutable(.{
-            .name = tool_description.name,
+            .name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_check" }),
             .root_module = normal_module,
         });
         step_collection.registerCheck(check_exe);
@@ -146,9 +144,11 @@ fn resolveTool(
     const build_step = b.step(build_step_name, build_step_description);
     build_step.dependOn(&exe_install_step.step);
 
+    const test_name = try std.mem.concat(b.allocator, u8, &.{ tool_description.name, "_test" });
+
     {
         const check_test_exe = b.addTest(.{
-            .name = test_name,
+            .name = try std.mem.concat(b.allocator, u8, &.{ test_name, "_check" }),
             .root_module = normal_module,
         });
         step_collection.registerCheck(check_test_exe);

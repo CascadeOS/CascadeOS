@@ -110,7 +110,7 @@ fn create(
 
     {
         const check_exe = b.addExecutable(.{
-            .name = "kernel",
+            .name = "kernel_check",
             .root_module = kernel_module,
         });
         step_collection.registerCheck(check_exe);
