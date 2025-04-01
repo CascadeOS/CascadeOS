@@ -47,7 +47,7 @@ pub fn initStage1() !noreturn {
     kernel.arch.interrupts.init.initializeEarlyInterrupts();
 
     log.debug("capturing early system information", .{});
-    try kernel.arch.init.captureEarlySystemInformation();
+    kernel.arch.init.captureEarlySystemInformation();
 
     log.debug("configuring per-executor system features", .{});
     kernel.arch.init.configurePerExecutorSystemFeatures(&bootstrap_executor);

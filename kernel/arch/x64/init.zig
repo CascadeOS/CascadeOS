@@ -102,9 +102,9 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation() !void {
+pub fn captureEarlySystemInformation() void {
     log.debug("capturing cpuid information", .{});
-    try x64.info.cpu_id.capture();
+    x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
     if (!x64.info.cpu_id.mtrr) {
         @panic("MTRRs not supported");

@@ -556,11 +556,11 @@ pub const init = struct {
     /// Capture any system information that can be without using mmio.
     ///
     /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-    pub fn captureEarlySystemInformation() callconv(core.inline_in_non_debug) !void {
+    pub fn captureEarlySystemInformation() callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.init,
             "captureEarlySystemInformation",
-            fn () anyerror!void,
+            fn () void,
         );
 
         return current.init.captureEarlySystemInformation();
