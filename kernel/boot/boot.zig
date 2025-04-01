@@ -57,6 +57,17 @@ pub const MemoryMap = struct {
             unusable,
 
             unknown,
+
+            pub fn isUsable(self: Type) bool {
+                return switch (self) {
+                    .free,
+                    .in_use,
+                    .bootloader_reclaimable,
+                    .acpi_reclaimable,
+                    => true,
+                    .reserved, .unusable, .unknown => false,
+                };
+            }
         };
 
         pub fn print(entry: Entry, writer: std.io.AnyWriter, indent: usize) !void {
