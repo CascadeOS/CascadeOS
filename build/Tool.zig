@@ -258,8 +258,6 @@ fn addDependenciesToModule(
 const std = @import("std");
 const Step = std.Build.Step;
 
-const helpers = @import("helpers.zig");
-
 const Library = @import("Library.zig");
 const StepCollection = @import("StepCollection.zig");
 const ToolDescription = @import("ToolDescription.zig");

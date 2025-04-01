@@ -528,8 +528,6 @@ fn addFilesRecursive(
 const std = @import("std");
 const Step = std.Build.Step;
 
-const helpers = @import("helpers.zig");
-
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const Library = @import("Library.zig");
 const Options = @import("Options.zig");

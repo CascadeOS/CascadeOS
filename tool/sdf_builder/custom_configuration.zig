@@ -90,5 +90,4 @@ pub fn customConfiguration(
 const std = @import("std");
 const builtin = @import("builtin");
 
-const helpers = @import("../../build/helpers.zig");
 const ToolDescription = @import("../../build/ToolDescription.zig");

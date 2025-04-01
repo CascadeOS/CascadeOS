@@ -132,8 +132,6 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 const std = @import("std");
 const Step = std.Build.Step;
 
-const helpers = @import("helpers.zig");
-
 const Kernel = @import("Kernel.zig");
 const Library = @import("Library.zig");
 const Tool = @import("Tool.zig");

@@ -261,7 +261,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
     if (should_use_acceleration) {
         switch (b.graph.host.result.os.tag) {
-            .linux => if (helpers.fileExists("/dev/kvm")) run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
+            .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
             .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
             .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
             else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.graph.host.result.os.tag)}),
@@ -356,8 +356,6 @@ fn qemuExecutable(self: CascadeTarget) []const u8 {
 
 const std = @import("std");
 const Step = std.Build.Step;
-
-const helpers = @import("helpers.zig");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const ImageStep = @import("ImageStep.zig");
