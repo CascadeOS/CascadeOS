@@ -119,31 +119,7 @@ comptime {
 }
 
 const cascade_version = std.SemanticVersion.parse(build_zig_zon.version) catch unreachable;
-
-const build_zig_zon: BuildZigZon = @import("build.zig.zon");
-
-// requirement to have a type will be removed by https://github.com/ziglang/zig/pull/22907
-const BuildZigZon = struct {
-    name: @TypeOf(.enum_literal),
-    version: []const u8,
-    minimum_zig_version: []const u8,
-    dependencies: Deps,
-    paths: []const []const u8,
-    fingerprint: u64,
-
-    pub const Deps = struct {
-        devicetree: UrlDep,
-        edk2: UrlDep,
-        libdwarf: UrlDep,
-        limine: UrlDep,
-        uacpi: UrlDep,
-
-        const UrlDep = struct {
-            url: []const u8,
-            hash: []const u8,
-        };
-    };
-};
+const build_zig_zon = @import("build.zig.zon");
 
 const builtin = @import("builtin");
 const std = @import("std");
