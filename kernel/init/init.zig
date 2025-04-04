@@ -151,6 +151,8 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
         log.debug("loading standard interrupt handlers", .{});
         kernel.arch.interrupts.init.loadStandardInterruptHandlers();
 
+        Barrier.bootstrapInitialComplete();
+
         log.debug("initializing PCI ECAM", .{});
         try kernel.pci.init.initializeECAM();
 
@@ -167,9 +169,12 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
                 kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
             }) catch {};
         }
-    }
 
-    Barrier.executorReady();
+        Barrier.executorReady();
+    } else {
+        Barrier.executorReady();
+        Barrier.waitForBootstrapInitial();
+    }
 
     // enabling interrupts so we can service IPIs on non-bootstrap executors
     current_task.decrementInterruptDisable();
@@ -277,9 +282,20 @@ pub const Output = @import("output/Output.zig");
 
 const Barrier = struct {
     var executor_count = std.atomic.Value(usize).init(0);
+    var bootstrap_initial = std.atomic.Value(bool).init(false);
 
     fn executorReady() void {
         _ = executor_count.fetchAdd(1, .release);
+    }
+
+    fn bootstrapInitialComplete() void {
+        _ = bootstrap_initial.store(true, .release);
+    }
+
+    fn waitForBootstrapInitial() void {
+        while (!bootstrap_initial.load(.acquire)) {
+            kernel.arch.spinLoopHint();
+        }
     }
 
     fn waitForOthers() void {
