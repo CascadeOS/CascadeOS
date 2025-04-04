@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: Copyright (c) 2022 Diego Barria (https://github.com/xyaman/mibu/blob/main/LICENSE)
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Copyright (c) 2022 Diego Barria (https://github.com/xyaman/mibu/blob/c2d3719d5dcc1e5a723d3b06459c3b6275d2cef0/LICENSE)
 
 pub const style = struct {
     pub const reset = comptimeCsi("0m", .{});

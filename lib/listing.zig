@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: CC0-1.0
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{

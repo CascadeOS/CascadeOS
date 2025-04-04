@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/UltraOS/uACPI/blob/3bd2a570104ae95e555131765888d9038ec4322b/LICENSE)
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/c163b24bada6069e13c564e57d1b0bbeb1c6d21f/LICENSE)
 
 //! Provides a nice zig API wrapping uACPI 2.1.0 (3bd2a570104ae95e555131765888d9038ec4322b).
 //!

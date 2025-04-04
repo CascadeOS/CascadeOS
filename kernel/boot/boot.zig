@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
 pub fn kernelBaseAddress() ?KernelBaseAddress {

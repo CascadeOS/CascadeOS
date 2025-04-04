@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Returns the `PCIEConfigurationSpace` of the function at 'address'.
 pub fn getFunction(address: Address) ?*volatile Function {

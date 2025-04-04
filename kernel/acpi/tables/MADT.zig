@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// The Multiple APIC Description Table (MADT), provides OSPM with information necessary for operation on systems with
 /// APIC, SAPIC, GIC, or LPIC implementations.

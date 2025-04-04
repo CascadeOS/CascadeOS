@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const RFlags = packed struct(u64) {
     /// Set by hardware if last arithmetic operation generated a carry out of the most-significant bit of the result.

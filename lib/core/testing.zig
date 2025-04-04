@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Asserts that the size and bit size of the given type matches the expected size.
 pub inline fn expectSize(comptime T: type, comptime bytes: comptime_int) void {

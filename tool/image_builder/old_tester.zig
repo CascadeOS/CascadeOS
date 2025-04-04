@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 // !WARNING: This file was used to stumble through building a simple image, it is not used.
 //           It has not been deleted as some of the ext2 code will need to be migrated out into image_builder eventually.
