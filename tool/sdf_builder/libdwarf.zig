@@ -545,6 +545,11 @@ pub const DW_AT = enum(c.Dwarf_Half) {
     deleted = 0x8a,
     defaulted = 0x8b,
     loclists_base = 0x8c,
+
+    // DWARF 6
+    language_name = 0x90,
+    language_version = 0x91,
+
     lo_user = 0x2000,
     hi_user = 0x3fff,
 
