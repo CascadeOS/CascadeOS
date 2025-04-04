@@ -146,9 +146,9 @@ fn heapArenaImport(
     globals.heap_page_table_mutex.lock(current_task);
     defer globals.heap_page_table_mutex.unlock(current_task);
 
-    kernel.vmm.mapRange(
+    kernel.mem.mapRangeAndAllocatePhysicalFrames(
         current_task,
-        kernel.vmm.globals.core_page_table,
+        kernel.mem.globals.core_page_table,
         .{
             .address = .fromInt(allocation.base),
             .size = .from(allocation.len, .byte),
@@ -156,6 +156,7 @@ fn heapArenaImport(
         .{ .writeable = true, .global = true },
         .kernel,
         true,
+        kernel.mem.phys.allocator,
     ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
     errdefer comptime unreachable;
 
@@ -173,9 +174,9 @@ fn heapArenaRelease(
         globals.heap_page_table_mutex.lock(current_task);
         defer globals.heap_page_table_mutex.unlock(current_task);
 
-        kernel.vmm.unmapRange(
+        kernel.mem.unmapRange(
             current_task,
-            kernel.vmm.globals.core_page_table,
+            kernel.mem.globals.core_page_table,
             .{
                 .address = .fromInt(allocation.base),
                 .size = .from(allocation.len, .byte),
@@ -183,6 +184,7 @@ fn heapArenaRelease(
             true,
             .kernel,
             true,
+            kernel.mem.phys.allocator,
         );
     }
 
@@ -196,7 +198,7 @@ pub fn allocateSpecial(
     current_task: *kernel.Task,
     size: core.Size,
     physical_range: core.PhysicalRange,
-    map_type: kernel.vmm.MapType,
+    map_type: kernel.mem.MapType,
 ) !core.VirtualRange {
     const allocation = try globals.special_heap_address_space_arena.allocate(
         current_task,
@@ -213,12 +215,15 @@ pub fn allocateSpecial(
     globals.special_heap_page_table_mutex.lock(current_task);
     defer globals.special_heap_page_table_mutex.unlock(current_task);
 
-    try kernel.vmm.mapToPhysicalRange(
-        kernel.vmm.globals.core_page_table,
+    try kernel.mem.mapRangeToPhysicalRange(
+        current_task,
+        kernel.mem.globals.core_page_table,
         virtual_range,
         physical_range,
         map_type,
+        .kernel,
         true,
+        kernel.mem.phys.allocator,
     );
 
     return virtual_range;
@@ -232,8 +237,8 @@ pub fn deallocateSpecial(
         globals.special_heap_page_table_mutex.lock(current_task);
         defer globals.special_heap_page_table_mutex.unlock(current_task);
 
-        kernel.vmm.unmapRange(
-            kernel.vmm.globals.core_page_table,
+        kernel.mem.unmapRange(
+            kernel.mem.globals.core_page_table,
             virtual_range,
             false,
             .kernel,
@@ -298,8 +303,7 @@ pub const init = struct {
                 },
             );
 
-            const heap_range = kernel.vmm.getKernelRegion(.kernel_heap) orelse
-                @panic("no kernel heap");
+            const heap_range = kernel.mem.getKernelRegion(.kernel_heap);
 
             globals.heap_address_space_arena.addSpan(
                 current_task,
@@ -321,8 +325,7 @@ pub const init = struct {
                 .{},
             );
 
-            const special_heap_range = kernel.vmm.getKernelRegion(.special_heap) orelse
-                @panic("no special heap region");
+            const special_heap_range = kernel.mem.getKernelRegion(.special_heap);
 
             globals.special_heap_address_space_arena.addSpan(
                 current_task,

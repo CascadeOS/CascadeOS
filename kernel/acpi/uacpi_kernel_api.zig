@@ -10,7 +10,7 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.S
     switch (address) {
         .physical => |addr| out_rsdp_address.* = addr,
         .virtual => |addr| out_rsdp_address.* =
-            kernel.vmm.physicalFromDirectMap(addr) catch return .internal_error,
+            kernel.mem.physicalFromDirectMap(addr) catch return .internal_error,
     }
 
     return .ok;
@@ -269,7 +269,7 @@ export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
 
     _ = len;
 
-    return kernel.vmm.directMapFromPhysical(addr).toPtr([*]u8);
+    return kernel.mem.directMapFromPhysical(addr).toPtr([*]u8);
 }
 
 /// Unmap a virtual memory range at 'addr' with a length of 'len' bytes.

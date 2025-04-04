@@ -82,13 +82,14 @@ pub fn createStack(current_task: *kernel.Task) !Stack {
         globals.stack_page_table_mutex.lock(current_task);
         defer globals.stack_page_table_mutex.unlock(current_task);
 
-        try kernel.vmm.mapRange(
+        try kernel.mem.mapRangeAndAllocatePhysicalFrames(
             current_task,
-            kernel.vmm.globals.core_page_table,
+            kernel.mem.globals.core_page_table,
             usable_range,
             .{ .writeable = true, .global = true },
             .kernel,
             true,
+            kernel.mem.phys.allocator,
         );
     }
 
@@ -100,12 +101,14 @@ pub fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
         globals.stack_page_table_mutex.lock(current_task);
         defer globals.stack_page_table_mutex.unlock(current_task);
 
-        kernel.vmm.unmapRange(
-            kernel.vmm.globals.core_page_table,
+        kernel.mem.unmapRange(
+            current_task,
+            kernel.mem.globals.core_page_table,
             stack.usable_range,
             true,
             .kernel,
             true,
+            kernel.mem.phys.allocator,
         );
     }
 
@@ -130,8 +133,7 @@ pub const init = struct {
             .{},
         );
 
-        const stacks_range = kernel.vmm.getKernelRegion(.kernel_stacks) orelse
-            @panic("no kernel stacks");
+        const stacks_range = kernel.mem.getKernelRegion(.kernel_stacks);
 
         globals.stack_arena.addSpan(
             current_task,

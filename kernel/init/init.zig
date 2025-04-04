@@ -8,7 +8,7 @@ pub fn initStage1() !noreturn {
     kernel.time.init.tryCaptureStandardWallclockStartTime();
 
     // we need the direct map to be available as early as possible
-    try kernel.vmm.init.determineOffsets();
+    kernel.mem.init.earlyDetermineOffsets();
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     kernel.acpi.init.initializeACPITables();
@@ -17,7 +17,8 @@ pub fn initStage1() !noreturn {
 
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
 
-    kernel.vmm.init.logOffsets();
+    // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
+    kernel.mem.init.logEarlyOffsets();
 
     var bootstrap_init_task: kernel.Task = .{
         .id = @enumFromInt(0),
@@ -54,14 +55,8 @@ pub fn initStage1() !noreturn {
     log.debug("configuring per-executor system features", .{});
     kernel.arch.init.configurePerExecutorSystemFeatures(&bootstrap_executor);
 
-    log.debug("building memory layout", .{});
-    try kernel.vmm.init.buildMemoryLayout();
-
-    log.debug("initializing physical memory", .{});
-    try kernel.pmm.init.initializePhysicalMemory();
-
-    log.debug("building core page table", .{});
-    try kernel.vmm.init.buildAndLoadCorePageTable();
+    log.debug("initializing memory system", .{});
+    kernel.mem.init.initializeMemorySystem(&bootstrap_init_task);
 
     log.debug("initializing kernel and special heap", .{});
     try kernel.heap.init.initializeHeaps(&bootstrap_init_task);
@@ -109,7 +104,7 @@ pub fn initStage1() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage2(current_task: *kernel.Task) !noreturn {
-    kernel.vmm.globals.core_page_table.load();
+    kernel.mem.globals.core_page_table.load();
     const executor = current_task.state.running;
     kernel.arch.init.loadExecutor(executor);
 

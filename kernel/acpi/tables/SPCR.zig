@@ -444,7 +444,7 @@ pub const SPCR = extern struct {
                         switch (spcr.table.base_address.address_space) {
                             .memory => return .{
                                 .memory_16550 = try uart.Memory16550.init(
-                                    kernel.vmm.directMapFromPhysical(
+                                    kernel.mem.directMapFromPhysical(
                                         .fromInt(spcr.table.base_address.address),
                                     ).toPtr([*]volatile u8),
                                     baud,
@@ -468,7 +468,7 @@ pub const SPCR = extern struct {
                         switch (spcr.table.base_address.address_space) {
                             .memory => return .{
                                 .memory_16450 = try uart.Memory16450.init(
-                                    kernel.vmm.directMapFromPhysical(
+                                    kernel.mem.directMapFromPhysical(
                                         .fromInt(spcr.table.base_address.address),
                                     ).toPtr([*]volatile u8),
                                     baud,
@@ -496,7 +496,7 @@ pub const SPCR = extern struct {
                     switch (spcr.table.base_address.address_space) {
                         .memory => return .{
                             .memory_16550 = try uart.Memory16550.init(
-                                kernel.vmm.directMapFromPhysical(
+                                kernel.mem.directMapFromPhysical(
                                     .fromInt(spcr.table.base_address.address),
                                 ).toPtr([*]volatile u8),
                                 baud,
@@ -520,7 +520,7 @@ pub const SPCR = extern struct {
                     switch (spcr.table.base_address.address_space) {
                         .memory => return .{
                             .memory_16450 = try uart.Memory16450.init(
-                                kernel.vmm.directMapFromPhysical(
+                                kernel.mem.directMapFromPhysical(
                                     .fromInt(spcr.table.base_address.address),
                                 ).toPtr([*]volatile u8),
                                 baud,
@@ -546,7 +546,7 @@ pub const SPCR = extern struct {
 
                     return .{
                         .pl011 = try uart.PL011.init(
-                            kernel.vmm.directMapFromPhysical(
+                            kernel.mem.directMapFromPhysical(
                                 .fromInt(spcr.table.base_address.address),
                             ).toPtr([*]volatile u32),
                             baud,

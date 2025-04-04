@@ -1,0 +1,760 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+
+pub const phys = @import("phys.zig");
+
+pub const MapType = @import("MapType.zig");
+pub const FlushRequest = @import("FlushRequest.zig");
+pub const Page = @import("Page.zig");
+
+pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) core.VirtualRange {
+    for (globals.regions.constSlice()) |region| {
+        if (region.type == range_type) return region.range;
+    }
+
+    std.debug.panic("no kernel region of type '{s}'", .{@tagName(range_type)});
+}
+
+pub fn pageFromFrame(frame: phys.Frame) ?*Page {
+    const index = pageIndexFromFrame(frame) orelse return null;
+    return &globals.pages[index];
+}
+
+pub fn pageIndexFromFrame(frame: phys.Frame) ?usize {
+    const region_index = std.sort.binarySearch(
+        Page.Region,
+        globals.page_regions,
+        frame,
+        struct {
+            fn compare(inner_frame: phys.Frame, region: Page.Region) std.math.Order {
+                return region.compareContainsFrame(inner_frame);
+            }
+        }.compare,
+    ) orelse return null;
+    const region = globals.page_regions[region_index];
+
+    const offset_into_region = @intFromEnum(frame) - @intFromEnum(region.start_frame);
+    std.debug.assert(offset_into_region < region.number_of_frames);
+
+    const index = region.start_index + offset_into_region;
+    std.debug.assert(index < globals.pages.len);
+
+    return index;
+}
+
+pub const MapError = error{
+    AlreadyMapped,
+
+    /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+    MappingNotValid,
+} || phys.FrameAllocator.AllocateError;
+
+/// Maps a virtual range using the standard page size.
+///
+/// Physical frames are allocated for each page in the virtual range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+///
+/// FIXME: this function needs to be deleted as the memory subsystem should be used instead
+pub fn mapRangeAndAllocatePhysicalFrames(
+    current_task: *kernel.Task,
+    page_table: kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    map_type: MapType,
+    flush_target: FlushRequest.Target,
+    keep_top_level: bool,
+    physical_frame_allocator: phys.FrameAllocator,
+) MapError!void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_address = virtual_range.address;
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        unmapRange(
+            current_task,
+            page_table,
+            .{
+                .address = virtual_range.address,
+                .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
+            },
+            true,
+            flush_target,
+            keep_top_level,
+            physical_frame_allocator,
+        );
+    }
+
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+        const physical_frame = try physical_frame_allocator.allocate();
+        errdefer physical_frame_allocator.deallocate(physical_frame);
+
+        try kernel.arch.paging.map(
+            page_table,
+            current_virtual_address,
+            physical_frame,
+            map_type,
+            keep_top_level,
+            physical_frame_allocator,
+        );
+
+        current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+}
+
+/// Maps a virtual address range to a physical range using the standard page size.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `physical_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be equal to `physical_range.size`
+pub fn mapRangeToPhysicalRange(
+    current_task: *kernel.Task,
+    page_table: kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    physical_range: core.PhysicalRange,
+    map_type: MapType,
+    flush_target: FlushRequest.Target,
+    keep_top_level: bool,
+    physical_frame_allocator: phys.FrameAllocator,
+) MapError!void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.equal(physical_range.size));
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_address = virtual_range.address;
+
+    errdefer {
+        // Unmap all pages that have been mapped.
+        unmapRange(
+            current_task,
+            page_table,
+            .{
+                .address = virtual_range.address,
+                .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
+            },
+            false,
+            flush_target,
+            keep_top_level,
+            physical_frame_allocator,
+        );
+    }
+
+    var current_physical_address = physical_range.address;
+
+    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+        try kernel.arch.paging.map(
+            page_table,
+            current_virtual_address,
+            .fromAddress(current_physical_address),
+            map_type,
+            keep_top_level,
+            physical_frame_allocator,
+        );
+
+        current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+        current_physical_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+}
+
+/// Unmaps a virtual range.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+pub fn unmapRange(
+    current_task: *kernel.Task,
+    page_table: kernel.arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    free_backing_pages: bool,
+    flush_target: FlushRequest.Target,
+    keep_top_level: bool,
+    physical_frame_allocator: phys.FrameAllocator,
+) void {
+    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_address = virtual_range.address;
+
+    while (current_virtual_address.lessThan(last_virtual_address)) {
+        kernel.arch.paging.unmap(
+            page_table,
+            current_virtual_address,
+            free_backing_pages,
+            keep_top_level,
+            physical_frame_allocator,
+        );
+        current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+    }
+
+    var request: FlushRequest = .{
+        .range = virtual_range,
+        .flush_target = flush_target,
+    };
+
+    request.submitAndWait(current_task);
+}
+
+/// Returns the virtual address corresponding to this physical address in the direct map.
+pub fn directMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + globals.direct_map.address.value };
+}
+
+/// Returns the virtual address corresponding to this physical address in the non-cached direct map.
+pub fn nonCachedDirectMapFromPhysical(self: core.PhysicalAddress) core.VirtualAddress {
+    return .{ .value = self.value + globals.non_cached_direct_map.address.value };
+}
+
+/// Returns a virtual range corresponding to this physical range in the direct map.
+pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
+    return .{
+        .address = directMapFromPhysical(self.address),
+        .size = self.size,
+    };
+}
+
+/// Returns the physical address of the given virtual address if it is in the direct map.
+pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirectMap}!core.PhysicalAddress {
+    if (globals.direct_map.contains(self)) {
+        return .{ .value = self.value - globals.direct_map.address.value };
+    }
+    return error.AddressNotInDirectMap;
+}
+
+/// Returns the physical range of the given direct map virtual range.
+pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDirectMap}!core.PhysicalRange {
+    if (globals.direct_map.containsRange(self)) {
+        return .{
+            .address = .fromInt(self.address.value - globals.direct_map.address.value),
+            .size = self.size,
+        };
+    }
+    return error.AddressNotInDirectMap;
+}
+
+/// Returns the physical address of the given kernel ELF section virtual address.
+///
+/// It is the caller's responsibility to ensure that the given virtual address is in the kernel ELF sections.
+pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalAddress {
+    return .{ .value = self.value - globals.physical_to_virtual_offset.value };
+}
+
+pub const globals = struct {
+    /// The core page table.
+    ///
+    /// All other page tables start as a copy of this one.
+    ///
+    /// Initialized during `init.buildCorePageTable`.
+    pub var core_page_table: kernel.arch.paging.PageTable = undefined;
+
+    /// The virtual base address that the kernel was loaded at.
+    ///
+    /// Initialized during `init.earlyDetermineOffsets`.
+    var virtual_base_address: core.VirtualAddress = undefined;
+
+    /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
+    ///
+    /// Initialized during `init.earlyDetermineOffsets`.
+    pub var virtual_offset: core.Size = undefined;
+
+    /// Offset from the virtual address of kernel sections to the physical address of the section.
+    ///
+    /// Initialized during `init.earlyDetermineOffsets`.
+    pub var physical_to_virtual_offset: core.Size = undefined;
+
+    /// Provides an identity mapping between virtual and physical addresses.
+    ///
+    /// Initialized during `init.earlyDetermineOffsets`.
+    var direct_map: core.VirtualRange = undefined;
+
+    /// Provides an identity mapping between virtual and physical addresses.
+    ///
+    /// Caching is disabled for this mapping.
+    ///
+    /// Initialized during `init.buildMemoryLayout`.
+    var non_cached_direct_map: core.VirtualRange = undefined;
+
+    /// The layout of the memory regions of the kernel.
+    ///
+    /// Initialized during `init.buildMemoryLayout`.
+    var regions: Regions = undefined;
+
+    const Regions = std.BoundedArray(
+        KernelMemoryRegion,
+        std.meta.tags(KernelMemoryRegion.Type).len,
+    );
+
+    /// A `Page` for each usable physical page.
+    ///
+    /// Initialized during `init.allocatePages`.
+    pub var pages: []Page = undefined;
+
+    /// A `Page.Region` for each range of usable physical pages in the `pages` array.
+    ///
+    /// Initialized during `init.allocatePages`.
+    pub var page_regions: []Page.Region = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeMemorySystem(current_task: *kernel.Task) void {
+        init_log.debug("initializing bootstrap physical frame allocator", .{});
+        phys.init.initializeBootstrapFrameAllocator();
+
+        const number_of_usable_pages, const number_of_usable_regions = numberOfUsablePagesAndRegions();
+
+        init_log.debug("building kernel memory layout", .{});
+        const pages_range = buildMemoryLayout(number_of_usable_pages, number_of_usable_regions);
+
+        init_log.debug("building core page table", .{});
+        buildAndLoadCorePageTable(current_task);
+
+        init_log.debug("allocating pages array", .{});
+        initalizePages(number_of_usable_pages, number_of_usable_regions, pages_range);
+
+        init_log.debug("initializing physical memory", .{});
+        phys.init.initializePhysicalMemory();
+    }
+
+    fn numberOfUsablePagesAndRegions() struct { usize, usize } {
+        var memory_iter = kernel.boot.memoryMap(.forward) catch @panic("no memory map");
+
+        var number_of_usable_pages: usize = 0;
+        var number_of_usable_regions: usize = 0;
+
+        while (memory_iter.next()) |entry| {
+            if (!entry.type.isUsable()) continue;
+            if (entry.range.size.value == 0) continue;
+
+            number_of_usable_regions += 1;
+
+            number_of_usable_pages += std.math.divExact(
+                usize,
+                entry.range.size.value,
+                kernel.arch.paging.standard_page_size.value,
+            ) catch std.debug.panic(
+                "memory map entry size is not a multiple of page size: {}",
+                .{entry},
+            );
+        }
+
+        return .{ number_of_usable_pages, number_of_usable_regions };
+    }
+
+    fn buildMemoryLayout(number_of_usable_pages: usize, number_of_usable_regions: usize) core.VirtualRange {
+        registerKernelSections();
+        registerDirectMaps();
+        registerHeaps();
+        const pages_range = registerPages(number_of_usable_pages, number_of_usable_regions);
+
+        sortKernelMemoryRegions();
+
+        if (init_log.levelEnabled(.debug)) {
+            init_log.debug("kernel memory layout:", .{});
+
+            for (globals.regions.constSlice()) |region| {
+                init_log.debug("\t{}", .{region});
+            }
+        }
+
+        return pages_range;
+    }
+
+    fn registerKernelSections() void {
+        const linker_symbols = struct {
+            extern const __text_start: u8;
+            extern const __text_end: u8;
+            extern const __rodata_start: u8;
+            extern const __rodata_end: u8;
+            extern const __data_start: u8;
+            extern const __data_end: u8;
+        };
+
+        const sdf_slice = kernel.debug.sdfSlice() catch &.{};
+        const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
+
+        const sections: []const struct {
+            core.VirtualAddress,
+            core.VirtualAddress,
+            KernelMemoryRegion.Type,
+        } = &.{
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+                .executable_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+                .readonly_section,
+            },
+            .{
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
+                core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+                .writeable_section,
+            },
+            .{
+                sdf_range.address,
+                sdf_range.endBound(),
+                .sdf_section,
+            },
+        };
+
+        for (sections) |section| {
+            const start_address = section[0];
+            const end_address = section[1];
+            const region_type = section[2];
+
+            std.debug.assert(end_address.greaterThan(start_address));
+
+            const virtual_range: core.VirtualRange = .fromAddr(
+                start_address,
+                core.Size.from(end_address.value - start_address.value, .byte)
+                    .alignForward(kernel.arch.paging.standard_page_size),
+            );
+
+            globals.regions.appendAssumeCapacity(.{
+                .range = virtual_range,
+                .type = region_type,
+            });
+        }
+    }
+
+    fn registerDirectMaps() void {
+        const direct_map = globals.direct_map;
+
+        // does the direct map range overlap a pre-existing region?
+        for (globals.regions.constSlice()) |region| {
+            if (region.range.containsRange(direct_map)) {
+                std.debug.panic("direct map overlaps region: {}", .{region});
+                return error.DirectMapOverlapsRegion;
+            }
+        }
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = direct_map,
+            .type = .direct_map,
+        });
+
+        const non_cached_direct_map = findFreeRange(
+            direct_map.size,
+            kernel.arch.paging.largest_page_size,
+        ) orelse @panic("no free range for non-cached direct map");
+
+        globals.non_cached_direct_map = non_cached_direct_map;
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = non_cached_direct_map,
+            .type = .non_cached_direct_map,
+        });
+    }
+
+    fn registerHeaps() void {
+        const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
+
+        const kernel_heap_range = findFreeRange(
+            size_of_top_level,
+            size_of_top_level,
+        ) orelse
+            @panic("no space in kernel memory layout for the kernel heap");
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = kernel_heap_range,
+            .type = .kernel_heap,
+        });
+
+        const special_heap_range = findFreeRange(
+            size_of_top_level,
+            size_of_top_level,
+        ) orelse
+            @panic("no space in kernel memory layout for the special heap");
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = special_heap_range,
+            .type = .special_heap,
+        });
+
+        const kernel_stacks_range = findFreeRange(
+            size_of_top_level,
+            size_of_top_level,
+        ) orelse
+            @panic("no space in kernel memory layout for the kernel stacks");
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = kernel_stacks_range,
+            .type = .kernel_stacks,
+        });
+    }
+
+    fn registerPages(number_of_usable_pages: usize, number_of_usable_regions: usize) core.VirtualRange {
+        std.debug.assert(@alignOf(Page.Region) <= kernel.arch.paging.standard_page_size.value);
+
+        const size_of_regions = core.Size.of(Page.Region)
+            .multiplyScalar(number_of_usable_regions);
+
+        const size_of_pages = core.Size.of(Page)
+            .multiplyScalar(number_of_usable_pages);
+
+        const range_size =
+            size_of_regions
+                .alignForward(.from(@alignOf(Page), .byte))
+                .add(size_of_pages)
+                .alignForward(kernel.arch.paging.standard_page_size);
+
+        const pages_range = findFreeRange(
+            range_size,
+            kernel.arch.paging.standard_page_size,
+        ) orelse @panic("no space in kernel memory layout for the pages array");
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = pages_range,
+            .type = .pages,
+        });
+
+        return pages_range;
+    }
+
+    fn buildAndLoadCorePageTable(current_task: *kernel.Task) void {
+        globals.core_page_table = kernel.arch.paging.PageTable.create(
+            phys.init.bootstrap_allocator.allocate() catch unreachable,
+        );
+
+        for (globals.regions.constSlice()) |region| {
+            init_log.debug("mapping '{s}' into the core page table", .{@tagName(region.type)});
+
+            const map_info = region.mapInfo();
+
+            switch (map_info) {
+                .top_level => kernel.arch.paging.init.fillTopLevel(
+                    globals.core_page_table,
+                    region.range,
+                    phys.init.bootstrap_allocator,
+                ) catch |err| {
+                    std.debug.panic("failed to fill top level for {}: {s}", .{ region, @errorName(err) });
+                },
+                .full => |full| kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                    globals.core_page_table,
+                    region.range,
+                    full.physical_range,
+                    full.map_type,
+                    phys.init.bootstrap_allocator,
+                ) catch |err| {
+                    std.debug.panic("failed to full map {}: {s}", .{ region, @errorName(err) });
+                },
+                .back_with_frames => |map_type| {
+                    mapRangeAndAllocatePhysicalFrames(
+                        current_task,
+                        globals.core_page_table,
+                        region.range,
+                        map_type,
+                        .kernel,
+                        true,
+                        phys.init.bootstrap_allocator,
+                    ) catch |err| {
+                        std.debug.panic("failed to back with frames {}: {s}", .{ region, @errorName(err) });
+                    };
+                },
+            }
+        }
+
+        init_log.debug("loading core page table", .{});
+        globals.core_page_table.load();
+    }
+
+    /// Initializes the pages array.
+    ///
+    /// All pages are set to `.in_use`, leaving it up to the bootstrap physical frame allocator to mark the free ones.
+    fn initalizePages(
+        number_of_usable_pages: usize,
+        number_of_usable_regions: usize,
+        pages_range: core.VirtualRange,
+    ) void {
+        init_log.debug(
+            "initializing pages array with {} usable pages ({}) in {} regions",
+            .{
+                number_of_usable_pages,
+                kernel.arch.paging.standard_page_size.multiplyScalar(number_of_usable_pages),
+                number_of_usable_regions,
+            },
+        );
+
+        // ugly pointer stuff
+        {
+            var byte_ptr = pages_range.address.toPtr([*]u8);
+
+            const page_regions_ptr: [*]Page.Region = @alignCast(@ptrCast(byte_ptr));
+            globals.page_regions = page_regions_ptr[0..number_of_usable_regions];
+
+            byte_ptr += @sizeOf(Page.Region) * number_of_usable_regions;
+            byte_ptr = std.mem.alignPointer(byte_ptr, @alignOf(Page)).?;
+
+            const page_ptr: [*]Page = @alignCast(@ptrCast(byte_ptr));
+            globals.pages = page_ptr[0..number_of_usable_pages];
+        }
+
+        var memory_iter = kernel.boot.memoryMap(.forward) catch @panic("no memory map");
+
+        var page_index: u32 = 0;
+        var usable_range_index: u32 = 0;
+
+        while (memory_iter.next()) |entry| {
+            if (!entry.type.isUsable()) continue;
+            if (entry.range.size.value == 0) continue;
+
+            const usable_pages_in_range: u32 = @intCast(std.math.divExact(
+                usize,
+                entry.range.size.value,
+                kernel.arch.paging.standard_page_size.value,
+            ) catch std.debug.panic(
+                "memory map entry size is not a multiple of page size: {}",
+                .{entry},
+            ));
+
+            const start_frame: phys.Frame = .fromAddress(entry.range.address);
+
+            globals.page_regions[usable_range_index] = .{
+                .start_frame = start_frame,
+                .number_of_frames = usable_pages_in_range,
+                .start_index = page_index,
+            };
+            usable_range_index += 1;
+
+            const range_start_phys_frame = @intFromEnum(start_frame);
+
+            for (0..usable_pages_in_range) |range_i| {
+                globals.pages[page_index] = .{
+                    .physical_frame = @enumFromInt(range_start_phys_frame + range_i),
+                    .state = .in_use,
+                };
+                page_index += 1;
+            }
+        }
+        std.debug.assert(page_index == number_of_usable_pages);
+        std.debug.assert(usable_range_index == number_of_usable_regions);
+    }
+
+    /// Determine various offsets used by the kernel early in the boot process.
+    pub fn earlyDetermineOffsets() void {
+        const base_address = kernel.boot.kernelBaseAddress() orelse
+            @panic("no kernel base address");
+
+        globals.virtual_base_address = base_address.virtual;
+
+        globals.virtual_offset = core.Size.from(
+            base_address.virtual.value - kernel.config.kernel_base_address.value,
+            .byte,
+        );
+
+        globals.physical_to_virtual_offset = core.Size.from(
+            base_address.virtual.value - base_address.physical.value,
+            .byte,
+        );
+
+        const direct_map_size = direct_map_size: {
+            const last_memory_map_entry = last_memory_map_entry: {
+                var memory_map_iterator = kernel.boot.memoryMap(.backward) catch @panic("no memory map");
+                break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
+            };
+
+            var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
+
+            // We ensure that the lowest 4GiB are always mapped.
+            const four_gib = core.Size.from(4, .gib);
+            if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
+
+            // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+            direct_map_size.alignForwardInPlace(kernel.arch.paging.largest_page_size);
+
+            break :direct_map_size direct_map_size;
+        };
+
+        globals.direct_map = core.VirtualRange.fromAddr(
+            kernel.boot.directMapAddress() orelse @panic("direct map address not provided"),
+            direct_map_size,
+        );
+    }
+
+    pub fn logEarlyOffsets() void {
+        if (!init_log.levelEnabled(.debug)) return;
+
+        init_log.debug("kernel memory offsets:", .{});
+
+        init_log.debug("  virtual base address:       {}", .{globals.virtual_base_address});
+        init_log.debug("  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
+        init_log.debug("  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
+    }
+
+    fn sortKernelMemoryRegions() void {
+        std.mem.sort(KernelMemoryRegion, globals.regions.slice(), {}, struct {
+            fn lessThanFn(context: void, region: KernelMemoryRegion, other_region: KernelMemoryRegion) bool {
+                _ = context;
+                return region.range.address.lessThan(other_region.range.address);
+            }
+        }.lessThanFn);
+    }
+
+    fn findFreeRange(size: core.Size, alignment: core.Size) ?core.VirtualRange {
+        // needs the regions to be sorted
+        sortKernelMemoryRegions();
+
+        const regions = globals.regions.constSlice();
+
+        var current_address = kernel.arch.paging.higher_half_start;
+        current_address.alignForwardInPlace(alignment);
+
+        var i: usize = 0;
+
+        while (true) {
+            const region = if (i < regions.len) regions[i] else {
+                const size_of_free_range = core.Size.from(
+                    (kernel.arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                    .byte,
+                );
+
+                if (size_of_free_range.lessThan(size)) return null;
+
+                return core.VirtualRange.fromAddr(current_address, size);
+            };
+
+            const region_address = region.range.address;
+
+            if (region_address.lessThanOrEqual(current_address)) {
+                current_address = region.range.endBound();
+                current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            const size_of_free_range = core.Size.from(
+                (region_address.value - 1) - current_address.value,
+                .byte,
+            );
+
+            if (size_of_free_range.lessThan(size)) {
+                current_address = region.range.endBound();
+                current_address.alignForwardInPlace(alignment);
+                i += 1;
+                continue;
+            }
+
+            return core.VirtualRange.fromAddr(current_address, size);
+        }
+    }
+
+    const init_log = kernel.debug.log.scoped(.init_mem);
+};
+
+const std = @import("std");
+const core = @import("core");
+const kernel = @import("kernel");
+const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
+const log = kernel.debug.log.scoped(.mem);

@@ -343,7 +343,7 @@ pub const DBG2 = extern struct {
                             switch (address.address_space) {
                                 .memory => return .{
                                     .memory_16550 = (uart.Memory16550.init(
-                                        kernel.vmm.directMapFromPhysical(
+                                        kernel.mem.directMapFromPhysical(
                                             .fromInt(address.address),
                                         ).toPtr([*]volatile u8),
                                         null,
@@ -362,7 +362,7 @@ pub const DBG2 = extern struct {
                             switch (address.address_space) {
                                 .memory => return .{
                                     .memory_16450 = (uart.Memory16450.init(
-                                        kernel.vmm.directMapFromPhysical(
+                                        kernel.mem.directMapFromPhysical(
                                             .fromInt(address.address),
                                         ).toPtr([*]volatile u8),
                                         null,
@@ -383,7 +383,7 @@ pub const DBG2 = extern struct {
 
                             return .{
                                 .pl011 = (uart.PL011.init(
-                                    kernel.vmm.directMapFromPhysical(
+                                    kernel.mem.directMapFromPhysical(
                                         .fromInt(address.address),
                                     ).toPtr([*]volatile u32),
                                     null,

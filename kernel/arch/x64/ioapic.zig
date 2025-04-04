@@ -109,7 +109,7 @@ pub const init = struct {
                 .io_apic => {
                     const io_apic_data = entry.specific.io_apic;
 
-                    const address = kernel.vmm.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
+                    const address = kernel.mem.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
                     const ioapic = IOAPIC.init(address, io_apic_data.global_system_interrupt_base);
 
                     init_log.debug("found ioapic for gsi {}-{}", .{

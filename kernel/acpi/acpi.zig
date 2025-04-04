@@ -139,7 +139,7 @@ const hack = struct {
         const fadt: *const tables.FADT = acpi_table.table;
 
         var s5_addr: [*]const u8 = blk: {
-            const dsdt = kernel.vmm
+            const dsdt = kernel.mem
                 .nonCachedDirectMapFromPhysical(fadt.getDSDT())
                 .toPtr(*tables.DSDT);
             if (!dsdt.header.signatureIs(tables.DSDT.SIGNATURE_STRING)) return error.DSDTNotPresent;

@@ -11,9 +11,9 @@ pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     };
 }
 
-pub fn memoryMap(direction: core.Direction) ?boot.MemoryMap {
+pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!boot.MemoryMap {
     const resp = requests.memmap.response orelse
-        return null;
+        return error.NoMemoryMap;
 
     var result: boot.MemoryMap = .{
         .backing = undefined,

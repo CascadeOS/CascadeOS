@@ -9,15 +9,14 @@ pub const debug = @import("debug/debug.zig");
 pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");
 pub const heap = @import("heap.zig");
+pub const mem = @import("mem/mem.zig");
 pub const pci = @import("pci.zig");
-pub const pmm = @import("pmm.zig");
 pub const ResourceArena = @import("ResourceArena.zig");
 pub const scheduler = @import("scheduler.zig");
 pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
-pub const vmm = @import("vmm/vmm.zig");
 
 pub var executors: []Executor = &.{};
 

@@ -736,11 +736,11 @@ fn ensureBoundaryTags(arena: *ResourceArena, current_task: *kernel.Task) EnsureB
         log.debug("{s}: performing boundary tag allocation", .{arena.name()});
 
         const tags = blk: {
-            const physical_range = kernel.pmm.allocatePage() catch
+            const physical_frame = kernel.mem.phys.allocator.allocate() catch
                 return EnsureBoundaryTagsError.OutOfBoundaryTags;
             errdefer comptime unreachable;
 
-            const ptr = kernel.vmm.directMapFromPhysicalRange(physical_range).address.toPtr([*]BoundaryTag);
+            const ptr = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr([*]BoundaryTag);
             break :blk ptr[0..TAGS_PER_PAGE];
         };
         errdefer comptime unreachable;

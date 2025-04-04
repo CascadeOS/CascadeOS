@@ -1,102 +1,78 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-/// Create a new page table at the given physical range.
-///
-/// The range must have alignment of `page_table_alignment` and size greater than or equal to
-/// `page_table_size`.
-pub fn createPageTable(physical_range: core.PhysicalRange) *PageTable {
-    std.debug.assert(physical_range.address.isAligned(page_table_alignment));
-    std.debug.assert(physical_range.size.greaterThanOrEqual(page_table_size));
-
-    const page_table = kernel.vmm.directMapFromPhysical(physical_range.address).toPtr(*PageTable);
+/// Create a new page table in the given physical frame.
+pub fn createPageTable(physical_frame: kernel.mem.phys.Frame) *PageTable {
+    const page_table = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
     page_table.zero();
     return page_table;
 }
 
-pub fn loadPageTable(physical_address: core.PhysicalAddress) void {
-    lib_x64.registers.Cr3.writeAddress(physical_address);
+pub fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
+    lib_x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
 }
 
-/// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+/// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
 ///
 /// Caller must ensure:
-///  - the virtual range address and size are aligned to the standard page size
-///  - the physical range address and size are aligned to the standard page size
-///  - the virtual range size is equal to the physical range size
-///  - the virtual range is not already mapped
+///  - the virtual address is aligned to the standard page size
+///  - the virtual address is not already mapped
 ///
 /// This function:
-///  - uses only the standard page size for the architecture
+///  - only supports the standard page size for the architecture
 ///  - does not flush the TLB
-///  - on error is not required roll back any modifications to the page tables
-pub fn mapToPhysicalRange(
+pub fn map(
     page_table: *PageTable,
-    virtual_range: core.VirtualRange,
-    physical_range: core.PhysicalRange,
-    map_type: kernel.vmm.MapType,
+    virtual_address: core.VirtualAddress,
+    physical_frame: kernel.mem.phys.Frame,
+    map_type: kernel.mem.MapType,
     keep_top_level: bool,
-) kernel.vmm.MapError!void {
-    log.debug("mapToPhysicalRange - {} - {} - {}", .{ virtual_range, physical_range, map_type });
+    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+) kernel.mem.MapError!void {
+    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
-    const start_virtual_address = virtual_range.address;
-
-    var current_virtual_address = start_virtual_address;
-    const last_virtual_address = virtual_range.last();
-    var current_physical_address = physical_range.address;
-
-    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        mapTo4KiB(
-            page_table,
-            current_virtual_address,
-            current_physical_address,
-            map_type,
-        ) catch |err| {
-            unmapRange(
-                page_table,
-                .between(start_virtual_address, current_virtual_address),
-                false,
-                keep_top_level,
-            );
-
-            return err;
-        };
-
-        current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
-        current_physical_address.moveForwardInPlace(PageTable.small_page_size);
-    }
-}
-
-/// Unmaps the `virtual_range`.
-///
-/// Caller must ensure:
-///  - the virtual range address and size are aligned to the standard page size
-///  - the virtual range is mapped
-///  - the virtual range is mapped using only the standard page size for the architecture
-///
-/// This function:
-///  - does not flush the TLB
-pub fn unmapRange(
-    page_table: *PageTable,
-    virtual_range: core.VirtualRange,
-    free_backing_pages: bool,
-    keep_top_level: bool,
-) void {
-    log.debug("unmapRange - {}", .{virtual_range});
-
-    var current_virtual_address = virtual_range.address;
-    const last_virtual_address = virtual_range.last();
-
-    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+    mapTo4KiB(
+        page_table,
+        virtual_address,
+        physical_frame.baseAddress(),
+        map_type,
+        physical_frame_allocator,
+    ) catch |err| {
         unmap4KiB(
             page_table,
-            current_virtual_address,
-            free_backing_pages,
+            virtual_address,
+            false,
             keep_top_level,
+            physical_frame_allocator,
         );
+        return err;
+    };
+}
 
-        current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
-    }
+/// Unmaps `virtual_address`.
+///
+/// Caller must ensure:
+///  - the virtual address is aligned to the standard page size
+///
+/// This function:
+///  - only supports the standard page size for the architecture
+///  - does not flush the TLB
+pub fn unmap(
+    page_table: *PageTable,
+    virtual_address: core.VirtualAddress,
+    free_backing_pages: bool,
+    keep_top_level: bool,
+    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+) callconv(core.inline_in_non_debug) void {
+    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+
+    unmap4KiB(
+        page_table,
+        virtual_address,
+        free_backing_pages,
+        keep_top_level,
+        physical_frame_allocator,
+    );
 }
 
 /// Flushes the cache for the given virtual range on the current executor.
@@ -122,7 +98,8 @@ fn mapTo4KiB(
     virtual_address: core.VirtualAddress,
     physical_address: core.PhysicalAddress,
     map_type: MapType,
-) kernel.vmm.MapError!void {
+    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+) kernel.mem.MapError!void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
     std.debug.assert(physical_address.isAligned(PageTable.small_page_size));
 
@@ -130,14 +107,14 @@ fn mapTo4KiB(
 
     const level3_table, const created_level3_table = try ensureNextTable(
         &level4_table.entries[level4_index],
-        map_type,
+        physical_frame_allocator,
     );
     errdefer {
         if (created_level3_table) {
             var level4_entry: PageTable.Entry = .fromRaw(&level4_table.entries[level4_index]);
             const address = level4_entry.getAddress4kib();
             level4_table.entries[level4_index].store(0, .release);
-            kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
+            physical_frame_allocator.deallocate(.fromAddress(address));
         }
     }
 
@@ -145,14 +122,14 @@ fn mapTo4KiB(
 
     const level2_table, const created_level2_table = try ensureNextTable(
         &level3_table.entries[level3_index],
-        map_type,
+        physical_frame_allocator,
     );
     errdefer {
         if (created_level2_table) {
             var level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
             const address = level3_entry.getAddress4kib();
             level3_table.entries[level3_index].store(0, .release);
-            kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
+            physical_frame_allocator.deallocate(.fromAddress(address));
         }
     }
 
@@ -160,14 +137,14 @@ fn mapTo4KiB(
 
     const level1_table, const created_level1_table = try ensureNextTable(
         &level2_table.entries[level2_index],
-        map_type,
+        physical_frame_allocator,
     );
     errdefer {
         if (created_level1_table) {
             var level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
             const address = level2_entry.getAddress4kib();
             level2_table.entries[level2_index].store(0, .release);
-            kernel.pmm.deallocatePage(address.toRange(PageTable.small_page_size));
+            physical_frame_allocator.deallocate(.fromAddress(address));
         }
     }
 
@@ -180,7 +157,7 @@ fn mapTo4KiB(
     ) catch |err| switch (err) {
         error.WriteCombiningAndNoCache => {
             log.err("write combining and no cache not supported", .{});
-            return kernel.vmm.MapError.MappingNotValid;
+            return kernel.mem.MapError.MappingNotValid;
         },
         else => |e| return e,
     };
@@ -194,6 +171,7 @@ fn unmap4KiB(
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
     keep_top_level: bool,
+    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
@@ -201,63 +179,45 @@ fn unmap4KiB(
     const level4_entry: PageTable.Entry = .fromRaw(&level4_table.entries[level4_index]);
 
     const level3_table = level4_entry.getNextLevel(
-        kernel.vmm.directMapFromPhysical,
+        kernel.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
         error.NotPresent => @panic("page table entry is not present"),
         error.HugePage => @panic("page table entry is huge"),
     };
 
     defer if (!keep_top_level and level3_table.empty()) {
-        kernel.pmm.deallocatePage(
-            core.PhysicalRange.fromAddr(
-                level4_entry.getAddress4kib(),
-                PageTable.small_page_size,
-            ),
-        );
-
         level4_table.entries[level4_index].store(0, .release);
+        physical_frame_allocator.deallocate(.fromAddress(level4_entry.getAddress4kib()));
     };
 
     const level3_index = PageTable.p3Index(virtual_address);
     const level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
 
     const level2_table = level3_entry.getNextLevel(
-        kernel.vmm.directMapFromPhysical,
+        kernel.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
         error.NotPresent => @panic("page table entry is not present"),
         error.HugePage => @panic("page table entry is huge"),
     };
 
     defer if (level2_table.empty()) {
-        kernel.pmm.deallocatePage(
-            core.PhysicalRange.fromAddr(
-                level3_entry.getAddress4kib(),
-                PageTable.small_page_size,
-            ),
-        );
-
         level3_table.entries[level3_index].store(0, .release);
+        physical_frame_allocator.deallocate(.fromAddress(level3_entry.getAddress4kib()));
     };
 
     const level2_index = PageTable.p2Index(virtual_address);
     const level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
 
     const level1_table = level2_entry.getNextLevel(
-        kernel.vmm.directMapFromPhysical,
+        kernel.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
         error.NotPresent => @panic("page table entry is not present"),
         error.HugePage => @panic("page table entry is huge"),
     };
 
     defer if (level1_table.empty()) {
-        kernel.pmm.deallocatePage(
-            core.PhysicalRange.fromAddr(
-                level2_entry.getAddress4kib(),
-                PageTable.small_page_size,
-            ),
-        );
-
         level2_table.entries[level2_index].store(0, .release);
+        physical_frame_allocator.deallocate(.fromAddress(level2_entry.getAddress4kib()));
     };
 
     const level1_index = PageTable.p1Index(virtual_address);
@@ -267,16 +227,11 @@ fn unmap4KiB(
         @panic("page table entry is not present");
     }
 
-    if (free_backing_pages) {
-        kernel.pmm.deallocatePage(
-            core.PhysicalRange.fromAddr(
-                level1_entry.getAddress4kib(),
-                PageTable.small_page_size,
-            ),
-        );
-    }
-
     level1_table.entries[level1_index].store(0, .release);
+
+    if (free_backing_pages) {
+        physical_frame_allocator.deallocate(.fromAddress(level1_entry.getAddress4kib()));
+    }
 }
 
 fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
@@ -310,14 +265,9 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
     }
 }
 
-fn applyParentMapType(map_type: MapType, entry: *PageTable.Entry) void {
-    entry.writeable.write(true);
-    if (map_type.user) entry.user_accessible.write(true);
-}
-
 fn ensureNextTable(
     raw_entry: *PageTable.RawEntry,
-    map_type: MapType,
+    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 
@@ -332,22 +282,27 @@ fn ensureNextTable(
         std.debug.assert(entry.raw == 0);
         created_table = true;
 
-        const backing_range = try kernel.pmm.allocatePage();
+        const physical_frame = try physical_frame_allocator.allocate();
         errdefer comptime unreachable;
 
-        @memset(kernel.vmm.directMapFromPhysicalRange(backing_range).toByteSlice(), 0);
+        const physical_address = physical_frame.baseAddress();
+        kernel.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
 
-        entry.setAddress4kib(backing_range.address);
+        entry.setAddress4kib(physical_address);
         entry.present.write(true);
-        applyParentMapType(map_type, &entry);
+
+        // always set intermediate levels to writeable and user accessible, leaving the leaf node to determine the
+        // actual permissions
+        entry.writeable.write(true);
+        entry.user_accessible.write(true);
 
         raw_entry.store(entry.raw, .release);
 
-        break :blk backing_range.address;
+        break :blk physical_address;
     };
 
     return .{
-        kernel.vmm
+        kernel.mem
             .directMapFromPhysical(next_level_physical_address)
             .toPtr(*PageTable),
         created_table,
@@ -420,7 +375,7 @@ pub const init = struct {
     pub fn fillTopLevel(
         page_table: *PageTable,
         range: core.VirtualRange,
-        map_type: kernel.vmm.MapType,
+        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) !void {
         const size_of_top_level_entry = sizeOfTopLevelEntry();
         std.debug.assert(range.size.equal(size_of_top_level_entry));
@@ -431,7 +386,7 @@ pub const init = struct {
         const entry: PageTable.Entry = .fromRaw(raw_entry);
         if (entry.present.read()) @panic("already mapped");
 
-        _ = try ensureNextTable(raw_entry, map_type);
+        _ = try ensureNextTable(raw_entry, physical_frame_allocator);
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -451,6 +406,7 @@ pub const init = struct {
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
         map_type: MapType,
+        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) !void {
         std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
         std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
@@ -484,7 +440,7 @@ pub const init = struct {
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
             const level3_table, _ = try ensureNextTable(
                 &level4_table.entries[level4_index],
-                map_type,
+                physical_frame_allocator,
             );
 
             var level3_index = PageTable.p3Index(current_virtual_address);
@@ -518,7 +474,7 @@ pub const init = struct {
 
                 const level2_table, _ = try ensureNextTable(
                     &level3_table.entries[level3_index],
-                    map_type,
+                    physical_frame_allocator,
                 );
 
                 var level2_index = PageTable.p2Index(current_virtual_address);
@@ -551,7 +507,7 @@ pub const init = struct {
 
                     const level1_table, _ = try ensureNextTable(
                         &level2_table.entries[level2_index],
-                        map_type,
+                        physical_frame_allocator,
                     );
 
                     var level1_index = PageTable.p1Index(current_virtual_address);
@@ -598,5 +554,5 @@ const kernel = @import("kernel");
 const x64 = @import("x64.zig");
 const lib_x64 = @import("x64");
 const PageTable = lib_x64.PageTable;
-const MapType = kernel.vmm.MapType;
+const MapType = kernel.mem.MapType;
 const log = kernel.debug.log.scoped(.paging);

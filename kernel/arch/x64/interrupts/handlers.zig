@@ -14,8 +14,8 @@ pub fn flushRequestHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*
     const executor = current_task.state.running;
 
     while (executor.flush_requests.pop()) |node| {
-        const request_node: *const kernel.vmm.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.performFlush(current_task);
+        const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
+        request_node.request.flush(current_task);
     }
 
     x64.apic.eoi();
@@ -29,8 +29,14 @@ pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: *InterruptFrame
 /// Handler for all unhandled interrupts.
 ///
 /// Used during early initialization as well as during normal kernel operation.
-pub fn unhandledInterrupt(_: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
-    std.debug.panic("unhandled interrupt\n{}", .{interrupt_frame});
+pub fn unhandledInterrupt(
+    current_task: *kernel.Task,
+    interrupt_frame: *InterruptFrame,
+    _: ?*anyopaque,
+    _: ?*anyopaque,
+) void {
+    const executor = current_task.state.running;
+    std.debug.panic("unhandled interrupt on {}\n{}", .{ executor, interrupt_frame });
 }
 
 const std = @import("std");

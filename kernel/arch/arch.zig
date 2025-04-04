@@ -184,26 +184,27 @@ pub const paging = struct {
     pub const largest_higher_half_virtual_address: core.VirtualAddress = current.paging.largest_higher_half_virtual_address;
 
     pub const PageTable = struct {
-        physical_address: core.PhysicalAddress,
+        physical_frame: kernel.mem.phys.Frame,
         arch: *ArchPageTable,
 
-        /// Create a new page table at the given physical range.
-        ///
-        /// The range must have alignment of `page_table_alignment` and size greater than or equal to
-        /// `page_table_size`.
-        pub fn create(physical_range: core.PhysicalRange) callconv(core.inline_in_non_debug) PageTable {
-            checkSupport(current.paging, "createPageTable", fn (core.PhysicalRange) *ArchPageTable);
+        /// Create a new page table in the given physical frame.
+        pub fn create(physical_frame: kernel.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
+            checkSupport(
+                current.paging,
+                "createPageTable",
+                fn (kernel.mem.phys.Frame) *ArchPageTable,
+            );
 
             return .{
-                .physical_address = physical_range.address,
-                .arch = current.paging.createPageTable(physical_range),
+                .physical_frame = physical_frame,
+                .arch = current.paging.createPageTable(physical_frame),
             };
         }
 
         pub fn load(page_table: PageTable) callconv(core.inline_in_non_debug) void {
-            checkSupport(current.paging, "loadPageTable", fn (core.PhysicalAddress) void);
+            checkSupport(current.paging, "loadPageTable", fn (kernel.mem.phys.Frame) void);
 
-            current.paging.loadPageTable(page_table.physical_address);
+            current.paging.loadPageTable(page_table.physical_frame);
         }
 
         pub const page_table_alignment: core.Size = current.paging.page_table_alignment;
@@ -212,68 +213,75 @@ pub const paging = struct {
         const ArchPageTable = current.paging.ArchPageTable;
     };
 
-    /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+    /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
     ///
     /// Caller must ensure:
-    ///  - the virtual range address and size are aligned to the standard page size
-    ///  - the physical range address and size are aligned to the standard page size
-    ///  - the virtual range size is equal to the physical range size
-    ///  - the virtual range is not already mapped
+    ///  - the virtual address is aligned to the standard page size
+    ///  - the virtual address is not already mapped
     ///
     /// This function:
-    ///  - uses only the standard page size for the architecture
+    ///  - only supports the standard page size for the architecture
     ///  - does not flush the TLB
-    ///  - on error is not required roll back any modifications to the page tables
-    pub fn mapToPhysicalRange(
+    pub fn map(
         page_table: PageTable,
-        virtual_range: core.VirtualRange,
-        physical_range: core.PhysicalRange,
-        map_type: kernel.vmm.MapType,
+        virtual_address: core.VirtualAddress,
+        physical_frame: kernel.mem.phys.Frame,
+        map_type: kernel.mem.MapType,
         keep_top_level: bool,
-    ) callconv(core.inline_in_non_debug) kernel.vmm.MapError!void {
-        checkSupport(current.paging, "mapToPhysicalRange", fn (
+        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
+        checkSupport(current.paging, "map", fn (
             *paging.PageTable.ArchPageTable,
-            core.VirtualRange,
-            core.PhysicalRange,
-            kernel.vmm.MapType,
+            core.VirtualAddress,
+            kernel.mem.phys.Frame,
+            kernel.mem.MapType,
             bool,
-        ) kernel.vmm.MapError!void);
+            kernel.mem.phys.FrameAllocator,
+        ) kernel.mem.MapError!void);
 
-        return current.paging.mapToPhysicalRange(
+        return current.paging.map(
             page_table.arch,
-            virtual_range,
-            physical_range,
+            virtual_address,
+            physical_frame,
             map_type,
             keep_top_level,
+            physical_frame_allocator,
         );
     }
 
-    /// Unmaps the `virtual_range`.
+    /// Unmaps `virtual_address`.
     ///
     /// Caller must ensure:
-    ///  - the virtual range address and size are aligned to the standard page size
-    ///  - the virtual range is mapped
-    ///  - the virtual range is mapped using only the standard page size for the architecture
+    ///  - the virtual address is aligned to the standard page size
     ///
     /// This function:
+    ///  - only supports the standard page size for the architecture
     ///  - does not flush the TLB
-    pub inline fn unmapRange(
+    pub fn unmap(
         page_table: PageTable,
-        virtual_range: core.VirtualRange,
+        virtual_address: core.VirtualAddress,
         free_backing_pages: bool,
         keep_top_level: bool,
-    ) void {
+        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    ) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.paging,
-            "unmapRange",
-            fn (*paging.PageTable.ArchPageTable, core.VirtualRange, bool, bool) void,
+            "unmap",
+            fn (
+                *paging.PageTable.ArchPageTable,
+                core.VirtualAddress,
+                bool,
+                bool,
+                kernel.mem.phys.FrameAllocator,
+            ) void,
         );
 
-        current.paging.unmapRange(
+        current.paging.unmap(
             page_table.arch,
-            virtual_range,
+            virtual_address,
             free_backing_pages,
             keep_top_level,
+            physical_frame_allocator,
         );
     }
 
@@ -304,7 +312,7 @@ pub const paging = struct {
         pub fn fillTopLevel(
             page_table: paging.PageTable,
             range: core.VirtualRange,
-            map_type: kernel.vmm.MapType,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
         ) callconv(core.inline_in_non_debug) !void {
             checkSupport(
                 current.paging.init,
@@ -312,14 +320,14 @@ pub const paging = struct {
                 fn (
                     *paging.PageTable.ArchPageTable,
                     core.VirtualRange,
-                    kernel.vmm.MapType,
+                    kernel.mem.phys.FrameAllocator,
                 ) anyerror!void,
             );
 
             return current.paging.init.fillTopLevel(
                 page_table.arch,
                 range,
-                map_type,
+                physical_frame_allocator,
             );
         }
 
@@ -339,13 +347,15 @@ pub const paging = struct {
             page_table: paging.PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
-            map_type: kernel.vmm.MapType,
+            map_type: kernel.mem.MapType,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
         ) callconv(core.inline_in_non_debug) !void {
             checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualRange,
                 core.PhysicalRange,
-                kernel.vmm.MapType,
+                kernel.mem.MapType,
+                kernel.mem.phys.FrameAllocator,
             ) anyerror!void);
 
             return current.paging.init.mapToPhysicalRangeAllPageSizes(
@@ -353,6 +363,7 @@ pub const paging = struct {
                 virtual_range,
                 physical_range,
                 map_type,
+                physical_frame_allocator,
             );
         }
     };

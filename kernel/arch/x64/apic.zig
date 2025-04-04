@@ -71,7 +71,7 @@ pub const init = struct {
         } else {
             // FIXME: if this is changed to union initialization then zig panics
             //        assigning directly to the xapic field is safe as `lapic` is initialized to a dummy xapic value
-            globals.lapic.xapic = kernel.vmm.nonCachedDirectMapFromPhysical(
+            globals.lapic.xapic = kernel.mem.nonCachedDirectMapFromPhysical(
                 core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address),
             ).toPtr([*]volatile u8);
         }

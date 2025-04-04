@@ -19,11 +19,14 @@ pub const Type = enum {
 
     kernel_heap,
     kernel_stacks,
+
+    pages,
 };
 
 pub const RegionMapInfo = union(enum) {
     top_level,
     full: struct { physical_range: core.PhysicalRange, map_type: MapType },
+    back_with_frames: MapType,
 };
 
 pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
@@ -43,7 +46,7 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
         .writeable_section, .readonly_section, .executable_section, .sdf_section => {
             const physical_range = core.PhysicalRange.fromAddr(
                 core.PhysicalAddress.fromInt(
-                    self.range.address.value - kernel.vmm.globals.physical_to_virtual_offset.value,
+                    self.range.address.value - kernel.mem.globals.physical_to_virtual_offset.value,
                 ),
                 self.range.size,
             );
@@ -58,7 +61,9 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
             return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
         },
 
-        .kernel_heap, .kernel_stacks, .special_heap => return .{ .top_level = {} },
+        .kernel_heap, .kernel_stacks, .special_heap => return .top_level,
+
+        .pages => return .{ .back_with_frames = .{ .global = true, .writeable = true } },
     }
 }
 
@@ -87,4 +92,4 @@ pub inline fn format(
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
-const MapType = kernel.vmm.MapType;
+const MapType = kernel.mem.MapType;

@@ -247,10 +247,10 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                             .io_port => {},
                             .memory => {
                                 const uart: *Self = @ptrCast(@alignCast(context));
-                                const write_register_physical_address = try kernel.vmm.physicalFromDirectMap(
+                                const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
                                     .fromPtr(@volatileCast(uart.write_register)),
                                 );
-                                uart.write_register = kernel.vmm
+                                uart.write_register = kernel.mem
                                     .nonCachedDirectMapFromPhysical(write_register_physical_address)
                                     .toPtr([*]volatile u8);
                                 uart.line_status_register = uart.write_register + @intFromEnum(RegisterOffset.line_status);
@@ -533,10 +533,10 @@ pub const PL011 = struct {
             .remapFn = struct {
                 fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(context));
-                    const write_register_physical_address = try kernel.vmm.physicalFromDirectMap(
+                    const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
                         .fromPtr(@volatileCast(uart.write_register)),
                     );
-                    uart.write_register = kernel.vmm
+                    uart.write_register = kernel.mem
                         .nonCachedDirectMapFromPhysical(write_register_physical_address)
                         .toPtr([*]volatile u32);
                     uart.flag_register = uart.write_register + @intFromEnum(RegisterOffset.Flag);

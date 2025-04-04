@@ -13,7 +13,7 @@ idle_task: kernel.Task,
 
 arch: kernel.arch.PerExecutor,
 
-/// List of `kernel.vmm.FlushRequest` objects that need to be actioned.
+/// List of `kernel.mem.FlushRequest` objects that need to be actioned.
 flush_requests: containers.AtomicSinglyLinkedLIFO = .{},
 
 pub const Id = enum(u32) {

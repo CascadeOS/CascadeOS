@@ -412,7 +412,7 @@ pub const init = struct {
                 .start_bus = base_allocation.start_pci_bus,
                 .end_bus = base_allocation.end_pci_bus,
                 .segment_group = base_allocation.segment_group,
-                .config_space_address = kernel.vmm.nonCachedDirectMapFromPhysical(base_allocation.base_address),
+                .config_space_address = kernel.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
             };
 
             init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {}", .{

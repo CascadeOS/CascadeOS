@@ -80,7 +80,7 @@ fn newLine() void {
 fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
     const framebuffer = kernel.boot.framebuffer().?;
 
-    const physical_address: core.PhysicalAddress = try kernel.vmm.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
+    const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
     if (!physical_address.isAligned(kernel.arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
 
     const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);

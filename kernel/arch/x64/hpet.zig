@@ -85,7 +85,7 @@ pub const init = struct {
 
         if (hpet_table.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
 
-        return kernel.vmm
+        return kernel.mem
             .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet_table.base_address.address))
             .toPtr([*]volatile u64);
     }

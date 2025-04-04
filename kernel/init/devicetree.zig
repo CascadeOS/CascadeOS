@@ -117,7 +117,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
 
     return .{
         .memory_16550 = (try uart.Memory16550.init(
-            kernel.vmm.directMapFromPhysical(
+            kernel.mem.directMapFromPhysical(
                 .fromInt(address),
             ).toPtr([*]volatile u8),
             .{
@@ -181,7 +181,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutp
 
     return .{
         .pl011 = (try uart.PL011.init(
-            kernel.vmm.directMapFromPhysical(
+            kernel.mem.directMapFromPhysical(
                 .fromInt(address),
             ).toPtr([*]volatile u32),
             .{

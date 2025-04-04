@@ -15,10 +15,10 @@ pub const KernelBaseAddress = struct {
 };
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMap(direction: core.Direction) ?MemoryMap {
+pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!MemoryMap {
     return switch (bootloader_api) {
         .limine => limine.memoryMap(direction),
-        .unknown => null,
+        .unknown => error.NoMemoryMap,
     };
 }
 
