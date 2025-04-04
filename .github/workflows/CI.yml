@@ -11,11 +11,15 @@ on:
       - ".github/workflows/CI.yml"
       - "**.zig"
       - "**.zig.zon"
+      - "**.c"
+      - "**.h"
   pull_request:
     paths:
       - ".github/workflows/CI.yml"
       - "**.zig"
       - "**.zig.zon"
+      - "**.c"
+      - "**.h"
   workflow_dispatch:
 
 jobs:
