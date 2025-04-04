@@ -16,8 +16,6 @@ on:
       - ".github/workflows/CI.yml"
       - "**.zig"
       - "**.zig.zon"
-  schedule:
-    - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
@@ -26,13 +24,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Grab zig
-        uses: mlugg/setup-zig@v1
-        with:
-          version: master
+        # FIXME: once https://github.com/mlugg/setup-zig/pull/30 is in a released version switch to that
+        uses: mlugg/setup-zig@153c8d5202cbb8c7e10831110a3afd27593eb960
 
       - name: Lint
         run: zig fmt --check --ast-check .
