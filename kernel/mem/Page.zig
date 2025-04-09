@@ -39,6 +39,10 @@ pub const Region = struct {
     }
 };
 
+pub const Index = enum(u32) {
+    _,
+};
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

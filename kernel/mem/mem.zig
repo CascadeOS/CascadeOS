@@ -15,33 +15,6 @@ pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) core.VirtualRange {
     std.debug.panic("no kernel region of type '{s}'", .{@tagName(range_type)});
 }
 
-pub fn pageFromFrame(frame: phys.Frame) ?*Page {
-    const index = pageIndexFromFrame(frame) orelse return null;
-    return &globals.pages[index];
-}
-
-pub fn pageIndexFromFrame(frame: phys.Frame) ?usize {
-    const region_index = std.sort.binarySearch(
-        Page.Region,
-        globals.page_regions,
-        frame,
-        struct {
-            fn compare(inner_frame: phys.Frame, region: Page.Region) std.math.Order {
-                return region.compareContainsFrame(inner_frame);
-            }
-        }.compare,
-    ) orelse return null;
-    const region = globals.page_regions[region_index];
-
-    const offset_into_region = @intFromEnum(frame) - @intFromEnum(region.start_frame);
-    std.debug.assert(offset_into_region < region.number_of_frames);
-
-    const index = region.start_index + offset_into_region;
-    std.debug.assert(index < globals.pages.len);
-
-    return index;
-}
-
 pub const MapError = error{
     AlreadyMapped,
 
@@ -293,16 +266,6 @@ pub const globals = struct {
         KernelMemoryRegion,
         std.meta.tags(KernelMemoryRegion.Type).len,
     );
-
-    /// A `Page` for each usable physical page.
-    ///
-    /// Initialized during `init.allocatePages`.
-    pub var pages: []Page = undefined;
-
-    /// A `Page.Region` for each range of usable physical pages in the `pages` array.
-    ///
-    /// Initialized during `init.allocatePages`.
-    pub var page_regions: []Page.Region = undefined;
 };
 
 pub const init = struct {
@@ -318,11 +281,8 @@ pub const init = struct {
         init_log.debug("building core page table", .{});
         buildAndLoadCorePageTable(current_task);
 
-        init_log.debug("allocating pages array", .{});
-        initalizePages(number_of_usable_pages, number_of_usable_regions, pages_range);
-
         init_log.debug("initializing physical memory", .{});
-        phys.init.initializePhysicalMemory();
+        phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, pages_range);
     }
 
     fn numberOfUsablePagesAndRegions() struct { usize, usize } {
@@ -568,78 +528,6 @@ pub const init = struct {
 
         init_log.debug("loading core page table", .{});
         globals.core_page_table.load();
-    }
-
-    /// Initializes the pages array.
-    ///
-    /// All pages are set to `.in_use`, leaving it up to the bootstrap physical frame allocator to mark the free ones.
-    fn initalizePages(
-        number_of_usable_pages: usize,
-        number_of_usable_regions: usize,
-        pages_range: core.VirtualRange,
-    ) void {
-        init_log.debug(
-            "initializing pages array with {} usable pages ({}) in {} regions",
-            .{
-                number_of_usable_pages,
-                kernel.arch.paging.standard_page_size.multiplyScalar(number_of_usable_pages),
-                number_of_usable_regions,
-            },
-        );
-
-        // ugly pointer stuff
-        {
-            var byte_ptr = pages_range.address.toPtr([*]u8);
-
-            const page_regions_ptr: [*]Page.Region = @alignCast(@ptrCast(byte_ptr));
-            globals.page_regions = page_regions_ptr[0..number_of_usable_regions];
-
-            byte_ptr += @sizeOf(Page.Region) * number_of_usable_regions;
-            byte_ptr = std.mem.alignPointer(byte_ptr, @alignOf(Page)).?;
-
-            const page_ptr: [*]Page = @alignCast(@ptrCast(byte_ptr));
-            globals.pages = page_ptr[0..number_of_usable_pages];
-        }
-
-        var memory_iter = kernel.boot.memoryMap(.forward) catch @panic("no memory map");
-
-        var page_index: u32 = 0;
-        var usable_range_index: u32 = 0;
-
-        while (memory_iter.next()) |entry| {
-            if (!entry.type.isUsable()) continue;
-            if (entry.range.size.value == 0) continue;
-
-            const usable_pages_in_range: u32 = @intCast(std.math.divExact(
-                usize,
-                entry.range.size.value,
-                kernel.arch.paging.standard_page_size.value,
-            ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {}",
-                .{entry},
-            ));
-
-            const start_frame: phys.Frame = .fromAddress(entry.range.address);
-
-            globals.page_regions[usable_range_index] = .{
-                .start_frame = start_frame,
-                .number_of_frames = usable_pages_in_range,
-                .start_index = page_index,
-            };
-            usable_range_index += 1;
-
-            const range_start_phys_frame = @intFromEnum(start_frame);
-
-            for (0..usable_pages_in_range) |range_i| {
-                globals.pages[page_index] = .{
-                    .physical_frame = @enumFromInt(range_start_phys_frame + range_i),
-                    .state = .in_use,
-                };
-                page_index += 1;
-            }
-        }
-        std.debug.assert(page_index == number_of_usable_pages);
-        std.debug.assert(usable_range_index == number_of_usable_regions);
     }
 
     /// Determine various offsets used by the kernel early in the boot process.
