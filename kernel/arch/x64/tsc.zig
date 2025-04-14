@@ -9,6 +9,13 @@ const globals = struct {
 };
 
 pub const init = struct {
+    // Read current wallclock time from the standard wallclock source of the current architecture.
+    ///
+    /// For example on x86_64 this is the TSC.
+    pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+        return @enumFromInt(readTsc());
+    }
+
     pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         if (!shouldUseTsc()) return;
 

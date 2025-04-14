@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const getStandardWallclockStartTime = x64.tsc.init.getStandardWallclockStartTime;
+
 /// Attempt to get some form of init output.
 ///
 /// This function can return an architecture specific output if it is available and if not is expected to call into

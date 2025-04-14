@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+/// Read current wallclock time from the standard wallclock source of the current architecture.
+///
+/// For example on x86_64 this is the TSC.
+pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+    return @enumFromInt(lib_arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
+}
+
 /// Attempt to get some form of init output.
 ///
 /// This function can return an architecture specific output if it is available and if not is expected to call into

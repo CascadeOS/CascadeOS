@@ -509,6 +509,15 @@ pub const io = struct {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
+    /// Read current wallclock time from the standard wallclock source of the current architecture.
+    ///
+    /// For example on x86_64 this is the TSC.
+    pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+        // `checkSupport` intentionally not called - mandatory function
+
+        return current.init.getStandardWallclockStartTime();
+    }
+
     /// Attempt to get some form of init output.
     ///
     /// This function can return an architecture specific output if it is available and if not is expected to call into
