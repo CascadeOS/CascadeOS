@@ -4,9 +4,9 @@
 pub const wallclock = struct {
     /// This is an opaque timer tick, to acquire an actual time value, use `elapsed`.
     pub const Tick = enum(u64) {
-        _,
+        zero = 0,
 
-        pub const zero: Tick = @enumFromInt(0);
+        _,
     };
 
     /// Read the wallclock value.
@@ -21,11 +21,27 @@ pub const wallclock = struct {
         return globals.elapsedFn(value1, value2);
     }
 
-    pub const globals = struct {
+    /// The wallclock tick at kernel start or upon initialization of the time system.
+    ///
+    /// Upon kernel start this is captured by `init.tryCaptureStandardWallclockStartTime` then upon time system
+    /// initialization in `init.initializeTime` if the selected wallclock source is not the standard wallclock the
+    /// a tick is captured from the selected wallclock source at that time.
+    pub var kernel_start: wallclock.Tick = undefined;
+
+    /// Tracks whether the kernel start time stored in `kernel_start` is the kernel start time or the time system start
+    /// time.
+    ///
+    /// This depends on whether the architecture standard wallclock source used for `init.tryCaptureStandardWallclockStartTime`
+    /// is the wallclock source selected by the time system.
+    ///
+    /// This is only used for logging purposes during time system initialization.
+    var kernel_start_type: enum { kernel_start, time_system_start } = .kernel_start;
+
+    const globals = struct {
         // Initialized during `init.time.configureWallclockTimeSource`.
-        pub var readFn: *const fn () Tick = undefined;
+        var readFn: *const fn () Tick = undefined;
         // Initialized during `init.time.configureWallclockTimeSource`.
-        pub var elapsedFn: *const fn (value1: Tick, value2: Tick) core.Duration = undefined;
+        var elapsedFn: *const fn (value1: Tick, value2: Tick) core.Duration = undefined;
     };
 };
 
@@ -35,8 +51,8 @@ pub const per_executor_periodic = struct {
         return globals.enableInterruptFn(period);
     }
 
-    pub const globals = struct {
-        pub var enableInterruptFn: *const fn (period: core.Duration) void = undefined;
+    const globals = struct {
+        var enableInterruptFn: *const fn (period: core.Duration) void = undefined;
     };
 };
 
@@ -47,6 +63,14 @@ pub const fs_per_ns = 1000000;
 pub const fs_per_s = fs_per_ns * std.time.ns_per_s;
 
 pub const init = struct {
+    /// Attempts to capture the wallclock time at the start of the system using the most likely time source.
+    ///
+    /// For example on x86_64 this is the TSC.
+    pub fn tryCaptureStandardWallclockStartTime() void {
+        wallclock.kernel_start = kernel.arch.init.getStandardWallclockStartTime();
+        // wallclock.kernel_start_type already set to .kernel_start
+    }
+
     pub fn initializeTime() !void {
         var candidate_time_sources: CandidateTimeSources = .{};
         kernel.arch.init.registerArchitecturalTimeSources(&candidate_time_sources);
@@ -58,15 +82,25 @@ pub const init = struct {
         configureWallclockTimeSource(time_sources, reference_counter);
         configurePerExecutorPeriodicTimeSource(time_sources, reference_counter);
 
-        init_log.debug(
-            "time initialized {} after system bootup",
-            .{
-                kernel.time.wallclock.elapsed(
-                    @enumFromInt(0),
-                    kernel.time.wallclock.read(),
-                ),
+        switch (wallclock.kernel_start_type) {
+            .kernel_start => {
+                init_log.debug(
+                    "time initialized {} after kernel start, spent {} in firmware and bootloader before kernel start",
+                    .{
+                        wallclock.elapsed(wallclock.kernel_start, wallclock.read()),
+                        wallclock.elapsed(.zero, wallclock.kernel_start),
+                    },
+                );
             },
-        );
+            .time_system_start => {
+                init_log.debug(
+                    "time initialized {} after system start (includes early kernel init, firmware and bootloader time)",
+                    .{
+                        wallclock.elapsed(.zero, wallclock.read()),
+                    },
+                );
+            },
+        }
     }
 
     pub const CandidateTimeSources = struct {
@@ -163,6 +197,13 @@ pub const init = struct {
             /// Counter wraparound is assumed to have not occured.
             elapsedFn: *const fn (value1: Tick, value2: Tick) core.Duration,
 
+            /// Whether this wallclock is the standard wallclock source for the current architecture.
+            ///
+            /// This is `true` only if this is the source used by `tryCaptureStandardWallclockStartTime`.
+            ///
+            /// For example on x86_64 this is the TSC.
+            standard_wallclock_source: bool,
+
             pub const Tick = kernel.time.wallclock.Tick;
         };
 
@@ -234,6 +275,15 @@ pub const init = struct {
 
         wallclock.globals.readFn = wallclock_impl.readFn;
         wallclock.globals.elapsedFn = wallclock_impl.elapsedFn;
+
+        if (!wallclock_impl.standard_wallclock_source) {
+            init_log.warn(
+                "wallclock is not the standard wallclock source - setting kernel start time to now",
+                .{},
+            );
+            wallclock.kernel_start = wallclock.read();
+            wallclock.kernel_start_type = .time_system_start;
+        }
     }
 
     fn configurePerExecutorPeriodicTimeSource(

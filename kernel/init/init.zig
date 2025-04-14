@@ -5,6 +5,8 @@
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !noreturn {
+    kernel.time.init.tryCaptureStandardWallclockStartTime();
+
     // we need the direct map to be available as early as possible
     try kernel.vmm.init.determineOffsets();
 
@@ -165,9 +167,19 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
             Output.globals.lock.lock(current_task);
             defer Output.globals.lock.unlock(current_task);
 
-            Output.writer.print("initialization complete - time since boot: {}\n", .{
-                kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()),
-            }) catch {};
+            Output.writer.print(
+                "initialization complete - time since kernel start: {} - time since system start: {}\n",
+                .{
+                    kernel.time.wallclock.elapsed(
+                        kernel.time.wallclock.kernel_start,
+                        kernel.time.wallclock.read(),
+                    ),
+                    kernel.time.wallclock.elapsed(
+                        .zero,
+                        kernel.time.wallclock.read(),
+                    ),
+                },
+            ) catch {};
         }
 
         Barrier.executorReady();

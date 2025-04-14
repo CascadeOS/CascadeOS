@@ -71,6 +71,7 @@ pub const init = struct {
                         return core.Duration.from((number_of_ticks * globals.tick_duration_fs) / kernel.time.fs_per_ns, .nanosecond);
                     }
                 }.elapsedFn,
+                .standard_wallclock_source = true,
             },
         });
     }
