@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub inline fn readPhysicalCount() u64 {
+    return asm ("mrs %[ret], cntpct_el0"
+        : [ret] "=r" (-> u64),
+    );
+}
+
 /// Halt the CPU.
 pub inline fn halt() void {
     asm volatile ("wfe");
