@@ -403,7 +403,7 @@ pub const init = struct {
 
         const base_allocations = mcfg.baseAllocations();
 
-        var ecams: std.ArrayList(ECAM) = try .initCapacity(kernel.heap.allocator, base_allocations.len);
+        var ecams: std.ArrayList(ECAM) = try .initCapacity(kernel.mem.heap.allocator, base_allocations.len);
         defer ecams.deinit();
 
         for (mcfg.baseAllocations()) |base_allocation| {

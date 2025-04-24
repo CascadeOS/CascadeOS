@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const heap = @import("heap.zig");
 pub const phys = @import("phys.zig");
 
 pub const MapType = @import("MapType.zig");
 pub const FlushRequest = @import("FlushRequest.zig");
+pub const ResourceArena = @import("ResourceArena.zig");
 pub const Page = @import("Page.zig");
 
 pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) core.VirtualRange {
@@ -269,20 +271,26 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeMemorySystem(current_task: *kernel.Task) void {
+    pub fn initializeMemorySystem(current_task: *kernel.Task) !void {
         init_log.debug("initializing bootstrap physical frame allocator", .{});
         phys.init.initializeBootstrapFrameAllocator();
 
         const number_of_usable_pages, const number_of_usable_regions = numberOfUsablePagesAndRegions();
 
         init_log.debug("building kernel memory layout", .{});
-        const pages_range = buildMemoryLayout(number_of_usable_pages, number_of_usable_regions);
+        const result = buildMemoryLayout(number_of_usable_pages, number_of_usable_regions);
 
         init_log.debug("building core page table", .{});
         buildAndLoadCorePageTable(current_task);
 
         init_log.debug("initializing physical memory", .{});
-        phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, pages_range);
+        phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, result.pages_range);
+
+        init_log.debug("initializing kernel and special heap", .{});
+        try heap.init.initializeHeaps(current_task, result.heap_range, result.special_heap_range);
+
+        init_log.debug("initializing kernel stacks heap", .{});
+        try kernel.Stack.init.initializeStacks(current_task, result.stacks_range);
     }
 
     fn numberOfUsablePagesAndRegions() struct { usize, usize } {
@@ -310,10 +318,17 @@ pub const init = struct {
         return .{ number_of_usable_pages, number_of_usable_regions };
     }
 
-    fn buildMemoryLayout(number_of_usable_pages: usize, number_of_usable_regions: usize) core.VirtualRange {
+    const MemoryLayoutResult = struct {
+        pages_range: core.VirtualRange,
+        heap_range: core.VirtualRange,
+        special_heap_range: core.VirtualRange,
+        stacks_range: core.VirtualRange,
+    };
+
+    fn buildMemoryLayout(number_of_usable_pages: usize, number_of_usable_regions: usize) MemoryLayoutResult {
         registerKernelSections();
         registerDirectMaps();
-        registerHeaps();
+        const heaps = registerHeaps();
         const pages_range = registerPages(number_of_usable_pages, number_of_usable_regions);
 
         sortKernelMemoryRegions();
@@ -326,7 +341,12 @@ pub const init = struct {
             }
         }
 
-        return pages_range;
+        return .{
+            .pages_range = pages_range,
+            .heap_range = heaps.kernel_heap_range,
+            .special_heap_range = heaps.special_heap_range,
+            .stacks_range = heaps.kernel_stacks_range,
+        };
     }
 
     fn registerKernelSections() void {
@@ -418,7 +438,13 @@ pub const init = struct {
         });
     }
 
-    fn registerHeaps() void {
+    const RegisterHeapsResult = struct {
+        kernel_heap_range: core.VirtualRange,
+        special_heap_range: core.VirtualRange,
+        kernel_stacks_range: core.VirtualRange,
+    };
+
+    fn registerHeaps() RegisterHeapsResult {
         const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
 
         const kernel_heap_range = findFreeRange(
@@ -453,6 +479,12 @@ pub const init = struct {
             .range = kernel_stacks_range,
             .type = .kernel_stacks,
         });
+
+        return .{
+            .kernel_heap_range = kernel_heap_range,
+            .special_heap_range = special_heap_range,
+            .kernel_stacks_range = kernel_stacks_range,
+        };
     }
 
     fn registerPages(number_of_usable_pages: usize, number_of_usable_regions: usize) core.VirtualRange {

@@ -85,7 +85,7 @@ fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
 
     const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
 
-    const virtual_range = try kernel.heap.allocateSpecial(
+    const virtual_range = try kernel.mem.heap.allocateSpecial(
         current_task,
         framebuffer_size,
         .fromAddr(

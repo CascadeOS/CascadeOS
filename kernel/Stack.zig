@@ -121,19 +121,17 @@ pub fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
 const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 
 const globals = struct {
-    var stack_arena: kernel.ResourceArena = undefined;
+    var stack_arena: kernel.mem.ResourceArena = undefined;
     var stack_page_table_mutex: kernel.sync.Mutex = .{};
 };
 
 pub const init = struct {
-    pub fn initializeStacks(current_task: *kernel.Task) !void {
+    pub fn initializeStacks(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
         try globals.stack_arena.create(
             "stacks",
             kernel.arch.paging.standard_page_size.value,
             .{},
         );
-
-        const stacks_range = kernel.mem.getKernelRegion(.kernel_stacks);
 
         globals.stack_arena.addSpan(
             current_task,

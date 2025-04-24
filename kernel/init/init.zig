@@ -56,16 +56,10 @@ pub fn initStage1() !noreturn {
     kernel.arch.init.configurePerExecutorSystemFeatures(&bootstrap_executor);
 
     log.debug("initializing memory system", .{});
-    kernel.mem.init.initializeMemorySystem(&bootstrap_init_task);
-
-    log.debug("initializing kernel and special heap", .{});
-    try kernel.heap.init.initializeHeaps(&bootstrap_init_task);
+    try kernel.mem.init.initializeMemorySystem(&bootstrap_init_task);
 
     log.debug("remapping init outputs", .{});
     try Output.remapOutputs(&bootstrap_init_task);
-
-    log.debug("initializing kernel stacks", .{});
-    try kernel.Stack.init.initializeStacks(&bootstrap_init_task);
 
     log.debug("capturing system information", .{});
     try kernel.arch.init.captureSystemInformation(switch (kernel.config.cascade_target) {
@@ -210,8 +204,8 @@ fn createExecutors() ![]kernel.Executor {
     log.debug("initializing {} executors", .{descriptors.count()});
 
     // TODO: these init tasks need to be freed after initialization
-    const init_tasks = try kernel.heap.allocator.alloc(kernel.Task, descriptors.count());
-    const executors = try kernel.heap.allocator.alloc(kernel.Executor, descriptors.count());
+    const init_tasks = try kernel.mem.heap.allocator.alloc(kernel.Task, descriptors.count());
+    const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
     var i: u32 = 0;
     var task_id: u32 = 1; // `1` as `0` is the bootstrap task

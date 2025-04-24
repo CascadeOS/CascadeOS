@@ -276,13 +276,17 @@ const globals = struct {
     /// Has no source arena, provided with a single span representing the entire range.
     ///
     /// Initialized during `init.initializeHeaps`.
-    var special_heap_address_space_arena: kernel.ResourceArena = undefined;
+    var special_heap_address_space_arena: kernel.mem.ResourceArena = undefined;
 
     var special_heap_page_table_mutex: kernel.sync.Mutex = .{};
 };
 
 pub const init = struct {
-    pub fn initializeHeaps(current_task: *kernel.Task) !void {
+    pub fn initializeHeaps(
+        current_task: *kernel.Task,
+        heap_range: core.VirtualRange,
+        special_heap_range: core.VirtualRange,
+    ) !void {
         // heap
         {
             try globals.heap_address_space_arena.create(
@@ -302,8 +306,6 @@ pub const init = struct {
                     },
                 },
             );
-
-            const heap_range = kernel.mem.getKernelRegion(.kernel_heap);
 
             globals.heap_address_space_arena.addSpan(
                 current_task,
@@ -325,8 +327,6 @@ pub const init = struct {
                 .{},
             );
 
-            const special_heap_range = kernel.mem.getKernelRegion(.special_heap);
-
             globals.special_heap_address_space_arena.addSpan(
                 current_task,
                 special_heap_range.address.value,
@@ -345,4 +345,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.heap);
-const ResourceArena = kernel.ResourceArena;
+const ResourceArena = kernel.mem.ResourceArena;

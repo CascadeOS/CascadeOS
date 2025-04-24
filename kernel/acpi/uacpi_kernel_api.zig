@@ -289,7 +289,7 @@ export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
 export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
     log.debug("uacpi_kernel_alloc called", .{});
 
-    const allocation = kernel.heap.allocate(
+    const allocation = kernel.mem.heap.allocate(
         size,
         kernel.Task.getCurrent(),
     ) catch return null;
@@ -303,7 +303,7 @@ export fn uacpi_kernel_free(opt_mem: ?[*]u8) void {
     log.debug("uacpi_kernel_free called", .{});
 
     const mem = opt_mem orelse return;
-    kernel.heap.deallocateBase(.fromPtr(mem), kernel.Task.getCurrent());
+    kernel.mem.heap.deallocateBase(.fromPtr(mem), kernel.Task.getCurrent());
 }
 
 export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8) void {
@@ -366,7 +366,7 @@ export fn uacpi_kernel_sleep(msec: u64) void {
 export fn uacpi_kernel_create_mutex() *kernel.sync.Mutex {
     log.debug("uacpi_kernel_create_mutex called", .{});
 
-    const mutex = kernel.heap.allocator.create(kernel.sync.Mutex) catch unreachable;
+    const mutex = kernel.mem.heap.allocator.create(kernel.sync.Mutex) catch unreachable;
     mutex.* = .{};
     return mutex;
 }
@@ -375,7 +375,7 @@ export fn uacpi_kernel_create_mutex() *kernel.sync.Mutex {
 export fn uacpi_kernel_free_mutex(mutex: *kernel.sync.Mutex) void {
     log.debug("uacpi_kernel_free_mutex called", .{});
 
-    kernel.heap.allocator.destroy(mutex);
+    kernel.mem.heap.allocator.destroy(mutex);
 }
 
 /// Create/free an opaque kernel (semaphore-like) event object.
@@ -549,7 +549,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
 export fn uacpi_kernel_create_spinlock() *kernel.sync.TicketSpinLock {
     log.debug("uacpi_kernel_create_spinlock called", .{});
 
-    const lock = kernel.heap.allocator.create(kernel.sync.TicketSpinLock) catch unreachable;
+    const lock = kernel.mem.heap.allocator.create(kernel.sync.TicketSpinLock) catch unreachable;
     lock.* = .{};
     return lock;
 }
@@ -560,7 +560,7 @@ export fn uacpi_kernel_create_spinlock() *kernel.sync.TicketSpinLock {
 export fn uacpi_kernel_free_spinlock(spinlock: *kernel.sync.TicketSpinLock) void {
     log.debug("uacpi_kernel_free_spinlock called", .{});
 
-    kernel.heap.allocator.destroy(spinlock);
+    kernel.mem.heap.allocator.destroy(spinlock);
 }
 
 /// Lock a spinlock.
