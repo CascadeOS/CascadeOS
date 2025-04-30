@@ -5,6 +5,14 @@ const WaitQueue = @This();
 
 waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 
+/// Returns the first task in the wait queue.
+///
+/// It is the callers responsibility to ensure that the task is not removed from the wait queue.
+pub fn firstTask(self: *WaitQueue) ?*kernel.Task {
+    const node = self.waiting_tasks.start_node orelse return null;
+    return kernel.Task.fromNode(node);
+}
+
 /// Wake one task from the wait queue.
 ///
 /// Asserts that interrupts are disabled.

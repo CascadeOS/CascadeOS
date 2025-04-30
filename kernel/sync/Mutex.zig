@@ -4,6 +4,8 @@
 const Mutex = @This();
 
 locked_by: std.atomic.Value(?*kernel.Task) align(std.atomic.cache_line) = .init(null),
+/// `true` when the mutex is passed directly to a waiter on unlock.
+passed_to_waiter: bool = false,
 
 spinlock: kernel.sync.TicketSpinLock = .{},
 wait_queue: kernel.sync.WaitQueue = .{},
@@ -13,7 +15,7 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
         current_task.incrementPreemptionDisable();
 
         for (0..spins) |_| {
-            _ = mutex.locked_by.cmpxchgWeak(
+            const task = mutex.locked_by.cmpxchgWeak(
                 null,
                 current_task,
                 .acq_rel,
@@ -22,6 +24,15 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
                 // we have the mutex
                 return;
             };
+
+            if (task == current_task) {
+                if (mutex.passed_to_waiter) {
+                    mutex.passed_to_waiter = false;
+                    return;
+                }
+                unreachable; // recursive lock
+            }
+
             kernel.arch.spinLoopHint();
         }
 
@@ -48,23 +59,35 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
 pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     defer current_task.decrementPreemptionDisable();
 
-    if (mutex.locked_by.cmpxchgStrong(
-        current_task,
-        null,
-        .acq_rel,
-        .monotonic,
-    )) |_| {
-        @panic("not locked by current task");
-    }
-
     mutex.spinlock.lock(current_task);
     defer mutex.spinlock.unlock(current_task);
 
-    if (mutex.locked_by.load(.acquire) == null) {
-        return;
-    }
+    if (mutex.wait_queue.firstTask()) |waiting_task| {
+        // pass the mutex directly to the waiting task
 
-    mutex.wait_queue.wakeOne(current_task);
+        std.debug.assert(mutex.passed_to_waiter == false);
+        mutex.passed_to_waiter = true;
+
+        if (mutex.locked_by.cmpxchgStrong(
+            current_task,
+            waiting_task,
+            .acq_rel,
+            .monotonic,
+        )) |_| {
+            @panic("not locked by current task");
+        }
+
+        mutex.wait_queue.wakeOne(current_task);
+    } else {
+        if (mutex.locked_by.cmpxchgStrong(
+            current_task,
+            null,
+            .acq_rel,
+            .monotonic,
+        )) |_| {
+            @panic("not locked by current task");
+        }
+    }
 }
 
 pub fn isLockedBy(mutex: *const Mutex, task: *const kernel.Task) bool {
