@@ -31,7 +31,7 @@ jobs:
 
       - name: Grab zig
         # FIXME: once https://github.com/mlugg/setup-zig/pull/30 is in a released version switch to that
-        uses: mlugg/setup-zig@153c8d5202cbb8c7e10831110a3afd27593eb960
+        uses: mlugg/setup-zig@915f70607f6642da2dd36333035f4221a7bc8618
 
       - name: Lint
         run: zig fmt --check --ast-check .
