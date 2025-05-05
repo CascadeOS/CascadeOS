@@ -594,41 +594,32 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
 pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation) void {
     log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
 
-    arena.deallocateInner(current_task, allocation.base, allocation.len);
-}
+    const quantum_aligned_provided_len = std.mem.alignForward(
+        usize,
+        allocation.len,
+        arena.quantum,
+    );
 
-/// Deallocate the allocation at `base`.
-///
-/// Panics if the `base` does not match a previous call to `allocate`.
-pub fn deallocateBase(arena: *ResourceArena, current_task: *kernel.Task, base: usize) void {
-    log.debug("{s}: deallocating base 0x{x}", .{ arena.name(), base });
 
-    arena.deallocateInner(current_task, base, null);
-}
 
-fn deallocateInner(arena: *ResourceArena, current_task: *kernel.Task, base: usize, len: ?usize) void {
     arena.mutex.lock(current_task);
 
     var need_to_unlock_mutex = true;
     defer if (need_to_unlock_mutex) arena.mutex.unlock(current_task);
 
-    const tag = arena.removeFromAllocationTable(base) orelse {
+    const tag = arena.removeFromAllocationTable(allocation.base) orelse {
         std.debug.panic(
             "no allocation at '{}' found",
-            .{base},
+            .{allocation.base},
         );
     };
     std.debug.assert(tag.kind == .allocated);
 
-    if (len) |provided_len| {
-        const quantum_aligned_provided_len = std.mem.alignForward(usize, provided_len, arena.quantum);
-
-        if (quantum_aligned_provided_len != tag.len) {
-            std.debug.panic(
-                "provided len '{}' does not match len '{}' of allocation at '{}'",
-                .{ provided_len, tag.len, base },
-            );
-        }
+    if (quantum_aligned_provided_len != tag.len) {
+        std.debug.panic(
+            "provided len '{}' does not match len '{}' of allocation at '{}'",
+            .{ allocation.len, tag.len, allocation.base },
+        );
     }
 
     tag.kind = .free;

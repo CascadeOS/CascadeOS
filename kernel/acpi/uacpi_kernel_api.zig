@@ -289,11 +289,8 @@ export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
 export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
     log.debug("uacpi_kernel_alloc called", .{});
 
-    const allocation = kernel.mem.heap.allocate(
-        size,
-        kernel.Task.getCurrent(),
-    ) catch return null;
-    return allocation.address.toPtr([*]u8);
+    const buf = kernel.mem.heap.allocator.alloc(u8, size) catch return null;
+    return buf.ptr;
 }
 
 /// Free a previously allocated memory block.
@@ -301,9 +298,7 @@ export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
 /// 'mem' might be a NULL pointer. In this case, the call is assumed to be a no-op.
 export fn uacpi_kernel_free(opt_mem: ?[*]u8) void {
     log.debug("uacpi_kernel_free called", .{});
-
-    const mem = opt_mem orelse return;
-    kernel.mem.heap.deallocateBase(.fromPtr(mem), kernel.Task.getCurrent());
+    kernel.mem.heap.freeWithNoSize(opt_mem orelse return);
 }
 
 export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8) void {
