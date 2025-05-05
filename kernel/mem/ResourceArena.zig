@@ -594,13 +594,8 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
 pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation) void {
     log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
 
-    const quantum_aligned_provided_len = std.mem.alignForward(
-        usize,
-        allocation.len,
-        arena.quantum,
-    );
-
-
+    std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
+    std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
 
     arena.mutex.lock(current_task);
 
@@ -615,7 +610,7 @@ pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation:
     };
     std.debug.assert(tag.kind == .allocated);
 
-    if (quantum_aligned_provided_len != tag.len) {
+    if (allocation.len != tag.len) {
         std.debug.panic(
             "provided len '{}' does not match len '{}' of allocation at '{}'",
             .{ allocation.len, tag.len, allocation.base },
