@@ -73,28 +73,13 @@ const allocator_impl = struct {
     fn resize(
         _: *anyopaque,
         memory: []u8,
-        alignment: std.mem.Alignment,
+        _: std.mem.Alignment,
         new_len: usize,
         _: usize,
     ) bool {
         std.debug.assert(new_len != 0);
-        const alignment_bytes = alignment.toByteUnits();
-
-        const full_old_len = memory.len + alignment_bytes - 1 + @sizeOf(Allocation);
-        const full_new_len = new_len + alignment_bytes - 1 + @sizeOf(Allocation);
-
-        const old_quantum_aligned_len = std.mem.alignForward(
-            usize,
-            full_old_len,
-            heap_arena_quantum,
-        );
-        const new_quantum_aligned_len = std.mem.alignForward(
-            usize,
-            full_new_len,
-            heap_arena_quantum,
-        );
-
-        return new_quantum_aligned_len == old_quantum_aligned_len;
+        const allocation = getAllocationHeader(memory.ptr);
+        return new_len <= allocation.len;
     }
 
     fn remap(
