@@ -130,7 +130,7 @@ pub const init = struct {
         try globals.stack_arena.create(
             "stacks",
             kernel.arch.paging.standard_page_size.value,
-            .{},
+            .{ .quantum_caching = .no },
         );
 
         globals.stack_arena.addSpan(

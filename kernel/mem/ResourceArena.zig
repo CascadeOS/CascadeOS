@@ -11,7 +11,6 @@
 //!  - [lylythechosenone's rust crate](https://github.com/lylythechosenone/vmem/blob/main/src/lib.rs)
 //!
 
-// TODO: quantum caches
 // TODO: stats
 // TODO: next fit
 
@@ -49,6 +48,13 @@ unused_tags: SingleLinkedList,
 
 /// Number of unused boundary tags.
 unused_tags_count: usize,
+
+/// The largest size of a cached object.
+max_cached_size: usize,
+
+quantum_caches: std.BoundedArray(*kernel.mem.RawCache, MAX_NUMBER_OF_QUANTUM_CACHES),
+
+quantum_cache_allocation: QuantumCacheAllocation,
 
 pub fn name(self: *const ResourceArena) []const u8 {
     return self._name.constSlice();
@@ -90,6 +96,24 @@ pub const Source = struct {
 
 pub const CreateOptions = struct {
     source: ?Source = null,
+
+    quantum_caching: QuantumCaching,
+
+    pub const QuantumCaching = union(enum) {
+        no,
+
+        /// The number of multiples of the quantum to cache.
+        ///
+        /// Uses the heap resource arena to allocate the caches.
+        yes: u6,
+
+        /// The number of multiples of the quantum to cache.
+        ///
+        /// This should only be used by the heap resource arena itself.
+        ///
+        /// Uses the physical memory allocator and the hhdm to allocate the caches.
+        heap: u6,
+    };
 };
 
 pub const CreateError = error{
@@ -98,6 +122,12 @@ pub const CreateError = error{
 
     /// The length of `name` exceeds `resource_arena_name_length`.
     NameTooLong,
+};
+
+const QuantumCacheAllocation = union(enum) {
+    no,
+    yes: []kernel.mem.RawCache,
+    heap: std.BoundedArray(kernel.mem.phys.Frame, MAX_NUMBER_OF_QUANTUM_CACHES),
 };
 
 pub fn create(
@@ -122,7 +152,69 @@ pub fn create(
         .freelist_bitmap = .empty,
         .unused_tags = .empty,
         .unused_tags_count = 0,
+        .max_cached_size = undefined, // set below
+        .quantum_caches = .{},
+        .quantum_cache_allocation = undefined, // set below
     };
+
+    switch (options.quantum_caching) {
+        .no => {
+            arena.max_cached_size = 0;
+            arena.quantum_cache_allocation = .no;
+        },
+        .yes => |count| {
+            std.debug.assert(count > 0);
+
+            const quantum_caches = kernel.mem.heap.allocator.alloc(kernel.mem.RawCache, count) catch
+                @panic("quantum cache allocation failed");
+
+            for (quantum_caches, 0..) |*quantum_cache, i| {
+                var cache_name: kernel.mem.RawCache.Name = .{};
+                cache_name.writer().print("{s} qcache {}", .{ arena.name(), i + 1 }) catch unreachable;
+
+                quantum_cache.init(cache_name, .{
+                    .size = quantum * (i + 1),
+                    .alignment = .fromByteUnits(quantum),
+                    .source = arena,
+                });
+                arena.quantum_caches.append(quantum_cache) catch unreachable;
+            }
+
+            arena.quantum_cache_allocation = .{ .yes = quantum_caches };
+            arena.max_cached_size = count * quantum;
+        },
+        .heap => |count| {
+            std.debug.assert(count > 0);
+
+            var frames: std.BoundedArray(
+                kernel.mem.phys.Frame,
+                MAX_NUMBER_OF_QUANTUM_CACHES,
+            ) = .{};
+
+            for (0..count) |i| {
+                const frame = kernel.mem.phys.allocator.allocate() catch
+                    @panic("quantum cache allocation failed");
+                frames.append(frame) catch unreachable;
+
+                const raw_cache = kernel.mem.directMapFromPhysical(frame.baseAddress())
+                    .toPtr(*kernel.mem.RawCache);
+
+                var cache_name: kernel.mem.RawCache.Name = .{};
+                cache_name.writer().print("heap qcache {}", .{i + 1}) catch unreachable;
+
+                raw_cache.init(cache_name, .{
+                    .size = quantum * (i + 1),
+                    .alignment = .fromByteUnits(quantum),
+                    .source = arena,
+                });
+
+                arena.quantum_caches.append(raw_cache) catch unreachable;
+            }
+
+            arena.quantum_cache_allocation = .{ .heap = frames };
+            arena.max_cached_size = count * quantum;
+        },
+    }
 }
 
 /// Destroy the resource arena.
@@ -130,8 +222,22 @@ pub fn create(
 /// Assumes that no concurrent access to the resource arena is happening, does not lock.
 ///
 /// Panics if there are any allocations in the resource arena.
-pub fn destroy(arena: *ResourceArena) void {
+pub fn destroy(arena: *ResourceArena, current_task: *kernel.Task) void {
     log.debug("{s}: destroying arena", .{arena.name()});
+
+    for (arena.quantum_caches.constSlice()) |quantum_cache| {
+        quantum_cache.deinit(current_task);
+    }
+
+    switch (arena.quantum_cache_allocation) {
+        .no => {},
+        .yes => |caches| kernel.mem.heap.allocator.free(caches),
+        .heap => |frames| {
+            for (frames.constSlice()) |frame| {
+                kernel.mem.phys.allocator.deallocate(frame);
+            }
+        },
+    }
 
     var tags_to_release: SingleLinkedList = .empty;
 
@@ -385,6 +491,19 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, p
         @tagName(policy),
     });
 
+    if (quantum_aligned_len <= arena.max_cached_size) {
+        const cache_index: usize = (quantum_aligned_len / arena.quantum) - 1;
+        const cache = arena.quantum_caches.constSlice()[cache_index];
+        std.debug.assert(cache.size == quantum_aligned_len);
+        const buffer = cache.allocate(current_task) catch
+            return AllocateError.RequestedLengthUnavailable; // TODO: is there a better way to handle this?
+        std.debug.assert(buffer.len == quantum_aligned_len);
+        return .{
+            .base = @intFromPtr(buffer.ptr),
+            .len = buffer.len,
+        };
+    }
+
     try arena.ensureBoundaryTags(current_task);
     errdefer arena.mutex.unlock(current_task); // unconditionally unlock mutex on error
 
@@ -596,6 +715,19 @@ pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation:
 
     std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
     std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
+
+    if (allocation.len <= arena.max_cached_size) {
+        const cache_index: usize = (allocation.len / arena.quantum) - 1;
+        const cache = arena.quantum_caches.constSlice()[cache_index];
+        std.debug.assert(cache.size == allocation.len);
+
+        const buffer_ptr: [*]u8 = @ptrFromInt(allocation.base);
+        const buffer = buffer_ptr[0..allocation.len];
+
+        cache.free(current_task, buffer);
+
+        return;
+    }
 
     arena.mutex.lock(current_task);
 
@@ -1208,6 +1340,8 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
     const truncated_len: UsizeShiftInt = @truncate(index);
     return @as(usize, 1) << @truncate(truncated_len);
 }
+
+const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));

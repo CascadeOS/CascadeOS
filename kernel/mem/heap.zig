@@ -236,6 +236,7 @@ pub fn deallocateSpecial(
 }
 
 const heap_arena_quantum: usize = 16;
+const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
 
 pub const globals = struct {
     /// An arena managing the heap's virtual address space.
@@ -275,7 +276,7 @@ pub const init = struct {
             try globals.heap_address_space_arena.create(
                 "heap_address_space",
                 kernel.arch.paging.standard_page_size.value,
-                .{},
+                .{ .quantum_caching = .no },
             );
 
             try globals.heap_arena.create(
@@ -287,6 +288,7 @@ pub const init = struct {
                         .import = heapArenaImport,
                         .release = heapArenaRelease,
                     },
+                    .quantum_caching = .{ .heap = heap_arena_quantum_caches },
                 },
             );
 
@@ -307,7 +309,7 @@ pub const init = struct {
             try globals.special_heap_address_space_arena.create(
                 "special_heap_address_space",
                 kernel.arch.paging.standard_page_size.value,
-                .{},
+                .{ .quantum_caching = .no },
             );
 
             globals.special_heap_address_space_arena.addSpan(
