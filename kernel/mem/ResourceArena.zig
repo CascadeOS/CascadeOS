@@ -494,10 +494,12 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, p
     if (quantum_aligned_len <= arena.max_cached_size) {
         const cache_index: usize = (quantum_aligned_len / arena.quantum) - 1;
         const cache = arena.quantum_caches.constSlice()[cache_index];
-        std.debug.assert(cache.size == quantum_aligned_len);
+        std.debug.assert(cache.object_size == quantum_aligned_len);
+
         const buffer = cache.allocate(current_task) catch
             return AllocateError.RequestedLengthUnavailable; // TODO: is there a better way to handle this?
         std.debug.assert(buffer.len == quantum_aligned_len);
+
         return .{
             .base = @intFromPtr(buffer.ptr),
             .len = buffer.len,
@@ -719,7 +721,7 @@ pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation:
     if (allocation.len <= arena.max_cached_size) {
         const cache_index: usize = (allocation.len / arena.quantum) - 1;
         const cache = arena.quantum_caches.constSlice()[cache_index];
-        std.debug.assert(cache.size == allocation.len);
+        std.debug.assert(cache.object_size == allocation.len);
 
         const buffer_ptr: [*]u8 = @ptrFromInt(allocation.base);
         const buffer = buffer_ptr[0..allocation.len];
