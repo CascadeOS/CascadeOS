@@ -52,7 +52,7 @@ unused_tags_count: usize,
 /// The largest size of a cached object.
 max_cached_size: usize,
 
-quantum_caches: std.BoundedArray(*kernel.mem.RawCache, MAX_NUMBER_OF_QUANTUM_CACHES),
+quantum_caches: std.BoundedArray(*kernel.mem.cache.RawCache, MAX_NUMBER_OF_QUANTUM_CACHES),
 
 quantum_cache_allocation: QuantumCacheAllocation,
 
@@ -126,7 +126,7 @@ pub const CreateError = error{
 
 const QuantumCacheAllocation = union(enum) {
     no,
-    yes: []kernel.mem.RawCache,
+    yes: []kernel.mem.cache.RawCache,
     heap: std.BoundedArray(kernel.mem.phys.Frame, MAX_NUMBER_OF_QUANTUM_CACHES),
 };
 
@@ -165,11 +165,11 @@ pub fn create(
         .yes => |count| {
             std.debug.assert(count > 0);
 
-            const quantum_caches = kernel.mem.heap.allocator.alloc(kernel.mem.RawCache, count) catch
+            const quantum_caches = kernel.mem.heap.allocator.alloc(kernel.mem.cache.RawCache, count) catch
                 @panic("quantum cache allocation failed");
 
             for (quantum_caches, 0..) |*quantum_cache, i| {
-                var cache_name: kernel.mem.RawCache.Name = .{};
+                var cache_name: kernel.mem.cache.Name = .{};
                 cache_name.writer().print("{s} qcache {}", .{ arena.name(), i + 1 }) catch unreachable;
 
                 quantum_cache.init(.{
@@ -197,9 +197,9 @@ pub fn create(
                 frames.append(frame) catch unreachable;
 
                 const raw_cache = kernel.mem.directMapFromPhysical(frame.baseAddress())
-                    .toPtr(*kernel.mem.RawCache);
+                    .toPtr(*kernel.mem.cache.RawCache);
 
-                var cache_name: kernel.mem.RawCache.Name = .{};
+                var cache_name: kernel.mem.cache.Name = .{};
                 cache_name.writer().print("heap qcache {}", .{i + 1}) catch unreachable;
 
                 raw_cache.init(.{

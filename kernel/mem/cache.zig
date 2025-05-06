@@ -6,17 +6,18 @@
 //! Based on [The slab allocator: an object-caching kernel memory allocator](https://dl.acm.org/doi/10.5555/1267257.1267263) by Jeff Bonwick.
 //!
 
+pub const ConstructorError = error{ObjectConstructionFailed};
+pub const Name = std.BoundedArray(u8, kernel.config.cache_name_length);
+
 pub fn Cache(
     comptime T: type,
-    comptime constructor: ?fn (object: *T) ConstructorError!void,
-    comptime destructor: ?fn (object: *T) void,
+    comptime constructor: ?fn (object: *T, current_task: *kernel.Task) ConstructorError!void,
+    comptime destructor: ?fn (object: *T, current_task: *kernel.Task) void,
 ) type {
     return struct {
         raw_cache: RawCache,
 
         const Self = @This();
-
-        pub const Name = CacheName;
 
         pub const InitOptions = struct {
             cache_name: Name,
@@ -40,16 +41,16 @@ pub fn Cache(
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
                     struct {
-                        fn innerConstructor(object: []u8) ConstructorError!void {
-                            try con(@ptrCast(@alignCast(object)));
+                        fn innerConstructor(object: []u8, current_task: *kernel.Task) ConstructorError!void {
+                            try con(@ptrCast(@alignCast(object)), current_task);
                         }
                     }.innerConstructor
                 else
                     null,
                 .destructor = if (destructor) |des|
                     struct {
-                        fn innerDestructor(object: []u8) void {
-                            des(@ptrCast(@alignCast(object)));
+                        fn innerDestructor(object: []u8, current_task: *kernel.Task) void {
+                            des(@ptrCast(@alignCast(object)), current_task);
                         }
                     }.innerDestructor
                 else
@@ -82,8 +83,6 @@ pub fn Cache(
     };
 }
 
-pub const ConstructorError = error{ObjectConstructionFailed};
-
 pub const RawCache = struct {
     _name: Name,
 
@@ -103,8 +102,8 @@ pub const RawCache = struct {
     /// Whether the last slab should be held in memory even if it is unused.
     hold_last_slab: bool,
 
-    constructor: ?*const fn ([]u8) ConstructorError!void,
-    destructor: ?*const fn ([]u8) void,
+    constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
+    destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
 
     available_slabs: DoublyLinkedList,
     full_slabs: DoublyLinkedList,
@@ -121,16 +120,14 @@ pub const RawCache = struct {
         };
     };
 
-    pub const Name = CacheName;
-
     pub const InitOptions = struct {
         cache_name: Name,
 
         size: usize,
         alignment: std.mem.Alignment,
 
-        constructor: ?*const fn ([]u8) ConstructorError!void = null,
-        destructor: ?*const fn ([]u8) void = null,
+        constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void = null,
+        destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void = null,
 
         /// Whether the last slab should be held in memory even if it is unused.
         hold_last_slab: bool = true,
@@ -324,7 +321,7 @@ pub const RawCache = struct {
                     const object_ptr = slab_base_ptr + (i * self.effective_object_size);
 
                     if (self.constructor) |constructor| {
-                        try constructor(object_ptr[0..self.object_size]);
+                        try constructor(object_ptr[0..self.object_size], current_task);
                     }
 
                     const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
@@ -354,7 +351,7 @@ pub const RawCache = struct {
                         const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
                         if (self.destructor) |destructor| {
-                            destructor(large_object.object);
+                            destructor(large_object.object, current_task);
                         }
 
                         globals.large_object_cache.free(current_task, large_object);
@@ -378,7 +375,7 @@ pub const RawCache = struct {
                     };
 
                     if (self.constructor) |constructor| {
-                        try constructor(object);
+                        try constructor(object, current_task);
                     }
 
                     slab.objects.prepend(&large_object.node);
@@ -472,7 +469,7 @@ pub const RawCache = struct {
                 if (self.destructor) |destructor| {
                     for (0..self.objects_per_slab) |i| {
                         const object_ptr = slab_base_ptr + (i * self.effective_object_size);
-                        destructor(object_ptr[0..self.object_size]);
+                        destructor(object_ptr[0..self.object_size], current_task);
                     }
                 }
 
@@ -491,7 +488,7 @@ pub const RawCache = struct {
                     const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
                     if (self.destructor) |destructor| {
-                        destructor(large_object.object);
+                        destructor(large_object.object, current_task);
                     }
 
                     globals.large_object_cache.free(current_task, large_object);
@@ -530,8 +527,6 @@ pub const RawCache = struct {
 
     const default_large_objects_per_slab = 16;
 };
-
-const CacheName = std.BoundedArray(u8, kernel.config.cache_name_length);
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
