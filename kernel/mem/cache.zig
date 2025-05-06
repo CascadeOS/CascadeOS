@@ -148,8 +148,25 @@ pub const RawCache = struct {
 
         const objects_per_slab = if (is_small)
             (kernel.arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_object_size
-        else
-            large_objects_per_slab;
+        else blk: {
+            var candidate_large_objects_per_slab: usize = default_large_objects_per_slab;
+
+            const initial_pages_for_allocation = kernel.arch.paging.standard_page_size.amountToCover(
+                .from(candidate_large_objects_per_slab * effective_object_size, .byte),
+            );
+
+            while (true) {
+                const next_pages_for_allocation = kernel.arch.paging.standard_page_size.amountToCover(
+                    .from((candidate_large_objects_per_slab + 1) * effective_object_size, .byte),
+                );
+
+                if (next_pages_for_allocation != initial_pages_for_allocation) break;
+
+                candidate_large_objects_per_slab += 1;
+            }
+
+            break :blk candidate_large_objects_per_slab;
+        };
 
         self.* = .{
             ._name = options.cache_name,
@@ -503,8 +520,7 @@ pub const RawCache = struct {
     const small_object_size = kernel.arch.paging.standard_page_size.divideScalar(8);
     const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(SinglyLinkedList.Node));
 
-    // TODO: this needs to be dynamically determined based on size of the object to minimize fragmentation
-    const large_objects_per_slab = 16;
+    const default_large_objects_per_slab = 16;
 };
 
 const CacheName = std.BoundedArray(u8, kernel.config.cache_name_length);
