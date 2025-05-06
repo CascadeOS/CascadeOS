@@ -8,7 +8,7 @@
 
 pub fn Cache(
     comptime T: type,
-    comptime constructor: ?fn (object: *T) void,
+    comptime constructor: ?fn (object: *T) ConstructorError!void,
     comptime destructor: ?fn (object: *T) void,
 ) type {
     return struct {
@@ -40,8 +40,8 @@ pub fn Cache(
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
                     struct {
-                        fn innerConstructor(object: []u8) void {
-                            con(@ptrCast(@alignCast(object)));
+                        fn innerConstructor(object: []u8) ConstructorError!void {
+                            try con(@ptrCast(@alignCast(object)));
                         }
                     }.innerConstructor
                 else
@@ -82,6 +82,8 @@ pub fn Cache(
     };
 }
 
+pub const ConstructorError = error{ObjectConstructionFailed};
+
 pub const RawCache = struct {
     _name: Name,
 
@@ -101,7 +103,7 @@ pub const RawCache = struct {
     /// Whether the last slab should be held in memory even if it is unused.
     hold_last_slab: bool,
 
-    constructor: ?*const fn ([]u8) void,
+    constructor: ?*const fn ([]u8) ConstructorError!void,
     destructor: ?*const fn ([]u8) void,
 
     available_slabs: DoublyLinkedList,
@@ -127,7 +129,7 @@ pub const RawCache = struct {
         size: usize,
         alignment: std.mem.Alignment,
 
-        constructor: ?*const fn ([]u8) void = null,
+        constructor: ?*const fn ([]u8) ConstructorError!void = null,
         destructor: ?*const fn ([]u8) void = null,
 
         /// Whether the last slab should be held in memory even if it is unused.
@@ -219,6 +221,8 @@ pub const RawCache = struct {
     }
 
     pub const AllocateError = error{
+        ObjectConstructionFailed,
+
         SlabAllocationFailed,
 
         /// Failed to allocate a large object.
@@ -304,7 +308,7 @@ pub const RawCache = struct {
                     kernel.arch.paging.standard_page_size.value,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
-                errdefer comptime unreachable;
+                errdefer kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, slab_allocation);
                 std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
 
                 const slab_base_ptr: [*]u8 = @ptrFromInt(slab_allocation.base);
@@ -320,7 +324,7 @@ pub const RawCache = struct {
                     const object_ptr = slab_base_ptr + (i * self.effective_object_size);
 
                     if (self.constructor) |constructor| {
-                        constructor(object_ptr[0..self.object_size]);
+                        try constructor(object_ptr[0..self.object_size]);
                     }
 
                     const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
@@ -347,10 +351,13 @@ pub const RawCache = struct {
 
                 errdefer {
                     while (slab.objects.popFirst()) |object_node| {
-                        globals.large_object_cache.free(
-                            current_task,
-                            @fieldParentPtr("node", object_node),
-                        );
+                        const large_object: *LargeObject = @fieldParentPtr("node", object_node);
+
+                        if (self.destructor) |destructor| {
+                            destructor(large_object.object);
+                        }
+
+                        globals.large_object_cache.free(current_task, large_object);
                     }
 
                     globals.slab_cache.free(current_task, slab);
@@ -360,6 +367,7 @@ pub const RawCache = struct {
 
                 for (0..self.objects_per_slab) |i| {
                     const large_object = try globals.large_object_cache.allocate(current_task);
+                    errdefer globals.large_object_cache.free(current_task, large_object);
 
                     const object: []u8 = (objects_base + (i * self.effective_object_size))[0..self.object_size];
 
@@ -369,11 +377,11 @@ pub const RawCache = struct {
                         .node = .{},
                     };
 
-                    slab.objects.prepend(&large_object.node);
-
                     if (self.constructor) |constructor| {
-                        constructor(object);
+                        try constructor(object);
                     }
+
+                    slab.objects.prepend(&large_object.node);
                 }
 
                 break :blk slab;
