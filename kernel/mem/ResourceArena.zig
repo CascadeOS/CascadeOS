@@ -172,10 +172,10 @@ pub fn create(
                 var cache_name: kernel.mem.RawCache.Name = .{};
                 cache_name.writer().print("{s} qcache {}", .{ arena.name(), i + 1 }) catch unreachable;
 
-                quantum_cache.init(cache_name, .{
+                quantum_cache.init(.{
+                    .cache_name = cache_name,
                     .size = quantum * (i + 1),
                     .alignment = .fromByteUnits(quantum),
-                    .source = arena,
                 });
                 arena.quantum_caches.append(quantum_cache) catch unreachable;
             }
@@ -202,10 +202,10 @@ pub fn create(
                 var cache_name: kernel.mem.RawCache.Name = .{};
                 cache_name.writer().print("heap qcache {}", .{i + 1}) catch unreachable;
 
-                raw_cache.init(cache_name, .{
+                raw_cache.init(.{
+                    .cache_name = cache_name,
                     .size = quantum * (i + 1),
                     .alignment = .fromByteUnits(quantum),
-                    .source = arena,
                 });
 
                 arena.quantum_caches.append(raw_cache) catch unreachable;

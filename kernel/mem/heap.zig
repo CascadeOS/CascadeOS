@@ -43,6 +43,64 @@ pub fn freeWithNoSize(ptr: [*]u8) void {
     );
 }
 
+pub fn allocateSpecial(
+    current_task: *kernel.Task,
+    size: core.Size,
+    physical_range: core.PhysicalRange,
+    map_type: kernel.mem.MapType,
+) !core.VirtualRange {
+    const allocation = try globals.special_heap_address_space_arena.allocate(
+        current_task,
+        size.value,
+        .instant_fit,
+    );
+    errdefer globals.special_heap_address_space_arena.deallocate(current_task, allocation);
+
+    const virtual_range: core.VirtualRange = .{
+        .address = .fromInt(allocation.base),
+        .size = .from(allocation.len, .byte),
+    };
+
+    globals.special_heap_page_table_mutex.lock(current_task);
+    defer globals.special_heap_page_table_mutex.unlock(current_task);
+
+    try kernel.mem.mapRangeToPhysicalRange(
+        current_task,
+        kernel.mem.globals.core_page_table,
+        virtual_range,
+        physical_range,
+        map_type,
+        .kernel,
+        true,
+        kernel.mem.phys.allocator,
+    );
+
+    return virtual_range;
+}
+
+pub fn deallocateSpecial(
+    current_task: *kernel.Task,
+    virtual_range: core.VirtualRange,
+) void {
+    {
+        globals.special_heap_page_table_mutex.lock(current_task);
+        defer globals.special_heap_page_table_mutex.unlock(current_task);
+
+        kernel.mem.unmapRange(
+            kernel.mem.globals.core_page_table,
+            virtual_range,
+            false,
+            .kernel,
+            true,
+        );
+    }
+
+    globals.special_heap_address_space_arena.deallocate(
+        current_task,
+        .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
+    );
+}
+
 const allocator_impl = struct {
     const Allocation = kernel.mem.ResourceArena.Allocation;
     fn alloc(
@@ -111,7 +169,7 @@ const allocator_impl = struct {
     }
 };
 
-fn heapArenaImport(
+fn heapPageArenaImport(
     arena: *ResourceArena,
     current_task: *kernel.Task,
     len: usize,
@@ -146,7 +204,7 @@ fn heapArenaImport(
     return allocation;
 }
 
-fn heapArenaRelease(
+fn heapPageArenaRelease(
     arena: *ResourceArena,
     current_task: *kernel.Task,
     allocation: ResourceArena.Allocation,
@@ -177,64 +235,6 @@ fn heapArenaRelease(
     );
 }
 
-pub fn allocateSpecial(
-    current_task: *kernel.Task,
-    size: core.Size,
-    physical_range: core.PhysicalRange,
-    map_type: kernel.mem.MapType,
-) !core.VirtualRange {
-    const allocation = try globals.special_heap_address_space_arena.allocate(
-        current_task,
-        size.value,
-        .instant_fit,
-    );
-    errdefer globals.special_heap_address_space_arena.deallocate(current_task, allocation);
-
-    const virtual_range: core.VirtualRange = .{
-        .address = .fromInt(allocation.base),
-        .size = .from(allocation.len, .byte),
-    };
-
-    globals.special_heap_page_table_mutex.lock(current_task);
-    defer globals.special_heap_page_table_mutex.unlock(current_task);
-
-    try kernel.mem.mapRangeToPhysicalRange(
-        current_task,
-        kernel.mem.globals.core_page_table,
-        virtual_range,
-        physical_range,
-        map_type,
-        .kernel,
-        true,
-        kernel.mem.phys.allocator,
-    );
-
-    return virtual_range;
-}
-
-pub fn deallocateSpecial(
-    current_task: *kernel.Task,
-    virtual_range: core.VirtualRange,
-) void {
-    {
-        globals.special_heap_page_table_mutex.lock(current_task);
-        defer globals.special_heap_page_table_mutex.unlock(current_task);
-
-        kernel.mem.unmapRange(
-            kernel.mem.globals.core_page_table,
-            virtual_range,
-            false,
-            .kernel,
-            true,
-        );
-    }
-
-    globals.special_heap_address_space_arena.deallocate(
-        current_task,
-        .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
-    );
-}
-
 const heap_arena_quantum: usize = 16;
 const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
 
@@ -246,12 +246,19 @@ pub const globals = struct {
     /// Initialized during `init.initializeHeaps`.
     var heap_address_space_arena: ResourceArena = undefined;
 
-    /// The heap arena.
+    /// The heap page arena, has a quantum of the standard page size.
     ///
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
     /// Initialized during `init.initializeHeaps`.
-    pub var heap_arena: ResourceArena = undefined;
+    pub var heap_page_arena: ResourceArena = undefined;
+
+    /// The heap arena.
+    ///
+    /// Has a source arena of `heap_page_arena`.
+    ///
+    /// Initialized during `init.initializeHeaps`.
+    var heap_arena: ResourceArena = undefined;
 
     var heap_page_table_mutex: kernel.sync.Mutex = .{};
 
@@ -279,15 +286,24 @@ pub const init = struct {
                 .{ .quantum_caching = .no },
             );
 
+            try globals.heap_page_arena.create(
+                "heap_page",
+                kernel.arch.paging.standard_page_size.value,
+                .{
+                    .source = .{
+                        .arena = &globals.heap_address_space_arena,
+                        .import = heapPageArenaImport,
+                        .release = heapPageArenaRelease,
+                    },
+                    .quantum_caching = .no,
+                },
+            );
+
             try globals.heap_arena.create(
                 "heap",
                 heap_arena_quantum,
                 .{
-                    .source = .{
-                        .arena = &globals.heap_address_space_arena,
-                        .import = heapArenaImport,
-                        .release = heapArenaRelease,
-                    },
+                    .source = .{ .arena = &globals.heap_page_arena },
                     .quantum_caching = .{ .heap = heap_arena_quantum_caches },
                 },
             );

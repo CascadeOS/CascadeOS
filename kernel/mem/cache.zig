@@ -19,7 +19,7 @@ pub fn Cache(
         pub const Name = CacheName;
 
         pub const InitOptions = struct {
-            source: *kernel.mem.ResourceArena,
+            cache_name: Name,
 
             /// Whether the last slab should be held in memory even if it is unused.
             hold_last_slab: bool = true,
@@ -28,14 +28,14 @@ pub fn Cache(
         /// Initialize the cache.
         pub fn init(
             self: *Self,
-            cache_name: Name,
             options: InitOptions,
         ) void {
             self.* = .{
                 .raw_cache = undefined,
             };
 
-            self.raw_cache.init(cache_name, .{
+            self.raw_cache.init(.{
+                .cache_name = options.cache_name,
                 .size = @sizeOf(T),
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
@@ -54,7 +54,6 @@ pub fn Cache(
                     }.innerDestructor
                 else
                     null,
-                .source = options.source,
                 .hold_last_slab = options.hold_last_slab,
             });
         }
@@ -110,7 +109,6 @@ pub const RawCache = struct {
 
     /// Used to ensure that only one thread allocates a new slab at a time.
     allocate_mutex: kernel.sync.Mutex,
-    source: *kernel.mem.ResourceArena,
 
     const Size = union(enum) {
         small,
@@ -124,10 +122,10 @@ pub const RawCache = struct {
     pub const Name = CacheName;
 
     pub const InitOptions = struct {
+        cache_name: Name,
+
         size: usize,
         alignment: std.mem.Alignment,
-
-        source: *kernel.mem.ResourceArena,
 
         constructor: ?*const fn ([]u8) void = null,
         destructor: ?*const fn ([]u8) void = null,
@@ -139,7 +137,6 @@ pub const RawCache = struct {
     /// Initialize the cache.
     pub fn init(
         self: *RawCache,
-        cache_name: Name,
         options: InitOptions,
     ) void {
         const is_small = options.alignment.forward(options.size) <= small_object_size.value;
@@ -155,8 +152,7 @@ pub const RawCache = struct {
             large_objects_per_slab;
 
         self.* = .{
-            ._name = cache_name,
-            .source = options.source,
+            ._name = options.cache_name,
             .allocate_mutex = .{},
             .lock = .{},
             .object_size = options.size,
@@ -286,7 +282,7 @@ pub const RawCache = struct {
 
         const slab = switch (self.size_class) {
             .small => blk: {
-                const slab_allocation = self.source.allocate(
+                const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
                     current_task,
                     kernel.arch.paging.standard_page_size.value,
                     .instant_fit,
@@ -320,14 +316,12 @@ pub const RawCache = struct {
                 break :blk slab;
             },
             .large => blk: {
-                const large_object_allocation_size = self.effective_object_size * self.objects_per_slab;
-
-                const large_object_allocation = self.source.allocate(
+                const large_object_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
                     current_task,
-                    large_object_allocation_size,
+                    self.effective_object_size * self.objects_per_slab,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
-                errdefer self.source.deallocate(current_task, large_object_allocation);
+                errdefer kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, large_object_allocation);
 
                 const slab = try globals.slab_cache.allocate(current_task);
                 slab.* = .{
@@ -457,7 +451,7 @@ pub const RawCache = struct {
                     }
                 }
 
-                self.source.deallocate(
+                kernel.mem.heap.globals.heap_page_arena.deallocate(
                     current_task,
                     .{
                         .base = @intFromPtr(slab_base_ptr),
@@ -478,7 +472,7 @@ pub const RawCache = struct {
                     globals.large_object_cache.free(current_task, large_object);
                 }
 
-                self.source.deallocate(current_task, slab.large_object_allocation);
+                kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, slab.large_object_allocation);
 
                 globals.slab_cache.free(current_task, slab);
             },
@@ -526,13 +520,11 @@ const globals = struct {
 pub const init = struct {
     pub fn initializeCaches() !void {
         globals.slab_cache.init(
-            try .fromSlice("slab"),
-            .{ .source = &kernel.mem.heap.globals.heap_arena },
+            .{ .cache_name = try .fromSlice("slab") },
         );
 
         globals.large_object_cache.init(
-            try .fromSlice("large object"),
-            .{ .source = &kernel.mem.heap.globals.heap_arena },
+            .{ .cache_name = try .fromSlice("large object") },
         );
     }
 };
