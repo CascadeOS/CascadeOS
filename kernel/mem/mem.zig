@@ -296,7 +296,7 @@ pub const init = struct {
         try heap.init.initializeHeaps(current_task, result.heap_range, result.special_heap_range);
 
         init_log.debug("initializing kernel stacks heap", .{});
-        try kernel.Stack.init.initializeStacks(current_task, result.stacks_range);
+        try kernel.Task.init.initializeStacks(current_task, result.stacks_range);
     }
 
     fn numberOfUsablePagesAndRegions() struct { usize, usize } {

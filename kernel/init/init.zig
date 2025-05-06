@@ -222,7 +222,7 @@ fn createExecutors() ![]kernel.Executor {
             .id = @enumFromInt(task_id),
             ._name = .{}, // set below
             .state = .{ .running = executor },
-            .stack = try kernel.Stack.createStack(current_task),
+            .stack = try kernel.Task.Stack.createStack(current_task),
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
         };
         task_id += 1;
@@ -237,7 +237,7 @@ fn createExecutors() ![]kernel.Executor {
                 .id = @enumFromInt(task_id),
                 ._name = .{}, // set below
                 .state = .ready,
-                .stack = try kernel.Stack.createStack(current_task),
+                .stack = try kernel.Task.Stack.createStack(current_task),
                 .is_idle_task = true,
             },
         };

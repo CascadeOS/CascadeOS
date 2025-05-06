@@ -6,8 +6,8 @@ apic_id: u32,
 gdt: lib_x64.Gdt = .{},
 tss: lib_x64.Tss = .{},
 
-double_fault_stack: kernel.Stack,
-non_maskable_interrupt_stack: kernel.Stack,
+double_fault_stack: kernel.Task.Stack,
+non_maskable_interrupt_stack: kernel.Task.Stack,
 
 const std = @import("std");
 const core = @import("core");

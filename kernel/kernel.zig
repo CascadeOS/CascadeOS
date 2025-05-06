@@ -11,7 +11,6 @@ pub const Executor = @import("Executor.zig");
 pub const mem = @import("mem/mem.zig");
 pub const pci = @import("pci.zig");
 pub const scheduler = @import("scheduler.zig");
-pub const Stack = @import("Stack.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");

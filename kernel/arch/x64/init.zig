@@ -62,16 +62,16 @@ pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u6
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        kernel.Stack.createStack(current_task) catch @panic("failed to allocate double fault stack"),
-        kernel.Stack.createStack(current_task) catch @panic("failed to allocate NMI stack"),
+        kernel.Task.Stack.createStack(current_task) catch @panic("failed to allocate double fault stack"),
+        kernel.Task.Stack.createStack(current_task) catch @panic("failed to allocate NMI stack"),
     );
 }
 
 fn prepareExecutorShared(
     executor: *kernel.Executor,
     apic_id: u32,
-    double_fault_stack: kernel.Stack,
-    non_maskable_interrupt_stack: kernel.Stack,
+    double_fault_stack: kernel.Task.Stack,
+    non_maskable_interrupt_stack: kernel.Task.Stack,
 ) void {
     executor.arch = .{
         .apic_id = apic_id,

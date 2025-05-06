@@ -176,7 +176,7 @@ pub fn prepareNewTaskForScheduling(
 /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
 pub fn callOneArgs(
     opt_old_task: ?*kernel.Task,
-    new_stack: kernel.Stack,
+    new_stack: kernel.Task.Stack,
     arg1: anytype,
     target_function: *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
 ) kernel.arch.scheduling.CallError!void {
@@ -241,7 +241,7 @@ pub fn callOneArgs(
 /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
 pub fn callTwoArgs(
     opt_old_task: ?*kernel.Task,
-    new_stack: kernel.Stack,
+    new_stack: kernel.Task.Stack,
     arg1: anytype,
     arg2: anytype,
     target_function: *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
