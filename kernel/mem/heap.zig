@@ -237,7 +237,7 @@ pub fn deallocateSpecial(
 
 const heap_arena_quantum: usize = 16;
 
-const globals = struct {
+pub const globals = struct {
     /// An arena managing the heap's virtual address space.
     ///
     /// Has no source arena, provided with a single span representing the entire heap.
@@ -250,7 +250,7 @@ const globals = struct {
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
     /// Initialized during `init.initializeHeaps`.
-    var heap_arena: ResourceArena = undefined;
+    pub var heap_arena: ResourceArena = undefined;
 
     var heap_page_table_mutex: kernel.sync.Mutex = .{};
 

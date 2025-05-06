@@ -4,6 +4,9 @@
 pub const heap = @import("heap.zig");
 pub const phys = @import("phys.zig");
 
+const cache = @import("cache.zig");
+pub const Cache = cache.Cache;
+pub const RawCache = cache.RawCache;
 pub const MapType = @import("MapType.zig");
 pub const FlushRequest = @import("FlushRequest.zig");
 pub const ResourceArena = @import("ResourceArena.zig");
@@ -285,6 +288,9 @@ pub const init = struct {
 
         init_log.debug("initializing physical memory", .{});
         phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, result.pages_range);
+
+        init_log.debug("initializing caches", .{});
+        try cache.init.initializeCaches();
 
         init_log.debug("initializing kernel and special heap", .{});
         try heap.init.initializeHeaps(current_task, result.heap_range, result.special_heap_range);
