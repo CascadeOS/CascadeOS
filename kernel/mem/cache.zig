@@ -88,6 +88,8 @@ pub const RawCache = struct {
 
     lock: kernel.sync.TicketSpinLock,
 
+    size_class: Size,
+
     size: usize,
 
     /// The size of the object with sufficient padding to ensure alignment.
@@ -110,7 +112,14 @@ pub const RawCache = struct {
     /// Whether the last slab should be held in memory even if it is unused.
     hold_last_slab: bool,
 
-    large_object_hashmap: std.AutoHashMap(usize, *LargeBuffer),
+    const Size = union(enum) {
+        small,
+        large: Large,
+
+        const Large = struct {
+            object_lookup: std.AutoHashMap(usize, *LargeBuffer),
+        };
+    };
 
     pub const Name = CacheName;
 
@@ -133,12 +142,14 @@ pub const RawCache = struct {
         cache_name: Name,
         options: InitOptions,
     ) void {
-        const effective_size = if (isSmallObject(options.size))
+        const is_small = options.size <= small_object_size.value;
+
+        const effective_size = if (is_small)
             options.alignment.forward(single_node_alignment.forward(options.size) + @sizeOf(SinglyLinkedList.Node))
         else
             options.alignment.forward(options.size);
 
-        const buffers_per_slab = if (isSmallObject(options.size))
+        const buffers_per_slab = if (is_small)
             (kernel.arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_size
         else
             large_objects_per_slab;
@@ -156,10 +167,14 @@ pub const RawCache = struct {
             .full_slabs = .{},
             .buffers_per_slab = buffers_per_slab,
             .hold_last_slab = options.hold_last_slab,
-            .large_object_hashmap = if (!isSmallObject(options.size))
-                .init(kernel.mem.heap.allocator)
+            .size_class = if (is_small)
+                .small
             else
-                undefined,
+                .{
+                    .large = .{
+                        .object_lookup = .init(kernel.mem.heap.allocator),
+                    },
+                },
         };
     }
 
@@ -171,14 +186,19 @@ pub const RawCache = struct {
 
         std.debug.assert(self.full_slabs.first == null);
 
+        switch (self.size_class) {
+            .small => {},
+            .large => |large| {
+                if (large.object_lookup.count() != 0) @panic("large object lookup not empty");
+            },
+        }
+
         while (self.available_slabs.pop()) |node| {
             const slab: *Slab = @fieldParentPtr("linkage", node);
             if (slab.allocated_buffers != 0) @panic("slab not empty");
 
             self.deallocateSlab(current_task, slab);
         }
-
-        self.large_object_hashmap.deinit();
 
         self.lock.unlock(current_task);
 
@@ -191,6 +211,11 @@ pub const RawCache = struct {
 
     pub const AllocateError = error{
         SlabAllocationFailed,
+
+        /// Failed to allocate a large object.
+        ///
+        /// Only possible if adding the object to the large object lookup failed.
+        LargeObjectAllocationFailed,
     };
 
     /// Allocate a buffer from the cache.
@@ -216,14 +241,30 @@ pub const RawCache = struct {
 
         self.lock.unlock(current_task);
 
-        if (isSmallObject(self.size)) {
-            const buffer_node_ptr: [*]u8 = @ptrCast(buffer_node);
-            const buffer_ptr: [*]u8 = buffer_node_ptr - single_node_alignment.forward(self.size);
-            return buffer_ptr[0..self.size];
-        }
+        switch (self.size_class) {
+            .small => {
+                const buffer_node_ptr: [*]u8 = @ptrCast(buffer_node);
+                const buffer_ptr: [*]u8 = buffer_node_ptr - single_node_alignment.forward(self.size);
+                return buffer_ptr[0..self.size];
+            },
+            .large => |*large| {
+                const large_buffer: *LargeBuffer = @fieldParentPtr("node", buffer_node);
 
-        const large_buffer: *LargeBuffer = @fieldParentPtr("node", buffer_node);
-        return large_buffer.buffer;
+                large.object_lookup.putNoClobber(@intFromPtr(large_buffer.buffer.ptr), large_buffer) catch {
+                    @branchHint(.cold);
+
+                    self.lock.lock(current_task);
+                    defer self.lock.unlock(current_task);
+
+                    slab.buffers.prepend(buffer_node);
+                    slab.allocated_buffers -= 1;
+
+                    return AllocateError.LargeObjectAllocationFailed;
+                };
+
+                return large_buffer.buffer;
+            },
+        }
     }
 
     /// Allocates a new slab.
@@ -235,121 +276,104 @@ pub const RawCache = struct {
         self.allocate_mutex.lock(current_task);
         defer self.allocate_mutex.unlock(current_task);
 
-        self.lock.lock(current_task);
-
-        if (self.available_slabs.first) |slab_node| {
-            // there is an available slab now, use it without allocating a new one
-            return @fieldParentPtr("linkage", slab_node);
-        }
-
-        self.lock.unlock(current_task);
-
-        if (isSmallObject(self.size)) {
-            // small object slab
-
-            const page_buffer_allocation = self.source.allocate(
-                current_task,
-                kernel.arch.paging.standard_page_size.value,
-                .instant_fit,
-            ) catch return AllocateError.SlabAllocationFailed;
-            errdefer comptime unreachable;
-            std.debug.assert(page_buffer_allocation.len == kernel.arch.paging.standard_page_size.value);
-
-            const page_buffer_base_ptr: [*]u8 = @ptrFromInt(page_buffer_allocation.base);
-
-            const slab: *Slab = @ptrFromInt(page_buffer_allocation.base + page_buffer_allocation.len - @sizeOf(Slab));
-            slab.* = .{
-                .large_object_allocation = undefined,
-            };
-
-            for (0..self.buffers_per_slab) |i| {
-                const buffer_ptr = page_buffer_base_ptr + (i * self.effective_size);
-
-                if (self.constructor) |constructor| {
-                    constructor(buffer_ptr[0..self.size]);
-                }
-
-                const buffer_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
-                    buffer_ptr + single_node_alignment.forward(self.size),
-                ));
-                slab.buffers.prepend(buffer_node);
-            }
-
+        // optimistically check for an available slab without locking, if there is one lock and check again
+        if (self.available_slabs.first != null) {
             self.lock.lock(current_task);
 
-            self.available_slabs.append(&slab.linkage);
-
-            return slab;
-        }
-
-        // large object slab
-
-        const large_buffer_size = self.effective_size * self.buffers_per_slab;
-
-        const buffer_allocation = self.source.allocate(
-            current_task,
-            large_buffer_size,
-            .instant_fit,
-        ) catch return AllocateError.SlabAllocationFailed;
-        errdefer self.source.deallocate(current_task, buffer_allocation);
-
-        const buffer_base_ptr: [*]u8 = @ptrFromInt(buffer_allocation.base);
-
-        const slab = try globals.slab_cache.allocate(current_task);
-        slab.* = .{
-            .large_object_allocation = buffer_allocation,
-        };
-
-        errdefer {
-            while (slab.buffers.popFirst()) |large_buffer_node| {
-                globals.large_buffer_cache.free(
-                    current_task,
-                    @fieldParentPtr("node", large_buffer_node),
-                );
-            }
-
-            globals.slab_cache.free(current_task, slab);
-        }
-
-        for (0..self.buffers_per_slab) |i| {
-            const large_buffer = try globals.large_buffer_cache.allocate(current_task);
-
-            const buffer: []u8 = (buffer_base_ptr + (i * self.effective_size))[0..self.size];
-
-            large_buffer.* = .{
-                .buffer = buffer,
-                .slab = slab,
-                .node = .{},
-            };
-
-            slab.buffers.prepend(&large_buffer.node);
-
-            if (self.constructor) |constructor| {
-                constructor(buffer);
-            }
-        }
-
-        self.lock.lock(current_task);
-
-        errdefer {
-            var opt_node = slab.buffers.first;
-            while (opt_node) |node| : (opt_node = node.next) {
-                const large_buffer: *LargeBuffer = @fieldParentPtr("node", node);
-
-                if (!self.large_object_hashmap.remove(@intFromPtr(large_buffer.buffer.ptr))) {
-                    break;
-                }
+            if (self.available_slabs.first) |slab_node| {
+                // there is an available slab now, use it without allocating a new one
+                return @fieldParentPtr("linkage", slab_node);
             }
 
             self.lock.unlock(current_task);
         }
 
-        var opt_node = slab.buffers.first;
-        while (opt_node) |node| : (opt_node = node.next) {
-            const large_buffer: *LargeBuffer = @fieldParentPtr("node", node);
-            self.large_object_hashmap.putNoClobber(@intFromPtr(large_buffer.buffer.ptr), large_buffer) catch
-                return AllocateError.SlabAllocationFailed;
-        }
+        const slab = switch (self.size_class) {
+            .small => blk: {
+                const slab_allocation = self.source.allocate(
+                    current_task,
+                    kernel.arch.paging.standard_page_size.value,
+                    .instant_fit,
+                ) catch return AllocateError.SlabAllocationFailed;
+                errdefer comptime unreachable;
+                std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
+
+                const slab_base_ptr: [*]u8 = @ptrFromInt(slab_allocation.base);
+
+                const slab: *Slab = @ptrFromInt(
+                    slab_allocation.base + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab),
+                );
+                slab.* = .{
+                    .large_object_allocation = undefined,
+                };
+
+                for (0..self.buffers_per_slab) |i| {
+                    const buffer_ptr = slab_base_ptr + (i * self.effective_size);
+
+                    if (self.constructor) |constructor| {
+                        constructor(buffer_ptr[0..self.size]);
+                    }
+
+                    const buffer_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
+                        buffer_ptr + single_node_alignment.forward(self.size),
+                    ));
+                    buffer_node.* = .{};
+                    slab.buffers.prepend(buffer_node);
+                }
+
+                break :blk slab;
+            },
+            .large => blk: {
+                const large_buffer_size = self.effective_size * self.buffers_per_slab;
+
+                const buffer_allocation = self.source.allocate(
+                    current_task,
+                    large_buffer_size,
+                    .instant_fit,
+                ) catch return AllocateError.SlabAllocationFailed;
+                errdefer self.source.deallocate(current_task, buffer_allocation);
+
+                const buffer_base_ptr: [*]u8 = @ptrFromInt(buffer_allocation.base);
+
+                const slab = try globals.slab_cache.allocate(current_task);
+                slab.* = .{
+                    .large_object_allocation = buffer_allocation,
+                };
+
+                errdefer {
+                    while (slab.buffers.popFirst()) |large_buffer_node| {
+                        globals.large_buffer_cache.free(
+                            current_task,
+                            @fieldParentPtr("node", large_buffer_node),
+                        );
+                    }
+
+                    globals.slab_cache.free(current_task, slab);
+                }
+
+                for (0..self.buffers_per_slab) |i| {
+                    const large_buffer = try globals.large_buffer_cache.allocate(current_task);
+
+                    const buffer: []u8 = (buffer_base_ptr + (i * self.effective_size))[0..self.size];
+
+                    large_buffer.* = .{
+                        .buffer = buffer,
+                        .slab = slab,
+                        .node = .{},
+                    };
+
+                    slab.buffers.prepend(&large_buffer.node);
+
+                    if (self.constructor) |constructor| {
+                        constructor(buffer);
+                    }
+                }
+
+                break :blk slab;
+            },
+        };
+
+        self.lock.lock(current_task);
 
         self.available_slabs.append(&slab.linkage);
 
@@ -358,28 +382,31 @@ pub const RawCache = struct {
 
     /// Free a buffer back to the cache.
     pub fn free(self: *RawCache, current_task: *kernel.Task, buffer: []u8) void {
-        const slab, const buffer_node = if (isSmallObject(self.size)) blk: {
-            const page_start = std.mem.alignBackward(
-                usize,
-                @intFromPtr(buffer.ptr),
-                kernel.arch.paging.standard_page_size.value,
-            );
+        const slab, const buffer_node = switch (self.size_class) {
+            .small => blk: {
+                const page_start = std.mem.alignBackward(
+                    usize,
+                    @intFromPtr(buffer.ptr),
+                    kernel.arch.paging.standard_page_size.value,
+                );
 
-            const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
+                const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
 
-            const buffer_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
-                buffer.ptr + single_node_alignment.forward(self.size),
-            ));
+                const buffer_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
+                    buffer.ptr + single_node_alignment.forward(self.size),
+                ));
 
-            break :blk .{ slab, buffer_node };
-        } else blk: {
-            const large_buffer = self.large_object_hashmap.get(@intFromPtr(buffer.ptr)) orelse {
-                @panic("large object not found in hashmap");
-            };
+                break :blk .{ slab, buffer_node };
+            },
+            .large => |*large| blk: {
+                const large_buffer = large.object_lookup.get(@intFromPtr(buffer.ptr)) orelse {
+                    @panic("large object not found in object lookup");
+                };
 
-            _ = self.large_object_hashmap.remove(@intFromPtr(buffer.ptr));
+                _ = large.object_lookup.remove(@intFromPtr(buffer.ptr));
 
-            break :blk .{ large_buffer.slab, &large_buffer.node };
+                break :blk .{ large_buffer.slab, &large_buffer.node };
+            },
         };
 
         self.lock.lock(current_task);
@@ -422,49 +449,48 @@ pub const RawCache = struct {
     ///
     /// The cache's lock must *not* be held when this is called.
     fn deallocateSlab(self: *RawCache, current_task: *kernel.Task, slab: *Slab) void {
-        if (isSmallObject(self.size)) {
-            // small object slab
+        switch (self.size_class) {
+            .small => {
+                const page_buffer_base = @intFromPtr(slab) + @sizeOf(Slab) - kernel.arch.paging.standard_page_size.value;
 
-            const page_buffer_base = @intFromPtr(slab) + @sizeOf(Slab) - kernel.arch.paging.standard_page_size.value;
+                const page_buffer_base_ptr: [*]u8 = @ptrFromInt(page_buffer_base);
 
-            const page_buffer_base_ptr: [*]u8 = @ptrFromInt(page_buffer_base);
+                if (self.destructor) |destructor| {
+                    for (0..self.buffers_per_slab) |i| {
+                        const buffer_ptr = page_buffer_base_ptr + (i * self.effective_size);
 
-            if (self.destructor) |destructor| {
-                for (0..self.buffers_per_slab) |i| {
-                    const buffer_ptr = page_buffer_base_ptr + (i * self.effective_size);
-
-                    destructor(buffer_ptr[0..self.size]);
+                        destructor(buffer_ptr[0..self.size]);
+                    }
                 }
-            }
 
-            const allocation: kernel.mem.ResourceArena.Allocation = .{
-                .base = page_buffer_base,
-                .len = kernel.arch.paging.standard_page_size.value,
-            };
+                const allocation: kernel.mem.ResourceArena.Allocation = .{
+                    .base = page_buffer_base,
+                    .len = kernel.arch.paging.standard_page_size.value,
+                };
 
-            self.source.deallocate(
-                current_task,
-                allocation,
-            );
+                self.source.deallocate(
+                    current_task,
+                    allocation,
+                );
 
-            return;
+                return;
+            },
+            .large => {
+                while (slab.buffers.popFirst()) |large_buffer_node| {
+                    const large_buffer: *LargeBuffer = @fieldParentPtr("node", large_buffer_node);
+
+                    if (self.destructor) |destructor| {
+                        destructor(large_buffer.buffer);
+                    }
+
+                    globals.large_buffer_cache.free(current_task, large_buffer);
+                }
+
+                self.source.deallocate(current_task, slab.large_object_allocation);
+
+                globals.slab_cache.free(current_task, slab);
+            },
         }
-
-        // large object slab
-
-        while (slab.buffers.popFirst()) |large_buffer_node| {
-            const large_buffer: *LargeBuffer = @fieldParentPtr("node", large_buffer_node);
-
-            if (self.destructor) |destructor| {
-                destructor(large_buffer.buffer);
-            }
-
-            globals.large_buffer_cache.free(current_task, large_buffer);
-        }
-
-        self.source.deallocate(current_task, slab.large_object_allocation);
-
-        globals.slab_cache.free(current_task, slab);
     }
 
     const Slab = struct {
@@ -488,9 +514,6 @@ pub const RawCache = struct {
         node: SinglyLinkedList.Node = .{},
     };
 
-    inline fn isSmallObject(size: usize) bool {
-        return size <= small_object_size.value;
-    }
     const small_object_size = kernel.arch.paging.standard_page_size.divideScalar(8);
     const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(SinglyLinkedList.Node));
 
