@@ -20,22 +20,16 @@ pub fn initStage1() !noreturn {
     // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
     kernel.mem.init.logEarlyOffsets();
 
-    var bootstrap_init_task: kernel.Task = .{
-        .id = @enumFromInt(0),
-        ._name = try .fromSlice("bootstrap init"),
-        .state = undefined, // set after declaration of `bootstrap_executor`
-        .stack = undefined, // never used
-        .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-    };
-
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
-        .current_task = &bootstrap_init_task,
+        .current_task = undefined, // set below
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
         .idle_task = undefined, // never used
     };
 
-    bootstrap_init_task.state = .{ .running = &bootstrap_executor };
+    var bootstrap_init_task = try kernel.Task.init.createBootstrapInitTask(&bootstrap_executor);
+
+    bootstrap_executor.current_task = &bootstrap_init_task;
 
     kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
 
@@ -208,7 +202,6 @@ fn createExecutors() ![]kernel.Executor {
     const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
     var i: u32 = 0;
-    var task_id: u32 = 1; // `1` as `0` is the bootstrap task
 
     while (descriptors.next()) |desc| : (i += 1) {
         if (i == 0) std.debug.assert(desc.acpiProcessorId() == 0);
@@ -218,32 +211,16 @@ fn createExecutors() ![]kernel.Executor {
 
         const init_task = &init_tasks[i];
 
-        init_task.* = .{
-            .id = @enumFromInt(task_id),
-            ._name = .{}, // set below
-            .state = .{ .running = executor },
-            .stack = try kernel.Task.Stack.createStack(current_task),
-            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-        };
-        task_id += 1;
-
-        try init_task._name.writer().print("init {}", .{i});
+        try kernel.Task.init.initializeInitTask(current_task, init_task, executor);
 
         executor.* = .{
             .id = id,
             .arch = undefined, // set by `arch.init.prepareExecutor`
             .current_task = init_task,
-            .idle_task = .{
-                .id = @enumFromInt(task_id),
-                ._name = .{}, // set below
-                .state = .ready,
-                .stack = try kernel.Task.Stack.createStack(current_task),
-                .is_idle_task = true,
-            },
+            .idle_task = undefined, // set below
         };
-        task_id += 1;
 
-        try executor.idle_task._name.writer().print("idle {}", .{i});
+        try kernel.Task.init.initializeIdleTask(current_task, &executor.idle_task, executor);
 
         kernel.arch.init.prepareExecutor(
             executor,

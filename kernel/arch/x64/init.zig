@@ -62,8 +62,8 @@ pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u6
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        kernel.Task.Stack.createStack(current_task) catch @panic("failed to allocate double fault stack"),
-        kernel.Task.Stack.createStack(current_task) catch @panic("failed to allocate NMI stack"),
+        kernel.Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate double fault stack"),
+        kernel.Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate NMI stack"),
     );
 }
 

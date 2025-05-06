@@ -123,6 +123,41 @@ pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
     return .{ current_task, .{ .previous_value = previous_value } };
 }
 
+pub const CreateOptions = struct {
+    name: Name,
+
+    start_function: kernel.arch.scheduling.NewTaskFunction,
+    arg: u64,
+};
+
+/// Create a task.
+pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
+    const task = try globals.cache.allocate(current_task);
+
+    task.id = getId();
+    task._name = options.name;
+    task.state = .ready;
+    task.interrupt_disable_count.store(1, .monotonic); // fresh tasks start with interrupts disabled
+    task.preemption_disable_count.store(0, .monotonic);
+    task.preemption_skipped.store(false, .monotonic);
+    task.spinlocks_held = 1; // fresh tasks start with the scheduler locked
+    task.next_task_node = .empty;
+
+    task.stack.stack_pointer = task.stack.top_stack_pointer;
+
+    try kernel.arch.scheduling.prepareNewTaskForScheduling(task, options.arg, options.start_function);
+
+    return task;
+}
+
+/// Destroy a task.
+///
+/// Asserts that the task is in the `dropped` state.
+pub fn destroy(current_task: *kernel.Task, task: *Task) void {
+    std.debug.assert(task.state == .dropped);
+    globals.cache.free(current_task, task);
+}
+
 pub const Id = enum(u64) {
     none = std.math.maxInt(u64),
 
@@ -130,28 +165,6 @@ pub const Id = enum(u64) {
 };
 
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
-
-pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
-    try writer.print("Task({s})", .{task.name()});
-}
-
-pub inline fn format(
-    task: *const Task,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
-    _ = options;
-    _ = fmt;
-    return if (@TypeOf(writer) == std.io.AnyWriter)
-        print(task, writer, 0)
-    else
-        print(task, writer.any(), 0);
-}
-
-pub inline fn fromNode(node: *containers.SingleNode) *Task {
-    return @fieldParentPtr("next_task_node", node);
-}
 
 pub const Stack = struct {
     /// The entire virtual range including the guard page.
@@ -211,74 +224,127 @@ pub const Stack = struct {
 
         stack.stack_pointer = new_stack_pointer;
     }
-
-    pub fn createStack(current_task: *kernel.Task) !Stack {
-        const stack_range = try globals.stack_arena.allocate(
-            current_task,
-            stack_size_including_guard_page.value,
-            .instant_fit,
-        );
-        errdefer globals.stack_arena.deallocate(current_task, stack_range);
-
-        const range: core.VirtualRange = .{
-            .address = .fromInt(stack_range.base),
-            .size = stack_size_including_guard_page,
-        };
-        const usable_range: core.VirtualRange = .{
-            .address = .fromInt(stack_range.base),
-            .size = kernel.config.kernel_stack_size,
-        };
-
-        {
-            globals.stack_page_table_mutex.lock(current_task);
-            defer globals.stack_page_table_mutex.unlock(current_task);
-
-            try kernel.mem.mapRangeAndAllocatePhysicalFrames(
-                current_task,
-                kernel.mem.globals.core_page_table,
-                usable_range,
-                .{ .writeable = true, .global = true },
-                .kernel,
-                true,
-                kernel.mem.phys.allocator,
-            );
-        }
-
-        return fromRange(range, usable_range);
-    }
-
-    pub fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
-        {
-            globals.stack_page_table_mutex.lock(current_task);
-            defer globals.stack_page_table_mutex.unlock(current_task);
-
-            kernel.mem.unmapRange(
-                current_task,
-                kernel.mem.globals.core_page_table,
-                stack.usable_range,
-                true,
-                .kernel,
-                true,
-                kernel.mem.phys.allocator,
-            );
-        }
-
-        globals.stack_arena.deallocate(current_task, .{
-            .base = stack.range.address.value,
-            .len = stack.range.size.value,
-        });
-    }
-
-    const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 };
 
-const globals = struct {
+const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
+
+fn getId() Id {
+    const id: Id = @enumFromInt(globals.id_counter.fetchAdd(1, .acq_rel));
+    if (id == .none) @panic("task id counter overflowed"); // TODO: handle this better
+    return id;
+}
+
+pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
+    try writer.print("Task({s})", .{task.name()});
+}
+
+pub inline fn format(
+    task: *const Task,
+    comptime fmt: []const u8,
+    options: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    _ = options;
+    _ = fmt;
+    return if (@TypeOf(writer) == std.io.AnyWriter)
+        print(task, writer, 0)
+    else
+        print(task, writer.any(), 0);
+}
+
+pub inline fn fromNode(node: *containers.SingleNode) *Task {
+    return @fieldParentPtr("next_task_node", node);
+}
+
+fn cacheConstructor(self: *Task, current_task: *Task) kernel.mem.cache.ConstructorError!void {
+    self.* = .{
+        .id = undefined,
+        ._name = .{},
+        .state = .dropped,
+        .stack = try createStack(current_task),
+    };
+}
+
+fn createStack(current_task: *kernel.Task) !Stack {
+    const stack_range = globals.stack_arena.allocate(
+        current_task,
+        stack_size_including_guard_page.value,
+        .instant_fit,
+    ) catch return error.ObjectConstructionFailed;
+    errdefer globals.stack_arena.deallocate(current_task, stack_range);
+
+    const range: core.VirtualRange = .{
+        .address = .fromInt(stack_range.base),
+        .size = stack_size_including_guard_page,
+    };
+    const usable_range: core.VirtualRange = .{
+        .address = .fromInt(stack_range.base),
+        .size = kernel.config.kernel_stack_size,
+    };
+
+    {
+        globals.stack_page_table_mutex.lock(current_task);
+        defer globals.stack_page_table_mutex.unlock(current_task);
+
+        kernel.mem.mapRangeAndAllocatePhysicalFrames(
+            current_task,
+            kernel.mem.globals.core_page_table,
+            usable_range,
+            .{ .writeable = true, .global = true },
+            .kernel,
+            true,
+            kernel.mem.phys.allocator,
+        ) catch return error.ObjectConstructionFailed;
+    }
+
+    return .fromRange(range, usable_range);
+}
+
+fn cacheDestructor(self: *Task, current_task: *Task) void {
+    destroyStack(self.stack, current_task);
+}
+
+fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
+    {
+        globals.stack_page_table_mutex.lock(current_task);
+        defer globals.stack_page_table_mutex.unlock(current_task);
+
+        kernel.mem.unmapRange(
+            current_task,
+            kernel.mem.globals.core_page_table,
+            stack.usable_range,
+            true,
+            .kernel,
+            true,
+            kernel.mem.phys.allocator,
+        );
+    }
+
+    globals.stack_arena.deallocate(current_task, .{
+        .base = stack.range.address.value,
+        .len = stack.range.size.value,
+    });
+}
+
+pub const globals = struct {
+    /// The source of task IDs.
+    ///
+    /// TODO: The system will panic if this counter overflows.
+    var id_counter: std.atomic.Value(usize) = .init(0);
+
+    /// The source of task objects.
+    ///
+    /// Initialized during `init.initializeMemorySystem`.
+    var cache: kernel.mem.cache.Cache(Task, cacheConstructor, cacheDestructor) = undefined;
+
     var stack_arena: kernel.mem.ResourceArena = undefined;
     var stack_page_table_mutex: kernel.sync.Mutex = .{};
 };
 
 pub const init = struct {
-    pub fn initializeStacks(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
+    pub const earlyCreateStack = createStack;
+
+    pub fn initializeTaskStacksAndCache(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
         try globals.stack_arena.create(
             "stacks",
             kernel.arch.paging.standard_page_size.value,
@@ -295,6 +361,58 @@ pub const init = struct {
                 .{@errorName(err)},
             );
         };
+
+        globals.cache.init(
+            .{ .cache_name = try .fromSlice("task") },
+        );
+    }
+
+    pub fn createBootstrapInitTask(
+        bootstrap_executor: *kernel.Executor,
+    ) !kernel.Task {
+        var bootstrap_init_task: Task = .{
+            .id = getId(),
+            ._name = try .fromSlice("bootstrap init"),
+            .state = undefined, // set after declaration of `bootstrap_executor`
+            .stack = undefined, // never used
+            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
+        };
+
+        bootstrap_init_task.state = .{ .running = bootstrap_executor };
+
+        return bootstrap_init_task;
+    }
+
+    pub fn initializeInitTask(
+        current_task: *kernel.Task,
+        init_task: *kernel.Task,
+        executor: *kernel.Executor,
+    ) !void {
+        init_task.* = .{
+            .id = getId(),
+            ._name = .{}, // set below
+            .state = .{ .running = executor },
+            .stack = try createStack(current_task),
+            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
+        };
+
+        try init_task._name.writer().print("init {}", .{@intFromEnum(executor.id)});
+    }
+
+    pub fn initializeIdleTask(
+        current_task: *kernel.Task,
+        idle_task: *kernel.Task,
+        executor: *kernel.Executor,
+    ) !void {
+        idle_task.* = .{
+            .id = getId(),
+            ._name = .{}, // set below
+            .state = .ready,
+            .stack = try createStack(current_task),
+            .is_idle_task = true,
+        };
+
+        try idle_task._name.writer().print("idle {}", .{@intFromEnum(executor.id)});
     }
 };
 
