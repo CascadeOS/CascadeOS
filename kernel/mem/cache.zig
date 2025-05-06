@@ -453,10 +453,13 @@ pub const RawCache = struct {
         // large object slab
 
         while (slab.buffers.popFirst()) |large_buffer_node| {
-            globals.large_buffer_cache.free(
-                current_task,
-                @fieldParentPtr("node", large_buffer_node),
-            );
+            const large_buffer: *LargeBuffer = @fieldParentPtr("node", large_buffer_node);
+
+            if (self.destructor) |destructor| {
+                destructor(large_buffer.buffer);
+            }
+
+            globals.large_buffer_cache.free(current_task, large_buffer);
         }
 
         self.source.deallocate(current_task, slab.large_object_allocation);
