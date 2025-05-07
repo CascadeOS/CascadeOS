@@ -3,7 +3,8 @@
 
 const Mutex = @This();
 
-locked_by: std.atomic.Value(?*kernel.Task) align(std.atomic.cache_line) = .init(null),
+locked_by: std.atomic.Value(?*kernel.Task) = .init(null),
+
 /// `true` when the mutex is passed directly to a waiter on unlock.
 passed_to_waiter: bool = false,
 
