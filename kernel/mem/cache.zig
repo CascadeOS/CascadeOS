@@ -22,8 +22,8 @@ pub fn Cache(
         pub const InitOptions = struct {
             cache_name: Name,
 
-            /// Whether the last slab should be held in memory even if it is unused.
-            hold_last_slab: bool = true,
+            /// Should the last available slab be deallocated when it is unused?
+            deallocate_last_available_slab: bool = false,
         };
 
         /// Initialize the cache.
@@ -55,7 +55,7 @@ pub fn Cache(
                     }.innerDestructor
                 else
                     null,
-                .hold_last_slab = options.hold_last_slab,
+                .deallocate_last_available_slab = options.deallocate_last_available_slab,
             });
         }
 
@@ -99,8 +99,8 @@ pub const RawCache = struct {
 
     objects_per_slab: usize,
 
-    /// Whether the last slab should be held in memory even if it is unused.
-    hold_last_slab: bool,
+    /// Should the last available slab be deallocated when it is unused?
+    deallocate_last_available_slab: bool,
 
     constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
     destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
@@ -129,8 +129,8 @@ pub const RawCache = struct {
         constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void = null,
         destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void = null,
 
-        /// Whether the last slab should be held in memory even if it is unused.
-        hold_last_slab: bool = true,
+        /// Should the last available slab be deallocated when it is unused?
+        deallocate_last_available_slab: bool = false,
     };
 
     /// Initialize the cache.
@@ -178,7 +178,7 @@ pub const RawCache = struct {
             .available_slabs = .{},
             .full_slabs = .{},
             .objects_per_slab = objects_per_slab,
-            .hold_last_slab = options.hold_last_slab,
+            .deallocate_last_available_slab = options.deallocate_last_available_slab,
             .size_class = if (is_small)
                 .small
             else
@@ -425,7 +425,8 @@ pub const RawCache = struct {
         };
 
         if (slab.allocated_objects == self.objects_per_slab) {
-            // slab was full, move it to available list
+            // slab was previously full, move it to available list
+            @branchHint(.unlikely);
             self.full_slabs.remove(&slab.linkage);
             self.available_slabs.append(&slab.linkage);
         }
@@ -442,11 +443,13 @@ pub const RawCache = struct {
 
         // slab is unused
 
-        if (self.hold_last_slab) {
-            if (self.full_slabs.first == null and self.available_slabs.first == self.available_slabs.last) {
+        if (!self.deallocate_last_available_slab) {
+            if (self.available_slabs.first == self.available_slabs.last) {
+                @branchHint(.unlikely);
+
                 std.debug.assert(self.available_slabs.first == &slab.linkage);
 
-                // this is the last slab so we leave it in the available list and don't deallocate it
+                // this is the last available slab so we leave it in the available list and don't deallocate it
 
                 self.lock.unlock(current_task);
                 return;
@@ -459,8 +462,6 @@ pub const RawCache = struct {
         self.lock.unlock(current_task);
 
         self.deallocateSlab(current_task, slab);
-
-        return;
     }
 
     /// Deallocate a slab.
