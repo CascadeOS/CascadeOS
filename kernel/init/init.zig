@@ -207,19 +207,15 @@ fn createExecutors() ![]kernel.Executor {
         if (i == 0) std.debug.assert(desc.acpiProcessorId() == 0);
 
         const executor = &executors[i];
-        const id: kernel.Executor.Id = @enumFromInt(i);
-
-        const init_task = &init_tasks[i];
-
-        try kernel.Task.init.initializeInitTask(current_task, init_task, executor);
 
         executor.* = .{
-            .id = id,
+            .id = @enumFromInt(i),
             .arch = undefined, // set by `arch.init.prepareExecutor`
-            .current_task = init_task,
+            .current_task = &init_tasks[i],
             .idle_task = undefined, // set below
         };
 
+        try kernel.Task.init.initializeInitTask(current_task, executor.current_task, executor);
         try kernel.Task.init.initializeIdleTask(current_task, &executor.idle_task, executor);
 
         kernel.arch.init.prepareExecutor(
