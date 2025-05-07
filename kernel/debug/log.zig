@@ -5,51 +5,59 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub fn err(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.err)) return;
-            logFn(scope, .err, format, args);
+            logFn(prefix_err, userFmt(format), args);
         }
 
         pub fn warn(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.warn)) return;
-            logFn(scope, .warn, format, args);
+            logFn(prefix_warn, userFmt(format), args);
         }
 
         pub fn info(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.info)) return;
-            logFn(scope, .info, format, args);
+            logFn(prefix_info, userFmt(format), args);
         }
 
         pub fn debug(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.debug)) return;
-            logFn(scope, .debug, format, args);
+            logFn(prefix_debug, userFmt(format), args);
         }
 
         pub inline fn levelEnabled(comptime message_level: std.log.Level) bool {
             comptime return loggingEnabledFor(scope, message_level);
         }
+
+        const prefix_err = levelAndScope(.err);
+        const prefix_warn = levelAndScope(.warn);
+        const prefix_info = levelAndScope(.info);
+        const prefix_debug = levelAndScope(.debug);
+
+        inline fn levelAndScope(comptime message_level: std.log.Level) []const u8 {
+            comptime return message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
+        }
+
+        inline fn userFmt(comptime format: []const u8) []const u8 {
+            comptime return if (format.len != 0 and format[format.len - 1] == '\n')
+                format
+            else
+                format ++ "\n";
+        }
     };
 }
 
 fn logFn(
-    comptime scope: @Type(.enum_literal),
-    comptime message_level: std.log.Level,
+    prefix: []const u8,
     comptime format: []const u8,
     args: anytype,
 ) void {
-    const level_and_scope = comptime message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
-
-    const user_fmt = comptime if (format.len != 0 and format[format.len - 1] == '\n')
-        format
-    else
-        format ++ "\n";
-
     switch (globals.log_mode) {
         .single_executor_init_log => {
             @branchHint(.unlikely);
 
             const writer = globals.init_log_buffered_writer.writer();
 
-            writer.writeAll(level_and_scope) catch {};
-            writer.print(user_fmt, args) catch {};
+            writer.writeAll(prefix) catch {};
+            writer.print(format, args) catch {};
 
             globals.init_log_buffered_writer.flush() catch {};
         },
@@ -63,8 +71,8 @@ fn logFn(
 
             const writer = globals.init_log_buffered_writer.writer();
 
-            writer.writeAll(level_and_scope) catch {};
-            writer.print(user_fmt, args) catch {};
+            writer.writeAll(prefix) catch {};
+            writer.print(format, args) catch {};
 
             globals.init_log_buffered_writer.flush() catch {};
         },
