@@ -15,31 +15,30 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
     while (true) {
         current_task.incrementPreemptionDisable();
 
-        for (0..spins) |_| {
-            const task = mutex.locked_by.cmpxchgWeak(
-                null,
-                current_task,
-                .acq_rel,
-                .monotonic,
-            ) orelse {
-                // we have the mutex
+        var locked_by = mutex.locked_by.cmpxchgWeak(
+            null,
+            current_task,
+            .acq_rel,
+            .monotonic,
+        ) orelse {
+            // we have the mutex
+            return;
+        };
+
+        if (locked_by == current_task) {
+            if (mutex.passed_to_waiter) {
+                @branchHint(.likely);
+                mutex.passed_to_waiter = false;
                 return;
-            };
-
-            if (task == current_task) {
-                if (mutex.passed_to_waiter) {
-                    mutex.passed_to_waiter = false;
-                    return;
-                }
-                unreachable; // recursive lock
+            } else {
+                @branchHint(.cold);
+                @panic("recursive lock");
             }
-
-            kernel.arch.spinLoopHint();
         }
 
         mutex.spinlock.lock(current_task);
 
-        const locked_by = mutex.locked_by.cmpxchgStrong(
+        locked_by = mutex.locked_by.cmpxchgStrong(
             null,
             current_task,
             .acq_rel,
@@ -49,7 +48,11 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
             mutex.spinlock.unlock(current_task);
             return;
         };
-        std.debug.assert(locked_by != current_task); // recursive lock
+
+        if (locked_by == current_task) {
+            @branchHint(.cold);
+            @panic("recursive lock");
+        }
 
         current_task.decrementPreemptionDisable();
 
@@ -75,6 +78,7 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
             .acq_rel,
             .monotonic,
         )) |_| {
+            @branchHint(.cold);
             @panic("not locked by current task");
         }
 
@@ -86,16 +90,11 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
             .acq_rel,
             .monotonic,
         )) |_| {
+            @branchHint(.cold);
             @panic("not locked by current task");
         }
     }
 }
-
-pub fn isLockedBy(mutex: *const Mutex, task: *const kernel.Task) bool {
-    return mutex.locked_by.load(.acquire) == task;
-}
-
-const spins = 10;
 
 const core = @import("core");
 const kernel = @import("kernel");
