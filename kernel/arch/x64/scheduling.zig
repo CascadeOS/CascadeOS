@@ -138,28 +138,16 @@ pub fn prepareNewTaskForScheduling(
                         \\pop %rdi // task
                         \\pop %rsi // arg
                         \\pop %rdx // target_function
-                        \\ret // the return address of `startNewTaskStage2` should be on the stack
+                        \\ret // the return address of `kernel.scheduler.newTaskEntry` should be on the stack
                     );
                 }
             }.impl;
 
             break :blk @ptrCast(&impl);
         };
-
-        fn startNewTaskStage2(
-            current_task: *kernel.Task,
-            task_arg: u64,
-            target_function_addr: *const anyopaque,
-        ) callconv(.C) void {
-            kernel.scheduler.unlockScheduler(current_task);
-
-            const func: kernel.arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
-            func(current_task, task_arg);
-            @panic("task returned to entry point");
-        }
     };
 
-    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(&impls.startNewTaskStage2)));
+    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(&kernel.scheduler.newTaskEntry)));
 
     try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
     try task.stack.push(arg);

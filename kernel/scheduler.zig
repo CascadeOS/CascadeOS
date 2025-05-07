@@ -282,6 +282,19 @@ pub fn unlockScheduler(current_task: *kernel.Task) void {
     globals.lock.unlock(current_task);
 }
 
+pub fn newTaskEntry(
+    current_task: *kernel.Task,
+    task_arg: u64,
+    /// must be a function compatible with `kernel.arch.scheduling.NewTaskFunction`
+    target_function_addr: *const anyopaque,
+) callconv(.C) noreturn {
+    globals.lock.unlock(current_task);
+
+    const func: kernel.arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
+    func(current_task, task_arg);
+    @panic("task returned to entry point");
+}
+
 fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
     globals.lock.unlock(current_task);
 
