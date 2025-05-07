@@ -249,22 +249,21 @@ pub const RawCache = struct {
             self.full_slabs.append(&slab.linkage);
         }
 
-        self.lock.unlock(current_task);
-
         switch (self.size_class) {
             .small => {
+                self.lock.unlock(current_task);
+
                 const object_node_ptr: [*]u8 = @ptrCast(object_node);
                 const object_ptr = object_node_ptr - single_node_alignment.forward(self.object_size);
                 return object_ptr[0..self.object_size];
             },
             .large => |*large| {
+                defer self.lock.unlock(current_task);
+
                 const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
                 large.object_lookup.putNoClobber(@intFromPtr(large_object.object.ptr), large_object) catch {
                     @branchHint(.cold);
-
-                    self.lock.lock(current_task);
-                    defer self.lock.unlock(current_task);
 
                     slab.objects.prepend(object_node);
                     slab.allocated_objects -= 1;
@@ -310,9 +309,9 @@ pub const RawCache = struct {
 
                 const slab_base_ptr: [*]u8 = @ptrFromInt(slab_allocation.base);
 
-                const slab: *Slab = @ptrFromInt(
-                    slab_allocation.base + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab),
-                );
+                const slab: *Slab = @alignCast(@ptrCast(
+                    slab_base_ptr + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab),
+                ));
                 slab.* = .{
                     .large_object_allocation = undefined,
                 };
@@ -408,9 +407,13 @@ pub const RawCache = struct {
                     object.ptr + single_node_alignment.forward(self.object_size),
                 ));
 
+                self.lock.lock(current_task);
+
                 break :blk .{ slab, object_node };
             },
             .large => |*large| blk: {
+                self.lock.lock(current_task);
+
                 const large_object = large.object_lookup.get(@intFromPtr(object.ptr)) orelse {
                     @panic("large object not found in object lookup");
                 };
@@ -421,8 +424,6 @@ pub const RawCache = struct {
             },
         };
 
-        self.lock.lock(current_task);
-
         if (slab.allocated_objects == self.objects_per_slab) {
             // slab was full, move it to available list
             self.full_slabs.remove(&slab.linkage);
@@ -432,29 +433,34 @@ pub const RawCache = struct {
         slab.objects.prepend(object_node);
         slab.allocated_objects -= 1;
 
-        if (slab.allocated_objects == 0) deallocate: {
-            @branchHint(.unlikely);
-
-            if (self.hold_last_slab) {
-                if (self.full_slabs.first == null and self.available_slabs.first == self.available_slabs.last) {
-                    std.debug.assert(self.available_slabs.first == &slab.linkage);
-
-                    // this is the last slab so we leave it in the available list and don't deallocate it
-                    break :deallocate;
-                }
-            }
-
-            // slab is unused remove it from available list and deallocate it
-            self.available_slabs.remove(&slab.linkage);
-
+        if (slab.allocated_objects != 0) {
+            // slab is still in use
+            @branchHint(.likely);
             self.lock.unlock(current_task);
-
-            self.deallocateSlab(current_task, slab);
-
             return;
         }
 
+        // slab is unused
+
+        if (self.hold_last_slab) {
+            if (self.full_slabs.first == null and self.available_slabs.first == self.available_slabs.last) {
+                std.debug.assert(self.available_slabs.first == &slab.linkage);
+
+                // this is the last slab so we leave it in the available list and don't deallocate it
+
+                self.lock.unlock(current_task);
+                return;
+            }
+        }
+
+        // slab is unused remove it from available list and deallocate it
+        self.available_slabs.remove(&slab.linkage);
+
         self.lock.unlock(current_task);
+
+        self.deallocateSlab(current_task, slab);
+
+        return;
     }
 
     /// Deallocate a slab.
