@@ -159,8 +159,6 @@ pub fn prepareNewTaskForScheduling(
         }
     };
 
-    try task.stack.push(core.VirtualAddress.zero); // zero return address prevents walking off the end of the stack
-
     try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(&impls.startNewTaskStage2)));
 
     try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));

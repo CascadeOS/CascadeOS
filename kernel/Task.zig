@@ -143,7 +143,7 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
     task.spinlocks_held = 1; // fresh tasks start with the scheduler locked
     task.next_task_node = .empty;
 
-    task.stack.stack_pointer = task.stack.top_stack_pointer;
+    task.stack.reset();
 
     try kernel.arch.scheduling.prepareNewTaskForScheduling(task, options.arg, options.start_function);
 
@@ -199,13 +199,10 @@ pub const Stack = struct {
             .range = range,
             .usable_range = usable_range,
             .stack_pointer = usable_range.endBound(),
-            .top_stack_pointer = undefined,
+            .top_stack_pointer = undefined, // set by `reset`
         };
 
-        // push a zero return address
-        stack.push(@as(usize, 0)) catch unreachable; // TODO: is this correct for non-x64?
-
-        stack.top_stack_pointer = stack.stack_pointer;
+        stack.reset();
 
         return stack;
     }
@@ -223,6 +220,72 @@ pub const Stack = struct {
         ptr.* = value;
 
         stack.stack_pointer = new_stack_pointer;
+    }
+
+    pub fn reset(stack: *Stack) void {
+        stack.stack_pointer = stack.usable_range.endBound();
+
+        // push a zero return address
+        stack.push(@as(usize, 0)) catch unreachable; // TODO: is this correct for non-x64?
+
+        stack.top_stack_pointer = stack.stack_pointer;
+    }
+
+    fn createStack(current_task: *kernel.Task) !Stack {
+        const stack_range = globals.stack_arena.allocate(
+            current_task,
+            stack_size_including_guard_page.value,
+            .instant_fit,
+        ) catch return error.ObjectConstructionFailed;
+        errdefer globals.stack_arena.deallocate(current_task, stack_range);
+
+        const range: core.VirtualRange = .{
+            .address = .fromInt(stack_range.base),
+            .size = stack_size_including_guard_page,
+        };
+        const usable_range: core.VirtualRange = .{
+            .address = .fromInt(stack_range.base),
+            .size = kernel.config.kernel_stack_size,
+        };
+
+        {
+            globals.stack_page_table_mutex.lock(current_task);
+            defer globals.stack_page_table_mutex.unlock(current_task);
+
+            kernel.mem.mapRangeAndAllocatePhysicalFrames(
+                current_task,
+                kernel.mem.globals.core_page_table,
+                usable_range,
+                .{ .writeable = true, .global = true },
+                .kernel,
+                true,
+                kernel.mem.phys.allocator,
+            ) catch return error.ObjectConstructionFailed;
+        }
+
+        return .fromRange(range, usable_range);
+    }
+
+    fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
+        {
+            globals.stack_page_table_mutex.lock(current_task);
+            defer globals.stack_page_table_mutex.unlock(current_task);
+
+            kernel.mem.unmapRange(
+                current_task,
+                kernel.mem.globals.core_page_table,
+                stack.usable_range,
+                true,
+                .kernel,
+                true,
+                kernel.mem.phys.allocator,
+            );
+        }
+
+        globals.stack_arena.deallocate(current_task, .{
+            .base = stack.range.address.value,
+            .len = stack.range.size.value,
+        });
     }
 };
 
@@ -261,69 +324,12 @@ fn cacheConstructor(self: *Task, current_task: *Task) kernel.mem.cache.Construct
         .id = undefined,
         ._name = .{},
         .state = .dropped,
-        .stack = try createStack(current_task),
+        .stack = try .createStack(current_task),
     };
-}
-
-fn createStack(current_task: *kernel.Task) !Stack {
-    const stack_range = globals.stack_arena.allocate(
-        current_task,
-        stack_size_including_guard_page.value,
-        .instant_fit,
-    ) catch return error.ObjectConstructionFailed;
-    errdefer globals.stack_arena.deallocate(current_task, stack_range);
-
-    const range: core.VirtualRange = .{
-        .address = .fromInt(stack_range.base),
-        .size = stack_size_including_guard_page,
-    };
-    const usable_range: core.VirtualRange = .{
-        .address = .fromInt(stack_range.base),
-        .size = kernel.config.kernel_stack_size,
-    };
-
-    {
-        globals.stack_page_table_mutex.lock(current_task);
-        defer globals.stack_page_table_mutex.unlock(current_task);
-
-        kernel.mem.mapRangeAndAllocatePhysicalFrames(
-            current_task,
-            kernel.mem.globals.core_page_table,
-            usable_range,
-            .{ .writeable = true, .global = true },
-            .kernel,
-            true,
-            kernel.mem.phys.allocator,
-        ) catch return error.ObjectConstructionFailed;
-    }
-
-    return .fromRange(range, usable_range);
 }
 
 fn cacheDestructor(self: *Task, current_task: *Task) void {
-    destroyStack(self.stack, current_task);
-}
-
-fn destroyStack(stack: Stack, current_task: *kernel.Task) void {
-    {
-        globals.stack_page_table_mutex.lock(current_task);
-        defer globals.stack_page_table_mutex.unlock(current_task);
-
-        kernel.mem.unmapRange(
-            current_task,
-            kernel.mem.globals.core_page_table,
-            stack.usable_range,
-            true,
-            .kernel,
-            true,
-            kernel.mem.phys.allocator,
-        );
-    }
-
-    globals.stack_arena.deallocate(current_task, .{
-        .base = stack.range.address.value,
-        .len = stack.range.size.value,
-    });
+    self.stack.destroyStack(current_task);
 }
 
 pub const globals = struct {
@@ -342,7 +348,7 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    pub const earlyCreateStack = createStack;
+    pub const earlyCreateStack = Stack.createStack;
 
     pub fn initializeTaskStacksAndCache(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
         try globals.stack_arena.create(
@@ -392,7 +398,7 @@ pub const init = struct {
             .id = getId(),
             ._name = .{}, // set below
             .state = .{ .running = executor },
-            .stack = try createStack(current_task),
+            .stack = try .createStack(current_task),
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
         };
 
@@ -408,7 +414,7 @@ pub const init = struct {
             .id = getId(),
             ._name = .{}, // set below
             .state = .ready,
-            .stack = try createStack(current_task),
+            .stack = try .createStack(current_task),
             .is_idle_task = true,
         };
 
