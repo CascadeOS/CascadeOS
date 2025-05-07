@@ -15,9 +15,16 @@ pub fn firstTask(self: *WaitQueue) ?*kernel.Task {
 
 /// Wake one task from the wait queue.
 ///
-/// Asserts that interrupts are disabled.
-pub fn wakeOne(self: *WaitQueue, current_task: *kernel.Task) void {
+/// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
+pub fn wakeOne(
+    self: *WaitQueue,
+    current_task: *kernel.Task,
+    spinlock: *const kernel.sync.TicketSpinLock,
+) void {
     std.debug.assert(current_task.interrupt_disable_count.load(.monotonic) != 0);
+
+    const executor = current_task.state.running;
+    std.debug.assert(spinlock.isLockedBy(executor.id));
 
     const task_to_wake_node = self.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);

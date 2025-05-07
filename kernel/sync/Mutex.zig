@@ -82,7 +82,7 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
             @panic("not locked by current task");
         }
 
-        mutex.wait_queue.wakeOne(current_task);
+        mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
     } else {
         if (mutex.locked_by.cmpxchgStrong(
             current_task,
