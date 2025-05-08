@@ -30,8 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Grab zig
-        # FIXME: once https://github.com/mlugg/setup-zig/pull/30 is in a released version switch to that
-        uses: mlugg/setup-zig@153c8d5202cbb8c7e10831110a3afd27593eb960
+        uses: mlugg/setup-zig@v2
 
       - name: Lint
         run: zig fmt --check --ast-check .
