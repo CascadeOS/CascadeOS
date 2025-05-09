@@ -8,7 +8,10 @@ pub const getStandardWallclockStartTime = x64.tsc.init.getStandardWallclockStart
 /// This function can return an architecture specific output if it is available and if not is expected to call into
 /// `kernel.init.Output.tryGetSerialOutputFromGenericSources`.
 pub fn tryGetSerialOutput() ?kernel.init.Output {
-    if (DebugCon.detect()) return DebugCon.output;
+    if (DebugCon.detect()) {
+        log.debug("using debug console for serial output", .{});
+        return DebugCon.output;
+    }
 
     if (kernel.init.Output.tryGetSerialOutputFromGenericSources()) |output| return output;
 
@@ -28,6 +31,8 @@ pub fn tryGetSerialOutput() ?kernel.init.Output {
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
         ) catch continue) |serial| {
+            log.debug("using {s} for serial output", .{@tagName(com_port)});
+
             static.init_output_serial_port = serial;
             return static.init_output_serial_port.output();
         }

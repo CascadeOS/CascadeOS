@@ -47,16 +47,22 @@ pub fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
 
     blk: {
         if (kernel.acpi.tables.SPCR.init.tryGetSerialOutput()) |output_uart| {
+            log.debug("got serial output from SPCR", .{});
+
             static.init_output_uart = output_uart;
             break :blk;
         }
 
         if (kernel.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
+            log.debug("got serial output from DBG2", .{});
+
             static.init_output_uart = output_uart;
             break :blk;
         }
 
         if (kernel.init.devicetree.tryGetSerialOutput()) |output_uart| {
+            log.debug("got serial output from device tree", .{});
+
             static.init_output_uart = output_uart;
             break :blk;
         }
