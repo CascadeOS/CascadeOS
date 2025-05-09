@@ -316,6 +316,9 @@ pub const SPCR = extern struct {
         try writer.writeAll("SPCR{\n");
 
         try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("revision: {},\n", .{revision});
+
+        try writer.writeByteNTimes(' ', new_indent);
         if (revision < 2) {
             try writer.print("interface_type: {s},\n", .{@tagName(self.interface_type.revision_1)});
         } else {
