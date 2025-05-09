@@ -490,7 +490,7 @@ pub const SPCR = extern struct {
             }
 
             switch (spcr.table.interface_type.revision_2_or_higher) {
-                .@"16550" => {
+                .@"16550", .@"16550-GAS" => {
                     const baud: ?uart.Baud = if (baud_rate) |br| .{
                         .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
                         .baud_rate = br,
