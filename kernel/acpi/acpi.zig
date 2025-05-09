@@ -90,6 +90,37 @@ pub const init = struct {
         globals.acpi_tables_initialized = true;
     }
 
+    pub fn logAcpiTables() !void {
+        // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
+
+        if (!init_log.levelEnabled(.debug)) return;
+
+        const rsdp_address = kernel.boot.rsdp() orelse return; // not an error to allow non-ACPI systems to boot
+
+        const rsdp = switch (rsdp_address) {
+            .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const tables.RSDP),
+            .virtual => |addr| addr.toPtr(*const tables.RSDP),
+        };
+        if (!rsdp.isValid()) return error.InvalidRSDP;
+
+        const sdt_header = kernel.mem.directMapFromPhysical(rsdp.sdtAddress())
+            .toPtr(*const tables.SharedHeader);
+
+        if (!sdt_header.isValid()) return error.InvalidSDT;
+
+        var iter = tableIterator(sdt_header);
+
+        init_log.debug("ACPI tables:", .{});
+
+        while (iter.next()) |table| {
+            if (table.isValid()) {
+                init_log.debug("  {s}", .{table.signatureAsString()});
+            } else {
+                init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
+            }
+        }
+    }
+
     pub fn initialize() !void {
         init_log.debug("entering ACPI mode", .{});
         try uacpi.initialize(.{});
@@ -125,6 +156,51 @@ pub const init = struct {
         };
         @panic("shutdown failed");
     }
+
+    fn tableIterator(
+        sdt_header: *const tables.SharedHeader,
+    ) TableIterator {
+        const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
+
+        const is_xsdt = sdt_header.signatureIs("XSDT");
+        std.debug.assert(is_xsdt or sdt_header.signatureIs("RSDT")); // Invalid SDT signature.
+
+        return .{
+            .ptr = sdt_ptr + @sizeOf(tables.SharedHeader),
+            .end_ptr = sdt_ptr + sdt_header.length,
+            .is_xsdt = is_xsdt,
+        };
+    }
+
+    const TableIterator = struct {
+        ptr: [*]const u8,
+        end_ptr: [*]const u8,
+
+        is_xsdt: bool,
+
+        pub fn next(self: *TableIterator) ?*const tables.SharedHeader {
+            // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
+
+            const opt_phys_addr = if (self.is_xsdt)
+                self.nextTablePhysicalAddressImpl(u64)
+            else
+                self.nextTablePhysicalAddressImpl(u32);
+
+            return kernel.mem
+                .directMapFromPhysical(opt_phys_addr orelse return null)
+                .toPtr(*const tables.SharedHeader);
+        }
+
+        fn nextTablePhysicalAddressImpl(self: *TableIterator, comptime T: type) ?core.PhysicalAddress {
+            if (@intFromPtr(self.ptr) + @sizeOf(T) >= @intFromPtr(self.end_ptr)) return null;
+
+            const physical_address = std.mem.readInt(T, @ptrCast(self.ptr), .little);
+
+            self.ptr += @sizeOf(T);
+
+            return core.PhysicalAddress.fromInt(physical_address);
+        }
+    };
 
     const init_log = kernel.debug.log.scoped(.init_acpi);
 };

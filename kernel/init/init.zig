@@ -20,6 +20,8 @@ pub fn initStage1() !noreturn {
     // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
     kernel.mem.init.logEarlyOffsets();
 
+    try kernel.acpi.init.logAcpiTables();
+
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
         .current_task = undefined, // set below
