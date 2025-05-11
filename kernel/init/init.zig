@@ -133,51 +133,47 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
 fn initStage3(current_task: *kernel.Task) !noreturn {
     const executor = current_task.state.running;
 
-    if (executor.id != .bootstrap) {
+    if (executor.id == .bootstrap) {
+        Barrier.waitForAllNonBootstrapExecutors();
+
+        log.debug("loading standard interrupt handlers", .{});
+        kernel.arch.interrupts.init.loadStandardInterruptHandlers();
+
+        // signal to other executors that standard interrupt handlers are loaded so they can safely enable interrupts
+        Barrier.standardInterruptHandlersLoaded();
+
+        log.debug("initializing PCI ECAM", .{});
+        try kernel.pci.init.initializeECAM();
+
+        log.debug("initializing ACPI", .{});
+        try kernel.acpi.init.initialize();
+
+        try kernel.acpi.init.finializeInitialization();
+
+        {
+            Output.globals.lock.lock(current_task);
+            defer Output.globals.lock.unlock(current_task);
+
+            try Output.writer.print(
+                "initialization complete - time since kernel start: {} - time since system start: {}\n",
+                .{
+                    kernel.time.wallclock.elapsed(
+                        kernel.time.wallclock.kernel_start,
+                        kernel.time.wallclock.read(),
+                    ),
+                    kernel.time.wallclock.elapsed(
+                        .zero,
+                        kernel.time.wallclock.read(),
+                    ),
+                },
+            );
+        }
+    } else {
         Barrier.nonBootstrapExecutorReady();
 
         // we need to wait for the standard interrupt handlers to be loaded before we can enable interrupts
         // which will happen when we enter the scheduler
         Barrier.waitForStandardInterruptHandlers();
-
-        _ = kernel.scheduler.lockScheduler(current_task);
-        kernel.scheduler.yield(current_task, .drop);
-        @panic("scheduler returned to init");
-    }
-
-    Barrier.waitForAllNonBootstrapExecutors();
-
-    log.debug("loading standard interrupt handlers", .{});
-    kernel.arch.interrupts.init.loadStandardInterruptHandlers();
-
-    // signal to other executors that standard interrupt handlers are loaded so they can safely enable interrupts
-    Barrier.standardInterruptHandlersLoaded();
-
-    log.debug("initializing PCI ECAM", .{});
-    try kernel.pci.init.initializeECAM();
-
-    log.debug("initializing ACPI", .{});
-    try kernel.acpi.init.initialize();
-
-    try kernel.acpi.init.finializeInitialization();
-
-    {
-        Output.globals.lock.lock(current_task);
-        defer Output.globals.lock.unlock(current_task);
-
-        try Output.writer.print(
-            "initialization complete - time since kernel start: {} - time since system start: {}\n",
-            .{
-                kernel.time.wallclock.elapsed(
-                    kernel.time.wallclock.kernel_start,
-                    kernel.time.wallclock.read(),
-                ),
-                kernel.time.wallclock.elapsed(
-                    .zero,
-                    kernel.time.wallclock.read(),
-                ),
-            },
-        );
     }
 
     _ = kernel.scheduler.lockScheduler(current_task);
