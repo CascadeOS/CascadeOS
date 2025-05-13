@@ -303,8 +303,14 @@ pub const PhysicalRange = extern struct {
         return true;
     }
 
+    pub fn containsAddressOrder(self: PhysicalRange, address: PhysicalAddress) std.math.Order {
+        if (self.address.greaterThan(address)) return .lt;
+        if (self.endBound().lessThanOrEqual(address)) return .gt;
+        return .eq;
+    }
+
     pub fn containsAddress(self: PhysicalRange, address: PhysicalAddress) bool {
-        return address.greaterThanOrEqual(self.address) and address.lessThanOrEqual(self.last());
+        return self.containsAddressOrder(address) == .eq;
     }
 
     pub fn print(value: PhysicalRange, writer: std.io.AnyWriter, indent: usize) !void {
@@ -417,8 +423,14 @@ pub const VirtualRange = extern struct {
         return true;
     }
 
+    pub fn containsAddressOrder(self: VirtualRange, address: VirtualAddress) std.math.Order {
+        if (self.address.greaterThan(address)) return .lt;
+        if (self.endBound().lessThanOrEqual(address)) return .gt;
+        return .eq;
+    }
+
     pub fn containsAddress(self: VirtualRange, address: VirtualAddress) bool {
-        return address.greaterThanOrEqual(self.address) and address.lessThanOrEqual(self.last());
+        return self.containsAddressOrder(address) == .eq;
     }
 
     pub fn print(value: VirtualRange, writer: std.io.AnyWriter, indent: usize) !void {
