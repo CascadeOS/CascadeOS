@@ -52,7 +52,7 @@ unused_tags_count: usize,
 /// The largest size of a cached object.
 max_cached_size: usize,
 
-quantum_caches: std.BoundedArray(*kernel.mem.cache.RawCache, MAX_NUMBER_OF_QUANTUM_CACHES),
+quantum_caches: std.BoundedArray(*RawCache, MAX_NUMBER_OF_QUANTUM_CACHES),
 
 quantum_cache_allocation: QuantumCacheAllocation,
 
@@ -126,8 +126,8 @@ pub const CreateError = error{
 
 const QuantumCacheAllocation = union(enum) {
     no,
-    yes: []kernel.mem.cache.RawCache,
-    heap: std.BoundedArray(kernel.mem.phys.Frame, MAX_NUMBER_OF_QUANTUM_CACHES),
+    yes: []RawCache,
+    heap: std.BoundedArray(kernel.mem.phys.Frame, FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES),
 };
 
 pub fn create(
@@ -165,8 +165,8 @@ pub fn create(
         .yes => |count| {
             std.debug.assert(count > 0);
 
-            const quantum_caches = kernel.mem.heap.allocator.alloc(kernel.mem.cache.RawCache, count) catch
-                @panic("quantum cache allocation failed");
+            const quantum_caches = kernel.mem.heap.allocator.alloc(RawCache, count) catch
+                @panic("quantum cache allocation failed"); // TODO: return this error
 
             for (quantum_caches, 0..) |*quantum_cache, i| {
                 var cache_name: kernel.mem.cache.Name = .{};
@@ -188,27 +188,39 @@ pub fn create(
 
             var frames: std.BoundedArray(
                 kernel.mem.phys.Frame,
-                MAX_NUMBER_OF_QUANTUM_CACHES,
+                FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES,
             ) = .{};
 
-            for (0..count) |i| {
+            var caches_created: usize = 0;
+
+            const frames_to_allocate = kernel.arch.paging.standard_page_size.amountToCover(
+                core.Size.of(RawCache).multiplyScalar(count),
+            );
+
+            for (0..frames_to_allocate) |_| {
                 const frame = kernel.mem.phys.allocator.allocate() catch
-                    @panic("quantum cache allocation failed");
+                    @panic("heap quantum cache allocation failed");
                 frames.append(frame) catch unreachable;
 
-                const raw_cache = kernel.mem.directMapFromPhysical(frame.baseAddress())
-                    .toPtr(*kernel.mem.cache.RawCache);
+                const frame_caches = kernel.mem.directMapFromPhysical(frame.baseAddress())
+                    .toPtr(*[QUANTUM_CACHES_PER_FRAME]RawCache);
 
-                var cache_name: kernel.mem.cache.Name = .{};
-                cache_name.writer().print("heap qcache {}", .{i + 1}) catch unreachable;
+                for (frame_caches) |*cache| {
+                    caches_created += 1;
 
-                raw_cache.init(.{
-                    .cache_name = cache_name,
-                    .size = quantum * (i + 1),
-                    .alignment = .fromByteUnits(quantum),
-                });
+                    var cache_name: kernel.mem.cache.Name = .{};
+                    cache_name.writer().print("heap qcache {}", .{caches_created}) catch unreachable;
 
-                arena.quantum_caches.append(raw_cache) catch unreachable;
+                    cache.init(.{
+                        .cache_name = cache_name,
+                        .size = quantum * (caches_created),
+                        .alignment = .fromByteUnits(quantum),
+                    });
+
+                    arena.quantum_caches.append(cache) catch unreachable;
+
+                    if (caches_created == count) break;
+                }
             }
 
             arena.quantum_cache_allocation = .{ .heap = frames };
@@ -1344,6 +1356,8 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
 }
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
+const QUANTUM_CACHES_PER_FRAME = kernel.arch.paging.standard_page_size.divide(core.Size.of(RawCache)).value;
+const FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES = MAX_NUMBER_OF_QUANTUM_CACHES / QUANTUM_CACHES_PER_FRAME;
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));
@@ -1364,6 +1378,8 @@ const globals = struct {
     /// The global list of unused boundary tags.
     var unused_tags: AtomicSingleLinkedList = .empty;
 };
+
+const RawCache = kernel.mem.cache.RawCache;
 
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
