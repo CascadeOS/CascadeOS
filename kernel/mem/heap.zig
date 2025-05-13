@@ -280,16 +280,18 @@ pub const init = struct {
     ) !void {
         // heap
         {
-            try globals.heap_address_space_arena.create(
-                "heap_address_space",
-                kernel.arch.paging.standard_page_size.value,
-                .{ .quantum_caching = .no },
+            try globals.heap_address_space_arena.init(
+                .{
+                    .name = try .fromSlice("heap_address_space"),
+                    .quantum = kernel.arch.paging.standard_page_size.value,
+                    .quantum_caching = .no,
+                },
             );
 
-            try globals.heap_page_arena.create(
-                "heap_page",
-                kernel.arch.paging.standard_page_size.value,
+            try globals.heap_page_arena.init(
                 .{
+                    .name = try .fromSlice("heap_page"),
+                    .quantum = kernel.arch.paging.standard_page_size.value,
                     .source = .{
                         .arena = &globals.heap_address_space_arena,
                         .import = heapPageArenaImport,
@@ -299,10 +301,10 @@ pub const init = struct {
                 },
             );
 
-            try globals.heap_arena.create(
-                "heap",
-                heap_arena_quantum,
+            try globals.heap_arena.init(
                 .{
+                    .name = try .fromSlice("heap"),
+                    .quantum = heap_arena_quantum,
                     .source = .{ .arena = &globals.heap_page_arena },
                     .quantum_caching = .{ .heap = heap_arena_quantum_caches },
                 },
@@ -322,10 +324,12 @@ pub const init = struct {
 
         // special heap
         {
-            try globals.special_heap_address_space_arena.create(
-                "special_heap_address_space",
-                kernel.arch.paging.standard_page_size.value,
-                .{ .quantum_caching = .no },
+            try globals.special_heap_address_space_arena.init(
+                .{
+                    .name = try .fromSlice("special_heap_address_space"),
+                    .quantum = kernel.arch.paging.standard_page_size.value,
+                    .quantum_caching = .no,
+                },
             );
 
             globals.special_heap_address_space_arena.addSpan(

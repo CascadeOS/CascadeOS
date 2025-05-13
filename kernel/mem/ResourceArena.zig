@@ -94,7 +94,11 @@ pub const Source = struct {
     }
 };
 
-pub const CreateOptions = struct {
+pub const InitOptions = struct {
+    name: Name,
+
+    quantum: usize,
+
     source: ?Source = null,
 
     quantum_caching: QuantumCaching,
@@ -116,12 +120,9 @@ pub const CreateOptions = struct {
     };
 };
 
-pub const CreateError = error{
+pub const InitError = error{
     /// The `quantum` is not a power of two.
     InvalidQuantum,
-
-    /// The length of `name` exceeds `resource_arena_name_length`.
-    NameTooLong,
 };
 
 const QuantumCacheAllocation = union(enum) {
@@ -130,19 +131,17 @@ const QuantumCacheAllocation = union(enum) {
     heap: std.BoundedArray(kernel.mem.phys.Frame, FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES),
 };
 
-pub fn create(
+pub fn init(
     arena: *ResourceArena,
-    arena_name: []const u8,
-    quantum: usize,
-    options: CreateOptions,
-) CreateError!void {
-    if (!std.mem.isValidAlign(quantum)) return CreateError.InvalidQuantum;
+    options: InitOptions,
+) InitError!void {
+    if (!std.mem.isValidAlign(options.quantum)) return InitError.InvalidQuantum;
 
-    log.debug("{s}: creating arena with quantum 0x{x}", .{ arena_name, quantum });
+    log.debug("{s}: creating arena with quantum 0x{x}", .{ options.name.constSlice(), options.quantum });
 
     arena.* = .{
-        ._name = Name.fromSlice(arena_name) catch return CreateError.NameTooLong,
-        .quantum = quantum,
+        ._name = options.name,
+        .quantum = options.quantum,
         .mutex = .{},
         .source = options.source,
         .all_tags = .empty,
@@ -174,14 +173,14 @@ pub fn create(
 
                 quantum_cache.init(.{
                     .cache_name = cache_name,
-                    .size = quantum * (i + 1),
-                    .alignment = .fromByteUnits(quantum),
+                    .size = options.quantum * (i + 1),
+                    .alignment = .fromByteUnits(options.quantum),
                 });
                 arena.quantum_caches.append(quantum_cache) catch unreachable;
             }
 
             arena.quantum_cache_allocation = .{ .yes = quantum_caches };
-            arena.max_cached_size = count * quantum;
+            arena.max_cached_size = count * options.quantum;
         },
         .heap => |count| {
             std.debug.assert(count > 0);
@@ -213,8 +212,8 @@ pub fn create(
 
                     cache.init(.{
                         .cache_name = cache_name,
-                        .size = quantum * (caches_created),
-                        .alignment = .fromByteUnits(quantum),
+                        .size = options.quantum * (caches_created),
+                        .alignment = .fromByteUnits(options.quantum),
                     });
 
                     arena.quantum_caches.append(cache) catch unreachable;
@@ -224,7 +223,7 @@ pub fn create(
             }
 
             arena.quantum_cache_allocation = .{ .heap = frames };
-            arena.max_cached_size = count * quantum;
+            arena.max_cached_size = count * options.quantum;
         },
     }
 }
@@ -234,7 +233,7 @@ pub fn create(
 /// Assumes that no concurrent access to the resource arena is happening, does not lock.
 ///
 /// Panics if there are any allocations in the resource arena.
-pub fn destroy(arena: *ResourceArena, current_task: *kernel.Task) void {
+pub fn deinit(arena: *ResourceArena, current_task: *kernel.Task) void {
     log.debug("{s}: destroying arena", .{arena.name()});
 
     for (arena.quantum_caches.constSlice()) |quantum_cache| {

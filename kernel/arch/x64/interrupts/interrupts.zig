@@ -292,10 +292,12 @@ pub const init = struct {
 
     /// Prepare interrupt allocation and routing.
     pub fn initializeInterruptRouting(current_task: *kernel.Task) !void {
-        try globals.interrupt_arena.create(
-            "interrupts",
-            1,
-            .{ .quantum_caching = .no },
+        try globals.interrupt_arena.init(
+            .{
+                .name = try .fromSlice("interrupts"),
+                .quantum = 1,
+                .quantum_caching = .no,
+            },
         );
 
         try globals.interrupt_arena.addSpan(

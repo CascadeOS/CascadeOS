@@ -351,10 +351,12 @@ pub const init = struct {
     pub const earlyCreateStack = Stack.createStack;
 
     pub fn initializeTaskStacksAndCache(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
-        try globals.stack_arena.create(
-            "stacks",
-            kernel.arch.paging.standard_page_size.value,
-            .{ .quantum_caching = .no },
+        try globals.stack_arena.init(
+            .{
+                .name = try .fromSlice("stacks"),
+                .quantum = kernel.arch.paging.standard_page_size.value,
+                .quantum_caching = .no,
+            },
         );
 
         globals.stack_arena.addSpan(
