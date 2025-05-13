@@ -209,7 +209,7 @@ pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirect
 
 /// Returns the physical range of the given direct map virtual range.
 pub fn physicalRangeFromDirectMap(self: core.VirtualRange) error{AddressNotInDirectMap}!core.PhysicalRange {
-    if (globals.direct_map.containsRange(self)) {
+    if (globals.direct_map.fullyContainsRange(self)) {
         return .{
             .address = .fromInt(self.address.value - globals.direct_map.address.value),
             .size = self.size,
@@ -418,7 +418,7 @@ pub const init = struct {
 
         // does the direct map range overlap a pre-existing region?
         for (globals.regions.constSlice()) |region| {
-            if (region.range.containsRange(direct_map)) {
+            if (region.range.fullyContainsRange(direct_map)) {
                 std.debug.panic("direct map overlaps region: {}", .{region});
                 return error.DirectMapOverlapsRegion;
             }

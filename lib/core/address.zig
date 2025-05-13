@@ -294,7 +294,7 @@ pub const PhysicalRange = extern struct {
         self.address.moveBackwardInPlace(size);
     }
 
-    pub fn containsRange(self: PhysicalRange, other: PhysicalRange) bool {
+    pub fn fullyContainsRange(self: PhysicalRange, other: PhysicalRange) bool {
         if (!self.address.lessThanOrEqual(other.address)) return false;
         if (!self.last().greaterThanOrEqual(other.last())) return false;
 
@@ -406,7 +406,7 @@ pub const VirtualRange = extern struct {
         self.address.moveBackwardInPlace(size);
     }
 
-    pub fn containsRange(self: VirtualRange, other: VirtualRange) bool {
+    pub fn fullyContainsRange(self: VirtualRange, other: VirtualRange) bool {
         if (!self.address.lessThanOrEqual(other.address)) return false;
         if (!self.last().greaterThanOrEqual(other.last())) return false;
 
