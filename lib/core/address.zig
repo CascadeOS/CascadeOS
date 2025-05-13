@@ -256,6 +256,8 @@ pub const PhysicalRange = extern struct {
     }
 
     /// Returns the address of the first byte __after__ the range.
+    ///
+    /// If the ranges size is zero, returns the start address of the range.
     pub fn endBound(self: PhysicalRange) PhysicalAddress {
         return self.address.moveForward(self.size);
     }
@@ -295,8 +297,8 @@ pub const PhysicalRange = extern struct {
     }
 
     pub fn fullyContainsRange(self: PhysicalRange, other: PhysicalRange) bool {
-        if (!self.address.lessThanOrEqual(other.address)) return false;
-        if (!self.last().greaterThanOrEqual(other.last())) return false;
+        if (self.address.greaterThan(other.address)) return false;
+        if (self.endBound().lessThan(other.endBound())) return false;
 
         return true;
     }
@@ -368,6 +370,8 @@ pub const VirtualRange = extern struct {
     }
 
     /// Returns the address of the first byte __after__ the range.
+    ///
+    /// If the ranges size is zero, returns the start address of the range.
     pub fn endBound(self: VirtualRange) VirtualAddress {
         return self.address.moveForward(self.size);
     }
@@ -407,8 +411,8 @@ pub const VirtualRange = extern struct {
     }
 
     pub fn fullyContainsRange(self: VirtualRange, other: VirtualRange) bool {
-        if (!self.address.lessThanOrEqual(other.address)) return false;
-        if (!self.last().greaterThanOrEqual(other.last())) return false;
+        if (self.address.greaterThan(other.address)) return false;
+        if (self.endBound().lessThan(other.endBound())) return false;
 
         return true;
     }
