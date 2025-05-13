@@ -27,12 +27,6 @@ pub const Direction = enum {
     backward,
 };
 
-pub const OrderedComparison = enum {
-    less,
-    match,
-    greater,
-};
-
 pub const endian = struct {
     /// Converts an integer which has host endianness to the desired endianness.
     ///

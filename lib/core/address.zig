@@ -92,10 +92,10 @@ pub const PhysicalAddress = extern struct {
         return self.value >= other.value;
     }
 
-    pub fn compare(self: PhysicalAddress, other: PhysicalAddress) core.OrderedComparison {
-        if (self.lessThan(other)) return .less;
-        if (self.greaterThan(other)) return .greater;
-        return .match;
+    pub fn compare(self: PhysicalAddress, other: PhysicalAddress) std.math.Order {
+        if (self.lessThan(other)) return .lt;
+        if (self.greaterThan(other)) return .gt;
+        return .eq;
     }
 
     pub fn print(self: PhysicalAddress, writer: std.io.AnyWriter, indent: usize) !void {
@@ -214,10 +214,10 @@ pub const VirtualAddress = extern struct {
         return self.value >= other.value;
     }
 
-    pub fn compare(self: VirtualAddress, other: VirtualAddress) core.OrderedComparison {
-        if (self.lessThan(other)) return .less;
-        if (self.greaterThan(other)) return .greater;
-        return .match;
+    pub fn compare(self: VirtualAddress, other: VirtualAddress) std.math.Order {
+        if (self.lessThan(other)) return .lt;
+        if (self.greaterThan(other)) return .gt;
+        return .eq;
     }
 
     pub fn print(self: VirtualAddress, writer: std.io.AnyWriter, indent: usize) !void {

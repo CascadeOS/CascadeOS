@@ -45,10 +45,10 @@ pub const Duration = extern struct {
         return self.value >= other.value;
     }
 
-    pub fn compare(self: Duration, other: Duration) core.OrderedComparison {
-        if (self.lessThan(other)) return .less;
-        if (self.greaterThan(other)) return .greater;
-        return .match;
+    pub fn compare(self: Duration, other: Duration) std.math.Order {
+        if (self.lessThan(other)) return .lt;
+        if (self.greaterThan(other)) return .gt;
+        return .eq;
     }
 
     pub fn add(self: Duration, other: Duration) Duration {

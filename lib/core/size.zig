@@ -123,10 +123,10 @@ pub const Size = extern struct {
         return self.value >= other.value;
     }
 
-    pub fn compare(self: Size, other: Size) core.OrderedComparison {
-        if (self.lessThan(other)) return .less;
-        if (self.greaterThan(other)) return .greater;
-        return .match;
+    pub fn compare(self: Size, other: Size) std.math.Order {
+        if (self.lessThan(other)) return .lt;
+        if (self.greaterThan(other)) return .gt;
+        return .eq;
     }
 
     pub fn add(self: Size, other: Size) Size {

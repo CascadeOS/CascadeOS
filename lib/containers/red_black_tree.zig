@@ -5,7 +5,7 @@
 ///
 /// Not thread-safe.
 pub fn Tree(
-    comptime compareFn: fn (node: *const Node, other_node: *const Node) core.OrderedComparison,
+    comptime compareFn: fn (node: *const Node, other_node: *const Node) std.math.Order,
 ) type {
     return struct {
         root: ?*Node = null,
@@ -25,9 +25,9 @@ pub fn Tree(
 
                 while (opt_current_node) |current_node| {
                     direction = switch (compareFn(node, current_node)) {
-                        .match => return error.AlreadyPresent,
-                        .less => .left,
-                        .greater => .right,
+                        .eq => return error.AlreadyPresent,
+                        .lt => .left,
+                        .gt => .right,
                     };
                     parent_node = current_node;
                     opt_current_node = current_node.children[direction.toValue()];
@@ -441,7 +441,7 @@ pub fn Tree(
             }
         }
 
-        /// Returns the first node encountered for which `whereFn` returns `OrderedComparison.match`.
+        /// Returns the first node encountered for which `whereFn` returns `std.math.Order.eq`.
         ///
         /// If no node is found, returns null.
         ///
@@ -450,7 +450,7 @@ pub fn Tree(
         pub fn findFirstMatch(
             self: *const Self,
             context: anytype,
-            comptime whereFn: fn (context: @TypeOf(context), other_node: *const Node) core.OrderedComparison,
+            comptime whereFn: fn (context: @TypeOf(context), other_node: *const Node) std.math.Order,
         ) ?*Node {
             const root = self.root orelse return null;
 
@@ -458,9 +458,9 @@ pub fn Tree(
 
             while (opt_current_node) |current_node| {
                 const direction: Direction = switch (whereFn(context, current_node)) {
-                    .match => return current_node,
-                    .less => .left,
-                    .greater => .right,
+                    .eq => return current_node,
+                    .lt => .left,
+                    .gt => .right,
                 };
                 opt_current_node = current_node.children[direction.toValue()];
             }
@@ -491,9 +491,9 @@ pub fn Tree(
                 const comparison = whereFn(context, current_node);
 
                 const direction: Direction = switch (comparison.comparison) {
-                    .match => return current_node,
-                    .less => .left,
-                    .greater => .right,
+                    .eq => return current_node,
+                    .lt => .left,
+                    .gt => .right,
                 };
 
                 if (comparison.counts_as_a_match) last_matching_node = current_node;
@@ -676,7 +676,7 @@ pub const Node = struct {
 };
 
 pub const ComparisonAndMatch = struct {
-    comparison: core.OrderedComparison,
+    comparison: std.math.Order,
     counts_as_a_match: bool,
 };
 
@@ -779,23 +779,23 @@ const Item = struct {
     value: usize,
     node: Node = .{},
 
-    fn findEqlNode(context: usize, other_node: *const Node) core.OrderedComparison {
+    fn findEqlNode(context: usize, other_node: *const Node) std.math.Order {
         const other_item: *const Item = @fieldParentPtr("node", other_node);
 
         return if (context < other_item.value)
-            core.OrderedComparison.less
+            .lt
         else if (context > other_item.value)
-            core.OrderedComparison.greater
+            .gt
         else
-            core.OrderedComparison.match;
+            .eq;
     }
 
-    fn findFirstLessThanEqualNode(context: usize, other_node: *const Node) core.OrderedComparison {
+    fn findFirstLessThanEqualNode(context: usize, other_node: *const Node) std.math.Order {
         const other_item: *const Item = @fieldParentPtr("node", other_node);
 
-        if (other_item.value <= context) return .match;
+        if (other_item.value <= context) return .eq;
 
-        return .less;
+        return .lt;
     }
 
     fn findLastLessThanEqualNode(context: usize, other_node: *const Node) ComparisonAndMatch {
@@ -804,21 +804,21 @@ const Item = struct {
         const less_than_or_equal = other_item.value <= context;
 
         return .{
-            .comparison = if (less_than_or_equal) .less else .greater,
+            .comparison = if (less_than_or_equal) .lt else .gt,
             .counts_as_a_match = less_than_or_equal,
         };
     }
 
-    fn compareNodes(node: *const Node, other_node: *const Node) core.OrderedComparison {
+    fn compareNodes(node: *const Node, other_node: *const Node) std.math.Order {
         const item: *const Item = @fieldParentPtr("node", node);
         const other: *const Item = @fieldParentPtr("node", other_node);
 
         return if (item.value < other.value)
-            .less
+            .lt
         else if (item.value > other.value)
-            .greater
+            .gt
         else
-            .match;
+            .eq;
     }
 
     fn lessThan(_: void, lhs: Item, rhs: Item) bool {
