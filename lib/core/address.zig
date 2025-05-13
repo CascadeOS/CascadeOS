@@ -301,7 +301,7 @@ pub const PhysicalRange = extern struct {
         return true;
     }
 
-    pub fn contains(self: PhysicalRange, address: PhysicalAddress) bool {
+    pub fn containsAddress(self: PhysicalRange, address: PhysicalAddress) bool {
         return address.greaterThanOrEqual(self.address) and address.lessThanOrEqual(self.last());
     }
 
@@ -413,7 +413,7 @@ pub const VirtualRange = extern struct {
         return true;
     }
 
-    pub fn contains(self: VirtualRange, address: VirtualAddress) bool {
+    pub fn containsAddress(self: VirtualRange, address: VirtualAddress) bool {
         return address.greaterThanOrEqual(self.address) and address.lessThanOrEqual(self.last());
     }
 

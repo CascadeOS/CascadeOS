@@ -201,7 +201,7 @@ pub fn directMapFromPhysicalRange(self: core.PhysicalRange) core.VirtualRange {
 
 /// Returns the physical address of the given virtual address if it is in the direct map.
 pub fn physicalFromDirectMap(self: core.VirtualAddress) error{AddressNotInDirectMap}!core.PhysicalAddress {
-    if (globals.direct_map.contains(self)) {
+    if (globals.direct_map.containsAddress(self)) {
         return .{ .value = self.value - globals.direct_map.address.value };
     }
     return error.AddressNotInDirectMap;
