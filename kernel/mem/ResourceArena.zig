@@ -261,6 +261,7 @@ pub fn destroy(arena: *ResourceArena, current_task: *kernel.Task) void {
 
         switch (tag.kind) {
             .imported_span => arena.source.?.callRelease(
+                current_task,
                 .{
                     .base = tag.base,
                     .len = tag.len,
