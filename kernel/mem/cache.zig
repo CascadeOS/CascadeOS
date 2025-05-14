@@ -24,6 +24,13 @@ pub fn Cache(
 
             /// Should the last available slab be deallocated when it is unused?
             deallocate_last_available_slab: bool = false,
+
+            /// Should slabs be allocated from the heap?
+            ///
+            /// This should only be false for caches used as part of `ResourceArena`/`RawCache` implementation.
+            ///
+            /// Only valid for small object caches.
+            allocate_slabs_from_heap: bool = true,
         };
 
         /// Initialize the cache.
@@ -56,6 +63,7 @@ pub fn Cache(
                 else
                     null,
                 .deallocate_last_available_slab = options.deallocate_last_available_slab,
+                .allocate_slabs_from_heap = options.allocate_slabs_from_heap,
             });
         }
 
@@ -102,6 +110,13 @@ pub const RawCache = struct {
     /// Should the last available slab be deallocated when it is unused?
     deallocate_last_available_slab: bool,
 
+    /// Should slabs be allocated from the heap?
+    ///
+    /// This should only be false for caches used as part of `ResourceArena`/`RawCache` implementation.
+    ///
+    /// `false` is only valid for small object caches.
+    allocate_slabs_from_heap: bool,
+
     constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
     destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
 
@@ -131,6 +146,13 @@ pub const RawCache = struct {
 
         /// Should the last available slab be deallocated when it is unused?
         deallocate_last_available_slab: bool = false,
+
+        /// Should slabs be allocated from the heap?
+        ///
+        /// This should only be false for caches used as part of `ResourceArena`/`RawCache` implementation.
+        ///
+        /// `false` is only valid for small object caches.
+        allocate_slabs_from_heap: bool = true,
     };
 
     /// Initialize the cache.
@@ -139,6 +161,10 @@ pub const RawCache = struct {
         options: InitOptions,
     ) void {
         const is_small = options.alignment.forward(options.size) <= small_object_size.value;
+
+        if (!options.allocate_slabs_from_heap and !is_small) {
+            @panic("only small object caches can have `allocate_slabs_from_heap` set to false");
+        }
 
         const effective_object_size = if (is_small)
             options.alignment.forward(single_node_alignment.forward(options.size) + @sizeOf(SinglyLinkedList.Node))
@@ -179,6 +205,7 @@ pub const RawCache = struct {
             .full_slabs = .{},
             .objects_per_slab = objects_per_slab,
             .deallocate_last_available_slab = options.deallocate_last_available_slab,
+            .allocate_slabs_from_heap = options.allocate_slabs_from_heap,
             .size_class = if (is_small)
                 .small
             else
@@ -298,16 +325,31 @@ pub const RawCache = struct {
         }
 
         const slab = switch (self.size_class) {
-            .small => blk: {
-                const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
-                    current_task,
-                    kernel.arch.paging.standard_page_size.value,
-                    .instant_fit,
-                ) catch return AllocateError.SlabAllocationFailed;
-                errdefer kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, slab_allocation);
-                std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
-
-                const slab_base_ptr: [*]u8 = @ptrFromInt(slab_allocation.base);
+            .small => slab: {
+                const slab_base_ptr: [*]u8 = if (self.allocate_slabs_from_heap) slab_base_ptr: {
+                    const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
+                        current_task,
+                        kernel.arch.paging.standard_page_size.value,
+                        .instant_fit,
+                    ) catch return AllocateError.SlabAllocationFailed;
+                    std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
+                    break :slab_base_ptr @ptrFromInt(slab_allocation.base);
+                } else slab_base_ptr: {
+                    const frame = kernel.mem.phys.allocator.allocate() catch
+                        return AllocateError.SlabAllocationFailed;
+                    break :slab_base_ptr kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
+                };
+                errdefer if (self.allocate_slabs_from_heap)
+                    kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
+                        .base = @intFromPtr(slab_base_ptr),
+                        .len = kernel.arch.paging.standard_page_size.value,
+                    })
+                else {
+                    const frame = kernel.mem.phys.Frame.fromAddress(
+                        kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
+                    );
+                    kernel.mem.phys.allocator.deallocate(frame);
+                };
 
                 const slab: *Slab = @alignCast(@ptrCast(
                     slab_base_ptr + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab),
@@ -330,9 +372,9 @@ pub const RawCache = struct {
                     slab.objects.prepend(object_node);
                 }
 
-                break :blk slab;
+                break :slab slab;
             },
-            .large => blk: {
+            .large => slab: {
                 const large_object_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
                     current_task,
                     self.effective_object_size * self.objects_per_slab,
@@ -380,7 +422,7 @@ pub const RawCache = struct {
                     slab.objects.prepend(&large_object.node);
                 }
 
-                break :blk slab;
+                break :slab slab;
             },
         };
 
@@ -480,13 +522,20 @@ pub const RawCache = struct {
                     }
                 }
 
-                kernel.mem.heap.globals.heap_page_arena.deallocate(
-                    current_task,
-                    .{
-                        .base = @intFromPtr(slab_base_ptr),
-                        .len = kernel.arch.paging.standard_page_size.value,
-                    },
-                );
+                if (self.allocate_slabs_from_heap) {
+                    kernel.mem.heap.globals.heap_page_arena.deallocate(
+                        current_task,
+                        .{
+                            .base = @intFromPtr(slab_base_ptr),
+                            .len = kernel.arch.paging.standard_page_size.value,
+                        },
+                    );
+                } else {
+                    const frame = kernel.mem.phys.Frame.fromAddress(
+                        kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
+                    );
+                    kernel.mem.phys.allocator.deallocate(frame);
+                }
 
                 return;
             },
@@ -545,13 +594,15 @@ const globals = struct {
 
 pub const init = struct {
     pub fn initializeCaches() !void {
-        globals.slab_cache.init(
-            .{ .cache_name = try .fromSlice("slab") },
-        );
+        globals.slab_cache.init(.{
+            .cache_name = try .fromSlice("slab"),
+            .allocate_slabs_from_heap = false,
+        });
 
-        globals.large_object_cache.init(
-            .{ .cache_name = try .fromSlice("large object") },
-        );
+        globals.large_object_cache.init(.{
+            .cache_name = try .fromSlice("large object"),
+            .allocate_slabs_from_heap = false,
+        });
     }
 };
 
