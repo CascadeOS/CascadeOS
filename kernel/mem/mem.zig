@@ -288,6 +288,7 @@ pub const init = struct {
         phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, result.pages_range);
 
         init_log.debug("initializing caches", .{});
+        try ResourceArena.global_init.initializeCache();
         try cache.init.initializeCaches();
 
         init_log.debug("initializing kernel and special heap", .{});

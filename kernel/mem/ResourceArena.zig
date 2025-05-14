@@ -278,9 +278,9 @@ pub fn deinit(arena: *ResourceArena, current_task: *kernel.Task) void {
         tags_to_release.push(node);
     }
 
-    // add all the tags in the `tags_to_release` list to the global unused tags list
+    // return all tags to the global tag cache
     while (tags_to_release.pop()) |node| {
-        globals.unused_tags.push(node);
+        globals.tag_cache.free(current_task, node.toTag());
     }
 
     if (any_allocations) {
@@ -840,72 +840,16 @@ pub const EnsureBoundaryTagsError = error{
 ///
 /// Upon non-error return, the mutex is locked.
 fn ensureBoundaryTags(arena: *ResourceArena, current_task: *kernel.Task) EnsureBoundaryTagsError!void {
-    const static = struct {
-        var allocate_tags_lock: kernel.sync.Mutex = .{};
-    };
+    arena.mutex.lock(current_task);
+    errdefer arena.mutex.unlock(current_task);
 
-    while (true) {
-        arena.mutex.lock(current_task);
+    while (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
+        const tag = globals.tag_cache.allocate(current_task) catch
+            return EnsureBoundaryTagsError.OutOfBoundaryTags;
 
-        if (arena.unused_tags_count >= MAX_TAGS_PER_ALLOCATION) return;
+        tag.* = .empty(.free);
 
-        while (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
-            const node = globals.unused_tags.pop() orelse break;
-            arena.pushUnusedTag(node.toTag());
-        } else {
-            return; // loop condition was false meaning we have enough tags
-        }
-
-        arena.mutex.unlock(current_task);
-        static.allocate_tags_lock.lock(current_task);
-
-        if (!globals.unused_tags.isEmpty()) {
-            // someone else has populated the global unused tags, so try again
-            static.allocate_tags_lock.unlock(current_task);
-            continue;
-        }
-
-        log.debug("{s}: performing boundary tag allocation", .{arena.name()});
-
-        const tags = blk: {
-            const physical_frame = kernel.mem.phys.allocator.allocate() catch
-                return EnsureBoundaryTagsError.OutOfBoundaryTags;
-            errdefer comptime unreachable;
-
-            const ptr = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr([*]BoundaryTag);
-            break :blk ptr[0..TAGS_PER_PAGE];
-        };
-        errdefer comptime unreachable;
-        std.debug.assert(tags.len >= MAX_TAGS_PER_ALLOCATION);
-
-        @memset(tags, .empty(.free));
-
-        const extra_tags = tags[MAX_TAGS_PER_ALLOCATION..];
-
-        // give the extra tags to the global unused tags list
-        for (extra_tags) |*tag| {
-            globals.unused_tags.push(&tag.all_tag_node);
-        }
-
-        static.allocate_tags_lock.unlock(current_task);
-        arena.mutex.lock(current_task);
-
-        const maximum_needed_tags = tags[0..MAX_TAGS_PER_ALLOCATION];
-
-        var tag_index: usize = 0;
-
-        // restock the arena's unused tags
-        while (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
-            arena.pushUnusedTag(&maximum_needed_tags[tag_index]);
-            tag_index += 1;
-        }
-
-        // give the left over tags to the global unused tags list
-        for (maximum_needed_tags[tag_index..]) |*tag| {
-            globals.unused_tags.push(&tag.all_tag_node);
-        }
-
-        return;
+        arena.pushUnusedTag(tag);
     }
 }
 
@@ -1290,62 +1234,6 @@ fn DoubleLinkedList(comptime Node: type) type {
     };
 }
 
-/// An atomic single linked list, that uses `AllTagNode.next` as the link.
-const AtomicSingleLinkedList = struct {
-    first: std.atomic.Value(?*AllTagNode),
-
-    const empty: AtomicSingleLinkedList = .{ .first = .init(null) };
-
-    pub fn isEmpty(self: *const AtomicSingleLinkedList) bool {
-        return self.first.load(.acquire) == null;
-    }
-
-    fn push(self: *AtomicSingleLinkedList, node: *AllTagNode) void {
-        std.debug.assert(node.previous == null and node.next == null);
-
-        var opt_first = self.first.load(.monotonic);
-
-        while (true) {
-            node.next = opt_first;
-
-            if (self.first.cmpxchgWeak(
-                opt_first,
-                node,
-                .acq_rel,
-                .monotonic,
-            )) |new_value| {
-                opt_first = new_value;
-                continue;
-            }
-
-            return;
-        }
-    }
-
-    fn pop(self: *AtomicSingleLinkedList) ?*AllTagNode {
-        var opt_first = self.first.load(.monotonic);
-
-        while (opt_first) |first| {
-            if (self.first.cmpxchgWeak(
-                opt_first,
-                first.next,
-                .acq_rel,
-                .monotonic,
-            )) |new_value| {
-                opt_first = new_value;
-                continue;
-            }
-            std.debug.assert(first.previous == null);
-
-            first.* = .empty;
-
-            break;
-        }
-
-        return opt_first;
-    }
-};
-
 inline fn indexOfFreelistContainingLen(len: usize) usize {
     return NUMBER_OF_FREELISTS - 1 - @clz(len);
 }
@@ -1375,8 +1263,17 @@ const TAGS_PER_PAGE = kernel.arch.paging.standard_page_size.value / @sizeOf(Boun
 pub const Name = std.BoundedArray(u8, kernel.config.resource_arena_name_length);
 
 const globals = struct {
-    /// The global list of unused boundary tags.
-    var unused_tags: AtomicSingleLinkedList = .empty;
+    /// Initialized during `global_init.initializeCache`.
+    var tag_cache: kernel.mem.cache.Cache(BoundaryTag, null, null) = undefined;
+};
+
+pub const global_init = struct {
+    pub fn initializeCache() !void {
+        globals.tag_cache.init(.{
+            .cache_name = try .fromSlice("boundary tags"),
+            .allocate_slabs_from_heap = false,
+        });
+    }
 };
 
 const RawCache = kernel.mem.cache.RawCache;
