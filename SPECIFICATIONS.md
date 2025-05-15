@@ -33,6 +33,9 @@ It is possible for these links or the text regarding versions to become out of d
   * [Design of the FAT file system](https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system)
   * [FAT Filesystem](http://elm-chan.org/docs/fat_e.html)
 * Limine - [Limine Boot Protocol](https://github.com/limine-bootloader/limine/blob/stable/PROTOCOL.md)
+* Resource Arena / Slab (cache)
+  * [The slab allocator: an object-caching kernel memory allocator](https://dl.acm.org/doi/10.5555/1267257.1267263) by Jeff Bonwick
+  * [Magazines and Vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources](https://www.usenix.org/legacy/publications/library/proceedings/usenix01/full_papers/bonwick/bonwick.pdf) by Jeff Bonwick and Jonathan Adams
 * RISC-V - [Unprivileged and Privileged ISA](https://github.com/riscv/riscv-isa-manual)
 * SDF - [SDF Spec](lib/sdf/sdf.md)
 * PCI
@@ -45,6 +48,10 @@ It is possible for these links or the text regarding versions to become out of d
   * [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc)
   * [x64 psABI](https://gitlab.com/x86-psABIs/x86-64-ABI)
 * UUID - [RFC 9562](https://www.rfc-editor.org/rfc/rfc9562.html)
+* UVM
+  * [Design and Implementation of the UVM Virtual Memory System](https://chuck.cranor.org/p/diss.pdf) by Charles D. Cranor
+  * [Zero-Copy Data Movement Mechanisms for UVM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=8961abccddf8ff24f7b494cd64d5cf62604b0018) by Charles D. Cranor and Gurudatta M. Parulkar
+  * [The UVM Virtual Memory System](https://www.usenix.org/legacy/publications/library/proceedings/usenix99/full_papers/cranor/cranor.pdf) by Charles D. Cranor and Gurudatta M. Parulkar
 * VirtIO - [VirtIO Specs](https://docs.oasis-open.org/virtio/virtio/)
 * x64
   * [AMD](https://www.amd.com/en/search/documentation/hub.html#q=AMD64%20Architecture%20Programmer's%20Manual&f-amd_document_type=Programmer%20References) link is to a search as AMD don't provide an always up to date link to the documents
