@@ -11,6 +11,7 @@
 //!  - [lylythechosenone's rust crate](https://github.com/lylythechosenone/vmem/blob/main/src/lib.rs)
 //!
 
+// TODO: return unused tags to the cache when they exceed a threshold
 // TODO: stats
 // TODO: next fit
 
@@ -279,8 +280,21 @@ pub fn deinit(arena: *ResourceArena, current_task: *kernel.Task) void {
     }
 
     // return all tags to the global tag cache
-    while (tags_to_release.pop()) |node| {
-        globals.tag_cache.free(current_task, node.toTag());
+    var any_tags_to_release = tags_to_release.first != null;
+    while (any_tags_to_release) {
+        const capacity = MAX_TAGS_PER_ALLOCATION * 4;
+        var temp_tag_buffer: std.BoundedArray(*BoundaryTag, capacity) = .{};
+
+        while (temp_tag_buffer.len < capacity) {
+            const node = tags_to_release.pop() orelse {
+                any_tags_to_release = false;
+                break;
+            };
+
+            temp_tag_buffer.appendAssumeCapacity(node.toTag());
+        }
+
+        globals.tag_cache.freeMany(current_task, capacity, temp_tag_buffer.constSlice());
     }
 
     if (any_allocations) {
@@ -843,10 +857,17 @@ fn ensureBoundaryTags(arena: *ResourceArena, current_task: *kernel.Task) EnsureB
     arena.mutex.lock(current_task);
     errdefer arena.mutex.unlock(current_task);
 
-    while (arena.unused_tags_count < MAX_TAGS_PER_ALLOCATION) {
-        const tag = globals.tag_cache.allocate(current_task) catch
-            return EnsureBoundaryTagsError.OutOfBoundaryTags;
+    if (arena.unused_tags_count >= MAX_TAGS_PER_ALLOCATION) return;
 
+    var tags = std.BoundedArray(
+        *BoundaryTag,
+        MAX_TAGS_PER_ALLOCATION,
+    ).init(MAX_TAGS_PER_ALLOCATION - arena.unused_tags_count) catch unreachable;
+
+    globals.tag_cache.allocateMany(current_task, MAX_TAGS_PER_ALLOCATION, tags.slice()) catch
+        return EnsureBoundaryTagsError.OutOfBoundaryTags;
+
+    for (tags.slice()) |tag| {
         tag.* = .empty(.free);
 
         arena.pushUnusedTag(tag);
