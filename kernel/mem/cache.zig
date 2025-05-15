@@ -204,6 +204,12 @@ pub const RawCache = struct {
         self: *RawCache,
         options: InitOptions,
     ) void {
+        log.debug("{s}: creating cache with size {} and alignment {}", .{
+            options.name.constSlice(),
+            core.Size.from(options.size, .byte),
+            options.alignment.toByteUnits(),
+        });
+
         const is_small = options.alignment.forward(options.size) <= small_object_size.value;
 
         if (!options.allocate_slabs_from_heap and !is_small) {
@@ -265,6 +271,8 @@ pub const RawCache = struct {
     ///
     /// All objects must have been freed before calling this.
     pub fn deinit(self: *RawCache, current_task: *kernel.Task) void {
+        log.debug("{s}: destroying cache", .{self.name()});
+
         if (self.full_slabs.first != null) @panic("full slabs not empty");
 
         switch (self.size_class) {
@@ -310,6 +318,8 @@ pub const RawCache = struct {
     pub fn allocateMany(self: *RawCache, current_task: *kernel.Task, objects: [][]u8) AllocateError!void {
         std.debug.assert(objects.len > 0);
 
+        verbose_log.debug("{s}: allocating {} objects", .{ self.name(), objects.len });
+
         var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
         errdefer self.freeMany(current_task, allocated_objects.items);
 
@@ -347,6 +357,8 @@ pub const RawCache = struct {
                             slab.objects.prepend(object_node);
                             slab.allocated_objects -= 1;
 
+                            log.warn("{s}: failed to add large object to lookup table", .{self.name()});
+
                             return AllocateError.LargeObjectAllocationFailed;
                         };
 
@@ -371,6 +383,8 @@ pub const RawCache = struct {
     ///
     /// The cache's lock must be held when this is called, the lock is held on success and unlocked on failure.
     fn allocateSlab(self: *RawCache, current_task: *kernel.Task) AllocateError!*Slab {
+        errdefer log.warn("{s}: failed to allocate slab", .{self.name()});
+
         self.lock.unlock(current_task);
 
         self.allocate_mutex.lock(current_task);
@@ -387,6 +401,8 @@ pub const RawCache = struct {
 
             self.lock.unlock(current_task);
         }
+
+        log.debug("{s}: allocating slab", .{self.name()});
 
         const slab = switch (self.size_class) {
             .small => slab: {
@@ -506,6 +522,8 @@ pub const RawCache = struct {
     pub fn freeMany(self: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
         std.debug.assert(objects.len > 0);
 
+        verbose_log.debug("{s}: freeing {} objects", .{ self.name(), objects.len });
+
         self.lock.lock(current_task);
         defer self.lock.unlock(current_task);
 
@@ -578,6 +596,8 @@ pub const RawCache = struct {
     ///
     /// The cache's lock must *not* be held when this is called.
     fn deallocateSlab(self: *RawCache, current_task: *kernel.Task, slab: *Slab) void {
+        log.debug("{s}: deallocating slab", .{self.name()});
+
         switch (self.size_class) {
             .small => {
                 const slab_base_ptr: [*]u8 =
@@ -679,3 +699,5 @@ const core = @import("core");
 const kernel = @import("kernel");
 const SinglyLinkedList = std.SinglyLinkedList;
 const DoublyLinkedList = std.DoublyLinkedList;
+const log = kernel.debug.log.scoped(.cache);
+const verbose_log = kernel.debug.log.scoped(.cache_verbose);
