@@ -20,7 +20,7 @@ pub fn Cache(
         const Self = @This();
 
         pub const InitOptions = struct {
-            cache_name: Name,
+            name: Name,
 
             /// Should the last available slab be deallocated when it is unused?
             deallocate_last_available_slab: bool = false,
@@ -43,7 +43,7 @@ pub fn Cache(
             };
 
             self.raw_cache.init(.{
-                .cache_name = options.cache_name,
+                .name = options.name,
                 .size = @sizeOf(T),
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
@@ -180,7 +180,7 @@ pub const RawCache = struct {
     };
 
     pub const InitOptions = struct {
-        cache_name: Name,
+        name: Name,
 
         size: usize,
         alignment: std.mem.Alignment,
@@ -238,7 +238,7 @@ pub const RawCache = struct {
         };
 
         self.* = .{
-            ._name = options.cache_name,
+            ._name = options.name,
             .allocate_mutex = .{},
             .lock = .{},
             .object_size = options.size,
@@ -663,12 +663,12 @@ const globals = struct {
 pub const init = struct {
     pub fn initializeCaches() !void {
         globals.slab_cache.init(.{
-            .cache_name = try .fromSlice("slab"),
+            .name = try .fromSlice("slab"),
             .allocate_slabs_from_heap = false,
         });
 
         globals.large_object_cache.init(.{
-            .cache_name = try .fromSlice("large object"),
+            .name = try .fromSlice("large object"),
             .allocate_slabs_from_heap = false,
         });
     }

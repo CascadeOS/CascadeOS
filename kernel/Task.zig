@@ -371,7 +371,7 @@ pub const init = struct {
         };
 
         globals.cache.init(
-            .{ .cache_name = try .fromSlice("task") },
+            .{ .name = try .fromSlice("task") },
         );
     }
 

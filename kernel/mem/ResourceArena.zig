@@ -173,7 +173,7 @@ pub fn init(
                 cache_name.writer().print("{s} qcache {}", .{ arena.name(), i + 1 }) catch unreachable;
 
                 quantum_cache.init(.{
-                    .cache_name = cache_name,
+                    .name = cache_name,
                     .size = options.quantum * (i + 1),
                     .alignment = .fromByteUnits(options.quantum),
                 });
@@ -212,7 +212,7 @@ pub fn init(
                     cache_name.writer().print("heap qcache {}", .{caches_created}) catch unreachable;
 
                     cache.init(.{
-                        .cache_name = cache_name,
+                        .name = cache_name,
                         .size = options.quantum * (caches_created),
                         .alignment = .fromByteUnits(options.quantum),
                     });
@@ -1291,7 +1291,7 @@ const globals = struct {
 pub const global_init = struct {
     pub fn initializeCache() !void {
         globals.tag_cache.init(.{
-            .cache_name = try .fromSlice("boundary tags"),
+            .name = try .fromSlice("boundary tags"),
             .allocate_slabs_from_heap = false,
         });
     }
