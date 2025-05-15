@@ -510,7 +510,7 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, p
 
     const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
 
-    log.debug("{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) with policy {s}", .{
+    verbose_log.debug("{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) with policy {s}", .{
         arena.name(),
         len,
         quantum_aligned_len,
@@ -564,7 +564,7 @@ pub fn allocate(arena: *ResourceArena, current_task: *kernel.Task, len: usize, p
         .len = quantum_aligned_len,
     };
 
-    log.debug("{s}: allocated {}", .{ arena.name(), allocation });
+    verbose_log.debug("{s}: allocated {}", .{ arena.name(), allocation });
 
     return allocation;
 }
@@ -739,7 +739,7 @@ fn splitFreeTag(arena: *ResourceArena, tag: *BoundaryTag, allocation_len: usize)
 ///
 /// Panics if the allocation does not match a previous call to `allocate`.
 pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation: Allocation) void {
-    log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
+    verbose_log.debug("{s}: deallocating {}", .{ arena.name(), allocation });
 
     std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
     std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
@@ -1304,3 +1304,4 @@ const Wyhash = std.hash.Wyhash;
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.resource_arena);
+const verbose_log = kernel.debug.log.scoped(.resource_arena_verbose);
