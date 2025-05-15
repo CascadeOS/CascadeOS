@@ -84,9 +84,53 @@ pub fn Cache(
             return @ptrCast(@alignCast(try self.raw_cache.allocate(current_task)));
         }
 
+        /// Allocate multiple objects from the cache.
+        ///
+        /// The length of `object_buffer` must be less than or equal to `max_count`.
+        pub fn allocateMany(
+            self: *Self,
+            current_task: *kernel.Task,
+            comptime max_count: usize, // TODO: is there a better way than this?
+            objects: []*T,
+        ) RawCache.AllocateError!void {
+            std.debug.assert(objects.len > 0);
+            std.debug.assert(objects.len <= max_count);
+
+            var raw_object_buffer: [max_count][]u8 = undefined;
+            const raw_objects = raw_object_buffer[0..objects.len];
+
+            try self.raw_cache.allocateMany(current_task, raw_objects);
+
+            for (objects, raw_objects) |*object, raw_object| {
+                object.* = @ptrCast(@alignCast(raw_object));
+            }
+        }
+
         /// Free an object back to the cache.
         pub fn free(self: *Self, current_task: *kernel.Task, object: *T) void {
             self.raw_cache.free(current_task, std.mem.asBytes(object));
+        }
+
+        /// Free multiple objects back to the cache.
+        ///
+        /// The length of `objects` must be less than or equal to `max_count`.
+        pub fn freeMany(
+            self: *Self,
+            current_task: *kernel.Task,
+            comptime max_count: usize, // TODO: is there a better way than this?
+            objects: []const *T,
+        ) void {
+            std.debug.assert(objects.len > 0);
+            std.debug.assert(objects.len <= max_count);
+
+            var raw_object_buffer: [max_count][]u8 = undefined;
+            const raw_objects = raw_object_buffer[0..objects.len];
+
+            for (raw_objects, objects) |*raw_object, object| {
+                raw_object.* = std.mem.asBytes(object);
+            }
+
+            self.raw_cache.freeMany(current_task, raw_objects);
         }
     };
 }
@@ -257,50 +301,70 @@ pub const RawCache = struct {
 
     /// Allocate an object from the cache.
     pub fn allocate(self: *RawCache, current_task: *kernel.Task) AllocateError![]u8 {
+        var object_buffer: [1][]u8 = undefined;
+        try self.allocateMany(current_task, &object_buffer);
+        return object_buffer[0];
+    }
+
+    /// Allocate multiple objects from the cache.
+    pub fn allocateMany(self: *RawCache, current_task: *kernel.Task, object_buffer: [][]u8) AllocateError!void {
+        std.debug.assert(object_buffer.len > 0);
+
+        var objects: std.ArrayListUnmanaged([]u8) = .initBuffer(object_buffer);
+        errdefer self.freeMany(current_task, objects.items);
+
         self.lock.lock(current_task);
 
-        const slab: *Slab = if (self.available_slabs.first) |slab_node|
-            @fieldParentPtr("linkage", slab_node)
-        else blk: {
-            @branchHint(.unlikely);
-            break :blk try self.allocateSlab(current_task);
-        };
+        var objects_left = object_buffer.len;
 
-        const object_node = slab.objects.popFirst() orelse
-            @panic("empty slab on available list");
-        slab.allocated_objects += 1;
+        while (objects_left > 0) {
+            const slab: *Slab = if (self.available_slabs.first) |slab_node|
+                @fieldParentPtr("linkage", slab_node)
+            else blk: {
+                @branchHint(.unlikely);
+                break :blk try self.allocateSlab(current_task);
+            };
 
-        if (slab.allocated_objects == self.objects_per_slab) {
-            @branchHint(.unlikely);
-            self.available_slabs.remove(&slab.linkage);
-            self.full_slabs.append(&slab.linkage);
+            while (objects_left > 0) {
+                defer objects_left -= 1;
+
+                const object_node = slab.objects.popFirst() orelse
+                    @panic("empty slab on available list");
+                slab.allocated_objects += 1;
+
+                switch (self.size_class) {
+                    .small => {
+                        const object_node_ptr: [*]u8 = @ptrCast(object_node);
+                        const object_ptr = object_node_ptr - single_node_alignment.forward(self.object_size);
+                        objects.appendAssumeCapacity(object_ptr[0..self.object_size]);
+                    },
+                    .large => |*large| {
+                        const large_object: *LargeObject = @fieldParentPtr("node", object_node);
+
+                        large.object_lookup.putNoClobber(@intFromPtr(large_object.object.ptr), large_object) catch {
+                            @branchHint(.cold);
+
+                            slab.objects.prepend(object_node);
+                            slab.allocated_objects -= 1;
+
+                            return AllocateError.LargeObjectAllocationFailed;
+                        };
+
+                        objects.appendAssumeCapacity(large_object.object);
+                    },
+                }
+
+                if (slab.allocated_objects == self.objects_per_slab) {
+                    @branchHint(.unlikely);
+                    self.available_slabs.remove(&slab.linkage);
+                    self.full_slabs.append(&slab.linkage);
+
+                    break;
+                }
+            }
         }
 
-        switch (self.size_class) {
-            .small => {
-                self.lock.unlock(current_task);
-
-                const object_node_ptr: [*]u8 = @ptrCast(object_node);
-                const object_ptr = object_node_ptr - single_node_alignment.forward(self.object_size);
-                return object_ptr[0..self.object_size];
-            },
-            .large => |*large| {
-                defer self.lock.unlock(current_task);
-
-                const large_object: *LargeObject = @fieldParentPtr("node", object_node);
-
-                large.object_lookup.putNoClobber(@intFromPtr(large_object.object.ptr), large_object) catch {
-                    @branchHint(.cold);
-
-                    slab.objects.prepend(object_node);
-                    slab.allocated_objects -= 1;
-
-                    return AllocateError.LargeObjectAllocationFailed;
-                };
-
-                return large_object.object;
-            },
-        }
+        self.lock.unlock(current_task);
     }
 
     /// Allocates a new slab.
@@ -435,75 +499,79 @@ pub const RawCache = struct {
 
     /// Free an object back to the cache.
     pub fn free(self: *RawCache, current_task: *kernel.Task, object: []u8) void {
-        const slab, const object_node = switch (self.size_class) {
-            .small => blk: {
-                const page_start = std.mem.alignBackward(
-                    usize,
-                    @intFromPtr(object.ptr),
-                    kernel.arch.paging.standard_page_size.value,
-                );
+        self.freeMany(current_task, &.{object});
+    }
 
-                const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
+    /// Free many objects back to the cache.
+    pub fn freeMany(self: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
+        std.debug.assert(objects.len > 0);
 
-                const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
-                    object.ptr + single_node_alignment.forward(self.object_size),
-                ));
+        self.lock.lock(current_task);
+        defer self.lock.unlock(current_task);
 
-                self.lock.lock(current_task);
+        for (objects) |object| {
+            const slab, const object_node = switch (self.size_class) {
+                .small => blk: {
+                    const page_start = std.mem.alignBackward(
+                        usize,
+                        @intFromPtr(object.ptr),
+                        kernel.arch.paging.standard_page_size.value,
+                    );
 
-                break :blk .{ slab, object_node };
-            },
-            .large => |*large| blk: {
-                self.lock.lock(current_task);
+                    const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
 
-                const large_object = large.object_lookup.get(@intFromPtr(object.ptr)) orelse {
-                    @panic("large object not found in object lookup");
-                };
+                    const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
+                        object.ptr + single_node_alignment.forward(self.object_size),
+                    ));
 
-                _ = large.object_lookup.remove(@intFromPtr(object.ptr));
+                    break :blk .{ slab, object_node };
+                },
+                .large => |*large| blk: {
+                    const large_object = large.object_lookup.get(@intFromPtr(object.ptr)) orelse {
+                        @panic("large object not found in object lookup");
+                    };
 
-                break :blk .{ large_object.slab, &large_object.node };
-            },
-        };
+                    _ = large.object_lookup.remove(@intFromPtr(object.ptr));
 
-        if (slab.allocated_objects == self.objects_per_slab) {
-            // slab was previously full, move it to available list
-            @branchHint(.unlikely);
-            self.full_slabs.remove(&slab.linkage);
-            self.available_slabs.append(&slab.linkage);
-        }
+                    break :blk .{ large_object.slab, &large_object.node };
+                },
+            };
 
-        slab.objects.prepend(object_node);
-        slab.allocated_objects -= 1;
-
-        if (slab.allocated_objects != 0) {
-            // slab is still in use
-            @branchHint(.likely);
-            self.lock.unlock(current_task);
-            return;
-        }
-
-        // slab is unused
-
-        if (!self.deallocate_last_available_slab) {
-            if (self.available_slabs.first == self.available_slabs.last) {
+            if (slab.allocated_objects == self.objects_per_slab) {
+                // slab was previously full, move it to available list
                 @branchHint(.unlikely);
-
-                std.debug.assert(self.available_slabs.first == &slab.linkage);
-
-                // this is the last available slab so we leave it in the available list and don't deallocate it
-
-                self.lock.unlock(current_task);
-                return;
+                self.full_slabs.remove(&slab.linkage);
+                self.available_slabs.append(&slab.linkage);
             }
+
+            slab.objects.prepend(object_node);
+            slab.allocated_objects -= 1;
+
+            if (slab.allocated_objects != 0) {
+                // slab is still in use
+                @branchHint(.likely);
+                continue;
+            }
+
+            // slab is unused
+
+            if (!self.deallocate_last_available_slab) {
+                if (self.available_slabs.first == self.available_slabs.last) {
+                    @branchHint(.unlikely);
+
+                    std.debug.assert(self.available_slabs.first == &slab.linkage);
+
+                    // this is the last available slab so we leave it in the available list and don't deallocate it
+
+                    continue;
+                }
+            }
+
+            // slab is unused remove it from available list and deallocate it
+            self.available_slabs.remove(&slab.linkage);
+
+            self.deallocateSlab(current_task, slab);
         }
-
-        // slab is unused remove it from available list and deallocate it
-        self.available_slabs.remove(&slab.linkage);
-
-        self.lock.unlock(current_task);
-
-        self.deallocateSlab(current_task, slab);
     }
 
     /// Deallocate a slab.
