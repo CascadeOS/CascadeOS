@@ -5,7 +5,7 @@
 ///
 /// Must be called with the scheduler lock held.
 pub fn queueTask(current_task: *kernel.Task, task: *kernel.Task) void {
-    std.debug.assert(globals.lock.isLockedBy(current_task.state.running.id));
+    std.debug.assert(globals.lock.isLockedByCurrent(current_task));
     std.debug.assert(task.state == .ready);
     std.debug.assert(!task.is_idle_task); // cannot queue an idle task
 
@@ -38,7 +38,7 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
 ///
 /// Must be called with the scheduler lock held.
 pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) void {
-    std.debug.assert(globals.lock.isLockedBy(current_task.state.running.id));
+    std.debug.assert(globals.lock.isLockedByCurrent(current_task));
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
 
     std.debug.assert(current_task.preemption_disable_count.load(.monotonic) == 0);
@@ -92,8 +92,7 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
 pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
 
-    const executor = current_task.state.running;
-    std.debug.assert(globals.lock.isLockedBy(executor.id));
+    std.debug.assert(globals.lock.isLockedByCurrent(current_task));
 
     std.debug.assert(!current_task.is_idle_task); // block during idle
 

@@ -13,7 +13,7 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     current_task.incrementInterruptDisable();
 
     const executor = current_task.state.running;
-    std.debug.assert(!self.isLockedBy(executor.id)); // recursive locks are not supported
+    std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
 
     const ticket = self.ticket.fetchAdd(1, .acq_rel);
     while (self.current.load(.monotonic) != ticket) {
@@ -30,8 +30,7 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held != 0);
 
-    const executor = current_task.state.running;
-    std.debug.assert(self.holding_executor.load(.acquire) == executor.id);
+    std.debug.assert(self.isLockedByCurrent(current_task));
 
     self.unsafeUnlock();
 
@@ -53,9 +52,9 @@ pub fn poison(self: *TicketSpinLock) void {
     _ = self.current.fetchSub(1, .acq_rel);
 }
 
-/// Returns true if the spinlock is locked by the given executor.
-pub fn isLockedBy(self: *const TicketSpinLock, executor_id: kernel.Executor.Id) bool {
-    return self.holding_executor.load(.acquire) == executor_id;
+/// Returns true if the spinlock is locked by the current executor.
+pub fn isLockedByCurrent(self: *const TicketSpinLock, current_task: *const kernel.Task) bool {
+    return self.holding_executor.load(.monotonic) == current_task.state.running.id;
 }
 
 const core = @import("core");

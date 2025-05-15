@@ -23,8 +23,7 @@ pub fn wakeOne(
 ) void {
     std.debug.assert(current_task.interrupt_disable_count.load(.monotonic) != 0);
 
-    const executor = current_task.state.running;
-    std.debug.assert(spinlock.isLockedBy(executor.id));
+    std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
     const task_to_wake_node = self.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
@@ -48,8 +47,7 @@ pub fn wait(
 ) void {
     std.debug.assert(current_task.interrupt_disable_count.load(.monotonic) != 0);
 
-    const executor = current_task.state.running;
-    std.debug.assert(spinlock.isLockedBy(executor.id));
+    std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
     self.waiting_tasks.push(&current_task.next_task_node);
 
