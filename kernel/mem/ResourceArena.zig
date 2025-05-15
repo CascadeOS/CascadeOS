@@ -1291,7 +1291,7 @@ const globals = struct {
 pub const global_init = struct {
     pub fn initializeCache() !void {
         globals.tag_cache.init(.{
-            .name = try .fromSlice("boundary tags"),
+            .name = try .fromSlice("boundary tag"),
             .allocate_slabs_from_heap = false,
         });
     }
