@@ -307,15 +307,15 @@ pub const RawCache = struct {
     }
 
     /// Allocate multiple objects from the cache.
-    pub fn allocateMany(self: *RawCache, current_task: *kernel.Task, object_buffer: [][]u8) AllocateError!void {
-        std.debug.assert(object_buffer.len > 0);
+    pub fn allocateMany(self: *RawCache, current_task: *kernel.Task, objects: [][]u8) AllocateError!void {
+        std.debug.assert(objects.len > 0);
 
-        var objects: std.ArrayListUnmanaged([]u8) = .initBuffer(object_buffer);
-        errdefer self.freeMany(current_task, objects.items);
+        var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
+        errdefer self.freeMany(current_task, allocated_objects.items);
 
         self.lock.lock(current_task);
 
-        var objects_left = object_buffer.len;
+        var objects_left = objects.len;
 
         while (objects_left > 0) {
             const slab: *Slab = if (self.available_slabs.first) |slab_node|
@@ -336,7 +336,7 @@ pub const RawCache = struct {
                     .small => {
                         const object_node_ptr: [*]u8 = @ptrCast(object_node);
                         const object_ptr = object_node_ptr - single_node_alignment.forward(self.object_size);
-                        objects.appendAssumeCapacity(object_ptr[0..self.object_size]);
+                        allocated_objects.appendAssumeCapacity(object_ptr[0..self.object_size]);
                     },
                     .large => |*large| {
                         const large_object: *LargeObject = @fieldParentPtr("node", object_node);
@@ -350,7 +350,7 @@ pub const RawCache = struct {
                             return AllocateError.LargeObjectAllocationFailed;
                         };
 
-                        objects.appendAssumeCapacity(large_object.object);
+                        allocated_objects.appendAssumeCapacity(large_object.object);
                     },
                 }
 
