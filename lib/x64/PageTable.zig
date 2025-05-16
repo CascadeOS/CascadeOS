@@ -3,7 +3,7 @@
 
 /// A page table for x64.
 pub const PageTable = extern struct {
-    entries: [number_of_entries]RawEntry align(small_page_size.value),
+    entries: [number_of_entries]Entry.Raw align(small_page_size.value),
 
     pub const number_of_entries = 512;
     pub const small_page_size: core.Size = .from(4, .kib);
@@ -15,15 +15,13 @@ pub const PageTable = extern struct {
     pub const level_3_address_space_size = large_page_size;
     pub const level_4_address_space_size = core.Size.from(512, .gib);
 
-    pub const RawEntry = std.atomic.Value(u64);
-
     pub fn zero(self: *PageTable) void {
         @memset(std.mem.asBytes(self), 0);
     }
 
-    pub fn empty(self: *const PageTable) bool {
+    pub fn isEmpty(self: *const PageTable) bool {
         for (self.entries) |entry| {
-            if (entry.load(.acquire) != 0) return false;
+            if (!entry.isZero()) return false;
         }
         return true;
     }
@@ -175,14 +173,38 @@ pub const PageTable = extern struct {
         ///  - 4KiB
         no_execute: bitjuggle.Boolean(u64, 63),
 
-        raw: u64,
+        _raw: Raw,
 
-        pub fn fromRaw(raw_entry: *RawEntry) Entry {
-            return .{ .raw = raw_entry.load(.acquire) };
-        }
+        pub const Raw = extern struct {
+            value: u64,
+
+            pub fn zero(self: *Raw) void {
+                self.value = 0;
+            }
+
+            pub fn isZero(self: Raw) bool {
+                return self.value == 0;
+            }
+
+            pub fn load(self: Raw) Entry {
+                return .{ ._raw = self };
+            }
+
+            pub fn store(self: *Raw, entry: Entry) void {
+                self.* = entry._raw;
+            }
+
+            comptime {
+                core.testing.expectSize(@This(), @sizeOf(u64));
+            }
+        };
 
         pub fn zero(self: *Entry) void {
-            self.raw = 0;
+            self._raw.zero();
+        }
+
+        pub fn isZero(self: Entry) bool {
+            return self._raw.isZero();
         }
 
         pub fn getAddress4kib(self: Entry) core.PhysicalAddress {

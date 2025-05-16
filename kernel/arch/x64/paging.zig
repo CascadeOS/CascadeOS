@@ -111,9 +111,9 @@ fn mapTo4KiB(
     );
     errdefer {
         if (created_level3_table) {
-            var level4_entry: PageTable.Entry = .fromRaw(&level4_table.entries[level4_index]);
+            var level4_entry = level4_table.entries[level4_index].load();
             const address = level4_entry.getAddress4kib();
-            level4_table.entries[level4_index].store(0, .release);
+            level4_table.entries[level4_index].zero();
             physical_frame_allocator.deallocate(.fromAddress(address));
         }
     }
@@ -126,9 +126,9 @@ fn mapTo4KiB(
     );
     errdefer {
         if (created_level2_table) {
-            var level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
+            var level3_entry = level3_table.entries[level3_index].load();
             const address = level3_entry.getAddress4kib();
-            level3_table.entries[level3_index].store(0, .release);
+            level3_table.entries[level3_index].zero();
             physical_frame_allocator.deallocate(.fromAddress(address));
         }
     }
@@ -141,9 +141,9 @@ fn mapTo4KiB(
     );
     errdefer {
         if (created_level1_table) {
-            var level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
+            var level2_entry = level2_table.entries[level2_index].load();
             const address = level2_entry.getAddress4kib();
-            level2_table.entries[level2_index].store(0, .release);
+            level2_table.entries[level2_index].zero();
             physical_frame_allocator.deallocate(.fromAddress(address));
         }
     }
@@ -176,7 +176,7 @@ fn unmap4KiB(
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     const level4_index = PageTable.p4Index(virtual_address);
-    const level4_entry: PageTable.Entry = .fromRaw(&level4_table.entries[level4_index]);
+    const level4_entry = level4_table.entries[level4_index].load();
 
     const level3_table = level4_entry.getNextLevel(
         kernel.mem.directMapFromPhysical,
@@ -185,13 +185,13 @@ fn unmap4KiB(
         error.HugePage => @panic("page table entry is huge"),
     };
 
-    defer if (!keep_top_level and level3_table.empty()) {
-        level4_table.entries[level4_index].store(0, .release);
+    defer if (!keep_top_level and level3_table.isEmpty()) {
+        level4_table.entries[level4_index].zero();
         physical_frame_allocator.deallocate(.fromAddress(level4_entry.getAddress4kib()));
     };
 
     const level3_index = PageTable.p3Index(virtual_address);
-    const level3_entry: PageTable.Entry = .fromRaw(&level3_table.entries[level3_index]);
+    const level3_entry = level3_table.entries[level3_index].load();
 
     const level2_table = level3_entry.getNextLevel(
         kernel.mem.directMapFromPhysical,
@@ -200,13 +200,13 @@ fn unmap4KiB(
         error.HugePage => @panic("page table entry is huge"),
     };
 
-    defer if (level2_table.empty()) {
-        level3_table.entries[level3_index].store(0, .release);
+    defer if (level2_table.isEmpty()) {
+        level3_table.entries[level3_index].zero();
         physical_frame_allocator.deallocate(.fromAddress(level3_entry.getAddress4kib()));
     };
 
     const level2_index = PageTable.p2Index(virtual_address);
-    const level2_entry: PageTable.Entry = .fromRaw(&level2_table.entries[level2_index]);
+    const level2_entry = level2_table.entries[level2_index].load();
 
     const level1_table = level2_entry.getNextLevel(
         kernel.mem.directMapFromPhysical,
@@ -215,19 +215,19 @@ fn unmap4KiB(
         error.HugePage => @panic("page table entry is huge"),
     };
 
-    defer if (level1_table.empty()) {
-        level2_table.entries[level2_index].store(0, .release);
+    defer if (level1_table.isEmpty()) {
+        level2_table.entries[level2_index].zero();
         physical_frame_allocator.deallocate(.fromAddress(level2_entry.getAddress4kib()));
     };
 
     const level1_index = PageTable.p1Index(virtual_address);
-    const level1_entry: PageTable.Entry = .fromRaw(&level1_table.entries[level1_index]);
+    const level1_entry = level1_table.entries[level1_index].load();
 
     if (!level1_entry.present.read()) {
         @panic("page table entry is not present");
     }
 
-    level1_table.entries[level1_index].store(0, .release);
+    level1_table.entries[level1_index].zero();
 
     if (free_backing_pages) {
         physical_frame_allocator.deallocate(.fromAddress(level1_entry.getAddress4kib()));
@@ -266,20 +266,20 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
 }
 
 fn ensureNextTable(
-    raw_entry: *PageTable.RawEntry,
+    raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 
     const next_level_physical_address = blk: {
-        var entry: PageTable.Entry = .fromRaw(raw_entry);
+        var entry = raw_entry.load();
 
         if (entry.present.read()) {
             if (entry.huge.read()) return error.MappingNotValid;
 
             break :blk entry.getAddress4kib();
         }
-        std.debug.assert(entry.raw == 0);
+        std.debug.assert(entry.isZero());
         created_table = true;
 
         const physical_frame = try physical_frame_allocator.allocate();
@@ -296,7 +296,7 @@ fn ensureNextTable(
         entry.writeable.write(true);
         entry.user_accessible.write(true);
 
-        raw_entry.store(entry.raw, .release);
+        raw_entry.store(entry);
 
         break :blk physical_address;
     };
@@ -318,7 +318,7 @@ fn setEntry(
     map_type: MapType,
     page_type: PageType,
 ) error{ AlreadyMapped, WriteCombiningAndNoCache }!void {
-    var entry: PageTable.Entry = .fromRaw(&page_table.entries[index]);
+    var entry = page_table.entries[index].load();
 
     if (entry.present.read()) return error.AlreadyMapped;
 
@@ -340,7 +340,7 @@ fn setEntry(
 
     entry.present.write(true);
 
-    page_table.entries[index].store(entry.raw, .release);
+    page_table.entries[index].store(entry);
 }
 
 pub const all_page_sizes: []const core.Size = &.{
@@ -383,7 +383,7 @@ pub const init = struct {
 
         const raw_entry = &page_table.entries[PageTable.p4Index(range.address)];
 
-        const entry: PageTable.Entry = .fromRaw(raw_entry);
+        const entry = raw_entry.load();
         if (entry.present.read()) @panic("already mapped");
 
         _ = try ensureNextTable(raw_entry, physical_frame_allocator);
