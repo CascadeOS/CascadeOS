@@ -10,18 +10,15 @@ pub fn nonMaskableInterruptHandler(_: *kernel.Task, interrupt_frame: *InterruptF
     kernel.arch.interrupts.disableInterruptsAndHalt();
 }
 
+
 pub fn flushRequestHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
-    const executor = current_task.state.running;
-
-    while (executor.flush_requests.pop()) |node| {
-        const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.flush(current_task);
-    }
-
+    kernel.entry.onFlushRequest(current_task);
+    // eoi after all current flush requests have been handled
     x64.apic.eoi();
 }
 
 pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
+    // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
     kernel.entry.onPerExecutorPeriodic(current_task);
 }
