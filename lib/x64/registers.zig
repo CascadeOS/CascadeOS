@@ -225,6 +225,7 @@ pub const Cr0 = packed struct(u64) {
     }
 };
 
+/// Stores the linear address that was accessed to result in the last page fault.
 pub const Cr2 = struct {
     /// Read the page fault linear address from the CR2 register.
     pub inline fn readAddress() core.VirtualAddress {
