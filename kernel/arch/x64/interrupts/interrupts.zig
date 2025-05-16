@@ -210,7 +210,7 @@ pub const InterruptFrame = extern struct {
         try writer.print("rbp: 0x{x:0>16}, rsi: 0x{x:0>16},\n", .{ value.rbp, value.rsi });
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("rdi: 0x{x:0>16}, r8: 0x{x:0>16},\n", .{ value.rdi, value.r8 });
+        try writer.print("rdi: 0x{x:0>16}, r8:  0x{x:0>16},\n", .{ value.rdi, value.r8 });
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.print("r9:  0x{x:0>16}, r10: 0x{x:0>16},\n", .{ value.r9, value.r10 });
