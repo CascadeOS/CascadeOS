@@ -313,6 +313,9 @@ pub const init = struct {
         globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
             .interrupt_handler = interrupt_handlers.nonMaskableInterruptHandler,
         };
+        globals.handlers[@intFromEnum(Interrupt.page_fault)] = .{
+            .interrupt_handler = interrupt_handlers.pageFaultHandler,
+        };
         globals.handlers[@intFromEnum(Interrupt.flush_request)] = .{
             .interrupt_handler = interrupt_handlers.flushRequestHandler,
         };
