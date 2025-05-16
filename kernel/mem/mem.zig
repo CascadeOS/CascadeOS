@@ -10,14 +10,6 @@ pub const FlushRequest = @import("FlushRequest.zig");
 pub const ResourceArena = @import("ResourceArena.zig");
 pub const Page = @import("Page.zig");
 
-pub fn getKernelRegion(range_type: KernelMemoryRegion.Type) core.VirtualRange {
-    for (globals.regions.constSlice()) |region| {
-        if (region.type == range_type) return region.range;
-    }
-
-    std.debug.panic("no kernel region of type '{s}'", .{@tagName(range_type)});
-}
-
 pub const MapError = error{
     AlreadyMapped,
 
