@@ -7,6 +7,13 @@ pub fn onPerExecutorPeriodic(current_task: *kernel.Task) void {
     kernel.scheduler.maybePreempt(current_task);
 }
 
+pub fn onPageFault(current_task: *kernel.Task, page_fault_details: kernel.mem.PageFaultDetails) void {
+    switch (page_fault_details.source) {
+        .kernel => kernel.mem.onKernelPageFault(current_task, page_fault_details),
+        .user => std.debug.panic("user page fault\n{}", .{page_fault_details}), // TODO
+    }
+}
+
 pub fn onFlushRequest(current_task: *kernel.Task) void {
     const executor = current_task.state.running;
 

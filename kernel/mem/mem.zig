@@ -217,6 +217,92 @@ pub fn physicalFromKernelSectionUnsafe(self: core.VirtualAddress) core.PhysicalA
     return .{ .value = self.value - globals.physical_to_virtual_offset.value };
 }
 
+pub fn onKernelPageFault(current_task: *kernel.Task, page_fault_details: PageFaultDetails) void {
+    _ = current_task;
+
+    if (page_fault_details.faulting_address.lessThan(kernel.arch.paging.higher_half_start)) {
+        @branchHint(.cold);
+        std.debug.panic("kernel page fault in lower half\n{}", .{page_fault_details});
+    }
+
+    const region = kernelRegionContainingAddress(page_fault_details.faulting_address) orelse {
+        @branchHint(.cold);
+        std.debug.panic("kernel page fault outside any kernel region\n{}", .{page_fault_details});
+    };
+
+    std.debug.panic("kernel page fault in '{s}'\n{}", .{ @tagName(region), page_fault_details });
+}
+
+pub const PageFaultDetails = struct {
+    faulting_address: core.VirtualAddress,
+    access_type: AccessType,
+    fault_type: FaultType,
+    source: Source,
+
+    pub const AccessType = enum {
+        read,
+        write,
+        execute,
+    };
+
+    pub const FaultType = enum {
+        /// Either the page was not present or the mapping is invalid.
+        invalid,
+
+        /// The access was not permitted by the page protection.
+        protection,
+    };
+
+    pub const Source = enum {
+        kernel,
+        user,
+    };
+
+    pub fn print(details: PageFaultDetails, writer: std.io.AnyWriter, indent: usize) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("PageFaultDetails{\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.writeAll("faulting_address: ");
+        try details.faulting_address.print(writer, new_indent);
+        try writer.writeAll(",\n");
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("access_type: {s},\n", .{@tagName(details.access_type)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("fault_type: {s},\n", .{@tagName(details.fault_type)});
+
+        try writer.writeByteNTimes(' ', new_indent);
+        try writer.print("source: {s},\n", .{@tagName(details.source)});
+
+        try writer.writeByteNTimes(' ', indent);
+        try writer.writeByte('}');
+    }
+
+    pub inline fn format(
+        details: PageFaultDetails,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        return if (@TypeOf(writer) == std.io.AnyWriter)
+            PageFaultDetails.print(details, writer, 0)
+        else
+            PageFaultDetails.print(details, writer.any(), 0);
+    }
+};
+
+fn kernelRegionContainingAddress(address: core.VirtualAddress) ?KernelMemoryRegion.Type {
+    for (globals.regions.constSlice()) |region| {
+        if (region.range.containsAddress(address)) return region.type;
+    }
+    return null;
+}
+
 pub const globals = struct {
     /// The core page table.
     ///
