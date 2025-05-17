@@ -3,7 +3,6 @@
 
 pub const AtomicSinglyLinkedLIFO = @import("AtomicSinglyLinkedLIFO.zig");
 pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
-pub const SinglyLinkedLIFO = @import("SinglyLinkedLIFO.zig");
 
 pub const RedBlack = struct {
     const red_black_tree = @import("red_black_tree.zig");
