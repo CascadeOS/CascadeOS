@@ -24,9 +24,7 @@ pub const MapError = error{
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
-///
-/// FIXME: this function needs to be deleted as the memory subsystem should be used instead
-pub fn mapRangeAndAllocatePhysicalFrames(
+pub fn mapRangeAndBackWithPhysicalFrames(
     current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
@@ -626,7 +624,7 @@ pub const init = struct {
                     std.debug.panic("failed to full map {}: {s}", .{ region, @errorName(err) });
                 },
                 .back_with_frames => |map_type| {
-                    mapRangeAndAllocatePhysicalFrames(
+                    mapRangeAndBackWithPhysicalFrames(
                         current_task,
                         globals.core_page_table,
                         region.range,

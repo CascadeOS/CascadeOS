@@ -252,7 +252,7 @@ pub const Stack = struct {
             globals.stack_page_table_mutex.lock(current_task);
             defer globals.stack_page_table_mutex.unlock(current_task);
 
-            kernel.mem.mapRangeAndAllocatePhysicalFrames(
+            kernel.mem.mapRangeAndBackWithPhysicalFrames(
                 current_task,
                 kernel.mem.globals.core_page_table,
                 usable_range,
