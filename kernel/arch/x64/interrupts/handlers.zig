@@ -19,8 +19,6 @@ pub fn pageFaultHandler(current_task: *kernel.Task, interrupt_frame: *InterruptF
 
     const error_code: lib_x64.PageFaultErrorCode = .fromErrorCode(interrupt_frame.error_code);
 
-    kernel.debug.log.scoped(.int).warn("error code: {}", .{error_code});
-
     var fault_type: kernel.mem.PageFaultDetails.FaultType = .invalid;
     if (error_code.present)
         fault_type = .protection
