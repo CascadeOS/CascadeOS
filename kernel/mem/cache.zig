@@ -6,6 +6,8 @@
 //! Based on [The slab allocator: an object-caching kernel memory allocator](https://dl.acm.org/doi/10.5555/1267257.1267263) by Jeff Bonwick.
 //!
 
+// TODO: use `core.Size`
+
 pub const ConstructorError = error{ObjectConstructionFailed};
 pub const Name = std.BoundedArray(u8, kernel.config.cache_name_length);
 
@@ -210,7 +212,7 @@ pub const RawCache = struct {
             options.alignment.toByteUnits(),
         });
 
-        const is_small = options.alignment.forward(options.size) <= small_object_size.value;
+        const is_small = isSmallObject(options.size, options.alignment);
 
         if (!options.allocate_slabs_from_heap and !is_small) {
             @panic("only small object caches can have `allocate_slabs_from_heap` set to false");
@@ -666,11 +668,15 @@ pub const RawCache = struct {
         node: SinglyLinkedList.Node = .{},
     };
 
-    const small_object_size = kernel.arch.paging.standard_page_size.divideScalar(8);
     const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(SinglyLinkedList.Node));
-
     const default_large_objects_per_slab = 16;
 };
+
+const small_object_size = kernel.arch.paging.standard_page_size.divideScalar(8);
+
+pub fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
+    return alignment.forward(size) <= small_object_size.value;
+}
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
