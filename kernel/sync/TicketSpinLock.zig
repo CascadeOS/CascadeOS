@@ -6,7 +6,7 @@ const TicketSpinLock = @This();
 
 current: std.atomic.Value(u32) = .init(0),
 ticket: std.atomic.Value(u32) = .init(0),
-holding_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none),
+holding_executor: kernel.Executor.Id = .none,
 
 /// Locks the spinlock.
 pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
@@ -19,7 +19,7 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     while (self.current.load(.monotonic) != ticket) {
         kernel.arch.spinLoopHint();
     }
-    self.holding_executor.store(executor.id, .release);
+    self.holding_executor = executor.id;
 
     current_task.spinlocks_held += 1;
 }
@@ -43,7 +43,7 @@ pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 ///
 /// Performs no checks and is unsafe, prefer `unlock` instead.
 pub fn unsafeUnlock(self: *TicketSpinLock) void {
-    self.holding_executor.store(.none, .release);
+    self.holding_executor = .none;
     _ = self.current.fetchAdd(1, .acq_rel);
 }
 
@@ -54,7 +54,7 @@ pub fn poison(self: *TicketSpinLock) void {
 
 /// Returns true if the spinlock is locked by the current executor.
 pub fn isLockedByCurrent(self: *const TicketSpinLock, current_task: *const kernel.Task) bool {
-    return self.holding_executor.load(.monotonic) == current_task.state.running.id;
+    return self.holding_executor == current_task.state.running.id;
 }
 
 const core = @import("core");
