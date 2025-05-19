@@ -21,7 +21,7 @@ pub fn wakeOne(
     current_task: *kernel.Task,
     spinlock: *const kernel.sync.TicketSpinLock,
 ) void {
-    std.debug.assert(current_task.interrupt_disable_count.load(.monotonic) != 0);
+    std.debug.assert(current_task.interrupt_disable_count != 0);
 
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
@@ -45,7 +45,7 @@ pub fn wait(
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
-    std.debug.assert(current_task.interrupt_disable_count.load(.monotonic) != 0);
+    std.debug.assert(current_task.interrupt_disable_count != 0);
 
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 

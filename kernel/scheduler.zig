@@ -19,15 +19,15 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
     std.debug.assert(current_task.state == .running);
     std.debug.assert(current_task.spinlocks_held == 0);
 
-    if (current_task.preemption_disable_count.load(.monotonic) != 0) {
-        current_task.preemption_skipped.store(true, .monotonic);
+    if (current_task.preemption_disable_count != 0) {
+        current_task.preemption_skipped = true;
         return;
     }
 
     lockScheduler(current_task);
     defer unlockScheduler(current_task);
 
-    current_task.preemption_skipped.store(false, .monotonic);
+    current_task.preemption_skipped = false;
 
     if (globals.ready_to_run.isEmpty()) return;
 
@@ -41,8 +41,8 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
 
-    std.debug.assert(current_task.preemption_disable_count.load(.monotonic) == 0);
-    std.debug.assert(current_task.preemption_skipped.load(.monotonic) == false);
+    std.debug.assert(current_task.preemption_disable_count == 0);
+    std.debug.assert(current_task.preemption_skipped == false);
 
     const new_task_node = globals.ready_to_run.pop() orelse {
         switch (mode) {

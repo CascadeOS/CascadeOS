@@ -13,15 +13,15 @@ state: State,
 stack: Stack,
 
 /// Tracks the depth of nested interrupt disables.
-interrupt_disable_count: std.atomic.Value(u32) = .init(1), // fresh tasks start with interrupts disabled
+interrupt_disable_count: u32 = 1, // fresh tasks start with interrupts disabled
 
 /// Tracks the depth of nested preemption disables.
-preemption_disable_count: std.atomic.Value(u32) = .init(0),
+preemption_disable_count: u32 = 0,
 
 /// Whenever we skip preemption, we set this to true.
 ///
 /// When we re-enable preemption, we check this flag.
-preemption_skipped: std.atomic.Value(bool) = .init(false),
+preemption_skipped: bool = false,
 
 spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked
 
@@ -49,7 +49,7 @@ pub fn getCurrent() *Task {
     const current_task = executor.current_task;
     std.debug.assert(current_task.state.running == executor);
 
-    if (current_task.interrupt_disable_count.load(.monotonic) == 0) {
+    if (current_task.interrupt_disable_count == 0) {
         kernel.arch.interrupts.enableInterrupts();
     }
 
@@ -59,7 +59,7 @@ pub fn getCurrent() *Task {
 pub fn incrementInterruptDisable(self: *Task) void {
     kernel.arch.interrupts.disableInterrupts();
 
-    _ = self.interrupt_disable_count.fetchAdd(1, .monotonic);
+    self.interrupt_disable_count += 1;
 
     const executor = self.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
@@ -73,8 +73,10 @@ pub fn decrementInterruptDisable(self: *Task) void {
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == self);
 
-    const previous = self.interrupt_disable_count.fetchSub(1, .monotonic);
+    const previous = self.interrupt_disable_count;
     std.debug.assert(previous > 0);
+
+    self.interrupt_disable_count = previous - 1;
 
     if (previous == 1) {
         kernel.arch.interrupts.enableInterrupts();
@@ -82,7 +84,7 @@ pub fn decrementInterruptDisable(self: *Task) void {
 }
 
 pub fn incrementPreemptionDisable(self: *Task) void {
-    _ = self.preemption_disable_count.fetchAdd(1, .monotonic);
+    self.preemption_disable_count += 1;
 
     const executor = self.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
@@ -94,10 +96,12 @@ pub fn decrementPreemptionDisable(self: *Task) void {
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == self);
 
-    const previous = self.preemption_disable_count.fetchSub(1, .monotonic);
+    const previous = self.preemption_disable_count;
     std.debug.assert(previous > 0);
 
-    if (previous == 1 and self.preemption_skipped.load(.monotonic)) {
+    self.preemption_disable_count = previous - 1;
+
+    if (previous == 1 and self.preemption_skipped) {
         kernel.scheduler.maybePreempt(self);
     }
 }
@@ -106,7 +110,7 @@ pub const InterruptRestorer = struct {
     previous_value: u32,
 
     pub fn exit(self: InterruptRestorer, current_task: *Task) void {
-        current_task.interrupt_disable_count.store(self.previous_value, .monotonic);
+        current_task.interrupt_disable_count = self.previous_value;
     }
 };
 
@@ -118,7 +122,8 @@ pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
     const current_task = executor.current_task;
     std.debug.assert(current_task.state.running == executor);
 
-    const previous_value = current_task.interrupt_disable_count.fetchAdd(1, .monotonic);
+    const previous_value = current_task.interrupt_disable_count;
+    current_task.interrupt_disable_count = previous_value + 1;
 
     return .{ current_task, .{ .previous_value = previous_value } };
 }
