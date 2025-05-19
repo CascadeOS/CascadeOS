@@ -18,8 +18,6 @@ pub fn isEmpty(self: *const AtomicSinglyLinkedLIFO) bool {
 
 /// Adds a node to the front of the list.
 pub fn push(self: *AtomicSinglyLinkedLIFO, node: *SingleNode) void {
-    std.debug.assert(node.next == null);
-
     var opt_start_node = self.start_node.load(.monotonic);
 
     while (true) {
@@ -55,11 +53,10 @@ pub fn pop(self: *AtomicSinglyLinkedLIFO) ?*SingleNode {
         }
 
         start_node.* = .empty;
-
-        break;
+        return start_node;
     }
 
-    return opt_start_node;
+    return null;
 }
 
 test AtomicSinglyLinkedLIFO {
