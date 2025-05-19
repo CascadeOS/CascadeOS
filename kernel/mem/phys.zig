@@ -65,9 +65,7 @@ fn allocate() FrameAllocator.AllocateError!Frame {
         .release,
     );
 
-    const page: *kernel.mem.Page = .fromFreeListNode(node);
-
-    page.state = .in_use;
+    const page: *kernel.mem.Page = .fromNode(node);
 
     if (core.is_debug) {
         const virtual_range = core.VirtualRange.fromAddr(
@@ -83,10 +81,8 @@ fn allocate() FrameAllocator.AllocateError!Frame {
 
 fn deallocate(frame: Frame) void {
     const page = frame.page() orelse std.debug.panic("page not found for frame: {}", .{frame});
-    std.debug.assert(page.state == .in_use);
 
-    page.state = .{ .free = .{} };
-    globals.free_page_list.push(&page.state.free.free_list_node);
+    globals.free_page_list.push(&page.node);
 
     _ = globals.free_memory.fetchAdd(kernel.arch.paging.standard_page_size.value, .release);
 }
@@ -285,15 +281,12 @@ pub const init = struct {
             for (0..usable_pages_in_range) |range_i| {
                 globals.pages[page_index] = .{
                     .physical_frame = @enumFromInt(range_start_phys_frame + range_i),
-                    .state = undefined,
                 };
 
                 if (in_use_frames_left != 0) {
-                    globals.pages[page_index].state = .in_use;
                     in_use_frames_left -= 1;
                 } else {
-                    globals.pages[page_index].state = .{ .free = .{} };
-                    globals.free_page_list.push(&globals.pages[page_index].state.free.free_list_node);
+                    globals.free_page_list.push(&globals.pages[page_index].node);
                 }
 
                 page_index += 1;

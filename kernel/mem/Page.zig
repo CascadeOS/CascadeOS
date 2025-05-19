@@ -5,23 +5,11 @@ const Page = @This();
 
 physical_frame: kernel.mem.phys.Frame,
 
-state: State,
+/// The node in the free list `kernel.mem.phys.globals.free_page_list`.
+node: containers.SingleNode = .empty,
 
-pub const State = union(enum) {
-    in_use,
-    free: Free,
-
-    pub const Free = struct {
-        /// The node in the free list `kernel.mem.phys.globals.free_page_list`.
-        free_list_node: containers.SingleNode = .empty,
-    };
-};
-
-pub fn fromFreeListNode(free_list_node: *containers.SingleNode) *Page {
-    // TODO: is this really the way to do this?
-    const free: *kernel.mem.Page.State.Free = @fieldParentPtr("free_list_node", free_list_node);
-    const state: *kernel.mem.Page.State = @fieldParentPtr("free", free);
-    return @fieldParentPtr("state", state);
+pub inline fn fromNode(node: *containers.SingleNode) *Page {
+    return @fieldParentPtr("node", node);
 }
 
 pub const Region = struct {
