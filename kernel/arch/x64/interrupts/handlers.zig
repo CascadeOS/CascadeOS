@@ -19,23 +19,25 @@ pub fn pageFaultHandler(current_task: *kernel.Task, interrupt_frame: *InterruptF
 
     const error_code: lib_x64.PageFaultErrorCode = .fromErrorCode(interrupt_frame.error_code);
 
-    var fault_type: kernel.mem.PageFaultDetails.FaultType = .invalid;
-    if (error_code.present)
-        fault_type = .protection
-    else if (error_code.reserved_write)
-        fault_type = .invalid;
-
-    var access_type: kernel.mem.PageFaultDetails.AccessType = .read;
-    if (error_code.write)
-        access_type = .write
-    else if (error_code.instruction_fetch)
-        access_type = .execute;
-
     kernel.entry.onPageFault(current_task, .{
         .faulting_address = faulting_address,
-        .access_type = access_type,
-        .fault_type = fault_type,
-        .source = if (error_code.user) .user else .kernel,
+
+        .access_type = if (error_code.write)
+            .write
+        else if (error_code.instruction_fetch)
+            .execute
+        else
+            .read,
+
+        .fault_type = if (error_code.present)
+            .protection
+        else
+            .invalid,
+
+        .source = if (error_code.user)
+            .user
+        else
+            .kernel,
     });
 }
 
