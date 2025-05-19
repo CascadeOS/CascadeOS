@@ -12,11 +12,8 @@ const MapType = @This();
 /// kernelspace by default.
 mode: kernel.Mode,
 
-/// Writeable.
-writeable: bool = false,
-
-/// Executable.
-executable: bool = false,
+/// The protection of the mapping.
+protection: Protection,
 
 /// Uncached.
 no_cache: bool = false,
@@ -24,17 +21,38 @@ no_cache: bool = false,
 /// Write combining.
 write_combining: bool = false,
 
+pub const Protection = enum {
+    /// Read only.
+    read,
+
+    /// Read and write.
+    read_write,
+
+    /// Execute only.
+    ///
+    /// If supported by the archtecture reads are not allowed.
+    executable,
+};
+
 pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
     _ = indent;
 
-    const buffer: []const u8 = &[_]u8{
-        if (value.mode == .user) 'U' else 'K',
-        if (value.writeable) 'W' else 'R',
-        if (value.executable) 'X' else '-',
-        if (value.no_cache) 'C' else '-',
-    };
+    var buf: std.BoundedArray(u8, 7) = .{};
 
-    try writer.print("Type{{ {s} }}", .{buffer});
+    buf.appendSliceAssumeCapacity(switch (value.mode) {
+        .user => "U_",
+        .kernel => "K_",
+    });
+
+    buf.appendSliceAssumeCapacity(switch (value.protection) {
+        .read => "RO",
+        .read_write => "RW",
+        .executable => "XO",
+    });
+
+    buf.appendSliceAssumeCapacity(if (value.no_cache) "_NC" else "_WB");
+
+    try writer.print("Type{{ {s} }}", .{buf.constSlice()});
 }
 
 pub inline fn format(

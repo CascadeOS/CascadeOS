@@ -240,13 +240,16 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
         .kernel => entry.global.write(true),
     }
 
-    if (x64.info.cpu_id.execute_disable) {
-        @branchHint(.likely); // modern CPUs support NX
-
-        if (!map_type.executable) entry.no_execute.write(true);
+    if (map_type.protection != .executable) {
+        if (x64.info.cpu_id.execute_disable) {
+            @branchHint(.likely); // modern CPUs support NX
+            entry.no_execute.write(true);
+        }
     }
 
-    if (map_type.writeable) entry.writeable.write(true);
+    if (map_type.protection == .read_write) {
+        entry.writeable.write(true);
+    }
 
     if (map_type.write_combining) {
         if (map_type.no_cache) return error.WriteCombiningAndNoCache;

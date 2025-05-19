@@ -35,8 +35,8 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
             const physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, self.range.size);
 
             const map_type: MapType = switch (self.type) {
-                .direct_map => .{ .mode = .kernel, .writeable = true },
-                .non_cached_direct_map => .{ .mode = .kernel, .writeable = true, .no_cache = true },
+                .direct_map => .{ .mode = .kernel, .protection = .read_write },
+                .non_cached_direct_map => .{ .mode = .kernel, .protection = .read_write, .no_cache = true },
                 else => unreachable,
             };
 
@@ -52,11 +52,9 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
             );
 
             const map_type: MapType = switch (self.type) {
-                .executable_section => .{ .mode = .kernel, .executable = true },
-                .readonly_section, .sdf_section => .{
-                    .mode = .kernel,
-                },
-                .writeable_section => .{ .mode = .kernel, .writeable = true },
+                .executable_section => .{ .mode = .kernel, .protection = .executable },
+                .readonly_section, .sdf_section => .{ .mode = .kernel, .protection = .read },
+                .writeable_section => .{ .mode = .kernel, .protection = .read_write },
                 else => unreachable,
             };
 
@@ -65,7 +63,7 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
 
         .kernel_heap, .kernel_stacks, .special_heap => return .top_level,
 
-        .pages => return .{ .back_with_frames = .{ .mode = .kernel, .writeable = true } },
+        .pages => return .{ .back_with_frames = .{ .mode = .kernel, .protection = .read_write } },
     }
 }
 
