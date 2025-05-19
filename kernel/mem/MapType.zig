@@ -15,11 +15,7 @@ mode: kernel.Mode,
 /// The protection of the mapping.
 protection: Protection,
 
-/// Uncached.
-no_cache: bool = false,
-
-/// Write combining.
-write_combining: bool = false,
+cache: Cache = .write_back,
 
 pub const Protection = enum {
     /// Read only.
@@ -32,6 +28,14 @@ pub const Protection = enum {
     ///
     /// If supported by the archtecture reads are not allowed.
     executable,
+};
+
+pub const Cache = enum {
+    write_back,
+
+    write_combining,
+
+    uncached,
 };
 
 pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
@@ -50,7 +54,11 @@ pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
         .executable => "XO",
     });
 
-    buf.appendSliceAssumeCapacity(if (value.no_cache) "_NC" else "_WB");
+    buf.appendSliceAssumeCapacity(switch (value.cache) {
+        .write_back => "_WB",
+        .write_combining => "_WC",
+        .uncached => "_UC",
+    });
 
     try writer.print("Type{{ {s} }}", .{buf.constSlice()});
 }

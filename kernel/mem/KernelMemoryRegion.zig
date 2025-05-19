@@ -36,7 +36,7 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
 
             const map_type: MapType = switch (self.type) {
                 .direct_map => .{ .mode = .kernel, .protection = .read_write },
-                .non_cached_direct_map => .{ .mode = .kernel, .protection = .read_write, .no_cache = true },
+                .non_cached_direct_map => .{ .mode = .kernel, .protection = .read_write, .cache = .uncached },
                 else => unreachable,
             };
 

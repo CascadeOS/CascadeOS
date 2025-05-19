@@ -251,21 +251,21 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
         entry.writeable.write(true);
     }
 
-    if (map_type.write_combining) {
-        if (map_type.no_cache) return error.WriteCombiningAndNoCache;
+    switch (map_type.cache) {
+        .write_back => {},
+        .write_combining => {
+            // PAT entry 6 is the one set to write combining
+            // to select entry 6 `pat[_huge]` and `no_cache` (pcd) must be set to `true`
 
-        // PAT entry 6 is the one set to write combining
-        // to select entry 6 `pat[_huge]` and `no_cache` (pcd) must be set to `true`
-
-        switch (page_type) {
-            .small => entry.pat.write(true),
-            .medium, .large => entry.pat_huge.write(true),
-        }
-        entry.no_cache.write(true);
-    }
-
-    if (map_type.no_cache) {
-        entry.no_cache.write(true);
+            switch (page_type) {
+                .small => entry.pat.write(true),
+                .medium, .large => entry.pat_huge.write(true),
+            }
+            entry.no_cache.write(true);
+        },
+        .uncached => {
+            entry.no_cache.write(true);
+        },
     }
 }
 
