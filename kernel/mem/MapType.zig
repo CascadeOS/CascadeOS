@@ -3,11 +3,14 @@
 
 const MapType = @This();
 
-/// Accessible from userspace.
-user: bool = false,
-
-/// A global mapping that is not flushed on context switch.
-global: bool = false,
+/// The mode of the mapping.
+///
+/// If the mode is `.kernel` then the mapping is inaccessible from userspace, and is not flushed on context switch if
+/// supported.
+///
+/// If the mode is `.user` then the mapping is accessible from userspace and is supported is not accessible from
+/// kernelspace by default.
+mode: kernel.Mode,
 
 /// Writeable.
 writeable: bool = false,
@@ -21,22 +24,13 @@ no_cache: bool = false,
 /// Write combining.
 write_combining: bool = false,
 
-pub fn equal(a: MapType, b: MapType) bool {
-    return a.user == b.user and
-        a.global == b.global and
-        a.writeable == b.writeable and
-        a.executable == b.executable and
-        a.no_cache == b.no_cache;
-}
-
 pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
     _ = indent;
 
     const buffer: []const u8 = &[_]u8{
-        if (value.user) 'U' else 'K',
+        if (value.mode == .user) 'U' else 'K',
         if (value.writeable) 'W' else 'R',
         if (value.executable) 'X' else '-',
-        if (value.global) 'G' else '-',
         if (value.no_cache) 'C' else '-',
     };
 

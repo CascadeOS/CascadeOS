@@ -235,9 +235,10 @@ fn unmap4KiB(
 }
 
 fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
-    if (map_type.user) entry.user_accessible.write(true);
-
-    if (map_type.global) entry.global.write(true);
+    switch (map_type.mode) {
+        .user => entry.user_accessible.write(true),
+        .kernel => entry.global.write(true),
+    }
 
     if (x64.info.cpu_id.execute_disable) {
         @branchHint(.likely); // modern CPUs support NX

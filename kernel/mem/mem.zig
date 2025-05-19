@@ -29,7 +29,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
-    flush_target: FlushRequest.Target,
+    flush_target: kernel.Mode,
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -86,7 +86,7 @@ pub fn mapRangeToPhysicalRange(
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: MapType,
-    flush_target: FlushRequest.Target,
+    flush_target: kernel.Mode,
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -142,7 +142,7 @@ pub fn unmapRange(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
-    flush_target: FlushRequest.Target,
+    flush_target: kernel.Mode,
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
@@ -235,7 +235,7 @@ pub const PageFaultDetails = struct {
     faulting_address: core.VirtualAddress,
     access_type: AccessType,
     fault_type: FaultType,
-    source: Source,
+    source: kernel.Mode,
 
     pub const AccessType = enum {
         read,
@@ -249,11 +249,6 @@ pub const PageFaultDetails = struct {
 
         /// The access was not permitted by the page protection.
         protection,
-    };
-
-    pub const Source = enum {
-        kernel,
-        user,
     };
 
     pub fn print(details: PageFaultDetails, writer: std.io.AnyWriter, indent: usize) !void {

@@ -24,6 +24,11 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
     return &executors[@intFromEnum(id)];
 }
 
+pub const Mode = enum {
+    kernel,
+    user,
+};
+
 pub const init = @import("init/init.zig");
 
 pub const panic = debug.panic_interface;

@@ -194,7 +194,7 @@ fn heapPageArenaImport(
             .address = .fromInt(allocation.base),
             .size = .from(allocation.len, .byte),
         },
-        .{ .writeable = true, .global = true },
+        .{ .mode = .kernel, .writeable = true },
         .kernel,
         true,
         kernel.mem.phys.allocator,
