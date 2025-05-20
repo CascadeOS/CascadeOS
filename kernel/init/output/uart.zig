@@ -220,7 +220,9 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                     if (byte == '\n') {
                         @branchHint(.unlikely);
 
-                        if (i != 0 and str[i - 1] != '\r') {
+                        const newline_first_or_only = str.len == 1 or i == 0;
+
+                        if (newline_first_or_only or str[i - 1] != '\r') {
                             @branchHint(.likely);
                             self.waitForOutputReady();
                             writeRegister(self.write_register, '\r');
