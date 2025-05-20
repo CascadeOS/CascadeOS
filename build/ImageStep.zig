@@ -147,11 +147,12 @@ const ImageDescriptionStep = struct {
             .{@tagName(target)},
         );
 
+        // TODO: handling of limine.conf should be better that this, we don't even add it as a dependency...
         const limine_conf = switch (target) {
             .arm => if (disable_kaslr)
-                b.pathJoin(&.{ "build", "limine_no_kaslr_arm.conf" })
+                b.pathJoin(&.{ "build", "limine_no_kaslr_ramfb.conf" })
             else
-                b.pathJoin(&.{ "build", "limine_arm.conf" }),
+                b.pathJoin(&.{ "build", "limine_ramfb.conf" }),
             else => if (disable_kaslr)
                 b.pathJoin(&.{ "build", "limine_no_kaslr.conf" })
             else
