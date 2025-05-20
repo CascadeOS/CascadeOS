@@ -322,7 +322,9 @@ const DebugCon = struct {
                     if (byte == '\n') {
                         @branchHint(.unlikely);
 
-                        if (i != 0 and str[i - 1] != '\r') {
+                        const newline_first_or_only = str.len == 1 or i == 0;
+
+                        if (newline_first_or_only or str[i - 1] != '\r') {
                             @branchHint(.likely);
                             lib_x64.instructions.portWriteU8(port, '\r');
                         }
