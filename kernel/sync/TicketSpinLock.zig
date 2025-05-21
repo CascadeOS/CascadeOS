@@ -15,12 +15,12 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     const executor = current_task.state.running;
     std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
 
-    const ticket = self.ticket.fetchAdd(1, .acq_rel);
-    while (self.current.load(.monotonic) != ticket) {
+    const ticket = self.ticket.fetchAdd(1, .monotonic);
+    while (self.current.load(.acquire) != ticket) {
         kernel.arch.spinLoopHint();
     }
-    self.holding_executor = executor.id;
 
+    self.holding_executor = executor.id;
     current_task.spinlocks_held += 1;
 }
 
@@ -29,13 +29,11 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 /// Asserts that the current executor is the one that locked the spinlock.
 pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held != 0);
-
     std.debug.assert(self.isLockedByCurrent(current_task));
 
     self.unsafeUnlock();
 
     current_task.spinlocks_held -= 1;
-
     current_task.decrementInterruptDisable();
 }
 
@@ -44,12 +42,12 @@ pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 /// Performs no checks and is unsafe, prefer `unlock` instead.
 pub fn unsafeUnlock(self: *TicketSpinLock) void {
     self.holding_executor = .none;
-    _ = self.current.fetchAdd(1, .acq_rel);
+    self.current.store(self.current.raw +% 1, .release);
 }
 
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
 pub fn poison(self: *TicketSpinLock) void {
-    _ = self.current.fetchSub(1, .acq_rel);
+    _ = self.current.fetchSub(1, .release);
 }
 
 /// Returns true if the spinlock is locked by the current executor.
