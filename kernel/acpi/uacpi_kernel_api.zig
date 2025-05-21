@@ -383,7 +383,7 @@ export fn uacpi_kernel_create_event() *anyopaque {
         var value: std.atomic.Value(usize) = .init(1);
     };
 
-    return @ptrFromInt(static.value.fetchAdd(1, .acquire));
+    return @ptrFromInt(static.value.fetchAdd(1, .monotonic));
 }
 
 /// Free a previously allocated kernel (semaphore-like) event object.
