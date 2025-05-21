@@ -41,11 +41,11 @@ pub fn flush(self: *FlushRequest, current_task: *const kernel.Task) void {
 
     kernel.arch.paging.flushCache(self.range);
 
-    _ = self.count.fetchSub(1, .acq_rel);
+    _ = self.count.fetchSub(1, .monotonic);
 }
 
 fn requestExecutor(self: *FlushRequest, executor: *kernel.Executor) void {
-    _ = self.count.fetchAdd(1, .acq_rel);
+    _ = self.count.fetchAdd(1, .monotonic);
 
     const node = self.nodes.addOne() catch @panic("exceeded maximum number of executors");
     node.* = .{
@@ -58,7 +58,7 @@ fn requestExecutor(self: *FlushRequest, executor: *kernel.Executor) void {
 }
 
 fn waitForCompletion(self: *FlushRequest) void {
-    while (self.count.load(.acquire) > 0) {
+    while (self.count.load(.monotonic) > 0) {
         kernel.arch.spinLoopHint();
     }
 }
