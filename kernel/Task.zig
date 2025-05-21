@@ -57,9 +57,16 @@ pub fn getCurrent() *Task {
 }
 
 pub fn incrementInterruptDisable(self: *Task) void {
-    kernel.arch.interrupts.disableInterrupts();
+    const previous = self.interrupt_disable_count;
 
-    self.interrupt_disable_count += 1;
+    if (previous == 0) {
+        std.debug.assert(kernel.arch.interrupts.areEnabled());
+        kernel.arch.interrupts.disableInterrupts();
+    } else {
+        std.debug.assert(!kernel.arch.interrupts.areEnabled());
+    }
+
+    self.interrupt_disable_count = previous + 1;
 
     const executor = self.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
