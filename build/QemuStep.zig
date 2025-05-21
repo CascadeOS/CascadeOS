@@ -183,24 +183,16 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
 
                 // TODO: once we have virtio-gpu support, uncomment this:
-                // run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-gpu-pci" });
+                // run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-gpu-gl" });
                 run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" });
             },
             .riscv => {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
 
-                // TODO: once we have virtio-gpu support, this will be:
-                // run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-gpu-pci" });
-                // run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" });
-
                 run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
             },
             .x64 => {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "vc" });
-
-                // TODO: once we have virtio-gpu support, this will be:
-                // run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-gpu-pci" });
-                // run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" });
 
                 run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
             },
