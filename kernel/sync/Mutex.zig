@@ -18,7 +18,7 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
         var locked_by = mutex.locked_by.cmpxchgWeak(
             null,
             current_task,
-            .acq_rel,
+            .acquire,
             .monotonic,
         ) orelse {
             // we have the mutex
@@ -41,7 +41,7 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
         locked_by = mutex.locked_by.cmpxchgStrong(
             null,
             current_task,
-            .acq_rel,
+            .acquire,
             .monotonic,
         ) orelse {
             // we have the mutex
@@ -66,34 +66,35 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     mutex.spinlock.lock(current_task);
     defer mutex.spinlock.unlock(current_task);
 
-    if (mutex.wait_queue.firstTask()) |waiting_task| {
-        // pass the mutex directly to the waiting task
-
-        std.debug.assert(mutex.passed_to_waiter == false);
-        mutex.passed_to_waiter = true;
-
-        if (mutex.locked_by.cmpxchgStrong(
-            current_task,
-            waiting_task,
-            .acq_rel,
-            .monotonic,
-        )) |_| {
-            @branchHint(.cold);
-            @panic("not locked by current task");
-        }
-
-        mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
-    } else {
+    const waiting_task = mutex.wait_queue.firstTask() orelse {
         if (mutex.locked_by.cmpxchgStrong(
             current_task,
             null,
-            .acq_rel,
+            .release,
             .monotonic,
         )) |_| {
             @branchHint(.cold);
             @panic("not locked by current task");
         }
+        return;
+    };
+
+    // pass the mutex directly to the waiting task
+
+    std.debug.assert(mutex.passed_to_waiter == false);
+    mutex.passed_to_waiter = true;
+
+    if (mutex.locked_by.cmpxchgStrong(
+        current_task,
+        waiting_task,
+        .release,
+        .monotonic,
+    )) |_| {
+        @branchHint(.cold);
+        @panic("not locked by current task");
     }
+
+    mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
 }
 
 const core = @import("core");
