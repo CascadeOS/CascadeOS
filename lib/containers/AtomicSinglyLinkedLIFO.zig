@@ -26,7 +26,7 @@ pub fn push(self: *AtomicSinglyLinkedLIFO, node: *SingleNode) void {
         if (self.start_node.cmpxchgWeak(
             opt_start_node,
             node,
-            .acq_rel,
+            .release,
             .monotonic,
         )) |new_value| {
             opt_start_node = new_value;
@@ -45,7 +45,7 @@ pub fn pop(self: *AtomicSinglyLinkedLIFO) ?*SingleNode {
         if (self.start_node.cmpxchgWeak(
             opt_start_node,
             start_node.next,
-            .acq_rel,
+            .release,
             .monotonic,
         )) |new_value| {
             opt_start_node = new_value;
