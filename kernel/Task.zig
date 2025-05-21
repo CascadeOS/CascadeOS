@@ -304,7 +304,7 @@ pub const Stack = struct {
 const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 
 fn getId() Id {
-    const id: Id = @enumFromInt(globals.id_counter.fetchAdd(1, .acq_rel));
+    const id: Id = @enumFromInt(globals.id_counter.fetchAdd(1, .monotonic));
     if (id == .none) @panic("task id counter overflowed"); // TODO: handle this better
     return id;
 }
