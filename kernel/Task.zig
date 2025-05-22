@@ -149,9 +149,9 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
     task.id = getId();
     task._name = options.name;
     task.state = .ready;
-    task.interrupt_disable_count.store(1, .monotonic); // fresh tasks start with interrupts disabled
-    task.preemption_disable_count.store(0, .monotonic);
-    task.preemption_skipped.store(false, .monotonic);
+    task.interrupt_disable_count = 1; // fresh tasks start with interrupts disabled
+    task.preemption_disable_count = 0;
+    task.preemption_skipped = false;
     task.spinlocks_held = 1; // fresh tasks start with the scheduler locked
     task.next_task_node = .empty;
 
