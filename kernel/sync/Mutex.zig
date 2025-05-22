@@ -79,7 +79,7 @@ pub fn tryLock(mutex: *Mutex, current_task: *kernel.Task) bool {
         @branchHint(.cold);
         std.debug.assert(!mutex.passed_to_waiter); // this should never happen
 
-        @panic("recursive lock");
+        // we don't support recursive locks so this is a failure to acquire the lock
     }
 
     current_task.decrementPreemptionDisable();
