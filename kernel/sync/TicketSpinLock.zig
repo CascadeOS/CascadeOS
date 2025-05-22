@@ -42,6 +42,37 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     current_task.spinlocks_held += 1;
 }
 
+/// Try to lock the spinlock.
+pub fn tryLock(self: *TicketSpinLock, current_task: *kernel.Task) bool {
+    std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
+
+    current_task.incrementInterruptDisable();
+
+    const old_container = @atomicLoad(Container, &self.containter, .monotonic);
+
+    if (old_container.contents.current != old_container.contents.ticket) {
+        @branchHint(.unlikely);
+
+        current_task.decrementInterruptDisable();
+        return false;
+    }
+
+    var new_container = old_container;
+    new_container.contents.ticket +%= 1;
+
+    if (@cmpxchgStrong(Container, &self.containter, old_container, new_container, .acquire, .monotonic)) |_| {
+        @branchHint(.unlikely);
+
+        current_task.decrementInterruptDisable();
+        return false;
+    }
+
+    self.holding_executor = current_task.state.running.id;
+    current_task.spinlocks_held += 1;
+
+    return true;
+}
+
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
