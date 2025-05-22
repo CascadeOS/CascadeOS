@@ -16,8 +16,15 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
 
     const ticket = self.ticket.fetchAdd(1, .monotonic);
-    while (self.current.load(.acquire) != ticket) {
-        kernel.arch.spinLoopHint();
+    if (self.current.load(.acquire) != ticket) {
+        @branchHint(.unlikely);
+
+        while (true) {
+            kernel.arch.spinLoopHint();
+            if (self.current.load(.monotonic) == ticket) break;
+        }
+
+        _ = self.current.load(.acquire);
     }
 
     self.holding_executor = executor.id;
@@ -40,7 +47,7 @@ pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 /// Unlock the spinlock.
 ///
 /// Performs no checks and is unsafe, prefer `unlock` instead.
-pub fn unsafeUnlock(self: *TicketSpinLock) void {
+pub inline fn unsafeUnlock(self: *TicketSpinLock) void {
     self.holding_executor = .none;
     self.current.store(self.current.raw +% 1, .release);
 }
