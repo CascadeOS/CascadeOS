@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+//! A fair in order mutex.
+//!
+//! Preemption is disabled while locked.
+
 const Mutex = @This();
 
 locked_by: std.atomic.Value(?*kernel.Task) = .init(null),
