@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-//! A simple spinlock implementation using tickets to ensure fairness.
+//! A fair in order spinlock.
+//!
+//! Interrupts are disabled while locked.
+
 const TicketSpinLock = @This();
 
 containter: Container = .{ .full = 0 },
