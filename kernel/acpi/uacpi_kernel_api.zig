@@ -420,7 +420,7 @@ export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: uacpi.T
     const current_task = kernel.Task.getCurrent();
 
     switch (timeout) {
-        .none => @panic("mutex try lock not implemented"),
+        .none => if (!mutex.tryLock(current_task)) return .timeout,
         .infinite => mutex.lock(current_task),
         else => @panic("mutex timeout lock not implemented"),
     }
