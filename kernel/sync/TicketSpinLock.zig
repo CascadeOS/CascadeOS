@@ -47,7 +47,8 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 
 /// Try to lock the spinlock.
 pub fn tryLock(self: *TicketSpinLock, current_task: *kernel.Task) bool {
-    std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
+    // no need to check if we already have the lock as the below logic will not allow us
+    // to acquire it again
 
     current_task.incrementInterruptDisable();
 
