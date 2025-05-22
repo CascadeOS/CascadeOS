@@ -123,21 +123,23 @@ pub fn jumpToTaskFromTask(
 
 /// Prepares the given task for being scheduled.
 ///
-/// Ensures that when the task is scheduled it will runlock the scheduler lock then call the `target_function` with the
-/// given `arg`.
+/// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
+/// the given arguments.
 pub fn prepareNewTaskForScheduling(
     task: *kernel.Task,
-    arg: u64,
     target_function: kernel.arch.scheduling.NewTaskFunction,
-) error{StackOverflow}!void {
+    arg1: u64,
+    arg2: u64,
+) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
     const impls = struct {
         const startNewTaskStage1: *const fn () callconv(.C) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
                         \\pop %rdi // task
-                        \\pop %rsi // arg
-                        \\pop %rdx // target_function
+                        \\pop %rsi // target_function
+                        \\pop %rdx // arg1
+                        \\pop %rcx // arg2
                         \\ret // the return address of `kernel.scheduler.newTaskEntry` should be on the stack
                     );
                 }
@@ -149,8 +151,9 @@ pub fn prepareNewTaskForScheduling(
 
     try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(&kernel.scheduler.newTaskEntry)));
 
+    try task.stack.push(arg2);
+    try task.stack.push(arg1);
     try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
-    try task.stack.push(arg);
     try task.stack.push(core.VirtualAddress.fromPtr(task));
 
     try task.stack.push(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));

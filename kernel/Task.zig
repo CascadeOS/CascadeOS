@@ -137,9 +137,9 @@ pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
 
 pub const CreateOptions = struct {
     name: Name,
-
     start_function: kernel.arch.scheduling.NewTaskFunction,
-    arg: u64,
+    arg1: u64,
+    arg2: u64,
 };
 
 /// Create a task.
@@ -157,7 +157,12 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
 
     task.stack.reset();
 
-    try kernel.arch.scheduling.prepareNewTaskForScheduling(task, options.arg, options.start_function);
+    try kernel.arch.scheduling.prepareNewTaskForScheduling(
+        task,
+        options.start_function,
+        options.arg1,
+        options.arg2,
+    );
 
     return task;
 }
