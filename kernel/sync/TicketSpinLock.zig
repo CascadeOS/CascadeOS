@@ -21,10 +21,9 @@ const Container = extern union {
 
 /// Locks the spinlock.
 pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
-    current_task.incrementInterruptDisable();
-
-    const executor = current_task.state.running;
     std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
+
+    current_task.incrementInterruptDisable();
 
     const ticket = @atomicRmw(u32, &self.containter.contents.ticket, .Add, 1, .monotonic);
 
@@ -39,7 +38,7 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
         _ = @atomicLoad(u32, &self.containter.contents.current, .acquire);
     }
 
-    self.holding_executor = executor.id;
+    self.holding_executor = current_task.state.running.id;
     current_task.spinlocks_held += 1;
 }
 
