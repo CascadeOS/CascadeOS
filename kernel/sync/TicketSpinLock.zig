@@ -4,9 +4,20 @@
 //! A simple spinlock implementation using tickets to ensure fairness.
 const TicketSpinLock = @This();
 
-current: u32 = 0,
-ticket: u32 = 0,
+containter: Container = .{ .full = 0 },
 holding_executor: kernel.Executor.Id = .none,
+
+const Container = extern union {
+    contents: extern struct {
+        current: u32 = 0,
+        ticket: u32 = 0,
+    },
+    full: u64,
+
+    comptime {
+        std.debug.assert(@sizeOf(Container) == @sizeOf(u64));
+    }
+};
 
 /// Locks the spinlock.
 pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
@@ -15,17 +26,17 @@ pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
     const executor = current_task.state.running;
     std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
 
-    const ticket = @atomicRmw(u32, &self.ticket, .Add, 1, .monotonic);
+    const ticket = @atomicRmw(u32, &self.containter.contents.ticket, .Add, 1, .monotonic);
 
-    if (@atomicLoad(u32, &self.current, .acquire) != ticket) {
+    if (@atomicLoad(u32, &self.containter.contents.current, .acquire) != ticket) {
         @branchHint(.unlikely);
 
         while (true) {
             kernel.arch.spinLoopHint();
-            if (@atomicLoad(u32, &self.current, .monotonic) == ticket) break;
+            if (@atomicLoad(u32, &self.containter.contents.current, .monotonic) == ticket) break;
         }
 
-        _ = @atomicLoad(u32, &self.current, .acquire);
+        _ = @atomicLoad(u32, &self.containter.contents.current, .acquire);
     }
 
     self.holding_executor = executor.id;
@@ -50,12 +61,12 @@ pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 /// Performs no checks and is unsafe, prefer `unlock` instead.
 pub inline fn unsafeUnlock(self: *TicketSpinLock) void {
     self.holding_executor = .none;
-    @atomicStore(u32, &self.current, self.current +% 1, .release);
+    @atomicStore(u32, &self.containter.contents.current, self.containter.contents.current +% 1, .release);
 }
 
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
 pub fn poison(self: *TicketSpinLock) void {
-    _ = @atomicRmw(u32, &self.current, .Sub, 1, .release);
+    _ = @atomicRmw(u32, &self.containter.contents.current, .Sub, 1, .release);
 }
 
 /// Returns true if the spinlock is locked by the current executor.
