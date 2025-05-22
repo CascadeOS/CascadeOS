@@ -60,6 +60,29 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
     }
 }
 
+/// Try to lock the mutex.
+pub fn tryLock(mutex: *Mutex, current_task: *kernel.Task) bool {
+    current_task.incrementPreemptionDisable();
+
+    const locked_by = mutex.locked_by.cmpxchgStrong(
+        null,
+        current_task,
+        .acquire,
+        .monotonic,
+    ) orelse return true;
+
+    if (locked_by == current_task) {
+        @branchHint(.cold);
+        std.debug.assert(!mutex.passed_to_waiter); // this should never happen
+
+        @panic("recursive lock");
+    }
+
+    current_task.decrementPreemptionDisable();
+
+    return false;
+}
+
 pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     defer current_task.decrementPreemptionDisable();
 
