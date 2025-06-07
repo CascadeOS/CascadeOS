@@ -16,8 +16,8 @@
         },
 
         .edk2 = .{
-            .url = "https://github.com/CascadeOS/ovmf-prebuilt/releases/download/edk2-stable202502-r1/edk2-stable202502-r1-bin.tar.xz",
-            .hash = "N-V-__8AAECatwxDir4EsmSOPgswzCYqQiOmiBJmU5oul9W1",
+            .url = "https://github.com/CascadeOS/ovmf-prebuilt/releases/download/edk2-stable202505-r1/edk2-stable202505-r1-bin.tar.xz",
+            .hash = "N-V-__8AAIC1uAx4Cf-d_mHji3ZH-qfjaeDGL09tLy-y-eci",
         },
 
         .libdwarf = .{
