@@ -25,7 +25,7 @@ pub const MBR = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 512);
+        core.testing.expectSize(MBR, 512);
     }
 };
 

@@ -10,8 +10,8 @@ pub const Frame = enum(u32) {
     _,
 
     /// Returns the base address of the given physical frame.
-    pub fn baseAddress(self: Frame) core.PhysicalAddress {
-        return .fromInt(@intFromEnum(self) * kernel.arch.paging.standard_page_size.value);
+    pub fn baseAddress(frame: Frame) core.PhysicalAddress {
+        return .fromInt(@intFromEnum(frame) * kernel.arch.paging.standard_page_size.value);
     }
 
     /// Returns the physical frame that contains the given physical address.
@@ -19,8 +19,8 @@ pub const Frame = enum(u32) {
         return @enumFromInt(physical_address.value / kernel.arch.paging.standard_page_size.value);
     }
 
-    pub fn page(self: Frame) ?*Page {
-        const index = self.pageIndex() orelse return null;
+    pub fn page(frame: Frame) ?*Page {
+        const index = frame.pageIndex() orelse return null;
         return &globals.pages[@intFromEnum(index)];
     }
 

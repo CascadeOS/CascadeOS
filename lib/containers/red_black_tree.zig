@@ -4,19 +4,19 @@
 /// A red-black tree.
 ///
 /// Not thread-safe.
-pub fn Tree(
+pub fn RedBlackTree(
     comptime compareFn: fn (node: *const Node, other_node: *const Node) std.math.Order,
 ) type {
     return struct {
         root: ?*Node = null,
 
-        const Self = @This();
+        const RedBlackTreeT = @This();
 
         /// Insert a node into the tree.
-        pub fn insert(self: *Self, node: *Node) error{AlreadyPresent}!void {
+        pub fn insert(red_black_tree: *RedBlackTreeT, node: *Node) error{AlreadyPresent}!void {
             node.* = .{}; // sets color to red
 
-            if (self.root) |root| {
+            if (red_black_tree.root) |root| {
                 var parent_node: *Node = undefined; // as we have a root, we know there is at least one node
 
                 var direction: Direction = .left;
@@ -36,15 +36,15 @@ pub fn Tree(
                 parent_node.children[direction.toValue()] = node;
                 node.setParent(parent_node);
 
-                self.fixInsertion(node);
+                red_black_tree.fixInsertion(node);
             } else {
                 node.setParentAndColorForRoot();
-                self.root = node;
+                red_black_tree.root = node;
             }
         }
 
         /// Maintain red black tree invariants after insertion.
-        fn fixInsertion(self: *Self, node: *Node) void {
+        fn fixInsertion(red_black_tree: *RedBlackTreeT, node: *Node) void {
             // Situation we are trying to fix: double red
             // According to red black tree invariants, only
             //
@@ -87,7 +87,7 @@ pub fn Tree(
                         // changed
                         // (before: grandparent black and uncle black, now P black and U black)
 
-                        self.rotate(grandparent, direction.otherDirection());
+                        red_black_tree.rotate(grandparent, direction.otherDirection());
                         parent.setColor(.black);
                     } else {
                         //          G(B)                  G(B)               C(B)
@@ -100,8 +100,8 @@ pub fn Tree(
                         // (before: G and U black, after: C and U black)
                         // On the old track in P direction, nothing has changed as well
 
-                        self.rotate(parent, direction.otherDirection());
-                        self.rotate(grandparent, direction);
+                        red_black_tree.rotate(parent, direction.otherDirection());
+                        red_black_tree.rotate(grandparent, direction);
                         current.setColor(.black);
                     }
 
@@ -129,11 +129,11 @@ pub fn Tree(
                 }
             }
 
-            self.root.?.setParentAndColorForRoot();
+            red_black_tree.root.?.setParentAndColorForRoot();
         }
 
         /// Rotate the subtree at `node` in `direction`.
-        fn rotate(self: *Self, node: *Node, direction: Direction) void {
+        fn rotate(red_black_tree: *RedBlackTreeT, node: *Node, direction: Direction) void {
             const other_direction = direction.otherDirection();
 
             const new_top = node.children[other_direction.toValue()].?; // required to exist as we are rotating
@@ -154,17 +154,17 @@ pub fn Tree(
                 new_top.setParent(parent);
             } else {
                 new_top.setParentAndColorForRoot();
-                self.root = new_top;
+                red_black_tree.root = new_top;
             }
         }
 
         /// Remove a node from the tree.
         ///
         /// NOTE: It is the caller's responsibility to ensure that the node is in the tree.
-        pub fn remove(self: *Self, node: *Node) void {
+        pub fn remove(red_black_tree: *RedBlackTreeT, node: *Node) void {
             // we only handle deletion of a node with at most one child,
             // so we need to check if we have two and find a replacement
-            self.replaceIfNeeded(node);
+            red_black_tree.replaceIfNeeded(node);
 
             const opt_node_parent = node.getParent();
 
@@ -182,7 +182,7 @@ pub fn Tree(
                     child.setColor(.black);
                 } else {
                     child.setParentAndColorForRoot();
-                    self.root = child;
+                    red_black_tree.root = child;
                 }
 
                 return;
@@ -199,18 +199,18 @@ pub fn Tree(
 
             if (opt_node_parent) |parent| {
                 // hard case: double black
-                self.fixDoubleBlack(node);
+                red_black_tree.fixDoubleBlack(node);
                 parent.children[node.directionWithParent(parent).toValue()] = null;
 
                 return;
             }
 
             // node is root with no children
-            self.root = null;
+            red_black_tree.root = null;
         }
 
         /// Ensure that node to delete has at most one child
-        fn replaceIfNeeded(self: *Self, node: *Node) void {
+        fn replaceIfNeeded(red_black_tree: *RedBlackTreeT, node: *Node) void {
             if (node.children[Direction.left.toValue()] != null and node.children[Direction.right.toValue()] != null) {
                 const replacement = blk: {
                     var current: *Node = node.children[Direction.left.toValue()].?; // checked above
@@ -220,14 +220,14 @@ pub fn Tree(
                     break :blk current;
                 };
 
-                pointerSwap(self, node, replacement);
+                pointerSwap(red_black_tree, node, replacement);
             }
         }
 
         /// Swap node with replacement found by `replaceIfNeeded`
         ///
         /// NOTE: `replacement` must have no right child.
-        fn pointerSwap(self: *Self, node: *Node, replacement: *Node) void {
+        fn pointerSwap(red_black_tree: *RedBlackTreeT, node: *Node, replacement: *Node) void {
             std.debug.assert(node.children[Direction.left.toValue()] != null and
                 node.children[Direction.right.toValue()] != null); // node should have two children
 
@@ -307,12 +307,12 @@ pub fn Tree(
             } else {
                 // node was root, set tree root to replacement
                 replacement.setParentAndColorForRoot();
-                self.root = replacement;
+                red_black_tree.root = replacement;
             }
         }
 
         /// Maintain red black tree invariants after deletion.
-        fn fixDoubleBlack(self: *Self, node: *Node) void {
+        fn fixDoubleBlack(red_black_tree: *RedBlackTreeT, node: *Node) void {
             // situation: node is a black leaf
             // simply deleteing node will harm blackness height rule
             //
@@ -343,7 +343,7 @@ pub fn Tree(
                 // This transformation leaves us with black sibling
                 if (current_node_sibling) |sibling| {
                     if (sibling.getColor() == .red) {
-                        self.rotate(current_node_parent, current_node_direction);
+                        red_black_tree.rotate(current_node_parent, current_node_direction);
                         sibling.setColor(.black);
                         current_node_parent.setColor(.red);
                         current_node_sibling = current_node.sibling();
@@ -410,7 +410,7 @@ pub fn Tree(
                     // on paths from P to X, Y, and Z remain unchanged
                     // the purpose is to make this case right newphew case
                     // (in which direction of red nephew is opposite to direction of node)
-                    self.rotate(sibling, current_node_direction.otherDirection());
+                    red_black_tree.rotate(sibling, current_node_direction.otherDirection());
                     sibling.setColor(.red);
 
                     // nephew exists and it will be a new subling
@@ -429,7 +429,7 @@ pub fn Tree(
                 // a new tree. We only increased black height on path from P/S to C. But that is
                 // fine, since recoloring C to red or deleting it is our final goal
 
-                self.rotate(current_node_parent, current_node_direction);
+                red_black_tree.rotate(current_node_parent, current_node_direction);
                 current_node_parent.setColor(.black);
                 sibling.setColor(parent_color);
 
@@ -448,11 +448,11 @@ pub fn Tree(
         /// NOTE: In the case of no match the `whereFn` *must* return the same value as the `compareFn` would when
         /// comparing the `other_node` to the target node.
         pub fn findFirstMatch(
-            self: *const Self,
+            red_black_tree: *const RedBlackTreeT,
             context: anytype,
             comptime whereFn: fn (context: @TypeOf(context), other_node: *const Node) std.math.Order,
         ) ?*Node {
-            const root = self.root orelse return null;
+            const root = red_black_tree.root orelse return null;
 
             var opt_current_node: ?*Node = root;
 
@@ -477,11 +477,11 @@ pub fn Tree(
         ///   - The `whereFn` *must* return the same `comparison` value as the `compareFn` would when comparing
         ///     the `other_node` to the target node.
         pub fn findLastMatch(
-            self: *const Self,
+            red_black_tree: *const RedBlackTreeT,
             context: anytype,
             comptime whereFn: fn (context: @TypeOf(context), other_node: *const Node) ComparisonAndMatch,
         ) ?*Node {
-            const root = self.root orelse return null;
+            const root = red_black_tree.root orelse return null;
 
             var opt_current_node: ?*Node = root;
 
@@ -504,14 +504,14 @@ pub fn Tree(
             return last_matching_node;
         }
 
-        pub fn iterator(self: *const Self) Iterator {
-            return Iterator.init(self.root);
+        pub fn iterator(red_black_tree: *const RedBlackTreeT) Iterator {
+            return Iterator.init(red_black_tree.root);
         }
     };
 }
 
-test Tree {
-    var tree: Tree(Item.compareNodes) = .{};
+test RedBlackTree {
+    var tree: RedBlackTree(Item.compareNodes) = .{};
 
     var items = [_]Item{
         .{ .value = 34 },
@@ -622,50 +622,50 @@ pub const Node = struct {
 
     const ALL_BITS_EXCEPT_FIRST: usize = ~@as(usize, 1);
 
-    inline fn getParent(self: *const Node) ?*Node {
-        return @ptrFromInt(self._parent & ALL_BITS_EXCEPT_FIRST);
+    inline fn getParent(node: *const Node) ?*Node {
+        return @ptrFromInt(node._parent & ALL_BITS_EXCEPT_FIRST);
     }
 
-    inline fn setParent(self: *Node, parent: ?*Node) void {
-        self._parent = @intFromPtr(parent) | self.getColor().toValue();
+    inline fn setParent(node: *Node, parent: ?*Node) void {
+        node._parent = @intFromPtr(parent) | node.getColor().toValue();
     }
 
-    inline fn getColor(self: *const Node) Color {
-        return Color.fromValue(@truncate(self._parent));
+    inline fn getColor(node: *const Node) Color {
+        return Color.fromValue(@truncate(node._parent));
     }
 
-    inline fn setColor(self: *Node, color: Color) void {
-        bitjuggle.setBit(&self._parent, 0, color.toValue());
+    inline fn setColor(node: *Node, color: Color) void {
+        bitjuggle.setBit(&node._parent, 0, color.toValue());
     }
 
     /// Get direction from parent.
-    fn directionWithParent(self: *const Node, parent: *const Node) Direction {
-        return Direction.fromValue(@intFromBool(parent.children[Direction.right.toValue()] == self));
+    fn directionWithParent(node: *const Node, parent: *const Node) Direction {
+        return Direction.fromValue(@intFromBool(parent.children[Direction.right.toValue()] == node));
     }
 
     /// Get direction from parent. If parent is null, returns left.
-    fn direction(self: *const Node) Direction {
-        if (self.getParent()) |parent| {
-            return directionWithParent(self, parent);
+    fn direction(node: *const Node) Direction {
+        if (node.getParent()) |parent| {
+            return directionWithParent(node, parent);
         }
 
         return .left;
     }
 
-    fn sibling(self: *const Node) ?*Node {
-        if (self.getParent()) |parent| {
-            return parent.children[self.directionWithParent(parent).otherDirection().toValue()];
+    fn sibling(node: *const Node) ?*Node {
+        if (node.getParent()) |parent| {
+            return parent.children[node.directionWithParent(parent).otherDirection().toValue()];
         }
 
         return null;
     }
 
-    inline fn setParentAndColorForRoot(self: *Node) void {
-        self._parent = Color.black.toValue();
+    inline fn setParentAndColorForRoot(node: *Node) void {
+        node._parent = Color.black.toValue();
     }
 
-    fn colorOrBlack(self: ?*const Node) Color {
-        return (self orelse return .black).getColor();
+    fn colorOrBlack(node: ?*const Node) Color {
+        return (node orelse return .black).getColor();
     }
 
     comptime {
@@ -695,8 +695,8 @@ pub const Iterator = struct {
         };
     }
 
-    pub fn next(self: *Iterator) ?*Node {
-        const node = self.next_node orelse return null;
+    pub fn next(iterator: *Iterator) ?*Node {
+        const node = iterator.next_node orelse return null;
 
         if (node.children[Direction.right.toValue()]) |right_child| {
             // next is left most child
@@ -707,7 +707,7 @@ pub const Iterator = struct {
                 next_node = left_child;
             }
 
-            self.next_node = next_node;
+            iterator.next_node = next_node;
 
             return node;
         }
@@ -716,7 +716,7 @@ pub const Iterator = struct {
 
         while (true) {
             const parent = child_node.getParent() orelse {
-                self.next_node = null;
+                iterator.next_node = null;
                 return node;
             };
 
@@ -724,7 +724,7 @@ pub const Iterator = struct {
 
             switch (direction_from_parent) {
                 .left => {
-                    self.next_node = parent;
+                    iterator.next_node = parent;
                     return node;
                 },
                 .right => child_node = parent,
@@ -753,8 +753,8 @@ const Direction = enum(u1) {
         return @enumFromInt(value);
     }
 
-    inline fn toValue(self: Direction) u1 {
-        return @intFromEnum(self);
+    inline fn toValue(direction: Direction) u1 {
+        return @intFromEnum(direction);
     }
 
     inline fn otherDirection(direction: Direction) Direction {
@@ -770,8 +770,8 @@ const Color = enum(u1) {
         return @enumFromInt(value);
     }
 
-    inline fn toValue(self: Color) u1 {
-        return @intFromEnum(self);
+    inline fn toValue(color: Color) u1 {
+        return @intFromEnum(color);
     }
 };
 

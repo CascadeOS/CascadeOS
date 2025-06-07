@@ -23,36 +23,36 @@ const Container = extern union {
 };
 
 /// Locks the spinlock.
-pub fn lock(self: *TicketSpinLock, current_task: *kernel.Task) void {
-    std.debug.assert(!self.isLockedByCurrent(current_task)); // recursive locks are not supported
+pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void {
+    std.debug.assert(!ticket_spin_lock.isLockedByCurrent(current_task)); // recursive locks are not supported
 
     current_task.incrementInterruptDisable();
 
-    const ticket = @atomicRmw(u32, &self.containter.contents.ticket, .Add, 1, .monotonic);
+    const ticket = @atomicRmw(u32, &ticket_spin_lock.containter.contents.ticket, .Add, 1, .monotonic);
 
-    if (@atomicLoad(u32, &self.containter.contents.current, .acquire) != ticket) {
+    if (@atomicLoad(u32, &ticket_spin_lock.containter.contents.current, .acquire) != ticket) {
         @branchHint(.unlikely);
 
         while (true) {
             kernel.arch.spinLoopHint();
-            if (@atomicLoad(u32, &self.containter.contents.current, .monotonic) == ticket) break;
+            if (@atomicLoad(u32, &ticket_spin_lock.containter.contents.current, .monotonic) == ticket) break;
         }
 
-        _ = @atomicLoad(u32, &self.containter.contents.current, .acquire);
+        _ = @atomicLoad(u32, &ticket_spin_lock.containter.contents.current, .acquire);
     }
 
-    self.holding_executor = current_task.state.running.id;
+    ticket_spin_lock.holding_executor = current_task.state.running.id;
     current_task.spinlocks_held += 1;
 }
 
 /// Try to lock the spinlock.
-pub fn tryLock(self: *TicketSpinLock, current_task: *kernel.Task) bool {
+pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
 
     current_task.incrementInterruptDisable();
 
-    const old_container = @atomicLoad(Container, &self.containter, .monotonic);
+    const old_container = @atomicLoad(Container, &ticket_spin_lock.containter, .monotonic);
 
     if (old_container.contents.current != old_container.contents.ticket) {
         @branchHint(.unlikely);
@@ -64,14 +64,14 @@ pub fn tryLock(self: *TicketSpinLock, current_task: *kernel.Task) bool {
     var new_container = old_container;
     new_container.contents.ticket +%= 1;
 
-    if (@cmpxchgStrong(Container, &self.containter, old_container, new_container, .acquire, .monotonic)) |_| {
+    if (@cmpxchgStrong(Container, &ticket_spin_lock.containter, old_container, new_container, .acquire, .monotonic)) |_| {
         @branchHint(.unlikely);
 
         current_task.decrementInterruptDisable();
         return false;
     }
 
-    self.holding_executor = current_task.state.running.id;
+    ticket_spin_lock.holding_executor = current_task.state.running.id;
     current_task.spinlocks_held += 1;
 
     return true;
@@ -80,11 +80,11 @@ pub fn tryLock(self: *TicketSpinLock, current_task: *kernel.Task) bool {
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
-pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
+pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held != 0);
-    std.debug.assert(self.isLockedByCurrent(current_task));
+    std.debug.assert(ticket_spin_lock.isLockedByCurrent(current_task));
 
-    self.unsafeUnlock();
+    ticket_spin_lock.unsafeUnlock();
 
     current_task.spinlocks_held -= 1;
     current_task.decrementInterruptDisable();
@@ -93,19 +93,19 @@ pub fn unlock(self: *TicketSpinLock, current_task: *kernel.Task) void {
 /// Unlock the spinlock.
 ///
 /// Performs no checks and is unsafe, prefer `unlock` instead.
-pub inline fn unsafeUnlock(self: *TicketSpinLock) void {
-    self.holding_executor = .none;
-    @atomicStore(u32, &self.containter.contents.current, self.containter.contents.current +% 1, .release);
+pub inline fn unsafeUnlock(ticket_spin_lock: *TicketSpinLock) void {
+    ticket_spin_lock.holding_executor = .none;
+    @atomicStore(u32, &ticket_spin_lock.containter.contents.current, ticket_spin_lock.containter.contents.current +% 1, .release);
 }
 
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
-pub fn poison(self: *TicketSpinLock) void {
-    _ = @atomicRmw(u32, &self.containter.contents.current, .Sub, 1, .release);
+pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
+    _ = @atomicRmw(u32, &ticket_spin_lock.containter.contents.current, .Sub, 1, .release);
 }
 
 /// Returns true if the spinlock is locked by the current executor.
-pub fn isLockedByCurrent(self: *const TicketSpinLock, current_task: *const kernel.Task) bool {
-    return self.holding_executor == current_task.state.running.id;
+pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *const kernel.Task) bool {
+    return ticket_spin_lock.holding_executor == current_task.state.running.id;
 }
 
 const core = @import("core");

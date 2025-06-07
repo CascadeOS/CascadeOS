@@ -82,76 +82,76 @@ pub const RFlags = packed struct(u64) {
     /// Writes the RFLAGS register.
     ///
     /// Note: does not protect reserved bits, that is left up to the caller
-    pub inline fn write(self: RFlags) void {
+    pub inline fn write(rflags: RFlags) void {
         asm volatile ("pushq %[val]; popfq"
             :
-            : [val] "r" (@as(u64, @bitCast(self))),
+            : [val] "r" (@as(u64, @bitCast(rflags))),
             : "flags"
         );
     }
 
-    pub fn print(self: RFlags, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(rflags: RFlags, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("RFlags{\n");
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("carry: {},\n", .{self.carry});
+        try writer.print("carry: {},\n", .{rflags.carry});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("parity: {},\n", .{self.parity});
+        try writer.print("parity: {},\n", .{rflags.parity});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("auxiliary_carry: {},\n", .{self.auxiliary_carry});
+        try writer.print("auxiliary_carry: {},\n", .{rflags.auxiliary_carry});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("zero: {},\n", .{self.zero});
+        try writer.print("zero: {},\n", .{rflags.zero});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("sign: {},\n", .{self.sign});
+        try writer.print("sign: {},\n", .{rflags.sign});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("trap: {},\n", .{self.trap});
+        try writer.print("trap: {},\n", .{rflags.trap});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("interrupt: {},\n", .{self.interrupt});
+        try writer.print("interrupt: {},\n", .{rflags.interrupt});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("direction: {},\n", .{self.direction});
+        try writer.print("direction: {},\n", .{rflags.direction});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("overflow: {},\n", .{self.overflow});
+        try writer.print("overflow: {},\n", .{rflags.overflow});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("iopl: {s},\n", .{@tagName(self.iopl)});
+        try writer.print("iopl: {s},\n", .{@tagName(rflags.iopl)});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("nested: {},\n", .{self.nested});
+        try writer.print("nested: {},\n", .{rflags.nested});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("resume: {},\n", .{self.@"resume"});
+        try writer.print("resume: {},\n", .{rflags.@"resume"});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("virtual_8086: {},\n", .{self.virtual_8086});
+        try writer.print("virtual_8086: {},\n", .{rflags.virtual_8086});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("alignment_check: {},\n", .{self.alignment_check});
+        try writer.print("alignment_check: {},\n", .{rflags.alignment_check});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("virtual_interrupt: {},\n", .{self.virtual_interrupt});
+        try writer.print("virtual_interrupt: {},\n", .{rflags.virtual_interrupt});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("virtual_interrupt_pending: {},\n", .{self.virtual_interrupt_pending});
+        try writer.print("virtual_interrupt_pending: {},\n", .{rflags.virtual_interrupt_pending});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("id: {},\n", .{self.id});
+        try writer.print("id: {},\n", .{rflags.id});
 
         try writer.writeByteNTimes(' ', indent);
         try writer.writeAll("}");
     }
 
     pub inline fn format(
-        self: RFlags,
+        rflags: RFlags,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -159,13 +159,13 @@ pub const RFlags = packed struct(u64) {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(rflags, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(rflags, writer.any(), 0);
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64));
+        core.testing.expectSize(RFlags, @sizeOf(u64));
     }
 };
 
@@ -217,10 +217,10 @@ pub const Cr0 = packed struct(u64) {
         ));
     }
 
-    pub fn write(self: Cr0) void {
+    pub fn write(cr0: Cr0) void {
         asm volatile ("mov %[value], %%cr0"
             :
-            : [value] "r" (@as(u64, @bitCast(self))),
+            : [value] "r" (@as(u64, @bitCast(cr0))),
         );
     }
 };
@@ -369,10 +369,10 @@ pub const Cr4 = packed struct(u64) {
         ));
     }
 
-    pub fn write(self: Cr4) void {
+    pub fn write(cr4: Cr4) void {
         asm volatile ("mov %[value], %%cr4"
             :
-            : [value] "r" (@as(u64, @bitCast(self))),
+            : [value] "r" (@as(u64, @bitCast(cr4))),
         );
     }
 };
@@ -417,8 +417,8 @@ pub const EFER = packed struct(u64) {
         return @bitCast(msr.read());
     }
 
-    pub inline fn write(self: EFER) void {
-        msr.write(@bitCast(self));
+    pub inline fn write(efer: EFER) void {
+        msr.write(@bitCast(efer));
     }
 
     const msr = MSR(u64, 0xC0000080);
@@ -603,10 +603,10 @@ pub const DR6 = packed struct(u64) {
         ));
     }
 
-    pub fn write(self: DR6) void {
+    pub fn write(dr6: DR6) void {
         asm volatile ("mov %[value], %%dr6"
             :
-            : [value] "r" (@as(u64, @bitCast(self))),
+            : [value] "r" (@as(u64, @bitCast(dr6))),
         );
     }
 };
@@ -748,10 +748,10 @@ pub const DR7 = packed struct(u64) {
         ));
     }
 
-    pub fn write(self: DR7) void {
+    pub fn write(dr7: DR7) void {
         asm volatile ("mov %[value], %%dr7"
             :
-            : [value] "r" (@as(u64, @bitCast(self))),
+            : [value] "r" (@as(u64, @bitCast(dr7))),
         );
     }
 };

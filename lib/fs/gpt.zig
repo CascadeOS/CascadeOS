@@ -156,10 +156,10 @@ pub const Header = extern struct {
     /// Anytime a field in this structure is modified, the CRC should be recomputed.
     ///
     /// This includes any changes to the partition entry array as it's checksum is stored in the header as well.
-    pub fn updateHash(self: *Header) void {
-        const header_bytes = @as([*]u8, @ptrCast(self))[0..self.header_size];
-        self.header_crc_32 = 0;
-        self.header_crc_32 = Crc32.hash(header_bytes);
+    pub fn updateHash(header: *Header) void {
+        const header_bytes = @as([*]u8, @ptrCast(header))[0..header.header_size];
+        header.header_crc_32 = 0;
+        header.header_crc_32 = Crc32.hash(header_bytes);
     }
 
     /// Copies the contents of one GPT header to another, handling the differences between primary and backup headers.
@@ -209,7 +209,7 @@ pub const Header = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), 92);
+        core.testing.expectSize(Header, 92);
     }
 };
 
@@ -280,7 +280,7 @@ pub const PartitionEntry = extern struct {
     pub const size: core.Size = core.Size.of(PartitionEntry);
 
     comptime {
-        core.testing.expectSize(@This(), 128);
+        core.testing.expectSize(PartitionEntry, 128);
     }
 };
 

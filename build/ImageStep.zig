@@ -117,8 +117,11 @@ pub fn registerImageSteps(
 fn makeImage(step: *Step, options: Step.MakeOptions) !void {
     _ = options;
 
-    const self: *ImageStep = @fieldParentPtr("step", step);
-    self.generated_image_file.path = step.owner.getInstallPath(self.install_image.dir, self.install_image.dest_rel_path);
+    const image_step: *ImageStep = @fieldParentPtr("step", step);
+    image_step.generated_image_file.path = step.owner.getInstallPath(
+        image_step.install_image.dir,
+        image_step.install_image.dest_rel_path,
+    );
 }
 
 const ImageDescriptionStep = struct {
@@ -159,8 +162,8 @@ const ImageDescriptionStep = struct {
                 b.pathJoin(&.{ "build", "limine.conf" }),
         };
 
-        const self = try b.allocator.create(ImageDescriptionStep);
-        self.* = .{
+        const image_description_step = try b.allocator.create(ImageDescriptionStep);
+        image_description_step.* = .{
             .b = b,
             .kernel = kernel,
             .limine_dep = limine_dep,
@@ -172,18 +175,22 @@ const ImageDescriptionStep = struct {
                 .makeFn = make,
             }),
             .target = target,
-            .generated_image_description_file = .{ .step = &self.step },
-            .image_description_file = .{ .generated = .{ .file = &self.generated_image_description_file } },
+            .generated_image_description_file = .{ .step = &image_description_step.step },
+            .image_description_file = .{
+                .generated = .{
+                    .file = &image_description_step.generated_image_description_file,
+                },
+            },
         };
 
-        try self.step.addWatchInput(b.path(limine_conf));
-        self.step.dependOn(kernel.install_kernel_binaries);
+        try image_description_step.step.addWatchInput(b.path(limine_conf));
+        image_description_step.step.dependOn(kernel.install_kernel_binaries);
 
-        return self;
+        return image_description_step;
     }
 
     fn make(step: *Step, options: Step.MakeOptions) !void {
-        const self: *ImageDescriptionStep = @fieldParentPtr("step", step);
+        const image_description_step: *ImageDescriptionStep = @fieldParentPtr("step", step);
 
         var timer = try std.time.Timer.start();
 
@@ -194,12 +201,12 @@ const ImageDescriptionStep = struct {
             step.result_duration_ns = timer.read();
         }
 
-        const image_description = try self.buildImageDescription();
+        const image_description = try image_description_step.buildImageDescription();
 
         const basename = "image_description.json";
 
         // Hash contents to file name.
-        var hash = self.b.graph.cache.hash;
+        var hash = image_description_step.b.graph.cache.hash;
         // Random bytes to make unique. Refresh this with new random bytes when
         // implementation is modified in a non-backwards-compatible way.
         hash.add(@as(u32, 0xde92a821));
@@ -210,20 +217,23 @@ const ImageDescriptionStep = struct {
             hash.final() ++ std.fs.path.sep_str ++
             basename;
 
-        self.generated_image_description_file.path = try self.b.cache_root.join(self.b.allocator, &.{sub_path});
+        image_description_step.generated_image_description_file.path = try image_description_step.b.cache_root.join(
+            image_description_step.b.allocator,
+            &.{sub_path},
+        );
 
         // Optimize for the hot path. Stat the file, and if it already exists,
         // cache hit.
-        if (self.b.cache_root.handle.access(sub_path, .{})) |_| {
+        if (image_description_step.b.cache_root.handle.access(sub_path, .{})) |_| {
             // This is the hot path, success.
             step.result_cached = true;
             return;
         } else |outer_err| switch (outer_err) {
             error.FileNotFound => {
                 const sub_dirname = std.fs.path.dirname(sub_path).?;
-                self.b.cache_root.handle.makePath(sub_dirname) catch |e| {
+                image_description_step.b.cache_root.handle.makePath(sub_dirname) catch |e| {
                     return step.fail("unable to make path '{}{s}': {s}", .{
-                        self.b.cache_root, sub_dirname, @errorName(e),
+                        image_description_step.b.cache_root, sub_dirname, @errorName(e),
                     });
                 };
 
@@ -233,24 +243,26 @@ const ImageDescriptionStep = struct {
                     basename;
                 const tmp_sub_path_dirname = std.fs.path.dirname(tmp_sub_path).?;
 
-                self.b.cache_root.handle.makePath(tmp_sub_path_dirname) catch |err| {
+                image_description_step.b.cache_root.handle.makePath(tmp_sub_path_dirname) catch |err| {
                     return step.fail("unable to make temporary directory '{}{s}': {s}", .{
-                        self.b.cache_root, tmp_sub_path_dirname, @errorName(err),
+                        image_description_step.b.cache_root, tmp_sub_path_dirname, @errorName(err),
                     });
                 };
 
-                self.b.cache_root.handle.writeFile(.{ .sub_path = tmp_sub_path, .data = image_description.items }) catch |err| {
+                image_description_step.b.cache_root.handle.writeFile(
+                    .{ .sub_path = tmp_sub_path, .data = image_description.items },
+                ) catch |err| {
                     return step.fail("unable to write options to '{}{s}': {s}", .{
-                        self.b.cache_root, tmp_sub_path, @errorName(err),
+                        image_description_step.b.cache_root, tmp_sub_path, @errorName(err),
                     });
                 };
 
-                self.b.cache_root.handle.rename(tmp_sub_path, sub_path) catch |err| switch (err) {
+                image_description_step.b.cache_root.handle.rename(tmp_sub_path, sub_path) catch |err| switch (err) {
                     error.PathAlreadyExists => {
                         // Other process beat us to it. Clean up the temp file.
-                        self.b.cache_root.handle.deleteFile(tmp_sub_path) catch |e| {
+                        image_description_step.b.cache_root.handle.deleteFile(tmp_sub_path) catch |e| {
                             try step.addError("warning: unable to delete temp file '{}{s}': {s}", .{
-                                self.b.cache_root, tmp_sub_path, @errorName(e),
+                                image_description_step.b.cache_root, tmp_sub_path, @errorName(e),
                             });
                         };
                         step.result_cached = true;
@@ -258,28 +270,28 @@ const ImageDescriptionStep = struct {
                     },
                     else => {
                         return step.fail("unable to rename options from '{}{s}' to '{}{s}': {s}", .{
-                            self.b.cache_root, tmp_sub_path,
-                            self.b.cache_root, sub_path,
+                            image_description_step.b.cache_root, tmp_sub_path,
+                            image_description_step.b.cache_root, sub_path,
                             @errorName(err),
                         });
                     },
                 };
             },
             else => |e| return step.fail("unable to access options file '{}{s}': {s}", .{
-                self.b.cache_root, sub_path, @errorName(e),
+                image_description_step.b.cache_root, sub_path, @errorName(e),
             }),
         }
     }
 
     const ImageDescription = @import("../tool/image_builder/ImageDescription.zig");
 
-    fn buildImageDescription(self: *ImageDescriptionStep) !std.ArrayList(u8) {
+    fn buildImageDescription(image_description_step: *ImageDescriptionStep) !std.ArrayList(u8) {
         const image_size = 256 * 1024 * 1024; // 256 MiB
         const efi_partition_size = 64 * 1024 * 1024; // 64 MiB
         _ = efi_partition_size;
 
         var builder = ImageDescription.Builder.create(
-            self.b.allocator,
+            image_description_step.b.allocator,
             image_size,
         );
         defer builder.deinit();
@@ -288,40 +300,54 @@ const ImageDescriptionStep = struct {
 
         try efi_partition.addFile(.{
             .destination_path = "/limine.conf",
-            .source_path = self.limine_conf,
+            .source_path = image_description_step.limine_conf,
         });
 
-        switch (self.target) {
+        switch (image_description_step.target) {
             .arm => {
                 try efi_partition.addFile(.{
                     .destination_path = "/EFI/BOOT/BOOTAA64.EFI",
-                    .source_path = self.limine_dep.path("BOOTAA64.EFI").getPath2(self.b, &self.step),
+                    .source_path = image_description_step.limine_dep.path("BOOTAA64.EFI").getPath2(
+                        image_description_step.b,
+                        &image_description_step.step,
+                    ),
                 });
             },
             .riscv => {
                 try efi_partition.addFile(.{
                     .destination_path = "/EFI/BOOT/BOOTRISCV64.EFI",
-                    .source_path = self.limine_dep.path("BOOTRISCV64.EFI").getPath2(self.b, &self.step),
+                    .source_path = image_description_step.limine_dep.path("BOOTRISCV64.EFI").getPath2(
+                        image_description_step.b,
+                        &image_description_step.step,
+                    ),
                 });
             },
             .x64 => {
                 try efi_partition.addFile(.{
                     .destination_path = "/limine-bios.sys",
-                    .source_path = self.limine_dep.path("limine-bios.sys").getPath2(self.b, &self.step),
+                    .source_path = image_description_step.limine_dep.path("limine-bios.sys").getPath2(
+                        image_description_step.b,
+                        &image_description_step.step,
+                    ),
                 });
                 try efi_partition.addFile(.{
                     .destination_path = "/EFI/BOOT/BOOTX64.EFI",
-                    .source_path = self.limine_dep.path("BOOTX64.EFI").getPath2(self.b, &self.step),
+                    .source_path = image_description_step.limine_dep.path("BOOTX64.EFI").getPath2(
+                        image_description_step.b,
+                        &image_description_step.step,
+                    ),
                 });
             },
         }
 
         try efi_partition.addFile(.{
             .destination_path = "/kernel",
-            .source_path = self.kernel.final_kernel_binary_path.getPath(self.b),
+            .source_path = image_description_step.kernel.final_kernel_binary_path.getPath(
+                image_description_step.b,
+            ),
         });
 
-        var image_description_buffer = std.ArrayList(u8).init(self.b.allocator);
+        var image_description_buffer = std.ArrayList(u8).init(image_description_step.b.allocator);
         errdefer image_description_buffer.deinit();
 
         try builder.serialize(image_description_buffer.writer());

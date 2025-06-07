@@ -37,17 +37,17 @@ pub fn initPath(path: [:0]const u8) DwarfDebug {
 pub const DwarfDebug = struct {
     dwarf_debug: c.Dwarf_Debug,
 
-    pub fn deinit(self: DwarfDebug) void {
-        _ = c.dwarf_finish(self.dwarf_debug);
+    pub fn deinit(dwarf_debug: DwarfDebug) void {
+        _ = c.dwarf_finish(dwarf_debug.dwarf_debug);
     }
 
-    pub fn nextCompileUnit(self: DwarfDebug) ?CompileUnit {
+    pub fn nextCompileUnit(dwarf_debug: DwarfDebug) ?CompileUnit {
         var cu: CompileUnit = undefined;
 
         var dw_length_size: c.Dwarf_Half = undefined;
 
         toResult(c.dwarf_next_cu_header_e(
-            self.dwarf_debug,
+            dwarf_debug.dwarf_debug,
             1,
             &cu.die.die,
             null,
@@ -63,17 +63,17 @@ pub const DwarfDebug = struct {
             null,
         )) catch return null;
 
-        cu.dwarf_debug = self;
+        cu.dwarf_debug = dwarf_debug;
 
         return cu;
     }
 
-    pub fn getRanges(self: DwarfDebug, offset: u64, die: Die) []const Range {
+    pub fn getRanges(dwarf_debug: DwarfDebug, offset: u64, die: Die) []const Range {
         var result: [*c]c.Dwarf_Ranges = undefined;
         var count: c.Dwarf_Signed = undefined;
 
         toResult(c.dwarf_get_ranges_b(
-            self.dwarf_debug,
+            dwarf_debug.dwarf_debug,
             @intCast(offset),
             die.die,
             null,
@@ -86,11 +86,11 @@ pub const DwarfDebug = struct {
         return @as([*]const Range, @ptrCast(result))[0..@intCast(count)];
     }
 
-    pub fn getDieByOffset(self: DwarfDebug, offset: u64) ?Die {
+    pub fn getDieByOffset(dwarf_debug: DwarfDebug, offset: u64) ?Die {
         var result: Die = undefined;
 
         toResult(c.dwarf_offdie_b(
-            self.dwarf_debug,
+            dwarf_debug.dwarf_debug,
             @intCast(offset),
             1,
             &result.die,
@@ -104,16 +104,16 @@ pub const DwarfDebug = struct {
 pub const Range = extern struct {
     range: c.Dwarf_Ranges,
 
-    pub fn address1(self: Range) u64 {
-        return @intCast(self.range.dwr_addr1);
+    pub fn address1(range: Range) u64 {
+        return @intCast(range.range.dwr_addr1);
     }
 
-    pub fn address2(self: Range) u64 {
-        return @intCast(self.range.dwr_addr2);
+    pub fn address2(range: Range) u64 {
+        return @intCast(range.range.dwr_addr2);
     }
 
-    pub fn getType(self: Range) RangeType {
-        return @enumFromInt(self.range.dwr_type);
+    pub fn getType(range: Range) RangeType {
+        return @enumFromInt(range.range.dwr_type);
     }
 
     pub const RangeType = enum(c.Dwarf_Ranges_Entry_Type) {
@@ -135,12 +135,12 @@ pub const CompileUnit = struct {
     version: c.Dwarf_Half,
     address_size: c.Dwarf_Half,
 
-    pub fn getLineContext(self: CompileUnit) LineContext {
+    pub fn getLineContext(compile_unit: CompileUnit) LineContext {
         var table_count: c.Dwarf_Small = undefined;
         var line_context: c.Dwarf_Line_Context = undefined;
 
         toResult(c.dwarf_srclines_b(
-            self.die.die,
+            compile_unit.die.die,
             null,
             &table_count,
             &line_context,
@@ -150,12 +150,12 @@ pub const CompileUnit = struct {
         return .{ .line_context = line_context };
     }
 
-    pub fn getDie(self: CompileUnit) Die {
+    pub fn getDie(compile_unit: CompileUnit) Die {
         var result: Die = undefined;
 
         toResult(
             c.dwarf_siblingof_b(
-                self.dwarf_debug.dwarf_debug,
+                compile_unit.dwarf_debug.dwarf_debug,
                 null,
                 1,
                 &result.die,
@@ -170,11 +170,11 @@ pub const CompileUnit = struct {
 pub const Die = struct {
     die: c.Dwarf_Die,
 
-    pub fn nextSibling(self: Die) ?Die {
+    pub fn nextSibling(die: Die) ?Die {
         var result: Die = undefined;
 
         toResult(c.dwarf_siblingof_c(
-            self.die,
+            die.die,
             &result.die,
             null,
         )) catch return null;
@@ -182,11 +182,11 @@ pub const Die = struct {
         return result;
     }
 
-    pub fn tag(self: Die) DW_TAG {
+    pub fn tag(die: Die) DW_TAG {
         var result: c.Dwarf_Half = undefined;
 
         toResult(c.dwarf_tag(
-            self.die,
+            die.die,
             &result,
             null,
         )) catch unreachable;
@@ -194,11 +194,11 @@ pub const Die = struct {
         return @enumFromInt(result);
     }
 
-    pub fn child(self: Die) ?Die {
+    pub fn child(die: Die) ?Die {
         var result: Die = undefined;
 
         toResult(c.dwarf_child(
-            self.die,
+            die.die,
             &result.die,
             null,
         )) catch return null;
@@ -206,10 +206,10 @@ pub const Die = struct {
         return result;
     }
 
-    pub fn name(self: Die, dwarf_debug: DwarfDebug) ?[]const u8 {
-        if (self.simpleName()) |n| return n;
+    pub fn name(die: Die, dwarf_debug: DwarfDebug) ?[]const u8 {
+        if (die.simpleName()) |n| return n;
 
-        if (self.getAttribute(.abstract_origin)) |abstract_origin_attribute| blk: {
+        if (die.getAttribute(.abstract_origin)) |abstract_origin_attribute| blk: {
             const abstract_origin = abstract_origin_attribute.sectionRelativeOffset();
 
             const origin_die = dwarf_debug.getDieByOffset(abstract_origin) orelse break :blk;
@@ -217,7 +217,7 @@ pub const Die = struct {
             if (origin_die.simpleName()) |n| return n;
         }
 
-        if (self.getAttribute(.specification)) |specification_attribute| blk: {
+        if (die.getAttribute(.specification)) |specification_attribute| blk: {
             const specification_offset = specification_attribute.sectionRelativeOffset();
 
             const specification_die = dwarf_debug.getDieByOffset(specification_offset) orelse break :blk;
@@ -228,11 +228,11 @@ pub const Die = struct {
         return null;
     }
 
-    pub fn simpleName(self: Die) ?[:0]const u8 {
+    pub fn simpleName(die: Die) ?[:0]const u8 {
         var name_ptr: [*c]u8 = undefined;
 
         toResult(c.dwarf_diename(
-            self.die,
+            die.die,
             &name_ptr,
             null,
         )) catch return null;
@@ -240,16 +240,16 @@ pub const Die = struct {
         return std.mem.sliceTo(name_ptr, 0);
     }
 
-    pub fn abbreviationCode(self: Die) u64 {
-        return @intCast(c.dwarf_die_abbrev_code(self.die));
+    pub fn abbreviationCode(die: Die) u64 {
+        return @intCast(c.dwarf_die_abbrev_code(die.die));
     }
 
-    pub fn getLowHighPC(self: Die) ?LowHighPC {
+    pub fn getLowHighPC(die: Die) ?LowHighPC {
         const low_pc = blk: {
             var result: c.Dwarf_Addr = undefined;
 
             toResult(c.dwarf_lowpc(
-                self.die,
+                die.die,
                 &result,
                 null,
             )) catch return null;
@@ -262,7 +262,7 @@ pub const Die = struct {
         var form_class: c.Dwarf_Form_Class = undefined;
 
         toResult(c.dwarf_highpc_b(
-            self.die,
+            die.die,
             &high_pc,
             &form,
             &form_class,
@@ -274,12 +274,12 @@ pub const Die = struct {
         return .{ .low_pc = @intCast(low_pc), .high_pc = @intCast(high_pc) };
     }
 
-    pub fn getAttribute(self: Die, attribute: DW_AT) ?Attribute {
+    pub fn getAttribute(die: Die, attribute: DW_AT) ?Attribute {
         var result: Attribute = undefined;
 
         toResult(
             c.dwarf_attr(
-                self.die,
+                die.die,
                 @intFromEnum(attribute),
                 &result.attribute,
                 null,
@@ -289,12 +289,12 @@ pub const Die = struct {
         return result;
     }
 
-    pub fn getAttributes(self: Die) []const Attribute {
+    pub fn getAttributes(die: Die) []const Attribute {
         var result: [*c]c.Dwarf_Attribute = undefined;
         var result_count: c.Dwarf_Signed = undefined;
 
         toResult(c.dwarf_attrlist(
-            self.die,
+            die.die,
             &result,
             &result_count,
             null,
@@ -308,12 +308,12 @@ pub const Die = struct {
 pub const Attribute = struct {
     attribute: c.Dwarf_Attribute,
 
-    pub fn sectionRelativeOffset(self: Attribute) u64 {
+    pub fn sectionRelativeOffset(attribute: Attribute) u64 {
         var result: c.Dwarf_Off = undefined;
         var is_info: c.Dwarf_Bool = undefined;
 
         toResult(c.dwarf_global_formref_b(
-            self.attribute,
+            attribute.attribute,
             &result,
             &is_info,
             null,
@@ -322,10 +322,10 @@ pub const Attribute = struct {
         return result;
     }
 
-    pub fn attributeNumber(self: Attribute) DW_AT {
+    pub fn attributeNumber(attribute: Attribute) DW_AT {
         var result: c.Dwarf_Half = undefined;
 
-        toResult(c.dwarf_whatattr(self.attribute, &result, null)) catch unreachable;
+        toResult(c.dwarf_whatattr(attribute.attribute, &result, null)) catch unreachable;
 
         return @enumFromInt(result);
     }
@@ -339,13 +339,13 @@ pub const LowHighPC = struct {
 pub const LineContext = struct {
     line_context: c.Dwarf_Line_Context,
 
-    pub fn getLines(self: LineContext) []const Line {
+    pub fn getLines(line_context: LineContext) []const Line {
         var lines: [*c]c.Dwarf_Line = undefined;
         var line_count: c.Dwarf_Signed = undefined;
 
         toResult(
             c.dwarf_srclines_from_linecontext(
-                self.line_context,
+                line_context.line_context,
                 &lines,
                 &line_count,
                 null,
@@ -359,11 +359,11 @@ pub const LineContext = struct {
 pub const Line = extern struct {
     dwarf_line: c.Dwarf_Line,
 
-    pub fn line(self: Line) u64 {
+    pub fn line(dwarf_line: Line) u64 {
         var result: c.Dwarf_Unsigned = undefined;
 
         toResult(c.dwarf_lineno(
-            self.dwarf_line,
+            dwarf_line.dwarf_line,
             &result,
             null,
         )) catch unreachable;
@@ -371,11 +371,11 @@ pub const Line = extern struct {
         return @intCast(result);
     }
 
-    pub fn column(self: Line) u64 {
+    pub fn column(dwarf_line: Line) u64 {
         var result: c.Dwarf_Unsigned = undefined;
 
         toResult(c.dwarf_lineoff_b(
-            self.dwarf_line,
+            dwarf_line.dwarf_line,
             &result,
             null,
         )) catch unreachable;
@@ -383,11 +383,11 @@ pub const Line = extern struct {
         return @intCast(result);
     }
 
-    pub fn address(self: Line) u64 {
+    pub fn address(dwarf_line: Line) u64 {
         var result: c.Dwarf_Addr = undefined;
 
         toResult(c.dwarf_lineaddr(
-            self.dwarf_line,
+            dwarf_line.dwarf_line,
             &result,
             null,
         )) catch unreachable;
@@ -395,11 +395,11 @@ pub const Line = extern struct {
         return @intCast(result);
     }
 
-    pub fn file(self: Line) []const u8 {
+    pub fn file(dwarf_line: Line) []const u8 {
         var result: [*c]u8 = undefined;
 
         toResult(c.dwarf_linesrc(
-            self.dwarf_line,
+            dwarf_line.dwarf_line,
             &result,
             null,
         )) catch unreachable;

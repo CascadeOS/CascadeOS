@@ -364,15 +364,15 @@ const SymbolSource = struct {
         };
     }
 
-    pub fn getSymbol(self: SymbolSource, address: usize) ?Symbol {
-        const start_state = self.location_lookup.getStartState(address) catch return null;
+    pub fn getSymbol(symbol_source: SymbolSource, address: usize) ?Symbol {
+        const start_state = symbol_source.location_lookup.getStartState(address) catch return null;
 
-        const location = self.location_program.getLocation(start_state, address) catch return null;
+        const location = symbol_source.location_program.getLocation(start_state, address) catch return null;
 
-        const file = self.file_table.getFile(location.file_index) orelse return null;
+        const file = symbol_source.file_table.getFile(location.file_index) orelse return null;
 
-        const file_name = self.string_table.getString(file.file_offset);
-        const directory = self.string_table.getString(file.directory_offset);
+        const file_name = symbol_source.string_table.getString(file.file_offset);
+        const directory = symbol_source.string_table.getString(file.directory_offset);
 
         const line_source: Symbol.LineSource = line_source: {
             const file_contents = blk: {
@@ -397,7 +397,7 @@ const SymbolSource = struct {
         };
 
         return .{
-            .name = self.string_table.getString(location.symbol_offset),
+            .name = symbol_source.string_table.getString(location.symbol_offset),
             .directory = directory,
             .file_name = file_name,
             .line = location.line,

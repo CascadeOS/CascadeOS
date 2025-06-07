@@ -13,43 +13,43 @@ pub const Node = struct {
     node: containers.SingleNode,
 };
 
-pub fn submitAndWait(self: *FlushRequest, current_task: *kernel.Task) void {
+pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) void {
     current_task.incrementPreemptionDisable();
     defer current_task.decrementPreemptionDisable();
 
-    switch (self.flush_target) {
+    switch (flush_request.flush_target) {
         .kernel => {
             for (kernel.executors) |*executor| {
                 if (executor == current_task.state.running) continue;
-                self.requestExecutor(executor);
+                flush_request.requestExecutor(executor);
             }
         },
         .user => @panic("NOT IMPLEMENTED"),
     }
 
-    self.flush(current_task);
-    self.waitForCompletion();
+    flush_request.flush(current_task);
+    flush_request.waitForCompletion();
 }
 
-pub fn flush(self: *FlushRequest, current_task: *const kernel.Task) void {
+pub fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
     _ = current_task;
 
-    switch (self.flush_target) {
+    switch (flush_request.flush_target) {
         .kernel => {},
         .user => @panic("NOT IMPLEMENTED"),
     }
 
-    kernel.arch.paging.flushCache(self.range);
+    kernel.arch.paging.flushCache(flush_request.range);
 
-    _ = self.count.fetchSub(1, .monotonic);
+    _ = flush_request.count.fetchSub(1, .monotonic);
 }
 
-fn requestExecutor(self: *FlushRequest, executor: *kernel.Executor) void {
-    _ = self.count.fetchAdd(1, .monotonic);
+fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) void {
+    _ = flush_request.count.fetchAdd(1, .monotonic);
 
-    const node = self.nodes.addOne() catch @panic("exceeded maximum number of executors");
+    const node = flush_request.nodes.addOne() catch @panic("exceeded maximum number of executors");
     node.* = .{
-        .request = self,
+        .request = flush_request,
         .node = .empty,
     };
     executor.flush_requests.push(&node.node);
@@ -57,8 +57,8 @@ fn requestExecutor(self: *FlushRequest, executor: *kernel.Executor) void {
     kernel.arch.interrupts.sendFlushIPI(executor);
 }
 
-fn waitForCompletion(self: *FlushRequest) void {
-    while (self.count.load(.monotonic) > 0) {
+fn waitForCompletion(flush_request: *FlushRequest) void {
+    while (flush_request.count.load(.monotonic) > 0) {
         kernel.arch.spinLoopHint();
     }
 }

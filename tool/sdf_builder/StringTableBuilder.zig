@@ -8,30 +8,30 @@ allocator: std.mem.Allocator,
 string_table: std.ArrayListUnmanaged(u8) = .{},
 string_offsets: std.StringHashMapUnmanaged(u64) = .{},
 
-pub fn addString(self: *StringTableBuilder, string: []const u8) !u64 {
-    if (self.string_offsets.get(string)) |offset| return offset;
+pub fn addString(string_table_builder: *StringTableBuilder, string: []const u8) !u64 {
+    if (string_table_builder.string_offsets.get(string)) |offset| return offset;
 
-    const key = try self.allocator.dupe(u8, string);
-    errdefer self.allocator.free(key);
+    const key = try string_table_builder.allocator.dupe(u8, string);
+    errdefer string_table_builder.allocator.free(key);
 
-    const offset = self.string_table.items.len;
-    errdefer self.string_table.shrinkRetainingCapacity(offset);
+    const offset = string_table_builder.string_table.items.len;
+    errdefer string_table_builder.string_table.shrinkRetainingCapacity(offset);
 
-    try self.string_table.appendSlice(self.allocator, string);
-    try self.string_table.append(self.allocator, 0);
+    try string_table_builder.string_table.appendSlice(string_table_builder.allocator, string);
+    try string_table_builder.string_table.append(string_table_builder.allocator, 0);
 
-    try self.string_offsets.put(self.allocator, key, offset);
+    try string_table_builder.string_offsets.put(string_table_builder.allocator, key, offset);
 
     return offset;
 }
 
-pub fn output(self: *const StringTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
+pub fn output(string_table_builder: *const StringTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
     const offset = output_buffer.items.len;
 
-    try output_buffer.appendSlice(self.string_table.items);
+    try output_buffer.appendSlice(string_table_builder.string_table.items);
     try output_buffer.append(0);
 
-    return .{ offset, self.string_table.items.len };
+    return .{ offset, string_table_builder.string_table.items.len };
 }
 
 comptime {

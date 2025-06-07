@@ -641,7 +641,7 @@ pub const Superblock = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 1024);
+        core.testing.expectSize(Superblock, 1024);
     }
 };
 
@@ -746,7 +746,7 @@ pub const BlockGroupDescriptor = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 64);
+        core.testing.expectSize(BlockGroupDescriptor, 64);
     }
 };
 
@@ -889,8 +889,8 @@ pub const CompatibleFeatures = packed struct(u32) {
 
     _unused: u19 = 0,
 
-    pub fn hasUnknownBits(self: CompatibleFeatures) bool {
-        return self._unused != 0;
+    pub fn hasUnknownBits(compatible_features: CompatibleFeatures) bool {
+        return compatible_features._unused != 0;
     }
 };
 
@@ -967,8 +967,8 @@ pub const IncompatibleFeatures = packed struct(u32) {
 
     _unused3: u14 = 0,
 
-    pub fn hasUnknownBits(self: IncompatibleFeatures) bool {
-        return self._unused1 or self._unused2 or self._unused3 != 0;
+    pub fn hasUnknownBits(incompatible_features: IncompatibleFeatures) bool {
+        return incompatible_features._unused1 or incompatible_features._unused2 or incompatible_features._unused3 != 0;
     }
 };
 
@@ -1054,8 +1054,8 @@ pub const ReadOnlyFeatures = packed struct(u32) {
 
     _unused2: u15 = 0,
 
-    pub fn hasUnknownBits(self: ReadOnlyFeatures) bool {
-        return self._unused1 or self._unused2 != 0;
+    pub fn hasUnknownBits(readonly_features: ReadOnlyFeatures) bool {
+        return readonly_features._unused1 or readonly_features._unused2 != 0;
     }
 };
 

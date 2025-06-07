@@ -50,19 +50,19 @@ pub const SharedHeader = extern struct {
     /// For tables containing Definition Blocks, this is the revision for the ASL Compiler.
     creator_revision: u32 align(1),
 
-    pub fn signatureIs(self: *const SharedHeader, signature: *const [4]u8) bool {
-        return std.mem.eql(u8, signature, &self.signature);
+    pub fn signatureIs(shared_header: *const SharedHeader, signature: *const [4]u8) bool {
+        return std.mem.eql(u8, signature, &shared_header.signature);
     }
 
-    pub fn signatureAsString(self: *const SharedHeader) []const u8 {
-        return std.mem.asBytes(&self.signature);
+    pub fn signatureAsString(shared_header: *const SharedHeader) []const u8 {
+        return std.mem.asBytes(&shared_header.signature);
     }
 
     /// Returns `true` is the table is valid.
-    pub fn isValid(self: *const SharedHeader) bool {
+    pub fn isValid(shared_header: *const SharedHeader) bool {
         const bytes = blk: {
-            const ptr: [*]const u8 = @ptrCast(self);
-            break :blk ptr[0..self.length];
+            const ptr: [*]const u8 = @ptrCast(shared_header);
+            break :blk ptr[0..shared_header.length];
         };
 
         var lowest_byte_of_sum: u8 = 0;
@@ -73,7 +73,7 @@ pub const SharedHeader = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u8) * 4 + @sizeOf(u32) + @sizeOf(u8) * 16 + @sizeOf(u32) * 3);
+        core.testing.expectSize(SharedHeader, @sizeOf(u8) * 4 + @sizeOf(u32) + @sizeOf(u8) * 16 + @sizeOf(u32) * 3);
     }
 };
 

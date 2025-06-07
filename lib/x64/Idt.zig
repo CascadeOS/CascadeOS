@@ -51,12 +51,12 @@ pub const Entry = extern struct {
     };
 
     pub fn init(
-        self: *Entry,
+        entry: *Entry,
         code_selector: x64.Gdt.Selector,
         gate_type: GateType,
         handler: *const fn () callconv(.Naked) void,
     ) void {
-        self.* = .{
+        entry.* = .{
             .pointer_low = undefined,
             .code_selector = code_selector,
             .options = .{
@@ -66,35 +66,35 @@ pub const Entry = extern struct {
             .pointer_middle = undefined,
             .pointer_high = undefined,
         };
-        self.setHandler(handler);
+        entry.setHandler(handler);
     }
 
     /// Sets the interrupt handler for this interrupt.
-    pub fn setHandler(self: *Entry, handler: *const fn () callconv(.Naked) void) void {
+    pub fn setHandler(entry: *Entry, handler: *const fn () callconv(.Naked) void) void {
         const address = @intFromPtr(handler);
-        self.pointer_low = @truncate(address);
-        self.pointer_middle = @truncate(address >> 16);
-        self.pointer_high = @truncate(address >> 32);
+        entry.pointer_low = @truncate(address);
+        entry.pointer_middle = @truncate(address >> 16);
+        entry.pointer_high = @truncate(address >> 32);
     }
 
     /// Sets the interrupt stack table (IST) index for this interrupt.
-    pub fn setStack(self: *Entry, interrupt_stack: u3) void {
-        self.options.ist = interrupt_stack +% 1;
+    pub fn setStack(entry: *Entry, interrupt_stack: u3) void {
+        entry.options.ist = interrupt_stack +% 1;
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64) * 2);
+        core.testing.expectSize(Entry, @sizeOf(u64) * 2);
     }
 };
 
-pub fn load(self: *const Idt) void {
+pub fn load(idt: *const Idt) void {
     const Idtr = packed struct {
         limit: u16,
         address: u64,
     };
 
     const idtr = Idtr{
-        .address = @intFromPtr(self),
+        .address = @intFromPtr(idt),
         .limit = @sizeOf(Idt) - 1,
     };
 

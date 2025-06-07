@@ -21,10 +21,10 @@ const Arguments = struct {
     output_path: []const u8,
     image_description: *ImageDescription.Parsed,
 
-    pub fn deinit(self: Arguments, allocator: std.mem.Allocator) void {
-        allocator.free(self.output_path);
-        self.image_description.deinit();
-        allocator.destroy(self.image_description);
+    pub fn deinit(arguments: Arguments, allocator: std.mem.Allocator) void {
+        allocator.free(arguments.output_path);
+        arguments.image_description.deinit();
+        allocator.destroy(arguments.image_description);
     }
 };
 
@@ -258,8 +258,8 @@ const FATName = struct {
     /// Is guarenteed to have a trailing zero
     long_name: ?[]const u8,
 
-    fn deinit(self: FATName) void {
-        if (self.long_name) |long_name| self.allocator.free(long_name);
+    fn deinit(fat_name: FATName) void {
+        if (fat_name.long_name) |long_name| fat_name.allocator.free(long_name);
     }
 };
 
@@ -373,43 +373,48 @@ const FATContext = struct {
 
     const FAT32Entry = fat.FAT32Entry;
 
-    pub fn setFAT(self: *FATContext, index: u32, entry: FAT32Entry) void {
-        self.fat_table[index] = entry;
+    pub fn setFAT(fat_context: *FATContext, index: u32, entry: FAT32Entry) void {
+        fat_context.fat_table[index] = entry;
     }
 
-    pub fn nextCluster(self: *FATContext) !u32 {
-        const cluster = self.next_cluster;
+    pub fn nextCluster(fat_context: *FATContext) !u32 {
+        const cluster = fat_context.next_cluster;
 
-        if (cluster >= self.number_of_clusters) return error.NoFreeClusters;
+        if (cluster >= fat_context.number_of_clusters) return error.NoFreeClusters;
 
-        self.next_cluster += 1;
+        fat_context.next_cluster += 1;
         return cluster;
     }
 
     pub fn clusterSlice(
-        self: FATContext,
+        fat_context: FATContext,
         cluster_index: u32,
         number_of_clusters: usize,
     ) []u8 {
-        const start = self.cluster_begin_sector + (cluster_index - 2) * self.sectors_per_cluster;
-        const size = self.sector_size.multiplyScalar(self.sectors_per_cluster * number_of_clusters);
-        return asPtr([*]u8, self.fat_partition, start, self.sector_size)[0..size.value];
+        const start = fat_context.cluster_begin_sector + (cluster_index - 2) * fat_context.sectors_per_cluster;
+        const size = fat_context.sector_size.multiplyScalar(fat_context.sectors_per_cluster * number_of_clusters);
+        return asPtr(
+            [*]u8,
+            fat_context.fat_partition,
+            start,
+            fat_context.sector_size,
+        )[0..size.value];
     }
 
-    fn getRootDirectory(self: *FATContext) FATDirectory {
+    fn getRootDirectory(fat_context: *FATContext) FATDirectory {
         return .{
-            .context = self,
-            .cluster = self.root_cluster,
+            .context = fat_context,
+            .cluster = fat_context.root_cluster,
             .directory_entries = blk: {
                 const root_directory_ptr: [*]fat.DirectoryEntry =
-                    @ptrCast(self.clusterSlice(self.root_cluster, 1).ptr);
-                break :blk root_directory_ptr[0..self.directory_entries_per_cluster];
+                    @ptrCast(fat_context.clusterSlice(fat_context.root_cluster, 1).ptr);
+                break :blk root_directory_ptr[0..fat_context.directory_entries_per_cluster];
             },
         };
     }
 
     fn copyFile(
-        self: *FATContext,
+        fat_context: *FATContext,
         entry: *fat.DirectoryEntry.StandardDirectoryEntry,
         path: []const u8,
     ) !void {
@@ -419,10 +424,10 @@ const FATContext = struct {
         const stat = try file.stat();
 
         const file_size = core.Size.from(stat.size, .byte);
-        const clusters_required = self.cluster_size.amountToCover(file_size);
+        const clusters_required = fat_context.cluster_size.amountToCover(file_size);
         std.debug.assert(clusters_required != 0);
 
-        var current_cluster = try self.nextCluster();
+        var current_cluster = try fat_context.nextCluster();
 
         entry.high_cluster_number = @truncate(current_cluster >> 16);
         entry.low_cluster_number = @truncate(current_cluster);
@@ -431,7 +436,7 @@ const FATContext = struct {
         var i: usize = 0;
 
         while (i < clusters_required) : (i += 1) {
-            const cluster_ptr = self.clusterSlice(current_cluster, 1);
+            const cluster_ptr = fat_context.clusterSlice(current_cluster, 1);
             const read = try file.readAll(cluster_ptr);
 
             const is_last_cluster = i == clusters_required - 1;
@@ -440,10 +445,10 @@ const FATContext = struct {
             std.debug.assert(read == cluster_ptr.len or is_last_cluster);
 
             if (is_last_cluster) {
-                self.setFAT(current_cluster, fat.FAT32Entry.end_of_chain);
+                fat_context.setFAT(current_cluster, fat.FAT32Entry.end_of_chain);
             } else {
-                const next_cluster = try self.nextCluster();
-                self.setFAT(current_cluster, @enumFromInt(next_cluster));
+                const next_cluster = try fat_context.nextCluster();
+                fat_context.setFAT(current_cluster, @enumFromInt(next_cluster));
                 current_cluster = next_cluster;
             }
         }
@@ -454,32 +459,34 @@ const FATContext = struct {
         cluster: u32,
         directory_entries: []fat.DirectoryEntry,
 
-        fn getOrAddDirectory(self: FATDirectory, name: FATName) !FATDirectory {
+        fn getOrAddDirectory(fat_directory: FATDirectory, name: FATName) !FATDirectory {
             std.debug.assert(name.long_name == null); // TODO: support long names
 
-            if (self.findEntry(name)) |entry| {
+            if (fat_directory.findEntry(name)) |entry| {
                 std.debug.assert(entry.standard.attributes.directory); // pre-existing entry is not a directory
 
                 const cluster: u32 = @as(u32, entry.standard.high_cluster_number) << 16 | entry.standard.low_cluster_number;
 
                 // TODO: length is assumed to be one cluster
-                const directory_ptr: [*]fat.DirectoryEntry = @ptrCast(self.context.clusterSlice(cluster, 1).ptr);
-                const directory_entries: []fat.DirectoryEntry = directory_ptr[0..self.context.directory_entries_per_cluster];
+                const directory_ptr: [*]fat.DirectoryEntry = @ptrCast(
+                    fat_directory.context.clusterSlice(cluster, 1).ptr,
+                );
+                const directory_entries: []fat.DirectoryEntry = directory_ptr[0..fat_directory.context.directory_entries_per_cluster];
 
                 return .{
-                    .context = self.context,
+                    .context = fat_directory.context,
                     .cluster = cluster,
                     .directory_entries = directory_entries,
                 };
             }
 
-            return self.addDirectory(name);
+            return fat_directory.addDirectory(name);
         }
 
-        fn findEntry(self: FATDirectory, name: FATName) ?*fat.DirectoryEntry {
+        fn findEntry(fat_directory: FATDirectory, name: FATName) ?*fat.DirectoryEntry {
             std.debug.assert(name.long_name == null); // TODO: support long names
 
-            for (self.directory_entries) |*entry| {
+            for (fat_directory.directory_entries) |*entry| {
                 if (entry.isUnusedEntry()) continue;
                 if (entry.isLastEntry()) break;
 
@@ -493,14 +500,14 @@ const FATContext = struct {
             return null;
         }
 
-        fn addDirectory(self: FATDirectory, name: FATName) !FATDirectory {
+        fn addDirectory(fat_directory: FATDirectory, name: FATName) !FATDirectory {
             if (name.long_name) |long_name| {
-                try self.addLongFileName(name.short_name, long_name);
+                try fat_directory.addLongFileName(name.short_name, long_name);
             }
 
-            const entry = self.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
+            const entry = fat_directory.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
 
-            const new_cluster = try self.context.nextCluster();
+            const new_cluster = try fat_directory.context.nextCluster();
 
             entry.* = .{
                 .standard = .{
@@ -508,24 +515,24 @@ const FATContext = struct {
                     .attributes = .{
                         .directory = true,
                     },
-                    .creation_datetime_subsecond = self.context.date_time.subsecond,
-                    .creation_time = self.context.date_time.time,
-                    .creation_date = self.context.date_time.date,
-                    .last_accessed_date = self.context.date_time.date,
+                    .creation_datetime_subsecond = fat_directory.context.date_time.subsecond,
+                    .creation_time = fat_directory.context.date_time.time,
+                    .creation_date = fat_directory.context.date_time.date,
+                    .last_accessed_date = fat_directory.context.date_time.date,
                     .high_cluster_number = @truncate(new_cluster >> 16),
-                    .last_modification_time = self.context.date_time.time,
-                    .last_modification_date = self.context.date_time.date,
+                    .last_modification_time = fat_directory.context.date_time.time,
+                    .last_modification_date = fat_directory.context.date_time.date,
                     .low_cluster_number = @truncate(new_cluster),
                     .size = 0,
                 },
             };
 
             // TODO: We assume that no directories exceed a single cluster
-            self.context.setFAT(new_cluster, fat.FAT32Entry.end_of_chain);
+            fat_directory.context.setFAT(new_cluster, fat.FAT32Entry.end_of_chain);
 
             // TODO: length is assumed to be one cluster
-            const directory_ptr: [*]fat.DirectoryEntry = @ptrCast(self.context.clusterSlice(new_cluster, 1).ptr);
-            const directory_entries: []fat.DirectoryEntry = directory_ptr[0..self.context.directory_entries_per_cluster];
+            const directory_ptr: [*]fat.DirectoryEntry = @ptrCast(fat_directory.context.clusterSlice(new_cluster, 1).ptr);
+            const directory_entries: []fat.DirectoryEntry = directory_ptr[0..fat_directory.context.directory_entries_per_cluster];
 
             // '.' directory
             directory_entries[0] = fat.DirectoryEntry{
@@ -536,13 +543,13 @@ const FATContext = struct {
                     .attributes = .{
                         .directory = true,
                     },
-                    .creation_datetime_subsecond = self.context.date_time.subsecond,
-                    .creation_time = self.context.date_time.time,
-                    .creation_date = self.context.date_time.date,
-                    .last_accessed_date = self.context.date_time.date,
+                    .creation_datetime_subsecond = fat_directory.context.date_time.subsecond,
+                    .creation_time = fat_directory.context.date_time.time,
+                    .creation_date = fat_directory.context.date_time.date,
+                    .last_accessed_date = fat_directory.context.date_time.date,
                     .high_cluster_number = @truncate(new_cluster >> 16),
-                    .last_modification_time = self.context.date_time.time,
-                    .last_modification_date = self.context.date_time.date,
+                    .last_modification_time = fat_directory.context.date_time.time,
+                    .last_modification_date = fat_directory.context.date_time.date,
                     .low_cluster_number = @truncate(new_cluster),
                     .size = 0,
                 },
@@ -557,31 +564,31 @@ const FATContext = struct {
                     .attributes = .{
                         .directory = true,
                     },
-                    .creation_datetime_subsecond = self.context.date_time.subsecond,
-                    .creation_time = self.context.date_time.time,
-                    .creation_date = self.context.date_time.date,
-                    .last_accessed_date = self.context.date_time.date,
-                    .high_cluster_number = @truncate(self.cluster >> 16),
-                    .last_modification_time = self.context.date_time.time,
-                    .last_modification_date = self.context.date_time.date,
-                    .low_cluster_number = @truncate(self.cluster),
+                    .creation_datetime_subsecond = fat_directory.context.date_time.subsecond,
+                    .creation_time = fat_directory.context.date_time.time,
+                    .creation_date = fat_directory.context.date_time.date,
+                    .last_accessed_date = fat_directory.context.date_time.date,
+                    .high_cluster_number = @truncate(fat_directory.cluster >> 16),
+                    .last_modification_time = fat_directory.context.date_time.time,
+                    .last_modification_date = fat_directory.context.date_time.date,
+                    .low_cluster_number = @truncate(fat_directory.cluster),
                     .size = 0,
                 },
             };
 
             return FATDirectory{
-                .context = self.context,
+                .context = fat_directory.context,
                 .cluster = new_cluster,
                 .directory_entries = directory_entries,
             };
         }
 
-        fn addFile(self: FATDirectory, name: FATName, source_path: []const u8) !void {
+        fn addFile(fat_directory: FATDirectory, name: FATName, source_path: []const u8) !void {
             if (name.long_name) |long_name| {
-                try self.addLongFileName(name.short_name, long_name);
+                try fat_directory.addLongFileName(name.short_name, long_name);
             }
 
-            const entry = self.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
+            const entry = fat_directory.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
 
             entry.* = fat.DirectoryEntry{
                 .standard = fat.DirectoryEntry.StandardDirectoryEntry{
@@ -589,24 +596,24 @@ const FATContext = struct {
                     .attributes = .{
                         .archive = true,
                     },
-                    .creation_datetime_subsecond = self.context.date_time.subsecond,
-                    .creation_time = self.context.date_time.time,
-                    .creation_date = self.context.date_time.date,
-                    .last_accessed_date = self.context.date_time.date,
+                    .creation_datetime_subsecond = fat_directory.context.date_time.subsecond,
+                    .creation_time = fat_directory.context.date_time.time,
+                    .creation_date = fat_directory.context.date_time.date,
+                    .last_accessed_date = fat_directory.context.date_time.date,
                     .high_cluster_number = 0, // set by `copyFile`
-                    .last_modification_time = self.context.date_time.time,
-                    .last_modification_date = self.context.date_time.date,
+                    .last_modification_time = fat_directory.context.date_time.time,
+                    .last_modification_date = fat_directory.context.date_time.date,
                     .low_cluster_number = 0, // set by `copyFile`
                     .size = 0, // set by `copyFile`
                 },
             };
-            try self.context.copyFile(
+            try fat_directory.context.copyFile(
                 &entry.standard,
                 source_path,
             );
         }
 
-        fn addLongFileName(self: FATDirectory, short_name: fat.ShortFileName, long_name: []const u8) !void {
+        fn addLongFileName(fat_directory: FATDirectory, short_name: fat.ShortFileName, long_name: []const u8) !void {
             std.debug.assert(long_name[long_name.len - 1] == 0);
 
             const number_of_long_name_entries_required = (long_name.len / fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_characters) + 1;
@@ -620,7 +627,7 @@ const FATContext = struct {
             var start_index = std.mem.alignBackwardAnyAlign(usize, long_name.len, fat.DirectoryEntry.LongFileNameEntry.maximum_number_of_characters);
 
             while (sequence_number_counter >= 1) : (sequence_number_counter -= 1) {
-                const entry = self.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
+                const entry = fat_directory.firstUnusedEntry() orelse return error.NoFreeDirectoryEntries;
 
                 const sequence_number = if (sequence_number_counter == number_of_long_name_entries_required)
                     sequence_number_counter | fat.DirectoryEntry.LongFileNameEntry.last_entry
@@ -655,8 +662,8 @@ const FATContext = struct {
             }
         }
 
-        fn firstUnusedEntry(self: FATDirectory) ?*fat.DirectoryEntry {
-            for (self.directory_entries) |*entry| {
+        fn firstUnusedEntry(fat_directory: FATDirectory) ?*fat.DirectoryEntry {
+            for (fat_directory.directory_entries) |*entry| {
                 std.debug.assert(!entry.isUnusedEntry()); // we only add more entries, never remove them
                 if (entry.isLastEntry()) return entry;
             }

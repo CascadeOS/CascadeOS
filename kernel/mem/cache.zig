@@ -19,7 +19,7 @@ pub fn Cache(
     return struct {
         raw_cache: RawCache,
 
-        const Self = @This();
+        const CacheT = @This();
 
         pub const InitOptions = struct {
             name: Name,
@@ -37,14 +37,14 @@ pub fn Cache(
 
         /// Initialize the cache.
         pub fn init(
-            self: *Self,
+            cache: *CacheT,
             options: InitOptions,
         ) void {
-            self.* = .{
+            cache.* = .{
                 .raw_cache = undefined,
             };
 
-            self.raw_cache.init(.{
+            cache.raw_cache.init(.{
                 .name = options.name,
                 .size = @sizeOf(T),
                 .alignment = .fromByteUnits(@alignOf(T)),
@@ -72,25 +72,25 @@ pub fn Cache(
         /// Deinitialize the cache.
         ///
         /// All objects must have been freed before calling this.
-        pub fn deinit(self: *Self, current_task: *kernel.Task) void {
-            self.raw_cache.deinit(current_task);
-            self.* = undefined;
+        pub fn deinit(cache: *CacheT, current_task: *kernel.Task) void {
+            cache.raw_cache.deinit(current_task);
+            cache.* = undefined;
         }
 
-        pub fn name(self: *const Self) []const u8 {
-            return self.raw_cache.name();
+        pub fn name(cache: *const CacheT) []const u8 {
+            return cache.raw_cache.name();
         }
 
         /// Allocate an object from the cache.
-        pub fn allocate(self: *Self, current_task: *kernel.Task) RawCache.AllocateError!*T {
-            return @ptrCast(@alignCast(try self.raw_cache.allocate(current_task)));
+        pub fn allocate(cache: *CacheT, current_task: *kernel.Task) RawCache.AllocateError!*T {
+            return @ptrCast(@alignCast(try cache.raw_cache.allocate(current_task)));
         }
 
         /// Allocate multiple objects from the cache.
         ///
         /// The length of `object_buffer` must be less than or equal to `max_count`.
         pub fn allocateMany(
-            self: *Self,
+            cache: *CacheT,
             current_task: *kernel.Task,
             comptime max_count: usize, // TODO: is there a better way than this?
             objects: []*T,
@@ -101,7 +101,7 @@ pub fn Cache(
             var raw_object_buffer: [max_count][]u8 = undefined;
             const raw_objects = raw_object_buffer[0..objects.len];
 
-            try self.raw_cache.allocateMany(current_task, raw_objects);
+            try cache.raw_cache.allocateMany(current_task, raw_objects);
 
             for (objects, raw_objects) |*object, raw_object| {
                 object.* = @ptrCast(@alignCast(raw_object));
@@ -109,15 +109,15 @@ pub fn Cache(
         }
 
         /// Free an object back to the cache.
-        pub fn free(self: *Self, current_task: *kernel.Task, object: *T) void {
-            self.raw_cache.free(current_task, std.mem.asBytes(object));
+        pub fn free(cache: *CacheT, current_task: *kernel.Task, object: *T) void {
+            cache.raw_cache.free(current_task, std.mem.asBytes(object));
         }
 
         /// Free multiple objects back to the cache.
         ///
         /// The length of `objects` must be less than or equal to `max_count`.
         pub fn freeMany(
-            self: *Self,
+            cache: *CacheT,
             current_task: *kernel.Task,
             comptime max_count: usize, // TODO: is there a better way than this?
             objects: []const *T,
@@ -132,7 +132,7 @@ pub fn Cache(
                 raw_object.* = std.mem.asBytes(object);
             }
 
-            self.raw_cache.freeMany(current_task, raw_objects);
+            cache.raw_cache.freeMany(current_task, raw_objects);
         }
     };
 }
@@ -203,7 +203,7 @@ pub const RawCache = struct {
 
     /// Initialize the cache.
     pub fn init(
-        self: *RawCache,
+        raw_cache: *RawCache,
         options: InitOptions,
     ) void {
         log.debug("{s}: creating cache with size {} and alignment {}", .{
@@ -245,7 +245,7 @@ pub const RawCache = struct {
             break :blk candidate_large_objects_per_slab;
         };
 
-        self.* = .{
+        raw_cache.* = .{
             ._name = options.name,
             .allocate_mutex = .{},
             .lock = .{},
@@ -272,30 +272,30 @@ pub const RawCache = struct {
     /// Deinitialize the cache.
     ///
     /// All objects must have been freed before calling this.
-    pub fn deinit(self: *RawCache, current_task: *kernel.Task) void {
-        log.debug("{s}: destroying cache", .{self.name()});
+    pub fn deinit(raw_cache: *RawCache, current_task: *kernel.Task) void {
+        log.debug("{s}: destroying cache", .{raw_cache.name()});
 
-        if (self.full_slabs.first != null) @panic("full slabs not empty");
+        if (raw_cache.full_slabs.first != null) @panic("full slabs not empty");
 
-        switch (self.size_class) {
+        switch (raw_cache.size_class) {
             .small => {},
             .large => |large| {
                 if (large.object_lookup.count() != 0) @panic("large object lookup not empty");
             },
         }
 
-        while (self.available_slabs.pop()) |node| {
+        while (raw_cache.available_slabs.pop()) |node| {
             const slab: *Slab = @fieldParentPtr("linkage", node);
             if (slab.allocated_objects != 0) @panic("slab not empty");
 
-            self.deallocateSlab(current_task, slab);
+            raw_cache.deallocateSlab(current_task, slab);
         }
 
-        self.* = undefined;
+        raw_cache.* = undefined;
     }
 
-    pub fn name(self: *const RawCache) []const u8 {
-        return self._name.constSlice();
+    pub fn name(raw_cache: *const RawCache) []const u8 {
+        return raw_cache._name.constSlice();
     }
 
     pub const AllocateError = error{
@@ -310,31 +310,31 @@ pub const RawCache = struct {
     };
 
     /// Allocate an object from the cache.
-    pub fn allocate(self: *RawCache, current_task: *kernel.Task) AllocateError![]u8 {
+    pub fn allocate(raw_cache: *RawCache, current_task: *kernel.Task) AllocateError![]u8 {
         var object_buffer: [1][]u8 = undefined;
-        try self.allocateMany(current_task, &object_buffer);
+        try raw_cache.allocateMany(current_task, &object_buffer);
         return object_buffer[0];
     }
 
     /// Allocate multiple objects from the cache.
-    pub fn allocateMany(self: *RawCache, current_task: *kernel.Task, objects: [][]u8) AllocateError!void {
+    pub fn allocateMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: [][]u8) AllocateError!void {
         std.debug.assert(objects.len > 0);
 
-        verbose_log.debug("{s}: allocating {} objects", .{ self.name(), objects.len });
+        verbose_log.debug("{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
 
         var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
-        errdefer self.freeMany(current_task, allocated_objects.items);
+        errdefer raw_cache.freeMany(current_task, allocated_objects.items);
 
-        self.lock.lock(current_task);
+        raw_cache.lock.lock(current_task);
 
         var objects_left = objects.len;
 
         while (objects_left > 0) {
-            const slab: *Slab = if (self.available_slabs.first) |slab_node|
+            const slab: *Slab = if (raw_cache.available_slabs.first) |slab_node|
                 @fieldParentPtr("linkage", slab_node)
             else blk: {
                 @branchHint(.unlikely);
-                break :blk try self.allocateSlab(current_task);
+                break :blk try raw_cache.allocateSlab(current_task);
             };
 
             while (objects_left > 0) {
@@ -344,11 +344,11 @@ pub const RawCache = struct {
                     @panic("empty slab on available list");
                 slab.allocated_objects += 1;
 
-                switch (self.size_class) {
+                switch (raw_cache.size_class) {
                     .small => {
                         const object_node_ptr: [*]u8 = @ptrCast(object_node);
-                        const object_ptr = object_node_ptr - single_node_alignment.forward(self.object_size);
-                        allocated_objects.appendAssumeCapacity(object_ptr[0..self.object_size]);
+                        const object_ptr = object_node_ptr - single_node_alignment.forward(raw_cache.object_size);
+                        allocated_objects.appendAssumeCapacity(object_ptr[0..raw_cache.object_size]);
                     },
                     .large => |*large| {
                         const large_object: *LargeObject = @fieldParentPtr("node", object_node);
@@ -359,7 +359,7 @@ pub const RawCache = struct {
                             slab.objects.prepend(object_node);
                             slab.allocated_objects -= 1;
 
-                            log.warn("{s}: failed to add large object to lookup table", .{self.name()});
+                            log.warn("{s}: failed to add large object to lookup table", .{raw_cache.name()});
 
                             return AllocateError.LargeObjectAllocationFailed;
                         };
@@ -368,47 +368,47 @@ pub const RawCache = struct {
                     },
                 }
 
-                if (slab.allocated_objects == self.objects_per_slab) {
+                if (slab.allocated_objects == raw_cache.objects_per_slab) {
                     @branchHint(.unlikely);
-                    self.available_slabs.remove(&slab.linkage);
-                    self.full_slabs.append(&slab.linkage);
+                    raw_cache.available_slabs.remove(&slab.linkage);
+                    raw_cache.full_slabs.append(&slab.linkage);
 
                     break;
                 }
             }
         }
 
-        self.lock.unlock(current_task);
+        raw_cache.lock.unlock(current_task);
     }
 
     /// Allocates a new slab.
     ///
     /// The cache's lock must be held when this is called, the lock is held on success and unlocked on failure.
-    fn allocateSlab(self: *RawCache, current_task: *kernel.Task) AllocateError!*Slab {
-        errdefer log.warn("{s}: failed to allocate slab", .{self.name()});
+    fn allocateSlab(raw_cache: *RawCache, current_task: *kernel.Task) AllocateError!*Slab {
+        errdefer log.warn("{s}: failed to allocate slab", .{raw_cache.name()});
 
-        self.lock.unlock(current_task);
+        raw_cache.lock.unlock(current_task);
 
-        self.allocate_mutex.lock(current_task);
-        defer self.allocate_mutex.unlock(current_task);
+        raw_cache.allocate_mutex.lock(current_task);
+        defer raw_cache.allocate_mutex.unlock(current_task);
 
         // optimistically check for an available slab without locking, if there is one lock and check again
-        if (self.available_slabs.first != null) {
-            self.lock.lock(current_task);
+        if (raw_cache.available_slabs.first != null) {
+            raw_cache.lock.lock(current_task);
 
-            if (self.available_slabs.first) |slab_node| {
+            if (raw_cache.available_slabs.first) |slab_node| {
                 // there is an available slab now, use it without allocating a new one
                 return @fieldParentPtr("linkage", slab_node);
             }
 
-            self.lock.unlock(current_task);
+            raw_cache.lock.unlock(current_task);
         }
 
-        log.debug("{s}: allocating slab", .{self.name()});
+        log.debug("{s}: allocating slab", .{raw_cache.name()});
 
-        const slab = switch (self.size_class) {
+        const slab = switch (raw_cache.size_class) {
             .small => slab: {
-                const slab_base_ptr: [*]u8 = if (self.allocate_slabs_from_heap) slab_base_ptr: {
+                const slab_base_ptr: [*]u8 = if (raw_cache.allocate_slabs_from_heap) slab_base_ptr: {
                     const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
                         current_task,
                         kernel.arch.paging.standard_page_size.value,
@@ -421,7 +421,7 @@ pub const RawCache = struct {
                         return AllocateError.SlabAllocationFailed;
                     break :slab_base_ptr kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
                 };
-                errdefer if (self.allocate_slabs_from_heap)
+                errdefer if (raw_cache.allocate_slabs_from_heap)
                     kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
                         .base = @intFromPtr(slab_base_ptr),
                         .len = kernel.arch.paging.standard_page_size.value,
@@ -440,15 +440,15 @@ pub const RawCache = struct {
                     .large_object_allocation = undefined,
                 };
 
-                for (0..self.objects_per_slab) |i| {
-                    const object_ptr = slab_base_ptr + (i * self.effective_object_size);
+                for (0..raw_cache.objects_per_slab) |i| {
+                    const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
 
-                    if (self.constructor) |constructor| {
-                        try constructor(object_ptr[0..self.object_size], current_task);
+                    if (raw_cache.constructor) |constructor| {
+                        try constructor(object_ptr[0..raw_cache.object_size], current_task);
                     }
 
                     const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
-                        object_ptr + single_node_alignment.forward(self.object_size),
+                        object_ptr + single_node_alignment.forward(raw_cache.object_size),
                     ));
 
                     slab.objects.prepend(object_node);
@@ -459,7 +459,7 @@ pub const RawCache = struct {
             .large => slab: {
                 const large_object_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
                     current_task,
-                    self.effective_object_size * self.objects_per_slab,
+                    raw_cache.effective_object_size * raw_cache.objects_per_slab,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
                 errdefer kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, large_object_allocation);
@@ -473,7 +473,7 @@ pub const RawCache = struct {
                     while (slab.objects.popFirst()) |object_node| {
                         const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
-                        if (self.destructor) |destructor| {
+                        if (raw_cache.destructor) |destructor| {
                             destructor(large_object.object, current_task);
                         }
 
@@ -485,11 +485,11 @@ pub const RawCache = struct {
 
                 const objects_base: [*]u8 = @ptrFromInt(large_object_allocation.base);
 
-                for (0..self.objects_per_slab) |i| {
+                for (0..raw_cache.objects_per_slab) |i| {
                     const large_object = try globals.large_object_cache.allocate(current_task);
                     errdefer globals.large_object_cache.free(current_task, large_object);
 
-                    const object: []u8 = (objects_base + (i * self.effective_object_size))[0..self.object_size];
+                    const object: []u8 = (objects_base + (i * raw_cache.effective_object_size))[0..raw_cache.object_size];
 
                     large_object.* = .{
                         .object = object,
@@ -497,7 +497,7 @@ pub const RawCache = struct {
                         .node = .{},
                     };
 
-                    if (self.constructor) |constructor| {
+                    if (raw_cache.constructor) |constructor| {
                         try constructor(object, current_task);
                     }
 
@@ -508,29 +508,29 @@ pub const RawCache = struct {
             },
         };
 
-        self.lock.lock(current_task);
+        raw_cache.lock.lock(current_task);
 
-        self.available_slabs.append(&slab.linkage);
+        raw_cache.available_slabs.append(&slab.linkage);
 
         return slab;
     }
 
     /// Free an object back to the cache.
-    pub fn free(self: *RawCache, current_task: *kernel.Task, object: []u8) void {
-        self.freeMany(current_task, &.{object});
+    pub fn free(raw_cache: *RawCache, current_task: *kernel.Task, object: []u8) void {
+        raw_cache.freeMany(current_task, &.{object});
     }
 
     /// Free many objects back to the cache.
-    pub fn freeMany(self: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
+    pub fn freeMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
         std.debug.assert(objects.len > 0);
 
-        verbose_log.debug("{s}: freeing {} objects", .{ self.name(), objects.len });
+        verbose_log.debug("{s}: freeing {} objects", .{ raw_cache.name(), objects.len });
 
-        self.lock.lock(current_task);
-        defer self.lock.unlock(current_task);
+        raw_cache.lock.lock(current_task);
+        defer raw_cache.lock.unlock(current_task);
 
         for (objects) |object| {
-            const slab, const object_node = switch (self.size_class) {
+            const slab, const object_node = switch (raw_cache.size_class) {
                 .small => blk: {
                     const page_start = std.mem.alignBackward(
                         usize,
@@ -541,7 +541,7 @@ pub const RawCache = struct {
                     const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
 
                     const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
-                        object.ptr + single_node_alignment.forward(self.object_size),
+                        object.ptr + single_node_alignment.forward(raw_cache.object_size),
                     ));
 
                     break :blk .{ slab, object_node };
@@ -557,11 +557,11 @@ pub const RawCache = struct {
                 },
             };
 
-            if (slab.allocated_objects == self.objects_per_slab) {
+            if (slab.allocated_objects == raw_cache.objects_per_slab) {
                 // slab was previously full, move it to available list
                 @branchHint(.unlikely);
-                self.full_slabs.remove(&slab.linkage);
-                self.available_slabs.append(&slab.linkage);
+                raw_cache.full_slabs.remove(&slab.linkage);
+                raw_cache.available_slabs.append(&slab.linkage);
             }
 
             slab.objects.prepend(object_node);
@@ -575,11 +575,11 @@ pub const RawCache = struct {
 
             // slab is unused
 
-            if (!self.deallocate_last_available_slab) {
-                if (self.available_slabs.first == self.available_slabs.last) {
+            if (!raw_cache.deallocate_last_available_slab) {
+                if (raw_cache.available_slabs.first == raw_cache.available_slabs.last) {
                     @branchHint(.unlikely);
 
-                    std.debug.assert(self.available_slabs.first == &slab.linkage);
+                    std.debug.assert(raw_cache.available_slabs.first == &slab.linkage);
 
                     // this is the last available slab so we leave it in the available list and don't deallocate it
 
@@ -588,31 +588,31 @@ pub const RawCache = struct {
             }
 
             // slab is unused remove it from available list and deallocate it
-            self.available_slabs.remove(&slab.linkage);
+            raw_cache.available_slabs.remove(&slab.linkage);
 
-            self.deallocateSlab(current_task, slab);
+            raw_cache.deallocateSlab(current_task, slab);
         }
     }
 
     /// Deallocate a slab.
     ///
     /// The cache's lock must *not* be held when this is called.
-    fn deallocateSlab(self: *RawCache, current_task: *kernel.Task, slab: *Slab) void {
-        log.debug("{s}: deallocating slab", .{self.name()});
+    fn deallocateSlab(raw_cache: *RawCache, current_task: *kernel.Task, slab: *Slab) void {
+        log.debug("{s}: deallocating slab", .{raw_cache.name()});
 
-        switch (self.size_class) {
+        switch (raw_cache.size_class) {
             .small => {
                 const slab_base_ptr: [*]u8 =
                     @as([*]u8, @ptrCast(slab)) + @sizeOf(Slab) - kernel.arch.paging.standard_page_size.value;
 
-                if (self.destructor) |destructor| {
-                    for (0..self.objects_per_slab) |i| {
-                        const object_ptr = slab_base_ptr + (i * self.effective_object_size);
-                        destructor(object_ptr[0..self.object_size], current_task);
+                if (raw_cache.destructor) |destructor| {
+                    for (0..raw_cache.objects_per_slab) |i| {
+                        const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
+                        destructor(object_ptr[0..raw_cache.object_size], current_task);
                     }
                 }
 
-                if (self.allocate_slabs_from_heap) {
+                if (raw_cache.allocate_slabs_from_heap) {
                     kernel.mem.heap.globals.heap_page_arena.deallocate(
                         current_task,
                         .{
@@ -633,7 +633,7 @@ pub const RawCache = struct {
                 while (slab.objects.popFirst()) |object_node| {
                     const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
-                    if (self.destructor) |destructor| {
+                    if (raw_cache.destructor) |destructor| {
                         destructor(large_object.object, current_task);
                     }
 
@@ -657,8 +657,8 @@ pub const RawCache = struct {
         /// Only set for large object slabs.
         large_object_allocation: kernel.mem.ResourceArena.Allocation,
 
-        fn constructor(self: *Slab) void {
-            self.* = .{};
+        fn constructor(slab: *Slab) void {
+            slab.* = .{};
         }
     };
 

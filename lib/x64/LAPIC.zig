@@ -14,8 +14,8 @@ pub const LAPIC = union(enum) {
     ///
     /// This action indicates that the servicing of the current interrupt is complete and the local APIC can issue the next
     /// interrupt from the ISR.
-    pub fn eoi(self: LAPIC) void {
-        self.writeRegister(.eoi, 0);
+    pub fn eoi(lapic: LAPIC) void {
+        lapic.writeRegister(.eoi, 0);
     }
 
     /// Local APIC Version Register
@@ -38,8 +38,8 @@ pub const LAPIC = union(enum) {
         _reserved2: u7,
     };
 
-    pub fn readVersionRegister(self: LAPIC) VersionRegister {
-        return @bitCast(self.readRegister(.version));
+    pub fn readVersionRegister(lapic: LAPIC) VersionRegister {
+        return @bitCast(lapic.readRegister(.version));
     }
 
     /// Spurious-Interrupt Vector Register
@@ -68,12 +68,12 @@ pub const LAPIC = union(enum) {
         _reserved2: u19 = 0,
     };
 
-    pub fn readSupriousInterruptRegister(self: LAPIC) SupriousInterruptRegister {
-        return @bitCast(self.readRegister(.spurious_interrupt));
+    pub fn readSupriousInterruptRegister(lapic: LAPIC) SupriousInterruptRegister {
+        return @bitCast(lapic.readRegister(.spurious_interrupt));
     }
 
-    pub fn writeSupriousInterruptRegister(self: LAPIC, register: SupriousInterruptRegister) void {
-        self.writeRegister(.spurious_interrupt, @bitCast(register));
+    pub fn writeSupriousInterruptRegister(lapic: LAPIC, register: SupriousInterruptRegister) void {
+        lapic.writeRegister(.spurious_interrupt, @bitCast(register));
     }
 
     /// LVT Timer Register
@@ -165,12 +165,12 @@ pub const LAPIC = union(enum) {
         };
     };
 
-    pub fn readLVTTimerRegister(self: LAPIC) LVTTimerRegister {
-        return @bitCast(self.readRegister(.lvt_timer));
+    pub fn readLVTTimerRegister(lapic: LAPIC) LVTTimerRegister {
+        return @bitCast(lapic.readRegister(.lvt_timer));
     }
 
-    pub fn writeLVTTimerRegister(self: LAPIC, register: LVTTimerRegister) void {
-        self.writeRegister(.lvt_timer, @bitCast(register));
+    pub fn writeLVTTimerRegister(lapic: LAPIC, register: LVTTimerRegister) void {
+        lapic.writeRegister(.lvt_timer, @bitCast(register));
     }
 
     /// LVT Error Register
@@ -203,12 +203,12 @@ pub const LAPIC = union(enum) {
         _reserved3: u16 = 0,
     };
 
-    pub fn readLVTErrorRegister(self: LAPIC) LVTErrorRegister {
-        return @bitCast(self.readRegister(.lvt_error));
+    pub fn readLVTErrorRegister(lapic: LAPIC) LVTErrorRegister {
+        return @bitCast(lapic.readRegister(.lvt_error));
     }
 
-    pub fn writeLVTErrorRegister(self: LAPIC, register: LVTErrorRegister) void {
-        self.writeRegister(.lvt_error, @bitCast(register));
+    pub fn writeLVTErrorRegister(lapic: LAPIC, register: LVTErrorRegister) void {
+        lapic.writeRegister(.lvt_error, @bitCast(register));
     }
 
     /// Divide Configuration Register
@@ -241,8 +241,8 @@ pub const LAPIC = union(enum) {
         /// Divide by 1
         @"1" = 0b1011,
 
-        pub fn toInt(self: DivideConfigurationRegister) usize {
-            return switch (self) {
+        pub fn toInt(lapic: DivideConfigurationRegister) usize {
+            return switch (lapic) {
                 .@"2" => 2,
                 .@"4" => 4,
                 .@"8" => 8,
@@ -255,12 +255,12 @@ pub const LAPIC = union(enum) {
         }
     };
 
-    pub fn readDivideConfigurationRegister(self: LAPIC) DivideConfigurationRegister {
-        return @enumFromInt(self.readRegister(.divide_configuration));
+    pub fn readDivideConfigurationRegister(lapic: LAPIC) DivideConfigurationRegister {
+        return @enumFromInt(lapic.readRegister(.divide_configuration));
     }
 
-    pub fn writeDivideConfigurationRegister(self: LAPIC, register: DivideConfigurationRegister) void {
-        self.writeRegister(.divide_configuration, @intFromEnum(register));
+    pub fn writeDivideConfigurationRegister(lapic: LAPIC, register: DivideConfigurationRegister) void {
+        lapic.writeRegister(.divide_configuration, @intFromEnum(register));
     }
 
     /// In x2APIC mode, the Logical Destination Register (LDR) is increased to 32 bits wide and is read-only.
@@ -283,13 +283,13 @@ pub const LAPIC = union(enum) {
         },
     };
 
-    pub fn readLogicalDestinationRegister(self: LAPIC) LogicalDestinationRegister {
-        return @bitCast(self.readRegister(.logical_destination));
+    pub fn readLogicalDestinationRegister(lapic: LAPIC) LogicalDestinationRegister {
+        return @bitCast(lapic.readRegister(.logical_destination));
     }
 
-    pub fn writeLogicalDestinationRegister(self: LAPIC, register: LogicalDestinationRegister) void {
-        std.debug.assert(self != .x2apic); // read only in x2APIC mode
-        self.writeRegister(.logical_destination, @bitCast(register));
+    pub fn writeLogicalDestinationRegister(lapic: LAPIC, register: LogicalDestinationRegister) void {
+        std.debug.assert(lapic != .x2apic); // read only in x2APIC mode
+        lapic.writeRegister(.logical_destination, @bitCast(register));
     }
 
     /// This register selects one of two models (flat or cluster) that can be used to interpret the MDA when using
@@ -364,14 +364,14 @@ pub const LAPIC = union(enum) {
         };
     };
 
-    pub fn readDestinationFormatRegister(self: LAPIC) DestinationFormatRegister {
-        std.debug.assert(self != .x2apic); // not supported in x2APIC mode
-        return @bitCast(self.readRegister(.logical_destination));
+    pub fn readDestinationFormatRegister(lapic: LAPIC) DestinationFormatRegister {
+        std.debug.assert(lapic != .x2apic); // not supported in x2APIC mode
+        return @bitCast(lapic.readRegister(.logical_destination));
     }
 
-    pub fn writeDestinationFormatRegister(self: LAPIC, register: DestinationFormatRegister) void {
-        std.debug.assert(self != .x2apic); // not supported in x2APIC mode
-        self.writeRegister(.logical_destination, @bitCast(register));
+    pub fn writeDestinationFormatRegister(lapic: LAPIC, register: DestinationFormatRegister) void {
+        std.debug.assert(lapic != .x2apic); // not supported in x2APIC mode
+        lapic.writeRegister(.logical_destination, @bitCast(register));
     }
 
     /// The task priority register allows software to set a priority threshold for interrupting the processor.
@@ -389,12 +389,12 @@ pub const LAPIC = union(enum) {
         _reserved: u24 = 0,
     };
 
-    pub fn readTaskPriorityRegister(self: LAPIC) TaskPriorityRegister {
-        return @bitCast(self.readRegister(.task_priority));
+    pub fn readTaskPriorityRegister(lapic: LAPIC) TaskPriorityRegister {
+        return @bitCast(lapic.readRegister(.task_priority));
     }
 
-    pub fn writeTaskPriorityRegister(self: LAPIC, register: TaskPriorityRegister) void {
-        self.writeRegister(.task_priority, @bitCast(register));
+    pub fn writeTaskPriorityRegister(lapic: LAPIC, register: TaskPriorityRegister) void {
+        lapic.writeRegister(.task_priority, @bitCast(register));
     }
 
     /// In one-shot mode, the timer is started by programming its initial-count register. The initial count value is
@@ -409,12 +409,12 @@ pub const LAPIC = union(enum) {
     /// initial-count value.
     ///
     /// A write of 0 to the initial-count register effectively stops the local APIC timer, in both one-shot and periodic mode.
-    pub fn writeInitialCountRegister(self: LAPIC, count: u32) void {
-        self.writeRegister(.initial_count, count);
+    pub fn writeInitialCountRegister(lapic: LAPIC, count: u32) void {
+        lapic.writeRegister(.initial_count, count);
     }
 
-    pub fn readCurrentCountRegister(self: LAPIC) u32 {
-        return self.readRegister(.current_count);
+    pub fn readCurrentCountRegister(lapic: LAPIC) u32 {
+        return lapic.readRegister(.current_count);
     }
 
     /// The primary local APIC facility for issuing IPIs is the interrupt command register (ICR).
@@ -535,11 +535,11 @@ pub const LAPIC = union(enum) {
         };
     };
 
-    pub fn readInterruptCommandRegister(self: LAPIC) InterruptCommandRegister {
-        switch (self) {
+    pub fn readInterruptCommandRegister(lapic: LAPIC) InterruptCommandRegister {
+        switch (lapic) {
             .xapic => {
-                const low: u64 = self.readRegister(.interrupt_command_0_31);
-                const high: u64 = self.readRegister(.interrupt_command_32_63);
+                const low: u64 = lapic.readRegister(.interrupt_command_0_31);
+                const high: u64 = lapic.readRegister(.interrupt_command_32_63);
 
                 return @bitCast(high << 32 | low);
             },
@@ -551,13 +551,13 @@ pub const LAPIC = union(enum) {
         }
     }
 
-    pub fn writeInterruptCommandRegister(self: LAPIC, register: InterruptCommandRegister) void {
-        switch (self) {
+    pub fn writeInterruptCommandRegister(lapic: LAPIC, register: InterruptCommandRegister) void {
+        switch (lapic) {
             .xapic => {
                 const value: u64 = @bitCast(register);
 
-                self.writeRegister(.interrupt_command_32_63, @truncate(value >> 32));
-                self.writeRegister(.interrupt_command_0_31, @truncate(value));
+                lapic.writeRegister(.interrupt_command_32_63, @truncate(value >> 32));
+                lapic.writeRegister(.interrupt_command_0_31, @truncate(value));
             },
             .x2apic => {
                 x64.registers.writeMSR(
@@ -644,9 +644,9 @@ pub const LAPIC = union(enum) {
         _reserved: u24,
     };
 
-    pub fn readErrorStatusRegister(self: LAPIC) ErrorStatusRegister {
-        self.writeRegister(.error_status, 0);
-        return @bitCast(self.readRegister(.error_status));
+    pub fn readErrorStatusRegister(lapic: LAPIC) ErrorStatusRegister {
+        lapic.writeRegister(.error_status, 0);
+        return @bitCast(lapic.readRegister(.error_status));
     }
 
     /// Indicates the interrupt delivery status.
@@ -747,8 +747,8 @@ pub const LAPIC = union(enum) {
     /// Read a LAPIC register.
     ///
     /// Does not support reading the 64-bit register `interrupt_command_0_31` in x2apic mode, see `readInterruptCommandRegister`.
-    pub fn readRegister(self: LAPIC, register: Register) u32 {
-        switch (self) {
+    pub fn readRegister(lapic: LAPIC, register: Register) u32 {
+        switch (lapic) {
             .xapic => |base| {
                 const ptr: *align(16) volatile u32 = @ptrCast(@alignCast(
                     base + register.xapicOffset(),
@@ -767,8 +767,8 @@ pub const LAPIC = union(enum) {
     /// Write a LAPIC register.
     ///
     /// Does not support writing the 64-bit register `interrupt_command_0_31` in x2apic mode, see `writeInterruptCommandRegister`.
-    pub fn writeRegister(self: LAPIC, register: Register, value: u32) void {
-        switch (self) {
+    pub fn writeRegister(lapic: LAPIC, register: Register, value: u32) void {
+        switch (lapic) {
             .xapic => |base| {
                 const ptr: *align(16) volatile u32 = @ptrCast(@alignCast(
                     base + register.xapicOffset(),
@@ -1029,15 +1029,15 @@ pub const LAPIC = union(enum) {
         /// Only usable in x2APIC mode
         ///
         /// Write Only
-        self_ipi = 0x3F,
+        lapic_ipi = 0x3F,
 
         /// Acquire the offset of this register from the base address of the APIC.
         ///
         /// Does not support the `self_ipi` register as it is not supported in xAPIC mode.
-        pub fn xapicOffset(self: Register) usize {
-            std.debug.assert(self != .self_ipi); // not supported in xAPIC mode
+        pub fn xapicOffset(register: Register) usize {
+            std.debug.assert(register != .lapic_ipi); // not supported in xAPIC mode
 
-            return @intFromEnum(self) * 0x10;
+            return @intFromEnum(register) * 0x10;
         }
 
         /// Acquire the MSR number of this register.
@@ -1047,13 +1047,13 @@ pub const LAPIC = union(enum) {
         ///  - `arbitration_priority`
         ///  - `remote_read`
         ///  - `interrupt_command_32_63`
-        pub fn x2apicRegister(self: Register) u32 {
-            std.debug.assert(self != .destination_format); // not supported in x2APIC mode
-            std.debug.assert(self != .arbitration_priority); // not supported in x2APIC mode
-            std.debug.assert(self != .remote_read); // not supported in x2APIC mode
-            std.debug.assert(self != .interrupt_command_32_63); // not supported in x2APIC mode
+        pub fn x2apicRegister(register: Register) u32 {
+            std.debug.assert(register != .destination_format); // not supported in x2APIC mode
+            std.debug.assert(register != .arbitration_priority); // not supported in x2APIC mode
+            std.debug.assert(register != .remote_read); // not supported in x2APIC mode
+            std.debug.assert(register != .interrupt_command_32_63); // not supported in x2APIC mode
 
-            return 0x800 + @intFromEnum(self);
+            return 0x800 + @intFromEnum(register);
         }
     };
 };

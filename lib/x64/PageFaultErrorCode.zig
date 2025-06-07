@@ -48,49 +48,49 @@ pub const PageFaultErrorCode = packed struct(u64) {
         return @bitCast(error_code);
     }
 
-    pub fn print(self: PageFaultErrorCode, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(page_fault_error_code: PageFaultErrorCode, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("PageFaultErrorCode{ ");
 
-        if (!self.present) {
+        if (!page_fault_error_code.present) {
             try writer.writeAll("Not Present }");
             return;
         }
 
-        if (self.user) {
+        if (page_fault_error_code.user) {
             try writer.writeAll("User - ");
         } else {
             try writer.writeAll("Kernel - ");
         }
 
-        if (self.write) {
+        if (page_fault_error_code.write) {
             try writer.writeAll("Write");
         } else {
             try writer.writeAll("Read");
         }
 
-        if (self.reserved_write) {
+        if (page_fault_error_code.reserved_write) {
             try writer.writeAll("- Reserved Bit Set");
         }
 
-        if (self.instruction_fetch) {
+        if (page_fault_error_code.instruction_fetch) {
             try writer.writeAll("- No Execute");
         }
 
-        if (self.instruction_fetch) {
+        if (page_fault_error_code.instruction_fetch) {
             try writer.writeAll("- Protection Key");
         }
 
-        if (self.instruction_fetch) {
+        if (page_fault_error_code.instruction_fetch) {
             try writer.writeAll("- Shadow Stack");
         }
 
-        if (self.hlat) {
+        if (page_fault_error_code.hlat) {
             try writer.writeAll("- Hypervisor Linear Address Translation");
         }
 
-        if (self.instruction_fetch) {
+        if (page_fault_error_code.instruction_fetch) {
             try writer.writeAll("- Software Guard Extension");
         }
 
@@ -98,7 +98,7 @@ pub const PageFaultErrorCode = packed struct(u64) {
     }
 
     pub inline fn format(
-        self: PageFaultErrorCode,
+        page_fault_error_code: PageFaultErrorCode,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -106,9 +106,9 @@ pub const PageFaultErrorCode = packed struct(u64) {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(page_fault_error_code, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(page_fault_error_code, writer.any(), 0);
     }
 };
 

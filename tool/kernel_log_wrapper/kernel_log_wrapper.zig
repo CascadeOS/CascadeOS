@@ -86,12 +86,12 @@ const Rule = struct {
         rgb: ansi.RGB,
     };
 
-    pub fn buildFormattedString(comptime self: Rule) []const u8 {
+    pub fn buildFormattedString(comptime rule: Rule) []const u8 {
         // zig fmt: off
         comptime return
-        (if (self.bold) ansi.style.bold else "")
+        (if (rule.bold) ansi.style.bold else "")
         ++
-        (if (self.foreground) |foreground|
+        (if (rule.foreground) |foreground|
             (if (foreground == .simple)
                 ansi.color.fg(foreground.simple)
             else
@@ -99,7 +99,7 @@ const Rule = struct {
         else
             "")
         ++
-        (if (self.background) |background|
+        (if (rule.background) |background|
             (if (background == .simple)
                 ansi.color.bg(background.simple)
             else
@@ -107,13 +107,13 @@ const Rule = struct {
         else
             "")
         ++
-        self.pattern
+        rule.pattern
         ++
-        (if (self.background != null) ansi.color.reset_bg else "")
+        (if (rule.background != null) ansi.color.reset_bg else "")
         ++
-        (if (self.foreground != null) ansi.color.reset_fg else "")
+        (if (rule.foreground != null) ansi.color.reset_fg else "")
         ++
-        (if (self.bold) ansi.style.no_bold else "");
+        (if (rule.bold) ansi.style.no_bold else "");
         // zig fmt: on
     }
 };
@@ -133,9 +133,9 @@ const usage =
 const Command = struct {
     argv: []const []const u8,
 
-    pub fn deinit(self: Command, allocator: std.mem.Allocator) void {
-        for (self.argv) |arg| allocator.free(arg);
-        allocator.free(self.argv);
+    pub fn deinit(command: Command, allocator: std.mem.Allocator) void {
+        for (command.argv) |arg| allocator.free(arg);
+        allocator.free(command.argv);
     }
 };
 

@@ -41,8 +41,8 @@ pub const GeneralCapabilitiesAndIDRegister = packed struct(u64) {
     counter_tick_period_fs: u32,
 };
 
-pub fn readGeneralCapabilitiesAndIDRegister(self: Hpet) GeneralCapabilitiesAndIDRegister {
-    return @bitCast(self.base[general_capabilities_and_id_register_offset]);
+pub fn readGeneralCapabilitiesAndIDRegister(hpet: Hpet) GeneralCapabilitiesAndIDRegister {
+    return @bitCast(hpet.base[general_capabilities_and_id_register_offset]);
 }
 
 pub const GeneralConfigurationRegister = packed struct(u64) {
@@ -67,21 +67,21 @@ pub const GeneralConfigurationRegister = packed struct(u64) {
     _reserved: u62,
 };
 
-pub fn readGeneralConfigurationRegister(self: Hpet) GeneralConfigurationRegister {
-    return @bitCast(self.base[general_configuration_register_offset]);
+pub fn readGeneralConfigurationRegister(hpet: Hpet) GeneralConfigurationRegister {
+    return @bitCast(hpet.base[general_configuration_register_offset]);
 }
 
-pub fn writeGeneralConfigurationRegister(self: Hpet, register: GeneralConfigurationRegister) void {
-    self.base[general_configuration_register_offset] = @bitCast(register);
+pub fn writeGeneralConfigurationRegister(hpet: Hpet, register: GeneralConfigurationRegister) void {
+    hpet.base[general_configuration_register_offset] = @bitCast(register);
 }
 
-pub inline fn readCounterRegister(self: Hpet) u64 {
-    return self.base[counter_register_offset];
+pub inline fn readCounterRegister(hpet: Hpet) u64 {
+    return hpet.base[counter_register_offset];
 }
 
-pub fn writeCounterRegister(self: Hpet, value: u64) void {
-    std.debug.assert(!self.readGeneralConfigurationRegister().enable); // counter must be disabled
-    self.base[counter_register_offset] = value;
+pub fn writeCounterRegister(hpet: Hpet, value: u64) void {
+    std.debug.assert(!hpet.readGeneralConfigurationRegister().enable); // counter must be disabled
+    hpet.base[counter_register_offset] = value;
 }
 
 pub const TimerConfigurationAndCapabilitiesRegister = packed struct(u64) {
@@ -181,23 +181,23 @@ pub const TimerConfigurationAndCapabilitiesRegister = packed struct(u64) {
 };
 
 /// It is the callers responsibility to ensure that `timer` is a valid timer.
-pub fn readTimerConfigurationAndCapabilitiesRegister(self: Hpet, timer: u5) TimerConfigurationAndCapabilitiesRegister {
-    return @bitCast(self.base[timer_configuration_and_capabilities_register_base_offset + (timer_register_step * timer)]);
+pub fn readTimerConfigurationAndCapabilitiesRegister(hpet: Hpet, timer: u5) TimerConfigurationAndCapabilitiesRegister {
+    return @bitCast(hpet.base[timer_configuration_and_capabilities_register_base_offset + (timer_register_step * timer)]);
 }
 
 /// It is the callers responsibility to ensure that `timer` is a valid timer.
-pub fn writeTimerConfigurationAndCapabilitiesRegister(self: Hpet, register: TimerConfigurationAndCapabilitiesRegister, timer: u5) void {
-    self.base[timer_configuration_and_capabilities_register_base_offset + (timer_register_step * timer)] = @bitCast(register);
+pub fn writeTimerConfigurationAndCapabilitiesRegister(hpet: Hpet, register: TimerConfigurationAndCapabilitiesRegister, timer: u5) void {
+    hpet.base[timer_configuration_and_capabilities_register_base_offset + (timer_register_step * timer)] = @bitCast(register);
 }
 
 /// It is the callers responsibility to ensure that `timer` is a valid timer.
-pub fn readTimerComparatorRegister(self: Hpet, timer: u5) u64 {
-    return self.base[timer_comparator_register_base_offset + (timer_register_step * timer)];
+pub fn readTimerComparatorRegister(hpet: Hpet, timer: u5) u64 {
+    return hpet.base[timer_comparator_register_base_offset + (timer_register_step * timer)];
 }
 
 /// It is the callers responsibility to ensure that `timer` is a valid timer.
-pub fn writeTimerComparatorRegister(self: Hpet, timer: u5, value: u64) void {
-    self.base[timer_comparator_register_base_offset + (timer_register_step * timer)] = value;
+pub fn writeTimerComparatorRegister(hpet: Hpet, timer: u5, value: u64) void {
+    hpet.base[timer_comparator_register_base_offset + (timer_register_step * timer)] = value;
 }
 
 pub const TimerFSBInterruptRouteRegister = packed struct(u64) {
@@ -211,13 +211,13 @@ pub const TimerFSBInterruptRouteRegister = packed struct(u64) {
 };
 
 /// It is the callers responsibility to ensure that `timer` is a valid timer.
-pub fn readTimerFSBInterruptRouteRegister(self: Hpet, timer: u5) TimerFSBInterruptRouteRegister {
-    return @bitCast(self.base[timer_fsb_interrupt_route_register_base_offset + (timer_register_step * timer)]);
+pub fn readTimerFSBInterruptRouteRegister(hpet: Hpet, timer: u5) TimerFSBInterruptRouteRegister {
+    return @bitCast(hpet.base[timer_fsb_interrupt_route_register_base_offset + (timer_register_step * timer)]);
 }
 
 /// It is the callers responsibility to ensure that `timer` is a valid timer.
-pub fn writeTimerFSBInterruptRouteRegister(self: Hpet, register: TimerFSBInterruptRouteRegister, timer: u5) void {
-    self.base[timer_fsb_interrupt_route_register_base_offset + (timer_register_step * timer)] = @bitCast(register);
+pub fn writeTimerFSBInterruptRouteRegister(hpet: Hpet, register: TimerFSBInterruptRouteRegister, timer: u5) void {
+    hpet.base[timer_fsb_interrupt_route_register_base_offset + (timer_register_step * timer)] = @bitCast(register);
 }
 
 pub const general_capabilities_and_id_register_offset: usize = 0x0 / @sizeOf(u64);

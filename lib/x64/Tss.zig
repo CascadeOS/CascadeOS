@@ -22,25 +22,25 @@ pub const Tss = extern struct {
 
     /// Sets the stack for the given stack selector.
     pub fn setInterruptStack(
-        self: *Tss,
+        tss: *Tss,
         stack_selector: u3,
         stack_pointer: core.VirtualAddress,
     ) void {
-        self.interrupt_stack_table[stack_selector] = stack_pointer;
+        tss.interrupt_stack_table[stack_selector] = stack_pointer;
     }
 
     /// Sets the stack for the given privilege level.
     pub fn setPrivilegeStack(
-        self: *Tss,
+        tss: *Tss,
         privilege_level: x64.PrivilegeLevel,
         stack_pointer: core.VirtualAddress,
     ) void {
         std.debug.assert(privilege_level != .ring3);
-        self.privilege_stack_table[@intFromEnum(privilege_level)] = stack_pointer;
+        tss.privilege_stack_table[@intFromEnum(privilege_level)] = stack_pointer;
     }
 
     comptime {
-        core.testing.expectSize(@This(), 104);
+        core.testing.expectSize(Tss, 104);
     }
 };
 

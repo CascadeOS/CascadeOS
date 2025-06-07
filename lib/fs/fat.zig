@@ -149,7 +149,7 @@ pub const BPB = extern struct {
     large_sector_count: u32 align(1),
 
     comptime {
-        core.testing.expectSize(@This(), 36);
+        core.testing.expectSize(BPB, 36);
     }
 };
 
@@ -218,7 +218,7 @@ pub const ExtendedBPB_32 = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 512 - @sizeOf(BPB));
+        core.testing.expectSize(ExtendedBPB_32, 512 - @sizeOf(BPB));
     }
 };
 
@@ -250,8 +250,8 @@ pub const ShortFileName = extern struct {
     /// Calculates the checksum for a short file name.
     ///
     /// See `LongFileNameEntry.checksum_of_short_name`
-    pub fn checksum(self: *const ShortFileName) u8 {
-        const ptr = std.mem.asBytes(self);
+    pub fn checksum(short_file_name: *const ShortFileName) u8 {
+        const ptr = std.mem.asBytes(short_file_name);
 
         var sum: u8 = 0;
 
@@ -262,15 +262,16 @@ pub const ShortFileName = extern struct {
         return sum;
     }
 
-    pub fn equal(self: ShortFileName, other: ShortFileName) bool {
-        return std.mem.eql(u8, &self.name, &other.name) and std.mem.eql(u8, &self.extension, &other.extension);
+    pub fn equal(short_file_name: ShortFileName, other: ShortFileName) bool {
+        return std.mem.eql(u8, &short_file_name.name, &other.name) and
+            std.mem.eql(u8, &short_file_name.extension, &other.extension);
     }
 
     pub const file_name_max_length = 8;
     pub const extension_max_length = 3;
 
     comptime {
-        core.testing.expectSize(@This(), 11);
+        core.testing.expectSize(ShortFileName, 11);
     }
 };
 
@@ -279,28 +280,28 @@ pub const DirectoryEntry = extern union {
 
     long_file_name: LongFileNameEntry align(1),
 
-    pub fn isLastEntry(self: *const DirectoryEntry) bool {
-        const bytes = std.mem.asBytes(self);
+    pub fn isLastEntry(directory_entry: *const DirectoryEntry) bool {
+        const bytes = std.mem.asBytes(directory_entry);
         return bytes[0] == 0;
     }
 
-    pub fn setLastEntry(self: *DirectoryEntry) void {
-        const bytes = std.mem.asBytes(self);
+    pub fn setLastEntry(directory_entry: *DirectoryEntry) void {
+        const bytes = std.mem.asBytes(directory_entry);
         bytes[0] = 0;
     }
 
-    pub fn isUnusedEntry(self: *const DirectoryEntry) bool {
-        const bytes = std.mem.asBytes(self);
+    pub fn isUnusedEntry(directory_entry: *const DirectoryEntry) bool {
+        const bytes = std.mem.asBytes(directory_entry);
         return bytes[0] == unused_value;
     }
 
-    pub fn setUnused(self: *DirectoryEntry) void {
-        const bytes = std.mem.asBytes(self);
+    pub fn setUnused(directory_entry: *DirectoryEntry) void {
+        const bytes = std.mem.asBytes(directory_entry);
         bytes[0] = unused_value;
     }
 
-    pub inline fn isLongFileNameEntry(self: DirectoryEntry) bool {
-        return self.standard.attributes.isLongFileNameEntry();
+    pub inline fn isLongFileNameEntry(directory_entry: DirectoryEntry) bool {
+        return directory_entry.standard.attributes.isLongFileNameEntry();
     }
 
     const long_file_name_value: u8 = 0x0f;
@@ -359,15 +360,15 @@ pub const DirectoryEntry = extern union {
 
             _reserved: u2 = 0,
 
-            pub fn isLongFileNameEntry(self: Attributes) bool {
-                const raw: u8 = @bitCast(self);
+            pub fn isLongFileNameEntry(attributes: Attributes) bool {
+                const raw: u8 = @bitCast(attributes);
                 const truncated: u4 = @truncate(raw);
                 return truncated == long_file_name_value;
             }
         };
 
         comptime {
-            core.testing.expectSize(@This(), 32);
+            core.testing.expectSize(StandardDirectoryEntry, 32);
         }
     };
 
@@ -422,12 +423,12 @@ pub const DirectoryEntry = extern union {
         pub const maximum_number_of_long_name_entries = 20;
 
         comptime {
-            core.testing.expectSize(@This(), 32);
+            core.testing.expectSize(LongFileNameEntry, 32);
         }
     };
 
     comptime {
-        core.testing.expectSize(@This(), 32);
+        core.testing.expectSize(DirectoryEntry, 32);
     }
 };
 

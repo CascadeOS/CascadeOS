@@ -348,11 +348,11 @@ pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
 pub const MappedGas = opaque {
     /// Same as `readGas` but operates on a pre-mapped handle for faster access and/or ability to use in critical
     /// sections/irq contexts.
-    pub fn read(self: *const MappedGas) !u64 {
+    pub fn read(mapped_gas: *const MappedGas) !u64 {
         var value: u64 = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
-            @ptrCast(self),
+            @ptrCast(mapped_gas),
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -362,16 +362,16 @@ pub const MappedGas = opaque {
 
     /// Same as `writeGas` but operates on a pre-mapped handle for faster access and/or ability to use in critical
     /// sections/irq contexts.
-    pub fn write(self: *const MappedGas, value: u64) !void {
+    pub fn write(mapped_gas: *const MappedGas, value: u64) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
-            @ptrCast(self),
+            @ptrCast(mapped_gas),
             value,
         ));
         try ret.toError();
     }
 
-    pub fn unmap(self: *MappedGas) void {
-        c_uacpi.uacpi_unmap_gas(@ptrCast(self));
+    pub fn unmap(mapped_gas: *MappedGas) void {
+        c_uacpi.uacpi_unmap_gas(@ptrCast(mapped_gas));
     }
 };
 
@@ -465,10 +465,10 @@ pub const Register = enum(c_uacpi.uacpi_register) {
     /// Read a register from FADT
     ///
     /// NOTE: write-only bits (if any) are cleared automatically
-    pub fn read(self: Register) !u64 {
+    pub fn read(register: Register) !u64 {
         var value: u64 = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_read_register(
-            @intFromEnum(self),
+            @intFromEnum(register),
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -480,9 +480,9 @@ pub const Register = enum(c_uacpi.uacpi_register) {
     /// NOTE:
     /// - Preserved bits (if any) are preserved automatically
     /// - If a register is made up of two (e.g. PM1a and PM1b) parts, the input is written to both at the same time
-    pub fn write(self: Register, value: u64) !void {
+    pub fn write(register: Register, value: u64) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_write_register(
-            @intFromEnum(self),
+            @intFromEnum(register),
             value,
         ));
         try ret.toError();
@@ -493,9 +493,9 @@ pub const Register = enum(c_uacpi.uacpi_register) {
     /// NOTE:
     /// - Preserved bits (if any) are preserved automatically
     /// - If a register is made up of two (e.g. PM1a and PM1b) parts, the input is written to both at the same time
-    pub fn writeRegisters(self: Register, value1: u64, value2: u64) !void {
+    pub fn writeRegisters(register: Register, value1: u64, value2: u64) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_write_registers(
-            @intFromEnum(self),
+            @intFromEnum(register),
             value1,
             value2,
         ));
@@ -532,10 +532,10 @@ pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
     ///
     /// NOTE: The value is automatically masked and shifted down as appropriate,the client code doesn't have to do any
     /// bit manipulation. E.g. for a field at 0b???XX??? the returned value will contain just the 0bXX
-    pub fn read(self: RegisterField) !u64 {
+    pub fn read(register_field: RegisterField) !u64 {
         var value: u64 = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_read_register_field(
-            @intFromEnum(self),
+            @intFromEnum(register_field),
             @ptrCast(&value),
         ));
         try ret.toError();
@@ -546,9 +546,9 @@ pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
     ///
     /// NOTE: The value is automatically masked and shifted up as appropriate, the client code doesn't have to do any
     /// bit manipulation. E.g. for a field at 0b???XX??? the passed value should be just 0bXX
-    pub fn write(self: RegisterField, value: u64) !void {
+    pub fn write(register_field: RegisterField, value: u64) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_write_register_field(
-            @intFromEnum(self),
+            @intFromEnum(register_field),
             value,
         ));
         try ret.toError();
@@ -665,23 +665,23 @@ pub const Node = opaque {
     }
 
     /// Returns `true` if the node is an alias.
-    pub fn isAlias(self: *const Node) bool {
-        return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(self)));
+    pub fn isAlias(node: *const Node) bool {
+        return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(node)));
     }
 
-    pub fn name(self: *const Node) Object.Name {
-        return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(self)));
+    pub fn name(node: *const Node) Object.Name {
+        return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(node)));
     }
 
     /// Returns the type of object stored at the namespace node.
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn objectType(self: *const Node) !Object.Type {
+    pub fn objectType(node: *const Node) !Object.Type {
         var object_type: Object.Type = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_type(
-            @ptrCast(self),
+            @ptrCast(node),
             @ptrCast(&object_type),
         ));
         try ret.toError();
@@ -693,11 +693,11 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn is(self: *const Node, object_type: Object.Type) !bool {
+    pub fn is(node: *const Node, object_type: Object.Type) !bool {
         var out: bool = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
-            @ptrCast(self),
+            @ptrCast(node),
             @intFromEnum(object_type),
             @ptrCast(&out),
         ));
@@ -711,11 +711,11 @@ pub const Node = opaque {
     ///
     /// NOTE: due to the existance of the CopyObject operator in AML, the return value of this function is subject
     /// to TOCTOU bugs.
-    pub fn isOneOf(self: *const Node, object_type_bits: Object.TypeBits) !bool {
+    pub fn isOneOf(node: *const Node, object_type_bits: Object.TypeBits) !bool {
         var out: bool = undefined;
 
         const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
-            @ptrCast(self),
+            @ptrCast(node),
             @bitCast(object_type_bits),
             @ptrCast(&out),
         ));
@@ -724,12 +724,12 @@ pub const Node = opaque {
         return out;
     }
 
-    pub fn depth(self: *const Node) usize {
-        return c_uacpi.uacpi_namespace_node_depth(@ptrCast(self));
+    pub fn depth(node: *const Node) usize {
+        return c_uacpi.uacpi_namespace_node_depth(@ptrCast(node));
     }
 
-    pub fn parent(self: *const Node) *Node {
-        return @ptrCast(c_uacpi.uacpi_namespace_node_parent(@ptrCast(@constCast(self))));
+    pub fn parent(node: *const Node) *Node {
+        return @ptrCast(c_uacpi.uacpi_namespace_node_parent(@ptrCast(@constCast(node))));
     }
 
     pub fn find(parent_node: *const Node, path: [:0]const u8) !?*Node {
@@ -876,23 +876,23 @@ pub const Node = opaque {
         current_child: ?*Node,
         type_mask: ?Object.TypeBits,
 
-        pub fn next(self: *ChildIterator) !?*Node {
-            const child = self.current_child orelse return null;
+        pub fn next(child_iterator: *ChildIterator) !?*Node {
+            const child = child_iterator.current_child orelse return null;
 
-            const ret: Status = if (self.type_mask) |type_mask|
+            const ret: Status = if (child_iterator.type_mask) |type_mask|
                 @enumFromInt(c_uacpi.uacpi_namespace_node_next_typed(
-                    @ptrCast(@constCast(self.parent)),
-                    @ptrCast(&self.current_child),
+                    @ptrCast(@constCast(child_iterator.parent)),
+                    @ptrCast(&child_iterator.current_child),
                     @bitCast(type_mask),
                 ))
             else
                 @enumFromInt(c_uacpi.uacpi_namespace_node_next(
-                    @ptrCast(@constCast(self.parent)),
-                    @ptrCast(&self.current_child),
+                    @ptrCast(@constCast(child_iterator.parent)),
+                    @ptrCast(&child_iterator.current_child),
                 ));
 
             if (ret == .not_found) {
-                self.current_child = null;
+                child_iterator.current_child = null;
                 return child;
             }
             try ret.toError();
@@ -904,13 +904,13 @@ pub const Node = opaque {
     pub const AbsoultePath = struct {
         path: [:0]const u8,
 
-        pub fn deinit(self: AbsoultePath) void {
-            c_uacpi.uacpi_free_absolute_path(self.path.ptr);
+        pub fn deinit(absolute_path: AbsoultePath) void {
+            c_uacpi.uacpi_free_absolute_path(absolute_path.path.ptr);
         }
     };
 
-    pub fn getAbsolutePath(self: *const Node) AbsoultePath {
-        const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(self));
+    pub fn getAbsolutePath(node: *const Node) AbsoultePath {
+        const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(node));
         return .{ .path = std.mem.sliceTo(ptr, 0) };
     }
 
@@ -1065,13 +1065,13 @@ pub const Node = opaque {
         num_entries: usize,
         _entries: Entry,
 
-        pub fn entries(self: *const PciRoutingTable) []const Entry {
-            const ptr: [*]const Entry = @ptrCast(&self._entries);
-            return ptr[0..self.num_entries];
+        pub fn entries(pci_routing_table: *const PciRoutingTable) []const Entry {
+            const ptr: [*]const Entry = @ptrCast(&pci_routing_table._entries);
+            return ptr[0..pci_routing_table.num_entries];
         }
 
-        pub fn deinit(self: *const PciRoutingTable) void {
-            c_uacpi.uacpi_free_pci_routing_table(@ptrCast(@constCast(self)));
+        pub fn deinit(pci_routing_table: *const PciRoutingTable) void {
+            c_uacpi.uacpi_free_pci_routing_table(@ptrCast(@constCast(pci_routing_table)));
         }
 
         pub const Entry = extern struct {
@@ -1081,7 +1081,7 @@ pub const Node = opaque {
             pin: u8,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_pci_routing_table_entry));
+                core.testing.expectSize(Entry, @sizeOf(c_uacpi.uacpi_pci_routing_table_entry));
             }
         };
     };
@@ -1105,17 +1105,17 @@ pub const Node = opaque {
         size: u32,
         _value: [*:0]const u8,
 
-        pub fn value(self: *const IdString) ?[:0]const u8 {
-            if (self.size == 0) return null;
-            return self._value[0 .. self.size - 1 :0];
+        pub fn value(id_string: *const IdString) ?[:0]const u8 {
+            if (id_string.size == 0) return null;
+            return id_string._value[0 .. id_string.size - 1 :0];
         }
 
-        pub fn deinit(self: *const IdString) void {
-            c_uacpi.uacpi_free_id_string(@ptrCast(@constCast(self)));
+        pub fn deinit(id_string: *const IdString) void {
+            c_uacpi.uacpi_free_id_string(@ptrCast(@constCast(id_string)));
         }
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_id_string));
+            core.testing.expectSize(IdString, @sizeOf(c_uacpi.uacpi_id_string));
         }
     };
 
@@ -1138,13 +1138,13 @@ pub const Node = opaque {
         size: u32,
         _ids: IdString,
 
-        pub fn ids(self: *const PnpIdList) []const IdString {
-            const ptr: [*]const IdString = @ptrCast(&self._ids);
-            return ptr[0..self.num_ids];
+        pub fn ids(pnp_id_list: *const PnpIdList) []const IdString {
+            const ptr: [*]const IdString = @ptrCast(&pnp_id_list._ids);
+            return ptr[0..pnp_id_list.num_ids];
         }
 
-        pub fn deinit(self: *const PnpIdList) void {
-            c_uacpi.uacpi_free_pnp_id_list(@ptrCast(@constCast(self)));
+        pub fn deinit(pnp_id_list: *const PnpIdList) void {
+            c_uacpi.uacpi_free_pnp_id_list(@ptrCast(@constCast(pnp_id_list)));
         }
     };
 
@@ -1587,8 +1587,8 @@ pub const Node = opaque {
             _reserved: u1,
         };
 
-        pub fn deinit(self: *const Info) void {
-            c_uacpi.uacpi_free_namespace_node_info(@ptrCast(@constCast(self)));
+        pub fn deinit(node_info: *const Info) void {
+            c_uacpi.uacpi_free_namespace_node_info(@ptrCast(@constCast(node_info)));
         }
     };
 
@@ -1961,29 +1961,29 @@ pub const Node = opaque {
 };
 
 pub const Object = opaque {
-    pub fn ref(self: *Object) void {
-        c_uacpi.uacpi_object_ref(@ptrCast(self));
+    pub fn ref(object: *Object) void {
+        c_uacpi.uacpi_object_ref(@ptrCast(object));
     }
 
-    pub fn unref(self: *Object) void {
-        c_uacpi.uacpi_object_unref(@ptrCast(self));
+    pub fn unref(object: *Object) void {
+        c_uacpi.uacpi_object_unref(@ptrCast(object));
     }
 
-    pub fn getType(self: *const Object) Type {
-        return @enumFromInt(c_uacpi.uacpi_object_get_type(@ptrCast(@constCast(self))));
+    pub fn getType(object: *const Object) Type {
+        return @enumFromInt(c_uacpi.uacpi_object_get_type(@ptrCast(@constCast(object))));
     }
 
-    pub fn getTypeBit(self: *const Object) TypeBits {
-        return @bitCast(c_uacpi.uacpi_object_get_type_bit(@ptrCast(@constCast(self))));
+    pub fn getTypeBit(object: *const Object) TypeBits {
+        return @bitCast(c_uacpi.uacpi_object_get_type_bit(@ptrCast(@constCast(object))));
     }
 
-    pub fn is(self: *const Object, object_type: Type) bool {
-        return c_uacpi.uacpi_object_is(@ptrCast(@constCast(self)), @intFromEnum(object_type));
+    pub fn is(object: *const Object, object_type: Type) bool {
+        return c_uacpi.uacpi_object_is(@ptrCast(@constCast(object)), @intFromEnum(object_type));
     }
 
-    pub fn isOneOf(self: *const Object, type_mask: TypeBits) bool {
+    pub fn isOneOf(object: *const Object, type_mask: TypeBits) bool {
         return c_uacpi.uacpi_object_is_one_of(
-            @ptrCast(@constCast(self)),
+            @ptrCast(@constCast(object)),
             @bitCast(type_mask),
         );
     }
@@ -2016,18 +2016,18 @@ pub const Object = opaque {
         return object;
     }
 
-    pub fn assignInteger(self: *Object, value: u64) !void {
+    pub fn assignInteger(object: *Object, value: u64) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_integer(
-            @ptrCast(self),
+            @ptrCast(object),
             value,
         ));
         try ret.toError();
     }
 
-    pub fn getInteger(self: *const Object) !u64 {
+    pub fn getInteger(object: *const Object) !u64 {
         var value: u64 = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_integer(
-            @ptrCast(@constCast(self)),
+            @ptrCast(@constCast(object)),
             &value,
         ));
         try ret.toError();
@@ -2063,9 +2063,9 @@ pub const Object = opaque {
     /// Takes in a constant view of the data to be stored in the object.
     ///
     /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
-    pub fn assignString(self: *Object, str: []const u8) !void {
+    pub fn assignString(object: *Object, str: []const u8) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_string(
-            @ptrCast(self),
+            @ptrCast(object),
             .{
                 .unnamed_0 = .{ .const_bytes = str.ptr },
                 .length = str.len,
@@ -2079,9 +2079,9 @@ pub const Object = opaque {
     /// Takes in a constant view of the data to be stored in the object.
     ///
     /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
-    pub fn assignBuffer(self: *Object, str: []const u8) !void {
+    pub fn assignBuffer(object: *Object, str: []const u8) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_buffer(
-            @ptrCast(self),
+            @ptrCast(object),
             .{
                 .unnamed_0 = .{ .const_bytes = str.ptr },
                 .length = str.len,
@@ -2091,10 +2091,10 @@ pub const Object = opaque {
     }
 
     /// Returns a writable view of the data stored in the string or buffer object.
-    pub fn getStringOrBuffer(self: *Object) ![]u8 {
+    pub fn getStringOrBuffer(object: *Object) ![]u8 {
         var data_view: c_uacpi.uacpi_data_view = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_string_or_buffer(
-            @ptrCast(self),
+            @ptrCast(object),
             &data_view,
         ));
         try ret.toError();
@@ -2102,10 +2102,10 @@ pub const Object = opaque {
     }
 
     /// Returns a writable view of the data stored in the string object.
-    pub fn getString(self: *Object) ![]u8 {
+    pub fn getString(object: *Object) ![]u8 {
         var data_view: c_uacpi.uacpi_data_view = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_string(
-            @ptrCast(self),
+            @ptrCast(object),
             &data_view,
         ));
         try ret.toError();
@@ -2113,10 +2113,10 @@ pub const Object = opaque {
     }
 
     /// Returns a writable view of the data stored in the buffer object.
-    pub fn getBuffer(self: *Object) ![]u8 {
+    pub fn getBuffer(object: *Object) ![]u8 {
         var data_view: c_uacpi.uacpi_data_view = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_buffer(
-            @ptrCast(self),
+            @ptrCast(object),
             &data_view,
         ));
         try ret.toError();
@@ -2143,8 +2143,8 @@ pub const Object = opaque {
     ///        target_node = try arr[0].resolveAsAmlNamepath(scope);
     ///    }
     /// ```
-    pub fn isAmlNamepath(self: *const Object) bool {
-        return c_uacpi.uacpi_object_is_aml_namepath(@ptrCast(@constCast(self)));
+    pub fn isAmlNamepath(object: *const Object) bool {
+        return c_uacpi.uacpi_object_is_aml_namepath(@ptrCast(@constCast(object)));
     }
 
     /// Resolve an AML namepath contained in a string object.
@@ -2152,10 +2152,10 @@ pub const Object = opaque {
     /// This is only applicable to objects that are package elements.
     ///
     /// See an explanation of how this works in the comment above the declaration of `isAmlNamepath`.
-    pub fn resolveAsAmlNamepath(self: *const Object, scope: *const Node) !*Node {
+    pub fn resolveAsAmlNamepath(object: *const Object, scope: *const Node) !*Node {
         var target_node: *Node = undefined;
         const ret: Status = @enumFromInt(c_uacpi.uacpi_object_resolve_as_aml_namepath(
-            @ptrCast(@constCast(self)),
+            @ptrCast(@constCast(object)),
             @ptrCast(@constCast(scope)),
             @ptrCast(&target_node),
         ));
@@ -2252,7 +2252,7 @@ pub const Object = opaque {
         block_length: u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_processor_info));
+            core.testing.expectSize(ProcessorInfo, @sizeOf(c_uacpi.uacpi_processor_info));
         }
     };
 
@@ -2272,7 +2272,7 @@ pub const Object = opaque {
         resource_order: u16,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_power_resource_info));
+            core.testing.expectSize(PowerResourceInfo, @sizeOf(c_uacpi.uacpi_power_resource_info));
         }
     };
 
@@ -2292,7 +2292,7 @@ pub const Object = opaque {
         id: u32,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_name));
+            core.testing.expectSize(Name, @sizeOf(c_uacpi.uacpi_object_name));
         }
     };
 
@@ -2343,7 +2343,7 @@ pub const Object = opaque {
         pub const any: TypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_object_type_bits));
+            core.testing.expectSize(TypeBits, @sizeOf(c_uacpi.uacpi_object_type_bits));
         }
     };
 };
@@ -2514,12 +2514,12 @@ pub const Table = extern struct {
         oem_table_id: [8]u8 = @splat(0),
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table_identifiers));
+            core.testing.expectSize(TableIdentifiers, @sizeOf(c_uacpi.uacpi_table_identifiers));
         }
     };
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_table));
+        core.testing.expectSize(Table, @sizeOf(c_uacpi.uacpi_table));
     }
 };
 
@@ -2527,34 +2527,34 @@ pub const Resources = extern struct {
     length: usize,
     entries: [*]const Resource,
 
-    pub fn deinit(self: *const Resources) void {
-        c_uacpi.uacpi_free_resources(@ptrCast(@constCast(self)));
+    pub fn deinit(resources: *const Resources) void {
+        c_uacpi.uacpi_free_resources(@ptrCast(@constCast(resources)));
     }
 
     // uacpi_for_each_resource not implemented as below iterator is superior
 
-    pub fn iterate(self: *const Resources) Iterator {
+    pub fn iterate(resources: *const Resources) Iterator {
         return .{
-            .data = @ptrCast(self.entries),
+            .data = @ptrCast(resources.entries),
         };
     }
 
     pub const Iterator = struct {
         data: [*]const u8,
 
-        pub fn next(self: *Iterator) ?*const Resource {
-            const current: *const Resource = @ptrCast(@alignCast(self.data));
+        pub fn next(iterator: *Iterator) ?*const Resource {
+            const current: *const Resource = @ptrCast(@alignCast(iterator.data));
 
             if (current.type == .end_tag) return null;
 
-            self.data += current.length;
+            iterator.data += current.length;
 
             return current;
         }
     };
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resources));
+        core.testing.expectSize(Resources, @sizeOf(c_uacpi.uacpi_resources));
     }
 };
 
@@ -2585,8 +2585,8 @@ pub const Resource = extern struct {
         return resource;
     }
 
-    pub fn deinit(self: *Resource) void {
-        c_uacpi.uacpi_free_resource(@ptrCast(self));
+    pub fn deinit(resource: *Resource) void {
+        c_uacpi.uacpi_free_resource(@ptrCast(resource));
     }
 
     pub const Type = enum(c_uacpi.uacpi_resource_type) {
@@ -2679,13 +2679,13 @@ pub const Resource = extern struct {
         num_irqs: u8,
         _irqs: u8,
 
-        pub fn irqs(self: *const Irq) []const u8 {
-            const ptr: [*]const u8 = @ptrCast(&self._irqs);
-            return ptr[0..self.num_irqs];
+        pub fn irqs(irq: *const Irq) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&irq._irqs);
+            return ptr[0..irq.num_irqs];
         }
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_irq) + @sizeOf(u8));
+            core.testing.expectSize(Irq, @sizeOf(c_uacpi.uacpi_resource_irq) + @sizeOf(u8));
         }
     };
 
@@ -2699,14 +2699,14 @@ pub const Resource = extern struct {
         source: Source,
         _irqs: u32,
 
-        pub fn irqs(self: *const ExtendedIrq) []const u32 {
-            const ptr: [*]const u32 = @ptrCast(&self._irqs);
-            return ptr[0..self.num_irqs];
+        pub fn irqs(extended_irq: *const ExtendedIrq) []const u32 {
+            const ptr: [*]const u32 = @ptrCast(&extended_irq._irqs);
+            return ptr[0..extended_irq.num_irqs];
         }
 
         comptime {
             // `u64` due to the alignment forced by the `source` field
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_extended_irq) + @sizeOf(u64));
+            core.testing.expectSize(ExtendedIrq, @sizeOf(c_uacpi.uacpi_resource_extended_irq) + @sizeOf(u64));
         }
     };
 
@@ -2717,9 +2717,9 @@ pub const Resource = extern struct {
         num_channels: u8,
         _channels: u8,
 
-        pub fn channels(self: *const Dma) []const u8 {
-            const ptr: [*]const u8 = @ptrCast(&self._channels);
-            return ptr[0..self.num_channels];
+        pub fn channels(dma: *const Dma) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&dma._channels);
+            return ptr[0..dma.num_channels];
         }
 
         pub const TransferType = enum(u8) {
@@ -2742,7 +2742,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_dma) + @sizeOf(u8));
+            core.testing.expectSize(Dma, @sizeOf(c_uacpi.uacpi_resource_dma) + @sizeOf(u8));
         }
     };
 
@@ -2761,7 +2761,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_fixed_dma));
+            core.testing.expectSize(FixedDma, @sizeOf(c_uacpi.uacpi_resource_fixed_dma));
         }
     };
 
@@ -2778,7 +2778,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_io));
+            core.testing.expectSize(Io, @sizeOf(c_uacpi.uacpi_resource_io));
         }
     };
 
@@ -2787,7 +2787,7 @@ pub const Resource = extern struct {
         length: u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_fixed_io));
+            core.testing.expectSize(FixedIo, @sizeOf(c_uacpi.uacpi_resource_fixed_io));
         }
     };
 
@@ -2801,7 +2801,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address16));
+            core.testing.expectSize(Address16, @sizeOf(c_uacpi.uacpi_resource_address16));
         }
     };
 
@@ -2815,7 +2815,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address32));
+            core.testing.expectSize(Address32, @sizeOf(c_uacpi.uacpi_resource_address32));
         }
     };
 
@@ -2829,7 +2829,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address64));
+            core.testing.expectSize(Address64, @sizeOf(c_uacpi.uacpi_resource_address64));
         }
     };
 
@@ -2844,7 +2844,7 @@ pub const Resource = extern struct {
         attributes: u64,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address64_extended));
+            core.testing.expectSize(Address64Extended, @sizeOf(c_uacpi.uacpi_resource_address64_extended));
         }
     };
 
@@ -2856,7 +2856,7 @@ pub const Resource = extern struct {
         length: u16,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_memory24));
+            core.testing.expectSize(Memory24, @sizeOf(c_uacpi.uacpi_resource_memory24));
         }
     };
 
@@ -2868,7 +2868,7 @@ pub const Resource = extern struct {
         length: u32,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_memory32));
+            core.testing.expectSize(Memory32, @sizeOf(c_uacpi.uacpi_resource_memory32));
         }
     };
 
@@ -2878,7 +2878,7 @@ pub const Resource = extern struct {
         length: u32,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_fixed_memory32));
+            core.testing.expectSize(FixedMemory32, @sizeOf(c_uacpi.uacpi_resource_fixed_memory32));
         }
     };
 
@@ -2888,7 +2888,7 @@ pub const Resource = extern struct {
         performance: CompatibilityPerformance,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_start_dependent));
+            core.testing.expectSize(StartDependent, @sizeOf(c_uacpi.uacpi_resource_start_dependent));
         }
     };
 
@@ -2896,13 +2896,13 @@ pub const Resource = extern struct {
         length: u8,
         _data: u8,
 
-        pub fn data(self: *const Vendor) []const u8 {
-            const ptr: [*]const u8 = @ptrCast(&self._data);
-            return ptr[0..self.length];
+        pub fn data(vendor: *const Vendor) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&vendor._data);
+            return ptr[0..vendor.length];
         }
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_vendor) + @sizeOf(u8));
+            core.testing.expectSize(Vendor, @sizeOf(c_uacpi.uacpi_resource_vendor) + @sizeOf(u8));
         }
     };
 
@@ -2912,13 +2912,13 @@ pub const Resource = extern struct {
         uuid: [16]u8,
         _data: u8,
 
-        pub fn data(self: *const VendorTyped) []const u8 {
-            const ptr: [*]const u8 = @ptrCast(&self._data);
-            return ptr[0..self.length];
+        pub fn data(vendor_typed: *const VendorTyped) []const u8 {
+            const ptr: [*]const u8 = @ptrCast(&vendor_typed._data);
+            return ptr[0..vendor_typed.length];
         }
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_vendor_typed));
+            core.testing.expectSize(VendorTyped, @sizeOf(c_uacpi.uacpi_resource_vendor_typed));
         }
     };
 
@@ -2930,7 +2930,7 @@ pub const Resource = extern struct {
         address: u64,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_generic_register));
+            core.testing.expectSize(GenericRegister, @sizeOf(c_uacpi.uacpi_resource_generic_register));
         }
     };
 
@@ -2966,7 +2966,7 @@ pub const Resource = extern struct {
             wake_capability: WakeCapability,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_interrupt_connection_flags));
+                core.testing.expectSize(InterruptConnectionFlags, @sizeOf(c_uacpi.uacpi_interrupt_connection_flags));
             }
         };
 
@@ -2982,12 +2982,12 @@ pub const Resource = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_io_connection_flags));
+                core.testing.expectSize(IoConnectionFlags, @sizeOf(c_uacpi.uacpi_io_connection_flags));
             }
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_gpio_connection));
+            core.testing.expectSize(GpioConnection, @sizeOf(c_uacpi.uacpi_resource_gpio_connection));
         }
     };
 
@@ -3003,7 +3003,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_i2c_connection));
+            core.testing.expectSize(I2cConnection, @sizeOf(c_uacpi.uacpi_resource_i2c_connection));
         }
     };
 
@@ -3038,7 +3038,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_spi_connection));
+            core.testing.expectSize(SpiConnection, @sizeOf(c_uacpi.uacpi_resource_spi_connection));
         }
     };
 
@@ -3099,7 +3099,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_uart_connection));
+            core.testing.expectSize(UartConnection, @sizeOf(c_uacpi.uacpi_resource_uart_connection));
         }
     };
 
@@ -3114,7 +3114,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_csi2_connection));
+            core.testing.expectSize(Csi2Connection, @sizeOf(c_uacpi.uacpi_resource_csi2_connection));
         }
     };
 
@@ -3130,7 +3130,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_function));
+            core.testing.expectSize(PinFunction, @sizeOf(c_uacpi.uacpi_resource_pin_function));
         }
     };
 
@@ -3147,7 +3147,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_configuration));
+            core.testing.expectSize(PinConfiguration, @sizeOf(c_uacpi.uacpi_resource_pin_configuration));
         }
     };
 
@@ -3168,7 +3168,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_group));
+            core.testing.expectSize(PinGroup, @sizeOf(c_uacpi.uacpi_resource_pin_group));
         }
     };
 
@@ -3183,7 +3183,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_group_function));
+            core.testing.expectSize(PinGroupFunction, @sizeOf(c_uacpi.uacpi_resource_pin_group_function));
         }
     };
 
@@ -3199,7 +3199,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_pin_group_configuration));
+            core.testing.expectSize(PinConfiguration, @sizeOf(c_uacpi.uacpi_resource_pin_group_configuration));
         }
     };
 
@@ -3240,7 +3240,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_clock_input));
+            core.testing.expectSize(ClockInput, @sizeOf(c_uacpi.uacpi_resource_clock_input));
         }
     };
 
@@ -3262,7 +3262,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_serial_bus_common));
+            core.testing.expectSize(SerialBusCommon, @sizeOf(c_uacpi.uacpi_resource_serial_bus_common));
         }
     };
 
@@ -3315,7 +3315,7 @@ pub const Resource = extern struct {
                 };
 
                 comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_memory_attribute));
+                    core.testing.expectSize(MemoryAttribute, @sizeOf(c_uacpi.uacpi_memory_attribute));
                 }
             };
 
@@ -3330,17 +3330,17 @@ pub const Resource = extern struct {
                 };
 
                 comptime {
-                    core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_io_attribute));
+                    core.testing.expectSize(IoAttribute, @sizeOf(c_uacpi.uacpi_io_attribute));
                 }
             };
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_address_attribute));
+                core.testing.expectSize(AddressAttribute, @sizeOf(c_uacpi.uacpi_address_attribute));
             }
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_address_common));
+            core.testing.expectSize(AddressCommon, @sizeOf(c_uacpi.uacpi_resource_address_common));
         }
     };
 
@@ -3377,12 +3377,12 @@ pub const Resource = extern struct {
         length: u16,
         _str: [*:0]const u8,
 
-        pub fn str(self: Source) []const u8 {
-            return std.mem.sliceTo(self._str, 0);
+        pub fn str(source: Source) []const u8 {
+            return std.mem.sliceTo(source._str, 0);
         }
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_source));
+            core.testing.expectSize(Source, @sizeOf(c_uacpi.uacpi_resource_source));
         }
     };
 
@@ -3407,17 +3407,17 @@ pub const Resource = extern struct {
         length: u16,
         _string: [*]const u8,
 
-        pub fn string(self: *const Label) []const u8 {
-            return self._string[0..self.length];
+        pub fn string(label: *const Label) []const u8 {
+            return label._string[0..label.length];
         }
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource_label));
+            core.testing.expectSize(Label, @sizeOf(c_uacpi.uacpi_resource_label));
         }
     };
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_resource));
+        core.testing.expectSize(Resource, @sizeOf(c_uacpi.uacpi_resource));
     }
 };
 
@@ -3505,8 +3505,8 @@ pub const Status = enum(c_uacpi.uacpi_status) {
     aml_loop_timeout = c_uacpi.UACPI_STATUS_AML_LOOP_TIMEOUT,
     aml_call_stack_depth_limit = c_uacpi.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
 
-    fn toError(self: Status) Error!void {
-        return switch (self) {
+    fn toError(status: Status) Error!void {
+        return switch (status) {
             .ok => {
                 @branchHint(.likely);
             },
@@ -3608,7 +3608,7 @@ pub const FirmwareRequest = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_firmware_request));
+        core.testing.expectSize(FirmwareRequest, @sizeOf(c_uacpi.uacpi_firmware_request));
     }
 };
 
@@ -3653,12 +3653,12 @@ pub const DataView = extern struct {
     bytes: [*]const u8,
     length: usize,
 
-    pub fn slice(self: *const DataView) []const u8 {
-        return self.bytes[0..self.length];
+    pub fn slice(data_view: *const DataView) []const u8 {
+        return data_view.bytes[0..data_view.length];
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_data_view));
+        core.testing.expectSize(DataView, @sizeOf(c_uacpi.uacpi_data_view));
     }
 };
 
@@ -3831,7 +3831,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     length: u64,
 
                     comptime {
-                        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_generic_region_info));
+                        core.testing.expectSize(Generic, @sizeOf(c_uacpi.uacpi_generic_region_info));
                     }
                 };
 
@@ -3840,7 +3840,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     subspace_id: u8,
 
                     comptime {
-                        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_pcc_region_info));
+                        core.testing.expectSize(Pcc, @sizeOf(c_uacpi.uacpi_pcc_region_info));
                     }
                 };
 
@@ -3848,13 +3848,13 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     num_pins: u64,
 
                     comptime {
-                        core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_gpio_region_info));
+                        core.testing.expectSize(Gpio, @sizeOf(c_uacpi.uacpi_gpio_region_info));
                     }
                 };
             };
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_attach_data));
+                core.testing.expectSize(Attach, @sizeOf(c_uacpi.uacpi_region_attach_data));
             }
         };
 
@@ -3864,7 +3864,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             region_node: *Node,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_detach_data));
+                core.testing.expectSize(Detach, @sizeOf(c_uacpi.uacpi_region_detach_data));
             }
         };
 
@@ -3879,7 +3879,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             byte_width: ByteWidth,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_rw_data));
+                core.testing.expectSize(ReadWrite, @sizeOf(c_uacpi.uacpi_region_rw_data));
             }
         };
 
@@ -3889,7 +3889,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             buffer: DataView,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_pcc_send_data));
+                core.testing.expectSize(PccSend, @sizeOf(c_uacpi.uacpi_region_pcc_send_data));
             }
         };
 
@@ -3902,7 +3902,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             value: u64,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_gpio_rw_data));
+                core.testing.expectSize(GpioReadWrite, @sizeOf(c_uacpi.uacpi_region_gpio_rw_data));
             }
         };
 
@@ -3913,7 +3913,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             command: u64,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ipmi_rw_data));
+                core.testing.expectSize(IpmiCommand, @sizeOf(c_uacpi.uacpi_region_ipmi_rw_data));
             }
         };
 
@@ -3924,7 +3924,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             command: u64,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_ffixedhw_rw_data));
+                core.testing.expectSize(FixedHardwareCommand, @sizeOf(c_uacpi.uacpi_region_ffixedhw_rw_data));
             }
         };
 
@@ -3934,7 +3934,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             in_out_message: DataView,
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_prm_rw_data));
+                core.testing.expectSize(PrmReadWrite, @sizeOf(c_uacpi.uacpi_region_prm_rw_data));
             }
         };
 
@@ -3966,7 +3966,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             };
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(c_uacpi.uacpi_region_serial_rw_data));
+                core.testing.expectSize(SerialReadWrite, @sizeOf(c_uacpi.uacpi_region_serial_rw_data));
             }
         };
     };

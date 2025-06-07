@@ -345,8 +345,8 @@ fn constructKernelModule(
 }
 
 /// Returns a CrossTarget for building the kernel for the given target.
-fn getKernelCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
-    switch (self) {
+fn getKernelCrossTarget(cascade_target: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
+    switch (cascade_target) {
         .arm => {
             const features = std.Target.aarch64.Feature;
             var target_query = std.Target.Query{

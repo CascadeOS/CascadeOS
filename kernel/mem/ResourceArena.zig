@@ -28,24 +28,24 @@ source: ?Source,
 /// List of all boundary tags in the arena.
 ///
 /// In order of ascending `base`.
-all_tags: DoubleLinkedList(AllTagNode),
+all_tags: DoublyLinkedList(AllTagNode),
 
 /// List of all spans in the arena.
 ///
 /// In order of ascending `base`.
-spans: DoubleLinkedList(KindNode),
+spans: DoublyLinkedList(KindNode),
 
 /// Hash table of allocated boundary tags.
-allocation_table: [NUMBER_OF_HASH_BUCKETS]DoubleLinkedList(KindNode),
+allocation_table: [NUMBER_OF_HASH_BUCKETS]DoublyLinkedList(KindNode),
 
 /// Power-of-two freelists.
-freelists: [NUMBER_OF_FREELISTS]DoubleLinkedList(KindNode),
+freelists: [NUMBER_OF_FREELISTS]DoublyLinkedList(KindNode),
 
 /// Bitmap of freelists that are non-empty.
 freelist_bitmap: Bitmap,
 
 /// List of unused boundary tags.
-unused_tags: SingleLinkedList,
+unused_tags: SinglyLinkedList,
 
 /// Number of unused boundary tags.
 unused_tags_count: usize,
@@ -57,8 +57,8 @@ quantum_caches: std.BoundedArray(*RawCache, MAX_NUMBER_OF_QUANTUM_CACHES),
 
 quantum_cache_allocation: QuantumCacheAllocation,
 
-pub fn name(self: *const ResourceArena) []const u8 {
-    return self._name.constSlice();
+pub fn name(resource_arena: *const ResourceArena) []const u8 {
+    return resource_arena._name.constSlice();
 }
 
 pub const Source = struct {
@@ -251,7 +251,7 @@ pub fn deinit(arena: *ResourceArena, current_task: *kernel.Task) void {
         },
     }
 
-    var tags_to_release: SingleLinkedList = .empty;
+    var tags_to_release: SinglyLinkedList = .empty;
 
     var any_allocations = false;
 
@@ -479,13 +479,13 @@ pub const Allocation = struct {
     base: usize,
     len: usize,
 
-    pub fn print(self: Allocation, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(allocation: Allocation, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
-        try writer.print("Allocation{{ base: 0x{x}, len: 0x{x} }}", .{ self.base, self.len });
+        try writer.print("Allocation{{ base: 0x{x}, len: 0x{x} }}", .{ allocation.base, allocation.len });
     }
 
     pub inline fn format(
-        self: Allocation,
+        allocation: Allocation,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -493,9 +493,9 @@ pub const Allocation = struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(allocation, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(allocation, writer.any(), 0);
     }
 };
 
@@ -991,28 +991,28 @@ const BoundaryTag = struct {
         };
     }
 
-    pub fn print(self: BoundaryTag, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(boundary_tag: BoundaryTag, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("BoundaryTag{\n");
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("base: 0x{x},\n", .{self.base});
+        try writer.print("base: 0x{x},\n", .{boundary_tag.base});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("len: 0x{x},\n", .{self.len});
+        try writer.print("len: 0x{x},\n", .{boundary_tag.len});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("kind: {s},\n", .{@tagName(self.kind)});
+        try writer.print("kind: {s},\n", .{@tagName(boundary_tag.kind)});
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.writeAll("all_tag_node: ");
-        try self.all_tag_node.print(writer, new_indent);
+        try boundary_tag.all_tag_node.print(writer, new_indent);
         try writer.writeAll(",\n");
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.writeAll("kind_node: ");
-        try self.kind_node.print(writer, new_indent);
+        try boundary_tag.kind_node.print(writer, new_indent);
         try writer.writeAll(",\n");
 
         try writer.writeByteNTimes(' ', indent);
@@ -1020,7 +1020,7 @@ const BoundaryTag = struct {
     }
 
     pub inline fn format(
-        self: BoundaryTag,
+        boundary_tag: BoundaryTag,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -1028,9 +1028,9 @@ const BoundaryTag = struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(boundary_tag, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(boundary_tag, writer.any(), 0);
     }
 };
 
@@ -1038,23 +1038,23 @@ const AllTagNode = struct {
     previous: ?*AllTagNode,
     next: ?*AllTagNode,
 
-    fn toTag(self: *AllTagNode) *BoundaryTag {
-        return @fieldParentPtr("all_tag_node", self);
+    fn toTag(all_tag_node: *AllTagNode) *BoundaryTag {
+        return @fieldParentPtr("all_tag_node", all_tag_node);
     }
 
     const empty: AllTagNode = .{ .previous = null, .next = null };
 
-    pub fn print(self: AllTagNode, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(all_tag_node: AllTagNode, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("AllTagNode{ previous: ");
-        if (self.previous != null) {
+        if (all_tag_node.previous != null) {
             try writer.writeAll("set");
         } else {
             try writer.writeAll("null");
         }
         try writer.writeAll(", next: ");
-        if (self.next != null) {
+        if (all_tag_node.next != null) {
             try writer.writeAll("set");
         } else {
             try writer.writeAll("null");
@@ -1063,7 +1063,7 @@ const AllTagNode = struct {
     }
 
     pub inline fn format(
-        self: AllTagNode,
+        all_tag_node: AllTagNode,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -1071,9 +1071,9 @@ const AllTagNode = struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(all_tag_node, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(all_tag_node, writer.any(), 0);
     }
 };
 
@@ -1081,23 +1081,23 @@ const KindNode = struct {
     previous: ?*KindNode,
     next: ?*KindNode,
 
-    fn toTag(self: *KindNode) *BoundaryTag {
-        return @fieldParentPtr("kind_node", self);
+    fn toTag(kind_node: *KindNode) *BoundaryTag {
+        return @fieldParentPtr("kind_node", kind_node);
     }
 
     const empty: KindNode = .{ .previous = null, .next = null };
 
-    pub fn print(self: KindNode, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(kind_node: KindNode, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("KindNode{ previous: ");
-        if (self.previous != null) {
+        if (kind_node.previous != null) {
             try writer.writeAll("set");
         } else {
             try writer.writeAll("null");
         }
         try writer.writeAll(", next: ");
-        if (self.next != null) {
+        if (kind_node.next != null) {
             try writer.writeAll("set");
         } else {
             try writer.writeAll("null");
@@ -1106,7 +1106,7 @@ const KindNode = struct {
     }
 
     pub inline fn format(
-        self: KindNode,
+        kind_node: KindNode,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -1114,9 +1114,9 @@ const KindNode = struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(kind_node, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(kind_node, writer.any(), 0);
     }
 };
 
@@ -1125,12 +1125,12 @@ const Bitmap = struct {
 
     const empty: Bitmap = .{ .value = 0 };
 
-    fn set(self: *Bitmap, index: usize) void {
-        self.value |= maskBit(index);
+    fn set(bitmap: *Bitmap, index: usize) void {
+        bitmap.value |= maskBit(index);
     }
 
-    fn unset(self: *Bitmap, index: usize) void {
-        self.value &= ~maskBit(index);
+    fn unset(bitmap: *Bitmap, index: usize) void {
+        bitmap.value &= ~maskBit(index);
     }
 
     inline fn maskBit(index: usize) usize {
@@ -1138,25 +1138,25 @@ const Bitmap = struct {
     }
 };
 
-/// A single linked list, that uses `AllTagNode.next` as the link.
-const SingleLinkedList = struct {
+/// A singly linked list, that uses `AllTagNode.next` as the link.
+const SinglyLinkedList = struct {
     first: ?*AllTagNode,
 
-    const empty: SingleLinkedList = .{ .first = null };
+    const empty: SinglyLinkedList = .{ .first = null };
 
-    fn push(self: *SingleLinkedList, node: *AllTagNode) void {
+    fn push(singly_linked_list: *SinglyLinkedList, node: *AllTagNode) void {
         std.debug.assert(node.previous == null and node.next == null);
 
-        node.* = .{ .next = self.first, .previous = null };
+        node.* = .{ .next = singly_linked_list.first, .previous = null };
 
-        self.first = node;
+        singly_linked_list.first = node;
     }
 
-    fn pop(self: *SingleLinkedList) ?*AllTagNode {
-        const node = self.first orelse return null;
+    fn pop(singly_linked_list: *SinglyLinkedList) ?*AllTagNode {
+        const node = singly_linked_list.first orelse return null;
         std.debug.assert(node.previous == null);
 
-        self.first = node.next;
+        singly_linked_list.first = node.next;
 
         node.* = .empty;
 
@@ -1164,20 +1164,20 @@ const SingleLinkedList = struct {
     }
 };
 
-/// A double linked list, that uses `Node` as the link.
-fn DoubleLinkedList(comptime Node: type) type {
+/// A doubly linked list, that uses `Node` as the link.
+fn DoublyLinkedList(comptime Node: type) type {
     return struct {
         first: ?*Node,
 
-        const Self = @This();
+        const DoublyLinkedListT = @This();
 
-        const empty: Self = .{ .first = null };
+        const empty: DoublyLinkedListT = .{ .first = null };
 
         /// Push a node to the front of the list.
-        fn push(self: *Self, node: *Node) void {
+        fn push(doubly_linked_list: *DoublyLinkedListT, node: *Node) void {
             std.debug.assert(node.previous == null and node.next == null);
 
-            const opt_first = self.first;
+            const opt_first = doubly_linked_list.first;
 
             node.next = opt_first;
 
@@ -1187,12 +1187,12 @@ fn DoubleLinkedList(comptime Node: type) type {
             }
 
             node.previous = null;
-            self.first = node;
+            doubly_linked_list.first = node;
         }
 
         /// Pop a node from the front of the list.
-        fn pop(self: *Self) ?*Node {
-            const first = self.first orelse return null;
+        fn pop(doubly_linked_list: *DoublyLinkedListT) ?*Node {
+            const first = doubly_linked_list.first orelse return null;
             std.debug.assert(first.previous == null);
 
             const opt_next = first.next;
@@ -1202,7 +1202,7 @@ fn DoubleLinkedList(comptime Node: type) type {
                 next.previous = null;
             }
 
-            self.first = opt_next;
+            doubly_linked_list.first = opt_next;
 
             first.* = .empty;
 
@@ -1210,12 +1210,12 @@ fn DoubleLinkedList(comptime Node: type) type {
         }
 
         /// Removes a node from the list.
-        fn remove(self: *Self, node: *Node) void {
+        fn remove(doubly_linked_list: *DoublyLinkedListT, node: *Node) void {
             if (node.previous) |previous| {
                 std.debug.assert(previous.next == node);
                 previous.next = node.next;
             } else {
-                self.first = node.next;
+                doubly_linked_list.first = node.next;
             }
 
             if (node.next) |next| {
@@ -1226,7 +1226,7 @@ fn DoubleLinkedList(comptime Node: type) type {
             node.* = .empty;
         }
 
-        pub fn insertAfter(self: *Self, node: *Node, opt_previous: ?*Node) void {
+        pub fn insertAfter(doubly_linked_list: *DoublyLinkedListT, node: *Node, opt_previous: ?*Node) void {
             std.debug.assert(node.previous == null and node.next == null);
 
             if (opt_previous) |previous| {
@@ -1239,18 +1239,18 @@ fn DoubleLinkedList(comptime Node: type) type {
                 previous.next = node;
                 node.previous = previous;
             } else {
-                if (self.first) |first| {
+                if (doubly_linked_list.first) |first| {
                     std.debug.assert(first.previous == null);
                     first.previous = node;
                     node.next = first;
                 }
 
-                self.first = node;
+                doubly_linked_list.first = node;
             }
         }
 
-        inline fn isEmpty(self: *const Self) bool {
-            return self.first == null;
+        inline fn isEmpty(doubly_linked_list: *const DoublyLinkedListT) bool {
+            return doubly_linked_list.first == null;
         }
     };
 }

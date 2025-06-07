@@ -25,10 +25,10 @@ pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!MemoryMap {
 pub const MemoryMap = struct {
     backing: [backing_size]u8 align(backing_align),
 
-    pub fn next(self: *MemoryMap) ?Entry {
+    pub fn next(memory_map: *MemoryMap) ?Entry {
         while (true) {
             const entry = switch (bootloader_api) {
-                .limine => limine.MemoryMapIterator.next(self),
+                .limine => limine.MemoryMapIterator.next(memory_map),
                 .unknown => null,
             } orelse
                 return null;
@@ -58,8 +58,8 @@ pub const MemoryMap = struct {
 
             unknown,
 
-            pub fn isUsable(self: Type) bool {
-                return switch (self) {
+            pub fn isUsable(entry_type: Type) bool {
+                return switch (entry_type) {
                     .free,
                     .in_use,
                     .bootloader_reclaimable,
@@ -145,17 +145,17 @@ pub fn cpuDescriptors() ?CpuDescriptors {
 pub const CpuDescriptors = struct {
     backing: [descriptors_backing_size]u8 align(descriptors_backing_align),
 
-    pub fn count(self: *const CpuDescriptors) usize {
+    pub fn count(cpu_descriptors: *const CpuDescriptors) usize {
         return switch (bootloader_api) {
-            .limine => limine.CpuDescriptorIterator.count(self),
+            .limine => limine.CpuDescriptorIterator.count(cpu_descriptors),
             .unknown => 0,
         };
     }
 
     /// Returns the next cpu descriptor from the iterator, if any remain.
-    pub fn next(self: *CpuDescriptors) ?Descriptor {
+    pub fn next(cpu_descriptors: *CpuDescriptors) ?Descriptor {
         return switch (bootloader_api) {
-            .limine => limine.CpuDescriptorIterator.next(self),
+            .limine => limine.CpuDescriptorIterator.next(cpu_descriptors),
             .unknown => null,
         };
     }
@@ -164,26 +164,26 @@ pub const CpuDescriptors = struct {
         backing: [descriptor_backing_size]u8 align(descriptor_backing_align),
 
         pub fn boot(
-            self: *const Descriptor,
+            descriptor: *const Descriptor,
             user_data: *anyopaque,
             target_fn: fn (user_data: *anyopaque) noreturn,
         ) void {
             switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.bootFn(self, user_data, target_fn),
+                .limine => limine.CpuDescriptorIterator.bootFn(descriptor, user_data, target_fn),
                 .unknown => unreachable,
             }
         }
 
-        pub fn acpiProcessorId(self: *const Descriptor) u32 {
+        pub fn acpiProcessorId(descriptor: *const Descriptor) u32 {
             return switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.acpiProcessorId(self),
+                .limine => limine.CpuDescriptorIterator.acpiProcessorId(descriptor),
                 .unknown => unreachable,
             };
         }
 
-        pub fn architectureProcessorId(self: *const Descriptor) u64 {
+        pub fn architectureProcessorId(descriptor: *const Descriptor) u64 {
             return switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.architectureProcessorId(self),
+                .limine => limine.CpuDescriptorIterator.architectureProcessorId(descriptor),
                 .unknown => unreachable,
             };
         }

@@ -29,44 +29,44 @@ pub const Size = extern struct {
     /// Checks if the `Size` is aligned to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub inline fn isAligned(self: Size, alignment: Size) bool {
-        return std.mem.isAligned(self.value, alignment.value);
+    pub inline fn isAligned(size: Size, alignment: Size) bool {
+        return std.mem.isAligned(size.value, alignment.value);
     }
 
     /// Aligns the `Size` forward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignForward(self: Size, alignment: Size) Size {
-        return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
+    pub fn alignForward(size: Size, alignment: Size) Size {
+        return .{ .value = std.mem.alignForward(u64, size.value, alignment.value) };
     }
 
     /// Aligns the `Size` forward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignForwardInPlace(self: *Size, alignment: Size) void {
-        self.value = std.mem.alignForward(u64, self.value, alignment.value);
+    pub fn alignForwardInPlace(size: *Size, alignment: Size) void {
+        size.value = std.mem.alignForward(u64, size.value, alignment.value);
     }
 
     /// Aligns the `Size` backward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignBackward(self: Size, alignment: Size) Size {
-        return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
+    pub fn alignBackward(size: Size, alignment: Size) Size {
+        return .{ .value = std.mem.alignBackward(u64, size.value, alignment.value) };
     }
 
     /// Aligns the `Size` backward to the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignBackwardInPlace(self: *Size, alignment: core.Size) void {
-        self.value = std.mem.alignBackward(u64, self.value, alignment.value);
+    pub fn alignBackwardInPlace(size: *Size, alignment: core.Size) void {
+        size.value = std.mem.alignBackward(u64, size.value, alignment.value);
     }
 
-    /// Returns the amount of `self` sizes needed to cover `target`.
+    /// Returns the amount of `size` sizes needed to cover `target`.
     ///
-    /// Caller must ensure `self` is not zero.
-    pub fn amountToCover(self: Size, target: Size) u64 {
+    /// Caller must ensure `size` is not zero.
+    pub fn amountToCover(size: Size, target: Size) u64 {
         const one_byte = core.Size{ .value = 1 };
-        return target.add(self.subtract(one_byte)).divide(self).value;
+        return target.add(size.subtract(one_byte)).divide(size).value;
     }
 
     test amountToCover {
@@ -103,78 +103,78 @@ pub const Size = extern struct {
         }
     }
 
-    pub inline fn equal(self: Size, other: Size) bool {
-        return self.value == other.value;
+    pub inline fn equal(size: Size, other: Size) bool {
+        return size.value == other.value;
     }
 
-    pub inline fn lessThan(self: Size, other: Size) bool {
-        return self.value < other.value;
+    pub inline fn lessThan(size: Size, other: Size) bool {
+        return size.value < other.value;
     }
 
-    pub inline fn lessThanOrEqual(self: Size, other: Size) bool {
-        return self.value <= other.value;
+    pub inline fn lessThanOrEqual(size: Size, other: Size) bool {
+        return size.value <= other.value;
     }
 
-    pub inline fn greaterThan(self: Size, other: Size) bool {
-        return self.value > other.value;
+    pub inline fn greaterThan(size: Size, other: Size) bool {
+        return size.value > other.value;
     }
 
-    pub inline fn greaterThanOrEqual(self: Size, other: Size) bool {
-        return self.value >= other.value;
+    pub inline fn greaterThanOrEqual(size: Size, other: Size) bool {
+        return size.value >= other.value;
     }
 
-    pub fn compare(self: Size, other: Size) std.math.Order {
-        if (self.lessThan(other)) return .lt;
-        if (self.greaterThan(other)) return .gt;
+    pub fn compare(size: Size, other: Size) std.math.Order {
+        if (size.lessThan(other)) return .lt;
+        if (size.greaterThan(other)) return .gt;
         return .eq;
     }
 
-    pub fn add(self: Size, other: Size) Size {
-        return .{ .value = self.value + other.value };
+    pub fn add(size: Size, other: Size) Size {
+        return .{ .value = size.value + other.value };
     }
 
-    pub fn addInPlace(self: *Size, other: Size) void {
-        self.value += other.value;
+    pub fn addInPlace(size: *Size, other: Size) void {
+        size.value += other.value;
     }
 
-    pub fn subtract(self: Size, other: Size) Size {
-        return .{ .value = self.value - other.value };
+    pub fn subtract(size: Size, other: Size) Size {
+        return .{ .value = size.value - other.value };
     }
 
-    pub fn subtractInPlace(self: *Size, other: Size) void {
-        self.value -= other.value;
+    pub fn subtractInPlace(size: *Size, other: Size) void {
+        size.value -= other.value;
     }
 
-    pub fn multiply(self: Size, other: Size) Size {
-        return .{ .value = self.value * other.value };
+    pub fn multiply(size: Size, other: Size) Size {
+        return .{ .value = size.value * other.value };
     }
 
-    pub fn multiplyInPlace(self: *Size, other: Size) void {
-        self.value *= other.value;
+    pub fn multiplyInPlace(size: *Size, other: Size) void {
+        size.value *= other.value;
     }
 
-    pub fn multiplyScalar(self: Size, value: u64) Size {
-        return .{ .value = self.value * value };
+    pub fn multiplyScalar(size: Size, value: u64) Size {
+        return .{ .value = size.value * value };
     }
 
-    pub fn multiplyScalarInPlace(self: *Size, value: u64) void {
-        self.value *= value;
+    pub fn multiplyScalarInPlace(size: *Size, value: u64) void {
+        size.value *= value;
     }
 
-    pub fn divide(self: Size, other: Size) Size {
-        return .{ .value = self.value / other.value };
+    pub fn divide(size: Size, other: Size) Size {
+        return .{ .value = size.value / other.value };
     }
 
-    pub fn divideInPlace(self: *Size, other: Size) void {
-        self.value /= other.value;
+    pub fn divideInPlace(size: *Size, other: Size) void {
+        size.value /= other.value;
     }
 
-    pub fn divideScalar(self: Size, value: u64) Size {
-        return .{ .value = self.value / value };
+    pub fn divideScalar(size: Size, value: u64) Size {
+        return .{ .value = size.value / value };
     }
 
-    pub fn divideScalarInPlace(self: *Size, value: u64) void {
-        self.value /= value;
+    pub fn divideScalarInPlace(size: *Size, value: u64) void {
+        size.value /= value;
     }
 
     // Must be kept in descending size order due to the logic in `print`
@@ -228,7 +228,7 @@ pub const Size = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64));
+        core.testing.expectSize(Size, @sizeOf(u64));
     }
 };
 

@@ -20,91 +20,91 @@ pub const PhysicalAddress = extern struct {
         return .{ .value = value };
     }
 
-    pub inline fn toRange(self: PhysicalAddress, size: core.Size) PhysicalRange {
-        return .{ .address = self, .size = size };
+    pub inline fn toRange(physical_address: PhysicalAddress, size: core.Size) PhysicalRange {
+        return .{ .address = physical_address, .size = size };
     }
 
-    pub inline fn isAligned(self: PhysicalAddress, alignment: core.Size) bool {
-        return std.mem.isAligned(self.value, alignment.value);
+    pub inline fn isAligned(physical_address: PhysicalAddress, alignment: core.Size) bool {
+        return std.mem.isAligned(physical_address.value, alignment.value);
     }
 
     /// Returns the address rounded up to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignForward(self: PhysicalAddress, alignment: core.Size) PhysicalAddress {
-        return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
+    pub fn alignForward(physical_address: PhysicalAddress, alignment: core.Size) PhysicalAddress {
+        return .{ .value = std.mem.alignForward(u64, physical_address.value, alignment.value) };
     }
 
     /// Rounds up the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignForwardInPlace(self: *PhysicalAddress, alignment: core.Size) void {
-        self.value = std.mem.alignForward(u64, self.value, alignment.value);
+    pub fn alignForwardInPlace(physical_address: *PhysicalAddress, alignment: core.Size) void {
+        physical_address.value = std.mem.alignForward(u64, physical_address.value, alignment.value);
     }
 
     /// Returns the address rounded down to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignBackward(self: PhysicalAddress, alignment: core.Size) PhysicalAddress {
-        return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
+    pub fn alignBackward(physical_address: PhysicalAddress, alignment: core.Size) PhysicalAddress {
+        return .{ .value = std.mem.alignBackward(u64, physical_address.value, alignment.value) };
     }
 
     /// Rounds down the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignBackwardInPlace(self: *PhysicalAddress, alignment: core.Size) void {
-        self.value = std.mem.alignBackward(u64, self.value, alignment.value);
+    pub fn alignBackwardInPlace(physical_address: *PhysicalAddress, alignment: core.Size) void {
+        physical_address.value = std.mem.alignBackward(u64, physical_address.value, alignment.value);
     }
 
-    pub fn moveForward(self: PhysicalAddress, size: core.Size) PhysicalAddress {
-        return .{ .value = self.value + size.value };
+    pub fn moveForward(physical_address: PhysicalAddress, size: core.Size) PhysicalAddress {
+        return .{ .value = physical_address.value + size.value };
     }
 
-    pub fn moveForwardInPlace(self: *PhysicalAddress, size: core.Size) void {
-        self.value += size.value;
+    pub fn moveForwardInPlace(physical_address: *PhysicalAddress, size: core.Size) void {
+        physical_address.value += size.value;
     }
 
-    pub fn moveBackward(self: PhysicalAddress, size: core.Size) PhysicalAddress {
-        return .{ .value = self.value - size.value };
+    pub fn moveBackward(physical_address: PhysicalAddress, size: core.Size) PhysicalAddress {
+        return .{ .value = physical_address.value - size.value };
     }
 
-    pub fn moveBackwardInPlace(self: *PhysicalAddress, size: core.Size) void {
-        self.value -= size.value;
+    pub fn moveBackwardInPlace(physical_address: *PhysicalAddress, size: core.Size) void {
+        physical_address.value -= size.value;
     }
 
-    pub inline fn equal(self: PhysicalAddress, other: PhysicalAddress) bool {
-        return self.value == other.value;
+    pub inline fn equal(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
+        return physical_address.value == other.value;
     }
 
-    pub inline fn lessThan(self: PhysicalAddress, other: PhysicalAddress) bool {
-        return self.value < other.value;
+    pub inline fn lessThan(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
+        return physical_address.value < other.value;
     }
 
-    pub inline fn lessThanOrEqual(self: PhysicalAddress, other: PhysicalAddress) bool {
-        return self.value <= other.value;
+    pub inline fn lessThanOrEqual(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
+        return physical_address.value <= other.value;
     }
 
-    pub inline fn greaterThan(self: PhysicalAddress, other: PhysicalAddress) bool {
-        return self.value > other.value;
+    pub inline fn greaterThan(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
+        return physical_address.value > other.value;
     }
 
-    pub inline fn greaterThanOrEqual(self: PhysicalAddress, other: PhysicalAddress) bool {
-        return self.value >= other.value;
+    pub inline fn greaterThanOrEqual(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
+        return physical_address.value >= other.value;
     }
 
-    pub fn compare(self: PhysicalAddress, other: PhysicalAddress) std.math.Order {
-        if (self.lessThan(other)) return .lt;
-        if (self.greaterThan(other)) return .gt;
+    pub fn compare(physical_address: PhysicalAddress, other: PhysicalAddress) std.math.Order {
+        if (physical_address.lessThan(other)) return .lt;
+        if (physical_address.greaterThan(other)) return .gt;
         return .eq;
     }
 
-    pub fn print(self: PhysicalAddress, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(physical_address: PhysicalAddress, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
-        try writer.print("PhysicalAddress{{ 0x{x:0>16} }}", .{self.value});
+        try writer.print("PhysicalAddress{{ 0x{x:0>16} }}", .{physical_address.value});
     }
 
     pub inline fn format(
-        self: PhysicalAddress,
+        physical_address: PhysicalAddress,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -112,13 +112,13 @@ pub const PhysicalAddress = extern struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(physical_address, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(physical_address, writer.any(), 0);
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64));
+        core.testing.expectSize(PhysicalAddress, @sizeOf(u64));
     }
 };
 
@@ -138,95 +138,95 @@ pub const VirtualAddress = extern struct {
     /// Interprets the address as a pointer.
     ///
     /// It is the caller's responsibility to ensure that the address is valid in the current address space.
-    pub inline fn toPtr(self: VirtualAddress, comptime PtrT: type) PtrT {
-        return @ptrFromInt(self.value);
+    pub inline fn toPtr(virtual_address: VirtualAddress, comptime PtrT: type) PtrT {
+        return @ptrFromInt(virtual_address.value);
     }
 
-    pub inline fn toRange(self: VirtualAddress, size: core.Size) VirtualRange {
-        return .{ .address = self, .size = size };
+    pub inline fn toRange(virtual_address: VirtualAddress, size: core.Size) VirtualRange {
+        return .{ .address = virtual_address, .size = size };
     }
 
-    pub inline fn isAligned(self: VirtualAddress, alignment: core.Size) bool {
-        return std.mem.isAligned(self.value, alignment.value);
+    pub inline fn isAligned(virtual_address: VirtualAddress, alignment: core.Size) bool {
+        return std.mem.isAligned(virtual_address.value, alignment.value);
     }
 
     /// Returns the address rounded up to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignForward(self: VirtualAddress, alignment: core.Size) VirtualAddress {
-        return .{ .value = std.mem.alignForward(u64, self.value, alignment.value) };
+    pub fn alignForward(virtual_address: VirtualAddress, alignment: core.Size) VirtualAddress {
+        return .{ .value = std.mem.alignForward(u64, virtual_address.value, alignment.value) };
     }
 
     /// Rounds up the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignForwardInPlace(self: *VirtualAddress, alignment: core.Size) void {
-        self.value = std.mem.alignForward(u64, self.value, alignment.value);
+    pub fn alignForwardInPlace(virtual_address: *VirtualAddress, alignment: core.Size) void {
+        virtual_address.value = std.mem.alignForward(u64, virtual_address.value, alignment.value);
     }
 
     /// Returns the address rounded down to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignBackward(self: VirtualAddress, alignment: core.Size) VirtualAddress {
-        return .{ .value = std.mem.alignBackward(u64, self.value, alignment.value) };
+    pub fn alignBackward(virtual_address: VirtualAddress, alignment: core.Size) VirtualAddress {
+        return .{ .value = std.mem.alignBackward(u64, virtual_address.value, alignment.value) };
     }
 
     /// Rounds down the address to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
-    pub fn alignBackwardInPlace(self: *VirtualAddress, alignment: core.Size) void {
-        self.value = std.mem.alignBackward(u64, self.value, alignment.value);
+    pub fn alignBackwardInPlace(virtual_address: *VirtualAddress, alignment: core.Size) void {
+        virtual_address.value = std.mem.alignBackward(u64, virtual_address.value, alignment.value);
     }
 
-    pub fn moveForward(self: VirtualAddress, size: core.Size) VirtualAddress {
-        return .{ .value = self.value + size.value };
+    pub fn moveForward(virtual_address: VirtualAddress, size: core.Size) VirtualAddress {
+        return .{ .value = virtual_address.value + size.value };
     }
 
-    pub fn moveForwardInPlace(self: *VirtualAddress, size: core.Size) void {
-        self.value += size.value;
+    pub fn moveForwardInPlace(virtual_address: *VirtualAddress, size: core.Size) void {
+        virtual_address.value += size.value;
     }
 
-    pub fn moveBackward(self: VirtualAddress, size: core.Size) VirtualAddress {
-        return .{ .value = self.value - size.value };
+    pub fn moveBackward(virtual_address: VirtualAddress, size: core.Size) VirtualAddress {
+        return .{ .value = virtual_address.value - size.value };
     }
 
-    pub fn moveBackwardInPlace(self: *VirtualAddress, size: core.Size) void {
-        self.value -= size.value;
+    pub fn moveBackwardInPlace(virtual_address: *VirtualAddress, size: core.Size) void {
+        virtual_address.value -= size.value;
     }
 
-    pub inline fn equal(self: VirtualAddress, other: VirtualAddress) bool {
-        return self.value == other.value;
+    pub inline fn equal(virtual_address: VirtualAddress, other: VirtualAddress) bool {
+        return virtual_address.value == other.value;
     }
 
-    pub inline fn lessThan(self: VirtualAddress, other: VirtualAddress) bool {
-        return self.value < other.value;
+    pub inline fn lessThan(virtual_address: VirtualAddress, other: VirtualAddress) bool {
+        return virtual_address.value < other.value;
     }
 
-    pub inline fn lessThanOrEqual(self: VirtualAddress, other: VirtualAddress) bool {
-        return self.value <= other.value;
+    pub inline fn lessThanOrEqual(virtual_address: VirtualAddress, other: VirtualAddress) bool {
+        return virtual_address.value <= other.value;
     }
 
-    pub inline fn greaterThan(self: VirtualAddress, other: VirtualAddress) bool {
-        return self.value > other.value;
+    pub inline fn greaterThan(virtual_address: VirtualAddress, other: VirtualAddress) bool {
+        return virtual_address.value > other.value;
     }
 
-    pub inline fn greaterThanOrEqual(self: VirtualAddress, other: VirtualAddress) bool {
-        return self.value >= other.value;
+    pub inline fn greaterThanOrEqual(virtual_address: VirtualAddress, other: VirtualAddress) bool {
+        return virtual_address.value >= other.value;
     }
 
-    pub fn compare(self: VirtualAddress, other: VirtualAddress) std.math.Order {
-        if (self.lessThan(other)) return .lt;
-        if (self.greaterThan(other)) return .gt;
+    pub fn compare(virtual_address: VirtualAddress, other: VirtualAddress) std.math.Order {
+        if (virtual_address.lessThan(other)) return .lt;
+        if (virtual_address.greaterThan(other)) return .gt;
         return .eq;
     }
 
-    pub fn print(self: VirtualAddress, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(virtual_address: VirtualAddress, writer: std.io.AnyWriter, indent: usize) !void {
         _ = indent;
-        try writer.print("VirtualAddress{{ 0x{x:0>16} }}", .{self.value});
+        try writer.print("VirtualAddress{{ 0x{x:0>16} }}", .{virtual_address.value});
     }
 
     pub inline fn format(
-        self: VirtualAddress,
+        virtual_address: VirtualAddress,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -234,13 +234,13 @@ pub const VirtualAddress = extern struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(virtual_address, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(virtual_address, writer.any(), 0);
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64));
+        core.testing.expectSize(VirtualAddress, @sizeOf(u64));
     }
 };
 
@@ -258,59 +258,59 @@ pub const PhysicalRange = extern struct {
     /// Returns the address of the first byte __after__ the range.
     ///
     /// If the ranges size is zero, returns the start address of the range.
-    pub fn endBound(self: PhysicalRange) PhysicalAddress {
-        return self.address.moveForward(self.size);
+    pub fn endBound(physical_range: PhysicalRange) PhysicalAddress {
+        return physical_range.address.moveForward(physical_range.size);
     }
 
     /// Returns the last address in this range.
     ///
     /// If the ranges size is zero, returns the start address of the range.
-    pub fn last(self: PhysicalRange) PhysicalAddress {
-        if (self.size.value == 0) return self.address;
-        return self.address.moveForward(self.size.subtract(core.Size.one));
+    pub fn last(physical_range: PhysicalRange) PhysicalAddress {
+        if (physical_range.size.value == 0) return physical_range.address;
+        return physical_range.address.moveForward(physical_range.size.subtract(core.Size.one));
     }
 
-    pub fn equal(self: PhysicalRange, other: PhysicalRange) bool {
-        return self.address.equal(other.address) and self.size.equal(other.size);
+    pub fn equal(physical_range: PhysicalRange, other: PhysicalRange) bool {
+        return physical_range.address.equal(other.address) and physical_range.size.equal(other.size);
     }
 
-    pub fn moveForward(self: PhysicalRange, size: core.Size) PhysicalRange {
+    pub fn moveForward(physical_range: PhysicalRange, size: core.Size) PhysicalRange {
         return .{
-            .address = self.address.moveForward(size),
-            .size = self.size,
+            .address = physical_range.address.moveForward(size),
+            .size = physical_range.size,
         };
     }
 
-    pub fn moveForwardInPlace(self: *PhysicalRange, size: core.Size) void {
-        self.address.moveForwardInPlace(size);
+    pub fn moveForwardInPlace(physical_range: *PhysicalRange, size: core.Size) void {
+        physical_range.address.moveForwardInPlace(size);
     }
 
-    pub fn moveBackward(self: PhysicalRange, size: core.Size) PhysicalRange {
+    pub fn moveBackward(physical_range: PhysicalRange, size: core.Size) PhysicalRange {
         return .{
-            .address = self.address.moveBackward(size),
-            .size = self.size,
+            .address = physical_range.address.moveBackward(size),
+            .size = physical_range.size,
         };
     }
 
-    pub fn moveBackwardInPlace(self: *PhysicalRange, size: core.Size) void {
-        self.address.moveBackwardInPlace(size);
+    pub fn moveBackwardInPlace(physical_range: *PhysicalRange, size: core.Size) void {
+        physical_range.address.moveBackwardInPlace(size);
     }
 
-    pub fn fullyContainsRange(self: PhysicalRange, other: PhysicalRange) bool {
-        if (self.address.greaterThan(other.address)) return false;
-        if (self.endBound().lessThan(other.endBound())) return false;
+    pub fn fullyContainsRange(physical_range: PhysicalRange, other: PhysicalRange) bool {
+        if (physical_range.address.greaterThan(other.address)) return false;
+        if (physical_range.endBound().lessThan(other.endBound())) return false;
 
         return true;
     }
 
-    pub fn containsAddressOrder(self: PhysicalRange, address: PhysicalAddress) std.math.Order {
-        if (self.address.greaterThan(address)) return .lt;
-        if (self.endBound().lessThanOrEqual(address)) return .gt;
+    pub fn containsAddressOrder(physical_range: PhysicalRange, address: PhysicalAddress) std.math.Order {
+        if (physical_range.address.greaterThan(address)) return .lt;
+        if (physical_range.endBound().lessThanOrEqual(address)) return .gt;
         return .eq;
     }
 
-    pub fn containsAddress(self: PhysicalRange, address: PhysicalAddress) bool {
-        return self.containsAddressOrder(address) == .eq;
+    pub fn containsAddress(physical_range: PhysicalRange, address: PhysicalAddress) bool {
+        return physical_range.containsAddressOrder(address) == .eq;
     }
 
     pub fn print(value: PhysicalRange, writer: std.io.AnyWriter, indent: usize) !void {
@@ -354,8 +354,8 @@ pub const VirtualRange = extern struct {
     /// It is the caller's responsibility to ensure:
     ///   - the range is valid in the current address space
     ///   - no writes are performed if the range is read-only
-    pub inline fn toByteSlice(self: VirtualRange) []u8 {
-        return self.address.toPtr([*]u8)[0..self.size.value];
+    pub inline fn toByteSlice(virtual_range: VirtualRange) []u8 {
+        return virtual_range.address.toPtr([*]u8)[0..virtual_range.size.value];
     }
 
     pub inline fn fromAddr(address: VirtualAddress, size: core.Size) VirtualRange {
@@ -378,59 +378,59 @@ pub const VirtualRange = extern struct {
     /// Returns the address of the first byte __after__ the range.
     ///
     /// If the ranges size is zero, returns the start address of the range.
-    pub fn endBound(self: VirtualRange) VirtualAddress {
-        return self.address.moveForward(self.size);
+    pub fn endBound(virtual_range: VirtualRange) VirtualAddress {
+        return virtual_range.address.moveForward(virtual_range.size);
     }
 
     /// Returns the last address in this range.
     ///
     /// If the ranges size is zero, returns the start address of the range.
-    pub fn last(self: VirtualRange) VirtualAddress {
-        if (self.size.value == 0) return self.address;
-        return self.address.moveForward(self.size.subtract(core.Size.one));
+    pub fn last(virtual_range: VirtualRange) VirtualAddress {
+        if (virtual_range.size.value == 0) return virtual_range.address;
+        return virtual_range.address.moveForward(virtual_range.size.subtract(core.Size.one));
     }
 
-    pub fn equal(self: VirtualRange, other: VirtualRange) bool {
-        return self.address.equal(other.address) and self.size.equal(other.size);
+    pub fn equal(virtual_range: VirtualRange, other: VirtualRange) bool {
+        return virtual_range.address.equal(other.address) and virtual_range.size.equal(other.size);
     }
 
-    pub fn moveForward(self: VirtualRange, size: core.Size) VirtualRange {
+    pub fn moveForward(virtual_range: VirtualRange, size: core.Size) VirtualRange {
         return .{
-            .address = self.address.moveForward(size),
-            .size = self.size,
+            .address = virtual_range.address.moveForward(size),
+            .size = virtual_range.size,
         };
     }
 
-    pub fn moveForwardInPlace(self: *VirtualRange, size: core.Size) void {
-        self.address.moveForwardInPlace(size);
+    pub fn moveForwardInPlace(virtual_range: *VirtualRange, size: core.Size) void {
+        virtual_range.address.moveForwardInPlace(size);
     }
 
-    pub fn moveBackward(self: VirtualRange, size: core.Size) VirtualRange {
+    pub fn moveBackward(virtual_range: VirtualRange, size: core.Size) VirtualRange {
         return .{
-            .address = self.address.moveBackward(size),
-            .size = self.size,
+            .address = virtual_range.address.moveBackward(size),
+            .size = virtual_range.size,
         };
     }
 
-    pub fn moveBackwardInPlace(self: *VirtualRange, size: core.Size) void {
-        self.address.moveBackwardInPlace(size);
+    pub fn moveBackwardInPlace(virtual_range: *VirtualRange, size: core.Size) void {
+        virtual_range.address.moveBackwardInPlace(size);
     }
 
-    pub fn fullyContainsRange(self: VirtualRange, other: VirtualRange) bool {
-        if (self.address.greaterThan(other.address)) return false;
-        if (self.endBound().lessThan(other.endBound())) return false;
+    pub fn fullyContainsRange(virtual_range: VirtualRange, other: VirtualRange) bool {
+        if (virtual_range.address.greaterThan(other.address)) return false;
+        if (virtual_range.endBound().lessThan(other.endBound())) return false;
 
         return true;
     }
 
-    pub fn containsAddressOrder(self: VirtualRange, address: VirtualAddress) std.math.Order {
-        if (self.address.greaterThan(address)) return .lt;
-        if (self.endBound().lessThanOrEqual(address)) return .gt;
+    pub fn containsAddressOrder(virtual_range: VirtualRange, address: VirtualAddress) std.math.Order {
+        if (virtual_range.address.greaterThan(address)) return .lt;
+        if (virtual_range.endBound().lessThanOrEqual(address)) return .gt;
         return .eq;
     }
 
-    pub fn containsAddress(self: VirtualRange, address: VirtualAddress) bool {
-        return self.containsAddressOrder(address) == .eq;
+    pub fn containsAddress(virtual_range: VirtualRange, address: VirtualAddress) bool {
+        return virtual_range.containsAddressOrder(address) == .eq;
     }
 
     pub fn print(value: VirtualRange, writer: std.io.AnyWriter, indent: usize) !void {

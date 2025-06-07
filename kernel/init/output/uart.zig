@@ -9,9 +9,9 @@ pub const Uart = union(enum) {
 
     pl011: PL011,
 
-    pub fn output(self: *Uart) kernel.init.Output {
-        switch (self.*) {
-            inline else => |*uart| return uart.output(),
+    pub fn output(uart: *Uart) kernel.init.Output {
+        switch (uart.*) {
+            inline else => |*u| return u.output(),
         }
     }
 };
@@ -34,14 +34,14 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
         write_register: AddressT,
         line_status_register: AddressT,
 
-        const Self = @This();
+        const UartT = @This();
 
         pub const AddressT = switch (mode) {
             .memory => [*]volatile u8,
             .io_port => u16,
         };
 
-        pub fn init(base: AddressT, baud: ?Baud) Baud.DivisorError!?Self {
+        pub fn init(base: AddressT, baud: ?Baud) Baud.DivisorError!?UartT {
             // write to scratch register to check if the UART is connected
             writeRegister(base + @intFromEnum(RegisterOffset.scratch), 0xBA);
 
@@ -162,14 +162,14 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
             };
         }
 
-        fn writeSlice(self: Self, str: []const u8) void {
+        fn writeSlice(uart: UartT, str: []const u8) void {
             if (fifo) {
                 var i: usize = 0;
 
                 var last_byte_carridge_return = false;
 
                 while (i < str.len) {
-                    self.waitForOutputReady();
+                    uart.waitForOutputReady();
 
                     // FIFO is empty meaning we can write 16 bytes
                     var bytes_to_write = @min(str.len - i, 16);
@@ -188,7 +188,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                                 if (!last_byte_carridge_return) {
                                     @branchHint(.likely);
 
-                                    writeRegister(self.write_register, '\r');
+                                    writeRegister(uart.write_register, '\r');
                                     bytes_to_write -= 1;
 
                                     if (bytes_to_write == 0) {
@@ -208,7 +208,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                             },
                         }
 
-                        writeRegister(self.write_register, byte);
+                        writeRegister(uart.write_register, byte);
                         bytes_to_write -= 1;
                         i += 1;
                     }
@@ -224,23 +224,23 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
 
                         if (newline_first_or_only or str[i - 1] != '\r') {
                             @branchHint(.likely);
-                            self.waitForOutputReady();
-                            writeRegister(self.write_register, '\r');
+                            uart.waitForOutputReady();
+                            writeRegister(uart.write_register, '\r');
                         }
                     }
 
-                    self.waitForOutputReady();
-                    writeRegister(self.write_register, byte);
+                    uart.waitForOutputReady();
+                    writeRegister(uart.write_register, byte);
                 }
             }
         }
 
-        pub fn output(self: *Self) kernel.init.Output {
+        pub fn output(uart: *UartT) kernel.init.Output {
             return .{
                 .writeFn = struct {
                     fn writeFn(context: *anyopaque, str: []const u8) void {
-                        const uart: *Self = @ptrCast(@alignCast(context));
-                        uart.writeSlice(str);
+                        const inner_uart: *UartT = @ptrCast(@alignCast(context));
+                        inner_uart.writeSlice(str);
                     }
                 }.writeFn,
                 .remapFn = struct {
@@ -248,25 +248,25 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                         switch (mode) {
                             .io_port => {},
                             .memory => {
-                                const uart: *Self = @ptrCast(@alignCast(context));
+                                const inner_uart: *UartT = @ptrCast(@alignCast(context));
                                 const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
-                                    .fromPtr(@volatileCast(uart.write_register)),
+                                    .fromPtr(@volatileCast(inner_uart.write_register)),
                                 );
-                                uart.write_register = kernel.mem
+                                inner_uart.write_register = kernel.mem
                                     .nonCachedDirectMapFromPhysical(write_register_physical_address)
                                     .toPtr([*]volatile u8);
-                                uart.line_status_register = uart.write_register + @intFromEnum(RegisterOffset.line_status);
+                                inner_uart.line_status_register = inner_uart.write_register + @intFromEnum(RegisterOffset.line_status);
                             },
                         }
                     }
                 }.remapFn,
-                .context = self,
+                .context = uart,
             };
         }
 
-        inline fn waitForOutputReady(self: Self) void {
+        inline fn waitForOutputReady(uart: UartT) void {
             while (true) {
-                const line_status: LineStatusRegister = @bitCast(readRegister(self.line_status_register));
+                const line_status: LineStatusRegister = @bitCast(readRegister(uart.line_status_register));
                 if (line_status.transmitter_holding_register_empty) return;
                 // TODO: should there be a spinloop hint here?
             }
@@ -472,13 +472,13 @@ pub const PL011 = struct {
         };
     }
 
-    fn writeSlice(self: PL011, str: []const u8) void {
+    fn writeSlice(pl011: PL011, str: []const u8) void {
         var i: usize = 0;
 
         var last_byte_carridge_return = false;
 
         while (i < str.len) {
-            self.waitForOutputReady();
+            pl011.waitForOutputReady();
 
             // FIFO is empty meaning we can write 32 bytes
             var bytes_to_write = @min(str.len - i, 32);
@@ -497,7 +497,7 @@ pub const PL011 = struct {
                         if (!last_byte_carridge_return) {
                             @branchHint(.likely);
 
-                            writeRegister(self.write_register, '\r');
+                            writeRegister(pl011.write_register, '\r');
                             bytes_to_write -= 1;
 
                             if (bytes_to_write == 0) {
@@ -517,14 +517,14 @@ pub const PL011 = struct {
                     },
                 }
 
-                writeRegister(self.write_register, byte);
+                writeRegister(pl011.write_register, byte);
                 bytes_to_write -= 1;
                 i += 1;
             }
         }
     }
 
-    pub fn output(self: *PL011) kernel.init.Output {
+    pub fn output(pl011: *PL011) kernel.init.Output {
         return .{
             .writeFn = struct {
                 fn writeFn(context: *anyopaque, str: []const u8) void {
@@ -544,13 +544,13 @@ pub const PL011 = struct {
                     uart.flag_register = uart.write_register + @intFromEnum(RegisterOffset.Flag);
                 }
             }.remapFn,
-            .context = self,
+            .context = pl011,
         };
     }
 
-    inline fn waitForOutputReady(self: PL011) void {
+    inline fn waitForOutputReady(pl011: PL011) void {
         while (true) {
-            const flags: FlagRegister = @bitCast(readRegister(self.flag_register));
+            const flags: FlagRegister = @bitCast(readRegister(pl011.flag_register));
             if (flags.transmit_fifo_empty) return;
             // TODO: should there be a spinloop hint here?
         }
@@ -665,9 +665,9 @@ pub const Baud = struct {
         DivisorTooLarge,
     };
 
-    pub fn integerDivisor(self: Baud) DivisorError!u16 {
-        const baud_rate = @intFromEnum(self.baud_rate);
-        const clock_frequency = @intFromEnum(self.clock_frequency);
+    pub fn integerDivisor(baud: Baud) DivisorError!u16 {
+        const baud_rate = @intFromEnum(baud.baud_rate);
+        const clock_frequency = @intFromEnum(baud.clock_frequency);
 
         std.debug.assert(baud_rate != 0);
         std.debug.assert(clock_frequency != 0);
@@ -681,9 +681,9 @@ pub const Baud = struct {
         integer: u16,
     };
 
-    pub fn fractionalDivisor(self: Baud) DivisorError!Fractional {
-        const baud_rate = @intFromEnum(self.baud_rate);
-        const clock_frequency = @intFromEnum(self.clock_frequency);
+    pub fn fractionalDivisor(baud: Baud) DivisorError!Fractional {
+        const baud_rate = @intFromEnum(baud.baud_rate);
+        const clock_frequency = @intFromEnum(baud.clock_frequency);
 
         std.debug.assert(baud_rate != 0);
         std.debug.assert(clock_frequency != 0);

@@ -8,8 +8,8 @@ waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 /// Returns the first task in the wait queue.
 ///
 /// It is the callers responsibility to ensure that the task is not removed from the wait queue.
-pub fn firstTask(self: *WaitQueue) ?*kernel.Task {
-    const node = self.waiting_tasks.start_node orelse return null;
+pub fn firstTask(wait_queue: *WaitQueue) ?*kernel.Task {
+    const node = wait_queue.waiting_tasks.start_node orelse return null;
     return kernel.Task.fromNode(node);
 }
 
@@ -17,7 +17,7 @@ pub fn firstTask(self: *WaitQueue) ?*kernel.Task {
 ///
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wakeOne(
-    self: *WaitQueue,
+    wait_queue: *WaitQueue,
     current_task: *kernel.Task,
     spinlock: *const kernel.sync.TicketSpinLock,
 ) void {
@@ -25,7 +25,7 @@ pub fn wakeOne(
 
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
-    const task_to_wake_node = self.waiting_tasks.pop() orelse return;
+    const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
     const task_to_wake = kernel.Task.fromNode(task_to_wake_node);
 
     std.debug.assert(task_to_wake.state == .blocked);
@@ -41,7 +41,7 @@ pub fn wakeOne(
 ///
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
-    self: *WaitQueue,
+    wait_queue: *WaitQueue,
     current_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
@@ -49,7 +49,7 @@ pub fn wait(
 
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
-    self.waiting_tasks.push(&current_task.next_task_node);
+    wait_queue.waiting_tasks.push(&current_task.next_task_node);
 
     kernel.scheduler.lockScheduler(current_task);
     defer kernel.scheduler.unlockScheduler(current_task);

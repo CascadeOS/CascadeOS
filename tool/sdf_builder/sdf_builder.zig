@@ -659,7 +659,8 @@ fn createSdfDebugInfo(
 
     const string_table_offset, const string_table_length = try string_table.output(&output_buffer);
     const file_table_offset, const file_table_entries = try file_table.output(&output_buffer);
-    const location_lookup_offset, const location_program_states_offset, const location_lookup_entries = try location_lookup.output(&output_buffer);
+    const location_lookup_offset, const location_program_states_offset, const location_lookup_entries =
+        try location_lookup.output(&output_buffer);
     const location_program_offset, const location_program_length = try location_program.output(&output_buffer);
 
     // write out header
@@ -687,19 +688,29 @@ fn createSdfDebugInfo(
 const custom_atomic_file = struct {
     /// The same as `std.fs.Dir.atomicFile` but it opens the file as read and write
     fn atomicFileReadAndWrite(
-        self: std.fs.Dir,
+        parent_dir: std.fs.Dir,
         dest_path: []const u8,
         options: std.fs.Dir.AtomicFileOptions,
     ) !std.fs.AtomicFile {
         if (std.fs.path.dirname(dest_path)) |dirname| {
             const dir = if (options.make_path)
-                try self.makeOpenPath(dirname, .{})
+                try parent_dir.makeOpenPath(dirname, .{})
             else
-                try self.openDir(dirname, .{});
+                try parent_dir.openDir(dirname, .{});
 
-            return atomicFileInitReadAndWrite(std.fs.path.basename(dest_path), options.mode, dir, true);
+            return atomicFileInitReadAndWrite(
+                std.fs.path.basename(dest_path),
+                options.mode,
+                dir,
+                true,
+            );
         } else {
-            return atomicFileInitReadAndWrite(dest_path, options.mode, self, false);
+            return atomicFileInitReadAndWrite(
+                dest_path,
+                options.mode,
+                parent_dir,
+                false,
+            );
         }
     }
 

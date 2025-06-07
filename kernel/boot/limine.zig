@@ -41,18 +41,18 @@ pub const MemoryMapIterator = struct {
     direction: core.Direction,
 
     pub fn next(memory_map: *boot.MemoryMap) ?boot.MemoryMap.Entry {
-        const self: *MemoryMapIterator = @ptrCast(@alignCast(&memory_map.backing));
+        const memory_map_iterator: *MemoryMapIterator = @ptrCast(@alignCast(&memory_map.backing));
 
-        const limine_entry = switch (self.direction) {
+        const limine_entry = switch (memory_map_iterator.direction) {
             .backward => blk: {
-                if (self.index == 0) return null;
-                self.index -= 1;
-                break :blk self.entries[self.index];
+                if (memory_map_iterator.index == 0) return null;
+                memory_map_iterator.index -= 1;
+                break :blk memory_map_iterator.entries[memory_map_iterator.index];
             },
             .forward => blk: {
-                if (self.index >= self.entries.len) return null;
-                const entry = self.entries[self.index];
-                self.index += 1;
+                if (memory_map_iterator.index >= memory_map_iterator.entries.len) return null;
+                const entry = memory_map_iterator.entries[memory_map_iterator.index];
+                memory_map_iterator.index += 1;
                 break :blk entry;
             },
         };

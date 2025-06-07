@@ -112,16 +112,16 @@ pub const Interrupt = enum(u8) {
     const first_available_interrupt = @intFromEnum(Interrupt.per_executor_periodic) + 1;
     const last_available_interrupt = @intFromEnum(Interrupt.spurious_interrupt) - 1;
 
-    pub inline fn toInterruptVector(self: Interrupt) lib_x64.InterruptVector {
-        return @enumFromInt(@intFromEnum(self));
+    pub inline fn toInterruptVector(interrupt: Interrupt) lib_x64.InterruptVector {
+        return @enumFromInt(@intFromEnum(interrupt));
     }
 
-    pub inline fn hasErrorCode(self: Interrupt) bool {
-        return self.toInterruptVector().hasErrorCode();
+    pub inline fn hasErrorCode(interrupt: Interrupt) bool {
+        return interrupt.toInterruptVector().hasErrorCode();
     }
 
-    pub inline fn isException(self: Interrupt) bool {
-        return self.toInterruptVector().isException();
+    pub inline fn isException(interrupt: Interrupt) bool {
+        return interrupt.toInterruptVector().isException();
     }
 };
 
@@ -167,13 +167,13 @@ pub const InterruptFrame = extern struct {
     },
 
     /// Checks if this interrupt occurred in kernel mode.
-    pub inline fn isKernel(self: *const InterruptFrame) bool {
-        return self.cs.selector == .kernel_code;
+    pub inline fn isKernel(interrupt_frame: *const InterruptFrame) bool {
+        return interrupt_frame.cs.selector == .kernel_code;
     }
 
     /// Checks if this interrupt occurred in user mode.
-    pub inline fn isUser(self: *const InterruptFrame) bool {
-        return self.cs.selector == .user_code;
+    pub inline fn isUser(interrupt_frame: *const InterruptFrame) bool {
+        return interrupt_frame.cs.selector == .user_code;
     }
 
     pub fn print(
@@ -258,8 +258,8 @@ const Handler = struct {
     context1: ?*anyopaque = null,
     context2: ?*anyopaque = null,
 
-    inline fn call(self: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
-        self.interrupt_handler(current_task, interrupt_frame, self.context1, self.context2);
+    inline fn call(handler: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
+        handler.interrupt_handler(current_task, interrupt_frame, handler.context1, handler.context2);
     }
 };
 

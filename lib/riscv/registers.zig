@@ -32,8 +32,8 @@ pub const SupervisorStatus = packed struct(u64) {
         return @bitCast(csr.read());
     }
 
-    pub fn write(self: SupervisorStatus) void {
-        csr.write(@bitCast(self));
+    pub fn write(supervisor_status: SupervisorStatus) void {
+        csr.write(@bitCast(supervisor_status));
     }
 
     pub const csr = CSR("sstatus");

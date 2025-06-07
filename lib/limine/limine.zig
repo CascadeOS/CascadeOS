@@ -54,13 +54,13 @@ pub const BaseRevison = extern struct {
 
         _,
 
-        pub fn equalToOrGreaterThan(self: Revison, other: Revison) bool {
-            return @intFromEnum(self) >= @intFromEnum(other);
+        pub fn equalToOrGreaterThan(revision: Revison, other: Revison) bool {
+            return @intFromEnum(revision) >= @intFromEnum(other);
         }
     };
 
     comptime {
-        core.testing.expectSize(@This(), 3 * @sizeOf(u64));
+        core.testing.expectSize(BaseRevison, 3 * @sizeOf(u64));
     }
 };
 
@@ -102,25 +102,25 @@ pub const BootloaderInfo = extern struct {
         _name: [*:0]const u8,
         _version: [*:0]const u8,
 
-        pub fn name(self: *const Response) [:0]const u8 {
-            return std.mem.sliceTo(self._name, 0);
+        pub fn name(response: *const Response) [:0]const u8 {
+            return std.mem.sliceTo(response._name, 0);
         }
 
-        pub fn version(self: *const Response) [:0]const u8 {
-            return std.mem.sliceTo(self._version, 0);
+        pub fn version(response: *const Response) [:0]const u8 {
+            return std.mem.sliceTo(response._version, 0);
         }
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
             try writer.print("Bootloader({s} {s})", .{
-                self.name(),
-                self.version(),
+                response.name(),
+                response.version(),
             });
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -128,9 +128,9 @@ pub const BootloaderInfo = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -146,14 +146,14 @@ pub const FirmwareType = extern struct {
         revision: u64,
         firmware_type: Type,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("Firmware({s})", .{@tagName(self.firmware_type)});
+            try writer.print("Firmware({s})", .{@tagName(response.firmware_type)});
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -161,9 +161,9 @@ pub const FirmwareType = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 
@@ -205,14 +205,14 @@ pub const HHDM = extern struct {
         /// the virtual address offset of the beginning of the higher half direct map
         offset: core.VirtualAddress,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("HHDM({})", .{self.offset});
+            try writer.print("HHDM({})", .{response.offset});
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -220,9 +220,9 @@ pub const HHDM = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -241,8 +241,8 @@ pub const Framebuffer = extern struct {
 
         _framebuffers: [*]const *const LimineFramebuffer,
 
-        pub fn framebuffers(self: *const Response) []const *const LimineFramebuffer {
-            return self._framebuffers[0..self._framebuffer_count];
+        pub fn framebuffers(response: *const Response) []const *const LimineFramebuffer {
+            return response._framebuffers[0..response._framebuffer_count];
         }
     };
 
@@ -275,29 +275,32 @@ pub const Framebuffer = extern struct {
         /// Response revision 1 required
         _video_modes: [*]const *const VideoMode,
 
-        pub fn print(self: LimineFramebuffer, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(limine_framebuffer: LimineFramebuffer, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("Framebuffer{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("address: {}\n", .{self.address});
+            try writer.print("address: {}\n", .{limine_framebuffer.address});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("resolution: {}x{}@{}\n", .{ self.width, self.height, self.bpp });
+            try writer.print(
+                "resolution: {}x{}@{}\n",
+                .{ limine_framebuffer.width, limine_framebuffer.height, limine_framebuffer.bpp },
+            );
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("pitch: {}\n", .{self.pitch});
+            try writer.print("pitch: {}\n", .{limine_framebuffer.pitch});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("memory_model: {s}\n", .{@tagName(self.memory_model)});
+            try writer.print("memory_model: {s}\n", .{@tagName(limine_framebuffer.memory_model)});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: LimineFramebuffer,
+            limine_framebuffer: LimineFramebuffer,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -305,19 +308,26 @@ pub const Framebuffer = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                LimineFramebuffer.print(self, writer, 0)
+                LimineFramebuffer.print(limine_framebuffer, writer, 0)
             else
-                LimineFramebuffer.print(self, writer.any(), 0);
+                LimineFramebuffer.print(limine_framebuffer, writer.any(), 0);
         }
 
-        pub fn edid(self: *const LimineFramebuffer) ?[]const u8 {
-            if (self._edid.value == 0) return null;
+        pub fn edid(limine_framebuffer: *const LimineFramebuffer) ?[]const u8 {
+            if (limine_framebuffer._edid.value == 0) return null;
 
-            return core.VirtualRange.fromAddr(self._edid, self._edid_size).toByteSlice();
+            return core.VirtualRange.fromAddr(
+                limine_framebuffer._edid,
+                limine_framebuffer._edid_size,
+            ).toByteSlice();
         }
 
-        pub fn videoModes(self: *const LimineFramebuffer, revision: BaseRevison.Revison) []const *const VideoMode {
-            if (revision.equalToOrGreaterThan(.@"1")) return self._video_modes[0..self._video_mode_count];
+        pub fn videoModes(
+            limine_framebuffer: *const LimineFramebuffer,
+            revision: BaseRevison.Revison,
+        ) []const *const VideoMode {
+            if (revision.equalToOrGreaterThan(.@"1"))
+                return limine_framebuffer._video_modes[0..limine_framebuffer._video_mode_count];
 
             return &.{};
         }
@@ -339,26 +349,29 @@ pub const Framebuffer = extern struct {
         blue_mask_size: u8,
         blue_mask_shift: u8,
 
-        pub fn print(self: VideoMode, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(video_mode: VideoMode, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("VideoMode{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("resolution: {}x{}@{}\n", .{ self.width, self.height, self.bpp });
+            try writer.print(
+                "resolution: {}x{}@{}\n",
+                .{ video_mode.width, video_mode.height, video_mode.bpp },
+            );
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("pitch: {}\n", .{self.pitch});
+            try writer.print("pitch: {}\n", .{video_mode.pitch});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("memory_model: {s}\n", .{@tagName(self.memory_model)});
+            try writer.print("memory_model: {s}\n", .{@tagName(video_mode.memory_model)});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: VideoMode,
+            video_mode: VideoMode,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -366,9 +379,9 @@ pub const Framebuffer = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                VideoMode.print(self, writer, 0)
+                VideoMode.print(video_mode, writer, 0)
             else
-                VideoMode.print(self, writer.any(), 0);
+                VideoMode.print(video_mode, writer.any(), 0);
         }
     };
 
@@ -425,14 +438,14 @@ pub const PagingMode = extern struct {
         /// Executables must be prepared to handle the case where the requested paging mode is not supported by the hardware.
         mode: Mode,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("PagingMode({s})", .{@tagName(self.mode)});
+            try writer.print("PagingMode({s})", .{@tagName(response.mode)});
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -440,9 +453,9 @@ pub const PagingMode = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 
@@ -526,22 +539,22 @@ pub const MP = extern struct {
         _cpu_count: u64,
         _cpus: [*]*MPInfo,
 
-        pub fn cpus(self: *const aarch64) []*MPInfo {
-            return self._cpus[0..self._cpu_count];
+        pub fn cpus(response: *const aarch64) []*MPInfo {
+            return response._cpus[0..response._cpu_count];
         }
 
-        pub fn print(self: aarch64, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: aarch64, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("MP{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("bsp_mpidr: {}\n", .{self.bsp_mpidr});
+            try writer.print("bsp_mpidr: {}\n", .{response.bsp_mpidr});
 
             try writer.writeByteNTimes(' ', new_indent);
             try writer.writeAll("cpus:\n");
 
-            for (self.cpus()) |cpu| {
+            for (response.cpus()) |cpu| {
                 try writer.writeByteNTimes(' ', new_indent + 2);
                 try cpu.print(writer, new_indent + 2);
                 try writer.writeByte('\n');
@@ -552,7 +565,7 @@ pub const MP = extern struct {
         }
 
         pub inline fn format(
-            self: aarch64,
+            response: aarch64,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -560,9 +573,9 @@ pub const MP = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                aarch64.print(self, writer, 0)
+                aarch64.print(response, writer, 0)
             else
-                aarch64.print(self, writer.any(), 0);
+                aarch64.print(response, writer.any(), 0);
         }
 
         pub const MPInfo = extern struct {
@@ -589,23 +602,23 @@ pub const MP = extern struct {
             /// A free for use field
             extra_argument: u64,
 
-            pub fn print(self: MPInfo, writer: std.io.AnyWriter, indent: usize) !void {
+            pub fn print(mp_info: MPInfo, writer: std.io.AnyWriter, indent: usize) !void {
                 const new_indent = indent + 2;
 
                 try writer.writeAll("CPU{\n");
 
                 try writer.writeByteNTimes(' ', new_indent);
-                try writer.print("processor_id: {}\n", .{self.processor_id});
+                try writer.print("processor_id: {}\n", .{mp_info.processor_id});
 
                 try writer.writeByteNTimes(' ', new_indent);
-                try writer.print("mpidr: {}\n", .{self.mpidr});
+                try writer.print("mpidr: {}\n", .{mp_info.mpidr});
 
                 try writer.writeByteNTimes(' ', indent);
                 try writer.writeByte('}');
             }
 
             pub inline fn format(
-                self: MPInfo,
+                mp_info: MPInfo,
                 comptime fmt: []const u8,
                 options: std.fmt.FormatOptions,
                 writer: anytype,
@@ -613,9 +626,9 @@ pub const MP = extern struct {
                 _ = options;
                 _ = fmt;
                 return if (@TypeOf(writer) == std.io.AnyWriter)
-                    MPInfo.print(self, writer, 0)
+                    MPInfo.print(mp_info, writer, 0)
                 else
-                    MPInfo.print(self, writer.any(), 0);
+                    MPInfo.print(mp_info, writer.any(), 0);
             }
         };
     };
@@ -632,18 +645,18 @@ pub const MP = extern struct {
         _cpu_count: u64,
         _cpus: [*]*MPInfo,
 
-        pub fn print(self: riscv64, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: riscv64, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("MP{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("bsp_hartid: {}\n", .{self.bsp_hartid});
+            try writer.print("bsp_hartid: {}\n", .{response.bsp_hartid});
 
             try writer.writeByteNTimes(' ', new_indent);
             try writer.writeAll("cpus:\n");
 
-            for (self.cpus()) |cpu| {
+            for (response.cpus()) |cpu| {
                 try writer.writeByteNTimes(' ', new_indent + 2);
                 try cpu.print(writer, new_indent + 2);
                 try writer.writeByte('\n');
@@ -654,7 +667,7 @@ pub const MP = extern struct {
         }
 
         pub inline fn format(
-            self: riscv64,
+            response: riscv64,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -662,13 +675,13 @@ pub const MP = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                riscv64.print(self, writer, 0)
+                riscv64.print(response, writer, 0)
             else
-                riscv64.print(self, writer.any(), 0);
+                riscv64.print(response, writer.any(), 0);
         }
 
-        pub fn cpus(self: *const riscv64) []*MPInfo {
-            return self._cpus[0..self._cpu_count];
+        pub fn cpus(response: *const riscv64) []*MPInfo {
+            return response._cpus[0..response._cpu_count];
         }
 
         pub const MPInfo = extern struct {
@@ -693,23 +706,23 @@ pub const MP = extern struct {
             /// A free for use field
             extra_argument: u64,
 
-            pub fn print(self: MPInfo, writer: std.io.AnyWriter, indent: usize) !void {
+            pub fn print(mp_info: MPInfo, writer: std.io.AnyWriter, indent: usize) !void {
                 const new_indent = indent + 2;
 
                 try writer.writeAll("CPU{\n");
 
                 try writer.writeByteNTimes(' ', new_indent);
-                try writer.print("processor_id: {}\n", .{self.processor_id});
+                try writer.print("processor_id: {}\n", .{mp_info.processor_id});
 
                 try writer.writeByteNTimes(' ', new_indent);
-                try writer.print("hartid: {}\n", .{self.hartid});
+                try writer.print("hartid: {}\n", .{mp_info.hartid});
 
                 try writer.writeByteNTimes(' ', indent);
                 try writer.writeByte('}');
             }
 
             pub inline fn format(
-                self: MPInfo,
+                mp_info: MPInfo,
                 comptime fmt: []const u8,
                 options: std.fmt.FormatOptions,
                 writer: anytype,
@@ -717,9 +730,9 @@ pub const MP = extern struct {
                 _ = options;
                 _ = fmt;
                 return if (@TypeOf(writer) == std.io.AnyWriter)
-                    MPInfo.print(self, writer, 0)
+                    MPInfo.print(mp_info, writer, 0)
                 else
-                    MPInfo.print(self, writer.any(), 0);
+                    MPInfo.print(mp_info, writer.any(), 0);
             }
         };
     };
@@ -741,25 +754,25 @@ pub const MP = extern struct {
             _: u31 = 0,
         };
 
-        pub fn cpus(self: *const x86_64) []*MPInfo {
-            return self._cpus[0..self._cpu_count];
+        pub fn cpus(response: *const x86_64) []*MPInfo {
+            return response._cpus[0..response._cpu_count];
         }
 
-        pub fn print(self: x86_64, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: x86_64, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("MP{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("bsp_lapic_id: {}\n", .{self.bsp_lapic_id});
+            try writer.print("bsp_lapic_id: {}\n", .{response.bsp_lapic_id});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("x2apic_enabled: {}\n", .{self.flags.x2apic_enabled});
+            try writer.print("x2apic_enabled: {}\n", .{response.flags.x2apic_enabled});
 
             try writer.writeByteNTimes(' ', new_indent);
             try writer.writeAll("cpus:\n");
 
-            for (self.cpus()) |cpu| {
+            for (response.cpus()) |cpu| {
                 try writer.writeByteNTimes(' ', new_indent + 2);
                 try cpu.print(writer, new_indent + 2);
                 try writer.writeByte('\n');
@@ -770,7 +783,7 @@ pub const MP = extern struct {
         }
 
         pub inline fn format(
-            self: x86_64,
+            response: x86_64,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -778,9 +791,9 @@ pub const MP = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                x86_64.print(self, writer, 0)
+                x86_64.print(response, writer, 0)
             else
-                x86_64.print(self, writer.any(), 0);
+                x86_64.print(response, writer.any(), 0);
         }
 
         pub const MPInfo = extern struct {
@@ -808,23 +821,23 @@ pub const MP = extern struct {
             /// A free for use field
             extra_argument: u64,
 
-            pub fn print(self: MPInfo, writer: std.io.AnyWriter, indent: usize) !void {
+            pub fn print(mp_info: MPInfo, writer: std.io.AnyWriter, indent: usize) !void {
                 const new_indent = indent + 2;
 
                 try writer.writeAll("CPU{\n");
 
                 try writer.writeByteNTimes(' ', new_indent);
-                try writer.print("processor_id: {}\n", .{self.processor_id});
+                try writer.print("processor_id: {}\n", .{mp_info.processor_id});
 
                 try writer.writeByteNTimes(' ', new_indent);
-                try writer.print("lapic_id: {}\n", .{self.lapic_id});
+                try writer.print("lapic_id: {}\n", .{mp_info.lapic_id});
 
                 try writer.writeByteNTimes(' ', indent);
                 try writer.writeByte('}');
             }
 
             pub inline fn format(
-                self: MPInfo,
+                mp_info: MPInfo,
                 comptime fmt: []const u8,
                 options: std.fmt.FormatOptions,
                 writer: anytype,
@@ -832,9 +845,9 @@ pub const MP = extern struct {
                 _ = options;
                 _ = fmt;
                 return if (@TypeOf(writer) == std.io.AnyWriter)
-                    MPInfo.print(self, writer, 0)
+                    MPInfo.print(mp_info, writer, 0)
                 else
-                    MPInfo.print(self, writer.any(), 0);
+                    MPInfo.print(mp_info, writer.any(), 0);
             }
         };
     };
@@ -870,11 +883,11 @@ pub const Memmap = extern struct {
         _entry_count: u64,
         _entries: [*]const *const Entry,
 
-        pub fn entries(self: *const Response) []const *const Entry {
-            return self._entries[0..self._entry_count];
+        pub fn entries(response: *const Response) []const *const Entry {
+            return response._entries[0..response._entry_count];
         }
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("Memmap{\n");
@@ -882,7 +895,7 @@ pub const Memmap = extern struct {
             try writer.writeByteNTimes(' ', new_indent);
             try writer.writeAll("entries:\n");
 
-            for (self.entries()) |entry| {
+            for (response.entries()) |entry| {
                 try writer.writeByteNTimes(' ', new_indent + 2);
                 try entry.print(writer, new_indent + 2);
                 try writer.writeByte('\n');
@@ -893,7 +906,7 @@ pub const Memmap = extern struct {
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -901,9 +914,9 @@ pub const Memmap = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 
@@ -928,14 +941,14 @@ pub const Memmap = extern struct {
             _,
         };
 
-        pub fn print(self: Entry, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(entry: Entry, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("Entry({} - {} - {s})", .{ self.base, self.length, @tagName(self.type) });
+            try writer.print("Entry({} - {} - {s})", .{ entry.base, entry.length, @tagName(entry.type) });
         }
 
         pub inline fn format(
-            self: Entry,
+            entry: Entry,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -943,9 +956,9 @@ pub const Memmap = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Entry.print(self, writer, 0)
+                Entry.print(entry, writer, 0)
             else
-                Entry.print(self, writer.any(), 0);
+                Entry.print(entry, writer.any(), 0);
         }
     };
 };
@@ -976,13 +989,13 @@ pub const ExecutableFile = extern struct {
         revision: u64,
         executable_file: *const File,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("ExecutableFile{\n");
 
             try writer.writeByteNTimes(' ', new_indent + 2);
-            try self.executable_file.print(writer, new_indent + 2);
+            try response.executable_file.print(writer, new_indent + 2);
             try writer.writeByte('\n');
 
             try writer.writeByteNTimes(' ', indent);
@@ -990,7 +1003,7 @@ pub const ExecutableFile = extern struct {
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -998,9 +1011,9 @@ pub const ExecutableFile = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1023,18 +1036,18 @@ pub const ExecutableCommandLine = extern struct {
         /// String containing the command line associated with the booted executable.
         ///
         /// This is equivalent to the `string` member of the `executable_file` structure of the Executable File feature.
-        pub fn cmdline(self: *const Response) ?[:0]const u8 {
+        pub fn cmdline(response: *const Response) ?[:0]const u8 {
             const str = std.mem.sliceTo(
-                self._cmdline orelse return null,
+                response._cmdline orelse return null,
                 0,
             );
             return if (str.len == 0) null else str;
         }
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            if (self.cmdline()) |c| {
+            if (response.cmdline()) |c| {
                 try writer.print("ExecutableCommandLine(\"{s}\")", .{c});
             } else {
                 try writer.writeAll("ExecutableCommandLine(null)");
@@ -1042,7 +1055,7 @@ pub const ExecutableCommandLine = extern struct {
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1050,9 +1063,9 @@ pub const ExecutableCommandLine = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1084,21 +1097,21 @@ pub const Module = extern struct {
         _module_count: u64,
         _modules: [*]const *const File,
 
-        pub fn modules(self: *const Response) []const *const File {
-            return self._modules[0..self._module_count];
+        pub fn modules(response: *const Response) []const *const File {
+            return response._modules[0..response._module_count];
         }
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
-            if (self._module_count == 0) {
+            if (response._module_count == 0) {
                 try writer.writeAll("Modules{}");
                 return;
             }
 
             try writer.writeAll("Modules{\n");
 
-            for (self.modules()) |module| {
+            for (response.modules()) |module| {
                 try writer.writeByteNTimes(' ', new_indent + 2);
                 try module.print(writer, new_indent + 2);
                 try writer.writeByte('\n');
@@ -1109,7 +1122,7 @@ pub const Module = extern struct {
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1117,9 +1130,9 @@ pub const Module = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 
@@ -1138,8 +1151,8 @@ pub const Module = extern struct {
         flags: Flags,
 
         /// String associated with the given module.
-        pub fn string(self: *const InternalModule) ?[:0]const u8 {
-            return if (self._string) |s|
+        pub fn string(internal_module: *const InternalModule) ?[:0]const u8 {
+            return if (internal_module._string) |s|
                 std.mem.sliceTo(s, 0)
             else
                 null;
@@ -1173,11 +1186,11 @@ pub const RSDP = extern struct {
         _address: core.Address.Raw,
 
         /// Address of the RSDP table. Physical for base @intFromEnum(revision) >= 3.
-        pub fn address(self: *const Response, revision: BaseRevison.Revison) core.Address {
+        pub fn address(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = self._address.physical }
+                .{ .physical = response._address.physical }
             else
-                .{ .virtual = self._address.virtual };
+                .{ .virtual = response._address.virtual };
         }
     };
 };
@@ -1195,19 +1208,19 @@ pub const SMBIOS = extern struct {
         _entry_64: core.Address.Raw,
 
         /// Address of the 32-bit SMBIOS entry point, `null` if not present. Physical for base @intFromEnum(revision) >= 3.
-        pub fn entry32(self: *const Response, revision: BaseRevison.Revison) core.Address {
+        pub fn entry32(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = self._entry_32.physical }
+                .{ .physical = response._entry_32.physical }
             else
-                .{ .virtual = self._entry_32.virtual };
+                .{ .virtual = response._entry_32.virtual };
         }
 
         /// Address of the 64-bit SMBIOS entry point, `null` if not present. Physical for base @intFromEnum(revision) >= 3.
-        pub fn entry64(self: *const Response, revision: BaseRevison.Revison) core.Address {
+        pub fn entry64(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = self._entry_64.physical }
+                .{ .physical = response._entry_64.physical }
             else
-                .{ .virtual = self._entry_64.virtual };
+                .{ .virtual = response._entry_64.virtual };
         }
     };
 };
@@ -1224,11 +1237,11 @@ pub const EFISystemTable = extern struct {
         _address: core.Address.Raw,
 
         /// Address of EFI system table. Physical for base @intFromEnum(revision) >= 3.
-        pub fn address(self: *const Response, revision: BaseRevison.Revison) core.Address {
+        pub fn address(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = self._address.physical }
+                .{ .physical = response._address.physical }
             else
-                .{ .virtual = self._address.virtual };
+                .{ .virtual = response._address.virtual };
         }
     };
 };
@@ -1257,29 +1270,29 @@ pub const EFIMemoryMap = extern struct {
         /// Version of EFI memory map descriptors.
         desc_version: u64,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("EFIMemoryMap{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("address: {}\n", .{self.memmap});
+            try writer.print("address: {}\n", .{response.memmap});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("size: {}\n", .{self.memmap_size});
+            try writer.print("size: {}\n", .{response.memmap_size});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("desc_size: {}\n", .{self.desc_size});
+            try writer.print("desc_size: {}\n", .{response.desc_size});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("desc_version: {}\n", .{self.desc_version});
+            try writer.print("desc_version: {}\n", .{response.desc_version});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1287,9 +1300,9 @@ pub const EFIMemoryMap = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1307,14 +1320,14 @@ pub const DateAtBoot = extern struct {
         /// The UNIX timestamp, in seconds, taken from the system RTC, representing the date and time of boot.
         timestamp: i64,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("DateAtBoot({})", .{self.timestamp});
+            try writer.print("DateAtBoot({})", .{response.timestamp});
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1322,9 +1335,9 @@ pub const DateAtBoot = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1345,23 +1358,23 @@ pub const ExecutableAddress = extern struct {
         /// The virtual base address of the executable.
         virtual_base: core.VirtualAddress,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("ExecutableAddress{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("physical_base: {}\n", .{self.physical_base});
+            try writer.print("physical_base: {}\n", .{response.physical_base});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("virtual_base: {}\n", .{self.virtual_base});
+            try writer.print("virtual_base: {}\n", .{response.virtual_base});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1369,9 +1382,9 @@ pub const ExecutableAddress = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1395,14 +1408,14 @@ pub const DeviceTreeBlob = extern struct {
         /// Virtual (HHDM) pointer to the device tree blob, in bootloader reclaimable memory.
         address: core.VirtualAddress,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("DeviceTreeBlob({})", .{self.address});
+            try writer.print("DeviceTreeBlob({})", .{response.address});
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1410,9 +1423,9 @@ pub const DeviceTreeBlob = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1432,14 +1445,14 @@ pub const BSPHartID = extern struct {
         /// The Hart ID of the boot processor.
         bsp_hartid: u64,
 
-        pub fn print(self: Response, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(response: Response, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
-            try writer.print("BSPHartID({})", .{self.bsp_hartid});
+            try writer.print("BSPHartID({})", .{response.bsp_hartid});
         }
 
         pub inline fn format(
-            self: Response,
+            response: Response,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -1447,9 +1460,9 @@ pub const BSPHartID = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                Response.print(self, writer, 0)
+                Response.print(response, writer, 0)
             else
-                Response.print(self, writer.any(), 0);
+                Response.print(response, writer.any(), 0);
         }
     };
 };
@@ -1496,21 +1509,21 @@ pub const File = extern struct {
     part_uuid: UUID,
 
     /// The path of the file within the volume, with a leading slash
-    pub fn path(self: *const File) [:0]const u8 {
-        return std.mem.sliceTo(self._path, 0);
+    pub fn path(file: *const File) [:0]const u8 {
+        return std.mem.sliceTo(file._path, 0);
     }
 
     /// A string associated with the file
-    pub fn string(self: *const File) ?[:0]const u8 {
+    pub fn string(file: *const File) ?[:0]const u8 {
         const str = std.mem.sliceTo(
-            self._string orelse return null,
+            file._string orelse return null,
             0,
         );
         return if (str.len == 0) null else str;
     }
 
-    pub fn getContents(self: *const File) []const u8 {
-        return core.VirtualRange.fromAddr(self.address, self.size).toByteSlice();
+    pub fn getContents(file: *const File) []const u8 {
+        return core.VirtualRange.fromAddr(file.address, file.size).toByteSlice();
     }
 
     pub fn print(file: File, writer: std.io.AnyWriter, indent: usize) !void {

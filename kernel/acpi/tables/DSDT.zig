@@ -9,13 +9,13 @@ pub const DSDT = extern struct {
 
     pub const SIGNATURE_STRING = "DSDT";
 
-    pub fn definitionBlock(self: *const DSDT) []const u8 {
-        const ptr: [*]const u8 = @ptrCast(&self._definition_block);
-        return ptr[0..(self.header.length - @sizeOf(acpi.tables.SharedHeader))];
+    pub fn definitionBlock(dsdt: *const DSDT) []const u8 {
+        const ptr: [*]const u8 = @ptrCast(&dsdt._definition_block);
+        return ptr[0..(dsdt.header.length - @sizeOf(acpi.tables.SharedHeader))];
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(acpi.tables.SharedHeader) + 1);
+        core.testing.expectSize(DSDT, @sizeOf(acpi.tables.SharedHeader) + 1);
     }
 };
 

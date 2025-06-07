@@ -15,12 +15,12 @@ pub const DBG2 = extern struct {
 
     pub const SIGNATURE_STRING = "DBG2";
 
-    pub fn debugDevices(self: *const DBG2) DebugDeviceIterator {
-        const base: [*]const u8 = @ptrCast(self);
+    pub fn debugDevices(dbg2: *const DBG2) DebugDeviceIterator {
+        const base: [*]const u8 = @ptrCast(dbg2);
         return .{
-            .current = @ptrCast(@alignCast(base + self.offset_of_debug_device_info)),
+            .current = @ptrCast(@alignCast(base + dbg2.offset_of_debug_device_info)),
             .index = 0,
-            .count = self.number_of_debug_device_info,
+            .count = dbg2.number_of_debug_device_info,
         };
     }
 
@@ -64,12 +64,12 @@ pub const DBG2 = extern struct {
         /// Offset, in bytes, from beginning of this structure to the field AddressSize[].
         address_size_offset: u16,
 
-        pub fn portType(self: *align(1) const DebugDevice) PortType {
-            return switch (self.port_type) {
-                .serial => .{ .serial = @enumFromInt(self.port_subtype) },
-                .@"1394" => .{ .@"1394" = @enumFromInt(self.port_subtype) },
-                .usb => .{ .usb = @enumFromInt(self.port_subtype) },
-                .net => .{ .net = @enumFromInt(self.port_subtype) },
+        pub fn portType(debug_device: *align(1) const DebugDevice) PortType {
+            return switch (debug_device.port_type) {
+                .serial => .{ .serial = @enumFromInt(debug_device.port_subtype) },
+                .@"1394" => .{ .@"1394" = @enumFromInt(debug_device.port_subtype) },
+                .usb => .{ .usb = @enumFromInt(debug_device.port_subtype) },
+                .net => .{ .net = @enumFromInt(debug_device.port_subtype) },
             };
         }
 
@@ -79,27 +79,27 @@ pub const DBG2 = extern struct {
         /// namespace.
         ///
         /// If no namespace device exists, NamespaceString[] must only contain a single '.' (ASCII period) character.
-        pub fn namespaceString(self: *align(1) const DebugDevice) [:0]const u8 {
-            const ptr: [*]const u8 = @ptrCast(self);
-            return ptr[self.namespace_string_offset..][0 .. self.namespace_string_length - 1 :0];
+        pub fn namespaceString(debug_device: *align(1) const DebugDevice) [:0]const u8 {
+            const ptr: [*]const u8 = @ptrCast(debug_device);
+            return ptr[debug_device.namespace_string_offset..][0 .. debug_device.namespace_string_length - 1 :0];
         }
 
         /// Optional, variable-length OEM-specific data.
-        pub fn oemData(self: *align(1) const DebugDevice) ?[]const u8 {
-            if (self.oem_data_length == 0) return null;
+        pub fn oemData(debug_device: *align(1) const DebugDevice) ?[]const u8 {
+            if (debug_device.oem_data_length == 0) return null;
 
-            const ptr: [*]const u8 = @ptrCast(self);
-            return ptr[self.oem_data_offset..][0..self.oem_data_length];
+            const ptr: [*]const u8 = @ptrCast(debug_device);
+            return ptr[debug_device.oem_data_offset..][0..debug_device.oem_data_length];
         }
 
-        pub fn addresses(self: *align(1) const DebugDevice) AddressIterator {
-            const base: [*]const u8 = @ptrCast(self);
-            const address_ptr: [*]align(1) const acpi.Address = @ptrCast(@alignCast(base + self.base_address_register_offset));
-            const address_size_ptr: [*]align(1) const u32 = @ptrCast(@alignCast(base + self.address_size_offset));
+        pub fn addresses(debug_device: *align(1) const DebugDevice) AddressIterator {
+            const base: [*]const u8 = @ptrCast(debug_device);
+            const address_ptr: [*]align(1) const acpi.Address = @ptrCast(@alignCast(base + debug_device.base_address_register_offset));
+            const address_size_ptr: [*]align(1) const u32 = @ptrCast(@alignCast(base + debug_device.address_size_offset));
 
             return .{
-                .addresses = address_ptr[0..self.number_of_generic_address_registers],
-                .address_size = address_size_ptr[0..self.number_of_generic_address_registers],
+                .addresses = address_ptr[0..debug_device.number_of_generic_address_registers],
+                .address_size = address_size_ptr[0..debug_device.number_of_generic_address_registers],
                 .index = 0,
             };
         }
@@ -174,10 +174,10 @@ pub const DBG2 = extern struct {
                 EHCI = 0x0001,
             };
 
-            pub fn print(self: PortType, writer: std.io.AnyWriter, indent: usize) !void {
+            pub fn print(port_type: PortType, writer: std.io.AnyWriter, indent: usize) !void {
                 _ = indent;
 
-                switch (self) {
+                switch (port_type) {
                     .serial => |subtype| try writer.print(
                         "PortType{{ serial: {s} }}",
                         .{@tagName(subtype)},
@@ -198,7 +198,7 @@ pub const DBG2 = extern struct {
             }
 
             pub inline fn format(
-                self: PortType,
+                port_type: PortType,
                 comptime fmt: []const u8,
                 options: std.fmt.FormatOptions,
                 writer: anytype,
@@ -206,9 +206,9 @@ pub const DBG2 = extern struct {
                 _ = options;
                 _ = fmt;
                 return if (@TypeOf(writer) == std.io.AnyWriter)
-                    PortType.print(self, writer, 0)
+                    PortType.print(port_type, writer, 0)
                 else
-                    PortType.print(self, writer.any(), 0);
+                    PortType.print(port_type, writer.any(), 0);
             }
         };
 
@@ -223,34 +223,34 @@ pub const DBG2 = extern struct {
 
             index: usize,
 
-            pub fn next(self: *AddressIterator) ?Address {
-                if (self.index >= self.addresses.len) return null;
-                defer self.index += 1;
+            pub fn next(address_iterator: *AddressIterator) ?Address {
+                if (address_iterator.index >= address_iterator.addresses.len) return null;
+                defer address_iterator.index += 1;
 
                 return .{
-                    .address = self.addresses[self.index],
-                    .size = self.address_size[self.index],
+                    .address = address_iterator.addresses[address_iterator.index],
+                    .size = address_iterator.address_size[address_iterator.index],
                 };
             }
         };
 
-        pub fn print(self: *align(1) const DebugDevice, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(debug_device: *align(1) const DebugDevice, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("DebugDevice{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("namespace_string: {s},\n", .{self.namespaceString()});
+            try writer.print("namespace_string: {s},\n", .{debug_device.namespaceString()});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("port_type: {},\n", .{self.portType()});
+            try writer.print("port_type: {},\n", .{debug_device.portType()});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: *align(1) const DebugDevice,
+            debug_device: *align(1) const DebugDevice,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -258,13 +258,13 @@ pub const DBG2 = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                DebugDevice.print(self, writer, 0)
+                DebugDevice.print(debug_device, writer, 0)
             else
-                DebugDevice.print(self, writer.any(), 0);
+                DebugDevice.print(debug_device, writer.any(), 0);
         }
 
         comptime {
-            core.testing.expectSize(@This(), 22);
+            core.testing.expectSize(DebugDevice, 22);
         }
     };
 
@@ -273,37 +273,37 @@ pub const DBG2 = extern struct {
         index: usize,
         count: usize,
 
-        pub fn next(self: *DebugDeviceIterator) ?*align(1) const DebugDevice {
-            if (self.index >= self.count) return null;
+        pub fn next(debug_device_iterator: *DebugDeviceIterator) ?*align(1) const DebugDevice {
+            if (debug_device_iterator.index >= debug_device_iterator.count) return null;
 
-            self.index += 1;
+            debug_device_iterator.index += 1;
 
-            const current = self.current;
+            const current = debug_device_iterator.current;
 
             const ptr: [*]const u8 = @ptrCast(current);
-            self.current = @ptrCast(@alignCast(ptr + current.length));
+            debug_device_iterator.current = @ptrCast(@alignCast(ptr + current.length));
 
             return current;
         }
     };
 
-    pub fn print(self: *const DBG2, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(dbg2: *const DBG2, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("DBG2{\n");
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("offset_of_debug_device_info: {d},\n", .{self.offset_of_debug_device_info});
+        try writer.print("offset_of_debug_device_info: {d},\n", .{dbg2.offset_of_debug_device_info});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("number_of_debug_device_info: {d},\n", .{self.number_of_debug_device_info});
+        try writer.print("number_of_debug_device_info: {d},\n", .{dbg2.number_of_debug_device_info});
 
         try writer.writeByteNTimes(' ', indent);
         try writer.writeByte('}');
     }
 
     pub inline fn format(
-        self: *const DBG2,
+        dbg2: *const DBG2,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -311,13 +311,13 @@ pub const DBG2 = extern struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(dbg2, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(dbg2, writer.any(), 0);
     }
 
     comptime {
-        core.testing.expectSize(@This(), 44);
+        core.testing.expectSize(DBG2, 44);
     }
 
     pub const init = struct {

@@ -16,19 +16,19 @@ pub fn init(allocator: std.mem.Allocator, stdout: std.fs.File) !StdoutWrapper {
     };
 }
 
-pub fn deinit(self: *StdoutWrapper) void {
-    self.poller.deinit();
-    self.partial_read_buffer.deinit(self.allocator);
+pub fn deinit(stdout_wrapper: *StdoutWrapper) void {
+    stdout_wrapper.poller.deinit();
+    stdout_wrapper.partial_read_buffer.deinit(stdout_wrapper.allocator);
 }
 
-pub fn next(self: *StdoutWrapper) !?[]const u8 {
-    const stdout_fifo = self.poller.fifo(.stdout);
+pub fn next(stdout_wrapper: *StdoutWrapper) !?[]const u8 {
+    const stdout_fifo = stdout_wrapper.poller.fifo(.stdout);
 
-    self.partial_read_buffer.clearRetainingCapacity();
+    stdout_wrapper.partial_read_buffer.clearRetainingCapacity();
 
     while (true) {
-        if (self.stdout_window.len != 0) stdout_window_blk: {
-            const stdout_window = self.stdout_window;
+        if (stdout_wrapper.stdout_window.len != 0) stdout_window_blk: {
+            const stdout_window = stdout_wrapper.stdout_window;
 
             const newline_index = std.mem.indexOfScalar(
                 u8,
@@ -36,19 +36,19 @@ pub fn next(self: *StdoutWrapper) !?[]const u8 {
                 '\n',
             ) orelse {
                 // no newline found, store this partial line read in the partial read buffer
-                try self.partial_read_buffer.appendSlice(self.allocator, stdout_window);
-                self.stdout_window = &.{};
+                try stdout_wrapper.partial_read_buffer.appendSlice(stdout_wrapper.allocator, stdout_window);
+                stdout_wrapper.stdout_window = &.{};
 
                 stdout_fifo.discard(stdout_fifo.count);
                 break :stdout_window_blk;
             };
             const next_line_index = newline_index + 1;
 
-            self.stdout_window = stdout_window[next_line_index..];
+            stdout_wrapper.stdout_window = stdout_window[next_line_index..];
 
-            if (self.partial_read_buffer.items.len != 0) {
-                try self.partial_read_buffer.appendSlice(self.allocator, stdout_window[0..next_line_index]);
-                return self.partial_read_buffer.items;
+            if (stdout_wrapper.partial_read_buffer.items.len != 0) {
+                try stdout_wrapper.partial_read_buffer.appendSlice(stdout_wrapper.allocator, stdout_window[0..next_line_index]);
+                return stdout_wrapper.partial_read_buffer.items;
             }
 
             return stdout_window[0..next_line_index];
@@ -56,14 +56,14 @@ pub fn next(self: *StdoutWrapper) !?[]const u8 {
             stdout_fifo.discard(stdout_fifo.count);
         }
 
-        if (try self.poller.poll()) {
+        if (try stdout_wrapper.poller.poll()) {
             if (stdout_fifo.count == 0) continue;
-            self.stdout_window = stdout_fifo.readableSlice(0);
+            stdout_wrapper.stdout_window = stdout_fifo.readableSlice(0);
             continue;
         }
 
-        if (self.partial_read_buffer.items.len != 0) {
-            return self.partial_read_buffer.items;
+        if (stdout_wrapper.partial_read_buffer.items.len != 0) {
+            return stdout_wrapper.partial_read_buffer.items;
         }
 
         return null;

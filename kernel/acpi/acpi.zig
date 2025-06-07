@@ -45,21 +45,23 @@ pub fn AcpiTable(comptime T: type) type {
 
         handle: uacpi.Table,
 
-        pub fn deinit(self: @This()) void {
-            self.handle.unref() catch unreachable;
+        const AcpiTableT = @This();
+
+        pub fn deinit(acpi_table: AcpiTableT) void {
+            acpi_table.handle.unref() catch unreachable;
         }
 
-        pub fn print(self: @This(), writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(acpi_table: AcpiTableT, writer: std.io.AnyWriter, indent: usize) !void {
             _ = indent;
 
             try writer.print(
                 "AcpiTable{{ signature: {s}, revision: {d} }}",
-                .{ self.table.header.signatureAsString(), self.table.header.revision },
+                .{ acpi_table.table.header.signatureAsString(), acpi_table.table.header.revision },
             );
         }
 
         pub inline fn format(
-            self: @This(),
+            acpi_table: AcpiTableT,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -67,9 +69,9 @@ pub fn AcpiTable(comptime T: type) type {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                print(self, writer, 0)
+                print(acpi_table, writer, 0)
             else
-                print(self, writer.any(), 0);
+                print(acpi_table, writer.any(), 0);
         }
     };
 }
@@ -178,25 +180,25 @@ pub const init = struct {
 
         is_xsdt: bool,
 
-        pub fn next(self: *TableIterator) ?*const tables.SharedHeader {
+        pub fn next(table_iterator: *TableIterator) ?*const tables.SharedHeader {
             // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
 
-            const opt_phys_addr = if (self.is_xsdt)
-                self.nextTablePhysicalAddressImpl(u64)
+            const opt_phys_addr = if (table_iterator.is_xsdt)
+                table_iterator.nextTablePhysicalAddressImpl(u64)
             else
-                self.nextTablePhysicalAddressImpl(u32);
+                table_iterator.nextTablePhysicalAddressImpl(u32);
 
             return kernel.mem
                 .directMapFromPhysical(opt_phys_addr orelse return null)
                 .toPtr(*const tables.SharedHeader);
         }
 
-        fn nextTablePhysicalAddressImpl(self: *TableIterator, comptime T: type) ?core.PhysicalAddress {
-            if (@intFromPtr(self.ptr) + @sizeOf(T) >= @intFromPtr(self.end_ptr)) return null;
+        fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?core.PhysicalAddress {
+            if (@intFromPtr(table_iterator.ptr) + @sizeOf(T) >= @intFromPtr(table_iterator.end_ptr)) return null;
 
-            const physical_address = std.mem.readInt(T, @ptrCast(self.ptr), .little);
+            const physical_address = std.mem.readInt(T, @ptrCast(table_iterator.ptr), .little);
 
-            self.ptr += @sizeOf(T);
+            table_iterator.ptr += @sizeOf(T);
 
             return core.PhysicalAddress.fromInt(physical_address);
         }

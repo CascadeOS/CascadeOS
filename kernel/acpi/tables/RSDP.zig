@@ -52,16 +52,16 @@ pub const RSDP = extern struct {
 
     const BYTES_IN_ACPI_1_STRUCTURE = 20;
 
-    pub fn sdtAddress(self: *const RSDP) core.PhysicalAddress {
-        return switch (self.revision) {
-            0 => core.PhysicalAddress.fromInt(self.rsdt_addr),
-            2 => self.xsdt_addr,
-            else => std.debug.panic("unknown ACPI revision: {d}", .{self.revision}),
+    pub fn sdtAddress(rsdp: *const RSDP) core.PhysicalAddress {
+        return switch (rsdp.revision) {
+            0 => core.PhysicalAddress.fromInt(rsdp.rsdt_addr),
+            2 => rsdp.xsdt_addr,
+            else => std.debug.panic("unknown ACPI revision: {d}", .{rsdp.revision}),
         };
     }
 
     /// Returns `true` is the table is valid.
-    pub fn isValid(self: *const RSDP) bool {
+    pub fn isValid(rsdp: *const RSDP) bool {
         // Before the RSDP is relied upon you should check that the checksum is valid.
         // For ACPI 1.0 you add up every byte in the structure and make sure the lowest byte of the result is equal
         // to zero.
@@ -69,10 +69,10 @@ pub const RSDP = extern struct {
         // structure, and then do it again for the fields that are part of the ACPI 2.0 extension.
 
         const bytes = blk: {
-            const ptr: [*]const u8 = @ptrCast(self);
-            const length_of_table = switch (self.revision) {
+            const ptr: [*]const u8 = @ptrCast(rsdp);
+            const length_of_table = switch (rsdp.revision) {
                 0 => BYTES_IN_ACPI_1_STRUCTURE,
-                2 => self.length,
+                2 => rsdp.length,
                 else => return false,
             };
             break :blk ptr[0..length_of_table];
@@ -86,7 +86,7 @@ pub const RSDP = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u8) * 16 + @sizeOf(u32) * 2 + @sizeOf(u64) + @sizeOf(u8) * 4);
+        core.testing.expectSize(RSDP, @sizeOf(u8) * 16 + @sizeOf(u32) * 2 + @sizeOf(u64) + @sizeOf(u8) * 4);
     }
 };
 

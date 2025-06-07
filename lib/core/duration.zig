@@ -25,78 +25,78 @@ pub const Duration = extern struct {
         };
     }
 
-    pub inline fn equal(self: Duration, other: Duration) bool {
-        return self.value == other.value;
+    pub inline fn equal(duration: Duration, other: Duration) bool {
+        return duration.value == other.value;
     }
 
-    pub inline fn lessThan(self: Duration, other: Duration) bool {
-        return self.value < other.value;
+    pub inline fn lessThan(duration: Duration, other: Duration) bool {
+        return duration.value < other.value;
     }
 
-    pub inline fn lessThanOrEqual(self: Duration, other: Duration) bool {
-        return self.value <= other.value;
+    pub inline fn lessThanOrEqual(duration: Duration, other: Duration) bool {
+        return duration.value <= other.value;
     }
 
-    pub inline fn greaterThan(self: Duration, other: Duration) bool {
-        return self.value > other.value;
+    pub inline fn greaterThan(duration: Duration, other: Duration) bool {
+        return duration.value > other.value;
     }
 
-    pub inline fn greaterThanOrEqual(self: Duration, other: Duration) bool {
-        return self.value >= other.value;
+    pub inline fn greaterThanOrEqual(duration: Duration, other: Duration) bool {
+        return duration.value >= other.value;
     }
 
-    pub fn compare(self: Duration, other: Duration) std.math.Order {
-        if (self.lessThan(other)) return .lt;
-        if (self.greaterThan(other)) return .gt;
+    pub fn compare(duration: Duration, other: Duration) std.math.Order {
+        if (duration.lessThan(other)) return .lt;
+        if (duration.greaterThan(other)) return .gt;
         return .eq;
     }
 
-    pub fn add(self: Duration, other: Duration) Duration {
-        return .{ .value = self.value + other.value };
+    pub fn add(duration: Duration, other: Duration) Duration {
+        return .{ .value = duration.value + other.value };
     }
 
-    pub fn addInPlace(self: *Duration, other: Duration) void {
-        self.value += other.value;
+    pub fn addInPlace(duration: *Duration, other: Duration) void {
+        duration.value += other.value;
     }
 
-    pub fn subtract(self: Duration, other: Duration) Duration {
-        return .{ .value = self.value - other.value };
+    pub fn subtract(duration: Duration, other: Duration) Duration {
+        return .{ .value = duration.value - other.value };
     }
 
-    pub fn subtractInPlace(self: *Duration, other: Duration) void {
-        self.value -= other.value;
+    pub fn subtractInPlace(duration: *Duration, other: Duration) void {
+        duration.value -= other.value;
     }
 
-    pub fn multiply(self: Duration, other: Duration) Duration {
-        return .{ .value = self.value * other.value };
+    pub fn multiply(duration: Duration, other: Duration) Duration {
+        return .{ .value = duration.value * other.value };
     }
 
-    pub fn multiplyInPlace(self: *Duration, other: Duration) void {
-        self.value *= other.value;
+    pub fn multiplyInPlace(duration: *Duration, other: Duration) void {
+        duration.value *= other.value;
     }
 
-    pub fn multiplyScalar(self: Duration, value: u64) Duration {
-        return .{ .value = self.value * value };
+    pub fn multiplyScalar(duration: Duration, value: u64) Duration {
+        return .{ .value = duration.value * value };
     }
 
-    pub fn multiplyScalarInPlace(self: *Duration, value: u64) void {
-        self.value *= value;
+    pub fn multiplyScalarInPlace(duration: *Duration, value: u64) void {
+        duration.value *= value;
     }
 
-    pub fn divide(self: Duration, other: Duration) Duration {
-        return .{ .value = self.value / other.value };
+    pub fn divide(duration: Duration, other: Duration) Duration {
+        return .{ .value = duration.value / other.value };
     }
 
-    pub fn divideInPlace(self: *Duration, other: Duration) void {
-        self.value /= other.value;
+    pub fn divideInPlace(duration: *Duration, other: Duration) void {
+        duration.value /= other.value;
     }
 
-    pub fn divideScalar(self: Duration, value: u64) Duration {
-        return .{ .value = self.value / value };
+    pub fn divideScalar(duration: Duration, value: u64) Duration {
+        return .{ .value = duration.value / value };
     }
 
-    pub fn divideScalarInPlace(self: *Duration, value: u64) void {
-        self.value /= value;
+    pub fn divideScalarInPlace(duration: *Duration, value: u64) void {
+        duration.value /= value;
     }
 
     // Must be kept in descending order due to the logic in `print`
@@ -172,7 +172,7 @@ pub const Duration = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64));
+        core.testing.expectSize(Duration, @sizeOf(u64));
     }
 };
 

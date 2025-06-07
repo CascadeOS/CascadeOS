@@ -66,7 +66,7 @@ pub const UUID = extern struct {
     pub const uuid_buffer_length: usize = 36;
 
     /// `buf` must be atleast `uuid_buffer_length`
-    pub fn bufPrint(self: UUID, buf: []u8) []const u8 {
+    pub fn bufPrint(uuid: UUID, buf: []u8) []const u8 {
         std.debug.assert(buf.len >= uuid_buffer_length);
 
         var i: usize = 0;
@@ -78,7 +78,7 @@ pub const UUID = extern struct {
             }
 
             const characters_needed = comptime section.charactersNeededToStoreField();
-            const ptr: *align(1) const section.field_type = @ptrCast(&self.bytes[section.start_index]);
+            const ptr: *align(1) const section.field_type = @ptrCast(&uuid.bytes[section.start_index]);
 
             _ = std.fmt.formatIntBuf(
                 buf[i..][0..characters_needed],
@@ -95,7 +95,7 @@ pub const UUID = extern struct {
     }
 
     pub inline fn format(
-        self: UUID,
+        uuid: UUID,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -104,7 +104,7 @@ pub const UUID = extern struct {
         _ = options;
 
         var buf: [uuid_buffer_length]u8 = undefined;
-        try writer.writeAll(self.bufPrint(&buf));
+        try writer.writeAll(uuid.bufPrint(&buf));
     }
 
     const UUIDSection = struct {
@@ -112,12 +112,12 @@ pub const UUID = extern struct {
         start_index: usize,
         proceeded_by_hyphen: bool,
 
-        inline fn charactersNeededToStoreField(comptime self: UUIDSection) usize {
-            return comptime switch (self.field_type) {
+        inline fn charactersNeededToStoreField(comptime uuid_section: UUIDSection) usize {
+            return comptime switch (uuid_section.field_type) {
                 u32 => 8,
                 u16 => 4,
                 u8 => 2,
-                else => @compileError("Unsupported type '" ++ @typeName(self.field_type) ++ "'"),
+                else => @compileError("Unsupported type '" ++ @typeName(uuid_section.field_type) ++ "'"),
             };
         }
     };
@@ -137,7 +137,7 @@ pub const UUID = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 16);
+        core.testing.expectSize(UUID, 16);
     }
 };
 

@@ -94,32 +94,32 @@ pub const Address = extern struct {
         _,
     };
 
-    pub fn print(self: Address, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(address: Address, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("Address{\n");
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("address_space: {s},\n", .{@tagName(self.address_space)});
+        try writer.print("address_space: {s},\n", .{@tagName(address.address_space)});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("bit_width: {d},\n", .{self.register_bit_width});
+        try writer.print("bit_width: {d},\n", .{address.register_bit_width});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("bit_offset: {d},\n", .{self.register_bit_offset});
+        try writer.print("bit_offset: {d},\n", .{address.register_bit_offset});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("access_size: {s},\n", .{@tagName(self.access_size)});
+        try writer.print("access_size: {s},\n", .{@tagName(address.access_size)});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("address: 0x{x},\n", .{self.address});
+        try writer.print("address: 0x{x},\n", .{address.address});
 
         try writer.writeByteNTimes(' ', indent);
         try writer.writeByte('}');
     }
 
     pub inline fn format(
-        self: Address,
+        address: Address,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -127,13 +127,13 @@ pub const Address = extern struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(address, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(address, writer.any(), 0);
     }
 
     comptime {
-        core.testing.expectSize(@This(), @sizeOf(u64) + @sizeOf(u8) * 4);
+        core.testing.expectSize(Address, @sizeOf(u64) + @sizeOf(u8) * 4);
     }
 };
 

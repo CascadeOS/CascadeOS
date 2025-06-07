@@ -491,18 +491,18 @@ pub const FADT = extern struct {
     pub const SIGNATURE_STRING = "FACP";
 
     /// Physical address of the DSDT.
-    pub fn getDSDT(self: *const FADT) core.PhysicalAddress {
-        return if (self._X_DSDT.value != 0) self._X_DSDT else core.PhysicalAddress.fromInt(self._DSDT);
+    pub fn getDSDT(fadt: *const FADT) core.PhysicalAddress {
+        return if (fadt._X_DSDT.value != 0) fadt._X_DSDT else core.PhysicalAddress.fromInt(fadt._DSDT);
     }
 
     /// Address of the PM1a Control Register Block.
-    pub fn getPM1a_CNT(self: *const FADT) acpi.Address {
-        return if (self._X_PM1a_CNT_BLK.address != 0)
-            self._X_PM1a_CNT_BLK
+    pub fn getPM1a_CNT(fadt: *const FADT) acpi.Address {
+        return if (fadt._X_PM1a_CNT_BLK.address != 0)
+            fadt._X_PM1a_CNT_BLK
         else
             .{ // FIXME: non-x86?
                 .address_space = .io,
-                .address = @intCast(self._PM1a_CNT_BLK),
+                .address = @intCast(fadt._PM1a_CNT_BLK),
                 .register_bit_width = 16,
                 .register_bit_offset = 0,
                 .access_size = .undefined,
@@ -510,13 +510,13 @@ pub const FADT = extern struct {
     }
 
     /// Address of the PM1b Control Register Block.
-    pub fn getPM1b_CNT(self: *const FADT) ?acpi.Address {
-        return if (self._X_PM1b_CNT_BLK.address != 0)
-            self._X_PM1b_CNT_BLK
-        else if (self._PM1b_CNT_BLK != 0)
+    pub fn getPM1b_CNT(fadt: *const FADT) ?acpi.Address {
+        return if (fadt._X_PM1b_CNT_BLK.address != 0)
+            fadt._X_PM1b_CNT_BLK
+        else if (fadt._PM1b_CNT_BLK != 0)
             .{ // FIXME: non-x86?
                 .address_space = .io,
-                .address = @intCast(self._PM1b_CNT_BLK),
+                .address = @intCast(fadt._PM1b_CNT_BLK),
                 .register_bit_width = 16,
                 .register_bit_offset = 0,
                 .access_size = .undefined,
@@ -866,7 +866,7 @@ pub const FADT = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 276);
+        core.testing.expectSize(FADT, 276);
     }
 };
 

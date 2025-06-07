@@ -25,8 +25,8 @@ pub fn init(base_address: core.VirtualAddress, gsi_base: u32) IOAPIC {
     return ioapic;
 }
 
-pub fn apicId(self: IOAPIC) u4 {
-    const register: IdentificationRegister = .read(self);
+pub fn apicId(ioapic: IOAPIC) u4 {
+    const register: IdentificationRegister = .read(ioapic);
     return register.ioapic_id;
 }
 
@@ -35,7 +35,7 @@ pub const RedirectionTableError = error{
 };
 
 pub fn setRedirectionTableEntry(
-    self: IOAPIC,
+    ioapic: IOAPIC,
     index: u8,
     interrupt_vector: x64.InterruptVector,
     delivery_mode: DeliveryMode,
@@ -44,9 +44,9 @@ pub fn setRedirectionTableEntry(
     trigger_mode: TriggerMode,
     mask: bool,
 ) RedirectionTableError!void {
-    if (index >= self.number_of_redirection_entries) return error.InvalidIndex;
+    if (index >= ioapic.number_of_redirection_entries) return error.InvalidIndex;
 
-    var register: RedirectionTableRegister = .read(self, index);
+    var register: RedirectionTableRegister = .read(ioapic, index);
 
     register.interrupt_vector = interrupt_vector;
     register.delivery_mode = delivery_mode;
@@ -64,19 +64,19 @@ pub fn setRedirectionTableEntry(
     register.trigger_mode = trigger_mode;
     register.mask = mask;
 
-    register.write(self, index);
+    register.write(ioapic, index);
 }
 
 pub fn setRedirectionEntryMask(
-    self: IOAPIC,
+    ioapic: IOAPIC,
     index: u8,
     mask: bool,
 ) RedirectionTableError!void {
-    if (index >= self.number_of_redirection_entries) return error.InvalidIndex;
+    if (index >= ioapic.number_of_redirection_entries) return error.InvalidIndex;
 
-    var register: RedirectionTableRegister = .read(self, index);
+    var register: RedirectionTableRegister = .read(ioapic, index);
     register.mask = mask;
-    register.write(self, index);
+    register.write(ioapic, index);
 }
 
 const RedirectionTableRegister = packed struct(u64) {
@@ -102,10 +102,10 @@ const RedirectionTableRegister = packed struct(u64) {
         return @bitCast(backing);
     }
 
-    fn write(self: RedirectionTableRegister, ioapic: IOAPIC, index: u8) void {
+    fn write(redirection_table_register: RedirectionTableRegister, ioapic: IOAPIC, index: u8) void {
         const offset = base_register_offset + (index * 2);
 
-        const value: u64 = @bitCast(self);
+        const value: u64 = @bitCast(redirection_table_register);
 
         ioapic.writeRegister(offset, @truncate(value));
         ioapic.writeRegister(offset + 1, @truncate(value >> 32));

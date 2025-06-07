@@ -15,12 +15,12 @@ pub const PageTable = extern struct {
     pub const level_3_address_space_size = large_page_size;
     pub const level_4_address_space_size = core.Size.from(512, .gib);
 
-    pub fn zero(self: *PageTable) void {
-        @memset(std.mem.asBytes(self), 0);
+    pub fn zero(page_table: *PageTable) void {
+        @memset(std.mem.asBytes(page_table), 0);
     }
 
-    pub fn isEmpty(self: *const PageTable) bool {
-        for (self.entries) |entry| {
+    pub fn isEmpty(page_table: *const PageTable) bool {
+        for (page_table.entries) |entry| {
             if (!entry.isZero()) return false;
         }
         return true;
@@ -178,60 +178,60 @@ pub const PageTable = extern struct {
         pub const Raw = extern struct {
             value: u64,
 
-            pub fn zero(self: *Raw) void {
-                self.value = 0;
+            pub fn zero(raw: *Raw) void {
+                raw.value = 0;
             }
 
-            pub fn isZero(self: Raw) bool {
-                return self.value == 0;
+            pub fn isZero(raw: Raw) bool {
+                return raw.value == 0;
             }
 
-            pub fn load(self: Raw) Entry {
-                return .{ ._raw = self };
+            pub fn load(raw: Raw) Entry {
+                return .{ ._raw = raw };
             }
 
-            pub fn store(self: *Raw, entry: Entry) void {
-                self.* = entry._raw;
+            pub fn store(raw: *Raw, entry: Entry) void {
+                raw.* = entry._raw;
             }
 
             comptime {
-                core.testing.expectSize(@This(), @sizeOf(u64));
+                core.testing.expectSize(Raw, @sizeOf(u64));
             }
         };
 
-        pub fn zero(self: *Entry) void {
-            self._raw.zero();
+        pub fn zero(entry: *Entry) void {
+            entry._raw.zero();
         }
 
-        pub fn isZero(self: Entry) bool {
-            return self._raw.isZero();
+        pub fn isZero(entry: Entry) bool {
+            return entry._raw.isZero();
         }
 
-        pub fn getAddress4kib(self: Entry) core.PhysicalAddress {
-            return .{ .value = self._address_4kib_aligned.readNoShiftFullSize() };
+        pub fn getAddress4kib(entry: Entry) core.PhysicalAddress {
+            return .{ .value = entry._address_4kib_aligned.readNoShiftFullSize() };
         }
 
-        pub fn setAddress4kib(self: *Entry, address: core.PhysicalAddress) void {
+        pub fn setAddress4kib(entry: *Entry, address: core.PhysicalAddress) void {
             std.debug.assert(address.isAligned(small_page_size));
-            self._address_4kib_aligned.writeNoShiftFullSize(address.value);
+            entry._address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        pub fn getAddress2mib(self: Entry) core.PhysicalAddress {
-            return .{ .value = self._address_2mib_aligned.readNoShiftFullSize() };
+        pub fn getAddress2mib(entry: Entry) core.PhysicalAddress {
+            return .{ .value = entry._address_2mib_aligned.readNoShiftFullSize() };
         }
 
-        pub fn setAddress2mib(self: *Entry, address: core.PhysicalAddress) void {
+        pub fn setAddress2mib(entry: *Entry, address: core.PhysicalAddress) void {
             std.debug.assert(address.isAligned(medium_page_size));
-            self._address_2mib_aligned.writeNoShiftFullSize(address.value);
+            entry._address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        pub fn getAddress1gib(self: Entry) core.PhysicalAddress {
-            return .{ .value = self._address_1gib_aligned.readNoShiftFullSize() };
+        pub fn getAddress1gib(entry: Entry) core.PhysicalAddress {
+            return .{ .value = entry._address_1gib_aligned.readNoShiftFullSize() };
         }
 
-        pub fn setAddress1gib(self: *Entry, address: core.PhysicalAddress) void {
+        pub fn setAddress1gib(entry: *Entry, address: core.PhysicalAddress) void {
             std.debug.assert(address.isAligned(large_page_size));
-            self._address_1gib_aligned.writeNoShiftFullSize(address.value);
+            entry._address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 
         /// Gets the next page table level.
@@ -242,134 +242,134 @@ pub const PageTable = extern struct {
         ///
         /// Otherwise returns a pointer to the next page table level.
         pub fn getNextLevel(
-            self: Entry,
+            entry: Entry,
             comptime virtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
         ) error{ NotPresent, HugePage }!*PageTable {
-            if (!self.present.read()) return error.NotPresent;
-            if (self.huge.read()) return error.HugePage;
-            return virtualFromPhysical(self.getAddress4kib()).toPtr(*PageTable);
+            if (!entry.present.read()) return error.NotPresent;
+            if (entry.huge.read()) return error.HugePage;
+            return virtualFromPhysical(entry.getAddress4kib()).toPtr(*PageTable);
         }
 
-        fn printSmallEntryFlags(self: Entry, writer: std.io.AnyWriter) !void {
-            std.debug.assert(!self.huge.read());
+        fn printSmallEntryFlags(entry: Entry, writer: std.io.AnyWriter) !void {
+            std.debug.assert(!entry.huge.read());
 
-            if (self.present.read()) {
+            if (entry.present.read()) {
                 try writer.writeAll("Present ");
             } else {
                 try writer.writeAll("Not Present ");
             }
 
-            if (self.writeable.read()) {
+            if (entry.writeable.read()) {
                 try writer.writeAll("- Writeable ");
             }
 
-            if (self.user_accessible.read()) {
+            if (entry.user_accessible.read()) {
                 try writer.writeAll("- User ");
             }
 
-            if (self.write_through.read()) {
+            if (entry.write_through.read()) {
                 try writer.writeAll("- Write Through ");
             }
 
-            if (self.no_cache.read()) {
+            if (entry.no_cache.read()) {
                 try writer.writeAll("- No Cache ");
             }
 
-            if (self.accessed.read()) {
+            if (entry.accessed.read()) {
                 try writer.writeAll("- Accessed ");
             }
 
-            if (self.dirty.read()) {
+            if (entry.dirty.read()) {
                 try writer.writeAll("- Dirty ");
             }
 
-            if (self.pat.read()) {
+            if (entry.pat.read()) {
                 try writer.writeAll("- PAT ");
             }
 
-            if (self.global.read()) {
+            if (entry.global.read()) {
                 try writer.writeAll("- Global ");
             }
 
-            if (self.no_execute.read()) {
+            if (entry.no_execute.read()) {
                 try writer.writeAll("- No Execute ");
             }
         }
 
-        fn printHugeEntryFlags(self: Entry, writer: std.io.AnyWriter) !void {
-            std.debug.assert(self.huge.read());
+        fn printHugeEntryFlags(entry: Entry, writer: std.io.AnyWriter) !void {
+            std.debug.assert(entry.huge.read());
 
-            if (self.present.read()) {
+            if (entry.present.read()) {
                 try writer.writeAll("Present ");
             } else {
                 try writer.writeAll("Not Present ");
             }
 
-            if (self.writeable.read()) {
+            if (entry.writeable.read()) {
                 try writer.writeAll("- Writeable ");
             }
 
-            if (self.user_accessible.read()) {
+            if (entry.user_accessible.read()) {
                 try writer.writeAll("- User ");
             }
 
-            if (self.write_through.read()) {
+            if (entry.write_through.read()) {
                 try writer.writeAll("- Write Through ");
             }
 
-            if (self.no_cache.read()) {
+            if (entry.no_cache.read()) {
                 try writer.writeAll("- No Cache ");
             }
 
-            if (self.accessed.read()) {
+            if (entry.accessed.read()) {
                 try writer.writeAll("- Accessed ");
             }
 
-            if (self.dirty.read()) {
+            if (entry.dirty.read()) {
                 try writer.writeAll("- Dirty ");
             }
 
-            if (self.pat_huge.read()) {
+            if (entry.pat_huge.read()) {
                 try writer.writeAll("- PAT ");
             }
 
-            if (self.global.read()) {
+            if (entry.global.read()) {
                 try writer.writeAll("- Global ");
             }
 
-            if (self.no_execute.read()) {
+            if (entry.no_execute.read()) {
                 try writer.writeAll("- No Execute ");
             }
         }
 
-        fn printDirectoryEntryFlags(self: Entry, writer: std.io.AnyWriter) !void {
-            if (self.present.read()) {
+        fn printDirectoryEntryFlags(entry: Entry, writer: std.io.AnyWriter) !void {
+            if (entry.present.read()) {
                 try writer.writeAll("Present ");
             } else {
                 try writer.writeAll("Not Present ");
             }
 
-            if (self.writeable.read()) {
+            if (entry.writeable.read()) {
                 try writer.writeAll("- Writeable ");
             }
 
-            if (self.user_accessible.read()) {
+            if (entry.user_accessible.read()) {
                 try writer.writeAll("- User ");
             }
 
-            if (self.write_through.read()) {
+            if (entry.write_through.read()) {
                 try writer.writeAll("- Write Through ");
             }
 
-            if (self.no_cache.read()) {
+            if (entry.no_cache.read()) {
                 try writer.writeAll("- No Cache ");
             }
 
-            if (self.accessed.read()) {
+            if (entry.accessed.read()) {
                 try writer.writeAll("- Accessed ");
             }
 
-            if (self.no_execute.read()) {
+            if (entry.no_execute.read()) {
                 try writer.writeAll("- No Execute ");
             }
         }
@@ -379,12 +379,12 @@ pub const PageTable = extern struct {
     ///
     /// Assumes the page table is not modified during printing.
     pub fn printPageTable(
-        self: *const PageTable,
+        entry: *const PageTable,
         writer: std.io.AnyWriter,
         comptime print_detailed_level1: bool,
         comptime virtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
     ) !void {
-        for (self.entries, 0..) |raw_level4_entry, level4_index| {
+        for (entry.entries, 0..) |raw_level4_entry, level4_index| {
             const level4_entry: Entry = .{ .raw = raw_level4_entry };
 
             if (!level4_entry.present.read()) continue;
@@ -509,7 +509,7 @@ pub const PageTable = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(@This(), small_page_size.value);
+        core.testing.expectSize(PageTable, small_page_size.value);
     }
 };
 

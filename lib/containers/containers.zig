@@ -7,7 +7,7 @@ pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
 pub const RedBlack = struct {
     const red_black_tree = @import("red_black_tree.zig");
 
-    pub const Tree = red_black_tree.Tree;
+    pub const RedBlackTree = red_black_tree.RedBlackTree;
     pub const Node = red_black_tree.Node;
     pub const Iterator = red_black_tree.Iterator;
     pub const ComparisonAndMatch = red_black_tree.ComparisonAndMatch;
@@ -24,9 +24,9 @@ pub const SingleNode = extern struct {
     pub const Iterator = struct {
         current_node: ?*SingleNode,
 
-        pub fn next(self: *Iterator) ?*SingleNode {
-            const current_node = self.current_node orelse return null;
-            self.current_node = current_node.next;
+        pub fn next(iterator: *Iterator) ?*SingleNode {
+            const current_node = iterator.current_node orelse return null;
+            iterator.current_node = current_node.next;
             return current_node;
         }
     };
@@ -45,9 +45,9 @@ pub const DoubleNode = extern struct {
         direction: core.Direction,
         current_node: ?*DoubleNode,
 
-        pub fn next(self: *Iterator) ?*DoubleNode {
-            const current_node = self.current_node orelse return null;
-            self.current_node = switch (self.direction) {
+        pub fn next(iterator: *Iterator) ?*DoubleNode {
+            const current_node = iterator.current_node orelse return null;
+            iterator.current_node = switch (iterator.direction) {
                 .forward => current_node.next,
                 .backward => current_node.previous,
             };

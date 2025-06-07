@@ -30,8 +30,8 @@ next_task_node: containers.SingleNode = .empty,
 
 is_idle_task: bool = false,
 
-pub fn name(self: *const Task) []const u8 {
-    return self._name.constSlice();
+pub fn name(task: *const Task) []const u8 {
+    return task._name.constSlice();
 }
 
 pub const State = union(enum) {
@@ -56,8 +56,8 @@ pub fn getCurrent() *Task {
     return current_task;
 }
 
-pub fn incrementInterruptDisable(self: *Task) void {
-    const previous = self.interrupt_disable_count;
+pub fn incrementInterruptDisable(task: *Task) void {
+    const previous = task.interrupt_disable_count;
 
     if (previous == 0) {
         std.debug.assert(kernel.arch.interrupts.areEnabled());
@@ -66,58 +66,58 @@ pub fn incrementInterruptDisable(self: *Task) void {
         std.debug.assert(!kernel.arch.interrupts.areEnabled());
     }
 
-    self.interrupt_disable_count = previous + 1;
+    task.interrupt_disable_count = previous + 1;
 
-    const executor = self.state.running;
+    const executor = task.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
-    std.debug.assert(executor.current_task == self);
+    std.debug.assert(executor.current_task == task);
 }
 
-pub fn decrementInterruptDisable(self: *Task) void {
+pub fn decrementInterruptDisable(task: *Task) void {
     std.debug.assert(!kernel.arch.interrupts.areEnabled());
 
-    const executor = self.state.running;
+    const executor = task.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
-    std.debug.assert(executor.current_task == self);
+    std.debug.assert(executor.current_task == task);
 
-    const previous = self.interrupt_disable_count;
+    const previous = task.interrupt_disable_count;
     std.debug.assert(previous > 0);
 
-    self.interrupt_disable_count = previous - 1;
+    task.interrupt_disable_count = previous - 1;
 
     if (previous == 1) {
         kernel.arch.interrupts.enableInterrupts();
     }
 }
 
-pub fn incrementPreemptionDisable(self: *Task) void {
-    self.preemption_disable_count += 1;
+pub fn incrementPreemptionDisable(task: *Task) void {
+    task.preemption_disable_count += 1;
 
-    const executor = self.state.running;
+    const executor = task.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
-    std.debug.assert(executor.current_task == self);
+    std.debug.assert(executor.current_task == task);
 }
 
-pub fn decrementPreemptionDisable(self: *Task) void {
-    const executor = self.state.running;
+pub fn decrementPreemptionDisable(task: *Task) void {
+    const executor = task.state.running;
     std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
-    std.debug.assert(executor.current_task == self);
+    std.debug.assert(executor.current_task == task);
 
-    const previous = self.preemption_disable_count;
+    const previous = task.preemption_disable_count;
     std.debug.assert(previous > 0);
 
-    self.preemption_disable_count = previous - 1;
+    task.preemption_disable_count = previous - 1;
 
-    if (previous == 1 and self.preemption_skipped) {
-        kernel.scheduler.maybePreempt(self);
+    if (previous == 1 and task.preemption_skipped) {
+        kernel.scheduler.maybePreempt(task);
     }
 }
 
 pub const InterruptRestorer = struct {
     previous_value: u32,
 
-    pub fn exit(self: InterruptRestorer, current_task: *Task) void {
-        current_task.interrupt_disable_count = self.previous_value;
+    pub fn exit(interrupt_restorer: InterruptRestorer, current_task: *Task) void {
+        current_task.interrupt_disable_count = interrupt_restorer.previous_value;
     }
 };
 
@@ -336,8 +336,8 @@ pub inline fn fromNode(node: *containers.SingleNode) *Task {
     return @fieldParentPtr("next_task_node", node);
 }
 
-fn cacheConstructor(self: *Task, current_task: *Task) kernel.mem.cache.ConstructorError!void {
-    self.* = .{
+fn cacheConstructor(task: *Task, current_task: *Task) kernel.mem.cache.ConstructorError!void {
+    task.* = .{
         .id = undefined,
         ._name = .{},
         .state = .dropped,
@@ -345,8 +345,8 @@ fn cacheConstructor(self: *Task, current_task: *Task) kernel.mem.cache.Construct
     };
 }
 
-fn cacheDestructor(self: *Task, current_task: *Task) void {
-    self.stack.destroyStack(current_task);
+fn cacheDestructor(task: *Task, current_task: *Task) void {
+    task.stack.destroyStack(current_task);
 }
 
 pub const globals = struct {

@@ -29,12 +29,12 @@ pub const RegionMapInfo = union(enum) {
     back_with_frames: MapType,
 };
 
-pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
-    switch (self.type) {
+pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
+    switch (kernel_memory_region.type) {
         .direct_map, .non_cached_direct_map => {
-            const physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, self.range.size);
+            const physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, kernel_memory_region.range.size);
 
-            const map_type: MapType = switch (self.type) {
+            const map_type: MapType = switch (kernel_memory_region.type) {
                 .direct_map => .{ .mode = .kernel, .protection = .read_write },
                 .non_cached_direct_map => .{ .mode = .kernel, .protection = .read_write, .cache = .uncached },
                 else => unreachable,
@@ -46,12 +46,12 @@ pub fn mapInfo(self: KernelMemoryRegion) RegionMapInfo {
         .writeable_section, .readonly_section, .executable_section, .sdf_section => {
             const physical_range = core.PhysicalRange.fromAddr(
                 core.PhysicalAddress.fromInt(
-                    self.range.address.value - kernel.mem.globals.physical_to_virtual_offset.value,
+                    kernel_memory_region.range.address.value - kernel.mem.globals.physical_to_virtual_offset.value,
                 ),
-                self.range.size,
+                kernel_memory_region.range.size,
             );
 
-            const map_type: MapType = switch (self.type) {
+            const map_type: MapType = switch (kernel_memory_region.type) {
                 .executable_section => .{ .mode = .kernel, .protection = .executable },
                 .readonly_section, .sdf_section => .{ .mode = .kernel, .protection = .read },
                 .writeable_section => .{ .mode = .kernel, .protection = .read_write },

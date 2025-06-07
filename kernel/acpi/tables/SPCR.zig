@@ -128,26 +128,26 @@ pub const SPCR = extern struct {
     /// If no namespace device exists, must only contain a single '.' (ASCII period) character.
     ///
     /// This field is only present in revision 4 or higher will return `null` if the revision is lower than 4.
-    pub fn namespaceString(self: *const SPCR) ?[:0]const u8 {
-        if (self.header.revision < 4) return null;
+    pub fn namespaceString(spcr: *const SPCR) ?[:0]const u8 {
+        if (spcr.header.revision < 4) return null;
 
-        const ptr: [*]const u8 = @ptrCast(self);
-        const null_ptr: [*:0]const u8 = @ptrCast(ptr + self.namespace_string_offset);
+        const ptr: [*]const u8 = @ptrCast(spcr);
+        const null_ptr: [*:0]const u8 = @ptrCast(ptr + spcr.namespace_string_offset);
         return std.mem.sliceTo(null_ptr, 0);
     }
 
-    pub fn pciAddress(self: *const SPCR) ?kernel.pci.Address {
-        if (self.pci_vendor_id == .none) {
+    pub fn pciAddress(spcr: *const SPCR) ?kernel.pci.Address {
+        if (spcr.pci_vendor_id == .none) {
             // FIXME: SPCR says if device id is 0xFFFF then it is not present but the PCI spec does not say that it is
             //        not a valid device ID
             return null;
         }
 
         return .{
-            .segment = self.pci_segment_number,
-            .bus = self.pci_bus_number,
-            .device = self.pci_device_number,
-            .function = self.pci_function_number,
+            .segment = spcr.pci_segment_number,
+            .bus = spcr.pci_bus_number,
+            .device = spcr.pci_device_number,
+            .function = spcr.pci_function_number,
         };
     }
 
@@ -165,7 +165,7 @@ pub const SPCR = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(@This(), @sizeOf(u16));
+            core.testing.expectSize(Type, @sizeOf(u16));
         }
     };
 
@@ -183,40 +183,40 @@ pub const SPCR = extern struct {
 
         _: u3,
 
-        pub fn hasIrq(self: InterruptType) bool {
-            return self.pic;
+        pub fn hasIrq(interrupt_type: InterruptType) bool {
+            return interrupt_type.pic;
         }
 
-        pub fn hasGlobalSystemInterrupt(self: InterruptType) bool {
-            return self.ioapic or self.iosapic or self.armh_gic or self.riscv_plic;
+        pub fn hasGlobalSystemInterrupt(interrupt_type: InterruptType) bool {
+            return interrupt_type.ioapic or interrupt_type.iosapic or interrupt_type.armh_gic or interrupt_type.riscv_plic;
         }
 
-        pub fn print(self: InterruptType, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(interrupt_type: InterruptType, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("InterruptType{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("pic: {},\n", .{self.pic});
+            try writer.print("pic: {},\n", .{interrupt_type.pic});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("ioapic: {},\n", .{self.ioapic});
+            try writer.print("ioapic: {},\n", .{interrupt_type.ioapic});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("iosapic: {},\n", .{self.iosapic});
+            try writer.print("iosapic: {},\n", .{interrupt_type.iosapic});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("armh_gic: {},\n", .{self.armh_gic});
+            try writer.print("armh_gic: {},\n", .{interrupt_type.armh_gic});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("riscv_plic: {},\n", .{self.riscv_plic});
+            try writer.print("riscv_plic: {},\n", .{interrupt_type.riscv_plic});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: InterruptType,
+            interrupt_type: InterruptType,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -224,9 +224,9 @@ pub const SPCR = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                InterruptType.print(self, writer, 0)
+                InterruptType.print(interrupt_type, writer, 0)
             else
-                InterruptType.print(self, writer.any(), 0);
+                InterruptType.print(interrupt_type, writer.any(), 0);
         }
     };
 
@@ -258,26 +258,26 @@ pub const SPCR = extern struct {
 
         _reserved: u5,
 
-        pub fn print(self: FlowControl, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(flow_control: FlowControl, writer: std.io.AnyWriter, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("FlowControl{\n");
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("dcd: {},\n", .{self.dcd});
+            try writer.print("dcd: {},\n", .{flow_control.dcd});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("rts_cts: {},\n", .{self.rts_cts});
+            try writer.print("rts_cts: {},\n", .{flow_control.rts_cts});
 
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("xon_xoff: {},\n", .{self.xon_xoff});
+            try writer.print("xon_xoff: {},\n", .{flow_control.xon_xoff});
 
             try writer.writeByteNTimes(' ', indent);
             try writer.writeByte('}');
         }
 
         pub inline fn format(
-            self: FlowControl,
+            flow_control: FlowControl,
             comptime fmt: []const u8,
             options: std.fmt.FormatOptions,
             writer: anytype,
@@ -285,9 +285,9 @@ pub const SPCR = extern struct {
             _ = options;
             _ = fmt;
             return if (@TypeOf(writer) == std.io.AnyWriter)
-                FlowControl.print(self, writer, 0)
+                FlowControl.print(flow_control, writer, 0)
             else
-                FlowControl.print(self, writer.any(), 0);
+                FlowControl.print(flow_control, writer.any(), 0);
         }
     };
 
@@ -308,10 +308,10 @@ pub const SPCR = extern struct {
         _: u31,
     };
 
-    pub fn print(self: *const SPCR, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(spcr: *const SPCR, writer: std.io.AnyWriter, indent: usize) !void {
         const new_indent = indent + 2;
 
-        const revision = self.header.revision;
+        const revision = spcr.header.revision;
 
         try writer.writeAll("SPCR{\n");
 
@@ -320,43 +320,43 @@ pub const SPCR = extern struct {
 
         try writer.writeByteNTimes(' ', new_indent);
         if (revision < 2) {
-            try writer.print("interface_type: {s},\n", .{@tagName(self.interface_type.revision_1)});
+            try writer.print("interface_type: {s},\n", .{@tagName(spcr.interface_type.revision_1)});
         } else {
-            try writer.print("interface_type: {s},\n", .{@tagName(self.interface_type.revision_2_or_higher)});
+            try writer.print("interface_type: {s},\n", .{@tagName(spcr.interface_type.revision_2_or_higher)});
         }
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.writeAll("base_address: ");
-        try self.base_address.print(writer, new_indent);
+        try spcr.base_address.print(writer, new_indent);
         try writer.writeAll(",\n");
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.writeAll("interrupt_type: ");
-        try self.interrupt_type.print(writer, new_indent);
+        try spcr.interrupt_type.print(writer, new_indent);
         try writer.writeAll(",\n");
 
-        if (self.interrupt_type.hasIrq()) {
+        if (spcr.interrupt_type.hasIrq()) {
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("irq: {},\n", .{self.irq});
+            try writer.print("irq: {},\n", .{spcr.irq});
         }
 
-        if (self.interrupt_type.hasGlobalSystemInterrupt()) {
+        if (spcr.interrupt_type.hasGlobalSystemInterrupt()) {
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("global_system_interrupt: {},\n", .{self.global_system_interrupt});
+            try writer.print("global_system_interrupt: {},\n", .{spcr.global_system_interrupt});
         }
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("configured_baud_rate: {s},\n", .{@tagName(self.configured_baud_rate)});
+        try writer.print("configured_baud_rate: {s},\n", .{@tagName(spcr.configured_baud_rate)});
 
         try writer.writeByteNTimes(' ', new_indent);
         try writer.writeAll("flow_control: ");
-        try self.flow_control.print(writer, new_indent);
+        try spcr.flow_control.print(writer, new_indent);
         try writer.writeAll(",\n");
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("terminal_type: {s},\n", .{@tagName(self.terminal_type)});
+        try writer.print("terminal_type: {s},\n", .{@tagName(spcr.terminal_type)});
 
-        if (self.pciAddress()) |pci_address| {
+        if (spcr.pciAddress()) |pci_address| {
             try writer.writeByteNTimes(' ', new_indent);
             try writer.writeAll("pci_address: ");
             try pci_address.print(writer, new_indent);
@@ -365,20 +365,20 @@ pub const SPCR = extern struct {
             try writer.writeByteNTimes(' ', new_indent);
             try writer.print(
                 "pci_flags.dont_suppress_enumeration_or_perform_power_management: {}\n",
-                .{self.pci_flags.dont_suppress_enumeration_or_perform_power_management},
+                .{spcr.pci_flags.dont_suppress_enumeration_or_perform_power_management},
             );
         }
 
         if (revision >= 3) {
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("uart_clock_frequency: {},\n", .{self.uart_clock_frequency});
+            try writer.print("uart_clock_frequency: {},\n", .{spcr.uart_clock_frequency});
         }
 
         if (revision >= 4) {
             try writer.writeByteNTimes(' ', new_indent);
-            try writer.print("precise_baud_rate: {},\n", .{self.precise_baud_rate});
+            try writer.print("precise_baud_rate: {},\n", .{spcr.precise_baud_rate});
 
-            if (self.namespaceString()) |namespace_string| {
+            if (spcr.namespaceString()) |namespace_string| {
                 try writer.writeByteNTimes(' ', new_indent);
                 try writer.print("namespace_string: {s},\n", .{namespace_string});
             } else {
@@ -392,7 +392,7 @@ pub const SPCR = extern struct {
     }
 
     pub inline fn format(
-        self: *const SPCR,
+        spcr: *const SPCR,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -400,13 +400,13 @@ pub const SPCR = extern struct {
         _ = options;
         _ = fmt;
         return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(self, writer, 0)
+            print(spcr, writer, 0)
         else
-            print(self, writer.any(), 0);
+            print(spcr, writer.any(), 0);
     }
 
     comptime {
-        core.testing.expectSize(@This(), 88);
+        core.testing.expectSize(SPCR, 88);
     }
 
     pub const init = struct {

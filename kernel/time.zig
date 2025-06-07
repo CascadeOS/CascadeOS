@@ -109,7 +109,7 @@ pub const init = struct {
             kernel.config.maximum_number_of_time_sources,
         ) = .{},
 
-        pub fn addTimeSource(self: *CandidateTimeSources, time_source: CandidateTimeSource) void {
+        pub fn addTimeSource(candidate_time_sources: *CandidateTimeSources, time_source: CandidateTimeSource) void {
             if (time_source.reference_counter != null) {
                 if (time_source.initialization == .calibration_required) {
                     std.debug.panic(
@@ -119,7 +119,7 @@ pub const init = struct {
                 }
             }
 
-            self.candidate_time_sources.append(time_source) catch {
+            candidate_time_sources.candidate_time_sources.append(time_source) catch {
                 @panic("exceeded maximum number of time sources");
             };
 
@@ -158,16 +158,16 @@ pub const init = struct {
         initialized: bool = false,
 
         fn initialize(
-            self: *CandidateTimeSource,
+            candidate_time_source: *CandidateTimeSource,
             reference_counter: ReferenceCounter,
         ) void {
-            if (self.initialized) return;
-            switch (self.initialization) {
+            if (candidate_time_source.initialized) return;
+            switch (candidate_time_source.initialization) {
                 .none => {},
                 .simple => |simple| simple(),
                 .calibration_required => |calibration_required| calibration_required(reference_counter),
             }
-            self.initialized = true;
+            candidate_time_source.initialized = true;
         }
 
         pub const Initialization = union(enum) {
@@ -228,20 +228,20 @@ pub const init = struct {
         ///
         /// Must be called before `waitFor` is called.
         pub inline fn prepareToWaitFor(
-            self: ReferenceCounter,
+            reference_counter: ReferenceCounter,
             duration: core.Duration,
         ) void {
-            self._prepareToWaitForFn(duration);
+            reference_counter._prepareToWaitForFn(duration);
         }
 
         /// Waits for `duration`.
         ///
         /// Must be called after `prepareToWaitFor` is called.
         pub inline fn waitFor(
-            self: ReferenceCounter,
+            reference_counter: ReferenceCounter,
             duration: core.Duration,
         ) void {
-            self._waitForFn(duration);
+            reference_counter._waitForFn(duration);
         }
     };
 

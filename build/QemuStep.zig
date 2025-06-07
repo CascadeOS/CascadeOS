@@ -78,10 +78,10 @@ fn create(
         .{@tagName(target)},
     );
 
-    const self = try b.allocator.create(QemuStep);
-    errdefer b.allocator.destroy(self);
+    const qemu_step = try b.allocator.create(QemuStep);
+    errdefer b.allocator.destroy(qemu_step);
 
-    self.* = .{
+    qemu_step.* = .{
         .step = Step.init(.{
             .id = .custom,
             .name = step_name,
@@ -96,32 +96,23 @@ fn create(
     };
 
     if (kernel_log_wrapper_compile) |compile| {
-        compile.getEmittedBin().addStepDependencies(&self.step);
+        compile.getEmittedBin().addStepDependencies(&qemu_step.step);
     }
-    image.addStepDependencies(&self.step);
+    image.addStepDependencies(&qemu_step.step);
 
-    return self;
-}
-
-/// Returns true if the target needs UEFI to boot.
-fn needsUefi(self: CascadeTarget) bool {
-    return switch (self) {
-        .arm => true,
-        .riscv => true,
-        .x64 => false,
-    };
+    return qemu_step;
 }
 
 fn make(step: *Step, options: Step.MakeOptions) !void {
     const b = step.owner;
-    const self: *QemuStep = @fieldParentPtr("step", step);
+    const qemu_step: *QemuStep = @fieldParentPtr("step", step);
 
-    const run_qemu = if (!self.options.display and self.kernel_log_wrapper_compile != null) run_qemu: {
-        const kernel_log_wrapper = self.kernel_log_wrapper_compile.?;
+    const run_qemu = if (!qemu_step.options.display and qemu_step.kernel_log_wrapper_compile != null) run_qemu: {
+        const kernel_log_wrapper = qemu_step.kernel_log_wrapper_compile.?;
         const run_qemu = b.addRunArtifact(kernel_log_wrapper);
-        run_qemu.addArg(qemuExecutable(self.target));
+        run_qemu.addArg(qemuExecutable(qemu_step.target));
         break :run_qemu run_qemu;
-    } else b.addSystemCommand(&.{qemuExecutable(self.target)});
+    } else b.addSystemCommand(&.{qemuExecutable(qemu_step.target)});
 
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
@@ -135,7 +126,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // RAM
     run_qemu.addArgs(&.{
         "-m",
-        try std.fmt.allocPrint(b.allocator, "{d}", .{self.options.memory}),
+        try std.fmt.allocPrint(b.allocator, "{d}", .{qemu_step.options.memory}),
     });
 
     // boot disk
@@ -146,7 +137,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         try std.fmt.allocPrint(
             b.allocator,
             "file={s},format=raw,if=none,id=drive0",
-            .{self.image.getPath(b)},
+            .{qemu_step.image.getPath(b)},
         ),
     });
 
@@ -156,13 +147,13 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         try std.fmt.allocPrint(
             b.allocator,
             "{d}",
-            .{self.options.number_of_cpus},
+            .{qemu_step.options.number_of_cpus},
         ),
     });
 
     // interrupt details
-    if (self.options.interrupt_details) {
-        if (self.target == .x64) {
+    if (qemu_step.options.interrupt_details) {
+        if (qemu_step.target == .x64) {
             // The "-M smm=off" below disables the SMM generated spam that happens before the kernel starts.
             run_qemu.addArgs(&[_][]const u8{ "-d", "int", "-M", "smm=off" });
         } else {
@@ -171,14 +162,14 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     }
 
     // gdb remote debug
-    if (self.options.qemu_remote_debug) {
+    if (qemu_step.options.qemu_remote_debug) {
         run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
     }
 
-    if (self.options.display) {
+    if (qemu_step.options.display) {
         run_qemu.addArgs(&[_][]const u8{ "-monitor", "vc" });
 
-        switch (self.target) {
+        switch (qemu_step.target) {
             .arm => {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
 
@@ -203,14 +194,14 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             "gtk,gl=on,show-tabs=on,zoom-to-fit=off",
         });
     } else {
-        if (self.target == .x64) {
-            if (self.options.qemu_monitor) {
+        if (qemu_step.target == .x64) {
+            if (qemu_step.options.qemu_monitor) {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "mon:stdio" });
             } else {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
             }
         } else {
-            if (self.options.qemu_monitor) {
+            if (qemu_step.options.qemu_monitor) {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
             } else {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
@@ -221,28 +212,28 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     }
 
     // set target cpu
-    switch (self.target) {
+    switch (qemu_step.target) {
         .arm => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .riscv => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }),
     }
 
     // set target machine
-    switch (self.target) {
-        .arm => if (self.options.no_acpi) {
+    switch (qemu_step.target) {
+        .arm => if (qemu_step.options.no_acpi) {
             run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
         } else {
             run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=on" });
         },
         .riscv => {
-            if (self.firmware == .uefi) {
-                if (self.options.no_acpi) {
+            if (qemu_step.firmware == .uefi) {
+                if (qemu_step.options.no_acpi) {
                     run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=off" });
                 } else {
                     run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=on" });
                 }
             } else {
-                if (self.options.no_acpi) {
+                if (qemu_step.options.no_acpi) {
                     run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
                 } else {
                     run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=on" });
@@ -250,7 +241,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             }
         },
         .x64 => {
-            if (self.options.no_acpi) {
+            if (qemu_step.options.no_acpi) {
                 std.debug.print("ACPI cannot be disabled on x64\n", .{});
                 std.process.exit(1);
             }
@@ -260,7 +251,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     }
 
     // qemu acceleration
-    const should_use_acceleration = !self.options.no_acceleration and self.target.isNative(b);
+    const should_use_acceleration = !qemu_step.options.no_acceleration and qemu_step.target.isNative(b);
     if (should_use_acceleration) {
         switch (b.graph.host.result.os.tag) {
             .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
@@ -273,13 +264,13 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     // always add tcg as the last accelerator
     run_qemu.addArgs(&[_][]const u8{ "-accel", "tcg" });
 
-    switch (self.firmware) {
+    switch (qemu_step.firmware) {
         .default => {},
         .uefi => |edk2| {
-            const firmware_code = edk2.path(uefiFirmwareCodeFileName(self.target));
-            const firmware_var = edk2.path(uefiFirmwareVarFileName(self.target));
+            const firmware_code = edk2.path(uefiFirmwareCodeFileName(qemu_step.target));
+            const firmware_var = edk2.path(uefiFirmwareVarFileName(qemu_step.target));
 
-            switch (self.target) {
+            switch (qemu_step.target) {
                 .riscv => {
                     run_qemu.addArgs(&[_][]const u8{
                         "-blockdev",
@@ -331,16 +322,25 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     step.result_duration_ns = timer.read();
 }
 
-fn uefiFirmwareCodeFileName(self: CascadeTarget) []const u8 {
-    return switch (self) {
+/// Returns true if the target needs UEFI to boot.
+fn needsUefi(cascade_target: CascadeTarget) bool {
+    return switch (cascade_target) {
+        .arm => true,
+        .riscv => true,
+        .x64 => false,
+    };
+}
+
+fn uefiFirmwareCodeFileName(cascade_target: CascadeTarget) []const u8 {
+    return switch (cascade_target) {
         .arm => "aarch64/code.fd",
         .riscv => "riscv64/code.fd",
         .x64 => "x64/code.fd",
     };
 }
 
-fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
-    return switch (self) {
+fn uefiFirmwareVarFileName(cascade_target: CascadeTarget) []const u8 {
+    return switch (cascade_target) {
         .arm => "aarch64/vars.fd",
         .riscv => "riscv64/vars.fd",
         .x64 => "x64/vars.fd",
@@ -348,8 +348,8 @@ fn uefiFirmwareVarFileName(self: CascadeTarget) []const u8 {
 }
 
 /// Returns the name of the QEMU system executable for the given target.
-fn qemuExecutable(self: CascadeTarget) []const u8 {
-    return switch (self) {
+fn qemuExecutable(cascade_target: CascadeTarget) []const u8 {
+    return switch (cascade_target) {
         .arm => "qemu-system-aarch64",
         .riscv => "qemu-system-riscv64",
         .x64 => "qemu-system-x86_64",

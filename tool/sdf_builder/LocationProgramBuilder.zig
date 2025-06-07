@@ -9,21 +9,27 @@ pub fn init(allocator: std.mem.Allocator) LocationProgramBuilder {
     };
 }
 
-pub fn currentOffset(self: *const LocationProgramBuilder) u64 {
-    return self.location_table.items.len;
+pub fn currentOffset(location_program_builder: *const LocationProgramBuilder) u64 {
+    return location_program_builder.location_table.items.len;
 }
 
-pub fn addInstruction(self: *LocationProgramBuilder, instruction: sdf.LocationProgramInstruction) !void {
-    const writer = self.location_table.writer();
+pub fn addInstruction(
+    location_program_builder: *LocationProgramBuilder,
+    instruction: sdf.LocationProgramInstruction,
+) !void {
+    const writer = location_program_builder.location_table.writer();
     try instruction.write(writer);
 }
 
-pub fn output(self: *const LocationProgramBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
+pub fn output(
+    location_program_builder: *const LocationProgramBuilder,
+    output_buffer: *std.ArrayList(u8),
+) !struct { u64, u64 } {
     const offset = output_buffer.items.len;
 
-    try output_buffer.appendSlice(self.location_table.items);
+    try output_buffer.appendSlice(location_program_builder.location_table.items);
 
-    return .{ offset, self.location_table.items.len };
+    return .{ offset, location_program_builder.location_table.items.len };
 }
 
 comptime {

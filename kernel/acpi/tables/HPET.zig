@@ -74,7 +74,7 @@ pub const HPET = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(@This(), 56);
+        core.testing.expectSize(HPET, 56);
     }
 };
 

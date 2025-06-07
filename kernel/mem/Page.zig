@@ -17,12 +17,12 @@ pub const Region = struct {
     number_of_frames: u32,
     start_index: u32,
 
-    pub fn compareContainsFrame(self: Region, frame: kernel.mem.phys.Frame) std.math.Order {
+    pub fn compareContainsFrame(region: Region, frame: kernel.mem.phys.Frame) std.math.Order {
         const frame_num = @intFromEnum(frame);
-        const start_frame_num = @intFromEnum(self.start_frame);
+        const start_frame_num = @intFromEnum(region.start_frame);
 
         if (frame_num < start_frame_num) return .lt;
-        if (frame_num >= start_frame_num + self.number_of_frames) return .gt;
+        if (frame_num >= start_frame_num + region.number_of_frames) return .gt;
         return .eq;
     }
 };

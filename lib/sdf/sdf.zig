@@ -191,8 +191,8 @@ pub const Header = extern struct {
 pub const StringTable = struct {
     bytes: [:0]const u8,
 
-    pub fn getString(self: StringTable, offset: u64) [:0]const u8 {
-        return std.mem.sliceTo(self.bytes[offset..], 0);
+    pub fn getString(string_table: StringTable, offset: u64) [:0]const u8 {
+        return std.mem.sliceTo(string_table.bytes[offset..], 0);
     }
 };
 
@@ -203,11 +203,11 @@ pub const FileTable = struct {
     bytes: []const u8,
     entry_count: u64,
 
-    pub fn getFile(self: FileTable, index: u64) ?FileEntry {
-        if (index >= self.entry_count) return null;
+    pub fn getFile(file_table: FileTable, index: u64) ?FileEntry {
+        if (index >= file_table.entry_count) return null;
 
         var fbs = std.io.fixedBufferStream(
-            self.bytes[index * @sizeOf(FileEntry) ..],
+            file_table.bytes[index * @sizeOf(FileEntry) ..],
         );
 
         return FileEntry.read(fbs.reader()) catch null;
@@ -246,12 +246,12 @@ pub const FileEntry = extern struct {
         }
     }
 
-    pub fn directory(self: FileEntry, string_table: StringTable) [:0]const u8 {
-        return string_table.getString(self.directory_offset);
+    pub fn directory(file_entry: FileEntry, string_table: StringTable) [:0]const u8 {
+        return string_table.getString(file_entry.directory_offset);
     }
 
-    pub fn file(self: FileEntry, string_table: StringTable) [:0]const u8 {
-        return string_table.getString(self.file_offset);
+    pub fn file(file_entry: FileEntry, string_table: StringTable) [:0]const u8 {
+        return string_table.getString(file_entry.file_offset);
     }
 
     test FileEntry {
@@ -284,9 +284,9 @@ pub const LocationLookup = struct {
     location_program_states_bytes: []const u8,
     entry_count: u64,
 
-    pub fn getStartState(self: LocationLookup, address: u64) !LocationProgramState {
+    pub fn getStartState(location_lookup: LocationLookup, address: u64) !LocationProgramState {
         const index = blk: {
-            var instruction_addresses = std.io.fixedBufferStream(self.instruction_addresses_bytes);
+            var instruction_addresses = std.io.fixedBufferStream(location_lookup.instruction_addresses_bytes);
             const reader = instruction_addresses.reader();
 
             var candidate_index: u64 = 0;
@@ -297,7 +297,7 @@ pub const LocationLookup = struct {
         };
 
         var location_program_states = std.io.fixedBufferStream(
-            self.location_program_states_bytes[index * @sizeOf(LocationProgramState) ..],
+            location_lookup.location_program_states_bytes[index * @sizeOf(LocationProgramState) ..],
         );
 
         return LocationProgramState.read(location_program_states.reader());
@@ -401,8 +401,10 @@ pub const LocationProgramState = extern struct {
 pub const LocationProgram = struct {
     bytes: []const u8,
 
-    pub fn getLocation(self: LocationProgram, start_state: LocationProgramState, address: u64) !Location {
-        var fbs = std.io.fixedBufferStream(self.bytes[start_state.instruction_offset..]);
+    pub fn getLocation(location_program: LocationProgram, start_state: LocationProgramState, address: u64) !Location {
+        var fbs = std.io.fixedBufferStream(
+            location_program.bytes[start_state.instruction_offset..],
+        );
         const reader = fbs.reader();
 
         var state = start_state;
@@ -499,12 +501,12 @@ pub const LocationProgram = struct {
 
         column: u64,
 
-        pub fn file(self: Location, file_table: FileTable) !FileEntry {
-            return file_table.getFile(self.file_index) orelse error.NoSuchFile;
+        pub fn file(location: Location, file_table: FileTable) !FileEntry {
+            return file_table.getFile(location.file_index) orelse error.NoSuchFile;
         }
 
-        pub fn symbol(self: Location, string_table: StringTable) [:0]const u8 {
-            return string_table.getString(self.symbol_offset);
+        pub fn symbol(location: Location, string_table: StringTable) [:0]const u8 {
+            return string_table.getString(location.symbol_offset);
         }
     };
 };

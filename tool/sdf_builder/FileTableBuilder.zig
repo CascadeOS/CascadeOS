@@ -8,29 +8,29 @@ allocator: std.mem.Allocator,
 file_table: std.ArrayListUnmanaged(sdf.FileEntry) = .{},
 file_indexes: std.AutoHashMapUnmanaged(sdf.FileEntry, u64) = .{},
 
-pub fn addFile(self: *FileTableBuilder, file_entry: sdf.FileEntry) !u64 {
-    if (self.file_indexes.get(file_entry)) |index| return index;
+pub fn addFile(file_table_builder: *FileTableBuilder, file_entry: sdf.FileEntry) !u64 {
+    if (file_table_builder.file_indexes.get(file_entry)) |index| return index;
 
-    const index = self.file_table.items.len;
+    const index = file_table_builder.file_table.items.len;
 
-    try self.file_table.append(self.allocator, file_entry);
-    errdefer _ = self.file_table.pop();
+    try file_table_builder.file_table.append(file_table_builder.allocator, file_entry);
+    errdefer _ = file_table_builder.file_table.pop();
 
-    try self.file_indexes.put(self.allocator, file_entry, index);
+    try file_table_builder.file_indexes.put(file_table_builder.allocator, file_entry, index);
 
     return index;
 }
 
-pub fn output(self: *const FileTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
+pub fn output(file_table_builder: *const FileTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
     const file_table_offset = output_buffer.items.len;
 
     const writer = output_buffer.writer();
 
-    for (self.file_table.items) |file_entry| {
+    for (file_table_builder.file_table.items) |file_entry| {
         try file_entry.write(writer);
     }
 
-    return .{ file_table_offset, self.file_table.items.len };
+    return .{ file_table_offset, file_table_builder.file_table.items.len };
 }
 
 comptime {

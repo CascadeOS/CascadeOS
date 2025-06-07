@@ -161,7 +161,7 @@ pub const MADT = extern struct {
             flags: APICFlags align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 6);
+                core.testing.expectSize(ProcessorLocalAPIC, 6);
             }
         };
 
@@ -193,7 +193,7 @@ pub const MADT = extern struct {
             global_system_interrupt_base: u32 align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 10);
+                core.testing.expectSize(IOAPIC, 10);
             }
         };
 
@@ -229,7 +229,7 @@ pub const MADT = extern struct {
             flags: MPS_INIT_Flags align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 8);
+                core.testing.expectSize(InterruptSourceOverride, 8);
             }
         };
 
@@ -247,7 +247,7 @@ pub const MADT = extern struct {
             global_system_interrupt: u32 align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 6);
+                core.testing.expectSize(NonMaskableInterruptSource, 6);
             }
         };
 
@@ -278,7 +278,7 @@ pub const MADT = extern struct {
             local_apic_lintN: u8,
 
             comptime {
-                core.testing.expectSize(@This(), 4);
+                core.testing.expectSize(LocalAPICNonMaskableInterrupt, 4);
             }
         };
 
@@ -302,7 +302,7 @@ pub const MADT = extern struct {
             local_apic_address: core.PhysicalAddress align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 10);
+                core.testing.expectSize(LocalAPICAddressOverride, 10);
             }
         };
 
@@ -335,7 +335,7 @@ pub const MADT = extern struct {
             iosapic_address: core.PhysicalAddress align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 14);
+                core.testing.expectSize(IOSAPIC, 14);
             }
         };
 
@@ -383,15 +383,15 @@ pub const MADT = extern struct {
             /// This value is stored as a null-terminated ASCII string.
             _acpi_processor_uid_string_start: u8,
 
-            pub fn acpiProcessorUidString(self: *const LocalSAPIC) [:0]const u8 {
+            pub fn acpiProcessorUidString(local_sapic: *const LocalSAPIC) [:0]const u8 {
                 return std.mem.sliceTo(
-                    @as([*:0]const u8, @ptrCast(&self._acpi_processor_uid_string_start)),
+                    @as([*:0]const u8, @ptrCast(&local_sapic._acpi_processor_uid_string_start)),
                     0,
                 );
             }
 
             comptime {
-                core.testing.expectSize(@This(), 13);
+                core.testing.expectSize(LocalSAPIC, 13);
             }
         };
 
@@ -481,7 +481,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 14);
+                core.testing.expectSize(PlatformInterruptSources, 14);
             }
         };
 
@@ -519,7 +519,7 @@ pub const MADT = extern struct {
             acpi_processor_uid: u32 align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 14);
+                core.testing.expectSize(ProcessorLocalX2APIC, 14);
             }
         };
 
@@ -560,7 +560,7 @@ pub const MADT = extern struct {
             _reserved2: u16 align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 10);
+                core.testing.expectSize(LocalX2APICNonMaskableInterrupt, 10);
             }
         };
 
@@ -704,7 +704,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 80);
+                core.testing.expectSize(GIC_CPUInterface, 80);
             }
         };
 
@@ -758,7 +758,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 22);
+                core.testing.expectSize(GIC_Distributor, 22);
             }
         };
 
@@ -813,7 +813,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 22);
+                core.testing.expectSize(GIC_MSIFrame, 22);
             }
         };
 
@@ -838,7 +838,7 @@ pub const MADT = extern struct {
             discovery_range_length: u32 align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 14);
+                core.testing.expectSize(GIC_Redistributor, 14);
             }
         };
 
@@ -859,7 +859,7 @@ pub const MADT = extern struct {
             _reserved2: u32 align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 18);
+                core.testing.expectSize(GIC_InterruptTranslationService, 18);
             }
         };
 
@@ -916,7 +916,7 @@ pub const MADT = extern struct {
             mailbox_address: core.PhysicalAddress align(1),
 
             comptime {
-                core.testing.expectSize(@This(), 14);
+                core.testing.expectSize(MultiprocessorWakeup, 14);
             }
         };
 
@@ -962,7 +962,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 13);
+                core.testing.expectSize(CoreProgrammableInterruptController, 13);
             }
         };
 
@@ -994,7 +994,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 21);
+                core.testing.expectSize(LegacyIOProgrammableInterruptController, 21);
             }
         };
 
@@ -1022,7 +1022,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 19);
+                core.testing.expectSize(HyperTransportProgrammableInterruptController, 19);
             }
         };
 
@@ -1051,7 +1051,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 11);
+                core.testing.expectSize(ExtendIOProgrammableInterruptController, 11);
             }
         };
 
@@ -1078,7 +1078,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 17);
+                core.testing.expectSize(MSIProgrammableInterruptController, 17);
             }
         };
 
@@ -1110,7 +1110,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 15);
+                core.testing.expectSize(BridgeIOProgrammableInterruptController, 15);
             }
         };
 
@@ -1138,7 +1138,7 @@ pub const MADT = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 13);
+                core.testing.expectSize(LowPinCountProgrammableInterruptController, 13);
             }
         };
 
@@ -1199,8 +1199,8 @@ pub const MADT = extern struct {
         };
     };
 
-    pub fn iterate(self: *const MADT) MADTIterator {
-        return MADTIterator.init(self);
+    pub fn iterate(madt: *const MADT) MADTIterator {
+        return MADTIterator.init(madt);
     }
 
     pub const MADTIterator = struct {
@@ -1217,12 +1217,12 @@ pub const MADT = extern struct {
             };
         }
 
-        pub fn next(self: *MADTIterator) ?*const InterruptControllerEntry {
-            if (@intFromPtr(self.current_ptr) >= @intFromPtr(self.end_ptr)) return null;
+        pub fn next(madt_iterator: *MADTIterator) ?*const InterruptControllerEntry {
+            if (@intFromPtr(madt_iterator.current_ptr) >= @intFromPtr(madt_iterator.end_ptr)) return null;
 
-            const entry: *const InterruptControllerEntry = @ptrCast(self.current_ptr);
+            const entry: *const InterruptControllerEntry = @ptrCast(madt_iterator.current_ptr);
 
-            self.current_ptr += entry.length;
+            madt_iterator.current_ptr += entry.length;
 
             return entry;
         }
@@ -1230,7 +1230,7 @@ pub const MADT = extern struct {
 
     comptime {
         core.testing.expectSize(
-            @This(),
+            MADT,
             @sizeOf(acpi.tables.SharedHeader) + @sizeOf(MultipleAPICFlags) + @sizeOf(u32) + 1,
         );
     }

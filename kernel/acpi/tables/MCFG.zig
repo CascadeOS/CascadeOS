@@ -9,10 +9,10 @@ pub const MCFG = extern struct {
 
     _base_allocations_start: BaseAllocation align(1),
 
-    pub fn baseAllocations(self: *const MCFG) []const BaseAllocation {
-        const base_allocations_ptr: [*]const BaseAllocation = @ptrCast(&self._base_allocations_start);
+    pub fn baseAllocations(mcfg: *const MCFG) []const BaseAllocation {
+        const base_allocations_ptr: [*]const BaseAllocation = @ptrCast(&mcfg._base_allocations_start);
 
-        const size_of_base_allocations = self.header.length - (@sizeOf(acpi.tables.SharedHeader) + @sizeOf(u64));
+        const size_of_base_allocations = mcfg.header.length - (@sizeOf(acpi.tables.SharedHeader) + @sizeOf(u64));
 
         std.debug.assert(size_of_base_allocations % @sizeOf(BaseAllocation) == 0);
 
@@ -33,13 +33,13 @@ pub const MCFG = extern struct {
         _reserved: u32 align(1),
 
         comptime {
-            core.testing.expectSize(@This(), 16);
+            core.testing.expectSize(BaseAllocation, 16);
         }
     };
 
     comptime {
         core.testing.expectSize(
-            @This(),
+            MCFG,
             @sizeOf(acpi.tables.SharedHeader) + @sizeOf(BaseAllocation) + @sizeOf(u64),
         );
     }

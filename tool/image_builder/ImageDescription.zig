@@ -60,8 +60,8 @@ pub const Parsed = struct {
 
     image_description: ImageDescription,
 
-    pub fn deinit(self: Parsed) void {
-        self.area_allocator.deinit();
+    pub fn deinit(parsed: Parsed) void {
+        parsed.area_allocator.deinit();
     }
 };
 
@@ -100,48 +100,51 @@ pub const Builder = struct {
         };
     }
 
-    pub fn deinit(self: *Builder) void {
-        for (self.partition_builders.items) |partition_builder| {
+    pub fn deinit(builder: *Builder) void {
+        for (builder.partition_builders.items) |partition_builder| {
             partition_builder.deinit();
-            self.allocator.destroy(partition_builder);
+            builder.allocator.destroy(partition_builder);
         }
-        self.partition_builders.deinit(self.allocator);
+        builder.partition_builders.deinit(builder.allocator);
     }
 
     pub fn addPartition(
-        self: *Builder,
+        builder: *Builder,
         /// Assumed to outlive the `Builder`
         name: []const u8,
         size: u64,
         filesystem: Filesystem,
         partition_type: PartitionType,
     ) !*PartitionBuilder {
-        const new_used_size = self.used_size + size;
-        if (new_used_size > self.size) return error.ImageSizeExceeded;
+        const new_used_size = builder.used_size + size;
+        if (new_used_size > builder.size) return error.ImageSizeExceeded;
 
-        const partition_builder = try self.allocator.create(PartitionBuilder);
-        errdefer self.allocator.destroy(partition_builder);
+        const partition_builder = try builder.allocator.create(PartitionBuilder);
+        errdefer builder.allocator.destroy(partition_builder);
 
         partition_builder.* = .{
-            .allocator = self.allocator,
+            .allocator = builder.allocator,
             .name = name,
             .size = size,
             .filesystem = filesystem,
             .partition_type = partition_type,
         };
 
-        try self.partition_builders.append(self.allocator, partition_builder);
-        self.used_size = new_used_size;
+        try builder.partition_builders.append(builder.allocator, partition_builder);
+        builder.used_size = new_used_size;
 
         return partition_builder;
     }
 
-    pub fn serialize(self: Builder, writer: anytype) !void {
+    pub fn serialize(builder: Builder, writer: anytype) !void {
         const partitions = blk: {
-            var partitions = try std.ArrayListUnmanaged(Partition).initCapacity(self.allocator, self.partition_builders.items.len);
-            defer partitions.deinit(self.allocator);
+            var partitions = try std.ArrayListUnmanaged(Partition).initCapacity(
+                builder.allocator,
+                builder.partition_builders.items.len,
+            );
+            defer partitions.deinit(builder.allocator);
 
-            for (self.partition_builders.items) |partition_builder| {
+            for (builder.partition_builders.items) |partition_builder| {
                 partitions.appendAssumeCapacity(.{
                     .name = partition_builder.name,
                     .size = partition_builder.size,
@@ -152,12 +155,12 @@ pub const Builder = struct {
                 });
             }
 
-            break :blk try partitions.toOwnedSlice(self.allocator);
+            break :blk try partitions.toOwnedSlice(builder.allocator);
         };
-        defer self.allocator.free(partitions);
+        defer builder.allocator.free(partitions);
 
         const image_description = ImageDescription{
-            .size = self.size,
+            .size = builder.size,
             .partitions = partitions,
         };
 
@@ -181,18 +184,18 @@ pub const PartitionBuilder = struct {
 
     entries: std.ArrayListUnmanaged(Entry) = .{},
 
-    fn deinit(self: *PartitionBuilder) void {
-        self.entries.deinit(self.allocator);
+    fn deinit(partition_builder: *PartitionBuilder) void {
+        partition_builder.entries.deinit(partition_builder.allocator);
     }
 
     /// The slices in `dir` are assumed to outlive the `Builder`
-    pub fn addDir(self: *PartitionBuilder, dir: Entry.Dir) !void {
-        try self.entries.append(self.allocator, .{ .dir = dir });
+    pub fn addDir(partition_builder: *PartitionBuilder, dir: Entry.Dir) !void {
+        try partition_builder.entries.append(partition_builder.allocator, .{ .dir = dir });
     }
 
     /// The slices in `file` are assumed to outlive the `Builder`
-    pub fn addFile(self: *PartitionBuilder, file: Entry.File) !void {
-        try self.entries.append(self.allocator, .{ .file = file });
+    pub fn addFile(partition_builder: *PartitionBuilder, file: Entry.File) !void {
+        try partition_builder.entries.append(partition_builder.allocator, .{ .file = file });
     }
 };
 

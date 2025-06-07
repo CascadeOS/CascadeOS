@@ -105,26 +105,26 @@ pub const DeviceID = enum(u16) {
 pub const Function = extern struct {
     full_configuration_space: [pcie_configuration_space_size.value]u8 align(pcie_configuration_space_size.value),
 
-    pub fn configurationSpace(self: *volatile Function) *volatile ConfigurationSpace {
-        return @ptrCast(self);
+    pub fn configurationSpace(function: *volatile Function) *volatile ConfigurationSpace {
+        return @ptrCast(function);
     }
 
-    pub fn read(self: *const volatile Function, comptime T: type, offset: usize) T {
+    pub fn read(function: *const volatile Function, comptime T: type, offset: usize) T {
         switch (T) {
-            u8 => return self.full_configuration_space[offset],
+            u8 => return function.full_configuration_space[offset],
             u16, u32 => {
-                const ptr: *const volatile T = @ptrCast(@alignCast(self.full_configuration_space[offset..].ptr));
+                const ptr: *const volatile T = @ptrCast(@alignCast(function.full_configuration_space[offset..].ptr));
                 return ptr.*;
             },
             else => @compileError("unsupported type " ++ @typeName(T)),
         }
     }
 
-    pub fn write(self: *volatile Function, comptime T: type, offset: usize, value: T) void {
+    pub fn write(function: *volatile Function, comptime T: type, offset: usize, value: T) void {
         switch (T) {
-            u8 => self.full_configuration_space[offset] = value,
+            u8 => function.full_configuration_space[offset] = value,
             u16, u32 => {
-                const ptr: *volatile T = @ptrCast(@alignCast(self.full_configuration_space[offset..].ptr));
+                const ptr: *volatile T = @ptrCast(@alignCast(function.full_configuration_space[offset..].ptr));
                 ptr.* = value;
             },
             else => @compileError("unsupported type " ++ @typeName(T)),
@@ -366,21 +366,21 @@ pub const Function = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(@This(), 0x30);
+                core.testing.expectSize(Generic, 0x30);
             }
         };
 
         pub const PciToPciBridge = extern struct {};
 
         comptime {
-            core.testing.expectSize(@This(), 0x40);
+            core.testing.expectSize(ConfigurationSpace, 0x40);
         }
     };
 
     pub const pcie_configuration_space_size: core.Size = .from(4096, .byte);
 
     comptime {
-        core.testing.expectSize(@This(), pcie_configuration_space_size.value);
+        core.testing.expectSize(Function, pcie_configuration_space_size.value);
     }
 };
 

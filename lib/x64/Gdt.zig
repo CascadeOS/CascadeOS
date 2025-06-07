@@ -22,7 +22,7 @@ pub const Gdt = extern struct {
         tss = 0x28,
     };
 
-    pub fn setTss(self: *Gdt, tss: *x64.Tss) void {
+    pub fn setTss(gdt: *Gdt, tss: *x64.Tss) void {
         const mask_u8: u64 = std.math.maxInt(u8);
         const mask_u16: u64 = std.math.maxInt(u16);
         const mask_u24: u64 = std.math.maxInt(u24);
@@ -40,8 +40,8 @@ pub const Gdt = extern struct {
 
         const limit: u64 = (@sizeOf(x64.Tss) - 1) & mask_u16;
 
-        self.descriptors[5] = low_base | mid_base | limit | present | available_64_bit_tss;
-        self.descriptors[6] = high_base;
+        gdt.descriptors[5] = low_base | mid_base | limit | present | available_64_bit_tss;
+        gdt.descriptors[6] = high_base;
 
         asm volatile (
             \\  ltr %[ts_sel]
@@ -50,10 +50,10 @@ pub const Gdt = extern struct {
         );
     }
 
-    pub fn load(self: *Gdt) void {
+    pub fn load(gdt: *Gdt) void {
         const gdt_ptr = Gdtr{
             .limit = @sizeOf(Gdt) - 1,
-            .base = @intFromPtr(self),
+            .base = @intFromPtr(gdt),
         };
 
         // Load the GDT

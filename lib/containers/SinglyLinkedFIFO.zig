@@ -18,38 +18,38 @@ pub const empty: SinglyLinkedFIFO = .{
 /// Returns `true` if the list is empty.
 ///
 /// This operation is O(1).
-pub fn isEmpty(self: *const SinglyLinkedFIFO) bool {
-    return self.start_node == null;
+pub fn isEmpty(singly_linked_lifo: *const SinglyLinkedFIFO) bool {
+    return singly_linked_lifo.start_node == null;
 }
 
 /// Adds a node to the end of the list.
 ///
 /// This operation is O(1).
-pub fn push(self: *SinglyLinkedFIFO, node: *SingleNode) void {
+pub fn push(singly_linked_lifo: *SinglyLinkedFIFO, node: *SingleNode) void {
     std.debug.assert(node.next == null);
 
-    if (self.end_node) |end| {
-        std.debug.assert(self.start_node != null);
+    if (singly_linked_lifo.end_node) |end| {
+        std.debug.assert(singly_linked_lifo.start_node != null);
         end.next = node;
     } else {
         node.* = .empty;
-        self.start_node = node;
+        singly_linked_lifo.start_node = node;
     }
 
-    self.end_node = node;
+    singly_linked_lifo.end_node = node;
 }
 
 /// Removes a node from the front of the list and returns it.
-pub fn pop(self: *SinglyLinkedFIFO) ?*SingleNode {
-    const node = self.start_node orelse return null;
-    std.debug.assert(self.end_node != null);
+pub fn pop(singly_linked_lifo: *SinglyLinkedFIFO) ?*SingleNode {
+    const node = singly_linked_lifo.start_node orelse return null;
+    std.debug.assert(singly_linked_lifo.end_node != null);
 
-    if (self.start_node == self.end_node) {
+    if (singly_linked_lifo.start_node == singly_linked_lifo.end_node) {
         std.debug.assert(node.next == null);
-        self.end_node = null;
+        singly_linked_lifo.end_node = null;
     }
 
-    self.start_node = node.next;
+    singly_linked_lifo.start_node = node.next;
     node.* = .empty;
     return node;
 }
@@ -57,10 +57,10 @@ pub fn pop(self: *SinglyLinkedFIFO) ?*SingleNode {
 /// Returns the number of nodes in the list.
 ///
 /// This operation is O(N).
-pub fn len(self: *const SinglyLinkedFIFO) usize {
+pub fn len(singly_linked_lifo: *const SinglyLinkedFIFO) usize {
     var result: usize = 0;
 
-    var opt_node = self.start_node;
+    var opt_node = singly_linked_lifo.start_node;
     while (opt_node) |node| : (opt_node = node.next) {
         result += 1;
     }
@@ -68,8 +68,8 @@ pub fn len(self: *const SinglyLinkedFIFO) usize {
     return result;
 }
 
-pub fn iterate(self: *const SinglyLinkedFIFO) SingleNode.Iterator {
-    return .{ .current_node = self.start_node };
+pub fn iterate(singly_linked_lifo: *const SinglyLinkedFIFO) SingleNode.Iterator {
+    return .{ .current_node = singly_linked_lifo.start_node };
 }
 
 test SinglyLinkedFIFO {

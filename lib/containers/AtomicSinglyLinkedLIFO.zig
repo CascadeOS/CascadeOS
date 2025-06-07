@@ -12,18 +12,18 @@ start_node: std.atomic.Value(?*SingleNode) = .init(null),
 pub const empty: AtomicSinglyLinkedLIFO = .{ .start_node = .init(null) };
 
 /// Returns `true` if the list is empty.
-pub fn isEmpty(self: *const AtomicSinglyLinkedLIFO) bool {
-    return self.start_node.load(.acquire) == null;
+pub fn isEmpty(atomic_singly_linked_lifo: *const AtomicSinglyLinkedLIFO) bool {
+    return atomic_singly_linked_lifo.start_node.load(.acquire) == null;
 }
 
 /// Adds a node to the front of the list.
-pub fn push(self: *AtomicSinglyLinkedLIFO, node: *SingleNode) void {
-    var opt_start_node = self.start_node.load(.monotonic);
+pub fn push(atomic_singly_linked_lifo: *AtomicSinglyLinkedLIFO, node: *SingleNode) void {
+    var opt_start_node = atomic_singly_linked_lifo.start_node.load(.monotonic);
 
     while (true) {
         node.next = opt_start_node;
 
-        if (self.start_node.cmpxchgWeak(
+        if (atomic_singly_linked_lifo.start_node.cmpxchgWeak(
             opt_start_node,
             node,
             .release,
@@ -38,11 +38,11 @@ pub fn push(self: *AtomicSinglyLinkedLIFO, node: *SingleNode) void {
 }
 
 /// Removes a node from the front of the list and returns it.
-pub fn pop(self: *AtomicSinglyLinkedLIFO) ?*SingleNode {
-    var opt_start_node = self.start_node.load(.monotonic);
+pub fn pop(atomic_singly_linked_lifo: *AtomicSinglyLinkedLIFO) ?*SingleNode {
+    var opt_start_node = atomic_singly_linked_lifo.start_node.load(.monotonic);
 
     while (opt_start_node) |start_node| {
-        if (self.start_node.cmpxchgWeak(
+        if (atomic_singly_linked_lifo.start_node.cmpxchgWeak(
             opt_start_node,
             start_node.next,
             .release,

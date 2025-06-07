@@ -18,38 +18,38 @@ tools_test_step: *Step,
 check_step: *Step,
 
 /// Registers a check step.
-pub fn registerCheck(self: StepCollection, exe: *Step.Compile) void {
-    self.check_step.dependOn(&exe.step);
+pub fn registerCheck(step_collection: StepCollection, exe: *Step.Compile) void {
+    step_collection.check_step.dependOn(&exe.step);
 }
 
 /// Registers a tool.
-pub fn registerTool(self: StepCollection, build_step: *Step, test_step: *Step) void {
-    self.tools_build_step.dependOn(build_step);
-    self.tools_test_step.dependOn(test_step);
+pub fn registerTool(step_collection: StepCollection, build_step: *Step, test_step: *Step) void {
+    step_collection.tools_build_step.dependOn(build_step);
+    step_collection.tools_test_step.dependOn(test_step);
 }
 
 /// Registers a kernel build step for a target.
 pub fn registerKernel(
-    self: StepCollection,
+    step_collection: StepCollection,
     target: CascadeTarget,
     install_both_kernel_binaries: *Step,
 ) void {
-    self.kernel_build_steps_per_target.get(target).?.dependOn(install_both_kernel_binaries);
+    step_collection.kernel_build_steps_per_target.get(target).?.dependOn(install_both_kernel_binaries);
 }
 
 /// Registers an image build step for a target.
-pub fn registerImage(self: StepCollection, target: CascadeTarget, step: *Step) void {
-    self.image_build_steps_per_target.get(target).?.dependOn(step);
+pub fn registerImage(step_collection: StepCollection, target: CascadeTarget, step: *Step) void {
+    step_collection.image_build_steps_per_target.get(target).?.dependOn(step);
 }
 
 /// Registers a Cascade library build step for a target.
-pub fn registerCascadeLibrary(self: StepCollection, target: CascadeTarget, install_step: *Step) void {
-    self.cascade_library_build_steps_per_target.get(target).?.dependOn(install_step);
+pub fn registerCascadeLibrary(step_collection: StepCollection, target: CascadeTarget, install_step: *Step) void {
+    step_collection.cascade_library_build_steps_per_target.get(target).?.dependOn(install_step);
 }
 
 /// Registers non-Cascade library build and run steps for a target.
-pub fn registerNonCascadeLibrary(self: StepCollection, target: CascadeTarget, run_step: *Step) void {
-    self.non_cascade_library_test_steps_per_target.get(target).?.dependOn(run_step);
+pub fn registerNonCascadeLibrary(step_collection: StepCollection, target: CascadeTarget, run_step: *Step) void {
+    step_collection.non_cascade_library_test_steps_per_target.get(target).?.dependOn(run_step);
 }
 
 pub fn create(b: *std.Build, targets: []const CascadeTarget) !StepCollection {

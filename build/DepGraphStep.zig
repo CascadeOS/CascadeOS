@@ -32,9 +32,9 @@ fn create(
     libraries: Library.Collection,
     tools: Tool.Collection,
 ) !*DepGraphStep {
-    const self = try b.allocator.create(DepGraphStep);
+    const dep_grap_step = try b.allocator.create(DepGraphStep);
 
-    self.* = .{
+    dep_grap_step.* = .{
         .b = b,
         .step = Step.init(.{
             .id = .custom,
@@ -49,24 +49,24 @@ fn create(
         .libraries = libraries,
         .tools = tools,
     };
-    self.dep_file = .{ .step = &self.step };
-    self.dep_lazy_path = .{ .generated = .{ .file = &self.dep_file } };
+    dep_grap_step.dep_file = .{ .step = &dep_grap_step.step };
+    dep_grap_step.dep_lazy_path = .{ .generated = .{ .file = &dep_grap_step.dep_file } };
 
-    return self;
+    return dep_grap_step;
 }
 
 fn make(step: *Step, options: Step.MakeOptions) !void {
-    const self: *DepGraphStep = @fieldParentPtr("step", step);
+    const dep_grap_step: *DepGraphStep = @fieldParentPtr("step", step);
 
     var node = options.progress_node.start(
         step.name,
-        self.kernels.count() + self.libraries.count() + self.tools.count(),
+        dep_grap_step.kernels.count() + dep_grap_step.libraries.count() + dep_grap_step.tools.count(),
     );
     defer node.end();
 
     var timer = try std.time.Timer.start();
 
-    const dep_grap_file_path = self.b.pathJoin(&.{ "zig-out", "dependency_graph.d2" });
+    const dep_grap_file_path = dep_grap_step.b.pathJoin(&.{ "zig-out", "dependency_graph.d2" });
     try std.fs.cwd().makePath(std.fs.path.dirname(dep_grap_file_path).?);
 
     var output_file = try std.fs.cwd().createFile(dep_grap_file_path, .{});
@@ -83,10 +83,14 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         \\
     );
 
-    var kernel_iterator = self.kernels.iterator();
+    var kernel_iterator = dep_grap_step.kernels.iterator();
 
     while (kernel_iterator.next()) |kernel| {
-        const kernel_name = try std.fmt.allocPrint(self.b.allocator, "{s}_kernel", .{@tagName(kernel.key_ptr.*)});
+        const kernel_name = try std.fmt.allocPrint(
+            dep_grap_step.b.allocator,
+            "{s}_kernel",
+            .{@tagName(kernel.key_ptr.*)},
+        );
         try writer.print("{s}: {{class: binary}}\n", .{kernel_name});
 
         for (kernel.value_ptr.dependencies) |dep| {
@@ -96,7 +100,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         node.completeOne();
     }
 
-    var tool_iterator = self.tools.iterator();
+    var tool_iterator = dep_grap_step.tools.iterator();
 
     while (tool_iterator.next()) |tool| {
         const tool_name = tool.key_ptr.*;
@@ -109,7 +113,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         node.completeOne();
     }
 
-    var library_iterator = self.libraries.iterator();
+    var library_iterator = dep_grap_step.libraries.iterator();
 
     while (library_iterator.next()) |library| {
         const library_name = library.key_ptr.*;
@@ -124,7 +128,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
     try buffered_writer.flush();
 
-    self.dep_file.path = dep_grap_file_path;
+    dep_grap_step.dep_file.path = dep_grap_file_path;
 
     step.result_duration_ns = timer.read();
 }
