@@ -55,6 +55,7 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
             .{ .name = "bitjuggle" },
         },
         .supported_targets = &.{.x64},
+        .need_llvm = true,
     },
 };
 

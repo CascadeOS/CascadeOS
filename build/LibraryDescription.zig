@@ -23,6 +23,12 @@ is_cascade_only: bool = false,
 /// If `null`, defaults to "name.zig".
 root_file_name: ?[]const u8 = null,
 
+/// Whether the library needs to be built with the LLVM backend.
+///
+/// TODO: This is used to disable the x86 backend for now, as it does not support disabling SSE.
+/// https://github.com/CascadeOS/CascadeOS/issues/99
+need_llvm: bool = false,
+
 const std = @import("std");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;

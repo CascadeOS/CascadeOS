@@ -121,6 +121,10 @@ fn create(
         .root_module = kernel_module,
     });
 
+    // TODO: disable the x86 backend for now, as it does not support disabling SSE
+    // https://github.com/CascadeOS/CascadeOS/issues/99
+    kernel_exe.use_llvm = true;
+
     kernel_exe.entry = .disabled;
     kernel_exe.want_lto = false;
     kernel_exe.pie = true; // allow kaslr
