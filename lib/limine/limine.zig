@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT AND BSD-2-Clause
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2025 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v9.2.0/COPYING)
+// SPDX-FileCopyrightText: 2019-2025 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v9.3.3/COPYING)
 
-//! This module contains the definitions of the Limine protocol as of v9.2.0.
+//! This module contains the definitions of the Limine protocol as of v9.3.3.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v9.2.0/PROTOCOL.md)
-//! 99738edd072a14fdedba822359daee754c8fe193 2025-02-17
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v9.3.3/PROTOCOL.md)
+//! 1c602bb69ab5acd1dcf06ef9bb62386686b3d534 2025-03-20
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
@@ -1149,9 +1149,9 @@ pub const Module = extern struct {
             /// If `true` then fail if the requested module is not found.
             required: bool = false,
 
-            /// Deprecated. Bootloader may not support it and panic instead (from Limine 8.x onwards). Alternatively:
+            /// Deprecated. Bootloader may not support it and panic instead (from Limine 8.x onwards).
             ///
-            /// The module is GZ-compressed and should be decompressed by the bootloader.
+            /// Alternatively, the module is GZ-compressed and should be decompressed by the bootloader.
             ///
             /// This is honoured if the response is revision 2 or greater.
             compressed: bool = false,
