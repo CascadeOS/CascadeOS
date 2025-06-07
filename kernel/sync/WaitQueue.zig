@@ -38,6 +38,8 @@ pub fn wakeOne(
 
 /// Add the current task to the wait queue.
 ///
+/// The spinlock will be unlocked upon return.
+///
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     wait_queue: *WaitQueue,

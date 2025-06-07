@@ -101,6 +101,8 @@ pub fn readUnlock(rw_lock: *RwLock, current_task: *kernel.Task) void {
 
     if ((state & READER_MASK == READER) and (state & IS_WRITING != 0)) {
         rw_lock.wait_queue_spinlock.lock(current_task);
+        defer rw_lock.wait_queue_spinlock.unlock(current_task);
+
         rw_lock.wait_queue.wakeOne(current_task, &rw_lock.wait_queue_spinlock);
     }
 }
