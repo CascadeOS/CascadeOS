@@ -22,7 +22,6 @@ pub fn wakeOne(
     spinlock: *const kernel.sync.TicketSpinLock,
 ) void {
     std.debug.assert(current_task.interrupt_disable_count != 0);
-
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
@@ -46,7 +45,6 @@ pub fn wait(
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
     std.debug.assert(current_task.interrupt_disable_count != 0);
-
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
     wait_queue.waiting_tasks.push(&current_task.next_task_node);

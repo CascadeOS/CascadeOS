@@ -7,7 +7,7 @@
 
 const TicketSpinLock = @This();
 
-containter: Container = .{ .full = 0 },
+container: Container = .{ .full = 0 },
 holding_executor: kernel.Executor.Id = .none,
 
 const Container = extern union {
@@ -28,17 +28,17 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void 
 
     current_task.incrementInterruptDisable();
 
-    const ticket = @atomicRmw(u32, &ticket_spin_lock.containter.contents.ticket, .Add, 1, .monotonic);
+    const ticket = @atomicRmw(u32, &ticket_spin_lock.container.contents.ticket, .Add, 1, .monotonic);
 
-    if (@atomicLoad(u32, &ticket_spin_lock.containter.contents.current, .acquire) != ticket) {
+    if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire) != ticket) {
         @branchHint(.unlikely);
 
         while (true) {
             kernel.arch.spinLoopHint();
-            if (@atomicLoad(u32, &ticket_spin_lock.containter.contents.current, .monotonic) == ticket) break;
+            if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .monotonic) == ticket) break;
         }
 
-        _ = @atomicLoad(u32, &ticket_spin_lock.containter.contents.current, .acquire);
+        _ = @atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire);
     }
 
     ticket_spin_lock.holding_executor = current_task.state.running.id;
@@ -52,7 +52,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bo
 
     current_task.incrementInterruptDisable();
 
-    const old_container = @atomicLoad(Container, &ticket_spin_lock.containter, .monotonic);
+    const old_container = @atomicLoad(Container, &ticket_spin_lock.container, .monotonic);
 
     if (old_container.contents.current != old_container.contents.ticket) {
         @branchHint(.unlikely);
@@ -64,7 +64,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bo
     var new_container = old_container;
     new_container.contents.ticket +%= 1;
 
-    if (@cmpxchgStrong(Container, &ticket_spin_lock.containter, old_container, new_container, .acquire, .monotonic)) |_| {
+    if (@cmpxchgStrong(Container, &ticket_spin_lock.container, old_container, new_container, .acquire, .monotonic)) |_| {
         @branchHint(.unlikely);
 
         current_task.decrementInterruptDisable();
@@ -95,12 +95,12 @@ pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) voi
 /// Performs no checks and is unsafe, prefer `unlock` instead.
 pub inline fn unsafeUnlock(ticket_spin_lock: *TicketSpinLock) void {
     ticket_spin_lock.holding_executor = .none;
-    @atomicStore(u32, &ticket_spin_lock.containter.contents.current, ticket_spin_lock.containter.contents.current +% 1, .release);
+    @atomicStore(u32, &ticket_spin_lock.container.contents.current, ticket_spin_lock.container.contents.current +% 1, .release);
 }
 
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
 pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
-    _ = @atomicRmw(u32, &ticket_spin_lock.containter.contents.current, .Sub, 1, .release);
+    _ = @atomicRmw(u32, &ticket_spin_lock.container.contents.current, .Sub, 1, .release);
 }
 
 /// Returns true if the spinlock is locked by the current executor.
