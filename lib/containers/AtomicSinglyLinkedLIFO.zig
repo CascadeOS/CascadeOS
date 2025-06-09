@@ -18,14 +18,25 @@ pub fn isEmpty(atomic_singly_linked_lifo: *const AtomicSinglyLinkedLIFO) bool {
 
 /// Adds a node to the front of the list.
 pub fn push(atomic_singly_linked_lifo: *AtomicSinglyLinkedLIFO, node: *SingleNode) void {
+    atomic_singly_linked_lifo.pushMany(node, node);
+}
+
+/// Adds a linked list of nodes to the front of the list.
+///
+/// The list is expected to be already linked correctly.
+pub fn pushMany(
+    atomic_singly_linked_lifo: *AtomicSinglyLinkedLIFO,
+    start_node: *SingleNode,
+    end_node: *SingleNode,
+) void {
     var opt_start_node = atomic_singly_linked_lifo.start_node.load(.monotonic);
 
     while (true) {
-        node.next = opt_start_node;
+        end_node.next = opt_start_node;
 
         if (atomic_singly_linked_lifo.start_node.cmpxchgWeak(
             opt_start_node,
-            node,
+            start_node,
             .release,
             .monotonic,
         )) |new_value| {
