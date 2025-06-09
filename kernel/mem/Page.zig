@@ -5,7 +5,6 @@ const Page = @This();
 
 physical_frame: kernel.mem.phys.Frame,
 
-/// The node in the free list `kernel.mem.phys.globals.free_page_list`.
 node: containers.SingleNode = .empty,
 
 pub inline fn fromNode(node: *containers.SingleNode) *Page {

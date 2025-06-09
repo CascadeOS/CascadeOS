@@ -57,7 +57,11 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         const physical_frame = try physical_frame_allocator.allocate();
-        errdefer physical_frame_allocator.deallocate(physical_frame);
+        errdefer {
+            var deallocate_frame_list: phys.FrameList = .{};
+            deallocate_frame_list.push(physical_frame);
+            physical_frame_allocator.deallocate(deallocate_frame_list);
+        }
 
         try kernel.arch.paging.map(
             page_table,
@@ -149,6 +153,8 @@ pub fn unmapRange(
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
+    var deallocate_frame_list: phys.FrameList = .{};
+
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
 
@@ -158,7 +164,7 @@ pub fn unmapRange(
             current_virtual_address,
             free_backing_pages,
             keep_top_level,
-            physical_frame_allocator,
+            &deallocate_frame_list,
         );
         current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
     }
@@ -169,6 +175,8 @@ pub fn unmapRange(
     };
 
     request.submitAndWait(current_task);
+
+    physical_frame_allocator.deallocate(deallocate_frame_list);
 }
 
 /// Returns the virtual address corresponding to this physical address in the direct map.

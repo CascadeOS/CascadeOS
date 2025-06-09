@@ -427,10 +427,11 @@ pub const RawCache = struct {
                         .len = kernel.arch.paging.standard_page_size.value,
                     })
                 else {
-                    const frame = kernel.mem.phys.Frame.fromAddress(
+                    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+                    deallocate_frame_list.push(.fromAddress(
                         kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
-                    );
-                    kernel.mem.phys.allocator.deallocate(frame);
+                    ));
+                    kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
                 };
 
                 const slab: *Slab = @alignCast(@ptrCast(
@@ -621,10 +622,11 @@ pub const RawCache = struct {
                         },
                     );
                 } else {
-                    const frame = kernel.mem.phys.Frame.fromAddress(
+                    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+                    deallocate_frame_list.push(.fromAddress(
                         kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
-                    );
-                    kernel.mem.phys.allocator.deallocate(frame);
+                    ));
+                    kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
                 }
 
                 return;

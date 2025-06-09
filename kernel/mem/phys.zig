@@ -54,7 +54,18 @@ pub const FrameAllocator = struct {
     pub const AllocateError = error{FramesExhausted};
 
     pub const Allocate = *const fn () AllocateError!Frame;
-    pub const Deallocate = *const fn (Frame) void;
+    pub const Deallocate = *const fn (FrameList) void;
+};
+
+pub const FrameList = struct {
+    list: containers.SinglyLinkedFIFO = .empty,
+    count: usize = 0,
+
+    pub fn push(frame_list: *FrameList, frame: Frame) void {
+        const page = frame.page() orelse std.debug.panic("page not found for frame: {}", .{frame});
+        frame_list.list.push(&page.node);
+        frame_list.count += 1;
+    }
 };
 
 fn allocate() FrameAllocator.AllocateError!Frame {
@@ -79,12 +90,18 @@ fn allocate() FrameAllocator.AllocateError!Frame {
     return page.physical_frame;
 }
 
-fn deallocate(frame: Frame) void {
-    const page = frame.page() orelse std.debug.panic("page not found for frame: {}", .{frame});
+fn deallocate(frame_list: FrameList) void {
+    if (frame_list.count == 0) {
+        @branchHint(.unlikely);
+        return;
+    }
 
-    globals.free_page_list.push(&page.node);
+    globals.free_page_list.pushMany(frame_list.list.start_node.?, frame_list.list.end_node.?);
 
-    _ = globals.free_memory.fetchAdd(kernel.arch.paging.standard_page_size.value, .release);
+    _ = globals.free_memory.fetchAdd(
+        kernel.arch.paging.standard_page_size.multiplyScalar(frame_list.count).value,
+        .release,
+    );
 }
 
 const globals = struct {
@@ -335,7 +352,7 @@ pub const init = struct {
             }
         }.allocate,
         .deallocate = struct {
-            fn deallocate(_: Frame) void {
+            fn deallocate(_: FrameList) void {
                 @panic("deallocate not supported");
             }
         }.deallocate,

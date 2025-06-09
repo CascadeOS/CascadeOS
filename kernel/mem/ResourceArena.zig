@@ -129,7 +129,7 @@ pub const InitError = error{
 const QuantumCacheAllocation = union(enum) {
     no,
     yes: []RawCache,
-    heap: std.BoundedArray(kernel.mem.phys.Frame, FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES),
+    heap: kernel.mem.phys.FrameList,
 };
 
 pub fn init(
@@ -186,10 +186,7 @@ pub fn init(
         .heap => |count| {
             std.debug.assert(count > 0);
 
-            var frames: std.BoundedArray(
-                kernel.mem.phys.Frame,
-                FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES,
-            ) = .{};
+            var frames: kernel.mem.phys.FrameList = .{};
 
             var caches_created: usize = 0;
 
@@ -200,7 +197,7 @@ pub fn init(
             for (0..frames_to_allocate) |_| {
                 const frame = kernel.mem.phys.allocator.allocate() catch
                     @panic("heap quantum cache allocation failed");
-                frames.append(frame) catch unreachable;
+                frames.push(frame);
 
                 const frame_caches = kernel.mem.directMapFromPhysical(frame.baseAddress())
                     .toPtr(*[QUANTUM_CACHES_PER_FRAME]RawCache);
@@ -244,11 +241,7 @@ pub fn deinit(arena: *ResourceArena, current_task: *kernel.Task) void {
     switch (arena.quantum_cache_allocation) {
         .no => {},
         .yes => |caches| kernel.mem.heap.allocator.free(caches),
-        .heap => |frames| {
-            for (frames.constSlice()) |frame| {
-                kernel.mem.phys.allocator.deallocate(frame);
-            }
-        },
+        .heap => |frames| kernel.mem.phys.allocator.deallocate(frames),
     }
 
     var tags_to_release: SinglyLinkedList = .empty;
@@ -1266,7 +1259,6 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
 const QUANTUM_CACHES_PER_FRAME = kernel.arch.paging.standard_page_size.divide(core.Size.of(RawCache)).value;
-const FRAMES_FOR_MAX_NUMBER_OF_QUANTUM_CACHES = MAX_NUMBER_OF_QUANTUM_CACHES / QUANTUM_CACHES_PER_FRAME;
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));

@@ -262,7 +262,7 @@ pub const paging = struct {
         virtual_address: core.VirtualAddress,
         free_backing_pages: bool,
         keep_top_level: bool,
-        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.paging,
@@ -272,7 +272,7 @@ pub const paging = struct {
                 core.VirtualAddress,
                 bool,
                 bool,
-                kernel.mem.phys.FrameAllocator,
+                *kernel.mem.phys.FrameList,
             ) void,
         );
 
@@ -281,7 +281,7 @@ pub const paging = struct {
             virtual_address,
             free_backing_pages,
             keep_top_level,
-            physical_frame_allocator,
+            deallocate_frame_list,
         );
     }
 

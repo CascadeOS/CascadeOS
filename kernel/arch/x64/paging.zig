@@ -38,13 +38,18 @@ pub fn map(
         map_type,
         physical_frame_allocator,
     ) catch |err| {
+        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+
         unmap4KiB(
             page_table,
             virtual_address,
             false,
             keep_top_level,
-            physical_frame_allocator,
+            &deallocate_frame_list,
         );
+
+        physical_frame_allocator.deallocate(deallocate_frame_list);
+
         return err;
     };
 }
@@ -62,7 +67,7 @@ pub fn unmap(
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
     keep_top_level: bool,
-    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) callconv(core.inline_in_non_debug) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
@@ -71,7 +76,7 @@ pub fn unmap(
         virtual_address,
         free_backing_pages,
         keep_top_level,
-        physical_frame_allocator,
+        deallocate_frame_list,
     );
 }
 
@@ -103,6 +108,9 @@ fn mapTo4KiB(
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
     std.debug.assert(physical_address.isAligned(PageTable.small_page_size));
 
+    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+    errdefer physical_frame_allocator.deallocate(deallocate_frame_list);
+
     const level4_index = PageTable.p4Index(virtual_address);
 
     const level3_table, const created_level3_table = try ensureNextTable(
@@ -114,7 +122,7 @@ fn mapTo4KiB(
             var level4_entry = level4_table.entries[level4_index].load();
             const address = level4_entry.getAddress4kib();
             level4_table.entries[level4_index].zero();
-            physical_frame_allocator.deallocate(.fromAddress(address));
+            deallocate_frame_list.push(.fromAddress(address));
         }
     }
 
@@ -129,7 +137,7 @@ fn mapTo4KiB(
             var level3_entry = level3_table.entries[level3_index].load();
             const address = level3_entry.getAddress4kib();
             level3_table.entries[level3_index].zero();
-            physical_frame_allocator.deallocate(.fromAddress(address));
+            deallocate_frame_list.push(.fromAddress(address));
         }
     }
 
@@ -144,7 +152,7 @@ fn mapTo4KiB(
             var level2_entry = level2_table.entries[level2_index].load();
             const address = level2_entry.getAddress4kib();
             level2_table.entries[level2_index].zero();
-            physical_frame_allocator.deallocate(.fromAddress(address));
+            deallocate_frame_list.push(.fromAddress(address));
         }
     }
 
@@ -171,7 +179,7 @@ fn unmap4KiB(
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
     keep_top_level: bool,
-    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
@@ -187,7 +195,7 @@ fn unmap4KiB(
 
     defer if (!keep_top_level and level3_table.isEmpty()) {
         level4_table.entries[level4_index].zero();
-        physical_frame_allocator.deallocate(.fromAddress(level4_entry.getAddress4kib()));
+        deallocate_frame_list.push(.fromAddress(level4_entry.getAddress4kib()));
     };
 
     const level3_index = PageTable.p3Index(virtual_address);
@@ -202,7 +210,7 @@ fn unmap4KiB(
 
     defer if (level2_table.isEmpty()) {
         level3_table.entries[level3_index].zero();
-        physical_frame_allocator.deallocate(.fromAddress(level3_entry.getAddress4kib()));
+        deallocate_frame_list.push(.fromAddress(level3_entry.getAddress4kib()));
     };
 
     const level2_index = PageTable.p2Index(virtual_address);
@@ -217,7 +225,7 @@ fn unmap4KiB(
 
     defer if (level1_table.isEmpty()) {
         level2_table.entries[level2_index].zero();
-        physical_frame_allocator.deallocate(.fromAddress(level2_entry.getAddress4kib()));
+        deallocate_frame_list.push(.fromAddress(level2_entry.getAddress4kib()));
     };
 
     const level1_index = PageTable.p1Index(virtual_address);
@@ -230,7 +238,7 @@ fn unmap4KiB(
     level1_table.entries[level1_index].zero();
 
     if (free_backing_pages) {
-        physical_frame_allocator.deallocate(.fromAddress(level1_entry.getAddress4kib()));
+        deallocate_frame_list.push(.fromAddress(level1_entry.getAddress4kib()));
     }
 }
 
