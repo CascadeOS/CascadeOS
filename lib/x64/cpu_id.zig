@@ -7,7 +7,7 @@
 //!
 //! Specification's used:
 //!  - "Intel 64 and IA-32 Architectures Software Developer's Manual Volume 2A December 2023"
-//!  - "AMD64 Architecture Programmer's Manual Volume 3: General-Purpose and System Instructions 3.35 June 2023"
+//!  - "AMD64 Architecture Programmer's Manual Volume 3: General-Purpose and System Instructions 3.36 March 2024"
 //!
 
 /// Capture the CPUID information.
@@ -1120,9 +1120,7 @@ pub var intel_avx512_ifma: bool = false;
 
 /// RDPID and IA32_TSC_AUX are available.
 ///
-/// AMD: CPUID.07.00H: EBX[22]
-///
-/// Intel: CPUID.07.00H: ECX[22]
+/// CPUID.07.00H: ECX[22]
 pub var rdpid: bool = false;
 
 /// CLFLUSHOPT.
@@ -2645,7 +2643,6 @@ fn capture07H() void {
         adx = bitjuggle.isBitSet(subleaf0.ebx, 19);
         smap = bitjuggle.isBitSet(subleaf0.ebx, 20);
         if (vendor == .intel) intel_avx512_ifma = bitjuggle.isBitSet(subleaf0.ebx, 21);
-        if (vendor == .amd) rdpid = bitjuggle.isBitSet(subleaf0.ebx, 22);
         clflushopt = bitjuggle.isBitSet(subleaf0.ebx, 23);
         clwb = bitjuggle.isBitSet(subleaf0.ebx, 24);
         intel_processor_trace = bitjuggle.isBitSet(subleaf0.ebx, 25);
@@ -2677,7 +2674,7 @@ fn capture07H() void {
         // CPUID.07.00H: ECX[15] reserved
         la57 = bitjuggle.isBitSet(subleaf0.ecx, 16);
         if (vendor == .intel) intel_mawau = bitjuggle.getBits(subleaf0.ecx, 17, 5);
-        if (vendor == .intel) rdpid = bitjuggle.isBitSet(subleaf0.ecx, 22);
+        rdpid = bitjuggle.isBitSet(subleaf0.ecx, 22);
         if (vendor == .intel) intel_kl = bitjuggle.isBitSet(subleaf0.ecx, 23);
         // Provided by `busLockDetect`
         if (vendor == .intel) intel_cldemote = bitjuggle.isBitSet(subleaf0.ecx, 25);
