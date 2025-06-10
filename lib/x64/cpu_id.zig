@@ -2287,16 +2287,12 @@ pub var amd_procpowerreporting: bool = false;
 
 /// Maximum physical address size in bits.
 ///
-/// When `guest_physical_address_size` is zero, this field also indicates the maximum guest physical address size.
-///
-/// AMD Only.
+///  When this is zero, this field also indicates the maximum guest physical address size.
 ///
 /// CPUID.80000008H: EAX[7:0]
 pub var physical_address_size: ?u8 = null;
 
 /// Maximum linear address size in bits.
-///
-/// AMD Only.
 ///
 /// CPUID.80000008H: EAX[15:8]
 pub var linear_address_size: ?u8 = null;
@@ -2305,10 +2301,6 @@ pub var linear_address_size: ?u8 = null;
 ///
 /// This number applies only to guests using nested paging. When this field is zero, refer to the
 /// `physical_address_size` field for the maximum guest physical address size.
-///
-/// See “Secure Virtual Machine” in APM Volume 2.
-///
-/// AMD Only.
 ///
 /// CPUID.80000008H: EAX[23:16]
 pub var guest_physical_address_size: ?u8 = null;
@@ -2363,8 +2355,6 @@ pub var bandwidth_enforcement_extension: bool = false;
 pub var mcommit: bool = false;
 
 /// WBNOINVD instruction supported.
-///
-/// AMD Only.
 ///
 /// CPUID.80000008H: EBX[9]
 pub var wbnoinvd: bool = false;
@@ -3450,9 +3440,9 @@ fn capture80000008H() void {
 
     // EAX
     {
-        if (vendor == .amd) physical_address_size = bitjuggle.getBits(cpuid_result.eax, 0, 8);
-        if (vendor == .amd) linear_address_size = bitjuggle.getBits(cpuid_result.eax, 8, 8);
-        if (vendor == .amd) guest_physical_address_size = bitjuggle.getBits(cpuid_result.eax, 16, 8);
+        physical_address_size = bitjuggle.getBits(cpuid_result.eax, 0, 8);
+        linear_address_size = bitjuggle.getBits(cpuid_result.eax, 8, 8);
+        guest_physical_address_size = bitjuggle.getBits(cpuid_result.eax, 16, 8);
         // CPUID.80000008H: EAX[24] reserved
         // CPUID.80000008H: EAX[25] reserved
         // CPUID.80000008H: EAX[26] reserved
@@ -3474,7 +3464,7 @@ fn capture80000008H() void {
         if (vendor == .amd) bandwidth_enforcement_extension = bitjuggle.isBitSet(cpuid_result.ebx, 6);
         // CPUID.80000008H: EBX[7] reserved
         if (vendor == .amd) mcommit = bitjuggle.isBitSet(cpuid_result.ebx, 8);
-        if (vendor == .amd) wbnoinvd = bitjuggle.isBitSet(cpuid_result.ebx, 9);
+        wbnoinvd = bitjuggle.isBitSet(cpuid_result.ebx, 9);
         // CPUID.80000008H: EBX[10] reserved
         // CPUID.80000008H: EBX[11] reserved
         if (vendor == .amd) indirect_branch_prediction_barrier = bitjuggle.isBitSet(cpuid_result.ebx, 12);
@@ -3603,7 +3593,6 @@ const x64 = @import("x64");
 // TODO: CPUID.80000006H - L2 Cache and TLB and L3 Cache Information (AMD Only)
 // TODO: CPUID.80000006H - Cache stuff (Intel Only)
 // TODO: CPUID.80000008H - Processor Capacity Parameters and Extended Feature Identification (AMD Only)
-// TODO: CPUID.80000008H - Address bits (Intel Only)
 // TODO: CPUID.8000000AH - SVM Features (AMD Only)
 // TODO: CPUID.80000019H - TLB Characteristics for 1GB pages (AMD Only)
 // TODO: CPUID.8000001AH - Instruction Optimizations (AMD Only)
