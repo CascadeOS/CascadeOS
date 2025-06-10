@@ -320,7 +320,7 @@ pub const RawCache = struct {
     pub fn allocateMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: [][]u8) AllocateError!void {
         std.debug.assert(objects.len > 0);
 
-        verbose_log.debug("{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose("{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
 
         var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
         errdefer raw_cache.freeMany(current_task, allocated_objects.items);
@@ -525,7 +525,7 @@ pub const RawCache = struct {
     pub fn freeMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
         std.debug.assert(objects.len > 0);
 
-        verbose_log.debug("{s}: freeing {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose("{s}: freeing {} objects", .{ raw_cache.name(), objects.len });
 
         raw_cache.lock.lock(current_task);
         defer raw_cache.lock.unlock(current_task);
@@ -708,4 +708,3 @@ const kernel = @import("kernel");
 const SinglyLinkedList = std.SinglyLinkedList;
 const DoublyLinkedList = std.DoublyLinkedList;
 const log = kernel.debug.log.scoped(.cache);
-const verbose_log = kernel.debug.log.scoped(.cache_verbose);
