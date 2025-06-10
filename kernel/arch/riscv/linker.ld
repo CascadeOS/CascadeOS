@@ -26,11 +26,13 @@ SECTIONS
         *(.text .text.*)
     } :text
 
-     __text_end = .;
+    __text_end = .;
+
+    PROVIDE(_global_pointer = .);
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
-     __rodata_start = .;
+    __rodata_start = .;
 
     .rodata : {
         *(.rodata .rodata.*)
