@@ -23,7 +23,12 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
             logFn(prefix_debug, userFmt(format), args);
         }
 
-        pub inline fn levelEnabled(comptime message_level: std.log.Level) bool {
+        pub fn verbose(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
+            if (comptime !levelEnabled(.verbose)) return;
+            logFn(prefix_verbose, userFmt(format), args);
+        }
+
+        pub inline fn levelEnabled(comptime message_level: Level) bool {
             comptime return loggingEnabledFor(scope, message_level);
         }
 
@@ -31,8 +36,9 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         const prefix_warn = levelAndScope(.warn);
         const prefix_info = levelAndScope(.info);
         const prefix_debug = levelAndScope(.debug);
+        const prefix_verbose = levelAndScope(.verbose);
 
-        inline fn levelAndScope(comptime message_level: std.log.Level) []const u8 {
+        inline fn levelAndScope(comptime message_level: Level) []const u8 {
             comptime return message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
         }
 
@@ -44,6 +50,33 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
     };
 }
+
+pub const Level = enum {
+    err,
+    warn,
+    info,
+    debug,
+    verbose,
+
+    pub inline fn asText(comptime self: Level) []const u8 {
+        return switch (self) {
+            .err => "error",
+            .warn => "warning",
+            .info => "info",
+            .debug => "debug",
+            .verbose => "verbose",
+        };
+    }
+
+    pub fn toStd(self: Level) std.log.Level {
+        return switch (self) {
+            .err => .err,
+            .warn => .warn,
+            .info => .info,
+            .debug, .verbose => .debug,
+        };
+    }
+};
 
 fn logFn(
     prefix: []const u8,
@@ -107,8 +140,13 @@ pub fn setLogMode(mode: LogMode) void {
     globals.log_mode = mode;
 }
 
-pub const log_level: std.log.Level = blk: {
-    if (kernel.config.force_debug_log) break :blk .debug;
+pub const log_level: Level = blk: {
+    if (@hasDecl(kernel_options, "force_log_level")) {
+        break :blk switch (kernel_options.force_log_level) {
+            .debug => .debug,
+            .verbose => .verbose,
+        };
+    }
 
     break :blk switch (builtin.mode) {
         .Debug => .info,
@@ -132,24 +170,36 @@ pub fn stdLogImpl(
 }
 
 /// Determine if a specific scope and log level pair is enabled for logging.
-inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: std.log.Level) bool {
-    comptime return isScopeInForcedDebugScopes(scope) or @intFromEnum(message_level) <= @intFromEnum(log_level);
+inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: Level) bool {
+    comptime {
+        if (@intFromEnum(message_level) <= @intFromEnum(log_level)) return true;
+
+        if (@intFromEnum(message_level) <= @intFromEnum(Level.debug) and
+            isScopeInForceScopeList(scope, forced_debug_log_scopes))
+            return true;
+
+        if (@intFromEnum(message_level) <= @intFromEnum(Level.verbose) and
+            isScopeInForceScopeList(scope, forced_verbose_log_scopes))
+            return true;
+
+        return false;
+    }
 }
 
-/// Checks if a scope is in the list of scopes forced to log at debug level.
-inline fn isScopeInForcedDebugScopes(comptime scope: @Type(.enum_literal)) bool {
+/// Checks if a scope is in the list of forced scopes.
+inline fn isScopeInForceScopeList(comptime scope: @Type(.enum_literal), comptime force_scope_list: []const []const u8) bool {
     comptime {
-        if (kernel.config.forced_debug_log_scopes.len == 0) return false;
+        if (force_scope_list.len == 0) return false;
 
         const tag = @tagName(scope);
 
-        for (kernel.config.forced_debug_log_scopes) |debug_scope| {
-            if (std.mem.endsWith(u8, debug_scope, "+")) {
-                // if this debug_scope ends with a +, then it is a prefix match
-                if (std.mem.startsWith(u8, tag, debug_scope[0 .. debug_scope.len - 1])) return true;
+        for (force_scope_list) |forced_scope| {
+            if (std.mem.endsWith(u8, forced_scope, "+")) {
+                // if this forced_scope ends with a +, then it is a prefix match
+                if (std.mem.startsWith(u8, tag, forced_scope[0 .. forced_scope.len - 1])) return true;
             }
 
-            if (std.mem.eql(u8, tag, debug_scope)) return true;
+            if (std.mem.eql(u8, tag, forced_scope)) return true;
         }
 
         return false;
@@ -163,7 +213,11 @@ const globals = struct {
     var init_log_buffered_writer = std.io.bufferedWriter(kernel.init.Output.writer);
 };
 
+const forced_debug_log_scopes = kernel_options.forced_debug_log_scopes;
+const forced_verbose_log_scopes = kernel_options.forced_verbose_log_scopes;
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const builtin = @import("builtin");
+const kernel_options = @import("kernel_options");

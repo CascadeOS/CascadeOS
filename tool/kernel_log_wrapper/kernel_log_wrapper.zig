@@ -48,9 +48,15 @@ fn handleLine(stdout: std.fs.File, line: []const u8) !void {
 
 const rules = [_]Rule{
     .{
+        .pattern = "verbose",
+        .foreground = .{
+            .rgb = .{ .r = 110, .g = 110, .b = 110 }, // dark grey
+        },
+    },
+    .{
         .pattern = "debug",
         .foreground = .{
-            .rgb = .{ .r = 100, .g = 100, .b = 100 }, // grey
+            .rgb = .{ .r = 200, .g = 200, .b = 200 }, // light grey
         },
     },
     // .{ .pattern = "info" },

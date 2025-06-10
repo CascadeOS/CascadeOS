@@ -306,8 +306,9 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 
     switch (uacpi_log_level) {
         inline else => |level| {
-            const kernel_log_level: std.log.Level = comptime switch (level) {
-                .DEBUG, .TRACE, .INFO => .debug,
+            const kernel_log_level: kernel.debug.log.Level = comptime switch (level) {
+                .TRACE => .verbose,
+                .DEBUG, .INFO => .debug,
                 .WARN => .warn,
                 .ERROR => .err,
             };
@@ -322,6 +323,7 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
                 full_msg;
 
             switch (kernel_log_level) {
+                .verbose => uacpi_log.verbose("{s}", .{msg}),
                 .debug => uacpi_log.debug("{s}", .{msg}),
                 .info => @compileError("NO INFO LOGS"),
                 .warn => uacpi_log.warn("{s}", .{msg}),
