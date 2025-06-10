@@ -26,6 +26,7 @@ pub fn capture() !void {
     capture80000001H();
     capture80000002H_80000004H();
     capture80000007H();
+    capture80000008H();
 
     if (hypervisor_present) {
         capture40000000H();
@@ -2284,6 +2285,272 @@ pub var amd_procfeedbackinterface: bool = false;
 /// CPUID.80000007H: EDX[12]
 pub var amd_procpowerreporting: bool = false;
 
+/// Maximum physical address size in bits.
+///
+/// When `guest_physical_address_size` is zero, this field also indicates the maximum guest physical address size.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EAX[7:0]
+pub var physical_address_size: ?u8 = null;
+
+/// Maximum linear address size in bits.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EAX[15:8]
+pub var linear_address_size: ?u8 = null;
+
+/// Maximum guest physical address size in bits.
+///
+/// This number applies only to guests using nested paging. When this field is zero, refer to the
+/// `physical_address_size` field for the maximum guest physical address size.
+///
+/// See “Secure Virtual Machine” in APM Volume 2.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EAX[23:16]
+pub var guest_physical_address_size: ?u8 = null;
+
+/// CLZERO instruction supported.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[0]
+pub var clzero: bool = false;
+
+/// Instruction Retired Counter MSR available.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[1]
+pub var instruction_retired_counter_msr: bool = false;
+
+/// FP Error Pointers Restored by XRSTOR.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[2]
+pub var fp_error_pointers_restored_by_xrstor: bool = false;
+
+/// INVLPGB and TLBSYNC instruction supported.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[3]
+pub var invlpgb: bool = false;
+
+/// RDPRU instruction supported.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[4]
+pub var rdpru: bool = false;
+
+/// Bandwidth Enforcement Extension.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[6]
+pub var bandwidth_enforcement_extension: bool = false;
+
+/// MCOMMIT instruction supported.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[8]
+pub var mcommit: bool = false;
+
+/// WBNOINVD instruction supported.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[9]
+pub var wbnoinvd: bool = false;
+
+/// Indirect Branch Prediction Barrier.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[12]
+pub var indirect_branch_prediction_barrier: bool = false;
+
+/// WBINVD/WBNOINVD are interruptible.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[13]
+pub var wbinvd_wbnoinvd_are_interruptible: bool = false;
+
+/// Indirect Branch Restricted Speculation.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[14]
+pub var indirect_branch_restricted_speculation: bool = false;
+
+/// Single Thread Indirect Branch Prediction mode.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[15]
+pub var single_thread_indirect_branch_prediction_mode: bool = false;
+
+/// Processor prefers that IBRS be left on.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[16]
+pub var processor_prefers_that_ibrs_be_left_on: bool = false;
+
+/// Processor prefers that STIBP be left on.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[17]
+pub var processor_prefers_that_stibp_be_left_on: bool = false;
+
+/// IBRS is preferred over software solution.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[18]
+pub var ibrs_is_preferred_over_software: bool = false;
+
+/// IBRS provides same mode speculation limits.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[19]
+pub var ibrs_provides_same_mode_speculation_limits: bool = false;
+
+/// EFER.LMSLE is unsupported.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[20]
+pub var efer_lmsle_is_unsupported: bool = false;
+
+/// INVLPGB support for invalidating guest nested translations.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[21]
+pub var invlpgb_support_for_invalidating_guest_nested_translations: bool = false;
+
+/// Speculative Store Bypass Disable.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[24]
+pub var speculative_store_bypass_disable: bool = false;
+
+/// Use VIRT_SPEC_CTL for SSBD.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[25]
+pub var use_virt_spec_ctl_for_ssbd: bool = false;
+
+/// SSBD not needed on this processor.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[26]
+pub var ssbd_not_needed: bool = false;
+
+/// Collaborative Processor Performance Control.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[27]
+pub var collaborative_processor_performance_control: bool = false;
+
+/// Predictive Store Forward Disable.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[28]
+pub var predictive_store_forward_disable: bool = false;
+
+/// The processor is not affected by branch type confusion.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[29]
+pub var processor_is_not_affected_by_branch_type_confusion: bool = false;
+
+/// The processor clears the return address predictor when MSR PRED_CMD.IBPB is written to 1.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EBX[30]
+pub var return_address_predictor_cleared_on_ibpb_write: bool = false;
+
+/// Number of physical threads - 1.
+///
+/// The number of threads in the processor is `physical_threads + 1` (e.g., if `physical_threads` = 0, then there is one
+/// thread).
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: ECX[7:0]
+pub var physical_threads: ?u8 = null;
+
+/// APIC ID size.
+///
+/// The number of bits in the initial APIC20[ApicId] value that indicate logical processor ID within a package.
+/// The size of this field determines the maximum number of logical processors (MNLP) that the package could
+/// theoretically support, and not the actual number of logical processors that are implemented or enabled in the
+/// package, as indicated by `physical_threads`.
+///
+/// A value of zero indicates that legacy methods must be used to determine the maximum number of logical processors,
+/// as indicated by `physical_threads`.
+///
+/// ```zig
+///     if (apic_id_size == 0) {
+///         MNLP = physical_threads + 1;
+///     } else {
+///         MNLP = (2 raised to the power of apic_id_size);
+///     }
+/// ```
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: ECX[15:12]
+pub var apic_id_size: ?u4 = null;
+
+/// Performance time-stamp counter size.
+///
+/// Indicates the size of MSRC001_0280[PTSC].
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: ECX[17:16]
+pub var performance_time_stamp_counter_size: ?PerformanceTimeStampCounterSize = null;
+
+pub const PerformanceTimeStampCounterSize = enum(u2) {
+    @"40" = 0b00,
+    @"48" = 0b01,
+    @"56" = 0b10,
+    @"64" = 0b11,
+};
+
+/// Maximum page count for INVLPGB instruction.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EDX[15:0]
+pub var maximum_page_count_for_invlpgb: ?u16 = null;
+
+/// The maximum ECX value recognized by RDPRU.
+///
+/// AMD Only.
+///
+/// CPUID.80000008H: EDX[31:16]
+pub var maximum_ecx_value_for_rdpru: ?u16 = null;
+
 const hz_per_khz = 1000;
 const hz_per_mhz = 1000000;
 
@@ -3172,6 +3439,95 @@ fn capture80000007H() void {
         // CPUID.80000001H: ECX[29] reserved
         // CPUID.80000001H: ECX[30] reserved
         // CPUID.80000001H: ECX[31] reserved
+    }
+}
+
+/// Captures CPUID.80000008H.
+fn capture80000008H() void {
+    if (max_extended_leaf < 0x80000008) return;
+
+    const cpuid_result = raw(0x80000008, 0);
+
+    // EAX
+    {
+        if (vendor == .amd) physical_address_size = bitjuggle.getBits(cpuid_result.eax, 0, 8);
+        if (vendor == .amd) linear_address_size = bitjuggle.getBits(cpuid_result.eax, 8, 8);
+        if (vendor == .amd) guest_physical_address_size = bitjuggle.getBits(cpuid_result.eax, 16, 8);
+        // CPUID.80000008H: EAX[24] reserved
+        // CPUID.80000008H: EAX[25] reserved
+        // CPUID.80000008H: EAX[26] reserved
+        // CPUID.80000008H: EAX[27] reserved
+        // CPUID.80000008H: EAX[28] reserved
+        // CPUID.80000008H: EAX[29] reserved
+        // CPUID.80000008H: EAX[30] reserved
+        // CPUID.80000008H: EAX[31] reserved
+    }
+
+    // EBX
+    {
+        if (vendor == .amd) clzero = bitjuggle.isBitSet(cpuid_result.ebx, 0);
+        if (vendor == .amd) instruction_retired_counter_msr = bitjuggle.isBitSet(cpuid_result.ebx, 1);
+        if (vendor == .amd) fp_error_pointers_restored_by_xrstor = bitjuggle.isBitSet(cpuid_result.ebx, 2);
+        if (vendor == .amd) invlpgb = bitjuggle.isBitSet(cpuid_result.ebx, 3);
+        if (vendor == .amd) rdpru = bitjuggle.isBitSet(cpuid_result.ebx, 4);
+        // CPUID.80000008H: EBX[5] reserved
+        if (vendor == .amd) bandwidth_enforcement_extension = bitjuggle.isBitSet(cpuid_result.ebx, 6);
+        // CPUID.80000008H: EBX[7] reserved
+        if (vendor == .amd) mcommit = bitjuggle.isBitSet(cpuid_result.ebx, 8);
+        if (vendor == .amd) wbnoinvd = bitjuggle.isBitSet(cpuid_result.ebx, 9);
+        // CPUID.80000008H: EBX[10] reserved
+        // CPUID.80000008H: EBX[11] reserved
+        if (vendor == .amd) indirect_branch_prediction_barrier = bitjuggle.isBitSet(cpuid_result.ebx, 12);
+        if (vendor == .amd) wbinvd_wbnoinvd_are_interruptible = bitjuggle.isBitSet(cpuid_result.ebx, 13);
+        if (vendor == .amd) indirect_branch_restricted_speculation = bitjuggle.isBitSet(cpuid_result.ebx, 14);
+        if (vendor == .amd) single_thread_indirect_branch_prediction_mode = bitjuggle.isBitSet(cpuid_result.ebx, 15);
+        if (vendor == .amd) processor_prefers_that_ibrs_be_left_on = bitjuggle.isBitSet(cpuid_result.ebx, 16);
+        if (vendor == .amd) processor_prefers_that_stibp_be_left_on = bitjuggle.isBitSet(cpuid_result.ebx, 17);
+        if (vendor == .amd) ibrs_is_preferred_over_software = bitjuggle.isBitSet(cpuid_result.ebx, 18);
+        if (vendor == .amd) ibrs_provides_same_mode_speculation_limits = bitjuggle.isBitSet(cpuid_result.ebx, 19);
+        if (vendor == .amd) efer_lmsle_is_unsupported = bitjuggle.isBitSet(cpuid_result.ebx, 20);
+        if (vendor == .amd) invlpgb_support_for_invalidating_guest_nested_translations = bitjuggle.isBitSet(cpuid_result.ebx, 21);
+        // CPUID.80000008H: EBX[22] reserved
+        // CPUID.80000008H: EBX[23] reserved
+        if (vendor == .amd) speculative_store_bypass_disable = bitjuggle.isBitSet(cpuid_result.ebx, 24);
+        if (vendor == .amd) use_virt_spec_ctl_for_ssbd = bitjuggle.isBitSet(cpuid_result.ebx, 25);
+        if (vendor == .amd) ssbd_not_needed = bitjuggle.isBitSet(cpuid_result.ebx, 26);
+        if (vendor == .amd) collaborative_processor_performance_control = bitjuggle.isBitSet(cpuid_result.ebx, 27);
+        if (vendor == .amd) predictive_store_forward_disable = bitjuggle.isBitSet(cpuid_result.ebx, 28);
+        if (vendor == .amd) processor_is_not_affected_by_branch_type_confusion = bitjuggle.isBitSet(cpuid_result.ebx, 29);
+        if (vendor == .amd) return_address_predictor_cleared_on_ibpb_write = bitjuggle.isBitSet(cpuid_result.ebx, 30);
+        // CPUID.80000008H: EBX[31] reserved
+    }
+
+    // ECX
+    {
+        if (vendor == .amd) physical_threads = bitjuggle.getBits(cpuid_result.ecx, 0, 8);
+        // CPUID.80000008H: ECX[8] reserved
+        // CPUID.80000008H: ECX[9] reserved
+        // CPUID.80000008H: ECX[10] reserved
+        // CPUID.80000008H: ECX[11] reserved
+        if (vendor == .amd) apic_id_size = bitjuggle.getBits(cpuid_result.ecx, 12, 4);
+        if (vendor == .amd) performance_time_stamp_counter_size = @enumFromInt(bitjuggle.getBits(cpuid_result.ecx, 16, 2));
+        // CPUID.80000008H: ECX[18] reserved
+        // CPUID.80000008H: ECX[19] reserved
+        // CPUID.80000008H: ECX[20] reserved
+        // CPUID.80000008H: ECX[21] reserved
+        // CPUID.80000008H: ECX[22] reserved
+        // CPUID.80000008H: ECX[23] reserved
+        // CPUID.80000008H: ECX[24] reserved
+        // CPUID.80000008H: ECX[25] reserved
+        // CPUID.80000008H: ECX[26] reserved
+        // CPUID.80000008H: ECX[27] reserved
+        // CPUID.80000008H: ECX[28] reserved
+        // CPUID.80000008H: ECX[29] reserved
+        // CPUID.80000008H: ECX[30] reserved
+        // CPUID.80000008H: ECX[31] reserved
+    }
+
+    // EDX
+    {
+        if (vendor == .amd) maximum_page_count_for_invlpgb = bitjuggle.getBits(cpuid_result.edx, 0, 16);
+        if (vendor == .amd) maximum_ecx_value_for_rdpru = bitjuggle.getBits(cpuid_result.edx, 16, 16);
     }
 }
 
