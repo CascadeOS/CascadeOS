@@ -15,12 +15,7 @@ pub fn onPageFault(current_task: *kernel.Task, page_fault_details: kernel.mem.Pa
 }
 
 pub fn onFlushRequest(current_task: *kernel.Task) void {
-    const executor = current_task.state.running;
-
-    while (executor.flush_requests.pop()) |node| {
-        const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.flush(current_task);
-    }
+    kernel.mem.FlushRequest.processFlushRequests(current_task);
 }
 
 const std = @import("std");

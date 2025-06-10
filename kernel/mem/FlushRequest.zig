@@ -19,6 +19,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) v
 
     switch (flush_request.flush_target) {
         .kernel => {
+            // TODO: all except self
             for (kernel.executors) |*executor| {
                 if (executor == current_task.state.running) continue;
                 flush_request.requestExecutor(executor);
@@ -28,10 +29,20 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) v
     }
 
     flush_request.flush(current_task);
-    flush_request.waitForCompletion();
+    flush_request.waitForCompletion(current_task);
 }
 
-pub fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
+pub fn processFlushRequests(current_task: *kernel.Task) void {
+    std.debug.assert(current_task.interrupt_disable_count != 0 or current_task.preemption_disable_count != 0);
+    const executor = current_task.state.running;
+
+    while (executor.flush_requests.pop()) |node| {
+        const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
+        request_node.request.flush(current_task);
+    }
+}
+
+fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
     _ = current_task;
 
     switch (flush_request.flush_target) {
@@ -57,8 +68,10 @@ fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) voi
     kernel.arch.interrupts.sendFlushIPI(executor);
 }
 
-fn waitForCompletion(flush_request: *FlushRequest) void {
-    while (flush_request.count.load(.monotonic) > 0) {
+fn waitForCompletion(flush_request: *FlushRequest, current_task: *kernel.Task) void {
+    while (true) {
+        processFlushRequests(current_task);
+        if (flush_request.count.load(.monotonic) == 0) break;
         kernel.arch.spinLoopHint();
     }
 }
