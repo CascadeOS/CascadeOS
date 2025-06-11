@@ -6,16 +6,11 @@ pub fn customConfiguration(
     tool_description: ToolDescription,
     module: *std.Build.Module,
 ) void {
+    _ = tool_description;
+
     module.link_libc = true;
 
     const lib_dwarf = b.dependency("libdwarf", .{});
-
-    const own_directory_path = b.pathJoin(&.{
-        "tool",
-        tool_description.name,
-    });
-
-    module.addIncludePath(b.path(own_directory_path));
 
     module.addIncludePath(lib_dwarf.path("src/lib/libdwarf"));
 
@@ -85,6 +80,25 @@ pub fn customConfiguration(
         .files = c_files,
         .flags = &.{"-fno-sanitize=undefined"},
     });
+
+    module.addConfigHeader(b.addConfigHeader(.{}, .{
+        .HAVE_DLFCN_H = 1,
+        .HAVE_FCNTL_H = 1,
+        .HAVE_INTPTR_T = 1,
+        .HAVE_INTTYPES_H = 1,
+        .HAVE_STDDEF_H = 1,
+        .HAVE_STDINT_H = 1,
+        .HAVE_STDIO_H = 1,
+        .HAVE_STDLIB_H = 1,
+        .HAVE_STRINGS_H = 1,
+        .HAVE_STRING_H = 1,
+        .HAVE_SYS_STAT_H = 1,
+        .HAVE_SYS_TYPES_H = 1,
+        .HAVE_UINTPTR_T = 1,
+        .HAVE_UNISTD_H = 1,
+        .HAVE_UNUSED_ATTRIBUTE = 1,
+        .PACKAGE_VERSION = "0.9.2",
+    }));
 }
 
 const std = @import("std");
