@@ -110,10 +110,10 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
     try kernel.arch.scheduling.callOneArgs(
         null,
         current_task.stack,
-        current_task,
+        @intFromPtr(current_task),
         struct {
-            fn initStage3Wrapper(inner_current_task: *kernel.Task) callconv(.C) noreturn {
-                initStage3(inner_current_task) catch |err| {
+            fn initStage3Wrapper(inner_current_task_addr: usize) callconv(.C) noreturn {
+                initStage3(@ptrFromInt(inner_current_task_addr)) catch |err| {
                     std.debug.panic(
                         "unhandled error: {s}",
                         .{@errorName(err)},
@@ -238,7 +238,7 @@ fn bootNonBootstrapExecutors() !void {
             executor.current_task,
             struct {
                 fn bootFn(user_data: *anyopaque) noreturn {
-                    initStage2(@as(*kernel.Task, @ptrCast(@alignCast(user_data)))) catch |err| {
+                    initStage2(@ptrCast(@alignCast(user_data))) catch |err| {
                         std.debug.panic(
                             "unhandled error: {s}",
                             .{@errorName(err)},

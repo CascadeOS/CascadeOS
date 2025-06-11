@@ -128,8 +128,8 @@ pub fn jumpToTaskFromTask(
 pub fn prepareNewTaskForScheduling(
     task: *kernel.Task,
     target_function: kernel.arch.scheduling.NewTaskFunction,
-    arg1: u64,
-    arg2: u64,
+    arg1: usize,
+    arg2: usize,
 ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
     const impls = struct {
         const startNewTaskStage1: *const fn () callconv(.C) void = blk: {
@@ -159,15 +159,15 @@ pub fn prepareNewTaskForScheduling(
     try task.stack.push(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));
 
     // general purpose registers
-    for (0..6) |_| try task.stack.push(@as(u64, 0));
+    for (0..6) |_| try task.stack.push(0);
 }
 
 /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
 pub fn callOneArgs(
     opt_old_task: ?*kernel.Task,
     new_stack: kernel.Task.Stack,
-    arg1: anytype,
-    target_function: *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
+    arg1: usize,
+    target_function: *const fn (usize) callconv(.C) noreturn,
 ) kernel.arch.scheduling.CallError!void {
     const impls = struct {
         const callOneArgs: *const fn (
@@ -214,7 +214,7 @@ pub fn callOneArgs(
 
     var stack = new_stack;
 
-    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)).value);
     try stack.push(arg1);
 
     if (opt_old_task) |old_task| {
@@ -231,9 +231,9 @@ pub fn callOneArgs(
 pub fn callTwoArgs(
     opt_old_task: ?*kernel.Task,
     new_stack: kernel.Task.Stack,
-    arg1: anytype,
-    arg2: anytype,
-    target_function: *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
+    arg1: usize,
+    arg2: usize,
+    target_function: *const fn (usize, usize) callconv(.C) noreturn,
 ) kernel.arch.scheduling.CallError!void {
     const impls = struct {
         const callTwoArgs: *const fn (
@@ -282,7 +282,7 @@ pub fn callTwoArgs(
 
     var stack = new_stack;
 
-    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
+    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)).value);
     try stack.push(arg2);
     try stack.push(arg1);
 

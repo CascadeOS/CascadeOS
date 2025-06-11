@@ -157,7 +157,8 @@ pub const Header = extern struct {
     ///
     /// This includes any changes to the partition entry array as it's checksum is stored in the header as well.
     pub fn updateHash(header: *Header) void {
-        const header_bytes = @as([*]u8, @ptrCast(header))[0..header.header_size];
+        const header_ptr: [*]u8 = @ptrCast(header);
+        const header_bytes = header_ptr[0..header.header_size];
         header.header_crc_32 = 0;
         header.header_crc_32 = Crc32.hash(header_bytes);
     }

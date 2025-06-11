@@ -496,18 +496,6 @@ pub const PageTable = extern struct {
         return @as(u9, @truncate(address.value >> level_4_shift));
     }
 
-    /// Converts page table indices to a virtual address.
-    pub fn indexToAddr(level_4_index: u9, level_3_index: u9, level_2_index: u9, level_1_index: u9) core.VirtualAddress {
-        return core.VirtualAddress.fromInt(
-            signExtendAddress(
-                @as(u64, level_4_index) << level_4_shift |
-                    @as(u64, level_3_index) << level_3_shift |
-                    @as(u64, level_2_index) << level_2_shift |
-                    @as(u64, level_1_index) << level_1_shift,
-            ),
-        );
-    }
-
     comptime {
         core.testing.expectSize(PageTable, small_page_size.value);
     }

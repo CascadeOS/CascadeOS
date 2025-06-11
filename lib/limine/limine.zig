@@ -1585,7 +1585,7 @@ pub const File = extern struct {
     }
 
     fn formatIP(ip: u32, port: u32, writer: std.io.AnyWriter) !void {
-        const bytes = @as(*const [4]u8, @ptrCast(&ip));
+        const bytes: *const [4]u8 = @ptrCast(&ip);
         try writer.print("{}.{}.{}.{}:{}", .{
             bytes[0],
             bytes[1],

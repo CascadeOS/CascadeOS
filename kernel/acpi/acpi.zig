@@ -256,7 +256,7 @@ const hack = struct {
         };
 
         const SCI_EN: u8 = 1;
-        const SLP_EN = @as(u16, 1) << 13;
+        const SLP_EN: u16 = 1 << 13;
 
         const PM1a_CNT = fadt.getPM1a_CNT();
         const PM1b_CNT_opt = fadt.getPM1b_CNT();

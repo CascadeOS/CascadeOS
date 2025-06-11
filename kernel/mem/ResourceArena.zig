@@ -901,7 +901,7 @@ fn pushToFreelist(arena: *ResourceArena, tag: *BoundaryTag) void {
     arena.freelist_bitmap.set(index);
 }
 
-fn popFromFreelist(arena: *ResourceArena, index: usize) ?*BoundaryTag {
+fn popFromFreelist(arena: *ResourceArena, index: UsizeShiftInt) ?*BoundaryTag {
     const freelist = &arena.freelists[index];
 
     const node = freelist.pop() orelse return null;
@@ -937,10 +937,10 @@ fn pushUnusedTag(arena: *ResourceArena, tag: *BoundaryTag) void {
     arena.unused_tags_count += 1;
 }
 
-fn indexOfNonEmptyFreelistInstantFit(arena: *const ResourceArena, len: usize) ?usize {
+fn indexOfNonEmptyFreelistInstantFit(arena: *const ResourceArena, len: usize) ?UsizeShiftInt {
     const pow2_len = std.math.ceilPowerOfTwoAssert(usize, len);
     const index = @ctz(arena.freelist_bitmap.value & ~(pow2_len - 1));
-    return if (index == NUMBER_OF_FREELISTS) null else index;
+    return if (index == NUMBER_OF_FREELISTS) null else @intCast(index);
 }
 
 const BoundaryTag = struct {
@@ -1118,16 +1118,17 @@ const Bitmap = struct {
 
     const empty: Bitmap = .{ .value = 0 };
 
-    fn set(bitmap: *Bitmap, index: usize) void {
+    fn set(bitmap: *Bitmap, index: UsizeShiftInt) void {
         bitmap.value |= maskBit(index);
     }
 
-    fn unset(bitmap: *Bitmap, index: usize) void {
+    fn unset(bitmap: *Bitmap, index: UsizeShiftInt) void {
         bitmap.value &= ~maskBit(index);
     }
 
-    inline fn maskBit(index: usize) usize {
-        return @as(usize, 1) << @as(UsizeShiftInt, @intCast(index));
+    inline fn maskBit(index: UsizeShiftInt) usize {
+        const one: usize = 1;
+        return one << index;
     }
 };
 
@@ -1248,13 +1249,14 @@ fn DoublyLinkedList(comptime Node: type) type {
     };
 }
 
-inline fn indexOfFreelistContainingLen(len: usize) usize {
-    return NUMBER_OF_FREELISTS - 1 - @clz(len);
+inline fn indexOfFreelistContainingLen(len: usize) UsizeShiftInt {
+    return @intCast(NUMBER_OF_FREELISTS - 1 - @clz(len));
 }
 
 inline fn smallestPossibleLenInFreelist(index: usize) usize {
     const truncated_len: UsizeShiftInt = @truncate(index);
-    return @as(usize, 1) << @truncate(truncated_len);
+    const one: usize = 1;
+    return one << @truncate(truncated_len);
 }
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;

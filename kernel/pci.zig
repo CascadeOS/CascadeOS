@@ -7,10 +7,9 @@ pub fn getFunction(address: Address) ?*volatile Function {
         if (ecam.segment_group != address.segment) continue;
         if (ecam.start_bus < address.bus or address.bus >= ecam.end_bus) continue;
 
-        const bus_offset = address.bus - ecam.start_bus;
+        const bus_offset: usize = address.bus - ecam.start_bus;
 
-        const config_space_offset: usize =
-            @as(usize, bus_offset) << 20 |
+        const config_space_offset: usize = bus_offset << 20 |
             @as(usize, address.device) << 15 |
             @as(usize, address.function) << 12;
 
@@ -220,7 +219,7 @@ pub const Function = extern struct {
             interrupt_disable: bool,
             _reserved11_15: u5,
 
-            pub const zero: Command = @bitCast(@as(u16, 0));
+            pub const zero: Command = @bitCast(0);
         };
 
         pub const Status = packed struct(u16) {

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub inline fn expectEqual(actual: anytype, expected: @TypeOf(actual)) !void {
+    return std.testing.expectEqual(expected, actual);
+}
+
 /// Asserts that the size and bit size of the given type matches the expected size.
 pub inline fn expectSize(comptime T: type, comptime bytes: comptime_int) void {
     if (@sizeOf(T) != bytes) {

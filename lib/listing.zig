@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
+pub const libraries: []const LibraryDescription = &.{
     .{
         .name = "arm",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
         .supported_targets = &.{.arm},
     },
-    .{ .name = "bitjuggle" },
+    .{
+        .name = "bitjuggle",
+        .dependencies = &.{
+            .{ .name = "core" },
+        },
+    },
     .{
         .name = "containers",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
@@ -21,21 +26,21 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{ .name = "core" },
     .{
         .name = "fs",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "uuid" },
         },
     },
     .{
         .name = "limine",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "uuid" },
         },
     },
     .{
         .name = "riscv",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
@@ -44,13 +49,13 @@ pub const libraries: []const LibraryDescription = &[_]LibraryDescription{
     .{ .name = "sdf" },
     .{
         .name = "uuid",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
         },
     },
     .{
         .name = "x64",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },

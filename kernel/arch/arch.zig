@@ -440,8 +440,8 @@ pub const scheduling = struct {
 
     pub const NewTaskFunction = *const fn (
         current_task: *kernel.Task,
-        arg1: u64,
-        arg2: u64,
+        arg1: usize,
+        arg2: usize,
     ) noreturn;
 
     /// Prepares the given task for being scheduled.
@@ -451,14 +451,14 @@ pub const scheduling = struct {
     pub fn prepareNewTaskForScheduling(
         task: *kernel.Task,
         target_function: NewTaskFunction,
-        arg1: u64,
-        arg2: u64,
+        arg1: usize,
+        arg2: usize,
     ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
         checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
             *kernel.Task,
             NewTaskFunction,
-            u64,
-            u64,
+            usize,
+            usize,
         ) error{StackOverflow}!void);
 
         return current.scheduling.prepareNewTaskForScheduling(task, target_function, arg1, arg2);
@@ -470,14 +470,14 @@ pub const scheduling = struct {
     pub fn callOneArgs(
         opt_old_task: ?*kernel.Task,
         new_stack: kernel.Task.Stack,
-        arg1: anytype,
-        target_function: *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
+        arg1: usize,
+        target_function: *const fn (usize) callconv(.C) noreturn,
     ) callconv(core.inline_in_non_debug) CallError!void {
         checkSupport(current.scheduling, "callOneArgs", fn (
             ?*kernel.Task,
             kernel.Task.Stack,
-            *const fn (@TypeOf(arg1)) callconv(.C) noreturn,
-            @TypeOf(arg1),
+            usize,
+            *const fn (usize) callconv(.C) noreturn,
         ) CallError!void);
 
         try current.scheduling.callOneArgs(opt_old_task, new_stack, arg1, target_function);
@@ -487,16 +487,16 @@ pub const scheduling = struct {
     pub fn callTwoArgs(
         opt_old_task: ?*kernel.Task,
         new_stack: kernel.Task.Stack,
-        arg1: anytype,
-        arg2: anytype,
-        target_function: *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
+        arg1: usize,
+        arg2: usize,
+        target_function: *const fn (usize, usize) callconv(.C) noreturn,
     ) callconv(core.inline_in_non_debug) CallError!void {
         checkSupport(current.scheduling, "callTwoArgs", fn (
             ?*kernel.Task,
             kernel.Task.Stack,
-            *const fn (@TypeOf(arg1), @TypeOf(arg2)) callconv(.C) noreturn,
-            @TypeOf(arg1),
-            @TypeOf(arg2),
+            usize,
+            usize,
+            *const fn (usize, usize) callconv(.C) noreturn,
         ) CallError!void);
 
         try current.scheduling.callTwoArgs(opt_old_task, new_stack, arg1, arg2, target_function);

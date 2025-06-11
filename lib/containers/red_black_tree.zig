@@ -528,14 +528,14 @@ test RedBlackTree {
     // insertion
     {
         try std.testing.expect(tree.root == null);
-        try std.testing.expectEqual(@as(usize, 0), countNodes(tree));
+        try core.testing.expectEqual(countNodes(tree), 0);
 
         for (&items) |*item| {
             try tree.insert(&item.node);
         }
 
         try std.testing.expect(tree.root != null);
-        try std.testing.expectEqual(@as(usize, items.len), countNodes(tree));
+        try core.testing.expectEqual(countNodes(tree), items.len);
     }
 
     // order
@@ -578,7 +578,7 @@ test RedBlackTree {
         );
         try std.testing.expect(less_than_node != null);
         var less_than_item: *Item = @fieldParentPtr("node", less_than_node.?);
-        try std.testing.expectEqual(@as(usize, 12), less_than_item.value);
+        try core.testing.expectEqual(less_than_item.value, 12);
 
         tree.remove(less_than_node.?);
 
@@ -588,7 +588,7 @@ test RedBlackTree {
         );
         try std.testing.expect(less_than_node != null);
         less_than_item = @fieldParentPtr("node", less_than_node.?);
-        try std.testing.expectEqual(@as(usize, 0), less_than_item.value);
+        try core.testing.expectEqual(less_than_item.value, 0);
     }
 
     // find - last less than
@@ -599,7 +599,7 @@ test RedBlackTree {
         );
         try std.testing.expect(less_than_node != null);
         var less_than_item: *Item = @fieldParentPtr("node", less_than_node.?);
-        try std.testing.expectEqual(@as(usize, 0), less_than_item.value);
+        try core.testing.expectEqual(less_than_item.value, 0);
 
         tree.remove(less_than_node.?);
 
@@ -609,7 +609,7 @@ test RedBlackTree {
         );
         try std.testing.expect(less_than_node != null);
         less_than_item = @fieldParentPtr("node", less_than_node.?);
-        try std.testing.expectEqual(@as(usize, 17), less_than_item.value);
+        try core.testing.expectEqual(less_than_item.value, 17);
     }
 }
 
@@ -620,7 +620,8 @@ pub const Node = struct {
     // A new node is always red, which matches up with the pointer being null.
     _parent: usize = 0,
 
-    const ALL_BITS_EXCEPT_FIRST: usize = ~@as(usize, 1);
+    const one: usize = 1;
+    const ALL_BITS_EXCEPT_FIRST: usize = ~one;
 
     inline fn getParent(node: *const Node) ?*Node {
         return @ptrFromInt(node._parent & ALL_BITS_EXCEPT_FIRST);

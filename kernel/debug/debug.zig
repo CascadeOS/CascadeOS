@@ -307,38 +307,6 @@ const formatting = struct {
 
         try writer.writeAll("^\n");
     }
-
-    fn __helpZls() void {
-        printPanic(
-            @as(std.fs.File.Writer, undefined),
-            undefined,
-            undefined,
-            undefined,
-        );
-        printUserPanicMessage(
-            @as(std.fs.File.Writer, undefined),
-            undefined,
-        );
-        printErrorAndCurrentStackTrace(
-            @as(std.fs.File.Writer, undefined),
-            undefined,
-            undefined,
-        );
-        printCurrentBackTrace(
-            @as(std.fs.File.Writer, undefined),
-            undefined,
-            undefined,
-        );
-        printSourceAtAddress(
-            @as(std.fs.File.Writer, undefined),
-            undefined,
-            undefined,
-        );
-        printSymbol(
-            @as(std.fs.File.Writer, undefined),
-            undefined,
-        );
-    }
 };
 
 const SymbolSource = struct {

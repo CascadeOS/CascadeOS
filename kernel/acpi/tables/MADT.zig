@@ -384,10 +384,8 @@ pub const MADT = extern struct {
             _acpi_processor_uid_string_start: u8,
 
             pub fn acpiProcessorUidString(local_sapic: *const LocalSAPIC) [:0]const u8 {
-                return std.mem.sliceTo(
-                    @as([*:0]const u8, @ptrCast(&local_sapic._acpi_processor_uid_string_start)),
-                    0,
-                );
+                const ptr: [*:0]const u8 = @ptrCast(&local_sapic._acpi_processor_uid_string_start);
+                return std.mem.sliceTo(ptr, 0);
             }
 
             comptime {
@@ -1209,7 +1207,8 @@ pub const MADT = extern struct {
 
         pub fn init(madt: *const MADT) MADTIterator {
             const start_ptr: [*]const u8 = @ptrCast(&madt._interrupt_controller_structures_start);
-            const end_ptr = @as([*]const u8, @ptrCast(madt)) + madt.header.length;
+            const base_ptr: [*]const u8 = @ptrCast(madt);
+            const end_ptr: [*]const u8 = base_ptr + madt.header.length;
 
             return .{
                 .current_ptr = start_ptr,

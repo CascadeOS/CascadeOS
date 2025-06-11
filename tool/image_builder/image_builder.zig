@@ -146,7 +146,8 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
         .volume_id = 0xa96b2625, // TODO
         .volume_label = [_]u8{ 'N', 'O', ' ', 'N', 'A', 'M', 'E', ' ', ' ', ' ', ' ' }, // TODO
     };
-    @as(*@TypeOf(ebpb_boot_code), @ptrCast(&ebpb.boot_code)).* = ebpb_boot_code;
+    const boot_code_ptr: *@TypeOf(ebpb_boot_code) = @ptrCast(&ebpb.boot_code);
+    boot_code_ptr.* = ebpb_boot_code;
 
     const fsinfo = asPtr(*fat.FSInfo, slice, fsinfo_sector, sector_size);
     fsinfo.* = .{

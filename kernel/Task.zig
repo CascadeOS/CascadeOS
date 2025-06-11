@@ -225,15 +225,11 @@ pub const Stack = struct {
     }
 
     /// Pushes a value onto the stack.
-    pub fn push(stack: *Stack, value: anytype) error{StackOverflow}!void {
-        const T = @TypeOf(value);
-
-        comptime std.debug.assert(@sizeOf(T) == @sizeOf(usize)); // other code assumes register sized types
-
-        const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(core.Size.of(T));
+    pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
+        const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(.of(usize));
         if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
-        const ptr: *T = new_stack_pointer.toPtr(*T);
+        const ptr: *usize = new_stack_pointer.toPtr(*usize);
         ptr.* = value;
 
         stack.stack_pointer = new_stack_pointer;
@@ -243,7 +239,7 @@ pub const Stack = struct {
         stack.stack_pointer = stack.usable_range.endBound();
 
         // push a zero return address
-        stack.push(@as(usize, 0)) catch unreachable; // TODO: is this correct for non-x64?
+        stack.push(0) catch unreachable; // TODO: is this correct for non-x64?
 
         stack.top_stack_pointer = stack.stack_pointer;
     }

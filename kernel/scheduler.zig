@@ -128,7 +128,7 @@ fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.
     kernel.arch.scheduling.callOneArgs(
         current_task,
         executor.idle_task.stack,
-        &executor.idle_task,
+        @intFromPtr(&executor.idle_task),
         idle,
     ) catch |err| {
         switch (err) {
@@ -145,14 +145,17 @@ fn switchToIdleWithLock(
 ) void {
     const static = struct {
         fn idleEntryWithLock(
-            inner_spinlock: *kernel.sync.TicketSpinLock,
-            idle_task: *kernel.Task,
+            inner_spinlock_addr: usize,
+            idle_task_addr: usize,
         ) callconv(.C) noreturn {
+            const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(inner_spinlock_addr);
+            const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
+
             std.debug.assert(idle_task.is_idle_task);
 
             inner_spinlock.unsafeUnlock();
 
-            idle(idle_task);
+            idle(idle_task_addr);
             @panic("idle returned");
         }
     };
@@ -172,8 +175,8 @@ fn switchToIdleWithLock(
     kernel.arch.scheduling.callTwoArgs(
         current_task,
         executor.idle_task.stack,
-        spinlock,
-        &executor.idle_task,
+        @intFromPtr(spinlock),
+        @intFromPtr(&executor.idle_task),
         static.idleEntryWithLock,
     ) catch |err| {
         switch (err) {
@@ -232,9 +235,12 @@ fn switchToTaskFromTaskWithLock(
 ) void {
     const static = struct {
         fn switchToTaskWithLock(
-            inner_spinlock: *kernel.sync.TicketSpinLock,
-            new_task_inner: *kernel.Task,
+            inner_spinlock_addr: usize,
+            new_task_inner_addr: usize,
         ) callconv(.C) noreturn {
+            const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(inner_spinlock_addr);
+            const new_task_inner: *kernel.Task = @ptrFromInt(new_task_inner_addr);
+
             inner_spinlock.unsafeUnlock();
 
             kernel.arch.scheduling.jumpToTaskFromIdle(new_task_inner);
@@ -264,8 +270,8 @@ fn switchToTaskFromTaskWithLock(
     kernel.arch.scheduling.callTwoArgs(
         current_task,
         executor.idle_task.stack,
-        spinlock,
-        new_task,
+        @intFromPtr(spinlock),
+        @intFromPtr(new_task),
         static.switchToTaskWithLock,
     ) catch |err| {
         switch (err) {
@@ -287,8 +293,8 @@ pub fn newTaskEntry(
     current_task: *kernel.Task,
     /// must be a function compatible with `kernel.arch.scheduling.NewTaskFunction`
     target_function_addr: *const anyopaque,
-    task_arg1: u64,
-    task_arg2: u64,
+    task_arg1: usize,
+    task_arg2: usize,
 ) callconv(.C) noreturn {
     globals.lock.unlock(current_task);
 
@@ -297,7 +303,9 @@ pub fn newTaskEntry(
     @panic("task returned to entry point");
 }
 
-fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
+fn idle(current_task_addr: usize) callconv(.c) noreturn {
+    const current_task: *kernel.Task = @ptrFromInt(current_task_addr);
+
     globals.lock.unlock(current_task);
 
     log.debug("entering idle", .{});

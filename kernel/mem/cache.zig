@@ -603,8 +603,8 @@ pub const RawCache = struct {
 
         switch (raw_cache.size_class) {
             .small => {
-                const slab_base_ptr: [*]u8 =
-                    @as([*]u8, @ptrCast(slab)) + @sizeOf(Slab) - kernel.arch.paging.standard_page_size.value;
+                const slab_info_ptr: [*]u8 = @ptrCast(slab);
+                const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - kernel.arch.paging.standard_page_size.value;
 
                 if (raw_cache.destructor) |destructor| {
                     for (0..raw_cache.objects_per_slab) |i| {

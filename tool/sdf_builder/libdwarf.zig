@@ -83,7 +83,8 @@ pub const DwarfDebug = struct {
             null,
         )) catch unreachable;
 
-        return @as([*]const Range, @ptrCast(result))[0..@intCast(count)];
+        const range_ptr: [*]const Range = @ptrCast(result);
+        return range_ptr[0..@intCast(count)];
     }
 
     pub fn getDieByOffset(dwarf_debug: DwarfDebug, offset: u64) ?Die {
@@ -352,7 +353,8 @@ pub const LineContext = struct {
             ),
         ) catch unreachable;
 
-        return @as([*]const Line, @ptrCast(lines))[0..@intCast(line_count)];
+        const line_ptr: [*]const Line = @ptrCast(lines);
+        return line_ptr[0..@intCast(line_count)];
     }
 };
 

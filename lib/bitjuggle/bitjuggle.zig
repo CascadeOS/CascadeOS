@@ -91,31 +91,31 @@ test getBit {
     // comptime
     comptime {
         const a: comptime_int = 0b00000000;
-        try std.testing.expectEqual(@as(u1, 0), getBit(a, 0));
-        try std.testing.expectEqual(@as(u1, 0), getBit(a, 1));
+        try core.testing.expectEqual(getBit(a, 0), 0);
+        try core.testing.expectEqual(getBit(a, 1), 0);
 
         const b: comptime_int = 0b11111111;
-        try std.testing.expectEqual(@as(u1, 1), getBit(b, 0));
-        try std.testing.expectEqual(@as(u1, 1), getBit(b, 1));
+        try core.testing.expectEqual(getBit(b, 0), 1);
+        try core.testing.expectEqual(getBit(b, 1), 1);
 
         const c: comptime_int = 0b00000010;
-        try std.testing.expectEqual(@as(u1, 0), getBit(c, 0));
-        try std.testing.expectEqual(@as(u1, 1), getBit(c, 1));
+        try core.testing.expectEqual(getBit(c, 0), 0);
+        try core.testing.expectEqual(getBit(c, 1), 1);
     }
 
     // runtime
     {
         var value: u8 = 0b00000000;
-        try std.testing.expectEqual(@as(u1, 0), getBit(value, 0));
-        try std.testing.expectEqual(@as(u1, 0), getBit(value, 1));
+        try core.testing.expectEqual(getBit(value, 0), 0);
+        try core.testing.expectEqual(getBit(value, 1), 0);
 
         value = 0b11111111;
-        try std.testing.expectEqual(@as(u1, 1), getBit(value, 0));
-        try std.testing.expectEqual(@as(u1, 1), getBit(value, 1));
+        try core.testing.expectEqual(getBit(value, 0), 1);
+        try core.testing.expectEqual(getBit(value, 1), 1);
 
         value = 0b00000010;
-        try std.testing.expectEqual(@as(u1, 0), getBit(value, 0));
-        try std.testing.expectEqual(@as(u1, 1), getBit(value, 1));
+        try core.testing.expectEqual(getBit(value, 0), 0);
+        try core.testing.expectEqual(getBit(value, 1), 1);
     }
 }
 
@@ -165,21 +165,21 @@ test getBits {
     comptime {
         const a: comptime_int = 0b01101100;
         const b = getBits(a, 2, 4);
-        try std.testing.expectEqual(@as(u4, 0b1011), b);
+        try core.testing.expectEqual(b, 0b1011);
     }
 
     // runtime
     {
         var value: u8 = 0b01101100;
-        try std.testing.expectEqual(
-            @as(u4, 0b1011),
+        try core.testing.expectEqual(
             getBits(value, 2, 4),
+            0b1011,
         );
 
         value = 0b01101100;
-        try std.testing.expectEqual(
-            @as(u3, 0b100),
+        try core.testing.expectEqual(
             getBits(value, 0, 3),
+            0b100,
         );
     }
 }
@@ -217,9 +217,11 @@ pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) voi
         }
     }
 
-    const mask = comptime ~(@as(TargetType, 1) << bit);
+    const one: TargetType = 1;
+    const mask: TargetType = comptime ~(one << bit);
+    const target_value: TargetType = value;
 
-    target.* = (target.* & mask) | (@as(TargetType, value) << bit);
+    target.* = (target.* & mask) | (target_value << bit);
 }
 
 test setBit {
@@ -284,7 +286,8 @@ pub fn setBits(
     }
 
     const bitmask: TargetType = comptime blk: {
-        var bitmask = ~@as(TargetType, 0);
+        const zero: TargetType = 0;
+        var bitmask = ~zero;
         bitmask <<= (@bitSizeOf(TargetType) - end_bit);
         bitmask >>= (@bitSizeOf(TargetType) - end_bit);
         bitmask >>= start_bit;
@@ -298,7 +301,7 @@ pub fn setBits(
 test setBits {
     var val: u8 = 0b10000000;
     setBits(&val, 2, 4, 0b00001101);
-    try std.testing.expectEqual(@as(u8, 0b10110100), val);
+    try core.testing.expectEqual(val, 0b10110100);
 }
 
 /// Defines a bitfield.
@@ -324,7 +327,8 @@ pub fn Bitfield(
         const BitfieldT = @This();
 
         pub fn write(bitfield: *BitfieldT, val: ValueType) void {
-            bitfield.writeNoShiftFullSize(@as(FieldType, val) << shift_amount);
+            const field_val: FieldType = val;
+            bitfield.writeNoShiftFullSize(field_val << shift_amount);
         }
 
         /// Writes a value to the bitfield without shifting, all bits in `val` not in the bitfield are ignored.
@@ -483,3 +487,4 @@ comptime {
 
 const std = @import("std");
 const builtin = @import("builtin");
+const core = @import("core");
