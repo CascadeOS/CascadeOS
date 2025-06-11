@@ -31,6 +31,8 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
 
     if (globals.ready_to_run.isEmpty()) return;
 
+    log.verbose("preempting {}", .{current_task});
+
     yield(current_task, .requeue);
 }
 
@@ -50,7 +52,7 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
             .drop => {
                 std.debug.assert(!current_task.is_idle_task); // drop during idle
 
-                log.debug("dropping {}", .{current_task});
+                log.verbose("dropping {}", .{current_task});
 
                 switchToIdle(current_task, .dropped);
                 @panic("idle returned");
@@ -70,13 +72,13 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
 
     const current_task_new_state = blk: switch (mode) {
         .requeue => {
-            log.debug("yielding {}", .{current_task});
+            log.verbose("yielding {}", .{current_task});
             // can't call `queueTask` here because the `current_task.state` is not yet set to `.ready`
             globals.ready_to_run.push(&current_task.next_task_node);
             break :blk .ready;
         },
         .drop => {
-            log.debug("dropping {}", .{current_task});
+            log.verbose("dropping {}", .{current_task});
             break :blk .dropped;
         },
     };
@@ -96,7 +98,7 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
 
     std.debug.assert(!current_task.is_idle_task); // block during idle
 
-    log.debug("blocking {}", .{current_task});
+    log.verbose("blocking {}", .{current_task});
 
     const new_task_node = globals.ready_to_run.pop() orelse {
         switchToIdleWithLock(current_task, spinlock, .blocked);
@@ -185,7 +187,7 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(current_task.is_idle_task);
 
-    log.debug("switching to {} from idle", .{new_task});
+    log.verbose("switching to {} from idle", .{new_task});
 
     std.debug.assert(new_task.next_task_node.next == null);
 
@@ -206,7 +208,7 @@ fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, curr
     std.debug.assert(!current_task.is_idle_task);
     std.debug.assert(!new_task.is_idle_task);
 
-    log.debug("switching to {} from {}", .{ new_task, current_task });
+    log.verbose("switching to {} from {}", .{ new_task, current_task });
 
     std.debug.assert(new_task.next_task_node.next == null);
 
@@ -245,7 +247,7 @@ fn switchToTaskFromTaskWithLock(
     std.debug.assert(!current_task.is_idle_task);
     std.debug.assert(!new_task.is_idle_task);
 
-    log.debug("switching to {} from {} with a lock", .{ new_task, current_task });
+    log.verbose("switching to {} from {} with a lock", .{ new_task, current_task });
 
     std.debug.assert(new_task.next_task_node.next == null);
 
