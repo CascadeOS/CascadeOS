@@ -426,7 +426,7 @@ pub const init = struct {
         std.debug.assert(physical_range.size.isAligned(PageTable.small_page_size));
         std.debug.assert(virtual_range.size.equal(physical_range.size));
 
-        init_log.debug("mapToPhysicalRangeAllPageSizes - virtual_range: {} - physical_range: {} - map_type: {}", .{
+        init_log.verbose("mapToPhysicalRangeAllPageSizes - virtual_range: {} - physical_range: {} - map_type: {}", .{
             virtual_range,
             physical_range,
             map_type,
@@ -547,7 +547,7 @@ pub const init = struct {
             }
         }
 
-        init_log.debug(
+        init_log.verbose(
             "satified using {} large pages, {} medium pages, {} small pages",
             .{ large_pages_mapped, medium_pages_mapped, small_pages_mapped },
         );
