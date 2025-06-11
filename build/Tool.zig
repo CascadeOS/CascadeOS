@@ -76,6 +76,8 @@ fn resolveTool(
         root_file_name,
     }));
 
+    const serpent_module = b.dependency("serpent", .{}).module("serpent");
+
     const normal_module = b.createModule(.{
         .root_source_file = lazy_path,
         .target = b.graph.host,
@@ -157,6 +159,10 @@ fn resolveTool(
     const test_exe = b.addTest(.{
         .name = test_name,
         .root_module = normal_module,
+        .test_runner = .{
+            .path = serpent_module.root_source_file.?,
+            .mode = .simple,
+        },
     });
 
     const test_install_step = b.addInstallArtifact(

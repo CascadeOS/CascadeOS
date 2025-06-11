@@ -171,6 +171,8 @@ fn resolveLibrary(
 
     var host_native_module: ?*std.Build.Module = null;
 
+    const serpent_module = b.dependency("serpent", .{}).module("serpent");
+
     for (supported_targets) |target| {
         {
             const cascade_module = try createModule(
@@ -237,6 +239,10 @@ fn resolveLibrary(
             const host_test_exe = b.addTest(.{
                 .name = library_description.name,
                 .root_module = host_test_module,
+                .test_runner = .{
+                    .path = serpent_module.root_source_file.?,
+                    .mode = .simple,
+                },
             });
 
             if (library_description.need_llvm) {

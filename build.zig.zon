@@ -30,6 +30,11 @@
             .hash = "N-V-__8AAOBwRwDmz6JFkLfV2vqvHUH_opGQNDADqeOoN8am",
         },
 
+        .serpent = .{
+            .url = "git+https://github.com/leecannon/serpent.git?ref=both_prs#9cb2ca7865bf4bf0f32c0250d1625ba46a3be15a",
+            .hash = "serpent-1.0.0-43UO7ve6BQAwBfx7S9iY_71jHykkr-mnnVzAJGOMRWMK",
+        },
+
         .uacpi = .{
             .url = "git+https://github.com/CascadeOS/uACPI.git?ref=2.1.1#c163b24bada6069e13c564e57d1b0bbeb1c6d21f",
             .hash = "N-V-__8AAE1HEwBDJfW7a3JNk-FgNnYn6vEwOantBwsTFl-G",
@@ -39,4 +44,8 @@
     .paths = .{""},
 
     .fingerprint = 0x953e58ed07a831c1,
+
+    .serpent = .{
+        .print_exe_name = true,
+    },
 }
