@@ -307,8 +307,8 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
     switch (uacpi_log_level) {
         inline else => |level| {
             const kernel_log_level: kernel.debug.log.Level = comptime switch (level) {
-                .TRACE => .verbose,
-                .DEBUG, .INFO => .debug,
+                .DEBUG => .verbose, // DEBUG is the most verbose in uACPI
+                .TRACE, .INFO => .debug,
                 .WARN => .warn,
                 .ERROR => .err,
             };
