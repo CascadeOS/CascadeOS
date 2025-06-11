@@ -138,7 +138,7 @@ pub fn init(
 ) InitError!void {
     if (!std.mem.isValidAlign(options.quantum)) return InitError.InvalidQuantum;
 
-    log.debug("{s}: creating arena with quantum 0x{x}", .{ options.name.constSlice(), options.quantum });
+    log.debug("{s}: init with quantum 0x{x}", .{ options.name.constSlice(), options.quantum });
 
     arena.* = .{
         ._name = options.name,
@@ -232,7 +232,7 @@ pub fn init(
 ///
 /// Panics if there are any allocations in the resource arena.
 pub fn deinit(arena: *ResourceArena, current_task: *kernel.Task) void {
-    log.debug("{s}: destroying arena", .{arena.name()});
+    log.debug("{s}: deinit", .{arena.name()});
 
     for (arena.quantum_caches.constSlice()) |quantum_cache| {
         quantum_cache.deinit(current_task);
@@ -677,7 +677,7 @@ fn importFromSource(
 ) (AllocateError || AddSpanError)!*BoundaryTag {
     arena.mutex.unlock(current_task);
 
-    log.debug("{s}: importing len 0x{x} from source {s}", .{ arena.name(), len, source.arena.name() });
+    log.verbose("{s}: importing len 0x{x} from source {s}", .{ arena.name(), len, source.arena.name() });
 
     var need_to_lock_mutex = true;
     defer if (need_to_lock_mutex) arena.mutex.lock(current_task);
@@ -697,7 +697,7 @@ fn importFromSource(
 
     try arena.addSpanInner(span_tag, free_tag, false);
 
-    log.debug("{s}: imported {} from source {s}", .{ arena.name(), allocation, source.arena.name() });
+    log.verbose("{s}: imported {} from source {s}", .{ arena.name(), allocation, source.arena.name() });
 
     return free_tag;
 }
@@ -830,7 +830,7 @@ pub fn deallocate(arena: *ResourceArena, current_task: *kernel.Task, allocation:
 
             source.callRelease(current_task, allocation_to_release);
 
-            log.debug("{s}: released {} to source {s}", .{ arena.name(), allocation_to_release, source.arena.name() });
+            log.verbose("{s}: released {} to source {s}", .{ arena.name(), allocation_to_release, source.arena.name() });
 
             return;
         }
