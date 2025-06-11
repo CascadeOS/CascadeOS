@@ -86,6 +86,11 @@ kernel_forced_verbose_log_scopes: []const u8,
 /// In the kernel force the log level of every scope to be either debug or verbose.
 kernel_force_log_level: ?ForceLogLevel,
 
+/// Disable the kernel log wrapper.
+///
+/// Defaults to false.
+no_kernel_log_wrapper: bool,
+
 /// Module containing kernel options.
 kernel_option_module: *std.Build.Module,
 
@@ -201,6 +206,12 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         "In the kernel force the provided log scopes to be verbose (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
     ) orelse "";
 
+    const no_kernel_log_wrapper = b.option(
+        bool,
+        "no_log_wrapper",
+        "Disable the kernel log wrapper (defaults to false)",
+    ) orelse false;
+
     const root_path = std.fmt.allocPrint(
         b.allocator,
         comptime "{s}" ++ std.fs.path.sep_str,
@@ -223,9 +234,10 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
         .uefi = uefi,
         .memory = memory,
         .no_kaslr = no_kaslr,
-        .kernel_force_log_level = kernel_force_log_level,
         .kernel_forced_debug_log_scopes = kernel_forced_debug_log_scopes,
         .kernel_forced_verbose_log_scopes = kernel_forced_verbose_log_scopes,
+        .kernel_force_log_level = kernel_force_log_level,
+        .no_kernel_log_wrapper = no_kernel_log_wrapper,
         .kernel_option_module = try buildKernelOptionModule(
             b,
             kernel_force_log_level,

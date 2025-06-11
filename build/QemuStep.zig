@@ -31,7 +31,7 @@ pub fn registerQemuSteps(
     const kernel_log_wrapper = tools.get("kernel_log_wrapper").?;
 
     // the kernel log wrapper interferes with the qemu monitor
-    const kernel_log_wrapper_compile = if (!options.qemu_monitor)
+    const kernel_log_wrapper_compile = if (!options.qemu_monitor and !options.no_kernel_log_wrapper)
         kernel_log_wrapper.release_safe_exe
     else
         null;
