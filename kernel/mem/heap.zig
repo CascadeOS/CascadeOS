@@ -182,7 +182,7 @@ fn heapPageArenaImport(
     );
     errdefer arena.deallocate(current_task, allocation);
 
-    log.debug("mapping {} into heap", .{allocation});
+    log.verbose("mapping {} into heap", .{allocation});
 
     globals.heap_page_table_mutex.lock(current_task);
     defer globals.heap_page_table_mutex.unlock(current_task);
@@ -209,7 +209,7 @@ fn heapPageArenaRelease(
     current_task: *kernel.Task,
     allocation: ResourceArena.Allocation,
 ) void {
-    log.debug("unmapping {} from heap", .{allocation});
+    log.verbose("unmapping {} from heap", .{allocation});
 
     {
         globals.heap_page_table_mutex.lock(current_task);
