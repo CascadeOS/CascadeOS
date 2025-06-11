@@ -206,7 +206,7 @@ pub const RawCache = struct {
         raw_cache: *RawCache,
         options: InitOptions,
     ) void {
-        log.debug("{s}: creating cache with size {} and alignment {}", .{
+        log.debug("{s}: init with size {} and alignment {}", .{
             options.name.constSlice(),
             core.Size.from(options.size, .byte),
             options.alignment.toByteUnits(),
@@ -273,7 +273,7 @@ pub const RawCache = struct {
     ///
     /// All objects must have been freed before calling this.
     pub fn deinit(raw_cache: *RawCache, current_task: *kernel.Task) void {
-        log.debug("{s}: destroying cache", .{raw_cache.name()});
+        log.debug("{s}: deinit", .{raw_cache.name()});
 
         if (raw_cache.full_slabs.first != null) @panic("full slabs not empty");
 
@@ -361,7 +361,7 @@ pub const RawCache = struct {
 
                             log.warn("{s}: failed to add large object to lookup table", .{raw_cache.name()});
 
-                            return AllocateError.LargeObjectAllocationFailed;
+                            return error.LargeObjectAllocationFailed;
                         };
 
                         allocated_objects.appendAssumeCapacity(large_object.object);
