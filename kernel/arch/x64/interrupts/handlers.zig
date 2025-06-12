@@ -12,11 +12,6 @@ pub fn nonMaskableInterruptHandler(_: *kernel.Task, interrupt_frame: *InterruptF
 
 pub fn pageFaultHandler(current_task: *kernel.Task, interrupt_frame: *InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
     const faulting_address = lib_x64.registers.Cr2.readAddress();
-
-    // now that the `faulting_address` has been captured, re-enable interrupts if they were enabled when the page fault
-    // occurred
-    current_task.decrementInterruptDisable();
-
     const error_code: lib_x64.PageFaultErrorCode = .fromErrorCode(interrupt_frame.error_code);
 
     kernel.entry.onPageFault(current_task, .{
