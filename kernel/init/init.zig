@@ -22,16 +22,16 @@ pub fn initStage1() !noreturn {
 
     try kernel.acpi.init.logAcpiTables();
 
+    var bootstrap_init_task: kernel.Task = undefined;
+
     var bootstrap_executor: kernel.Executor = .{
         .id = .bootstrap,
-        .current_task = undefined, // set below
+        .current_task = &bootstrap_init_task,
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
         .idle_task = undefined, // never used
     };
 
-    var bootstrap_init_task = try kernel.Task.init.createBootstrapInitTask(&bootstrap_executor);
-
-    bootstrap_executor.current_task = &bootstrap_init_task;
+    try kernel.Task.init.initializeBootstrapInitTask(&bootstrap_init_task, &bootstrap_executor);
 
     kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
 

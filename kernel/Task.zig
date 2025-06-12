@@ -388,20 +388,17 @@ pub const init = struct {
         );
     }
 
-    pub fn createBootstrapInitTask(
+    pub fn initializeBootstrapInitTask(
+        bootstrap_init_task: *kernel.Task,
         bootstrap_executor: *kernel.Executor,
-    ) !kernel.Task {
-        var bootstrap_init_task: Task = .{
+    ) !void {
+        bootstrap_init_task.* = .{
             .id = getId(),
             ._name = try .fromSlice("bootstrap init"),
-            .state = undefined, // set after declaration of `bootstrap_executor`
+            .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
         };
-
-        bootstrap_init_task.state = .{ .running = bootstrap_executor };
-
-        return bootstrap_init_task;
     }
 
     pub fn initializeInitTask(
