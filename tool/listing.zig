@@ -15,7 +15,6 @@ pub const tools: []const ToolDescription = &[_]ToolDescription{
         .dependencies = &[_]LibraryDependency{
             .{ .name = "core" },
         },
-        .configuration = .link_c,
     },
     .{
         .name = "sdf_builder",

@@ -6,7 +6,7 @@ pub fn main() !void {
     defer {
         if (builtin.mode == .Debug) _ = gpa_impl.deinit();
     }
-    const allocator = if (builtin.mode == .Debug) gpa_impl.allocator() else std.heap.c_allocator;
+    const allocator = if (builtin.mode == .Debug) gpa_impl.allocator() else std.heap.smp_allocator;
 
     const command = try getCommand(allocator);
     defer command.deinit(allocator);
