@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/c163b24bada6069e13c564e57d1b0bbeb1c6d21f/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI 2.1.0 (3bd2a570104ae95e555131765888d9038ec4322b).
+//! Provides a nice zig API wrapping uACPI 3.0.0 (56258b3b9edc6dedbfce81955c9331caf9f4e2da).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
 //! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
@@ -1881,6 +1881,9 @@ pub const Node = opaque {
     /// Evaluate the _CRS method for a 'device' and get the returned resource list.
     ///
     /// NOTE: the returned buffer must be released via `Resources.deinit` when no longer needed.
+    ///
+    /// If you don't need to keep the resource array for later use you can `forEachDeviceResource(device_node, "_CRS", ...)`
+    /// instead, which takes care of iteration & memory management on its own.
     pub fn getCurrentResources(device: *const Node) !?*Resources {
         var resources: *Resources = undefined;
 
@@ -1897,6 +1900,9 @@ pub const Node = opaque {
     /// Evaluate the _PRS method for a 'device' and get the returned resource list.
     ///
     /// NOTE: the returned buffer must be released via `Resources.deinit` when no longer needed.
+    ///
+    /// If you don't need to keep the resource array for later use you can `forEachDeviceResource(device_node, "_PRS", ...)`
+    /// instead, which takes care of iteration & memory management on its own.
     pub fn getPossibleResources(device: *const Node) !?*Resources {
         var resources: *Resources = undefined;
 
@@ -1914,6 +1920,9 @@ pub const Node = opaque {
     /// returned resource list.
     ///
     /// NOTE: the returned buffer must be released via `Resources.deinit` when no longer needed.
+    ///
+    /// If you don't need to keep the resource array for later use you can `forEachDeviceResource(device_node, method, ...)`
+    /// instead, which takes care of iteration & memory management on its own.
     pub fn getResources(device: *const Node, method: [:0]const u8) !?*Resources {
         var resources: *Resources = undefined;
 
@@ -2524,6 +2533,7 @@ pub const Table = extern struct {
 };
 
 pub const Resources = extern struct {
+    /// Length of the entries array in bytes.
     length: usize,
     entries: [*]const Resource,
 
@@ -3292,7 +3302,7 @@ pub const Resource = extern struct {
         };
 
         pub const DecodeType = enum(u8) {
-            positive = c_uacpi.UACPI_POISITIVE_DECODE,
+            positive = c_uacpi.UACPI_POSITIVE_DECODE,
             subtractive = c_uacpi.UACPI_SUBTRACTIVE_DECODE,
         };
 
