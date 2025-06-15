@@ -39,6 +39,10 @@
             .url = "git+https://github.com/CascadeOS/uACPI.git?ref=3.0.0#56258b3b9edc6dedbfce81955c9331caf9f4e2da",
             .hash = "N-V-__8AAJuPEwCdHowrwjb0Xqa2sV-lWCstBcbk7GzwkkrB",
         },
+        .sbi = .{
+            .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#fc8ff79e7598e3c92d5ad7eeeabb6518c169523c",
+            .hash = "sbi-5.0.0-Muvb-ovtAQB47PaXM__EIa6hiOZoEdBQYDUzpn1sgRdB",
+        },
     },
 
     .paths = .{""},

@@ -308,6 +308,11 @@ fn constructKernelModule(
     // devicetree
     kernel_module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
 
+    // sbi
+    if (target == .riscv) {
+        kernel_module.addImport("sbi", b.dependency("sbi", .{}).module("sbi"));
+    }
+
     // source file modules
     for (source_file_modules) |module| {
         kernel_module.addImport(module.name, module.module);
