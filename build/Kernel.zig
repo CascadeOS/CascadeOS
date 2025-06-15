@@ -30,7 +30,6 @@ pub fn getKernels(
     try kernels.ensureTotalCapacity(b.allocator, @intCast(targets.len));
 
     const sdf_builder = tools.get("sdf_builder").?;
-    const uacpi_dep = b.dependency("uacpi", .{});
 
     for (targets) |target| {
         const kernel = try Kernel.create(
@@ -40,7 +39,6 @@ pub fn getKernels(
             sdf_builder,
             options,
             step_collection,
-            uacpi_dep,
         );
         kernels.putAssumeCapacityNoClobber(target, kernel);
     }
@@ -93,7 +91,6 @@ fn create(
     sdf_builder: Tool,
     options: Options,
     step_collection: StepCollection,
-    uacpi_dep: *std.Build.Dependency, // this is fine for one external dep but needs to be improved for multiple
 ) !Kernel {
     const dependencies = try getDependencies(b, target, libraries);
 
@@ -105,7 +102,6 @@ fn create(
         dependencies,
         source_file_modules,
         options,
-        uacpi_dep,
     );
 
     {
@@ -226,7 +222,6 @@ fn constructKernelModule(
     dependencies: []const Library.Dependency,
     source_file_modules: []const SourceFileModule,
     options: Options,
-    uacpi_dep: *std.Build.Dependency,
 ) !*std.Build.Module {
     const kernel_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
@@ -276,6 +271,8 @@ fn constructKernelModule(
             "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
         else
             "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
+
+        const uacpi_dep = b.dependency("uacpi", .{});
 
         kernel_module.addCSourceFiles(.{
             .root = uacpi_dep.path("source"),
