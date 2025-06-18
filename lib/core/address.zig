@@ -150,6 +150,14 @@ pub const VirtualAddress = extern struct {
         return std.mem.isAligned(virtual_address.value, alignment.value);
     }
 
+    /// Returns the difference between two addresses.
+    ///
+    /// `other` must be greater than or equal to `virtual_address`.
+    pub fn subtract(virtual_address: VirtualAddress, other: VirtualAddress) core.Size {
+        std.debug.assert(other.greaterThanOrEqual(virtual_address));
+        return .from(virtual_address.value - other.value, .byte);
+    }
+
     /// Returns the address rounded up to the nearest multiple of the given alignment.
     ///
     /// `alignment` must be a power of two.
