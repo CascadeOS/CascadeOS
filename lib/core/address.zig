@@ -416,6 +416,14 @@ pub const VirtualRange = extern struct {
         virtual_range.address.moveBackwardInPlace(size);
     }
 
+    pub fn anyOverlap(virtual_range: VirtualRange, other: VirtualRange) bool {
+        if (virtual_range.address.lessThan(other.endBound()) and
+            virtual_range.endBound().greaterThan(other.address))
+            return true;
+
+        return false;
+    }
+
     pub fn fullyContainsRange(virtual_range: VirtualRange, other: VirtualRange) bool {
         if (virtual_range.address.greaterThan(other.address)) return false;
         if (virtual_range.endBound().lessThan(other.endBound())) return false;
@@ -423,14 +431,14 @@ pub const VirtualRange = extern struct {
         return true;
     }
 
-    pub fn containsAddressOrder(virtual_range: VirtualRange, address: VirtualAddress) std.math.Order {
+    pub fn compareAddressOrder(virtual_range: VirtualRange, address: VirtualAddress) std.math.Order {
         if (virtual_range.address.greaterThan(address)) return .lt;
         if (virtual_range.endBound().lessThanOrEqual(address)) return .gt;
         return .eq;
     }
 
     pub fn containsAddress(virtual_range: VirtualRange, address: VirtualAddress) bool {
-        return virtual_range.containsAddressOrder(address) == .eq;
+        return virtual_range.compareAddressOrder(address) == .eq;
     }
 
     pub fn print(value: VirtualRange, writer: std.io.AnyWriter, indent: usize) !void {
