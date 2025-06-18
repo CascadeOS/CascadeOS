@@ -54,6 +54,22 @@ pub fn writeUnlock(rw_lock: *RwLock, current_task: *kernel.Task) void {
     rw_lock.mutex.unlock(current_task);
 }
 
+/// Returns `true` if the lock is read locked.
+///
+/// This value can only be trusted if the lock is held by the current task.
+pub fn isReadLocked(rw_lock: *const RwLock) bool {
+    const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
+    return state & READER_MASK != 0;
+}
+
+/// Returns `true` if the lock is read locked.
+///
+/// This value can only be trusted if the lock is held by the current task.
+pub fn isWriteLocked(rw_lock: *const RwLock) bool {
+    const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
+    return state & IS_WRITING != 0;
+}
+
 pub fn tryReadLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
     const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
