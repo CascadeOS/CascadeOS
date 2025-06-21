@@ -17,6 +17,30 @@ pub const MapError = error{
     MappingNotValid,
 } || phys.FrameAllocator.AllocateError;
 
+/// Maps a single page to a physical frame.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
+pub fn mapSinglePage(
+    page_table: kernel.arch.paging.PageTable,
+    virtual_address: core.VirtualAddress,
+    physical_frame: phys.Frame,
+    map_type: MapType,
+    keep_top_level: bool,
+    physical_frame_allocator: phys.FrameAllocator,
+) MapError!void {
+    std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
+
+    try kernel.arch.paging.map(
+        page_table,
+        virtual_address,
+        physical_frame,
+        map_type,
+        keep_top_level,
+        physical_frame_allocator,
+    );
+}
+
 /// Maps a virtual range using the standard page size.
 ///
 /// Physical frames are allocated for each page in the virtual range.
@@ -134,6 +158,43 @@ pub fn mapRangeToPhysicalRange(
         current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
         current_physical_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
     }
+}
+
+/// Unmaps a single page.
+///
+/// Performs TLB shootdown, prefer to use `unmapRange` instead.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
+pub fn unmapSinglePage(
+    current_task: *kernel.Task,
+    page_table: kernel.arch.paging.PageTable,
+    virtual_address: core.VirtualAddress,
+    free_backing_pages: bool,
+    flush_target: kernel.Mode,
+    keep_top_level: bool,
+    physical_frame_allocator: phys.FrameAllocator,
+) void {
+    std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
+
+    var deallocate_frame_list: phys.FrameList = .{};
+
+    kernel.arch.paging.unmap(
+        page_table,
+        virtual_address,
+        free_backing_pages,
+        keep_top_level,
+        &deallocate_frame_list,
+    );
+
+    var request: FlushRequest = .{
+        .range = .fromAddr(virtual_address, kernel.arch.paging.standard_page_size),
+        .flush_target = flush_target,
+    };
+
+    request.submitAndWait(current_task);
+
+    physical_frame_allocator.deallocate(deallocate_frame_list);
 }
 
 /// Unmaps a virtual range.
