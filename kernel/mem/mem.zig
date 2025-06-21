@@ -292,19 +292,33 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
 }
 
 pub fn onKernelPageFault(current_task: *kernel.Task, page_fault_details: PageFaultDetails) void {
-    _ = current_task;
-
     if (page_fault_details.faulting_address.lessThan(kernel.arch.paging.higher_half_start)) {
         @branchHint(.cold);
         std.debug.panic("kernel page fault in lower half\n{}", .{page_fault_details});
     }
 
-    const region = kernelRegionContainingAddress(page_fault_details.faulting_address) orelse {
+    const region_type = kernelRegionContainingAddress(page_fault_details.faulting_address) orelse {
         @branchHint(.cold);
-        std.debug.panic("kernel page fault outside any kernel region\n{}", .{page_fault_details});
+        std.debug.panic("kernel page fault outside of any kernel region\n{}", .{page_fault_details});
     };
 
-    std.debug.panic("kernel page fault in '{s}'\n{}", .{ @tagName(region), page_fault_details });
+    switch (region_type) {
+        .pageable_kernel_address_space => {
+            @branchHint(.likely);
+            globals.kernel_pageable_address_space.handlePageFault(current_task, page_fault_details) catch |err|
+                std.debug.panic(
+                    "failed to handle page fault in pageable kernel address space: {s}\n{}",
+                    .{ @errorName(err), page_fault_details },
+                );
+        },
+        else => {
+            @branchHint(.cold);
+            std.debug.panic(
+                "kernel page fault in '{s}'\n{}",
+                .{ @tagName(region_type), page_fault_details },
+            );
+        },
+    }
 }
 
 pub const PageFaultDetails = struct {
@@ -380,6 +394,13 @@ pub const globals = struct {
     /// Initialized during `init.buildCorePageTable`.
     pub var core_page_table: kernel.arch.paging.PageTable = undefined;
 
+    /// The kernel pageable address space.
+    ///
+    /// Used for pageable kernel memory like file caches and for loaning memory from and to user space.
+    ///
+    /// Initialized during `init.initializeMemorySystem`.
+    pub var kernel_pageable_address_space: kernel.mem.AddressSpace = undefined;
+
     /// The virtual base address that the kernel was loaded at.
     ///
     /// Initialized during `init.earlyDetermineOffsets`.
@@ -444,6 +465,17 @@ pub const init = struct {
 
         init_log.debug("initializing task stacks and cache", .{});
         try kernel.Task.init.initializeTaskStacksAndCache(current_task, result.stacks_range);
+
+        init_log.debug("initializing pageable kernel address space", .{});
+        try globals.kernel_pageable_address_space.init(
+            current_task,
+            .{
+                .name = try .fromSlice("pageable_kernel"),
+                .range = result.pageable_kernel_address_space_range,
+                .page_table = globals.core_page_table,
+                .mode = .kernel,
+            },
+        );
     }
 
     fn numberOfUsablePagesAndRegions() struct { usize, usize } {
@@ -476,6 +508,8 @@ pub const init = struct {
         heap_range: core.VirtualRange,
         special_heap_range: core.VirtualRange,
         stacks_range: core.VirtualRange,
+
+        pageable_kernel_address_space_range: core.VirtualRange,
     };
 
     fn buildMemoryLayout(number_of_usable_pages: usize, number_of_usable_regions: usize) MemoryLayoutResult {
@@ -499,6 +533,8 @@ pub const init = struct {
             .heap_range = heaps.kernel_heap_range,
             .special_heap_range = heaps.special_heap_range,
             .stacks_range = heaps.kernel_stacks_range,
+
+            .pageable_kernel_address_space_range = heaps.pageable_kernel_address_space_range,
         };
     }
 
@@ -595,6 +631,8 @@ pub const init = struct {
         kernel_heap_range: core.VirtualRange,
         special_heap_range: core.VirtualRange,
         kernel_stacks_range: core.VirtualRange,
+
+        pageable_kernel_address_space_range: core.VirtualRange,
     };
 
     fn registerHeaps() RegisterHeapsResult {
@@ -633,10 +671,23 @@ pub const init = struct {
             .type = .kernel_stacks,
         });
 
+        const pageable_kernel_address_space_range = findFreeRange(
+            size_of_top_level,
+            size_of_top_level,
+        ) orelse
+            @panic("no space in kernel memory layout for the pageable kernel address space");
+
+        globals.regions.appendAssumeCapacity(.{
+            .range = pageable_kernel_address_space_range,
+            .type = .pageable_kernel_address_space,
+        });
+
         return .{
             .kernel_heap_range = kernel_heap_range,
             .special_heap_range = special_heap_range,
             .kernel_stacks_range = kernel_stacks_range,
+
+            .pageable_kernel_address_space_range = pageable_kernel_address_space_range,
         };
     }
 
