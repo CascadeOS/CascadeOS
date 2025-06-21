@@ -4,6 +4,7 @@
 pub const heap = @import("heap.zig");
 pub const phys = @import("phys.zig");
 
+pub const AddressSpace = @import("address_space/AddressSpace.zig");
 pub const cache = @import("cache.zig");
 pub const MapType = @import("MapType.zig");
 pub const FlushRequest = @import("FlushRequest.zig");
@@ -436,6 +437,7 @@ pub const init = struct {
         init_log.debug("initializing caches", .{});
         try ResourceArena.global_init.initializeCache();
         try cache.init.initializeCaches();
+        try AddressSpace.global_init.initializeCaches();
 
         init_log.debug("initializing kernel and special heap", .{});
         try heap.init.initializeHeaps(current_task, result.heap_range, result.special_heap_range);

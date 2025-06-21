@@ -17,6 +17,7 @@ pub const maximum_number_of_executors = 64;
 
 pub const task_name_length = 32;
 pub const resource_arena_name_length = 32;
+pub const address_space_name_length = resource_arena_name_length - "_address_arena".len;
 pub const cache_name_length = 32;
 
 pub const per_executor_interrupt_period = core.Duration.from(5, .millisecond);
