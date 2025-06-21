@@ -152,9 +152,9 @@ pub const VirtualAddress = extern struct {
 
     /// Returns the difference between two addresses.
     ///
-    /// `other` must be greater than or equal to `virtual_address`.
+    /// `virtual_address` must be greater than or equal to `other`.
     pub fn subtract(virtual_address: VirtualAddress, other: VirtualAddress) core.Size {
-        std.debug.assert(other.greaterThanOrEqual(virtual_address));
+        std.debug.assert(virtual_address.greaterThanOrEqual(other));
         return .from(virtual_address.value - other.value, .byte);
     }
 
