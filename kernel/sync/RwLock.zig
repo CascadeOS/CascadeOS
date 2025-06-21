@@ -16,6 +16,30 @@ mutex: kernel.sync.Mutex = .{},
 wait_queue_spinlock: kernel.sync.TicketSpinLock = .{},
 wait_queue: kernel.sync.WaitQueue = .{},
 
+/// Attempts to upgrade the a read lock to a write lock.
+///
+/// If it fails the lock is left unlocked.
+pub fn tryUpgradeLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
+    _ = @atomicRmw(usize, &rw_lock.state, .Add, WRITER, .acquire);
+
+    if (rw_lock.mutex.tryLock(current_task)) {
+        const state = @atomicRmw(usize, &rw_lock.state, .Sub, READER, .release);
+
+        if (state & READER_MASK == READER) {
+            _ = @atomicRmw(usize, &rw_lock.state, .Or, IS_WRITING, .acquire);
+            return true;
+        }
+
+        _ = @atomicRmw(usize, &rw_lock.state, .Sub, WRITER, .release);
+
+        rw_lock.mutex.unlock(current_task);
+    } else {
+        _ = @atomicRmw(usize, &rw_lock.state, .Sub, WRITER, .release);
+    }
+
+    return false;
+}
+
 pub fn tryWriteLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
     if (rw_lock.mutex.tryLock(current_task)) {
         const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
