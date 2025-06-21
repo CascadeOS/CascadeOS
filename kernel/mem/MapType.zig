@@ -18,6 +18,9 @@ protection: Protection,
 cache: Cache = .write_back,
 
 pub const Protection = enum {
+    /// Disallow any access.
+    none,
+
     /// Read only.
     read,
 
@@ -49,6 +52,7 @@ pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
     });
 
     buf.appendSliceAssumeCapacity(switch (value.protection) {
+        .none => "NO",
         .read => "RO",
         .read_write => "RW",
         .executable => "XO",

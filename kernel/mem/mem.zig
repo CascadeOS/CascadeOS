@@ -21,6 +21,7 @@ pub const MapError = error{
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
+/// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
     page_table: kernel.arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
@@ -29,6 +30,7 @@ pub fn mapSinglePage(
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
+    std.debug.assert(map_type.protection != .none);
     std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
 
     try kernel.arch.paging.map(
@@ -48,6 +50,7 @@ pub fn mapSinglePage(
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalFrames(
     current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
@@ -57,6 +60,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
+    std.debug.assert(map_type.protection != .none);
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
 
@@ -108,6 +112,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 /// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `physical_range.size` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be equal to `physical_range.size`
+/// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
     current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
@@ -118,6 +123,7 @@ pub fn mapRangeToPhysicalRange(
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
+    std.debug.assert(map_type.protection != .none);
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
