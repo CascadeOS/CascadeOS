@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const tools: []const ToolDescription = &[_]ToolDescription{
+pub const tools: []const ToolDescription = &.{
     .{
         .name = "image_builder",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "fs" },
             .{ .name = "uuid" },
@@ -12,13 +12,19 @@ pub const tools: []const ToolDescription = &[_]ToolDescription{
     },
     .{
         .name = "kernel_log_wrapper",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
         },
     },
     .{
+        .name = "limine_install",
+        .configuration = .{
+            .custom = @import("limine_install/custom_configuration.zig").customConfiguration,
+        },
+    },
+    .{
         .name = "sdf_builder",
-        .dependencies = &[_]LibraryDependency{
+        .dependencies = &.{
             .{ .name = "core" },
             .{ .name = "sdf" },
         },
