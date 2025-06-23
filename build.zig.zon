@@ -26,8 +26,8 @@
         },
 
         .limine = .{
-            .url = "git+https://github.com/limine-bootloader/limine.git?ref=v9.3.3-binary#39e685c3695cc373a5859ebf14106c924b0c5ece",
-            .hash = "N-V-__8AAOBwRwDmz6JFkLfV2vqvHUH_opGQNDADqeOoN8am",
+            .url = "git+https://github.com/limine-bootloader/limine.git?ref=v9.3.4-binary#3bdb2297c80d7159243462936659bc5c82bc0983",
+            .hash = "N-V-__8AAIRpRwAz9-EPrciNtBX6AxrGGdPct5iYU_DIKR25",
         },
 
         .serpent = .{
@@ -39,6 +39,7 @@
             .url = "git+https://github.com/CascadeOS/uACPI.git?ref=3.0.0#56258b3b9edc6dedbfce81955c9331caf9f4e2da",
             .hash = "N-V-__8AAJuPEwCdHowrwjb0Xqa2sV-lWCstBcbk7GzwkkrB",
         },
+
         .sbi = .{
             .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#fc8ff79e7598e3c92d5ad7eeeabb6518c169523c",
             .hash = "sbi-5.0.0-Muvb-ovtAQB47PaXM__EIa6hiOZoEdBQYDUzpn1sgRdB",
