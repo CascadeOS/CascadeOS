@@ -27,26 +27,6 @@ pub fn registerImageSteps(
 
     const limine_dep = b.dependency("limine", .{});
 
-    const limine_exe = blk: {
-        const limine_c_module = b.createModule(.{
-            .target = b.graph.host,
-            .optimize = .ReleaseSafe,
-            .link_libc = true,
-        });
-        limine_c_module.addIncludePath(limine_dep.path(""));
-        limine_c_module.addCSourceFile(.{
-            .file = limine_dep.path("limine.c"),
-            .flags = &.{
-                "-std=c99",
-                "-fno-sanitize=undefined",
-            },
-        });
-        break :blk b.addExecutable(.{
-            .name = "limine",
-            .root_module = limine_c_module,
-        });
-    };
-
     var image_steps: Collection = .{};
     try image_steps.ensureTotalCapacity(b.allocator, @intCast(targets.len));
 
@@ -71,21 +51,22 @@ pub fn registerImageSteps(
         image_build_step.addFileArg(image_description_step.image_description_file);
         const raw_image = image_build_step.addOutputFileArg(image_file_name);
 
+        const image = if (target == .x64) image: {
+            const limine_install_tool = tools.get("limine_install").?;
+
+            const install_limine = b.addRunArtifact(limine_install_tool.release_safe_exe);
+
+            install_limine.addArg("-i");
+            install_limine.addFileArg(raw_image);
+
+            install_limine.addArg("-o");
+            break :image install_limine.addOutputFileArg(image_file_name);
+        } else raw_image;
+
         const install_image = b.addInstallFile(
-            raw_image,
+            image,
             b.pathJoin(&.{ @tagName(target), image_file_name }),
         );
-
-        if (target == .x64) {
-            const run_limine = b.addRunArtifact(limine_exe);
-
-            run_limine.addArg("bios-install");
-            run_limine.addFileArg(raw_image);
-            run_limine.addArg("--quiet");
-
-            run_limine.has_side_effects = true;
-            install_image.step.dependOn(&run_limine.step);
-        }
 
         const step_name = try std.fmt.allocPrint(
             b.allocator,
