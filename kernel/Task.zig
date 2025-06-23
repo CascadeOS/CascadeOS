@@ -5,34 +5,49 @@ const Task = @This();
 
 id: Id,
 
-_name: Name,
-
 state: State,
 
 /// The stack used by this task in kernel mode.
 stack: Stack,
 
 /// Tracks the depth of nested interrupt disables.
-interrupt_disable_count: u32 = 1, // fresh tasks start with interrupts disabled
+interrupt_disable_count: u32,
 
 /// Tracks the depth of nested preemption disables.
-preemption_disable_count: u32 = 0,
+preemption_disable_count: u32,
 
 /// Whenever we skip preemption, we set this to true.
 ///
 /// When we re-enable preemption, we check this flag.
-preemption_skipped: bool = false,
+preemption_skipped: bool,
 
-spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked
+spinlocks_held: u32,
 
 /// Used for various linked lists.
-next_task_node: containers.SingleNode = .empty,
+next_task_node: containers.SingleNode,
 
-is_idle_task: bool = false,
+context: Context,
 
-pub fn name(task: *const Task) []const u8 {
-    return task._name.constSlice();
-}
+pub const Context = union(kernel.Context) {
+    kernel: Kernel,
+    user: User,
+
+    pub const Kernel = struct {
+        /// Name of the task.
+        ///
+        /// Kernel tasks always have a name.
+        name: Name,
+
+        is_idle_task: bool,
+    };
+
+    pub const User = struct {
+        /// Optional name of the task.
+        ///
+        /// User task names are optional.
+        name: ?Name,
+    };
+};
 
 pub const State = union(enum) {
     ready,
@@ -54,6 +69,81 @@ pub fn getCurrent() *Task {
     }
 
     return current_task;
+}
+
+pub const CreateOptions = struct {
+    start_function: kernel.arch.scheduling.NewTaskFunction,
+    arg1: u64,
+    arg2: u64,
+
+    context: CreateContext,
+
+    pub const CreateContext = union(kernel.Context) {
+        kernel: Kernel,
+        user: User,
+
+        pub const Kernel = struct {
+            name: Name,
+        };
+
+        pub const User = struct {
+            name: ?Name = null,
+        };
+    };
+};
+
+/// Create a task.
+///
+/// Not to be used for creating idle, bootstrap, or init tasks.
+pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
+    const task = try globals.cache.allocate(current_task);
+    errdefer globals.cache.free(current_task, task);
+
+    const preconstructed_stack = task.stack;
+
+    task.* = .{
+        .id = getId(),
+        .state = .ready,
+        .stack = preconstructed_stack,
+        .interrupt_disable_count = 1, // fresh tasks start with interrupts disabled
+        .preemption_disable_count = 0,
+        .preemption_skipped = false,
+        .spinlocks_held = 1, // fresh tasks start with the scheduler locked
+        .next_task_node = .empty,
+
+        .context = switch (options.context) {
+            .kernel => |kernel_context| .{
+                .kernel = .{
+                    .name = kernel_context.name,
+                    .is_idle_task = false,
+                },
+            },
+            .user => |user_context| .{
+                .user = .{
+                    .name = user_context.name,
+                },
+            },
+        },
+    };
+
+    task.stack.reset();
+
+    try kernel.arch.scheduling.prepareNewTaskForScheduling(
+        task,
+        options.start_function,
+        options.arg1,
+        options.arg2,
+    );
+
+    return task;
+}
+
+/// Destroy a task.
+///
+/// Asserts that the task is in the `dropped` state.
+pub fn destroy(current_task: *kernel.Task, task: *Task) void {
+    std.debug.assert(task.state == .dropped);
+    globals.cache.free(current_task, task);
 }
 
 pub fn incrementInterruptDisable(task: *Task) void {
@@ -135,44 +225,11 @@ pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
     return .{ current_task, .{ .previous_value = previous_value } };
 }
 
-pub const CreateOptions = struct {
-    name: Name,
-    start_function: kernel.arch.scheduling.NewTaskFunction,
-    arg1: u64,
-    arg2: u64,
-};
-
-/// Create a task.
-pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
-    const task = try globals.cache.allocate(current_task);
-
-    task.id = getId();
-    task._name = options.name;
-    task.state = .ready;
-    task.interrupt_disable_count = 1; // fresh tasks start with interrupts disabled
-    task.preemption_disable_count = 0;
-    task.preemption_skipped = false;
-    task.spinlocks_held = 1; // fresh tasks start with the scheduler locked
-    task.next_task_node = .empty;
-
-    task.stack.reset();
-
-    try kernel.arch.scheduling.prepareNewTaskForScheduling(
-        task,
-        options.start_function,
-        options.arg1,
-        options.arg2,
-    );
-
-    return task;
-}
-
-/// Destroy a task.
-///
-/// Asserts that the task is in the `dropped` state.
-pub fn destroy(current_task: *kernel.Task, task: *Task) void {
-    std.debug.assert(task.state == .dropped);
-    globals.cache.free(current_task, task);
+pub fn isIdleTask(task: *const Task) bool {
+    return switch (task.context) {
+        .kernel => |kernel_context| kernel_context.is_idle_task,
+        .user => false,
+    };
 }
 
 pub const Id = enum(u64) {
@@ -300,18 +357,26 @@ pub const Stack = struct {
             .len = stack.range.size.value,
         });
     }
+
+    const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 };
 
-const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
-
-fn getId() Id {
-    const id: Id = @enumFromInt(globals.id_counter.fetchAdd(1, .monotonic));
-    if (id == .none) @panic("task id counter overflowed"); // TODO: handle this better
-    return id;
-}
-
 pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
-    try writer.print("Task({s})", .{task.name()});
+    switch (task.context) {
+        .kernel => |kernel_context| {
+            try writer.print("KernelTask({d} - {s})", .{
+                @intFromEnum(task.id),
+                kernel_context.name.constSlice(),
+            });
+        },
+        .user => |user_context| {
+            if (user_context.name) |*name| {
+                try writer.print("UserTask({d} - {s})", .{ @intFromEnum(task.id), name.constSlice() });
+            } else {
+                try writer.print("UserTask({d})", .{@intFromEnum(task.id)});
+            }
+        },
+    }
 }
 
 pub inline fn format(
@@ -333,16 +398,22 @@ pub inline fn fromNode(node: *containers.SingleNode) *Task {
 }
 
 fn cacheConstructor(task: *Task, current_task: *Task) kernel.mem.cache.ConstructorError!void {
-    task.* = .{
-        .id = undefined,
-        ._name = .{},
-        .state = .dropped,
-        .stack = try .createStack(current_task),
-    };
+    task.* = undefined;
+    task.stack = try .createStack(current_task);
 }
 
 fn cacheDestructor(task: *Task, current_task: *Task) void {
     task.stack.destroyStack(current_task);
+}
+
+fn getId() Id {
+    // TODO: should task ids be per process instead of global?
+    const id: Id = @enumFromInt(globals.id_counter.fetchAdd(1, .monotonic));
+    if (id == .none) {
+        // if we create one task per millisecond it will take more than 584 million years to overflow
+        @panic("task id counter overflowed");
+    }
+    return id;
 }
 
 pub const globals = struct {
@@ -394,10 +465,20 @@ pub const init = struct {
     ) !void {
         bootstrap_init_task.* = .{
             .id = getId(),
-            ._name = try .fromSlice("bootstrap init"),
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
+            .interrupt_disable_count = 1, // init tasks start with interrupts disabled
+            .preemption_disable_count = 0,
+            .preemption_skipped = false,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
+            .next_task_node = .empty,
+
+            .context = .{
+                .kernel = .{
+                    .name = try .fromSlice("bootstrap init"),
+                    .is_idle_task = false,
+                },
+            },
         };
     }
 
@@ -406,15 +487,26 @@ pub const init = struct {
         init_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
+        var name: Name = .{};
+        try name.writer().print("init {}", .{@intFromEnum(executor.id)});
+
         init_task.* = .{
             .id = getId(),
-            ._name = .{}, // set below
             .state = .{ .running = executor },
             .stack = try .createStack(current_task),
+            .interrupt_disable_count = 1, // init tasks start with interrupts disabled
+            .preemption_disable_count = 0,
+            .preemption_skipped = false,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-        };
+            .next_task_node = .empty,
 
-        try init_task._name.writer().print("init {}", .{@intFromEnum(executor.id)});
+            .context = .{
+                .kernel = .{
+                    .name = name,
+                    .is_idle_task = false,
+                },
+            },
+        };
     }
 
     pub fn initializeIdleTask(
@@ -422,15 +514,26 @@ pub const init = struct {
         idle_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
+        var name: Name = .{};
+        try name.writer().print("idle {}", .{@intFromEnum(executor.id)});
+
         idle_task.* = .{
             .id = getId(),
-            ._name = .{}, // set below
             .state = .ready,
             .stack = try .createStack(current_task),
-            .is_idle_task = true,
-        };
+            .interrupt_disable_count = 1, // idle tasks start with interrupts disabled
+            .preemption_disable_count = 0,
+            .preemption_skipped = false,
+            .spinlocks_held = 1, // idle tasks start with the scheduler locked
+            .next_task_node = .empty,
 
-        try idle_task._name.writer().print("idle {}", .{@intFromEnum(executor.id)});
+            .context = .{
+                .kernel = .{
+                    .name = name,
+                    .is_idle_task = true,
+                },
+            },
+        };
     }
 };
 

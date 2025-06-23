@@ -7,7 +7,7 @@
 pub fn queueTask(current_task: *kernel.Task, task: *kernel.Task) void {
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
     std.debug.assert(task.state == .ready);
-    std.debug.assert(!task.is_idle_task); // cannot queue an idle task
+    std.debug.assert(!task.isIdleTask()); // cannot queue an idle task
 
     globals.ready_to_run.push(&task.next_task_node);
 }
@@ -50,7 +50,7 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
         switch (mode) {
             .requeue => return, // no tasks to run
             .drop => {
-                std.debug.assert(!current_task.is_idle_task); // drop during idle
+                std.debug.assert(!current_task.isIdleTask()); // drop during idle
 
                 log.verbose("dropping {}", .{current_task});
 
@@ -63,7 +63,7 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
     const new_task = kernel.Task.fromNode(new_task_node);
     std.debug.assert(new_task.state == .ready);
 
-    if (current_task.is_idle_task) {
+    if (current_task.isIdleTask()) {
         switchToTaskFromIdle(current_task, new_task);
         @panic("idle returned");
     }
@@ -96,7 +96,7 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
 
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
 
-    std.debug.assert(!current_task.is_idle_task); // block during idle
+    std.debug.assert(!current_task.isIdleTask()); // block during idle
 
     log.verbose("blocking {}", .{current_task});
 
@@ -115,7 +115,7 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
 fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
 
-    std.debug.assert(!current_task.is_idle_task);
+    std.debug.assert(!current_task.isIdleTask());
     const executor = current_task.state.running;
 
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
@@ -151,7 +151,7 @@ fn switchToIdleWithLock(
             const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(inner_spinlock_addr);
             const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
 
-            std.debug.assert(idle_task.is_idle_task);
+            std.debug.assert(idle_task.isIdleTask());
 
             inner_spinlock.unsafeUnlock();
 
@@ -161,7 +161,7 @@ fn switchToIdleWithLock(
     };
 
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
-    std.debug.assert(!current_task.is_idle_task);
+    std.debug.assert(!current_task.isIdleTask());
     const executor = current_task.state.running;
 
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
@@ -188,7 +188,7 @@ fn switchToIdleWithLock(
 
 fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
-    std.debug.assert(current_task.is_idle_task);
+    std.debug.assert(current_task.isIdleTask());
 
     log.verbose("switching to {} from idle", .{new_task});
 
@@ -208,8 +208,8 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void
 
 fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
-    std.debug.assert(!current_task.is_idle_task);
-    std.debug.assert(!new_task.is_idle_task);
+    std.debug.assert(!current_task.isIdleTask());
+    std.debug.assert(!new_task.isIdleTask());
 
     log.verbose("switching to {} from {}", .{ new_task, current_task });
 
@@ -250,8 +250,8 @@ fn switchToTaskFromTaskWithLock(
 
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
 
-    std.debug.assert(!current_task.is_idle_task);
-    std.debug.assert(!new_task.is_idle_task);
+    std.debug.assert(!current_task.isIdleTask());
+    std.debug.assert(!new_task.isIdleTask());
 
     log.verbose("switching to {} from {} with a lock", .{ new_task, current_task });
 
