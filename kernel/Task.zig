@@ -269,7 +269,7 @@ pub const Stack = struct {
                 current_task,
                 kernel.mem.globals.core_page_table,
                 usable_range,
-                .{ .mode = .kernel, .protection = .read_write },
+                .{ .context = .kernel, .protection = .read_write },
                 .kernel,
                 true,
                 kernel.mem.phys.allocator,

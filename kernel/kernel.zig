@@ -24,7 +24,7 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
     return &executors[@intFromEnum(id)];
 }
 
-pub const Mode = enum {
+pub const Context = enum {
     kernel,
     user,
 };

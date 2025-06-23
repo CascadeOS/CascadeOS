@@ -34,15 +34,25 @@ pub const RegionMapInfo = union(enum) {
 pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
     switch (kernel_memory_region.type) {
         .direct_map, .non_cached_direct_map => {
-            const physical_range = core.PhysicalRange.fromAddr(core.PhysicalAddress.zero, kernel_memory_region.range.size);
+            const physical_range = core.PhysicalRange.fromAddr(
+                core.PhysicalAddress.zero,
+                kernel_memory_region.range.size,
+            );
 
             const map_type: MapType = switch (kernel_memory_region.type) {
-                .direct_map => .{ .mode = .kernel, .protection = .read_write },
-                .non_cached_direct_map => .{ .mode = .kernel, .protection = .read_write, .cache = .uncached },
+                .direct_map => .{ .context = .kernel, .protection = .read_write },
+                .non_cached_direct_map => .{
+                    .context = .kernel,
+                    .protection = .read_write,
+                    .cache = .uncached,
+                },
                 else => unreachable,
             };
 
-            return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
+            return .{ .full = .{
+                .physical_range = physical_range,
+                .map_type = map_type,
+            } };
         },
 
         .writeable_section, .readonly_section, .executable_section, .sdf_section => {
@@ -54,9 +64,9 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
             );
 
             const map_type: MapType = switch (kernel_memory_region.type) {
-                .executable_section => .{ .mode = .kernel, .protection = .executable },
-                .readonly_section, .sdf_section => .{ .mode = .kernel, .protection = .read },
-                .writeable_section => .{ .mode = .kernel, .protection = .read_write },
+                .executable_section => .{ .context = .kernel, .protection = .executable },
+                .readonly_section, .sdf_section => .{ .context = .kernel, .protection = .read },
+                .writeable_section => .{ .context = .kernel, .protection = .read_write },
                 else => unreachable,
             };
 
@@ -65,7 +75,10 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
 
         .kernel_heap, .kernel_stacks, .special_heap, .pageable_kernel_address_space => return .top_level,
 
-        .pages => return .{ .back_with_frames = .{ .mode = .kernel, .protection = .read_write } },
+        .pages => return .{ .back_with_frames = .{
+            .context = .kernel,
+            .protection = .read_write,
+        } },
     }
 }
 

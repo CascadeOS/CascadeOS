@@ -273,7 +273,7 @@ pub fn faultObjectOrZeroFill(
 
     {
         const map_type: kernel.mem.MapType = .{
-            .mode = switch (fault_info.address_space.mode) {
+            .context = switch (fault_info.address_space.context) {
                 .kernel => .kernel,
                 .user => .user,
             },
@@ -285,7 +285,7 @@ pub fn faultObjectOrZeroFill(
             },
         };
 
-        const keep_top_level = switch (fault_info.address_space.mode) {
+        const keep_top_level = switch (fault_info.address_space.context) {
             .kernel => true,
             .user => false,
         };

@@ -3,14 +3,14 @@
 
 const MapType = @This();
 
-/// The mode of the mapping.
+/// The context of the mapping.
 ///
-/// If the mode is `.kernel` then the mapping is inaccessible from userspace, and is not flushed on context switch if
+/// If the context is `.kernel` then the mapping is inaccessible from userspace, and is not flushed on context switch if
 /// supported.
 ///
-/// If the mode is `.user` then the mapping is accessible from userspace and is supported is not accessible from
+/// If the context is `.user` then the mapping is accessible from userspace and if supported is not accessible from
 /// kernelspace by default.
-mode: kernel.Mode,
+context: kernel.Context,
 
 /// The protection of the mapping.
 protection: Protection,
@@ -46,7 +46,7 @@ pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
 
     var buf: std.BoundedArray(u8, 7) = .{};
 
-    buf.appendSliceAssumeCapacity(switch (value.mode) {
+    buf.appendSliceAssumeCapacity(switch (value.context) {
         .user => "U_",
         .kernel => "K_",
     });

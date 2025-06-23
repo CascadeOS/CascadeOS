@@ -57,7 +57,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
-    flush_target: kernel.Mode,
+    flush_target: kernel.Context,
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -120,7 +120,7 @@ pub fn mapRangeToPhysicalRange(
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: MapType,
-    flush_target: kernel.Mode,
+    flush_target: kernel.Context,
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -214,7 +214,7 @@ pub fn unmapRange(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
-    flush_target: kernel.Mode,
+    flush_target: kernel.Context,
     keep_top_level: bool,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
@@ -325,7 +325,7 @@ pub const PageFaultDetails = struct {
     faulting_address: core.VirtualAddress,
     access_type: AccessType,
     fault_type: FaultType,
-    source: kernel.Mode,
+    context: kernel.Context,
 
     pub const AccessType = enum {
         read,
@@ -358,7 +358,7 @@ pub const PageFaultDetails = struct {
         try writer.print("fault_type: {s},\n", .{@tagName(details.fault_type)});
 
         try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("source: {s},\n", .{@tagName(details.source)});
+        try writer.print("context: {s},\n", .{@tagName(details.context)});
 
         try writer.writeByteNTimes(' ', indent);
         try writer.writeByte('}');
@@ -473,7 +473,7 @@ pub const init = struct {
                 .name = try .fromSlice("pageable_kernel"),
                 .range = result.pageable_kernel_address_space_range,
                 .page_table = globals.core_page_table,
-                .mode = .kernel,
+                .context = .kernel,
             },
         );
     }

@@ -92,7 +92,7 @@ fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
             physical_address,
             framebuffer_size,
         ),
-        .{ .mode = .kernel, .protection = .read_write, .cache = .write_combining },
+        .{ .context = .kernel, .protection = .read_write, .cache = .write_combining },
     );
 
     c.ssfn_dst.ptr = virtual_range.address.toPtr([*]u8);

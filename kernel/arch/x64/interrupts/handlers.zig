@@ -29,7 +29,7 @@ pub fn pageFaultHandler(current_task: *kernel.Task, interrupt_frame: *InterruptF
         else
             .invalid,
 
-        .source = if (error_code.user)
+        .context = if (error_code.user)
             .user
         else
             .kernel,
