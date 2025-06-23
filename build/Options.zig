@@ -94,6 +94,14 @@ no_kernel_log_wrapper: bool,
 /// Module containing kernel options.
 kernel_option_module: *std.Build.Module,
 
+/// Module containing kernel options.
+///
+/// This options module attempts to enable all kernel options to ensure as may code paths are hit as possible for the
+/// purpose of the kernels check step.
+///
+/// This is mainly forcing debug and verbose log scopes to always be enabled but may do more in the future.
+all_enabled_kernel_option_module: *std.Build.Module,
+
 /// Hash map of target to module containing target-specific kernel options.
 target_specific_kernel_options_modules: Modules,
 
@@ -243,6 +251,13 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
             kernel_force_log_level,
             kernel_forced_debug_log_scopes,
             kernel_forced_verbose_log_scopes,
+            cascade_version_string,
+        ),
+        .all_enabled_kernel_option_module = try buildKernelOptionModule(
+            b,
+            .verbose,
+            "",
+            "",
             cascade_version_string,
         ),
         .target_specific_kernel_options_modules = try buildKernelTargetOptionModules(b, targets),

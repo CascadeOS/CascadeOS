@@ -96,21 +96,31 @@ fn create(
 
     const source_file_modules = try getSourceFileModules(b, options, dependencies);
 
+    {
+        const check_kernel_module = try constructKernelModule(
+            b,
+            target,
+            dependencies,
+            source_file_modules,
+            options,
+            options.all_enabled_kernel_option_module,
+        );
+
+        const check_exe = b.addExecutable(.{
+            .name = "kernel_check",
+            .root_module = check_kernel_module,
+        });
+        step_collection.registerCheck(check_exe);
+    }
+
     const kernel_module = try constructKernelModule(
         b,
         target,
         dependencies,
         source_file_modules,
         options,
+        options.kernel_option_module,
     );
-
-    {
-        const check_exe = b.addExecutable(.{
-            .name = "kernel_check",
-            .root_module = kernel_module,
-        });
-        step_collection.registerCheck(check_exe);
-    }
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
@@ -222,6 +232,7 @@ fn constructKernelModule(
     dependencies: []const Library.Dependency,
     source_file_modules: []const SourceFileModule,
     options: Options,
+    kernel_option_module: *std.Build.Module,
 ) !*std.Build.Module {
     const kernel_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
@@ -243,7 +254,7 @@ fn constructKernelModule(
     kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
 
     // kernel options
-    kernel_module.addImport("kernel_options", options.kernel_option_module);
+    kernel_module.addImport("kernel_options", kernel_option_module);
 
     // ssfn
     kernel_module.addCSourceFile(.{ .file = b.path("kernel/init/output/ssfn.c") });
