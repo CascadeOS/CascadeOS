@@ -398,10 +398,10 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 /// Returns a unique identifier of the currently executing thread.
 ///
 /// The returned thread id cannot be UACPI_THREAD_ID_NONE.
-export fn uacpi_kernel_get_thread_id() kernel.Task.Id {
+export fn uacpi_kernel_get_thread_id() usize {
     log.verbose("uacpi_kernel_get_thread_id called", .{});
 
-    return kernel.Task.getCurrent().id;
+    return @intFromPtr(kernel.Task.getCurrent());
 }
 
 /// Try to acquire the mutex with a millisecond timeout.
