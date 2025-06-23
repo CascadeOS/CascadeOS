@@ -11,20 +11,20 @@ state: State,
 stack: Stack,
 
 /// Tracks the depth of nested interrupt disables.
-interrupt_disable_count: u32,
+interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
 
 /// Tracks the depth of nested preemption disables.
-preemption_disable_count: u32,
+preemption_disable_count: u32 = 0,
 
 /// Whenever we skip preemption, we set this to true.
 ///
 /// When we re-enable preemption, we check this flag.
-preemption_skipped: bool,
+preemption_skipped: bool = false,
 
 spinlocks_held: u32,
 
 /// Used for various linked lists.
-next_task_node: containers.SingleNode,
+next_task_node: containers.SingleNode = .empty,
 
 context: Context,
 
@@ -105,11 +105,7 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
         .id = getId(),
         .state = .ready,
         .stack = preconstructed_stack,
-        .interrupt_disable_count = 1, // fresh tasks start with interrupts disabled
-        .preemption_disable_count = 0,
-        .preemption_skipped = false,
         .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-        .next_task_node = .empty,
 
         .context = switch (options.context) {
             .kernel => |kernel_context| .{
@@ -467,11 +463,7 @@ pub const init = struct {
             .id = getId(),
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
-            .interrupt_disable_count = 1, // init tasks start with interrupts disabled
-            .preemption_disable_count = 0,
-            .preemption_skipped = false,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-            .next_task_node = .empty,
 
             .context = .{
                 .kernel = .{
@@ -494,11 +486,7 @@ pub const init = struct {
             .id = getId(),
             .state = .{ .running = executor },
             .stack = try .createStack(current_task),
-            .interrupt_disable_count = 1, // init tasks start with interrupts disabled
-            .preemption_disable_count = 0,
-            .preemption_skipped = false,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-            .next_task_node = .empty,
 
             .context = .{
                 .kernel = .{
@@ -521,11 +509,7 @@ pub const init = struct {
             .id = getId(),
             .state = .ready,
             .stack = try .createStack(current_task),
-            .interrupt_disable_count = 1, // idle tasks start with interrupts disabled
-            .preemption_disable_count = 0,
-            .preemption_skipped = false,
             .spinlocks_held = 1, // idle tasks start with the scheduler locked
-            .next_task_node = .empty,
 
             .context = .{
                 .kernel = .{
