@@ -149,14 +149,14 @@ pub fn prepareNewTaskForScheduling(
         };
     };
 
-    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(&kernel.scheduler.newTaskEntry)));
+    try task.stack.push(@intFromPtr(&kernel.scheduler.newTaskEntry));
 
     try task.stack.push(arg2);
     try task.stack.push(arg1);
-    try task.stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)));
-    try task.stack.push(core.VirtualAddress.fromPtr(task));
+    try task.stack.push(@intFromPtr(target_function));
+    try task.stack.push(@intFromPtr(task));
 
-    try task.stack.push(core.VirtualAddress.fromPtr(impls.startNewTaskStage1));
+    try task.stack.push(@intFromPtr(impls.startNewTaskStage1));
 
     // general purpose registers
     for (0..6) |_| try task.stack.push(0);
@@ -214,7 +214,7 @@ pub fn callOneArgs(
 
     var stack = new_stack;
 
-    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)).value);
+    try stack.push(@intFromPtr(target_function));
     try stack.push(arg1);
 
     if (opt_old_task) |old_task| {
@@ -282,7 +282,7 @@ pub fn callTwoArgs(
 
     var stack = new_stack;
 
-    try stack.push(core.VirtualAddress.fromPtr(@ptrCast(target_function)).value);
+    try stack.push(@intFromPtr(target_function));
     try stack.push(arg2);
     try stack.push(arg1);
 
