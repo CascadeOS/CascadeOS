@@ -64,11 +64,11 @@ pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *co
 }
 
 const globals = struct {
-    /// Initialized during `global_init.initializeCache`.
+    /// Initialized during `init.initializeCache`.
     var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
 };
 
-pub const global_init = struct {
+pub const init = struct {
     pub fn initializeCache() !void {
         globals.anonymous_page_cache.init(.{
             .name = try .fromSlice("anonymous page"),

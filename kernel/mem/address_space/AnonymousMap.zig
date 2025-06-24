@@ -254,11 +254,11 @@ pub inline fn format(
 }
 
 const globals = struct {
-    /// Initialized during `global_init.initializeCache`.
+    /// Initialized during `init.initializeCache`.
     var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
 };
 
-pub const global_init = struct {
+pub const init = struct {
     pub fn initializeCache() !void {
         globals.anonymous_map_cache.init(.{
             .name = try .fromSlice("anonymous map"),

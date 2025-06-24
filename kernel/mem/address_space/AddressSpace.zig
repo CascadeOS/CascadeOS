@@ -421,9 +421,9 @@ pub const Name = std.BoundedArray(u8, kernel.config.address_space_name_length);
 
 pub const global_init = struct {
     pub fn initializeCaches() !void {
-        try AnonymousMap.global_init.initializeCache();
-        try AnonymousPage.global_init.initializeCache();
-        try Entry.global_init.initializeCache();
+        try AnonymousMap.init.initializeCache();
+        try AnonymousPage.init.initializeCache();
+        try Entry.init.initializeCache();
     }
 };
 

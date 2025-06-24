@@ -320,11 +320,11 @@ pub inline fn format(
 }
 
 const globals = struct {
-    /// Initialized during `global_init.initializeCache`.
+    /// Initialized during `init.initializeCache`.
     var entry_cache: Cache(Entry, null, null) = undefined;
 };
 
-pub const global_init = struct {
+pub const init = struct {
     pub fn initializeCache() !void {
         if (!kernel.mem.cache.isSmallObject(@sizeOf(Entry), .of(Entry))) {
             @panic("`Entry` is a large cache object");
