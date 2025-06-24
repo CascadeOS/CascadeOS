@@ -186,22 +186,28 @@ fn heapPageArenaImport(
 
     log.verbose("mapping {} into heap", .{allocation});
 
-    globals.heap_page_table_mutex.lock(current_task);
-    defer globals.heap_page_table_mutex.unlock(current_task);
+    const virtual_range: core.VirtualRange = .{
+        .address = .fromInt(allocation.base),
+        .size = .from(allocation.len, .byte),
+    };
 
-    kernel.mem.mapRangeAndBackWithPhysicalFrames(
-        current_task,
-        kernel.mem.globals.core_page_table,
-        .{
-            .address = .fromInt(allocation.base),
-            .size = .from(allocation.len, .byte),
-        },
-        .{ .context = .kernel, .protection = .read_write },
-        .kernel,
-        true,
-        kernel.mem.phys.allocator,
-    ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
+    {
+        globals.heap_page_table_mutex.lock(current_task);
+        defer globals.heap_page_table_mutex.unlock(current_task);
+
+        kernel.mem.mapRangeAndBackWithPhysicalFrames(
+            current_task,
+            kernel.mem.globals.core_page_table,
+            virtual_range,
+            .{ .context = .kernel, .protection = .read_write },
+            .kernel,
+            true,
+            kernel.mem.phys.allocator,
+        ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
+    }
     errdefer comptime unreachable;
+
+    if (builtin.mode == .Debug) @memset(virtual_range.toByteSlice(), undefined);
 
     return allocation;
 }
@@ -352,4 +358,5 @@ const HeapArena = resource_arena.Arena(.{ .heap = heap_arena_quantum_caches });
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const builtin = @import("builtin");
 const log = kernel.debug.log.scoped(.heap);
