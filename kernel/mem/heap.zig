@@ -12,10 +12,14 @@ pub fn allocate(len: usize, current_task: *kernel.Task) !core.VirtualRange {
         .instant_fit,
     );
 
-    return .{
+    const virtual_range: core.VirtualRange = .{
         .address = .fromInt(allocation.base),
         .size = .from(allocation.len, .byte),
     };
+
+    if (builtin.mode == .Debug) @memset(virtual_range.toByteSlice(), undefined);
+
+    return virtual_range;
 }
 
 pub fn deallocate(range: core.VirtualRange, current_task: *kernel.Task) void {
