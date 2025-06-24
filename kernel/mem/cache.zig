@@ -439,7 +439,12 @@ pub const RawCache = struct {
                 } else slab_base_ptr: {
                     const frame = kernel.mem.phys.allocator.allocate() catch
                         return AllocateError.SlabAllocationFailed;
-                    break :slab_base_ptr kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
+
+                    const slab_base_ptr = kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
+
+                    if (builtin.mode == .Debug) @memset(slab_base_ptr[0..kernel.arch.paging.standard_page_size.value], undefined);
+
+                    break :slab_base_ptr slab_base_ptr;
                 };
                 errdefer if (raw_cache.allocate_slabs_from_heap)
                     kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
@@ -489,6 +494,14 @@ pub const RawCache = struct {
                 slab.* = .{
                     .large_object_allocation = large_object_allocation,
                 };
+
+                if (builtin.mode == .Debug) {
+                    const virtual_range: core.VirtualRange = .{
+                        .address = .fromInt(slab.large_object_allocation.base),
+                        .size = .from(slab.large_object_allocation.len, .byte),
+                    };
+                    @memset(virtual_range.toByteSlice(), undefined);
+                }
 
                 errdefer {
                     while (slab.objects.popFirst()) |object_node| {
@@ -725,6 +738,7 @@ pub const init = struct {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
+const builtin = @import("builtin");
 const SinglyLinkedList = std.SinglyLinkedList;
 const DoublyLinkedList = std.DoublyLinkedList;
 const log = kernel.debug.log.scoped(.cache);
