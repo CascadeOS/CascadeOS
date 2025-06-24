@@ -414,13 +414,11 @@ fn getId() Id {
 
 pub const globals = struct {
     /// The source of task IDs.
-    ///
-    /// TODO: The system will panic if this counter overflows.
     var id_counter: std.atomic.Value(usize) = .init(0);
 
     /// The source of task objects.
     ///
-    /// Initialized during `init.initializeMemorySystem`.
+    /// Initialized during `init.initializeTaskStacksAndCache`.
     var cache: kernel.mem.cache.Cache(Task, cacheConstructor, cacheDestructor) = undefined;
 
     var stack_arena: kernel.mem.ResourceArena = undefined;
