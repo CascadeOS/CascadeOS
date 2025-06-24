@@ -206,12 +206,6 @@ pub const RawCache = struct {
         raw_cache: *RawCache,
         options: InitOptions,
     ) void {
-        log.debug("{s}: init with size {} and alignment {}", .{
-            options.name.constSlice(),
-            core.Size.from(options.size, .byte),
-            options.alignment.toByteUnits(),
-        });
-
         const is_small = isSmallObject(options.size, options.alignment);
 
         if (!options.allocate_slabs_from_heap and !is_small) {
@@ -244,6 +238,32 @@ pub const RawCache = struct {
 
             break :blk candidate_large_objects_per_slab;
         };
+
+        if (is_small) {
+            log.debug(
+                "{s}: init small object cache with effective size {} (requested size {} alignment {}) objects per slab {} ({})",
+                .{
+                    options.name.constSlice(),
+                    core.Size.from(effective_object_size, .byte),
+                    core.Size.from(options.size, .byte),
+                    options.alignment.toByteUnits(),
+                    objects_per_slab,
+                    kernel.arch.paging.standard_page_size,
+                },
+            );
+        } else {
+            log.debug(
+                "{s}: init large object cache with effective size {} (requested size {} alignment {}) objects per slab {} ({})",
+                .{
+                    options.name.constSlice(),
+                    core.Size.from(effective_object_size, .byte),
+                    core.Size.from(options.size, .byte),
+                    options.alignment.toByteUnits(),
+                    objects_per_slab,
+                    core.Size.from(effective_object_size * objects_per_slab, .byte),
+                },
+            );
+        }
 
         raw_cache.* = .{
             ._name = options.name,
