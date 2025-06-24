@@ -34,7 +34,7 @@ pub fn mapSinglePage(
     std.debug.assert(map_type.protection != .none);
     std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
 
-    try kernel.arch.paging.map(
+    try kernel.arch.paging.mapSinglePage(
         page_table,
         virtual_address,
         physical_frame,
@@ -92,7 +92,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             physical_frame_allocator.deallocate(deallocate_frame_list);
         }
 
-        try kernel.arch.paging.map(
+        try kernel.arch.paging.mapSinglePage(
             page_table,
             current_virtual_address,
             physical_frame,
@@ -153,7 +153,7 @@ pub fn mapRangeToPhysicalRange(
     var current_physical_address = physical_range.address;
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        try kernel.arch.paging.map(
+        try kernel.arch.paging.mapSinglePage(
             page_table,
             current_virtual_address,
             .fromAddress(current_physical_address),
@@ -227,7 +227,7 @@ pub fn unmapRange(
     var current_virtual_address = virtual_range.address;
 
     while (current_virtual_address.lessThan(last_virtual_address)) {
-        kernel.arch.paging.unmap(
+        kernel.arch.paging.unmapSinglePage(
             page_table,
             current_virtual_address,
             free_backing_pages,

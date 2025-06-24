@@ -21,7 +21,7 @@ pub fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
 /// This function:
 ///  - only supports the standard page size for the architecture
 ///  - does not flush the TLB
-pub fn map(
+pub fn mapSinglePage(
     page_table: *PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: kernel.mem.phys.Frame,
@@ -62,7 +62,7 @@ pub fn map(
 /// This function:
 ///  - only supports the standard page size for the architecture
 ///  - does not flush the TLB
-pub fn unmap(
+pub fn unmapSinglePage(
     page_table: *PageTable,
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,

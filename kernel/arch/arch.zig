@@ -222,7 +222,7 @@ pub const paging = struct {
     /// This function:
     ///  - only supports the standard page size for the architecture
     ///  - does not flush the TLB
-    pub fn map(
+    pub fn mapSinglePage(
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
         physical_frame: kernel.mem.phys.Frame,
@@ -230,7 +230,7 @@ pub const paging = struct {
         keep_top_level: bool,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
-        checkSupport(current.paging, "map", fn (
+        checkSupport(current.paging, "mapSinglePage", fn (
             *paging.PageTable.ArchPageTable,
             core.VirtualAddress,
             kernel.mem.phys.Frame,
@@ -239,7 +239,7 @@ pub const paging = struct {
             kernel.mem.phys.FrameAllocator,
         ) kernel.mem.MapError!void);
 
-        return current.paging.map(
+        return current.paging.mapSinglePage(
             page_table.arch,
             virtual_address,
             physical_frame,
@@ -257,7 +257,7 @@ pub const paging = struct {
     /// This function:
     ///  - only supports the standard page size for the architecture
     ///  - does not flush the TLB
-    pub fn unmap(
+    pub fn unmapSinglePage(
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
         free_backing_pages: bool,
@@ -266,7 +266,7 @@ pub const paging = struct {
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(
             current.paging,
-            "unmap",
+            "unmapSinglePage",
             fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualAddress,
@@ -276,7 +276,7 @@ pub const paging = struct {
             ) void,
         );
 
-        current.paging.unmap(
+        current.paging.unmapSinglePage(
             page_table.arch,
             virtual_address,
             free_backing_pages,
