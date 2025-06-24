@@ -8,7 +8,7 @@ pub const AddressSpace = @import("address_space/AddressSpace.zig");
 pub const cache = @import("cache.zig");
 pub const MapType = @import("MapType.zig");
 pub const FlushRequest = @import("FlushRequest.zig");
-pub const ResourceArena = @import("ResourceArena.zig");
+pub const resource_arena = @import("resource_arena.zig");
 pub const Page = @import("Page.zig");
 
 pub const MapError = error{
@@ -456,7 +456,7 @@ pub const init = struct {
         phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, result.pages_range);
 
         init_log.debug("initializing caches", .{});
-        try ResourceArena.global_init.initializeCache();
+        try resource_arena.global_init.initializeCache();
         try cache.init.initializeCaches();
         try AddressSpace.global_init.initializeCaches();
 

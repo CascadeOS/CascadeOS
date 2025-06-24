@@ -267,7 +267,7 @@ const globals = struct {
     var idt: Idt = .{};
     const raw_interrupt_handlers = init.makeRawHandlers();
     var handlers: [Idt.number_of_handlers]Handler = @splat(.{ .interrupt_handler = interrupt_handlers.unhandledInterrupt });
-    var interrupt_arena: kernel.mem.ResourceArena = undefined; // initialized by `init.initializeInterrupts`
+    var interrupt_arena: kernel.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
 };
 
 pub const init = struct {
@@ -296,7 +296,6 @@ pub const init = struct {
             .{
                 .name = try .fromSlice("interrupts"),
                 .quantum = 1,
-                .quantum_caching = .no,
             },
         );
 

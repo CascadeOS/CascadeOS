@@ -421,7 +421,7 @@ pub const globals = struct {
     /// Initialized during `init.initializeTaskStacksAndCache`.
     var cache: kernel.mem.cache.Cache(Task, cacheConstructor, cacheDestructor) = undefined;
 
-    var stack_arena: kernel.mem.ResourceArena = undefined;
+    var stack_arena: kernel.mem.resource_arena.Arena(.none) = undefined;
     var stack_page_table_mutex: kernel.sync.Mutex = .{};
 };
 
@@ -433,7 +433,6 @@ pub const init = struct {
             .{
                 .name = try .fromSlice("stacks"),
                 .quantum = kernel.arch.paging.standard_page_size.value,
-                .quantum_caching = .no,
             },
         );
 

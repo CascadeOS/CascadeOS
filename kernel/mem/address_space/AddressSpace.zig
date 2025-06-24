@@ -19,7 +19,7 @@ const AddressSpace = @This();
 _name: Name,
 
 /// Used as the source of addresses in this address space.
-address_arena: kernel.mem.ResourceArena = undefined,
+address_arena: kernel.mem.resource_arena.Arena(.none) = undefined,
 
 context: kernel.Context,
 
@@ -70,7 +70,7 @@ pub fn init(
         .context = options.context,
     };
 
-    var address_space_name: kernel.mem.ResourceArena.Name = .{};
+    var address_space_name: kernel.mem.resource_arena.Name = .{};
     address_space_name.appendSliceAssumeCapacity(options.name.constSlice());
     address_space_name.appendSliceAssumeCapacity("_address_arena");
 
@@ -78,7 +78,6 @@ pub fn init(
         .{
             .name = address_space_name,
             .quantum = kernel.arch.paging.standard_page_size.value,
-            .quantum_caching = .no,
         },
     );
     errdefer address_space.address_arena.deinit(current_task);

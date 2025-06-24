@@ -102,7 +102,7 @@ pub fn deallocateSpecial(
 }
 
 const allocator_impl = struct {
-    const Allocation = kernel.mem.ResourceArena.Allocation;
+    const Allocation = kernel.mem.resource_arena.Allocation;
     fn alloc(
         _: *anyopaque,
         len: usize,
@@ -170,11 +170,13 @@ const allocator_impl = struct {
 };
 
 fn heapPageArenaImport(
-    arena: *ResourceArena,
+    arena_ptr: *anyopaque,
     current_task: *kernel.Task,
     len: usize,
-    policy: ResourceArena.Policy,
-) ResourceArena.AllocateError!ResourceArena.Allocation {
+    policy: resource_arena.Policy,
+) resource_arena.AllocateError!resource_arena.Allocation {
+    const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
+
     const allocation = try arena.allocate(
         current_task,
         len,
@@ -198,17 +200,19 @@ fn heapPageArenaImport(
         .kernel,
         true,
         kernel.mem.phys.allocator,
-    ) catch return ResourceArena.AllocateError.RequestedLengthUnavailable;
+    ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
     errdefer comptime unreachable;
 
     return allocation;
 }
 
 fn heapPageArenaRelease(
-    arena: *ResourceArena,
+    arena_ptr: *anyopaque,
     current_task: *kernel.Task,
-    allocation: ResourceArena.Allocation,
+    allocation: resource_arena.Allocation,
 ) void {
+    const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
+
     log.verbose("unmapping {} from heap", .{allocation});
 
     {
@@ -244,21 +248,21 @@ pub const globals = struct {
     /// Has no source arena, provided with a single span representing the entire heap.
     ///
     /// Initialized during `init.initializeHeaps`.
-    var heap_address_space_arena: ResourceArena = undefined;
+    var heap_address_space_arena: Arena = undefined;
 
     /// The heap page arena, has a quantum of the standard page size.
     ///
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
     /// Initialized during `init.initializeHeaps`.
-    pub var heap_page_arena: ResourceArena = undefined;
+    pub var heap_page_arena: Arena = undefined;
 
     /// The heap arena.
     ///
     /// Has a source arena of `heap_page_arena`.
     ///
     /// Initialized during `init.initializeHeaps`.
-    var heap_arena: ResourceArena = undefined;
+    var heap_arena: HeapArena = undefined;
 
     var heap_page_table_mutex: kernel.sync.Mutex = .{};
 
@@ -267,7 +271,7 @@ pub const globals = struct {
     /// Has no source arena, provided with a single span representing the entire range.
     ///
     /// Initialized during `init.initializeHeaps`.
-    var special_heap_address_space_arena: kernel.mem.ResourceArena = undefined;
+    var special_heap_address_space_arena: kernel.mem.resource_arena.Arena(.none) = undefined;
 
     var special_heap_page_table_mutex: kernel.sync.Mutex = .{};
 };
@@ -284,7 +288,6 @@ pub const init = struct {
                 .{
                     .name = try .fromSlice("heap_address_space"),
                     .quantum = kernel.arch.paging.standard_page_size.value,
-                    .quantum_caching = .no,
                 },
             );
 
@@ -292,12 +295,10 @@ pub const init = struct {
                 .{
                     .name = try .fromSlice("heap_page"),
                     .quantum = kernel.arch.paging.standard_page_size.value,
-                    .source = .{
-                        .arena = &globals.heap_address_space_arena,
-                        .import = heapPageArenaImport,
-                        .release = heapPageArenaRelease,
-                    },
-                    .quantum_caching = .no,
+                    .source = globals.heap_address_space_arena.createSource(.{
+                        .custom_import = heapPageArenaImport,
+                        .custom_release = heapPageArenaRelease,
+                    }),
                 },
             );
 
@@ -305,8 +306,7 @@ pub const init = struct {
                 .{
                     .name = try .fromSlice("heap"),
                     .quantum = heap_arena_quantum,
-                    .source = .{ .arena = &globals.heap_page_arena },
-                    .quantum_caching = .{ .heap = heap_arena_quantum_caches },
+                    .source = globals.heap_page_arena.createSource(.{}),
                 },
             );
 
@@ -328,7 +328,6 @@ pub const init = struct {
                 .{
                     .name = try .fromSlice("special_heap_address_space"),
                     .quantum = kernel.arch.paging.standard_page_size.value,
-                    .quantum_caching = .no,
                 },
             );
 
@@ -346,8 +345,11 @@ pub const init = struct {
     }
 };
 
+const resource_arena = kernel.mem.resource_arena;
+const Arena = resource_arena.Arena(.none);
+const HeapArena = resource_arena.Arena(.{ .heap = heap_arena_quantum_caches });
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.heap);
-const ResourceArena = kernel.mem.ResourceArena;

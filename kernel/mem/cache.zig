@@ -677,7 +677,7 @@ pub const RawCache = struct {
         /// The allocation containing this slabs objects.
         ///
         /// Only set for large object slabs.
-        large_object_allocation: kernel.mem.ResourceArena.Allocation,
+        large_object_allocation: kernel.mem.resource_arena.Allocation,
 
         fn constructor(slab: *Slab) void {
             slab.* = .{};
