@@ -91,11 +91,13 @@ pub fn deallocateSpecial(
         defer globals.special_heap_page_table_mutex.unlock(current_task);
 
         kernel.mem.unmapRange(
+            current_task,
             kernel.mem.globals.core_page_table,
             virtual_range,
-            false,
             .kernel,
-            true,
+            .nop,
+            .nop,
+            kernel.mem.phys.allocator,
         );
     }
 
