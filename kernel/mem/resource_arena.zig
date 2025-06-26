@@ -242,7 +242,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 arena.pushUnusedTag(free_tag);
             }
 
-            try arena.addSpanInner(span_tag, free_tag, true);
+            try arena.addSpanInner(span_tag, free_tag, .add);
         }
 
         fn getTagsForNewSpan(
@@ -287,7 +287,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             arena: *@This(),
             span_tag: *BoundaryTag,
             free_tag: *BoundaryTag,
-            comptime add_free_span_to_freelist: bool,
+            comptime freelist_decision: enum { add, nop },
         ) error{Overlap}!void {
             std.debug.assert(span_tag.kind == .span or span_tag.kind == .imported_span);
             std.debug.assert(free_tag.kind == .free);
@@ -316,8 +316,8 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 &span_tag.all_tag_node,
             );
 
-            // insert the new free tag into the appropriate freelist
-            if (add_free_span_to_freelist) {
+            if (freelist_decision == .add) {
+                // insert the new free tag into the appropriate freelist
                 arena.pushToFreelist(free_tag);
             }
         }
@@ -578,7 +578,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 arena.pushUnusedTag(free_tag);
             }
 
-            try arena.addSpanInner(span_tag, free_tag, false);
+            try arena.addSpanInner(span_tag, free_tag, .nop);
 
             log.verbose("{s}: imported {} from source {s}", .{ arena.name(), allocation, source.name });
 
