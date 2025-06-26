@@ -27,12 +27,12 @@ pub fn Cache(
             /// Should the last available slab be deallocated when it is unused?
             deallocate_last_available_slab: bool = false,
 
-            /// Should slabs be allocated from the heap?
+            /// The source of slabs.
             ///
-            /// This should only be false for caches used as part of `ResourceArena`/`RawCache` implementation.
+            /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
             ///
-            /// Only valid for small object caches.
-            allocate_slabs_from_heap: bool = true,
+            /// `.pmm` is only valid for small object caches.
+            slab_source: RawCache.SlabSource = .heap,
         };
 
         /// Initialize the cache.
@@ -65,7 +65,7 @@ pub fn Cache(
                 else
                     null,
                 .deallocate_last_available_slab = options.deallocate_last_available_slab,
-                .allocate_slabs_from_heap = options.allocate_slabs_from_heap,
+                .slab_source = options.slab_source,
             });
         }
 
@@ -156,12 +156,12 @@ pub const RawCache = struct {
     /// Should the last available slab be deallocated when it is unused?
     deallocate_last_available_slab: bool,
 
-    /// Should slabs be allocated from the heap?
+    /// The source of slabs.
     ///
-    /// This should only be false for caches used as part of `ResourceArena`/`RawCache` implementation.
+    /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
     ///
-    /// `false` is only valid for small object caches.
-    allocate_slabs_from_heap: bool,
+    /// `.pmm` is only valid for small object caches.
+    slab_source: SlabSource = .heap,
 
     constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
     destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
@@ -193,12 +193,17 @@ pub const RawCache = struct {
         /// Should the last available slab be deallocated when it is unused?
         deallocate_last_available_slab: bool = false,
 
-        /// Should slabs be allocated from the heap?
+        /// The source of slabs.
         ///
-        /// This should only be false for caches used as part of `ResourceArena`/`RawCache` implementation.
+        /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
         ///
-        /// `false` is only valid for small object caches.
-        allocate_slabs_from_heap: bool = true,
+        /// `.pmm` is only valid for small object caches.
+        slab_source: SlabSource = .heap,
+    };
+
+    pub const SlabSource = enum {
+        heap,
+        pmm,
     };
 
     /// Initialize the cache.
@@ -208,8 +213,8 @@ pub const RawCache = struct {
     ) void {
         const is_small = isSmallObject(options.size, options.alignment);
 
-        if (!options.allocate_slabs_from_heap and !is_small) {
-            @panic("only small object caches can have `allocate_slabs_from_heap` set to false");
+        if (!is_small and options.slab_source == .pmm) {
+            @panic("only small object caches can have `slab_source` set to `.pmm`");
         }
 
         const effective_object_size = if (is_small)
@@ -277,7 +282,7 @@ pub const RawCache = struct {
             .full_slabs = .{},
             .objects_per_slab = objects_per_slab,
             .deallocate_last_available_slab = options.deallocate_last_available_slab,
-            .allocate_slabs_from_heap = options.allocate_slabs_from_heap,
+            .slab_source = options.slab_source,
             .size_class = if (is_small)
                 .small
             else
@@ -428,35 +433,40 @@ pub const RawCache = struct {
 
         const slab = switch (raw_cache.size_class) {
             .small => slab: {
-                const slab_base_ptr: [*]u8 = if (raw_cache.allocate_slabs_from_heap) slab_base_ptr: {
-                    const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
-                        current_task,
-                        kernel.arch.paging.standard_page_size.value,
-                        .instant_fit,
-                    ) catch return AllocateError.SlabAllocationFailed;
-                    std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
-                    break :slab_base_ptr @ptrFromInt(slab_allocation.base);
-                } else slab_base_ptr: {
-                    const frame = kernel.mem.phys.allocator.allocate() catch
-                        return AllocateError.SlabAllocationFailed;
+                const slab_base_ptr: [*]u8 = switch (raw_cache.slab_source) {
+                    .heap => slab_base_ptr: {
+                        const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
+                            current_task,
+                            kernel.arch.paging.standard_page_size.value,
+                            .instant_fit,
+                        ) catch return AllocateError.SlabAllocationFailed;
+                        std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
+                        break :slab_base_ptr @ptrFromInt(slab_allocation.base);
+                    },
+                    .pmm => slab_base_ptr: {
+                        const frame = kernel.mem.phys.allocator.allocate() catch
+                            return AllocateError.SlabAllocationFailed;
 
-                    const slab_base_ptr = kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
+                        const slab_base_ptr = kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
 
-                    if (builtin.mode == .Debug) @memset(slab_base_ptr[0..kernel.arch.paging.standard_page_size.value], undefined);
+                        if (builtin.mode == .Debug) @memset(slab_base_ptr[0..kernel.arch.paging.standard_page_size.value], undefined);
 
-                    break :slab_base_ptr slab_base_ptr;
+                        break :slab_base_ptr slab_base_ptr;
+                    },
                 };
-                errdefer if (raw_cache.allocate_slabs_from_heap)
-                    kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
+
+                errdefer switch (raw_cache.slab_source) {
+                    .heap => kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
                         .base = @intFromPtr(slab_base_ptr),
                         .len = kernel.arch.paging.standard_page_size.value,
-                    })
-                else {
-                    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-                    deallocate_frame_list.push(.fromAddress(
-                        kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
-                    ));
-                    kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                    }),
+                    .pmm => {
+                        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+                        deallocate_frame_list.push(.fromAddress(
+                            kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
+                        ));
+                        kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                    },
                 };
 
                 const slab: *Slab = @alignCast(@ptrCast(
@@ -646,20 +656,21 @@ pub const RawCache = struct {
                     }
                 }
 
-                if (raw_cache.allocate_slabs_from_heap) {
-                    kernel.mem.heap.globals.heap_page_arena.deallocate(
+                switch (raw_cache.slab_source) {
+                    .heap => kernel.mem.heap.globals.heap_page_arena.deallocate(
                         current_task,
                         .{
                             .base = @intFromPtr(slab_base_ptr),
                             .len = kernel.arch.paging.standard_page_size.value,
                         },
-                    );
-                } else {
-                    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-                    deallocate_frame_list.push(.fromAddress(
-                        kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
-                    ));
-                    kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                    ),
+                    .pmm => {
+                        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+                        deallocate_frame_list.push(.fromAddress(
+                            kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
+                        ));
+                        kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                    },
                 }
 
                 return;
@@ -725,12 +736,12 @@ pub const init = struct {
     pub fn initializeCaches() !void {
         globals.slab_cache.init(.{
             .name = try .fromSlice("slab"),
-            .allocate_slabs_from_heap = false,
+            .slab_source = .pmm,
         });
 
         globals.large_object_cache.init(.{
             .name = try .fromSlice("large object"),
-            .allocate_slabs_from_heap = false,
+            .slab_source = .pmm,
         });
     }
 };

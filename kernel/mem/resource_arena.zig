@@ -1355,7 +1355,7 @@ pub const global_init = struct {
     pub fn initializeCache() !void {
         globals.tag_cache.init(.{
             .name = try .fromSlice("boundary tag"),
-            .allocate_slabs_from_heap = false,
+            .slab_source = .pmm,
         });
     }
 };
