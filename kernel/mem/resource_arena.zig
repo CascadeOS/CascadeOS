@@ -210,7 +210,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     temp_tag_buffer.appendAssumeCapacity(node.toTag());
                 }
 
-                globals.tag_cache.freeMany(current_task, capacity, temp_tag_buffer.constSlice());
+                globals.tag_cache.deallocateMany(current_task, capacity, temp_tag_buffer.constSlice());
             }
 
             if (any_allocations) {
@@ -632,7 +632,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     const buffer_ptr: [*]u8 = @ptrFromInt(allocation.base);
                     const buffer = buffer_ptr[0..allocation.len];
 
-                    cache.free(current_task, buffer);
+                    cache.deallocate(current_task, buffer);
 
                     return;
                 }

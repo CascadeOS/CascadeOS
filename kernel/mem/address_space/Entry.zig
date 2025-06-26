@@ -46,7 +46,7 @@ pub fn create(current_task: *kernel.Task) !*Entry {
 }
 
 pub fn destroy(entry: *Entry, current_task: *kernel.Task) void {
-    globals.entry_cache.free(current_task, entry);
+    globals.entry_cache.deallocate(current_task, entry);
 }
 
 pub fn range(entry: *const Entry) core.VirtualRange {
