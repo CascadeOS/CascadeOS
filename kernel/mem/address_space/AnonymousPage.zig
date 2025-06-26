@@ -57,7 +57,7 @@ pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *co
 
         anonymous_page.lock.unlock(current_task);
 
-        globals.anonymous_page_cache.free(current_task, anonymous_page);
+        globals.anonymous_page_cache.deallocate(current_task, anonymous_page);
     } else {
         anonymous_page.lock.unlock(current_task);
     }

@@ -71,7 +71,7 @@ pub fn Cache(
 
         /// Deinitialize the cache.
         ///
-        /// All objects must have been freed before calling this.
+        /// All objects must have been deallocated before calling this.
         pub fn deinit(cache: *CacheT, current_task: *kernel.Task) void {
             cache.raw_cache.deinit(current_task);
             cache.* = undefined;
@@ -108,15 +108,15 @@ pub fn Cache(
             }
         }
 
-        /// Free an object back to the cache.
-        pub fn free(cache: *CacheT, current_task: *kernel.Task, object: *T) void {
-            cache.raw_cache.free(current_task, std.mem.asBytes(object));
+        /// Deallocate an object back to the cache.
+        pub fn deallocate(cache: *CacheT, current_task: *kernel.Task, object: *T) void {
+            cache.raw_cache.deallocate(current_task, std.mem.asBytes(object));
         }
 
-        /// Free multiple objects back to the cache.
+        /// Deallocate multiple objects back to the cache.
         ///
         /// The length of `objects` must be less than or equal to `max_count`.
-        pub fn freeMany(
+        pub fn deallocateMany(
             cache: *CacheT,
             current_task: *kernel.Task,
             comptime max_count: usize, // TODO: is there a better way than this?
@@ -132,7 +132,7 @@ pub fn Cache(
                 raw_object.* = std.mem.asBytes(object);
             }
 
-            cache.raw_cache.freeMany(current_task, raw_objects);
+            cache.raw_cache.deallocateMany(current_task, raw_objects);
         }
     };
 }
@@ -296,7 +296,7 @@ pub const RawCache = struct {
 
     /// Deinitialize the cache.
     ///
-    /// All objects must have been freed before calling this.
+    /// All objects must have been deallocated before calling this.
     pub fn deinit(raw_cache: *RawCache, current_task: *kernel.Task) void {
         log.debug("{s}: deinit", .{raw_cache.name()});
 
@@ -348,7 +348,7 @@ pub const RawCache = struct {
         log.verbose("{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
 
         var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
-        errdefer raw_cache.freeMany(current_task, allocated_objects.items);
+        errdefer raw_cache.deallocateMany(current_task, allocated_objects.items);
 
         raw_cache.lock.lock(current_task);
 
@@ -521,17 +521,17 @@ pub const RawCache = struct {
                             destructor(large_object.object, current_task);
                         }
 
-                        globals.large_object_cache.free(current_task, large_object);
+                        globals.large_object_cache.deallocate(current_task, large_object);
                     }
 
-                    globals.slab_cache.free(current_task, slab);
+                    globals.slab_cache.deallocate(current_task, slab);
                 }
 
                 const objects_base: [*]u8 = @ptrFromInt(large_object_allocation.base);
 
                 for (0..raw_cache.objects_per_slab) |i| {
                     const large_object = try globals.large_object_cache.allocate(current_task);
-                    errdefer globals.large_object_cache.free(current_task, large_object);
+                    errdefer globals.large_object_cache.deallocate(current_task, large_object);
 
                     const object: []u8 = (objects_base + (i * raw_cache.effective_object_size))[0..raw_cache.object_size];
 
@@ -559,16 +559,16 @@ pub const RawCache = struct {
         return slab;
     }
 
-    /// Free an object back to the cache.
-    pub fn free(raw_cache: *RawCache, current_task: *kernel.Task, object: []u8) void {
-        raw_cache.freeMany(current_task, &.{object});
+    /// Deallocate an object back to the cache.
+    pub fn deallocate(raw_cache: *RawCache, current_task: *kernel.Task, object: []u8) void {
+        raw_cache.deallocateMany(current_task, &.{object});
     }
 
-    /// Free many objects back to the cache.
-    pub fn freeMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
+    /// Deallocate many objects back to the cache.
+    pub fn deallocateMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
         std.debug.assert(objects.len > 0);
 
-        log.verbose("{s}: freeing {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose("{s}: deallocating {} objects", .{ raw_cache.name(), objects.len });
 
         raw_cache.lock.lock(current_task);
         defer raw_cache.lock.unlock(current_task);
@@ -683,12 +683,12 @@ pub const RawCache = struct {
                         destructor(large_object.object, current_task);
                     }
 
-                    globals.large_object_cache.free(current_task, large_object);
+                    globals.large_object_cache.deallocate(current_task, large_object);
                 }
 
                 kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, slab.large_object_allocation);
 
-                globals.slab_cache.free(current_task, slab);
+                globals.slab_cache.deallocate(current_task, slab);
             },
         }
     }

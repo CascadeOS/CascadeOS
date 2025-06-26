@@ -65,7 +65,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *cons
 
         anonymous_map.lock.unlock(current_task);
 
-        globals.anonymous_map_cache.free(current_task, anonymous_map);
+        globals.anonymous_map_cache.deallocate(current_task, anonymous_map);
     } else {
         anonymous_map.lock.unlock(current_task);
     }

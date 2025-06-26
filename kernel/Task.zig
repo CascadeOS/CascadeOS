@@ -97,7 +97,7 @@ pub const CreateOptions = struct {
 /// Not to be used for creating idle, bootstrap, or init tasks.
 pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
     const task = try globals.cache.allocate(current_task);
-    errdefer globals.cache.free(current_task, task);
+    errdefer globals.cache.deallocate(current_task, task);
 
     const preconstructed_stack = task.stack;
 
@@ -139,7 +139,7 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
 /// Asserts that the task is in the `dropped` state.
 pub fn destroy(current_task: *kernel.Task, task: *Task) void {
     std.debug.assert(task.state == .dropped);
-    globals.cache.free(current_task, task);
+    globals.cache.deallocate(current_task, task);
 }
 
 pub fn incrementInterruptDisable(task: *Task) void {
