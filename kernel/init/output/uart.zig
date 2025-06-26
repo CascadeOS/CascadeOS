@@ -16,10 +16,10 @@ pub const Uart = union(enum) {
     }
 };
 
-pub const IoPort16550 = Uart16X50(.io_port, true);
-pub const Memory16550 = Uart16X50(.memory, true);
-pub const IoPort16450 = Uart16X50(.io_port, false);
-pub const Memory16450 = Uart16X50(.memory, false);
+pub const IoPort16550 = Uart16X50(.io_port, .enabled);
+pub const Memory16550 = Uart16X50(.memory, .enabled);
+pub const IoPort16450 = Uart16X50(.io_port, .disabled);
+pub const Memory16450 = Uart16X50(.memory, .disabled);
 
 /// A basic write only 16550/16450 UART.
 ///
@@ -29,7 +29,7 @@ pub const Memory16450 = Uart16X50(.memory, false);
 ///
 /// [UART 16550](https://caro.su/msx/ocm_de1/16550.pdf)
 /// [PC16550D Universal Asynchronous Receiver/Transmitter with FIFOs](https://media.digikey.com/pdf/Data%20Sheets/Texas%20Instruments%20PDFs/PC16550D.pdf)
-fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type {
+fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum { disabled, enabled }) type {
     return struct {
         write_register: AddressT,
         line_status_register: AddressT,
@@ -112,7 +112,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
                 }),
             );
 
-            if (fifo) {
+            if (fifo_mode == .enabled) {
                 // enable FIFO
                 writeRegister(
                     base + @intFromEnum(RegisterOffset.fifo_control),
@@ -163,7 +163,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo: bool) type 
         }
 
         fn writeSlice(uart: UartT, str: []const u8) void {
-            if (fifo) {
+            if (fifo_mode == .enabled) {
                 var i: usize = 0;
 
                 var last_byte_carridge_return = false;
