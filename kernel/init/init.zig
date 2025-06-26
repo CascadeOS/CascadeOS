@@ -10,6 +10,10 @@ pub fn initStage1() !noreturn {
     // we need the direct map to be available as early as possible
     kernel.mem.init.earlyDetermineOffsets();
 
+    // TODO: initialize the bootstrap frame allocator here then ensure all physical memory regions are mapped in the
+    //       bootloader provided memory map, this would allow us to switch to latter limine revisions and also
+    //       allow us to support unusual systems with MMIO above 4GiB
+
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     kernel.acpi.init.initializeACPITables();
 
