@@ -184,8 +184,8 @@ fn resolveLibrary(
                     .architecture = architecture,
                     .context = .cascade,
                 },
+                .dependency,
                 dependencies,
-                false,
             );
             try cascade_modules.putNoClobber(b.allocator, architecture, cascade_module);
         }
@@ -201,8 +201,8 @@ fn resolveLibrary(
                     .architecture = architecture,
                     .context = .non_cascade,
                 },
+                .exe_root,
                 dependencies,
-                true,
             );
             const check_test_exe = b.addTest(.{
                 .name = try std.mem.concat(b.allocator, u8, &.{ library_description.name, "_check" }),
@@ -221,8 +221,8 @@ fn resolveLibrary(
                     .architecture = architecture,
                     .context = .non_cascade,
                 },
+                .dependency,
                 dependencies,
-                false,
             );
             try non_cascade_modules.putNoClobber(b.allocator, architecture, host_module);
 
@@ -239,8 +239,8 @@ fn resolveLibrary(
                     .architecture = architecture,
                     .context = .non_cascade,
                 },
+                .exe_root,
                 dependencies,
-                true,
             );
             host_test_module.optimize = options.optimize;
 
@@ -320,14 +320,14 @@ fn createModule(
     lazy_path: std.Build.LazyPath,
     options: Options,
     cascade_target: CascadeTarget,
+    purpose: enum { exe_root, dependency },
     dependencies: []const Dependency,
-    is_exe_root_module: bool,
 ) !*std.Build.Module {
     const module = b.createModule(.{
         .root_source_file = lazy_path,
     });
 
-    if (is_exe_root_module) {
+    if (purpose == .exe_root) {
         module.resolved_target = cascade_target.getCrossTarget(b);
     }
 
