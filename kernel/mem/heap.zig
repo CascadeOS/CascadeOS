@@ -75,7 +75,7 @@ pub fn allocateSpecial(
         physical_range,
         map_type,
         .kernel,
-        true,
+        .nop,
         kernel.mem.phys.allocator,
     );
 
@@ -205,7 +205,7 @@ fn heapPageArenaImport(
             virtual_range,
             .{ .context = .kernel, .protection = .read_write },
             .kernel,
-            true,
+            .nop,
             kernel.mem.phys.allocator,
         ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
     }
@@ -238,7 +238,7 @@ fn heapPageArenaRelease(
             },
             true,
             .kernel,
-            true,
+            .nop,
             kernel.mem.phys.allocator,
         );
     }

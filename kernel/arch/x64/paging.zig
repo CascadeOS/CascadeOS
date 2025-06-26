@@ -26,7 +26,7 @@ pub fn mapSinglePage(
     virtual_address: core.VirtualAddress,
     physical_frame: kernel.mem.phys.Frame,
     map_type: kernel.mem.MapType,
-    keep_top_level: bool,
+    top_level_decision: kernel.mem.UnmapDecision,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) kernel.mem.MapError!void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
@@ -43,8 +43,8 @@ pub fn mapSinglePage(
         unmap4KiB(
             page_table,
             virtual_address,
-            false,
-            keep_top_level,
+            .nop,
+            top_level_decision,
             &deallocate_frame_list,
         );
 
@@ -66,7 +66,7 @@ pub fn unmapSinglePage(
     page_table: *PageTable,
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
-    keep_top_level: bool,
+    top_level_decision: kernel.mem.UnmapDecision,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) callconv(core.inline_in_non_debug) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
@@ -75,7 +75,7 @@ pub fn unmapSinglePage(
         page_table,
         virtual_address,
         free_backing_pages,
-        keep_top_level,
+        top_level_decision,
         deallocate_frame_list,
     );
 }
@@ -178,7 +178,7 @@ fn unmap4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
-    keep_top_level: bool,
+    top_level_decision: kernel.mem.UnmapDecision,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
@@ -193,7 +193,7 @@ fn unmap4KiB(
         error.HugePage => @panic("page table entry is huge"),
     };
 
-    defer if (!keep_top_level and level3_table.isEmpty()) {
+    defer if (top_level_decision == .free and level3_table.isEmpty()) {
         level4_table.entries[level4_index].zero();
         deallocate_frame_list.push(.fromAddress(level4_entry.getAddress4kib()));
     };

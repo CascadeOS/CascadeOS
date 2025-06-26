@@ -11,13 +11,6 @@ pub const FlushRequest = @import("FlushRequest.zig");
 pub const resource_arena = @import("resource_arena.zig");
 pub const Page = @import("Page.zig");
 
-pub const MapError = error{
-    AlreadyMapped,
-
-    /// This is used to surface errors from the underlying paging implementation that are architecture specific.
-    MappingNotValid,
-} || phys.FrameAllocator.AllocateError;
-
 /// Maps a single page to a physical frame.
 ///
 /// **REQUIREMENTS**:
@@ -28,7 +21,7 @@ pub fn mapSinglePage(
     virtual_address: core.VirtualAddress,
     physical_frame: phys.Frame,
     map_type: MapType,
-    keep_top_level: bool,
+    top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
@@ -39,7 +32,7 @@ pub fn mapSinglePage(
         virtual_address,
         physical_frame,
         map_type,
-        keep_top_level,
+        top_level_decision,
         physical_frame_allocator,
     );
 }
@@ -58,7 +51,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     virtual_range: core.VirtualRange,
     map_type: MapType,
     flush_target: kernel.Context,
-    keep_top_level: bool,
+    top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
@@ -79,7 +72,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             },
             true,
             flush_target,
-            keep_top_level,
+            top_level_decision,
             physical_frame_allocator,
         );
     }
@@ -97,7 +90,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             current_virtual_address,
             physical_frame,
             map_type,
-            keep_top_level,
+            top_level_decision,
             physical_frame_allocator,
         );
 
@@ -121,7 +114,7 @@ pub fn mapRangeToPhysicalRange(
     physical_range: core.PhysicalRange,
     map_type: MapType,
     flush_target: kernel.Context,
-    keep_top_level: bool,
+    top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
@@ -145,7 +138,7 @@ pub fn mapRangeToPhysicalRange(
             },
             false,
             flush_target,
-            keep_top_level,
+            top_level_decision,
             physical_frame_allocator,
         );
     }
@@ -158,7 +151,7 @@ pub fn mapRangeToPhysicalRange(
             current_virtual_address,
             .fromAddress(current_physical_address),
             map_type,
-            keep_top_level,
+            top_level_decision,
             physical_frame_allocator,
         );
 
@@ -179,7 +172,7 @@ pub fn unmapSinglePage(
     virtual_address: core.VirtualAddress,
     free_backing_pages: bool,
     flush_target: kernel.Mode,
-    keep_top_level: bool,
+    top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
     std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
@@ -190,7 +183,7 @@ pub fn unmapSinglePage(
         page_table,
         virtual_address,
         free_backing_pages,
-        keep_top_level,
+        top_level_decision,
         &deallocate_frame_list,
     );
 
@@ -215,7 +208,7 @@ pub fn unmapRange(
     virtual_range: core.VirtualRange,
     free_backing_pages: bool,
     flush_target: kernel.Context,
-    keep_top_level: bool,
+    top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
@@ -231,7 +224,7 @@ pub fn unmapRange(
             page_table,
             current_virtual_address,
             free_backing_pages,
-            keep_top_level,
+            top_level_decision,
             &deallocate_frame_list,
         );
         current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
@@ -378,6 +371,18 @@ pub const PageFaultDetails = struct {
             PageFaultDetails.print(details, writer.any(), 0);
     }
 };
+
+pub const UnmapDecision = enum {
+    nop,
+    free,
+};
+
+pub const MapError = error{
+    AlreadyMapped,
+
+    /// This is used to surface errors from the underlying paging implementation that are architecture specific.
+    MappingNotValid,
+} || phys.FrameAllocator.AllocateError;
 
 fn kernelRegionContainingAddress(address: core.VirtualAddress) ?KernelMemoryRegion.Type {
     for (globals.regions.constSlice()) |region| {
@@ -753,7 +758,7 @@ pub const init = struct {
                         region.range,
                         map_type,
                         .kernel,
-                        true,
+                        .keep,
                         phys.init.bootstrap_allocator,
                     ) catch |err| {
                         std.debug.panic("failed to back with frames {}: {s}", .{ region, @errorName(err) });

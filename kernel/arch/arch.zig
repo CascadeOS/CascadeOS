@@ -227,7 +227,7 @@ pub const paging = struct {
         virtual_address: core.VirtualAddress,
         physical_frame: kernel.mem.phys.Frame,
         map_type: kernel.mem.MapType,
-        keep_top_level: bool,
+        top_level_decision: kernel.mem.UnmapDecision,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
         checkSupport(current.paging, "mapSinglePage", fn (
@@ -235,7 +235,7 @@ pub const paging = struct {
             core.VirtualAddress,
             kernel.mem.phys.Frame,
             kernel.mem.MapType,
-            bool,
+            kernel.mem.UnmapDecision,
             kernel.mem.phys.FrameAllocator,
         ) kernel.mem.MapError!void);
 
@@ -244,7 +244,7 @@ pub const paging = struct {
             virtual_address,
             physical_frame,
             map_type,
-            keep_top_level,
+            top_level_decision,
             physical_frame_allocator,
         );
     }
@@ -261,7 +261,7 @@ pub const paging = struct {
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
         free_backing_pages: bool,
-        keep_top_level: bool,
+        top_level_decision: kernel.mem.UnmapDecision,
         deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(
@@ -271,7 +271,7 @@ pub const paging = struct {
                 *paging.PageTable.ArchPageTable,
                 core.VirtualAddress,
                 bool,
-                bool,
+                kernel.mem.UnmapDecision,
                 *kernel.mem.phys.FrameList,
             ) void,
         );
@@ -280,7 +280,7 @@ pub const paging = struct {
             page_table.arch,
             virtual_address,
             free_backing_pages,
-            keep_top_level,
+            top_level_decision,
             deallocate_frame_list,
         );
     }
