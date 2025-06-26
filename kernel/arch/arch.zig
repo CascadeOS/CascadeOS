@@ -260,7 +260,7 @@ pub const paging = struct {
     pub fn unmapSinglePage(
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
-        free_backing_pages: bool,
+        backing_page_decision: kernel.mem.UnmapDecision,
         top_level_decision: kernel.mem.UnmapDecision,
         deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) callconv(core.inline_in_non_debug) void {
@@ -270,7 +270,7 @@ pub const paging = struct {
             fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualAddress,
-                bool,
+                kernel.mem.UnmapDecision,
                 kernel.mem.UnmapDecision,
                 *kernel.mem.phys.FrameList,
             ) void,
@@ -279,7 +279,7 @@ pub const paging = struct {
         current.paging.unmapSinglePage(
             page_table.arch,
             virtual_address,
-            free_backing_pages,
+            backing_page_decision,
             top_level_decision,
             deallocate_frame_list,
         );

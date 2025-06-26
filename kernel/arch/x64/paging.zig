@@ -65,7 +65,7 @@ pub fn mapSinglePage(
 pub fn unmapSinglePage(
     page_table: *PageTable,
     virtual_address: core.VirtualAddress,
-    free_backing_pages: bool,
+    backing_page_decision: kernel.mem.UnmapDecision,
     top_level_decision: kernel.mem.UnmapDecision,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) callconv(core.inline_in_non_debug) void {
@@ -74,7 +74,7 @@ pub fn unmapSinglePage(
     unmap4KiB(
         page_table,
         virtual_address,
-        free_backing_pages,
+        backing_page_decision,
         top_level_decision,
         deallocate_frame_list,
     );
@@ -177,7 +177,7 @@ fn mapTo4KiB(
 fn unmap4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
-    free_backing_pages: bool,
+    backing_page_decision: kernel.mem.UnmapDecision,
     top_level_decision: kernel.mem.UnmapDecision,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
@@ -237,7 +237,7 @@ fn unmap4KiB(
 
     level1_table.entries[level1_index].zero();
 
-    if (free_backing_pages) {
+    if (backing_page_decision == .free) {
         deallocate_frame_list.push(.fromAddress(level1_entry.getAddress4kib()));
     }
 }

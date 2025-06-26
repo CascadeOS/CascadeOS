@@ -341,8 +341,8 @@ pub const Stack = struct {
                 current_task,
                 kernel.mem.globals.core_page_table,
                 stack.usable_range,
-                true,
                 .kernel,
+                .free,
                 .nop,
                 kernel.mem.phys.allocator,
             );

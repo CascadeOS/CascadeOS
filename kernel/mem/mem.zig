@@ -70,8 +70,8 @@ pub fn mapRangeAndBackWithPhysicalFrames(
                 .address = virtual_range.address,
                 .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
             },
-            true,
             flush_target,
+            .free,
             top_level_decision,
             physical_frame_allocator,
         );
@@ -136,8 +136,8 @@ pub fn mapRangeToPhysicalRange(
                 .address = virtual_range.address,
                 .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
             },
-            false,
             flush_target,
+            .nop,
             top_level_decision,
             physical_frame_allocator,
         );
@@ -206,8 +206,8 @@ pub fn unmapRange(
     current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
-    free_backing_pages: bool,
     flush_target: kernel.Context,
+    backing_page_decision: UnmapDecision,
     top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
@@ -223,7 +223,7 @@ pub fn unmapRange(
         kernel.arch.paging.unmapSinglePage(
             page_table,
             current_virtual_address,
-            free_backing_pages,
+            backing_page_decision,
             top_level_decision,
             &deallocate_frame_list,
         );
@@ -758,7 +758,7 @@ pub const init = struct {
                         region.range,
                         map_type,
                         .kernel,
-                        .keep,
+                        .nop,
                         phys.init.bootstrap_allocator,
                     ) catch |err| {
                         std.debug.panic("failed to back with frames {}: {s}", .{ region, @errorName(err) });

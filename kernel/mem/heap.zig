@@ -236,8 +236,8 @@ fn heapPageArenaRelease(
                 .address = .fromInt(allocation.base),
                 .size = .from(allocation.len, .byte),
             },
-            true,
             .kernel,
+            .free,
             .nop,
             kernel.mem.phys.allocator,
         );
