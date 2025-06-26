@@ -63,7 +63,6 @@ fn initPanic(
     };
 
     const executor = kernel.arch.rawGetCurrentExecutor();
-    executor.panicked.store(true, .release);
 
     if (globals.panicking_executor.cmpxchgStrong(
         .none,

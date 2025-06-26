@@ -7,8 +7,6 @@ id: Id,
 
 current_task: *kernel.Task,
 
-panicked: std.atomic.Value(bool) = .init(false),
-
 idle_task: kernel.Task,
 
 arch: kernel.arch.PerExecutor,
