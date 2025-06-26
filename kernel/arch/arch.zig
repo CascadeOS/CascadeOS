@@ -658,8 +658,8 @@ pub const init = struct {
     }
 };
 
-const current = switch (cascade_target) {
-    // x64 is first to help zls, atleast while x64 is the main target.
+const current = switch (cascade_arch) {
+    // x64 is first to help zls, atleast while x64 is the main architecture.
     .x64 => @import("x64/x64.zig"),
     .arm => @import("arm/arm.zig"),
     .riscv => @import("riscv/riscv.zig"),
@@ -674,7 +674,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        @panic(comptime "`" ++ @tagName(cascade_target) ++ "` does not implement `" ++ name ++ "`");
+        @panic(comptime "`" ++ @tagName(cascade_arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));
@@ -720,4 +720,4 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const cascade_target = kernel.config.cascade_target;
+const cascade_arch = kernel.config.cascade_arch;

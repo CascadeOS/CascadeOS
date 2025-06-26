@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, Kernel);
+pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, Kernel);
 
 const Kernel = @This();
 
 b: *std.Build,
 
-target: CascadeTarget,
+architecture: CascadeTarget.Architecture,
 options: Options,
 
 final_kernel_binary_path: std.Build.LazyPath,
@@ -24,23 +24,23 @@ pub fn getKernels(
     libraries: Library.Collection,
     tools: Tool.Collection,
     options: Options,
-    targets: []const CascadeTarget,
+    all_architectures: []const CascadeTarget.Architecture,
 ) !Collection {
     var kernels: Collection = .{};
-    try kernels.ensureTotalCapacity(b.allocator, @intCast(targets.len));
+    try kernels.ensureTotalCapacity(b.allocator, @intCast(all_architectures.len));
 
     const sdf_builder = tools.get("sdf_builder").?;
 
-    for (targets) |target| {
+    for (all_architectures) |architecture| {
         const kernel = try Kernel.create(
             b,
-            target,
+            architecture,
             libraries,
             sdf_builder,
             options,
             step_collection,
         );
-        kernels.putAssumeCapacityNoClobber(target, kernel);
+        kernels.putAssumeCapacityNoClobber(architecture, kernel);
     }
 
     return kernels;
@@ -48,7 +48,7 @@ pub fn getKernels(
 
 fn getDependencies(
     b: *std.Build,
-    target: CascadeTarget,
+    architecture: CascadeTarget.Architecture,
     libraries: Library.Collection,
 ) ![]const Library.Dependency {
     var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
@@ -63,8 +63,8 @@ fn getDependencies(
         try dependencies.append(.{ .import_name = import_name, .library = library });
     }
 
-    // target specific dependencies
-    switch (target) {
+    // architecture specific dependencies
+    switch (architecture) {
         inline else => |tag| {
             const decl_name = comptime @tagName(tag) ++ "_dependencies";
 
@@ -86,20 +86,20 @@ fn getDependencies(
 
 fn create(
     b: *std.Build,
-    target: CascadeTarget,
+    architecture: CascadeTarget.Architecture,
     libraries: Library.Collection,
     sdf_builder: Tool,
     options: Options,
     step_collection: StepCollection,
 ) !Kernel {
-    const dependencies = try getDependencies(b, target, libraries);
+    const dependencies = try getDependencies(b, architecture, libraries);
 
     const source_file_modules = try getSourceFileModules(b, options, dependencies);
 
     {
         const check_kernel_module = try constructKernelModule(
             b,
-            target,
+            architecture,
             dependencies,
             source_file_modules,
             options,
@@ -115,7 +115,7 @@ fn create(
 
     const kernel_module = try constructKernelModule(
         b,
-        target,
+        architecture,
         dependencies,
         source_file_modules,
         options,
@@ -140,7 +140,7 @@ fn create(
         b.pathJoin(&.{
             "kernel",
             "arch",
-            @tagName(target),
+            @tagName(architecture),
             "linker.ld",
         }),
     ));
@@ -171,7 +171,7 @@ fn create(
 
     const install_fat_kernel_with_sdf = b.addInstallFile(
         fat_kernel_with_sdf,
-        b.pathJoin(&.{ @tagName(target), "kernel-dwarf" }),
+        b.pathJoin(&.{ @tagName(architecture), "kernel-dwarf" }),
     );
 
     const stripped_kernel = blk: {
@@ -198,7 +198,7 @@ fn create(
 
     const install_stripped_kernel_with_sdf = b.addInstallFile(
         stripped_kernel_with_sdf,
-        b.pathJoin(&.{ @tagName(target), "kernel" }),
+        b.pathJoin(&.{ @tagName(architecture), "kernel" }),
     );
 
     const install_both_kernel_binaries = try b.allocator.create(Step);
@@ -211,11 +211,11 @@ fn create(
     install_both_kernel_binaries.dependOn(&install_fat_kernel_with_sdf.step);
     install_both_kernel_binaries.dependOn(&install_stripped_kernel_with_sdf.step);
 
-    step_collection.registerKernel(target, install_both_kernel_binaries);
+    step_collection.registerKernel(architecture, install_both_kernel_binaries);
 
     return Kernel{
         .b = b,
-        .target = target,
+        .architecture = architecture,
         .options = options,
 
         .install_kernel_binaries = install_both_kernel_binaries,
@@ -228,7 +228,7 @@ fn create(
 
 fn constructKernelModule(
     b: *std.Build,
-    target: CascadeTarget,
+    architecture: CascadeTarget.Architecture,
     dependencies: []const Library.Dependency,
     source_file_modules: []const SourceFileModule,
     options: Options,
@@ -236,13 +236,16 @@ fn constructKernelModule(
 ) !*std.Build.Module {
     const kernel_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
-        .target = getKernelCrossTarget(target, b),
+        .target = getKernelCrossTarget(architecture, b),
         .optimize = options.optimize,
     });
 
     for (dependencies) |dep| {
-        const library_module = dep.library.cascade_modules.get(target) orelse
-            std.debug.panic("no module available for library '{s}' for target '{s}'", .{ dep.library.name, @tagName(target) });
+        const library_module = dep.library.cascade_modules.get(architecture) orelse
+            std.debug.panic(
+                "no module available for library '{s}' for architecture '{s}'",
+                .{ dep.library.name, @tagName(architecture) },
+            );
 
         kernel_module.addImport(dep.import_name, library_module);
     }
@@ -250,8 +253,11 @@ fn constructKernelModule(
     // self reference
     kernel_module.addImport("kernel", kernel_module);
 
-    // target options
-    kernel_module.addImport("cascade_target", options.target_specific_kernel_options_modules.get(target).?);
+    // architecture options
+    kernel_module.addImport(
+        "cascade_architecture",
+        options.architecture_specific_kernel_options_modules.get(architecture).?,
+    );
 
     // kernel options
     kernel_module.addImport("kernel_options", kernel_option_module);
@@ -320,7 +326,7 @@ fn constructKernelModule(
     kernel_module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
 
     // sbi
-    if (target == .riscv) {
+    if (architecture == .riscv) {
         kernel_module.addImport("sbi", b.dependency("sbi", .{}).module("sbi"));
     }
 
@@ -333,8 +339,8 @@ fn constructKernelModule(
     kernel_module.strip = false;
     kernel_module.omit_frame_pointer = false;
 
-    // apply target-specific configuration to the kernel
-    switch (target) {
+    // apply architecture-specific configuration to the kernel
+    switch (architecture) {
         .arm => {},
         .riscv => {},
         .x64 => {
@@ -348,7 +354,7 @@ fn constructKernelModule(
         const assembly_files_dir_path = b.pathJoin(&.{
             "kernel",
             "arch",
-            @tagName(target),
+            @tagName(architecture),
             "asm",
         });
 
@@ -372,9 +378,9 @@ fn constructKernelModule(
     return kernel_module;
 }
 
-/// Returns a CrossTarget for building the kernel for the given target.
-fn getKernelCrossTarget(cascade_target: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
-    switch (cascade_target) {
+/// Returns a CrossTarget for building the kernel for the given architecture.
+fn getKernelCrossTarget(architecture: CascadeTarget.Architecture, b: *std.Build) std.Build.ResolvedTarget {
+    switch (architecture) {
         .arm => {
             const features = std.Target.aarch64.Feature;
             var target_query = std.Target.Query{

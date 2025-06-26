@@ -8,7 +8,7 @@ pub const libraries: []const LibraryDescription = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
-        .supported_targets = &.{.arm},
+        .supported_architectures = &.{.arm},
     },
     .{
         .name = "bitjuggle",
@@ -44,7 +44,7 @@ pub const libraries: []const LibraryDescription = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
-        .supported_targets = &.{.riscv},
+        .supported_architectures = &.{.riscv},
     },
     .{ .name = "sdf" },
     .{
@@ -59,7 +59,7 @@ pub const libraries: []const LibraryDescription = &.{
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
-        .supported_targets = &.{.x64},
+        .supported_architectures = &.{.x64},
         .need_llvm = true,
     },
 };

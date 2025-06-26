@@ -118,7 +118,7 @@ pub fn rsdp() ?core.Address {
 }
 
 pub fn x2apicEnabled() bool {
-    if (kernel.config.cascade_target != .x64) {
+    if (kernel.config.cascade_arch != .x64) {
         @compileError("x2apicEnabled can only be called on x64");
     }
 

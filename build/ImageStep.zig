@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget, *ImageStep);
+pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *ImageStep);
 
 const ImageStep = @This();
 
@@ -13,14 +13,14 @@ image_file: std.Build.LazyPath,
 
 /// Registers image build steps.
 ///
-/// For each target, creates a `ImageStep` and registers its step with the `StepCollection`.
+/// For each `CascadeTarget.Architecture`, creates a `ImageStep` and registers its step with the `StepCollection`.
 pub fn registerImageSteps(
     b: *std.Build,
     kernels: Kernel.Collection,
     tools: Tool.Collection,
     step_collection: StepCollection,
     options: Options,
-    targets: []const CascadeTarget,
+    all_architectures: []const CascadeTarget.Architecture,
 ) !Collection {
     const image_builder_tool = tools.get("image_builder").?;
     const image_builder_compile_step = image_builder_tool.release_safe_exe;
@@ -28,21 +28,21 @@ pub fn registerImageSteps(
     const limine_dep = b.dependency("limine", .{});
 
     var image_steps: Collection = .{};
-    try image_steps.ensureTotalCapacity(b.allocator, @intCast(targets.len));
+    try image_steps.ensureTotalCapacity(b.allocator, @intCast(all_architectures.len));
 
-    for (targets) |target| {
+    for (all_architectures) |architecture| {
         const image_file_name = try std.fmt.allocPrint(
             b.allocator,
             "cascade_{s}.hdd",
-            .{@tagName(target)},
+            .{@tagName(architecture)},
         );
 
-        const kernel = kernels.get(target).?;
+        const kernel = kernels.get(architecture).?;
 
         const image_description_step = try ImageDescriptionStep.create(
             b,
             kernel,
-            target,
+            architecture,
             limine_dep,
             options.no_kaslr,
         );
@@ -51,7 +51,7 @@ pub fn registerImageSteps(
         image_build_step.addFileArg(image_description_step.image_description_file);
         const raw_image = image_build_step.addOutputFileArg(image_file_name);
 
-        const image = if (target == .x64) image: {
+        const image = if (architecture == .x64) image: {
             const limine_install_tool = tools.get("limine_install").?;
 
             const install_limine = b.addRunArtifact(limine_install_tool.release_safe_exe);
@@ -65,13 +65,13 @@ pub fn registerImageSteps(
 
         const install_image = b.addInstallFile(
             image,
-            b.pathJoin(&.{ @tagName(target), image_file_name }),
+            b.pathJoin(&.{ @tagName(architecture), image_file_name }),
         );
 
         const step_name = try std.fmt.allocPrint(
             b.allocator,
             "build {s} image",
-            .{@tagName(target)},
+            .{@tagName(architecture)},
         );
 
         const image_step = try b.allocator.create(ImageStep);
@@ -88,8 +88,8 @@ pub fn registerImageSteps(
         };
         image_step.step.dependOn(&install_image.step);
 
-        step_collection.registerImage(target, &install_image.step);
-        image_steps.putAssumeCapacityNoClobber(target, image_step);
+        step_collection.registerImage(architecture, &install_image.step);
+        image_steps.putAssumeCapacityNoClobber(architecture, image_step);
     }
 
     return image_steps;
@@ -109,7 +109,7 @@ const ImageDescriptionStep = struct {
     b: *std.Build,
     step: std.Build.Step,
 
-    target: CascadeTarget,
+    architecture: CascadeTarget.Architecture,
     limine_conf: []const u8,
 
     generated_image_description_file: std.Build.GeneratedFile,
@@ -121,18 +121,18 @@ const ImageDescriptionStep = struct {
     fn create(
         b: *std.Build,
         kernel: Kernel,
-        target: CascadeTarget,
+        architecture: CascadeTarget.Architecture,
         limine_dep: *std.Build.Dependency,
         disable_kaslr: bool,
     ) !*ImageDescriptionStep {
         const step_name = try std.fmt.allocPrint(
             b.allocator,
             "build image description for {s} image",
-            .{@tagName(target)},
+            .{@tagName(architecture)},
         );
 
         // TODO: handling of limine.conf should be better that this, we don't even add it as a dependency...
-        const limine_conf = switch (target) {
+        const limine_conf = switch (architecture) {
             .arm => if (disable_kaslr)
                 b.pathJoin(&.{ "build", "limine_no_kaslr_ramfb.conf" })
             else
@@ -155,7 +155,7 @@ const ImageDescriptionStep = struct {
                 .owner = b,
                 .makeFn = make,
             }),
-            .target = target,
+            .architecture = architecture,
             .generated_image_description_file = .{ .step = &image_description_step.step },
             .image_description_file = .{
                 .generated = .{
@@ -284,7 +284,7 @@ const ImageDescriptionStep = struct {
             .source_path = image_description_step.limine_conf,
         });
 
-        switch (image_description_step.target) {
+        switch (image_description_step.architecture) {
             .arm => {
                 try efi_partition.addFile(.{
                     .destination_path = "/EFI/BOOT/BOOTAA64.EFI",

@@ -6,17 +6,17 @@ pub fn build(b: *std.Build) !void {
 
     b.enable_qemu = true;
 
-    const all_targets: []const CascadeTarget = std.meta.tags(CascadeTarget);
+    const all_architectures: []const CascadeTarget.Architecture = std.meta.tags(CascadeTarget.Architecture);
 
-    const step_collection = try StepCollection.create(b, all_targets);
+    const step_collection = try StepCollection.create(b, all_architectures);
 
-    const options = try Options.get(b, cascade_version, all_targets);
+    const options = try Options.get(b, cascade_version, all_architectures);
 
     const libraries = try Library.getLibraries(
         b,
         step_collection,
         options,
-        all_targets,
+        all_architectures,
     );
 
     const tools = try Tool.getTools(
@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) !void {
         libraries,
         tools,
         options,
-        all_targets,
+        all_architectures,
     );
 
     const image_steps = try ImageStep.registerImageSteps(
@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) !void {
         tools,
         step_collection,
         options,
-        all_targets,
+        all_architectures,
     );
 
     try QemuStep.registerQemuSteps(
@@ -49,7 +49,7 @@ pub fn build(b: *std.Build) !void {
         image_steps,
         tools,
         options,
-        all_targets,
+        all_architectures,
     );
 
     try DepGraphStep.register(b, kernels, libraries, tools);

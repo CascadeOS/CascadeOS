@@ -6,7 +6,7 @@ const QemuStep = @This();
 step: Step,
 image: std.Build.LazyPath,
 
-target: CascadeTarget,
+architecture: CascadeTarget.Architecture,
 options: Options,
 
 firmware: Firmware,
@@ -18,15 +18,13 @@ const Firmware = union(enum) {
     uefi: *std.Build.Dependency, // EDK2 dependency
 };
 
-/// Registers QEMU steps for all targets.
-///
-/// For each target, creates a `QemuStep` that runs the image for the target using QEMU.
+/// For each architecture, creates a `QemuStep` that runs the image for the architecture using QEMU.
 pub fn registerQemuSteps(
     b: *std.Build,
     image_steps: ImageStep.Collection,
     tools: Tool.Collection,
     options: Options,
-    targets: []const CascadeTarget,
+    all_architectures: []const CascadeTarget.Architecture,
 ) !void {
     const kernel_log_wrapper = tools.get("kernel_log_wrapper").?;
 
@@ -36,12 +34,12 @@ pub fn registerQemuSteps(
     else
         null;
 
-    for (targets) |target| {
-        const image_step = image_steps.get(target).?;
+    for (all_architectures) |architecture| {
+        const image_step = image_steps.get(architecture).?;
 
         const qemu_step = try QemuStep.create(
             b,
-            target,
+            architecture,
             kernel_log_wrapper_compile,
             image_step.image_file,
             options,
@@ -50,12 +48,12 @@ pub fn registerQemuSteps(
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
             "run_{s}",
-            .{@tagName(target)},
+            .{@tagName(architecture)},
         );
         const qemu_step_description = try std.fmt.allocPrint(
             b.allocator,
             "Run the image for {s} in qemu",
-            .{@tagName(target)},
+            .{@tagName(architecture)},
         );
 
         const run_step = b.step(qemu_step_name, qemu_step_description);
@@ -65,17 +63,17 @@ pub fn registerQemuSteps(
 
 fn create(
     b: *std.Build,
-    target: CascadeTarget,
+    architecture: CascadeTarget.Architecture,
     kernel_log_wrapper_compile: ?*Step.Compile,
     image: std.Build.LazyPath,
     options: Options,
 ) !*QemuStep {
-    const uefi = options.uefi or needsUefi(target);
+    const uefi = options.uefi or needsUefi(architecture);
 
     const step_name = try std.fmt.allocPrint(
         b.allocator,
         "run qemu with {s} image",
-        .{@tagName(target)},
+        .{@tagName(architecture)},
     );
 
     const qemu_step = try b.allocator.create(QemuStep);
@@ -89,7 +87,7 @@ fn create(
             .makeFn = make,
         }),
         .image = image,
-        .target = target,
+        .architecture = architecture,
         .options = options,
         .firmware = if (uefi) .{ .uefi = b.dependency("edk2", .{}) } else .default,
         .kernel_log_wrapper_compile = kernel_log_wrapper_compile,
@@ -110,9 +108,9 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     const run_qemu = if (!qemu_step.options.display and qemu_step.kernel_log_wrapper_compile != null) run_qemu: {
         const kernel_log_wrapper = qemu_step.kernel_log_wrapper_compile.?;
         const run_qemu = b.addRunArtifact(kernel_log_wrapper);
-        run_qemu.addArg(qemuExecutable(qemu_step.target));
+        run_qemu.addArg(qemuExecutable(qemu_step.architecture));
         break :run_qemu run_qemu;
-    } else b.addSystemCommand(&.{qemuExecutable(qemu_step.target)});
+    } else b.addSystemCommand(&.{qemuExecutable(qemu_step.architecture)});
 
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;
@@ -153,7 +151,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
 
     // interrupt details
     if (qemu_step.options.interrupt_details) {
-        if (qemu_step.target == .x64) {
+        if (qemu_step.architecture == .x64) {
             // The "-M smm=off" below disables the SMM generated spam that happens before the kernel starts.
             run_qemu.addArgs(&[_][]const u8{ "-d", "int", "-M", "smm=off" });
         } else {
@@ -169,7 +167,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     if (qemu_step.options.display) {
         run_qemu.addArgs(&[_][]const u8{ "-monitor", "vc" });
 
-        switch (qemu_step.target) {
+        switch (qemu_step.architecture) {
             .arm => {
                 run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
 
@@ -194,7 +192,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             "gtk,gl=on,show-tabs=on,zoom-to-fit=off",
         });
     } else {
-        if (qemu_step.target == .x64) {
+        if (qemu_step.architecture == .x64) {
             if (qemu_step.options.qemu_monitor) {
                 run_qemu.addArgs(&[_][]const u8{ "-debugcon", "mon:stdio" });
             } else {
@@ -211,15 +209,15 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
     }
 
-    // set target cpu
-    switch (qemu_step.target) {
+    // set the cpu
+    switch (qemu_step.architecture) {
         .arm => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .riscv => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }),
     }
 
-    // set target machine
-    switch (qemu_step.target) {
+    // set the machine
+    switch (qemu_step.architecture) {
         .arm => if (qemu_step.options.no_acpi) {
             run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
         } else {
@@ -251,7 +249,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     }
 
     // qemu acceleration
-    const should_use_acceleration = !qemu_step.options.no_acceleration and qemu_step.target.isNative(b);
+    const should_use_acceleration = !qemu_step.options.no_acceleration and qemu_step.architecture.isNative(b);
     if (should_use_acceleration) {
         switch (b.graph.host.result.os.tag) {
             .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
@@ -267,10 +265,10 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     switch (qemu_step.firmware) {
         .default => {},
         .uefi => |edk2| {
-            const firmware_code = edk2.path(uefiFirmwareCodeFileName(qemu_step.target));
-            const firmware_var = edk2.path(uefiFirmwareVarFileName(qemu_step.target));
+            const firmware_code = edk2.path(uefiFirmwareCodeFileName(qemu_step.architecture));
+            const firmware_var = edk2.path(uefiFirmwareVarFileName(qemu_step.architecture));
 
-            switch (qemu_step.target) {
+            switch (qemu_step.architecture) {
                 .riscv => {
                     run_qemu.addArgs(&[_][]const u8{
                         "-blockdev",
@@ -322,34 +320,34 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     step.result_duration_ns = timer.read();
 }
 
-/// Returns true if the target needs UEFI to boot.
-fn needsUefi(cascade_target: CascadeTarget) bool {
-    return switch (cascade_target) {
+/// Returns true if the architecture needs UEFI to boot.
+fn needsUefi(architecture: CascadeTarget.Architecture) bool {
+    return switch (architecture) {
         .arm => true,
         .riscv => true,
         .x64 => false,
     };
 }
 
-fn uefiFirmwareCodeFileName(cascade_target: CascadeTarget) []const u8 {
-    return switch (cascade_target) {
+fn uefiFirmwareCodeFileName(architecture: CascadeTarget.Architecture) []const u8 {
+    return switch (architecture) {
         .arm => "aarch64/code.fd",
         .riscv => "riscv64/code.fd",
         .x64 => "x64/code.fd",
     };
 }
 
-fn uefiFirmwareVarFileName(cascade_target: CascadeTarget) []const u8 {
-    return switch (cascade_target) {
+fn uefiFirmwareVarFileName(architecture: CascadeTarget.Architecture) []const u8 {
+    return switch (architecture) {
         .arm => "aarch64/vars.fd",
         .riscv => "riscv64/vars.fd",
         .x64 => "x64/vars.fd",
     };
 }
 
-/// Returns the name of the QEMU system executable for the given target.
-fn qemuExecutable(cascade_target: CascadeTarget) []const u8 {
-    return switch (cascade_target) {
+/// Returns the name of the QEMU system executable for the given architecture.
+fn qemuExecutable(architecture: CascadeTarget.Architecture) []const u8 {
+    return switch (architecture) {
         .arm => "qemu-system-aarch64",
         .riscv => "qemu-system-riscv64",
         .x64 => "qemu-system-x86_64",

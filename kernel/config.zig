@@ -3,7 +3,7 @@
 
 // build system provided kernel options
 pub const cascade_version = kernel_options.cascade_version;
-pub const cascade_target = @import("cascade_target").arch;
+pub const cascade_arch = @import("cascade_architecture").arch;
 
 // This must be kept in sync with the linker scripts.
 pub const kernel_base_address: core.VirtualAddress = .fromInt(0xffffffff80000000);

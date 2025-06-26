@@ -19,10 +19,10 @@ directory_path: []const u8,
 /// The list of dependencies.
 dependencies: []const Dependency,
 
-/// The modules for each supported Cascade target.
+/// The modules for each supported Cascade architecture.
 cascade_modules: Modules,
 
-/// The modules for each supported non-Cascade target.
+/// The modules for each supported non-Cascade architecture.
 non_cascade_modules: Modules,
 
 /// If this library supports the hosts architecture the native module from `non_cascade_modules` will be stored here.
@@ -44,7 +44,7 @@ pub fn getLibraries(
     b: *std.Build,
     step_collection: StepCollection,
     options: Options,
-    targets: []const CascadeTarget,
+    all_architectures: []const CascadeTarget.Architecture,
 ) !Collection {
     const all_library_descriptions: []const LibraryDescription = @import("../lib/listing.zig").libraries;
 
@@ -70,7 +70,7 @@ pub fn getLibraries(
                 resolved_libraries,
                 step_collection,
                 options,
-                targets,
+                all_architectures,
                 all_library_descriptions,
             )) |library| {
                 resolved_libraries.putAssumeCapacityNoClobber(library_description.name, library);
@@ -97,7 +97,7 @@ fn resolveLibrary(
     resolved_libraries: Collection,
     step_collection: StepCollection,
     options: Options,
-    targets: []const CascadeTarget,
+    all_architectures: []const CascadeTarget.Architecture,
     all_library_descriptions: []const LibraryDescription,
 ) !?*Library {
     const dependencies = blk: {
@@ -141,7 +141,7 @@ fn resolveLibrary(
         root_file_name,
     }));
 
-    const supported_targets = library_description.supported_targets orelse targets;
+    const supported_architectures = library_description.supported_architectures orelse all_architectures;
 
     var cascade_modules: Modules = .{};
     errdefer cascade_modules.deinit(b.allocator);
@@ -157,13 +157,13 @@ fn resolveLibrary(
     const all_build_and_run_step_description = if (library_description.is_cascade_only)
         try std.fmt.allocPrint(
             b.allocator,
-            "Build the tests for {s} for every supported target",
+            "Build the tests for {s} for every supported architecture",
             .{library_description.name},
         )
     else
         try std.fmt.allocPrint(
             b.allocator,
-            "Build the tests for {s} for every supported target and attempt to run non-cascade test binaries",
+            "Build the tests for {s} for every supported architecture and attempt to run non-cascade test binaries",
             .{library_description.name},
         );
 
@@ -173,19 +173,21 @@ fn resolveLibrary(
 
     const serpent_module = b.dependency("serpent", .{}).module("serpent");
 
-    for (supported_targets) |target| {
+    for (supported_architectures) |architecture| {
         {
             const cascade_module = try createModule(
                 b,
                 library_description,
                 lazy_path,
                 options,
-                target,
+                .{
+                    .architecture = architecture,
+                    .context = .cascade,
+                },
                 dependencies,
-                true,
                 false,
             );
-            try cascade_modules.putNoClobber(b.allocator, target, cascade_module);
+            try cascade_modules.putNoClobber(b.allocator, architecture, cascade_module);
         }
 
         // host check exe
@@ -195,9 +197,11 @@ fn resolveLibrary(
                 library_description,
                 lazy_path,
                 options,
-                target,
+                .{
+                    .architecture = architecture,
+                    .context = .non_cascade,
+                },
                 dependencies,
-                false,
                 true,
             );
             const check_test_exe = b.addTest(.{
@@ -213,14 +217,16 @@ fn resolveLibrary(
                 library_description,
                 lazy_path,
                 options,
-                target,
+                .{
+                    .architecture = architecture,
+                    .context = .non_cascade,
+                },
                 dependencies,
                 false,
-                false,
             );
-            try non_cascade_modules.putNoClobber(b.allocator, target, host_module);
+            try non_cascade_modules.putNoClobber(b.allocator, architecture, host_module);
 
-            if (target.isNative(b)) host_native_module = host_module;
+            if (architecture.isNative(b)) host_native_module = host_module;
         }
 
         {
@@ -229,9 +235,11 @@ fn resolveLibrary(
                 library_description,
                 lazy_path,
                 options,
-                target,
+                .{
+                    .architecture = architecture,
+                    .context = .non_cascade,
+                },
                 dependencies,
-                false,
                 true,
             );
             host_test_module.optimize = options.optimize;
@@ -255,7 +263,7 @@ fn resolveLibrary(
                     .dest_dir = .{
                         .override = .{
                             .custom = b.pathJoin(&.{
-                                @tagName(target),
+                                @tagName(architecture),
                                 "tests",
                                 "non_cascade",
                             }),
@@ -273,21 +281,21 @@ fn resolveLibrary(
             const host_test_step_name = try std.fmt.allocPrint(
                 b.allocator,
                 "{s}_host_{s}",
-                .{ library_description.name, @tagName(target) },
+                .{ library_description.name, @tagName(architecture) },
             );
 
             const host_test_step_description =
                 try std.fmt.allocPrint(
                     b.allocator,
                     "Build and attempt to run the tests for {s} on {s} targeting the host os",
-                    .{ library_description.name, @tagName(target) },
+                    .{ library_description.name, @tagName(architecture) },
                 );
 
             const host_test_step = b.step(host_test_step_name, host_test_step_description);
             host_test_step.dependOn(&host_test_run_step.step);
 
             all_build_and_run_step.dependOn(host_test_step);
-            step_collection.registerNonCascadeLibrary(target, host_test_step);
+            step_collection.registerNonCascadeLibrary(architecture, host_test_step);
         }
     }
 
@@ -311,9 +319,8 @@ fn createModule(
     library_description: LibraryDescription,
     lazy_path: std.Build.LazyPath,
     options: Options,
-    target: CascadeTarget,
+    cascade_target: CascadeTarget,
     dependencies: []const Dependency,
-    build_for_cascade: bool,
     is_exe_root_module: bool,
 ) !*std.Build.Module {
     const module = b.createModule(.{
@@ -321,23 +328,22 @@ fn createModule(
     });
 
     if (is_exe_root_module) {
-        module.resolved_target = if (build_for_cascade) target.getCascadeCrossTarget(b) else target.getNonCascadeCrossTarget(b);
+        module.resolved_target = cascade_target.getCrossTarget(b);
     }
 
     // self reference
     module.addImport(library_description.name, module);
 
-    if (build_for_cascade) {
-        module.addImport("cascade_flag", options.cascade_os_options_module);
-    } else {
-        module.addImport("cascade_flag", options.non_cascade_os_options_module);
+    switch (cascade_target.context) {
+        .cascade => module.addImport("cascade_flag", options.cascade_detect_option_module),
+        .non_cascade => module.addImport("cascade_flag", options.non_cascade_detect_option_module),
     }
 
     for (dependencies) |dependency| {
-        const dependency_module = if (build_for_cascade)
-            dependency.library.cascade_modules.get(target) orelse continue
-        else
-            dependency.library.non_cascade_modules.get(target) orelse continue;
+        const dependency_module = switch (cascade_target.context) {
+            .cascade => dependency.library.cascade_modules.get(cascade_target.architecture) orelse unreachable,
+            .non_cascade => dependency.library.non_cascade_modules.get(cascade_target.architecture) orelse unreachable,
+        };
 
         module.addImport(dependency.import_name, dependency_module);
     }
@@ -352,4 +358,4 @@ const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const LibraryDescription = @import("LibraryDescription.zig");
 const Options = @import("Options.zig");
 const StepCollection = @import("StepCollection.zig");
-const Modules = std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module);
+const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);

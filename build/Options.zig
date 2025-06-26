@@ -28,7 +28,7 @@ qemu_remote_debug: bool,
 /// Defaults to false.
 display: bool,
 
-/// Disable ACPI in QEMU if the target supports it.
+/// Disable ACPI in QEMU if the architecture supports it.
 ///
 /// Defaults to false.
 no_acpi: bool,
@@ -102,18 +102,15 @@ kernel_option_module: *std.Build.Module,
 /// This is mainly forcing debug and verbose log scopes to always be enabled but may do more in the future.
 all_enabled_kernel_option_module: *std.Build.Module,
 
-/// Hash map of target to module containing target-specific kernel options.
-target_specific_kernel_options_modules: Modules,
+/// Hash map of `CascadeTarget.Architecture` to module containing architecture-specific kernel options.
+architecture_specific_kernel_options_modules: Modules,
 
-/// Module containing CascadeOS options.
-cascade_os_options_module: *std.Build.Module,
-
-/// Module containing non-CascadeOS options.
-non_cascade_os_options_module: *std.Build.Module,
+cascade_detect_option_module: *std.Build.Module,
+non_cascade_detect_option_module: *std.Build.Module,
 
 const ForceLogLevel = enum { debug, verbose };
 
-pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const CascadeTarget) !Options {
+pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architectures: []const CascadeTarget.Architecture) !Options {
     const qemu_monitor = b.option(
         bool,
         "monitor",
@@ -129,7 +126,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
     const no_acpi = b.option(
         bool,
         "no_acpi",
-        "Disable ACPI in QEMU if the target supports it (defaults to false)",
+        "Disable ACPI in QEMU if the architecture supports it (defaults to false)",
     ) orelse false;
 
     const display = b.option(
@@ -260,40 +257,43 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, targets: []const
             "",
             cascade_version_string,
         ),
-        .target_specific_kernel_options_modules = try buildKernelTargetOptionModules(b, targets),
-        .cascade_os_options_module = buildCascadeOptionModule(b, true),
-        .non_cascade_os_options_module = buildCascadeOptionModule(b, false),
+        .architecture_specific_kernel_options_modules = try buildKernelArchitectureOptionModules(b, all_architectures),
+        .cascade_detect_option_module = buildCascadeDetectOptionModule(b, .cascade),
+        .non_cascade_detect_option_module = buildCascadeDetectOptionModule(b, .non_cascade),
     };
 }
 
 /// Creates a option module containing a single `cascade` boolean.
 ///
 /// This module can be used to detect if we are running on cascade or not.
-fn buildCascadeOptionModule(b: *std.Build, is_cascade: bool) *std.Build.Module {
+fn buildCascadeDetectOptionModule(b: *std.Build, context: CascadeTarget.Context) *std.Build.Module {
     const options = b.addOptions();
-    options.addOption(bool, "is_cascade", is_cascade);
+    options.addOption(bool, "is_cascade", switch (context) {
+        .cascade => true,
+        .non_cascade => false,
+    });
     return options.createModule();
 }
 
-/// Creates a hash map of targets to modules containing target-specific options.
-fn buildKernelTargetOptionModules(
+/// Creates a hash map of `CascadeTarget.Architecture` to modules containing architecture-specific options.
+fn buildKernelArchitectureOptionModules(
     b: *std.Build,
-    targets: []const CascadeTarget,
+    all_architectures: []const CascadeTarget.Architecture,
 ) !Modules {
-    var target_option_modules: Modules = .{};
-    errdefer target_option_modules.deinit(b.allocator);
+    var architecture_option_modules: Modules = .{};
+    errdefer architecture_option_modules.deinit(b.allocator);
 
-    try target_option_modules.ensureTotalCapacity(b.allocator, @intCast(targets.len));
+    try architecture_option_modules.ensureTotalCapacity(b.allocator, @intCast(all_architectures.len));
 
-    for (targets) |target| {
-        const target_options = b.addOptions();
+    for (all_architectures) |architecture| {
+        const architecture_options = b.addOptions();
 
-        addTargetOptions(target_options, target);
+        addArchitectureOptions(architecture_options, architecture);
 
-        target_option_modules.putAssumeCapacityNoClobber(target, target_options.createModule());
+        architecture_option_modules.putAssumeCapacityNoClobber(architecture, architecture_options.createModule());
     }
 
-    return target_option_modules;
+    return architecture_option_modules;
 }
 
 /// Create a module containing target independent kernel options.
@@ -345,13 +345,13 @@ fn addEnumType(options: *Step.Options, name: []const u8, comptime EnumT: type) v
     out.writeAll("};\n") catch unreachable;
 }
 
-/// Adds target-specific options to the options.
-fn addTargetOptions(options: *Step.Options, target: CascadeTarget) void {
-    addEnumType(options, "Arch", CascadeTarget);
+/// Adds architecture-specific options to the options.
+fn addArchitectureOptions(options: *Step.Options, architecture: CascadeTarget.Architecture) void {
+    addEnumType(options, "Architecture", CascadeTarget.Architecture);
 
     const out = options.contents.writer();
 
-    out.print("pub const arch: Arch = .{};\n", .{std.zig.fmtId(@tagName(target))}) catch unreachable;
+    out.print("pub const arch: Architecture = .{};\n", .{std.zig.fmtId(@tagName(architecture))}) catch unreachable;
 }
 
 /// Gets the version string.
@@ -417,4 +417,4 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Modules = std.AutoHashMapUnmanaged(CascadeTarget, *std.Build.Module);
+const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);

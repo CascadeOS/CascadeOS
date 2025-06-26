@@ -1,42 +1,45 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const CascadeTarget = enum {
-    arm,
-    riscv,
-    x64,
+pub const CascadeTarget = struct {
+    architecture: Architecture,
+    context: Context,
 
-    /// Returns a CrossTarget for building targeting the host system.
-    pub fn getNonCascadeCrossTarget(cascade_target: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
-        const target_query: std.Target.Query = switch (cascade_target) {
-            .arm => .{ .cpu_arch = .aarch64 },
-            .riscv => .{ .cpu_arch = .riscv64 },
-            .x64 => .{ .cpu_arch = .x86_64 },
-        };
-
-        return b.resolveTargetQuery(target_query);
+    pub fn getCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
+        switch (self.context) {
+            .cascade => switch (self.architecture) {
+                .arm => return b.resolveTargetQuery(.{ .cpu_arch = .aarch64, .os_tag = .other }),
+                .riscv => return b.resolveTargetQuery(.{ .cpu_arch = .riscv64, .os_tag = .other }),
+                .x64 => return b.resolveTargetQuery(.{ .cpu_arch = .x86_64, .os_tag = .other }),
+            },
+            .non_cascade => switch (self.architecture) {
+                .arm => return b.resolveTargetQuery(.{ .cpu_arch = .aarch64 }),
+                .riscv => return b.resolveTargetQuery(.{ .cpu_arch = .riscv64 }),
+                .x64 => return b.resolveTargetQuery(.{ .cpu_arch = .x86_64 }),
+            },
+        }
     }
 
-    /// Returns a CrossTarget for building targeting cascade.
-    pub fn getCascadeCrossTarget(cascade_target: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
-        const target_query: std.Target.Query = switch (cascade_target) {
-            .arm => .{ .cpu_arch = .aarch64, .os_tag = .other },
-            .riscv => .{ .cpu_arch = .riscv64, .os_tag = .other },
-            .x64 => .{ .cpu_arch = .x86_64, .os_tag = .other },
-        };
+    pub const Architecture = enum {
+        arm,
+        riscv,
+        x64,
 
-        return b.resolveTargetQuery(target_query);
-    }
+        /// Is this architecture the same as the host system?
+        pub fn isNative(architecture: Architecture, b: *std.Build) bool {
+            return switch (b.graph.host.result.cpu.arch) {
+                .aarch64 => architecture == .arm,
+                .riscv64 => architecture == .riscv,
+                .x86_64 => architecture == .x64,
+                else => false,
+            };
+        }
+    };
 
-    /// Returns true if the targets architecture is equal to the host systems.
-    pub fn isNative(cascade_target: CascadeTarget, b: *std.Build) bool {
-        return switch (b.graph.host.result.cpu.arch) {
-            .aarch64 => cascade_target == .arm,
-            .riscv64 => cascade_target == .riscv,
-            .x86_64 => cascade_target == .x64,
-            else => false,
-        };
-    }
+    pub const Context = enum {
+        cascade,
+        non_cascade, // TODO: better name, `host` does not make sense in every case but it does for most of them?
+    };
 };
 
 const std = @import("std");

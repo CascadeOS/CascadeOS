@@ -10,10 +10,10 @@ name: []const u8,
 /// The library's dependencies.
 dependencies: []const LibraryDependency = &.{},
 
-/// The targets supported by the library.
+/// The architectures supported by the library.
 ///
-/// `null` means target-independent.
-supported_targets: ?[]const CascadeTarget = null,
+/// `null` means architecture-independent.
+supported_architectures: ?[]const CascadeTarget.Architecture = null,
 
 /// Whether the library can only be used or tested within Cascade.
 is_cascade_only: bool = false,
