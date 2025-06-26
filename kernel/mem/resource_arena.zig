@@ -236,7 +236,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             defer arena.mutex.unlock(current_task);
 
             const span_tag, const free_tag =
-                try arena.getTagsForNewSpan(base, len, false);
+                try arena.getTagsForNewSpan(base, len, .span);
             errdefer {
                 arena.pushUnusedTag(span_tag);
                 arena.pushUnusedTag(free_tag);
@@ -249,7 +249,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             arena: *@This(),
             base: usize,
             len: usize,
-            imported_span: bool,
+            span_type: enum { imported_span, span },
         ) AddSpanError!struct { *BoundaryTag, *BoundaryTag } {
             if (len == 0) return AddSpanError.ZeroLength;
 
@@ -268,7 +268,10 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 .len = len,
                 .all_tag_node = .empty,
                 .kind_node = .empty,
-                .kind = if (imported_span) .imported_span else .span,
+                .kind = switch (span_type) {
+                    .imported_span => .imported_span,
+                    .span => .span,
+                },
             };
 
             const free_tag = arena.popUnusedTag();
@@ -572,7 +575,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             need_to_lock_mutex = false;
 
             const span_tag, const free_tag =
-                try arena.getTagsForNewSpan(allocation.base, allocation.len, true);
+                try arena.getTagsForNewSpan(allocation.base, allocation.len, .imported_span);
             errdefer {
                 arena.pushUnusedTag(span_tag);
                 arena.pushUnusedTag(free_tag);
