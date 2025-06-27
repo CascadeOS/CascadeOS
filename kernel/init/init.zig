@@ -206,8 +206,6 @@ fn createExecutors() ![]kernel.Executor {
     var i: u32 = 0;
 
     while (descriptors.next()) |desc| : (i += 1) {
-        if (i == 0) std.debug.assert(desc.acpiProcessorId() == 0);
-
         const executor = &executors[i];
 
         executor.* = .{
