@@ -3,8 +3,6 @@
 
 const Task = @This();
 
-id: Id,
-
 state: State,
 
 /// The stack used by this task in kernel mode.
@@ -91,7 +89,6 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
     const preconstructed_stack = task.stack;
 
     task.* = .{
-        .id = getId(),
         .state = .ready,
         .stack = preconstructed_stack,
         .spinlocks_held = 1, // fresh tasks start with the scheduler locked
@@ -212,12 +209,6 @@ pub fn isIdleTask(task: *const Task) bool {
         .user => false,
     };
 }
-
-pub const Id = enum(u64) {
-    none = std.math.maxInt(u64),
-
-    _,
-};
 
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
 
@@ -344,13 +335,8 @@ pub const Stack = struct {
 
 pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
     switch (task.context) {
-        .kernel => |kernel_context| {
-            try writer.print("KernelTask({d} - {s})", .{
-                @intFromEnum(task.id),
-                kernel_context.name.constSlice(),
-            });
-        },
-        .user => try writer.print("UserTask({d})", .{@intFromEnum(task.id)}),
+        .kernel => |kernel_context| try writer.print("KernelTask({s})", .{kernel_context.name.constSlice()}),
+        .user => @panic("TODO: implement user task printing"),
     }
 }
 
@@ -381,20 +367,7 @@ fn cacheDestructor(task: *Task, current_task: *Task) void {
     task.stack.destroyStack(current_task);
 }
 
-fn getId() Id {
-    // TODO: should task ids be per process instead of global?
-    const id: Id = @enumFromInt(globals.id_counter.fetchAdd(1, .monotonic));
-    if (id == .none) {
-        // if we create one task per millisecond it will take more than 584 million years to overflow
-        @panic("task id counter overflowed");
-    }
-    return id;
-}
-
 pub const globals = struct {
-    /// The source of task IDs.
-    var id_counter: std.atomic.Value(usize) = .init(0);
-
     /// The source of task objects.
     ///
     /// Initialized during `init.initializeTaskStacksAndCache`.
@@ -436,7 +409,6 @@ pub const init = struct {
         bootstrap_executor: *kernel.Executor,
     ) !void {
         bootstrap_init_task.* = .{
-            .id = getId(),
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
@@ -459,7 +431,6 @@ pub const init = struct {
         try name.writer().print("init {}", .{@intFromEnum(executor.id)});
 
         init_task.* = .{
-            .id = getId(),
             .state = .{ .running = executor },
             .stack = try .createStack(current_task),
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
@@ -482,7 +453,6 @@ pub const init = struct {
         try name.writer().print("idle {}", .{@intFromEnum(executor.id)});
 
         idle_task.* = .{
-            .id = getId(),
             .state = .ready,
             .stack = try .createStack(current_task),
             .spinlocks_held = 1, // idle tasks start with the scheduler locked
