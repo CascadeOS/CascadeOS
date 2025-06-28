@@ -24,9 +24,14 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
     return &executors[@intFromEnum(id)];
 }
 
-pub const Context = enum {
+pub const Context = union(Type) {
     kernel,
     user,
+
+    pub const Type = enum {
+        kernel,
+        user,
+    };
 };
 
 pub const init = @import("init/init.zig");

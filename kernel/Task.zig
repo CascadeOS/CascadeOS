@@ -26,7 +26,7 @@ next_task_node: containers.SingleNode = .empty,
 
 context: Context,
 
-pub const Context = union(kernel.Context) {
+pub const Context = union(kernel.Context.Type) {
     kernel: Kernel,
     user: void,
 
