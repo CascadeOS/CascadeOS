@@ -30,7 +30,7 @@ context: Context,
 
 pub const Context = union(kernel.Context) {
     kernel: Kernel,
-    user: User,
+    user: void,
 
     pub const Kernel = struct {
         /// Name of the task.
@@ -39,13 +39,6 @@ pub const Context = union(kernel.Context) {
         name: Name,
 
         is_idle_task: bool,
-    };
-
-    pub const User = struct {
-        /// Optional name of the task.
-        ///
-        /// User task names are optional.
-        name: ?Name,
     };
 };
 
@@ -80,14 +73,10 @@ pub const CreateOptions = struct {
 
     pub const CreateContext = union(kernel.Context) {
         kernel: Kernel,
-        user: User,
+        user: void,
 
         pub const Kernel = struct {
             name: Name,
-        };
-
-        pub const User = struct {
-            name: ?Name = null,
         };
     };
 };
@@ -114,11 +103,7 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
                     .is_idle_task = false,
                 },
             },
-            .user => |user_context| .{
-                .user = .{
-                    .name = user_context.name,
-                },
-            },
+            .user => .{},
         },
     };
 
@@ -365,13 +350,7 @@ pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
                 kernel_context.name.constSlice(),
             });
         },
-        .user => |user_context| {
-            if (user_context.name) |*name| {
-                try writer.print("UserTask({d} - {s})", .{ @intFromEnum(task.id), name.constSlice() });
-            } else {
-                try writer.print("UserTask({d})", .{@intFromEnum(task.id)});
-            }
-        },
+        .user => try writer.print("UserTask({d})", .{@intFromEnum(task.id)}),
     }
 }
 
