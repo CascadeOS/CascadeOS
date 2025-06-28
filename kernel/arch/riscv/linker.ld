@@ -20,6 +20,8 @@ SECTIONS
     /* This must be kept in sync with `kernel.config.kernel_base_address` */
     . = 0xffffffff80000000;
 
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
+
     __text_start = .;
 
     .text : {
@@ -30,7 +32,7 @@ SECTIONS
 
     PROVIDE(_global_pointer = .);
 
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
 
     __rodata_start = .;
 
@@ -64,7 +66,7 @@ SECTIONS
 
     __rodata_end = .;
 
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
 
     __data_start = .;
 
@@ -84,7 +86,7 @@ SECTIONS
 
     __data_end = .;
 
-    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
 
     .sdf : { /* sdf_builder embeds the SDF data into this section */
         __sdf_start = .;
