@@ -476,7 +476,16 @@ pub const RawCache = struct {
                     .large_object_allocation = undefined,
                 };
 
-                for (0..raw_cache.objects_per_slab) |i| {
+                var i: usize = 0;
+                errdefer if (raw_cache.destructor) |destructor| {
+                    // call the destructor for any objects that the constructor was called on
+                    for (0..i) |y| {
+                        const object_ptr = slab_base_ptr + (y * raw_cache.effective_object_size);
+                        destructor(object_ptr[0..raw_cache.object_size], current_task);
+                    }
+                };
+
+                while (i < raw_cache.objects_per_slab) : (i += 1) {
                     const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
 
                     if (raw_cache.constructor) |constructor| {
