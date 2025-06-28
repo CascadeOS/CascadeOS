@@ -15,20 +15,20 @@ pub const Node = struct {
 
 pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) void {
     current_task.incrementPreemptionDisable();
-    defer current_task.decrementPreemptionDisable();
 
-    switch (flush_request.flush_target) {
-        .kernel => {
-            // TODO: all except self
-            for (kernel.executors) |*executor| {
-                if (executor == current_task.state.running) continue;
-                flush_request.requestExecutor(executor);
-            }
-        },
-        .user => @panic("NOT IMPLEMENTED"),
+    const current_executor = current_task.state.running;
+
+    // TODO: all except self IPI
+    // TODO: is there a better way to determine which executors to target?
+    for (kernel.executors) |*executor| {
+        if (executor == current_executor) continue; // skip ourselves
+        flush_request.requestExecutor(executor);
     }
 
     flush_request.flush(current_task);
+
+    current_task.decrementPreemptionDisable();
+
     flush_request.waitForCompletion(current_task);
 }
 
