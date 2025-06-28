@@ -3,9 +3,10 @@
 
 /// Prepares the executor for jumping to the idle state.
 pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kernel.Task) void {
-    _ = old_task;
-
-    // TODO: switch page table
+    switch (old_task.context) {
+        .kernel => {},
+        .user => kernel.mem.globals.core_page_table.load(),
+    }
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -15,7 +16,10 @@ pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kerne
 
 /// Prepares the executor for jumping to the given task from the idle state.
 pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) void {
-    // TODO: switch page tables
+    switch (new_task.context) {
+        .kernel => {},
+        .user => @panic("NOT IMPLEMENTED"), // TODO
+    }
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
@@ -64,9 +68,16 @@ pub fn prepareForJumpToTaskFromTask(
     old_task: *kernel.Task,
     new_task: *kernel.Task,
 ) void {
-    _ = old_task;
-
-    // TODO: switch page tables
+    switch (old_task.context) {
+        .kernel => switch (new_task.context) {
+            .kernel => {},
+            .user => @panic("NOT IMPLEMENTED"), // TODO
+        },
+        .user => switch (new_task.context) {
+            .kernel => kernel.mem.globals.core_page_table.load(),
+            .user => @panic("NOT IMPLEMENTED"), // TODO
+        },
+    }
 
     executor.arch.tss.setPrivilegeStack(
         .ring0,
