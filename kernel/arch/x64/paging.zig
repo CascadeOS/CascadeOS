@@ -12,6 +12,12 @@ pub fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
     lib_x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
 }
 
+/// Copies the top level of `page_table` into `target_page_table`.
+pub fn copyIntoPageTable(page_table: *PageTable, target_page_table: *PageTable) void {
+    std.debug.assert(page_table != target_page_table);
+    @memcpy(&target_page_table.entries, &page_table.entries);
+}
+
 /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
 ///
 /// Caller must ensure:
