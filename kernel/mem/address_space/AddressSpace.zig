@@ -70,13 +70,9 @@ pub fn init(
         .context = options.context,
     };
 
-    var address_space_name: kernel.mem.resource_arena.Name = .{};
-    address_space_name.appendSliceAssumeCapacity(options.name.constSlice());
-    address_space_name.appendSliceAssumeCapacity("_address_arena");
-
     try address_space.address_arena.init(
         .{
-            .name = address_space_name,
+            .name = resourceArenaName(options.name),
             .quantum = kernel.arch.paging.standard_page_size.value,
         },
     );
@@ -94,6 +90,12 @@ pub fn deinit(address_space: *AddressSpace, current_task: *kernel.Task) void {
 
     _ = current_task;
     @panic("NOT IMPLEMENTED"); // TODO
+}
+
+/// Rename the address space.
+pub fn rename(address_space: *AddressSpace, new_name: Name) void {
+    address_space._name = new_name;
+    address_space.address_arena._name = resourceArenaName(new_name);
 }
 
 pub fn name(address_space: *const AddressSpace) []const u8 {
@@ -417,6 +419,15 @@ pub inline fn format(
 }
 
 pub const Name = std.BoundedArray(u8, kernel.config.address_space_name_length);
+
+fn resourceArenaName(address_space_name: Name) kernel.mem.resource_arena.Name {
+    var resource_arena_name: kernel.mem.resource_arena.Name = .{};
+    // these assume capacity calls are safe as the size of an `kernel.mem.resource_arena.Name` is ensured in
+    // `kernel.config` to have enough capacity for a `kernel.mem.AddressSpace.Name` along with the `_address_arena` suffix
+    resource_arena_name.appendSliceAssumeCapacity(address_space_name.constSlice());
+    resource_arena_name.appendSliceAssumeCapacity("_address_arena");
+    return resource_arena_name;
+}
 
 pub const global_init = struct {
     pub fn initializeCaches() !void {
