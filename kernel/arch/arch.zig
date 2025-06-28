@@ -207,6 +207,17 @@ pub const paging = struct {
             current.paging.loadPageTable(page_table.physical_frame);
         }
 
+        /// Copies the top level of `page_table` into `target_page_table`.
+        pub fn copyInto(page_table: PageTable, target_page_table: PageTable) callconv(core.inline_in_non_debug) void {
+            checkSupport(
+                current.paging,
+                "copyIntoPageTable",
+                fn (*ArchPageTable, *ArchPageTable) void,
+            );
+
+            current.paging.copyIntoPageTable(page_table.arch, target_page_table.arch);
+        }
+
         pub const page_table_alignment: core.Size = current.paging.page_table_alignment;
         pub const page_table_size: core.Size = current.paging.page_table_size;
 
