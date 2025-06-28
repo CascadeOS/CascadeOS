@@ -124,6 +124,11 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
 }
 
+/// Returns `true` if the mutex is locked.
+pub fn isLocked(mutex: *Mutex) bool {
+    return mutex.locked_by.load(.monotonic) != null;
+}
+
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
