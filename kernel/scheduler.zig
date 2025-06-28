@@ -52,8 +52,6 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
             .drop => {
                 std.debug.assert(!current_task.isIdleTask()); // drop during idle
 
-                log.verbose("dropping {}", .{current_task});
-
                 switchToIdle(current_task, .dropped);
                 @panic("idle returned");
             },
@@ -98,8 +96,6 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
 
     std.debug.assert(!current_task.isIdleTask()); // block during idle
 
-    log.verbose("blocking {}", .{current_task});
-
     const new_task_node = globals.ready_to_run.pop() orelse {
         switchToIdleWithLock(current_task, spinlock, .blocked);
         return;
@@ -114,8 +110,10 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
 
 fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
-
     std.debug.assert(!current_task.isIdleTask());
+
+    log.verbose("switching from {} to idle", .{current_task});
+
     const executor = current_task.state.running;
 
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
@@ -162,6 +160,9 @@ fn switchToIdleWithLock(
 
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
     std.debug.assert(!current_task.isIdleTask());
+
+    log.verbose("switching from {} to idle with a lock", .{current_task});
+
     const executor = current_task.state.running;
 
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
@@ -189,10 +190,9 @@ fn switchToIdleWithLock(
 fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(current_task.isIdleTask());
-
-    log.verbose("switching to {} from idle", .{new_task});
-
     std.debug.assert(new_task.next_task_node.next == null);
+
+    log.verbose("switching from idle to {}", .{new_task});
 
     const executor = current_task.state.running;
 
@@ -210,10 +210,9 @@ fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, curr
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(!current_task.isIdleTask());
     std.debug.assert(!new_task.isIdleTask());
-
-    log.verbose("switching to {} from {}", .{ new_task, current_task });
-
     std.debug.assert(new_task.next_task_node.next == null);
+
+    log.verbose("switching from {} to {}", .{ current_task, new_task });
 
     const executor = current_task.state.running;
 
@@ -249,13 +248,11 @@ fn switchToTaskFromTaskWithLock(
     };
 
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
-
     std.debug.assert(!current_task.isIdleTask());
     std.debug.assert(!new_task.isIdleTask());
-
-    log.verbose("switching to {} from {} with a lock", .{ new_task, current_task });
-
     std.debug.assert(new_task.next_task_node.next == null);
+
+    log.verbose("switching from {} to {} with a lock", .{ current_task, new_task });
 
     const executor = current_task.state.running;
 
