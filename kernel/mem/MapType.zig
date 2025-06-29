@@ -10,7 +10,7 @@ const MapType = @This();
 ///
 /// If the context is `.user` then the mapping is accessible from userspace and if supported is not accessible from
 /// kernelspace by default.
-context: kernel.Context,
+context: kernel.Context.Type,
 
 /// The protection of the mapping.
 protection: Protection,
