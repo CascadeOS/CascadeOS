@@ -40,28 +40,16 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
-    .eh_frame_hdr : {
-        *(.eh_frame_hdr)
-    } :rodata
-
-    .dynsym : {
-        *(.dynsym)
-    } :rodata
-
-    .gnu.hash : {
-        *(.gnu.hash)
-    } :rodata
-
-    .hash : {
-        *(.hash)
+    .rela.dyn : {
+        *(.rela.dyn .rela.dyn.*)
     } :rodata
 
     .dynstr : {
-        *(.dynstr)
+        *(.dynstr .dynstr.*)
     } :rodata
 
-    .rela.dyn : {
-        *(.rela.dyn)
+    .dynsym : {
+        *(.dynsym .dynsym.*)
     } :rodata
 
     __rodata_end = .;
@@ -75,27 +63,31 @@ SECTIONS
     } :data
 
     .dynamic : {
-        *(.dynamic)
+        *(.dynamic .dynamic.*)
     } :data :dynamic
 
     .bss : {
-        *(COMMON)
         *(.bss .bss.*)
-        *(.sbss .sbss.*)
+        *(COMMON)
     } :data
 
     __data_end = .;
 
     . = ALIGN(CONSTANT(COMMONPAGESIZE));
 
+    __sdf_start = .;
+
     .sdf : { /* sdf_builder embeds the SDF data into this section */
-        __sdf_start = .;
-        . += 0x1000;
+        . += CONSTANT(COMMONPAGESIZE);
     } :sdf
 
     /DISCARD/ : {
         *(.eh_frame)
+        *(.eh_frame_hdr)
+        *(.gnu.hash)
+        *(.hash)
         *(.note .note.*)
         *(.comment)
+        *(.riscv.attributes)
     }
 }
