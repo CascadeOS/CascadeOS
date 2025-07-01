@@ -5,15 +5,6 @@
 
 pub const DeviceTree = @import("DeviceTree");
 
-pub fn getDeviceTree() ?DeviceTree {
-    const address = kernel.boot.deviceTreeBlob() orelse return null;
-    const ptr = address.toPtr([*]align(8) const u8);
-    return DeviceTree.fromPtr(ptr) catch |err| {
-        log.warn("failed to parse device tree blob: {s}", .{@errorName(err)});
-        return null;
-    };
-}
-
 pub fn tryGetSerialOutput() ?uart.Uart {
     const output_uart = tryGetSerialOutputInner() catch |err| switch (err) {
         error.BadOffset => {
@@ -50,6 +41,15 @@ fn tryGetSerialOutputInner() GetSerialOutputError!?uart.Uart {
     }
 
     return null;
+}
+
+fn getDeviceTree() ?DeviceTree {
+    const address = kernel.boot.deviceTreeBlob() orelse return null;
+    const ptr = address.toPtr([*]align(8) const u8);
+    return DeviceTree.fromPtr(ptr) catch |err| {
+        log.warn("failed to parse device tree blob: {s}", .{@errorName(err)});
+        return null;
+    };
 }
 
 fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart {
