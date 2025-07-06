@@ -9,10 +9,14 @@ pub fn onPerExecutorPeriodic(current_task: *kernel.Task) void {
 }
 
 /// Executed upon page fault.
-pub fn onPageFault(current_task: *kernel.Task, page_fault_details: kernel.mem.PageFaultDetails) void {
+pub fn onPageFault(
+    current_task: *kernel.Task,
+    page_fault_details: kernel.mem.PageFaultDetails,
+    interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+) void {
     current_task.decrementInterruptDisable();
     switch (page_fault_details.context) {
-        .kernel => kernel.mem.onKernelPageFault(current_task, page_fault_details),
+        .kernel => kernel.mem.onKernelPageFault(current_task, page_fault_details, interrupt_frame),
         .user => std.debug.panic("user page fault\n{}", .{page_fault_details}), // TODO
     }
 }

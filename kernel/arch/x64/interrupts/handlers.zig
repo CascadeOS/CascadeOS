@@ -43,7 +43,7 @@ pub fn pageFaultHandler(
             .user
         else
             .kernel,
-    });
+    }, interrupt_frame);
 }
 
 pub fn flushRequestHandler(current_task: *kernel.Task, _: InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {

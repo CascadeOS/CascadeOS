@@ -284,29 +284,51 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
     return .{ .value = virtual_address.value - globals.physical_to_virtual_offset.value };
 }
 
-pub fn onKernelPageFault(current_task: *kernel.Task, page_fault_details: PageFaultDetails) void {
+pub fn onKernelPageFault(
+    current_task: *kernel.Task,
+    page_fault_details: PageFaultDetails,
+    interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+) void {
     if (page_fault_details.faulting_address.lessThan(kernel.arch.paging.higher_half_start)) {
         @branchHint(.cold);
-        std.debug.panic("kernel page fault in lower half\n{}", .{page_fault_details});
+
+        kernel.debug.interruptSourcePanic(
+            interrupt_frame,
+            "kernel page fault in lower half\n{}",
+            .{page_fault_details},
+        );
     }
 
     const region_type = kernelRegionContainingAddress(page_fault_details.faulting_address) orelse {
         @branchHint(.cold);
-        std.debug.panic("kernel page fault outside of any kernel region\n{}", .{page_fault_details});
+
+        kernel.debug.interruptSourcePanic(
+            interrupt_frame,
+            "kernel page fault outside of any kernel region\n{}",
+            .{page_fault_details},
+        );
     };
 
     switch (region_type) {
         .pageable_kernel_address_space => {
             @branchHint(.likely);
-            globals.kernel_pageable_address_space.handlePageFault(current_task, page_fault_details) catch |err|
-                std.debug.panic(
+            globals.kernel_pageable_address_space.handlePageFault(current_task, page_fault_details) catch |err| switch (err) {
+                error.NoMemory => std.debug.panic(
+                    "no memory available to handle page fault in pageable kernel address space\n{}",
+                    .{page_fault_details},
+                ),
+                else => |e| kernel.debug.interruptSourcePanic(
+                    interrupt_frame,
                     "failed to handle page fault in pageable kernel address space: {s}\n{}",
-                    .{ @errorName(err), page_fault_details },
-                );
+                    .{ @errorName(e), page_fault_details },
+                ),
+            };
         },
         else => {
             @branchHint(.cold);
-            std.debug.panic(
+
+            kernel.debug.interruptSourcePanic(
+                interrupt_frame,
                 "kernel page fault in '{s}'\n{}",
                 .{ @tagName(region_type), page_fault_details },
             );
