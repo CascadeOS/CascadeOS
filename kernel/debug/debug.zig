@@ -3,20 +3,64 @@
 
 pub const log = @import("log.zig");
 
+pub fn interruptSourcePanic(
+    interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+    comptime format: []const u8,
+    args: anytype,
+) noreturn {
+    @branchHint(.cold);
+
+    // TODO: copy of the logic in `std.debug.panicExtra` - using a stack buffer is not ideal
+    const size = 0x1000;
+    const trunc_msg = "(msg truncated)";
+    var buf: [size + trunc_msg.len]u8 = undefined;
+    // a minor annoyance with this is that it will result in the NoSpaceLeft
+    // error being part of the @panic stack trace (but that error should
+    // only happen rarely)
+    const msg = std.fmt.bufPrint(buf[0..size], format, args) catch |err| switch (err) {
+        error.NoSpaceLeft => blk: {
+            @memcpy(buf[size..], trunc_msg);
+            break :blk &buf;
+        },
+    };
+
+    panicDispatch(
+        msg,
+        .{ .interrupt = interrupt_frame },
+    );
+}
+
 /// Entry point from the Zig language upon a panic.
 fn zigPanic(
     msg: []const u8,
     return_address_opt: ?usize,
 ) noreturn {
     @branchHint(.cold);
+    panicDispatch(
+        msg,
+        .{ .normal = .{
+            .return_address = return_address_opt orelse @returnAddress(),
+            .error_return_trace = @errorReturnTrace(),
+        } },
+    );
+}
+
+const PanicType = union(enum) {
+    normal: struct {
+        return_address: usize,
+        error_return_trace: ?*const std.builtin.StackTrace,
+    },
+    interrupt: kernel.arch.interrupts.InterruptFrame,
+};
+
+fn panicDispatch(msg: []const u8, panic_type: PanicType) noreturn {
+    @branchHint(.cold);
 
     kernel.arch.interrupts.disableInterrupts();
 
-    const return_address = return_address_opt orelse @returnAddress();
-
     switch (globals.panic_mode) {
-        .single_executor_init_panic => singleExecutorInitPanic(msg, @errorReturnTrace(), return_address),
-        .init_panic => initPanic(msg, @errorReturnTrace(), return_address),
+        .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
+        .init_panic => initPanic(msg, panic_type),
     }
 
     kernel.arch.interrupts.disableInterruptsAndHalt();
@@ -24,8 +68,7 @@ fn zigPanic(
 
 fn singleExecutorInitPanic(
     msg: []const u8,
-    error_return_trace: ?*const std.builtin.StackTrace,
-    return_address: usize,
+    panic_type: PanicType,
 ) void {
     const static = struct {
         var nested_panic_count: usize = 0;
@@ -38,12 +81,7 @@ fn singleExecutorInitPanic(
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(
-            writer,
-            msg,
-            error_return_trace,
-            return_address,
-        ) catch {},
+        0 => formatting.printPanic(writer, msg, panic_type) catch {},
         // on second panic print a shorter message
         1 => writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
@@ -55,8 +93,7 @@ fn singleExecutorInitPanic(
 
 fn initPanic(
     msg: []const u8,
-    error_return_trace: ?*const std.builtin.StackTrace,
-    return_address: usize,
+    panic_type: PanicType,
 ) void {
     const static = struct {
         var nested_panic_count: usize = 0;
@@ -83,12 +120,7 @@ fn initPanic(
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(
-            writer,
-            msg,
-            error_return_trace,
-            return_address,
-        ) catch {},
+        0 => formatting.printPanic(writer, msg, panic_type) catch {},
         // on second panic print a shorter message
         1 => writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
@@ -102,11 +134,17 @@ const formatting = struct {
     pub fn printPanic(
         writer: anytype,
         msg: []const u8,
-        error_return_trace: ?*const std.builtin.StackTrace,
-        return_address: usize,
+        panic_type: PanicType,
     ) !void {
         try printUserPanicMessage(writer, msg);
-        try printErrorAndCurrentStackTrace(writer, error_return_trace, return_address);
+        switch (panic_type) {
+            .normal => |normal| try printErrorAndCurrentStackTrace(
+                writer,
+                normal.error_return_trace,
+                normal.return_address,
+            ),
+            .interrupt => |interrupt| try printInterruptError(writer, interrupt),
+        }
     }
 
     fn printUserPanicMessage(writer: anytype, msg: []const u8) !void {
@@ -120,6 +158,25 @@ const formatting = struct {
             }
         } else {
             try writer.writeAll("\nPANIC\n");
+        }
+    }
+
+    fn printInterruptError(
+        writer: anytype,
+        interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+    ) !void {
+        const symbol_source = SymbolSource.load();
+
+        try printSourceAtAddress(
+            writer,
+            interrupt_frame.instructionPointer(),
+            symbol_source,
+        );
+
+        var stack_iter = interrupt_frame.createStackIterator();
+
+        while (stack_iter.next()) |address| {
+            try printSourceAtAddress(writer, address, symbol_source);
         }
     }
 
