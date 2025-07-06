@@ -46,6 +46,17 @@ pub const interrupts = struct {
             return self.arch.createStackIterator();
         }
 
+        pub fn instructionPointer(self: InterruptFrame) usize {
+            // TODO: this is used during panics, so if it is not implemented we will panic during a panic
+            checkSupport(
+                ArchInterruptFrame,
+                "instructionPointer",
+                fn (*const ArchInterruptFrame) usize,
+            );
+
+            return self.arch.instructionPointer();
+        }
+
         const ArchInterruptFrame = current.interrupts.ArchInterruptFrame;
     };
 

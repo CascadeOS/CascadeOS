@@ -177,6 +177,10 @@ pub const InterruptFrame = extern struct {
         return interrupt_frame.cs.selector == .user_code;
     }
 
+    pub inline fn instructionPointer(interrupt_frame: *const InterruptFrame) usize {
+        return interrupt_frame.rip;
+    }
+
     pub inline fn createStackIterator(interrupt_frame: *const InterruptFrame) std.debug.StackIterator {
         return .init(null, interrupt_frame.rbp);
     }
