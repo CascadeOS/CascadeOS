@@ -58,6 +58,24 @@ pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: InterruptFrame,
     kernel.entry.onPerExecutorPeriodic(current_task);
 }
 
+pub fn unhandledException(
+    current_task: *kernel.Task,
+    interrupt_frame: InterruptFrame,
+    _: ?*anyopaque,
+    _: ?*anyopaque,
+) void {
+    _ = current_task;
+
+    switch (interrupt_frame.arch.context()) {
+        .kernel => kernel.debug.interruptSourcePanic(
+            interrupt_frame,
+            "unhandled kernel exception: {s}",
+            .{@tagName(interrupt_frame.arch.vector_number.interrupt)},
+        ),
+        .user => @panic("NOT IMPLEMENTED: unhandled exception in user mode"),
+    }
+}
+
 /// Handler for all unhandled interrupts.
 ///
 /// Used during early initialization as well as during normal kernel operation.

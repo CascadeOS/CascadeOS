@@ -278,7 +278,23 @@ const Handler = struct {
 const globals = struct {
     var idt: Idt = .{};
     const raw_interrupt_handlers = init.makeRawHandlers();
-    var handlers: [Idt.number_of_handlers]Handler = @splat(.{ .interrupt_handler = interrupt_handlers.unhandledInterrupt });
+    var handlers: [Idt.number_of_handlers]Handler = handlers: {
+        @setEvalBranchQuota(4 * Idt.number_of_handlers);
+
+        var temp_handlers: [Idt.number_of_handlers]Handler = undefined;
+
+        for (0..Idt.number_of_handlers) |i| {
+            const interrupt: Interrupt = @enumFromInt(i);
+
+            temp_handlers[i] = if (interrupt.isException()) .{
+                .interrupt_handler = interrupt_handlers.unhandledException,
+            } else .{
+                .interrupt_handler = interrupt_handlers.unhandledInterrupt,
+            };
+        }
+
+        break :handlers temp_handlers;
+    };
     var interrupt_arena: kernel.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
 };
 
