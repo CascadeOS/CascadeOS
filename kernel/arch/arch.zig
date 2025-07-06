@@ -35,6 +35,17 @@ pub const interrupts = struct {
     pub const InterruptFrame = struct {
         arch: *ArchInterruptFrame,
 
+        pub fn createStackIterator(self: InterruptFrame) std.debug.StackIterator {
+            // TODO: this is used during panics, so if it is not implemented we will panic during a panic
+            checkSupport(
+                ArchInterruptFrame,
+                "createStackIterator",
+                fn (*const ArchInterruptFrame) std.debug.StackIterator,
+            );
+
+            return self.arch.createStackIterator();
+        }
+
         const ArchInterruptFrame = current.interrupts.ArchInterruptFrame;
     };
 
