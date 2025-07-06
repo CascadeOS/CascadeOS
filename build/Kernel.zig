@@ -97,6 +97,7 @@ fn create(
     const source_file_modules = try getSourceFileModules(b, options, dependencies);
 
     const ssfn_static_lib = try constructSSFNStaticLib(b, architecture);
+    const uacpi_static_lib = try constructUACPIStaticLib(b, options, architecture);
 
     {
         const check_kernel_module = try constructKernelModule(
@@ -107,6 +108,7 @@ fn create(
             options,
             options.all_enabled_kernel_option_module,
             ssfn_static_lib,
+            uacpi_static_lib,
         );
 
         const check_exe = b.addExecutable(.{
@@ -124,6 +126,7 @@ fn create(
         options,
         options.kernel_option_module,
         ssfn_static_lib,
+        uacpi_static_lib,
     );
 
     const kernel_exe = b.addExecutable(.{
@@ -255,6 +258,76 @@ fn constructSSFNStaticLib(b: *std.Build, architecture: CascadeTarget.Architectur
     return ssfn_static_lib;
 }
 
+fn constructUACPIStaticLib(
+    b: *std.Build,
+    options: Options,
+    architecture: CascadeTarget.Architecture,
+) !*std.Build.Step.Compile {
+    // in uACPI DEBUG is more verbose than TRACE
+    const uacpi_log_level: []const u8 = if (options.kernel_force_log_level) |force_log_level|
+        switch (force_log_level) {
+            .debug => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE",
+            .verbose => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG",
+        }
+    else if (std.mem.indexOf(
+        u8,
+        options.kernel_forced_verbose_log_scopes,
+        "uacpi",
+    ) != null)
+        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG"
+    else if (std.mem.indexOf(
+        u8,
+        options.kernel_forced_debug_log_scopes,
+        "uacpi",
+    ) != null)
+        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
+    else
+        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
+
+    const uacpi_dep = b.dependency("uacpi", .{});
+
+    const uacpi_static_lib = b.addLibrary(.{
+        .name = "uacpi",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = getKernelCrossTarget(architecture, b),
+            .optimize = .ReleaseFast,
+            .sanitize_c = .off,
+            .pic = true,
+        }),
+    });
+    uacpi_static_lib.addCSourceFiles(.{
+        .root = uacpi_dep.path("source"),
+        .files = &.{
+            "default_handlers.c",
+            "event.c",
+            "interpreter.c",
+            "io.c",
+            "mutex.c",
+            "namespace.c",
+            "notify.c",
+            "opcodes.c",
+            "opregion.c",
+            "osi.c",
+            "registers.c",
+            "resources.c",
+            "shareable.c",
+            "sleep.c",
+            "stdlib.c",
+            "tables.c",
+            "types.c",
+            "uacpi.c",
+            "utilities.c",
+        },
+        .flags = &.{uacpi_log_level},
+    });
+    uacpi_static_lib.addIncludePath(uacpi_dep.path("include"));
+
+    uacpi_static_lib.installHeadersDirectory(uacpi_dep.path("include"), "", .{});
+
+    return uacpi_static_lib;
+}
+
 fn constructKernelModule(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
@@ -263,6 +336,7 @@ fn constructKernelModule(
     options: Options,
     kernel_option_module: *std.Build.Module,
     ssfn_static_lib: *std.Build.Step.Compile,
+    uacpi_static_lib: *std.Build.Step.Compile,
 ) !*std.Build.Module {
     const kernel_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
@@ -296,60 +370,7 @@ fn constructKernelModule(
     kernel_module.linkLibrary(ssfn_static_lib);
 
     // uacpi
-    {
-        // in uACPI DEBUG is more verbose than TRACE
-        const uacpi_log_level: []const u8 = if (options.kernel_force_log_level) |force_log_level|
-            switch (force_log_level) {
-                .debug => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE",
-                .verbose => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG",
-            }
-        else if (std.mem.indexOf(
-            u8,
-            options.kernel_forced_verbose_log_scopes,
-            "uacpi",
-        ) != null)
-            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG"
-        else if (std.mem.indexOf(
-            u8,
-            options.kernel_forced_debug_log_scopes,
-            "uacpi",
-        ) != null)
-            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE"
-        else
-            "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
-
-        const uacpi_dep = b.dependency("uacpi", .{});
-
-        kernel_module.addCSourceFiles(.{
-            .root = uacpi_dep.path("source"),
-            .files = &.{
-                "default_handlers.c",
-                "event.c",
-                "interpreter.c",
-                "io.c",
-                "mutex.c",
-                "namespace.c",
-                "notify.c",
-                "opcodes.c",
-                "opregion.c",
-                "osi.c",
-                "registers.c",
-                "resources.c",
-                "shareable.c",
-                "sleep.c",
-                "stdlib.c",
-                "tables.c",
-                "types.c",
-                "uacpi.c",
-                "utilities.c",
-            },
-            .flags = &.{
-                uacpi_log_level,
-                "-fno-sanitize=undefined", // FIXME: investigate - seems to have been introduced sometime around uACPI 2.0.0
-            },
-        });
-        kernel_module.addIncludePath(uacpi_dep.path("include"));
-    }
+    kernel_module.linkLibrary(uacpi_static_lib);
 
     // devicetree
     kernel_module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
@@ -367,8 +388,10 @@ fn constructKernelModule(
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
     kernel_module.strip = false;
     ssfn_static_lib.root_module.strip = false;
+    uacpi_static_lib.root_module.strip = false;
     kernel_module.omit_frame_pointer = false;
     ssfn_static_lib.root_module.omit_frame_pointer = false;
+    uacpi_static_lib.root_module.omit_frame_pointer = false;
 
     // apply architecture-specific configuration to the kernel
     switch (architecture) {
@@ -377,8 +400,10 @@ fn constructKernelModule(
         .x64 => {
             kernel_module.code_model = .kernel;
             ssfn_static_lib.root_module.code_model = .kernel;
+            uacpi_static_lib.root_module.code_model = .kernel;
             kernel_module.red_zone = false;
             ssfn_static_lib.root_module.red_zone = false;
+            uacpi_static_lib.root_module.red_zone = false;
         },
     }
 
