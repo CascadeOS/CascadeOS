@@ -96,6 +96,8 @@ fn create(
 
     const source_file_modules = try getSourceFileModules(b, options, dependencies);
 
+    const ssfn_static_lib = try constructSSFNStaticLib(b, architecture);
+
     {
         const check_kernel_module = try constructKernelModule(
             b,
@@ -104,6 +106,7 @@ fn create(
             source_file_modules,
             options,
             options.all_enabled_kernel_option_module,
+            ssfn_static_lib,
         );
 
         const check_exe = b.addExecutable(.{
@@ -120,6 +123,7 @@ fn create(
         source_file_modules,
         options,
         options.kernel_option_module,
+        ssfn_static_lib,
     );
 
     const kernel_exe = b.addExecutable(.{
@@ -226,6 +230,31 @@ fn create(
     };
 }
 
+fn constructSSFNStaticLib(b: *std.Build, architecture: CascadeTarget.Architecture) !*std.Build.Step.Compile {
+    const ssfn_static_lib = b.addLibrary(.{
+        .name = "ssfn",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = getKernelCrossTarget(architecture, b),
+            .optimize = .ReleaseFast,
+            .sanitize_c = .off,
+            .pic = true,
+        }),
+    });
+    try ssfn_static_lib.installed_headers.append(.{
+        .file = .{
+            .source = b.path("kernel/init/output/ssfn.h"),
+            .dest_rel_path = "ssfn.h",
+        },
+    });
+    ssfn_static_lib.addCSourceFile(.{
+        .file = b.path("kernel/init/output/ssfn.h"),
+        .flags = &.{"-DSSFN_CONSOLEBITMAP_TRUECOLOR=1"},
+        .language = .c,
+    });
+    return ssfn_static_lib;
+}
+
 fn constructKernelModule(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
@@ -233,6 +262,7 @@ fn constructKernelModule(
     source_file_modules: []const SourceFileModule,
     options: Options,
     kernel_option_module: *std.Build.Module,
+    ssfn_static_lib: *std.Build.Step.Compile,
 ) !*std.Build.Module {
     const kernel_module = b.createModule(.{
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
@@ -263,8 +293,7 @@ fn constructKernelModule(
     kernel_module.addImport("kernel_options", kernel_option_module);
 
     // ssfn
-    kernel_module.addCSourceFile(.{ .file = b.path("kernel/init/output/ssfn.c") });
-    kernel_module.addIncludePath(b.path(("kernel/init/output")));
+    kernel_module.linkLibrary(ssfn_static_lib);
 
     // uacpi
     {
@@ -337,7 +366,9 @@ fn constructKernelModule(
 
     // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
     kernel_module.strip = false;
+    ssfn_static_lib.root_module.strip = false;
     kernel_module.omit_frame_pointer = false;
+    ssfn_static_lib.root_module.omit_frame_pointer = false;
 
     // apply architecture-specific configuration to the kernel
     switch (architecture) {
@@ -345,7 +376,9 @@ fn constructKernelModule(
         .riscv => {},
         .x64 => {
             kernel_module.code_model = .kernel;
+            ssfn_static_lib.root_module.code_model = .kernel;
             kernel_module.red_zone = false;
+            ssfn_static_lib.root_module.red_zone = false;
         },
     }
 
