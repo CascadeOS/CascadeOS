@@ -167,18 +167,16 @@ pub const InterruptFrame = extern struct {
         selector: Gdt.Selector,
     },
 
-    /// Checks if this interrupt occurred in kernel mode.
-    pub inline fn isKernel(interrupt_frame: *const InterruptFrame) bool {
-        return interrupt_frame.cs.selector == .kernel_code;
-    }
-
-    /// Checks if this interrupt occurred in user mode.
-    pub inline fn isUser(interrupt_frame: *const InterruptFrame) bool {
-        return interrupt_frame.cs.selector == .user_code;
-    }
-
     pub inline fn instructionPointer(interrupt_frame: *const InterruptFrame) usize {
         return interrupt_frame.rip;
+    }
+
+    pub inline fn context(interrupt_frame: *const InterruptFrame) kernel.Context.Type {
+        return switch (interrupt_frame.cs.selector) {
+            .kernel_code => return .kernel,
+            .user_code => return .user,
+            else => unreachable,
+        };
     }
 
     pub inline fn createStackIterator(interrupt_frame: *const InterruptFrame) std.debug.StackIterator {
