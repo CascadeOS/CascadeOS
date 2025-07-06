@@ -33,13 +33,15 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
 
     log.verbose("preempting {}", .{current_task});
 
-    yield(current_task, .requeue);
+    yield(current_task);
 }
 
-/// Yields the current task.
+/// Drops the current task.
 ///
 /// Must be called with the scheduler lock held.
-pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) void {
+pub fn drop(current_task: *kernel.Task) noreturn {
+    std.debug.assert(!current_task.isIdleTask()); // drop during idle
+
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
 
@@ -47,16 +49,31 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
     std.debug.assert(current_task.preemption_skipped == false);
 
     const new_task_node = globals.ready_to_run.pop() orelse {
-        switch (mode) {
-            .requeue => return, // no tasks to run
-            .drop => {
-                std.debug.assert(!current_task.isIdleTask()); // drop during idle
-
-                switchToIdle(current_task, .dropped);
-                @panic("idle returned");
-            },
-        }
+        switchToIdle(current_task, .dropped);
+        @panic("idle returned");
     };
+
+    const new_task = kernel.Task.fromNode(new_task_node);
+    std.debug.assert(new_task.state == .ready);
+    std.debug.assert(current_task != new_task);
+
+    log.verbose("dropping {}", .{current_task});
+    switchToTaskFromTask(current_task, new_task, .dropped);
+    @panic("dropped task resumed");
+}
+
+/// Yields the current task.
+///
+/// Must be called with the scheduler lock held.
+pub fn yield(current_task: *kernel.Task) void {
+    std.debug.assert(globals.lock.isLockedByCurrent(current_task));
+    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
+
+    std.debug.assert(current_task.preemption_disable_count == 0);
+    std.debug.assert(current_task.preemption_skipped == false);
+
+    const new_task_node = globals.ready_to_run.pop() orelse
+        return; // no tasks to run
 
     const new_task = kernel.Task.fromNode(new_task_node);
     std.debug.assert(new_task.state == .ready);
@@ -68,20 +85,11 @@ pub fn yield(current_task: *kernel.Task, comptime mode: enum { requeue, drop }) 
 
     std.debug.assert(current_task != new_task);
 
-    const current_task_new_state = blk: switch (mode) {
-        .requeue => {
-            log.verbose("yielding {}", .{current_task});
-            // can't call `queueTask` here because the `current_task.state` is not yet set to `.ready`
-            globals.ready_to_run.push(&current_task.next_task_node);
-            break :blk .ready;
-        },
-        .drop => {
-            log.verbose("dropping {}", .{current_task});
-            break :blk .dropped;
-        },
-    };
+    log.verbose("yielding {}", .{current_task});
+    // can't call `queueTask` here because the `current_task.state` is not yet set to `.ready`
+    globals.ready_to_run.push(&current_task.next_task_node);
 
-    switchToTaskFromTask(current_task, new_task, current_task_new_state);
+    switchToTaskFromTask(current_task, new_task, .ready);
 }
 
 /// Blocks the currently running task.
@@ -313,7 +321,7 @@ fn idle(current_task_addr: usize) callconv(.c) noreturn {
             defer unlockScheduler(current_task);
 
             if (!globals.ready_to_run.isEmpty()) {
-                yield(current_task, .requeue);
+                yield(current_task);
             }
         }
 

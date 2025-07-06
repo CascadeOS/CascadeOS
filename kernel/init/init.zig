@@ -181,8 +181,8 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     }
 
     _ = kernel.scheduler.lockScheduler(current_task);
-    kernel.scheduler.yield(current_task, .drop);
-    @panic("scheduler returned to init");
+    kernel.scheduler.drop(current_task);
+    unreachable;
 }
 
 fn createExecutors() ![]kernel.Executor {
