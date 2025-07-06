@@ -5,6 +5,11 @@ const Task = @This();
 
 state: State,
 
+/// The number of references to this task.
+///
+/// Each task has a reference to itself which is dropped when the scheduler drops the task.
+reference_count: std.atomic.Value(usize),
+
 /// The stack used by this task in kernel mode.
 stack: Stack,
 
@@ -90,6 +95,7 @@ pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
 
     task.* = .{
         .state = .ready,
+        .reference_count = .init(1), // tasks have a reference to themselves
         .stack = preconstructed_stack,
         .spinlocks_held = 1, // fresh tasks start with the scheduler locked
 
@@ -410,6 +416,7 @@ pub const init = struct {
     ) !void {
         bootstrap_init_task.* = .{
             .state = .{ .running = bootstrap_executor },
+            .reference_count = .init(1), // tasks have a reference to themselves
             .stack = undefined, // never used
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
@@ -432,6 +439,7 @@ pub const init = struct {
 
         init_task.* = .{
             .state = .{ .running = executor },
+            .reference_count = .init(1), // tasks have a reference to themselves
             .stack = try .createStack(current_task),
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
@@ -454,6 +462,7 @@ pub const init = struct {
 
         idle_task.* = .{
             .state = .ready,
+            .reference_count = .init(1), // tasks have a reference to themselves
             .stack = try .createStack(current_task),
             .spinlocks_held = 1, // idle tasks start with the scheduler locked
 
