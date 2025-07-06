@@ -67,24 +67,16 @@ memory: usize,
 /// Defaults to false.
 no_kaslr: bool,
 
-/// In the kernel force the provided log scopes to be debug (comma separated list of scope matchers).
+/// In the kernel, set the log level to be either debug or verbose.
+kernel_log_level: ?ForceLogLevel,
+
+/// In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers).
 ///
 /// If a scope ends with a `+` it will match any scope that starts with the prefix.
 ///
 /// Example:
 /// `virtual,init+,physical` will exact match `virtual` and `physical` and match any scope that starts with `init`.
-kernel_forced_debug_log_scopes: []const u8,
-
-/// In the kernel force the provided log scopes to be verbose (comma separated list of scope matchers).
-///
-/// If a scope ends with a `+` it will match any scope that starts with the prefix.
-///
-/// Example:
-/// `virtual,init+,physical` will exact match `virtual` and `physical` and match any scope that starts with `init`.
-kernel_forced_verbose_log_scopes: []const u8,
-
-/// In the kernel force the log level of every scope to be either debug or verbose.
-kernel_force_log_level: ?ForceLogLevel,
+kernel_log_scopes: []const u8,
 
 /// Disable the kernel log wrapper.
 ///
@@ -193,22 +185,16 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         "Disable KASLR (defaults to false)",
     ) orelse if (qemu_remote_debug) true else false;
 
-    const kernel_force_log_level = b.option(
+    const kernel_log_level = b.option(
         ForceLogLevel,
-        "force_log_level",
-        "In the kernel force the log level of every scope to be either debug or verbose.",
+        "kernel_log_level",
+        "In the kernel, set the log level to be either debug or verbose.",
     );
 
-    const kernel_forced_debug_log_scopes = b.option(
+    const kernel_log_scopes = b.option(
         []const u8,
-        "debug_scope",
-        "In the kernel force the provided log scopes to be debug (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
-    ) orelse "";
-
-    const kernel_forced_verbose_log_scopes = b.option(
-        []const u8,
-        "verbose_scope",
-        "In the kernel force the provided log scopes to be verbose (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
+        "kernel_log_scopes",
+        "In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
     ) orelse "";
 
     const no_kernel_log_wrapper = b.option(
@@ -239,21 +225,18 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         .uefi = uefi,
         .memory = memory,
         .no_kaslr = no_kaslr,
-        .kernel_forced_debug_log_scopes = kernel_forced_debug_log_scopes,
-        .kernel_forced_verbose_log_scopes = kernel_forced_verbose_log_scopes,
-        .kernel_force_log_level = kernel_force_log_level,
+        .kernel_log_level = kernel_log_level,
+        .kernel_log_scopes = kernel_log_scopes,
         .no_kernel_log_wrapper = no_kernel_log_wrapper,
         .kernel_option_module = try buildKernelOptionModule(
             b,
-            kernel_force_log_level,
-            kernel_forced_debug_log_scopes,
-            kernel_forced_verbose_log_scopes,
+            kernel_log_level,
+            kernel_log_scopes,
             cascade_version_string,
         ),
         .all_enabled_kernel_option_module = try buildKernelOptionModule(
             b,
             .verbose,
-            "",
             "",
             cascade_version_string,
         ),
@@ -299,21 +282,19 @@ fn buildKernelArchitectureOptionModules(
 /// Create a module containing target independent kernel options.
 fn buildKernelOptionModule(
     b: *std.Build,
-    kernel_force_log_level: ?ForceLogLevel,
-    forced_debug_log_scopes: []const u8,
-    kernel_forced_verbose_log_scopes: []const u8,
+    kernel_log_level: ?ForceLogLevel,
+    kernel_log_scopes: []const u8,
     cascade_version_string: []const u8,
 ) !*std.Build.Module {
     const kernel_options = b.addOptions();
 
     kernel_options.addOption([]const u8, "cascade_version", cascade_version_string);
 
-    if (kernel_force_log_level) |force_log_level| {
+    if (kernel_log_level) |force_log_level| {
         kernel_options.addOption(ForceLogLevel, "force_log_level", force_log_level);
     }
 
-    addStringLiteralSliceOption(kernel_options, "forced_debug_log_scopes", forced_debug_log_scopes);
-    addStringLiteralSliceOption(kernel_options, "forced_verbose_log_scopes", kernel_forced_verbose_log_scopes);
+    addStringLiteralSliceOption(kernel_options, "kernel_log_scopes", kernel_log_scopes);
 
     return kernel_options.createModule();
 }

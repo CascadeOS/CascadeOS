@@ -173,15 +173,7 @@ pub fn stdLogImpl(
 inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: Level) bool {
     comptime {
         if (@intFromEnum(message_level) <= @intFromEnum(log_level)) return true;
-
-        if (@intFromEnum(message_level) <= @intFromEnum(Level.debug) and
-            isScopeInForceScopeList(scope, forced_debug_log_scopes))
-            return true;
-
-        if (@intFromEnum(message_level) <= @intFromEnum(Level.verbose) and
-            isScopeInForceScopeList(scope, forced_verbose_log_scopes))
-            return true;
-
+        if (isScopeInForceScopeList(scope, kernel_log_scopes)) return true;
         return false;
     }
 }
@@ -213,8 +205,7 @@ const globals = struct {
     var init_log_buffered_writer = std.io.bufferedWriter(kernel.init.Output.writer);
 };
 
-const forced_debug_log_scopes = kernel_options.forced_debug_log_scopes;
-const forced_verbose_log_scopes = kernel_options.forced_verbose_log_scopes;
+const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
 const std = @import("std");
 const core = @import("core");
