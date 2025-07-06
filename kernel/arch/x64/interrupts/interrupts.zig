@@ -125,6 +125,7 @@ pub const Interrupt = enum(u8) {
     }
 };
 
+pub const ArchInterruptFrame = InterruptFrame;
 pub const InterruptFrame = extern struct {
     es: extern union {
         full: u64,
@@ -259,7 +260,12 @@ const Handler = struct {
     context2: ?*anyopaque = null,
 
     inline fn call(handler: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
-        handler.interrupt_handler(current_task, interrupt_frame, handler.context1, handler.context2);
+        handler.interrupt_handler(
+            current_task,
+            .{ .arch = interrupt_frame },
+            handler.context1,
+            handler.context2,
+        );
     }
 };
 

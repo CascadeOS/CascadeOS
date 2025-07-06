@@ -31,11 +31,16 @@ pub fn halt() callconv(core.inline_in_non_debug) void {
 
 pub const interrupts = struct {
     pub const Interrupt = current.interrupts.Interrupt;
-    pub const InterruptFrame = current.interrupts.InterruptFrame;
+
+    pub const InterruptFrame = struct {
+        arch: *ArchInterruptFrame,
+
+        const ArchInterruptFrame = current.interrupts.ArchInterruptFrame;
+    };
 
     pub const InterruptHandler = *const fn (
         current_task: *kernel.Task,
-        frame: *InterruptFrame,
+        frame: InterruptFrame,
         context1: ?*anyopaque,
         context2: ?*anyopaque,
     ) void;

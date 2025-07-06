@@ -492,7 +492,7 @@ export fn uacpi_kernel_install_interrupt_handler(
     const HandlerWrapper = struct {
         fn HandlerWrapper(
             _: *kernel.Task,
-            _: *kernel.arch.interrupts.InterruptFrame,
+            _: kernel.arch.interrupts.InterruptFrame,
             _handler: ?*anyopaque,
             _ctx: ?*anyopaque,
         ) void {

@@ -9,6 +9,7 @@ pub const disableInterrupts = lib_arm.instructions.disableInterrupts;
 pub const Interrupt = enum(u8) {
     _,
 };
+pub const ArchInterruptFrame = InterruptFrame;
 pub const InterruptFrame = extern struct {};
 
 pub const init = struct {};
