@@ -429,18 +429,22 @@ pub const init = struct {
         };
     }
 
-    pub fn initializeInitTask(
+    pub fn createAndAssignInitTask(
         current_task: *kernel.Task,
-        init_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
+        const task = try globals.cache.allocate(current_task);
+        errdefer globals.cache.deallocate(current_task, task);
+
+        const preconstructed_stack = task.stack;
+
         var name: Name = .{};
         try name.writer().print("init {}", .{@intFromEnum(executor.id)});
 
-        init_task.* = .{
+        task.* = .{
             .state = .{ .running = executor },
             .reference_count = .init(1), // tasks have a reference to themselves
-            .stack = try .createStack(current_task),
+            .stack = preconstructed_stack,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
             .context = .{
@@ -450,6 +454,10 @@ pub const init = struct {
                 },
             },
         };
+
+        task.stack.reset();
+
+        executor.current_task = task;
     }
 
     pub fn initializeIdleTask(

@@ -199,8 +199,6 @@ fn createExecutors() ![]kernel.Executor {
 
     log.debug("initializing {} executors", .{descriptors.count()});
 
-    // TODO: these init tasks need to be freed after initialization
-    const init_tasks = try kernel.mem.heap.allocator.alloc(kernel.Task, descriptors.count());
     const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
     var i: u32 = 0;
@@ -211,11 +209,11 @@ fn createExecutors() ![]kernel.Executor {
         executor.* = .{
             .id = @enumFromInt(i),
             .arch = undefined, // set by `arch.init.prepareExecutor`
-            .current_task = &init_tasks[i],
-            .idle_task = undefined, // set below
+            .current_task = undefined, // set below by `Task.init.createAndAssignInitTask`
+            .idle_task = undefined, // set below by `Task.init.initializeIdleTask`
         };
 
-        try kernel.Task.init.initializeInitTask(current_task, executor.current_task, executor);
+        try kernel.Task.init.createAndAssignInitTask(current_task, executor);
         try kernel.Task.init.initializeIdleTask(current_task, &executor.idle_task, executor);
 
         kernel.arch.init.prepareExecutor(
