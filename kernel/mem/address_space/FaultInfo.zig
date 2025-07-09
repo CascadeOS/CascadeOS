@@ -282,11 +282,6 @@ pub fn faultObjectOrZeroFill(
             },
         };
 
-        const top_level_decision: kernel.mem.UnmapDecision = switch (fault_info.address_space.context) {
-            .kernel => .nop,
-            .user => .free,
-        };
-
         log.verbose("mapping {} with {}", .{ fault_info.faulting_address, map_type });
 
         fault_info.address_space.page_table_lock.lock(current_task);
@@ -298,7 +293,6 @@ pub fn faultObjectOrZeroFill(
             fault_info.faulting_address,
             page.physical_frame,
             map_type,
-            top_level_decision,
             kernel.mem.phys.allocator,
         ) catch {
             @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1545-L1568

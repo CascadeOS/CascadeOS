@@ -27,38 +27,7 @@ pub fn copyIntoPageTable(page_table: *PageTable, target_page_table: *PageTable) 
 /// This function:
 ///  - only supports the standard page size for the architecture
 ///  - does not flush the TLB
-pub fn mapSinglePage(
-    page_table: *PageTable,
-    virtual_address: core.VirtualAddress,
-    physical_frame: kernel.mem.phys.Frame,
-    map_type: kernel.mem.MapType,
-    top_level_decision: kernel.mem.UnmapDecision,
-    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
-) kernel.mem.MapError!void {
-    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
-
-    mapTo4KiB(
-        page_table,
-        virtual_address,
-        physical_frame.baseAddress(),
-        map_type,
-        physical_frame_allocator,
-    ) catch |err| {
-        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-
-        unmap4KiB(
-            page_table,
-            virtual_address,
-            .nop,
-            top_level_decision,
-            &deallocate_frame_list,
-        );
-
-        physical_frame_allocator.deallocate(deallocate_frame_list);
-
-        return err;
-    };
-}
+pub const mapSinglePage = mapTo4KiB;
 
 /// Unmaps `virtual_address`.
 ///
@@ -68,23 +37,7 @@ pub fn mapSinglePage(
 /// This function:
 ///  - only supports the standard page size for the architecture
 ///  - does not flush the TLB
-pub fn unmapSinglePage(
-    page_table: *PageTable,
-    virtual_address: core.VirtualAddress,
-    backing_page_decision: kernel.mem.UnmapDecision,
-    top_level_decision: kernel.mem.UnmapDecision,
-    deallocate_frame_list: *kernel.mem.phys.FrameList,
-) callconv(core.inline_in_non_debug) void {
-    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
-
-    unmap4KiB(
-        page_table,
-        virtual_address,
-        backing_page_decision,
-        top_level_decision,
-        deallocate_frame_list,
-    );
-}
+pub const unmapSinglePage = unmap4KiB;
 
 /// Flushes the cache for the given virtual range on the current executor.
 ///
@@ -107,12 +60,11 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
 fn mapTo4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
-    physical_address: core.PhysicalAddress,
+    physical_frame: kernel.mem.phys.Frame,
     map_type: MapType,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) kernel.mem.MapError!void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
-    std.debug.assert(physical_address.isAligned(PageTable.small_page_size));
 
     var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
     errdefer physical_frame_allocator.deallocate(deallocate_frame_list);
@@ -165,7 +117,7 @@ fn mapTo4KiB(
     setEntry(
         level1_table,
         PageTable.p1Index(virtual_address),
-        physical_address,
+        physical_frame.baseAddress(),
         map_type,
         .small,
     ) catch |err| switch (err) {

@@ -21,7 +21,6 @@ pub fn mapSinglePage(
     virtual_address: core.VirtualAddress,
     physical_frame: phys.Frame,
     map_type: MapType,
-    top_level_decision: UnmapDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
@@ -32,7 +31,6 @@ pub fn mapSinglePage(
         virtual_address,
         physical_frame,
         map_type,
-        top_level_decision,
         physical_frame_allocator,
     );
 }
@@ -90,7 +88,6 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             current_virtual_address,
             physical_frame,
             map_type,
-            top_level_decision,
             physical_frame_allocator,
         );
 
@@ -151,7 +148,6 @@ pub fn mapRangeToPhysicalRange(
             current_virtual_address,
             .fromAddress(current_physical_address),
             map_type,
-            top_level_decision,
             physical_frame_allocator,
         );
 

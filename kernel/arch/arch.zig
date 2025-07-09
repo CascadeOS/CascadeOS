@@ -265,7 +265,6 @@ pub const paging = struct {
         virtual_address: core.VirtualAddress,
         physical_frame: kernel.mem.phys.Frame,
         map_type: kernel.mem.MapType,
-        top_level_decision: kernel.mem.UnmapDecision,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
         checkSupport(current.paging, "mapSinglePage", fn (
@@ -273,7 +272,6 @@ pub const paging = struct {
             core.VirtualAddress,
             kernel.mem.phys.Frame,
             kernel.mem.MapType,
-            kernel.mem.UnmapDecision,
             kernel.mem.phys.FrameAllocator,
         ) kernel.mem.MapError!void);
 
@@ -282,7 +280,6 @@ pub const paging = struct {
             virtual_address,
             physical_frame,
             map_type,
-            top_level_decision,
             physical_frame_allocator,
         );
     }
