@@ -522,7 +522,7 @@ pub const MP = extern struct {
 
     pub const Response = switch (arch) {
         .aarch64 => aarch64,
-        .loongarch64 => unreachable,
+        .loongarch64 => @compileError("MP feature not available for loongarch64"),
         .riscv64 => riscv64,
         .x86_64 => x86_64,
     };
