@@ -486,8 +486,8 @@ pub const init = struct {
         init_log.debug("initializing kernel and special heap", .{});
         try heap.init.initializeHeaps(current_task, result.heap_range, result.special_heap_range);
 
-        init_log.debug("initializing task stacks and cache", .{});
-        try kernel.Task.init.initializeTaskStacksAndCache(current_task, result.stacks_range);
+        init_log.debug("initializing tasks", .{});
+        try kernel.Task.init.initializeTasks(current_task, result.stacks_range);
 
         init_log.debug("initializing pageable kernel address space", .{});
         try globals.kernel_pageable_address_space.init(

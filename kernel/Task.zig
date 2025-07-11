@@ -386,7 +386,8 @@ pub const globals = struct {
 pub const init = struct {
     pub const earlyCreateStack = Stack.createStack;
 
-    pub fn initializeTaskStacksAndCache(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
+    pub fn initializeTasks(current_task: *kernel.Task, stacks_range: core.VirtualRange) !void {
+        log.debug("initializing task stacks", .{});
         try globals.stack_arena.init(
             .{
                 .name = try .fromSlice("stacks"),
@@ -405,6 +406,7 @@ pub const init = struct {
             );
         };
 
+        log.debug("initializing task cache", .{});
         globals.cache.init(
             .{ .name = try .fromSlice("task") },
         );
@@ -488,3 +490,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const containers = @import("containers");
+const log = kernel.debug.log.scoped(.task);
