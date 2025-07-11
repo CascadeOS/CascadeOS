@@ -7,9 +7,17 @@ waiting_tasks: containers.SinglyLinkedFIFO = .empty,
 
 /// Returns the first task in the wait queue.
 ///
-/// It is the callers responsibility to ensure that the task is not removed from the wait queue.
+/// Not thread-safe.
 pub fn firstTask(wait_queue: *WaitQueue) ?*kernel.Task {
     const node = wait_queue.waiting_tasks.start_node orelse return null;
+    return kernel.Task.fromNode(node);
+}
+
+/// Removes the first task from the wait queue.
+///
+/// Not thread-safe.
+pub fn popFirst(wait_queue: *WaitQueue) ?*kernel.Task {
+    const node = wait_queue.waiting_tasks.pop() orelse return null;
     return kernel.Task.fromNode(node);
 }
 
