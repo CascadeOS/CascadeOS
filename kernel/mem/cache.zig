@@ -759,6 +759,8 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const builtin = @import("builtin");
+const log = kernel.debug.log.scoped(.cache);
+
+// TODO: use `@import("containers")` instead
 const SinglyLinkedList = std.SinglyLinkedList;
 const DoublyLinkedList = std.DoublyLinkedList;
-const log = kernel.debug.log.scoped(.cache);
