@@ -140,7 +140,7 @@ pub fn Cache(
 pub const RawCache = struct {
     _name: Name,
 
-    lock: kernel.sync.TicketSpinLock,
+    lock: kernel.sync.Mutex,
 
     size_class: Size,
 
