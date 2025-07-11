@@ -572,10 +572,9 @@ pub const init = struct {
                 }),
             };
 
-            kernel.scheduler.lockScheduler(current_task);
-            defer kernel.scheduler.unlockScheduler(current_task);
-
-            kernel.scheduler.queueTask(current_task, globals.task_cleanup_service.task);
+            globals.task_cleanup_service.wait_queue.waiting_tasks.push(
+                &globals.task_cleanup_service.task.next_task_node,
+            );
         }
     }
 
