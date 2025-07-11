@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const AtomicSinglyLinkedLIFO = @import("AtomicSinglyLinkedLIFO.zig");
+pub const DoublyLinkedList = @import("DoublyLinkedList.zig");
 pub const SinglyLinkedFIFO = @import("SinglyLinkedFIFO.zig");
 
 pub const RedBlack = struct {
@@ -32,28 +33,22 @@ pub const SingleNode = extern struct {
     };
 };
 
-/// A node with a next and previous pointers.
+/// A node with next and previous pointers.
 ///
 /// Intended to be stored intrusively in a struct to allow `@fieldParentPtr`.
 pub const DoubleNode = extern struct {
-    next: ?*DoubleNode,
-    previous: ?*DoubleNode,
+    next: SingleNode,
+    previous: SingleNode,
 
-    pub const empty: DoubleNode = .{ .next = null, .previous = null };
+    pub const empty: DoubleNode = .{ .next = .empty, .previous = .empty };
 
-    pub const Iterator = struct {
-        direction: core.Direction,
-        current_node: ?*DoubleNode,
+    pub fn fromNextNode(next: *SingleNode) *DoubleNode {
+        return @fieldParentPtr("next", next);
+    }
 
-        pub fn next(iterator: *Iterator) ?*DoubleNode {
-            const current_node = iterator.current_node orelse return null;
-            iterator.current_node = switch (iterator.direction) {
-                .forward => current_node.next,
-                .backward => current_node.previous,
-            };
-            return current_node;
-        }
-    };
+    pub fn fromPreviousNode(previous: *SingleNode) *DoubleNode {
+        return @fieldParentPtr("previous", previous);
+    }
 };
 
 comptime {
