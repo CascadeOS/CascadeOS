@@ -34,6 +34,9 @@ pub const Context = union(Type) {
     };
 };
 
+pub var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
+pub var kernel_tasks_lock: sync.RwLock = .{};
+
 pub const init = @import("init/init.zig");
 
 pub const panic = debug.panic_interface;

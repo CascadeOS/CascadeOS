@@ -36,32 +36,6 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
     yield(current_task);
 }
 
-/// Drops the current task.
-///
-/// Must be called with the scheduler lock held.
-pub fn drop(current_task: *kernel.Task) noreturn {
-    std.debug.assert(!current_task.isIdleTask()); // drop during idle
-
-    std.debug.assert(globals.lock.isLockedByCurrent(current_task));
-    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
-
-    std.debug.assert(current_task.preemption_disable_count == 0);
-    std.debug.assert(current_task.preemption_skipped == false);
-
-    const new_task_node = globals.ready_to_run.pop() orelse {
-        switchToIdle(current_task, .dropped);
-        @panic("idle returned");
-    };
-
-    const new_task = kernel.Task.fromNode(new_task_node);
-    std.debug.assert(new_task.state == .ready);
-    std.debug.assert(current_task != new_task);
-
-    log.verbose("dropping {}", .{current_task});
-    switchToTaskFromTask(current_task, new_task, .dropped);
-    @panic("dropped task resumed");
-}
-
 /// Yields the current task.
 ///
 /// Must be called with the scheduler lock held.
@@ -79,17 +53,19 @@ pub fn yield(current_task: *kernel.Task) void {
     std.debug.assert(new_task.state == .ready);
 
     if (current_task.isIdleTask()) {
-        switchToTaskFromIdle(current_task, new_task);
+        log.verbose("leaving idle", .{});
+
+        switchToTaskFromIdleYield(current_task, new_task);
         @panic("idle returned");
     }
 
     std.debug.assert(current_task != new_task);
 
     log.verbose("yielding {}", .{current_task});
-    // can't call `queueTask` here because the `current_task.state` is not yet set to `.ready`
+
     globals.ready_to_run.push(&current_task.next_task_node);
 
-    switchToTaskFromTask(current_task, new_task, .ready);
+    switchToTaskFromTaskYield(current_task, new_task);
 }
 
 /// Blocks the currently running task.
@@ -99,13 +75,11 @@ pub fn yield(current_task: *kernel.Task) void {
 /// This function must be called with the scheduler lock held.
 pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
-
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
-
     std.debug.assert(!current_task.isIdleTask()); // block during idle
 
     const new_task_node = globals.ready_to_run.pop() orelse {
-        switchToIdleWithLock(current_task, spinlock, .blocked);
+        switchToIdleBlock(current_task, spinlock);
         return;
     };
 
@@ -113,29 +87,84 @@ pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) 
     std.debug.assert(current_task != new_task);
     std.debug.assert(new_task.state == .ready);
 
-    switchToTaskFromTaskWithLock(current_task, new_task, spinlock, .blocked);
+    switchToTaskFromTaskBlock(
+        current_task,
+        new_task,
+        spinlock,
+    );
 }
 
-fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
+/// Drops the current task.
+///
+/// Must be called with the scheduler lock held.
+pub fn drop(current_task: *kernel.Task) noreturn {
+    std.debug.assert(!current_task.isIdleTask()); // drop during idle
+
+    std.debug.assert(globals.lock.isLockedByCurrent(current_task));
+    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
+
+    std.debug.assert(current_task.preemption_disable_count == 0);
+    std.debug.assert(current_task.preemption_skipped == false);
+
+    log.verbose("dropping {}", .{current_task});
+
+    const new_task_node = globals.ready_to_run.pop() orelse blk: {
+        kernel.Task.globals.task_cleanup_service.lock.lock(current_task);
+
+        const cleanup_service_task = kernel.Task.globals.task_cleanup_service.wait_queue.popFirst() orelse {
+            kernel.Task.globals.task_cleanup_service.lock.unlock(current_task);
+            switchToIdleDrop(current_task);
+            @panic("idle returned");
+        };
+        kernel.Task.globals.task_cleanup_service.lock.unlock(current_task);
+
+        std.debug.assert(cleanup_service_task == kernel.Task.globals.task_cleanup_service.task);
+        cleanup_service_task.state = .ready;
+
+        break :blk &cleanup_service_task.next_task_node;
+    };
+
+    const new_task = kernel.Task.fromNode(new_task_node);
+    std.debug.assert(new_task.state == .ready);
+    std.debug.assert(current_task != new_task);
+
+    switchToTaskFromTaskDrop(current_task, new_task);
+    @panic("dropped task resumed");
+}
+
+fn switchToIdle(
+    current_executor: *kernel.Executor,
+    current_task: *kernel.Task,
+) void {
+    const static = struct {
+        fn idleEntry(
+            idle_task_addr: usize,
+        ) callconv(.C) noreturn {
+            const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
+
+            std.debug.assert(idle_task.isIdleTask());
+            globals.lock.unlock(idle_task);
+
+            idle(idle_task);
+            @panic("idle returned");
+        }
+    };
+
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(!current_task.isIdleTask());
 
     log.verbose("switching from {} to idle", .{current_task});
 
-    const executor = current_task.state.running;
+    kernel.arch.scheduling.prepareForJumpToIdleFromTask(current_executor, current_task);
 
-    kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
-
-    current_task.state = current_task_new_state;
-
-    executor.idle_task.state = .{ .running = executor };
-    executor.current_task = &executor.idle_task;
+    current_executor.idle_task.state = .{ .running = current_executor };
+    current_executor.current_task = &current_executor.idle_task;
 
     kernel.arch.scheduling.callOneArgs(
         current_task,
-        executor.idle_task.stack,
-        @intFromPtr(&executor.idle_task),
-        idle,
+        current_executor.idle_task.stack,
+        @intFromPtr(&current_executor.idle_task),
+        static.idleEntry,
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
@@ -144,13 +173,12 @@ fn switchToIdle(current_task: *kernel.Task, current_task_new_state: kernel.Task.
     };
 }
 
-fn switchToIdleWithLock(
-    current_task: *kernel.Task,
+fn switchToIdleBlock(
+    old_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
-    current_task_new_state: kernel.Task.State,
 ) void {
     const static = struct {
-        fn idleEntryWithLock(
+        fn idleEntryBlock(
             inner_spinlock_addr: usize,
             idle_task_addr: usize,
         ) callconv(.C) noreturn {
@@ -160,33 +188,35 @@ fn switchToIdleWithLock(
             std.debug.assert(idle_task.isIdleTask());
 
             inner_spinlock.unsafeUnlock();
+            globals.lock.unlock(idle_task);
 
-            idle(idle_task_addr);
+            idle(idle_task);
             @panic("idle returned");
         }
     };
 
-    std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
-    std.debug.assert(!current_task.isIdleTask());
+    std.debug.assert(old_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
+    std.debug.assert(!old_task.isIdleTask());
 
-    log.verbose("switching from {} to idle with a lock", .{current_task});
+    log.verbose("switching from {} to idle and blocking", .{old_task});
 
-    const executor = current_task.state.running;
+    const current_executor = old_task.state.running;
 
-    kernel.arch.scheduling.prepareForJumpToIdleFromTask(executor, current_task);
+    kernel.arch.scheduling.prepareForJumpToIdleFromTask(current_executor, old_task);
 
-    current_task.state = current_task_new_state;
-    current_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.idleEntryWithLock`
+    old_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.idleEntryBlock`
 
-    executor.idle_task.state = .{ .running = executor };
-    executor.current_task = &executor.idle_task;
+    current_executor.idle_task.state = .{ .running = current_executor };
+    current_executor.current_task = &current_executor.idle_task;
+
+    old_task.state = .blocked;
 
     kernel.arch.scheduling.callTwoArgs(
-        current_task,
-        executor.idle_task.stack,
+        old_task,
+        current_executor.idle_task.stack,
         @intFromPtr(spinlock),
-        @intFromPtr(&executor.idle_task),
-        static.idleEntryWithLock,
+        @intFromPtr(&current_executor.idle_task),
+        static.idleEntryBlock,
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
@@ -195,7 +225,55 @@ fn switchToIdleWithLock(
     };
 }
 
-fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void {
+fn switchToIdleDrop(old_task: *kernel.Task) void {
+    const static = struct {
+        fn idleEntryDrop(
+            task_to_drop_addr: usize,
+            idle_task_addr: usize,
+        ) callconv(.C) noreturn {
+            const task_to_drop: *kernel.Task = @ptrFromInt(task_to_drop_addr);
+            const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
+
+            std.debug.assert(idle_task.isIdleTask());
+            globals.lock.unlock(idle_task);
+
+            task_to_drop.decrementReferenceCount(idle_task);
+
+            idle(idle_task);
+            @panic("idle returned");
+        }
+    };
+
+    std.debug.assert(old_task.state == .running);
+    std.debug.assert(old_task.spinlocks_held == 1); // the scheduler lock is held
+    std.debug.assert(!old_task.isIdleTask());
+
+    log.verbose("switching from {} to idle and dropping", .{old_task});
+
+    const current_executor = old_task.state.running;
+
+    kernel.arch.scheduling.prepareForJumpToIdleFromTask(current_executor, old_task);
+
+    current_executor.idle_task.state = .{ .running = current_executor };
+    current_executor.current_task = &current_executor.idle_task;
+
+    old_task.state = .{ .dropped = .{} };
+
+    kernel.arch.scheduling.callTwoArgs(
+        old_task,
+        current_executor.idle_task.stack,
+        @intFromPtr(old_task),
+        @intFromPtr(&current_executor.idle_task),
+        static.idleEntryDrop,
+    ) catch |err| {
+        switch (err) {
+            // the idle task stack should be big enough
+            error.StackOverflow => @panic("insufficent space on the idle task stack"),
+        }
+    };
+}
+
+fn switchToTaskFromIdleYield(current_task: *kernel.Task, new_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(current_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
@@ -203,6 +281,7 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void
     log.verbose("switching from idle to {}", .{new_task});
 
     const executor = current_task.state.running;
+    std.debug.assert(&executor.idle_task == current_task);
 
     kernel.arch.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
 
@@ -214,34 +293,36 @@ fn switchToTaskFromIdle(current_task: *kernel.Task, new_task: *kernel.Task) void
     @panic("task returned");
 }
 
-fn switchToTaskFromTask(current_task: *kernel.Task, new_task: *kernel.Task, current_task_new_state: kernel.Task.State) void {
-    std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
-    std.debug.assert(!current_task.isIdleTask());
+fn switchToTaskFromTaskYield(
+    old_task: *kernel.Task,
+    new_task: *kernel.Task,
+) void {
+    std.debug.assert(old_task.spinlocks_held == 1); // the scheduler lock is held
+    std.debug.assert(!old_task.isIdleTask());
     std.debug.assert(!new_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
 
-    log.verbose("switching from {} to {}", .{ current_task, new_task });
+    log.verbose("switching from {} to {}", .{ old_task, new_task });
 
-    const executor = current_task.state.running;
+    const current_executor = old_task.state.running;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
 
-    current_task.state = current_task_new_state;
+    new_task.state = .{ .running = current_executor };
+    current_executor.current_task = new_task;
 
-    new_task.state = .{ .running = executor };
-    executor.current_task = new_task;
+    old_task.state = .ready;
 
-    kernel.arch.scheduling.jumpToTaskFromTask(current_task, new_task);
+    kernel.arch.scheduling.jumpToTaskFromTask(old_task, new_task);
 }
 
-fn switchToTaskFromTaskWithLock(
-    current_task: *kernel.Task,
+fn switchToTaskFromTaskBlock(
+    old_task: *kernel.Task,
     new_task: *kernel.Task,
     spinlock: *kernel.sync.TicketSpinLock,
-    current_task_new_state: kernel.Task.State,
 ) void {
     const static = struct {
-        fn switchToTaskWithLock(
+        fn switchToTaskBlock(
             inner_spinlock_addr: usize,
             new_task_inner_addr: usize,
         ) callconv(.C) noreturn {
@@ -255,29 +336,81 @@ fn switchToTaskFromTaskWithLock(
         }
     };
 
-    std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
-    std.debug.assert(!current_task.isIdleTask());
+    std.debug.assert(old_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
+    std.debug.assert(!old_task.isIdleTask());
     std.debug.assert(!new_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
 
-    log.verbose("switching from {} to {} with a lock", .{ current_task, new_task });
+    log.verbose("switching from {} to {} and blocking", .{ old_task, new_task });
 
-    const executor = current_task.state.running;
+    const current_executor = old_task.state.running;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(executor, current_task, new_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
 
-    current_task.state = current_task_new_state;
-    current_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.switchToTaskWithLock`
+    old_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.switchToTaskBlock`
 
-    new_task.state = .{ .running = executor };
-    executor.current_task = new_task;
+    new_task.state = .{ .running = current_executor };
+    current_executor.current_task = new_task;
+
+    old_task.state = .blocked;
 
     kernel.arch.scheduling.callTwoArgs(
-        current_task,
-        executor.idle_task.stack,
+        old_task,
+        current_executor.idle_task.stack,
         @intFromPtr(spinlock),
         @intFromPtr(new_task),
-        static.switchToTaskWithLock,
+        static.switchToTaskBlock,
+    ) catch |err| {
+        switch (err) {
+            // the idle task stack should be big enough
+            error.StackOverflow => @panic("insufficent space on the idle task stack"),
+        }
+    };
+}
+
+fn switchToTaskFromTaskDrop(old_task: *kernel.Task, new_task: *kernel.Task) void {
+    const static = struct {
+        fn switchToTaskDrop(
+            task_to_drop_addr: usize,
+            new_task_inner_addr: usize,
+        ) callconv(.C) noreturn {
+            const task_to_drop: *kernel.Task = @ptrFromInt(task_to_drop_addr);
+            const new_task_inner: *kernel.Task = @ptrFromInt(new_task_inner_addr);
+
+            globals.lock.unlock(new_task_inner);
+
+            task_to_drop.decrementReferenceCount(new_task_inner);
+
+            globals.lock.lock(new_task_inner);
+
+            kernel.arch.scheduling.jumpToTaskFromIdle(new_task_inner);
+            @panic("task returned");
+        }
+    };
+
+    std.debug.assert(old_task.state == .running);
+    std.debug.assert(old_task.spinlocks_held == 1); // the scheduler lock is held
+    std.debug.assert(!old_task.isIdleTask());
+    std.debug.assert(!new_task.isIdleTask());
+    std.debug.assert(new_task.next_task_node.next == null);
+
+    log.verbose("switching from {} to {} and dropping", .{ old_task, new_task });
+
+    const current_executor = old_task.state.running;
+
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
+
+    new_task.state = .{ .running = current_executor };
+    current_executor.current_task = new_task;
+
+    old_task.state = .{ .dropped = .{} };
+
+    kernel.arch.scheduling.callTwoArgs(
+        old_task,
+        current_executor.idle_task.stack,
+        @intFromPtr(old_task),
+        @intFromPtr(new_task),
+        static.switchToTaskDrop,
     ) catch |err| {
         switch (err) {
             // the idle task stack should be big enough
@@ -308,12 +441,8 @@ pub fn newTaskEntry(
     @panic("task returned to entry point");
 }
 
-fn idle(current_task_addr: usize) callconv(.c) noreturn {
-    const current_task: *kernel.Task = @ptrFromInt(current_task_addr);
-
-    globals.lock.unlock(current_task);
-
-    log.debug("entering idle", .{});
+fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
+    log.verbose("entering idle", .{});
 
     while (true) {
         {

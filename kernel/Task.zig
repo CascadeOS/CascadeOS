@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+//! Represents a schedulable task.
+//!
+//! Can be either a kernel or userspace task.
+
 const Task = @This();
 
 state: State,
@@ -8,7 +12,7 @@ state: State,
 /// The number of references to this task.
 ///
 /// Each task has a reference to itself which is dropped when the scheduler drops the task.
-reference_count: std.atomic.Value(usize),
+reference_count: std.atomic.Value(usize) = .init(1), // tasks start with a reference to themselves
 
 /// The stack used by this task in kernel mode.
 stack: Stack,
@@ -24,7 +28,7 @@ preemption_disable_count: u32 = 0,
 /// When we re-enable preemption, we check this flag.
 preemption_skipped: bool = false,
 
-spinlocks_held: u32,
+spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked (except for init tasks)
 
 /// Used for various linked lists.
 next_task_node: containers.SingleNode = .empty,
@@ -50,7 +54,18 @@ pub const State = union(enum) {
     /// It is the accessors responsibility to ensure that the executor does not change.
     running: *kernel.Executor,
     blocked,
-    dropped,
+    dropped: Dropped,
+
+    pub const Dropped = struct {
+        queued_for_cleanup: bool = false,
+        node: containers.DoubleNode = .empty,
+
+        inline fn taskFromNode(node: *containers.DoubleNode) *Task {
+            const dropped: *State.Dropped = @fieldParentPtr("node", node);
+            const state: *State = @fieldParentPtr("dropped", dropped);
+            return @fieldParentPtr("state", state);
+        }
+    };
 };
 
 pub fn getCurrent() *Task {
@@ -67,67 +82,51 @@ pub fn getCurrent() *Task {
     return current_task;
 }
 
-pub const CreateOptions = struct {
+pub const CreateKernelTaskOptions = struct {
+    name: Name,
+
     start_function: kernel.arch.scheduling.NewTaskFunction,
     arg1: u64,
     arg2: u64,
-
-    context: CreateContext,
-
-    pub const CreateContext = union(kernel.Context) {
-        kernel: Kernel,
-        user: void,
-
-        pub const Kernel = struct {
-            name: Name,
-        };
-    };
 };
 
-/// Create a task.
-///
-/// Not to be used for creating idle, bootstrap, or init tasks.
-pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
-    const task = try globals.cache.allocate(current_task);
-    errdefer globals.cache.deallocate(current_task, task);
-
-    const preconstructed_stack = task.stack;
-
-    task.* = .{
-        .state = .ready,
-        .reference_count = .init(1), // tasks have a reference to themselves
-        .stack = preconstructed_stack,
-        .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-
-        .context = switch (options.context) {
-            .kernel => |kernel_context| .{
-                .kernel = .{
-                    .name = kernel_context.name,
-                    .is_idle_task = false,
-                },
+pub fn createKernelTask(current_task: *kernel.Task, options: CreateKernelTaskOptions) !*Task {
+    const task = try internal.create(current_task, .{
+        .start_function = options.start_function,
+        .arg1 = options.arg1,
+        .arg2 = options.arg2,
+        .context = .{
+            .kernel = .{
+                .name = options.name,
             },
-            .user => .{},
         },
-    };
+    });
+    errdefer {
+        _ = task.reference_count.fetchSub(1, .monotonic); // ensure the reference count is zero
+        internal.destroy(current_task, task);
+    }
 
-    task.stack.reset();
+    {
+        kernel.kernel_tasks_lock.writeLock(current_task);
+        defer kernel.kernel_tasks_lock.writeUnlock(current_task);
 
-    try kernel.arch.scheduling.prepareNewTaskForScheduling(
-        task,
-        options.start_function,
-        options.arg1,
-        options.arg2,
-    );
+        const gop = try kernel.kernel_tasks.getOrPut(kernel.mem.heap.allocator, task);
+        std.debug.assert(gop.found_existing == false);
+    }
 
     return task;
 }
 
-/// Destroy a task.
+pub fn incrementReferenceCount(task: *Task) void {
+    _ = task.reference_count.fetchAdd(1, .acq_rel);
+}
+
+/// Decrements the reference count of the task.
 ///
-/// Asserts that the task is in the `dropped` state.
-pub fn destroy(current_task: *kernel.Task, task: *Task) void {
-    std.debug.assert(task.state == .dropped);
-    globals.cache.deallocate(current_task, task);
+/// If it reaches zero the task is submitted to the task cleanup service.
+pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
+    if (task.reference_count.fetchSub(1, .acq_rel) != 1) return;
+    globals.task_cleanup_service.queueForCleanup(current_task, task);
 }
 
 pub fn incrementInterruptDisable(task: *Task) void {
@@ -187,34 +186,95 @@ pub fn decrementPreemptionDisable(task: *Task) void {
     }
 }
 
-pub const InterruptRestorer = struct {
-    previous_value: u32,
-
-    pub fn exit(interrupt_restorer: InterruptRestorer, current_task: *Task) void {
-        current_task.interrupt_disable_count = interrupt_restorer.previous_value;
-    }
-};
-
-pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
-    std.debug.assert(!kernel.arch.interrupts.areEnabled());
-
-    const executor = kernel.arch.rawGetCurrentExecutor();
-
-    const current_task = executor.current_task;
-    std.debug.assert(current_task.state.running == executor);
-
-    const previous_value = current_task.interrupt_disable_count;
-    current_task.interrupt_disable_count = previous_value + 1;
-
-    return .{ current_task, .{ .previous_value = previous_value } };
-}
-
 pub fn isIdleTask(task: *const Task) bool {
     return switch (task.context) {
         .kernel => |kernel_context| kernel_context.is_idle_task,
         .user => false,
     };
 }
+
+pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
+    switch (task.context) {
+        .kernel => |kernel_context| try writer.print("KernelTask({s})", .{kernel_context.name.constSlice()}),
+        .user => @panic("TODO: implement user task printing"),
+    }
+}
+
+pub inline fn format(
+    task: *const Task,
+    comptime fmt: []const u8,
+    options: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    _ = options;
+    _ = fmt;
+    return if (@TypeOf(writer) == std.io.AnyWriter)
+        print(task, writer, 0)
+    else
+        print(task, writer.any(), 0);
+}
+
+pub inline fn fromNode(node: *containers.SingleNode) *Task {
+    return @fieldParentPtr("next_task_node", node);
+}
+
+pub const internal = struct {
+    pub const CreateOptions = struct {
+        start_function: kernel.arch.scheduling.NewTaskFunction,
+        arg1: u64,
+        arg2: u64,
+
+        context: CreateContext,
+
+        pub const CreateContext = union(kernel.Context.Type) {
+            kernel: Kernel,
+            user: void,
+
+            pub const Kernel = struct {
+                name: Name,
+            };
+        };
+    };
+
+    fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
+        const task = try globals.cache.allocate(current_task);
+        errdefer globals.cache.deallocate(current_task, task);
+
+        const preconstructed_stack = task.stack;
+
+        task.* = .{
+            .state = .ready,
+            .stack = preconstructed_stack,
+
+            .context = switch (options.context) {
+                .kernel => |kernel_context| .{
+                    .kernel = .{
+                        .name = kernel_context.name,
+                        .is_idle_task = false,
+                    },
+                },
+                .user => .user,
+            },
+        };
+
+        task.stack.reset();
+
+        try kernel.arch.scheduling.prepareNewTaskForScheduling(
+            task,
+            options.start_function,
+            options.arg1,
+            options.arg2,
+        );
+
+        return task;
+    }
+
+    fn destroy(current_task: *kernel.Task, task: *Task) void {
+        std.debug.assert(task.state == .dropped);
+        std.debug.assert(task.reference_count.load(.monotonic) == 0);
+        globals.cache.deallocate(current_task, task);
+    }
+};
 
 pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
 
@@ -339,48 +399,138 @@ pub const Stack = struct {
     const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
 };
 
-pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
-    switch (task.context) {
-        .kernel => |kernel_context| try writer.print("KernelTask({s})", .{kernel_context.name.constSlice()}),
-        .user => @panic("TODO: implement user task printing"),
+pub const InterruptRestorer = struct {
+    previous_value: u32,
+
+    pub fn exit(interrupt_restorer: InterruptRestorer, current_task: *Task) void {
+        current_task.interrupt_disable_count = interrupt_restorer.previous_value;
     }
+};
+
+pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
+    std.debug.assert(!kernel.arch.interrupts.areEnabled());
+
+    const executor = kernel.arch.rawGetCurrentExecutor();
+
+    const current_task = executor.current_task;
+    std.debug.assert(current_task.state.running == executor);
+
+    const previous_value = current_task.interrupt_disable_count;
+    current_task.interrupt_disable_count = previous_value + 1;
+
+    return .{ current_task, .{ .previous_value = previous_value } };
 }
 
-pub inline fn format(
-    task: *const Task,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
-    _ = options;
-    _ = fmt;
-    return if (@TypeOf(writer) == std.io.AnyWriter)
-        print(task, writer, 0)
-    else
-        print(task, writer.any(), 0);
-}
+const TaskCleanupService = struct {
+    task: *Task,
 
-pub inline fn fromNode(node: *containers.SingleNode) *Task {
-    return @fieldParentPtr("next_task_node", node);
-}
+    lock: kernel.sync.TicketSpinLock = .{},
+    wait_queue: kernel.sync.WaitQueue = .{},
 
-fn cacheConstructor(task: *Task, current_task: *Task) kernel.mem.cache.ConstructorError!void {
-    task.* = undefined;
-    task.stack = try .createStack(current_task);
-}
+    incoming: containers.AtomicSinglyLinkedLIFO = .empty,
+    to_clean: containers.DoublyLinkedList = .empty,
 
-fn cacheDestructor(task: *Task, current_task: *Task) void {
-    task.stack.destroyStack(current_task);
-}
+    fn queueForCleanup(task_cleanup_service: *TaskCleanupService, current_task: *Task, task: *Task) void {
+        std.debug.assert(current_task != task);
+
+        TaskCleanupService.log.debug("queueing {} for cleanup", .{task});
+
+        if (!task.state.dropped.queued_for_cleanup) {
+            task_cleanup_service.incoming.push(&task.state.dropped.node.next);
+            task.state.dropped.queued_for_cleanup = true;
+        }
+
+        {
+            task_cleanup_service.lock.lock(current_task);
+            defer task_cleanup_service.lock.unlock(current_task);
+            task_cleanup_service.wait_queue.wakeOne(current_task, &task_cleanup_service.lock);
+        }
+    }
+
+    fn execute(current_task: *Task, task_cleanup_service_addr: usize, _: usize) noreturn {
+        std.debug.assert(current_task.interrupt_disable_count == 0);
+        std.debug.assert(current_task.preemption_disable_count == 0);
+        std.debug.assert(current_task.preemption_skipped == false);
+        std.debug.assert(current_task.spinlocks_held == 0);
+        std.debug.assert(kernel.arch.interrupts.areEnabled());
+
+        const task_cleanup_service: *TaskCleanupService = @ptrFromInt(task_cleanup_service_addr);
+
+        while (true) {
+            while (task_cleanup_service.incoming.pop()) |node| {
+                const task: *Task = State.Dropped.taskFromNode(.fromNextNode(node));
+                std.debug.assert(task.state == .dropped);
+
+                switch (task.context) {
+                    .kernel => {
+                        kernel.kernel_tasks_lock.writeLock(current_task);
+                        defer kernel.kernel_tasks_lock.writeUnlock(current_task);
+
+                        if (!kernel.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks");
+                    },
+                    .user => @panic("TODO: implement user task cleanup"),
+                }
+
+                task_cleanup_service.to_clean.append(&task.state.dropped.node);
+            }
+
+            if (task_cleanup_service.to_clean.first) |first| {
+                @branchHint(.likely);
+                var opt_node: ?*containers.SingleNode = &first.next;
+
+                while (opt_node) |node| {
+                    const double_node: *containers.DoubleNode = .fromNextNode(node);
+                    const task: *Task = State.Dropped.taskFromNode(double_node);
+
+                    if (task.reference_count.load(.acquire) != 0) {
+                        opt_node = node.next;
+                        continue;
+                    }
+
+                    opt_node = double_node.next.next;
+                    task_cleanup_service.to_clean.remove(double_node);
+
+                    TaskCleanupService.log.debug("destroying {}", .{task});
+                    internal.destroy(current_task, task);
+                }
+            }
+
+            if (!task_cleanup_service.incoming.isEmpty()) continue;
+            task_cleanup_service.lock.lock(current_task);
+            if (!task_cleanup_service.incoming.isEmpty()) {
+                task_cleanup_service.lock.unlock(current_task);
+                continue;
+            }
+            task_cleanup_service.wait_queue.wait(current_task, &task_cleanup_service.lock);
+        }
+    }
+
+    const log = kernel.debug.log.scoped(.task_cleanup);
+};
 
 pub const globals = struct {
     /// The source of task objects.
     ///
-    /// Initialized during `init.initializeTaskStacksAndCache`.
-    var cache: kernel.mem.cache.Cache(Task, cacheConstructor, cacheDestructor) = undefined;
+    /// Initialized during `init.initializeTasks`.
+    var cache: kernel.mem.cache.Cache(
+        Task,
+        struct {
+            fn constructor(task: *Task, current_task: *Task) kernel.mem.cache.ConstructorError!void {
+                task.* = undefined;
+                task.stack = try .createStack(current_task);
+            }
+        }.constructor,
+        struct {
+            fn destructor(task: *Task, current_task: *Task) void {
+                task.stack.destroyStack(current_task);
+            }
+        }.destructor,
+    ) = undefined;
 
     var stack_arena: kernel.mem.resource_arena.Arena(.none) = undefined;
     var stack_page_table_mutex: kernel.sync.Mutex = .{};
+
+    pub var task_cleanup_service: TaskCleanupService = undefined;
 };
 
 pub const init = struct {
@@ -410,6 +560,23 @@ pub const init = struct {
         globals.cache.init(
             .{ .name = try .fromSlice("task") },
         );
+
+        log.debug("initializing task cleanup service", .{});
+        {
+            globals.task_cleanup_service = .{
+                .task = try createKernelTask(current_task, .{
+                    .name = try .fromSlice("task cleanup"),
+                    .start_function = TaskCleanupService.execute,
+                    .arg1 = @intFromPtr(&globals.task_cleanup_service),
+                    .arg2 = undefined,
+                }),
+            };
+
+            kernel.scheduler.lockScheduler(current_task);
+            defer kernel.scheduler.unlockScheduler(current_task);
+
+            kernel.scheduler.queueTask(current_task, globals.task_cleanup_service.task);
+        }
     }
 
     pub fn initializeBootstrapInitTask(
@@ -418,7 +585,6 @@ pub const init = struct {
     ) !void {
         bootstrap_init_task.* = .{
             .state = .{ .running = bootstrap_executor },
-            .reference_count = .init(1), // tasks have a reference to themselves
             .stack = undefined, // never used
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
@@ -435,29 +601,21 @@ pub const init = struct {
         current_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
-        const task = try globals.cache.allocate(current_task);
-        errdefer globals.cache.deallocate(current_task, task);
-
-        const preconstructed_stack = task.stack;
-
         var name: Name = .{};
         try name.writer().print("init {}", .{@intFromEnum(executor.id)});
 
-        task.* = .{
-            .state = .{ .running = executor },
-            .reference_count = .init(1), // tasks have a reference to themselves
-            .stack = preconstructed_stack,
-            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
+        const task = try createKernelTask(current_task, .{
+            .name = name,
+            .start_function = undefined,
+            .arg1 = undefined,
+            .arg2 = undefined,
+        });
+        errdefer comptime unreachable;
 
-            .context = .{
-                .kernel = .{
-                    .name = name,
-                    .is_idle_task = false,
-                },
-            },
-        };
+        task.state = .{ .running = executor };
+        task.spinlocks_held = 0; // init tasks don't start with the scheduler locked
 
-        task.stack.reset();
+        task.stack.reset(); // we don't care about the `start_function` and arguments
 
         executor.current_task = task;
     }
@@ -472,9 +630,7 @@ pub const init = struct {
 
         idle_task.* = .{
             .state = .ready,
-            .reference_count = .init(1), // tasks have a reference to themselves
             .stack = try .createStack(current_task),
-            .spinlocks_held = 1, // idle tasks start with the scheduler locked
 
             .context = .{
                 .kernel = .{
