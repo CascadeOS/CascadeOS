@@ -377,11 +377,15 @@ fn switchToTaskFromTaskDrop(old_task: *kernel.Task, new_task: *kernel.Task) void
             const task_to_drop: *kernel.Task = @ptrFromInt(task_to_drop_addr);
             const new_task_inner: *kernel.Task = @ptrFromInt(new_task_inner_addr);
 
+            const preemption_skipped = new_task_inner.preemption_skipped;
+            new_task_inner.preemption_disable_count += 1;
             globals.lock.unlock(new_task_inner);
 
             task_to_drop.decrementReferenceCount(new_task_inner);
 
             globals.lock.lock(new_task_inner);
+            new_task_inner.preemption_disable_count -= 1;
+            new_task_inner.preemption_skipped = preemption_skipped;
 
             kernel.arch.scheduling.jumpToTaskFromIdle(new_task_inner);
             @panic("task returned");
