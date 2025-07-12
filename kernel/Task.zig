@@ -432,19 +432,19 @@ const TaskCleanupService = struct {
 
     fn queueForCleanup(task_cleanup_service: *TaskCleanupService, current_task: *Task, task: *Task) void {
         std.debug.assert(current_task != task);
+        std.debug.assert(task.state == .dropped);
 
         TaskCleanupService.log.debug("queueing {} for cleanup", .{task});
+
+        task_cleanup_service.lock.lock(current_task);
+        defer task_cleanup_service.lock.unlock(current_task);
 
         if (!task.state.dropped.queued_for_cleanup) {
             task_cleanup_service.incoming.push(&task.state.dropped.node.next);
             task.state.dropped.queued_for_cleanup = true;
         }
 
-        {
-            task_cleanup_service.lock.lock(current_task);
-            defer task_cleanup_service.lock.unlock(current_task);
-            task_cleanup_service.wait_queue.wakeOne(current_task, &task_cleanup_service.lock);
-        }
+        task_cleanup_service.wait_queue.wakeOne(current_task, &task_cleanup_service.lock);
     }
 
     fn execute(current_task: *Task, task_cleanup_service_addr: usize, _: usize) noreturn {
