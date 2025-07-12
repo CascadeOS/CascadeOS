@@ -108,9 +108,12 @@ pub fn drop(current_task: *kernel.Task) noreturn {
 
     log.verbose("dropping {}", .{current_task});
 
-    const new_task_node = globals.ready_to_run.pop() orelse blk: {
-        kernel.Task.globals.task_cleanup_service.lock.lock(current_task);
-
+    const new_task_node = globals.ready_to_run.pop() orelse new_task_node: {
+        // TODO: is there a way to remove the redundancy within the two branches here?
+        if (!kernel.Task.globals.task_cleanup_service.lock.tryLock(current_task)) {
+            switchToIdleDrop(current_task);
+            @panic("idle returned");
+        }
         const cleanup_service_task = kernel.Task.globals.task_cleanup_service.wait_queue.popFirst() orelse {
             kernel.Task.globals.task_cleanup_service.lock.unlock(current_task);
             switchToIdleDrop(current_task);
@@ -121,7 +124,7 @@ pub fn drop(current_task: *kernel.Task) noreturn {
         std.debug.assert(cleanup_service_task == kernel.Task.globals.task_cleanup_service.task);
         cleanup_service_task.state = .ready;
 
-        break :blk &cleanup_service_task.next_task_node;
+        break :new_task_node &cleanup_service_task.next_task_node;
     };
 
     const new_task = kernel.Task.fromNode(new_task_node);
