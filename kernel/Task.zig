@@ -571,7 +571,7 @@ pub const init = struct {
                     .arg2 = undefined,
                 }),
             };
-
+            globals.task_cleanup_service.task.state = .blocked;
             globals.task_cleanup_service.wait_queue.waiting_tasks.push(
                 &globals.task_cleanup_service.task.next_task_node,
             );
