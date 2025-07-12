@@ -52,7 +52,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bo
 
     current_task.incrementInterruptDisable();
 
-    const old_container = @atomicLoad(Container, &ticket_spin_lock.container, .monotonic);
+    const old_container: Container = @bitCast(@atomicLoad(u64, &ticket_spin_lock.container.full, .monotonic));
 
     if (old_container.contents.current != old_container.contents.ticket) {
         @branchHint(.unlikely);
@@ -64,7 +64,14 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bo
     var new_container = old_container;
     new_container.contents.ticket +%= 1;
 
-    if (@cmpxchgStrong(Container, &ticket_spin_lock.container, old_container, new_container, .acquire, .monotonic)) |_| {
+    if (@cmpxchgStrong(
+        u64,
+        &ticket_spin_lock.container.full,
+        old_container.full,
+        new_container.full,
+        .acquire,
+        .monotonic,
+    )) |_| {
         @branchHint(.unlikely);
 
         current_task.decrementInterruptDisable();
