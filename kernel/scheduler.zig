@@ -238,9 +238,11 @@ fn switchToIdleDrop(old_task: *kernel.Task) void {
             const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
 
             std.debug.assert(idle_task.isIdleTask());
+            idle_task.incrementPreemptionDisable();
             globals.lock.unlock(idle_task);
 
             task_to_drop.decrementReferenceCount(idle_task);
+            idle_task.decrementPreemptionDisable();
 
             idle(idle_task);
             @panic("idle returned");
