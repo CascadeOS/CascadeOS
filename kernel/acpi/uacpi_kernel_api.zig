@@ -25,7 +25,7 @@ export fn uacpi_kernel_pci_device_open(
     address: kernel.pci.Address,
     out_handle: **volatile kernel.pci.Function,
 ) uacpi.Status {
-    log.verbose("uacpi_kernel_pci_device_open called with address {}", .{address});
+    log.verbose("uacpi_kernel_pci_device_open called with address {f}", .{address});
 
     out_handle.* = kernel.pci.getFunction(address) orelse return uacpi.Status.not_found;
     return .ok;

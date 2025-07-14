@@ -174,41 +174,25 @@ pub const DBG2 = extern struct {
                 EHCI = 0x0001,
             };
 
-            pub fn print(port_type: PortType, writer: std.io.AnyWriter, indent: usize) !void {
-                _ = indent;
-
+            pub fn format(port_type: PortType, writer: *std.Io.Writer) !void {
                 switch (port_type) {
                     .serial => |subtype| try writer.print(
-                        "PortType{{ serial: {s} }}",
-                        .{@tagName(subtype)},
+                        "PortType{{ serial: {t} }}",
+                        .{subtype},
                     ),
                     .@"1394" => |subtype| try writer.print(
-                        "PortType{{ 1394: {s} }}",
-                        .{@tagName(subtype)},
+                        "PortType{{ 1394: {t} }}",
+                        .{subtype},
                     ),
                     .usb => |subtype| try writer.print(
-                        "PortType{{ usb: {s} }}",
-                        .{@tagName(subtype)},
+                        "PortType{{ usb: {t} }}",
+                        .{subtype},
                     ),
                     .net => |vendor_id| try writer.print(
-                        "{{ net: {} }}",
+                        "{{ net: {f} }}",
                         .{vendor_id},
                     ),
                 }
-            }
-
-            pub inline fn format(
-                port_type: PortType,
-                comptime fmt: []const u8,
-                options: std.fmt.FormatOptions,
-                writer: anytype,
-            ) !void {
-                _ = options;
-                _ = fmt;
-                return if (@TypeOf(writer) == std.io.AnyWriter)
-                    PortType.print(port_type, writer, 0)
-                else
-                    PortType.print(port_type, writer.any(), 0);
             }
         };
 
@@ -234,33 +218,23 @@ pub const DBG2 = extern struct {
             }
         };
 
-        pub fn print(debug_device: *align(1) const DebugDevice, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(debug_device: *align(1) const DebugDevice, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("DebugDevice{\n");
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("namespace_string: {s},\n", .{debug_device.namespaceString()});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("port_type: {},\n", .{debug_device.portType()});
 
-            try writer.writeByteNTimes(' ', indent);
+            try writer.splatByteAll(' ', indent);
             try writer.writeByte('}');
         }
 
-        pub inline fn format(
-            debug_device: *align(1) const DebugDevice,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            _ = options;
-            _ = fmt;
-            return if (@TypeOf(writer) == std.io.AnyWriter)
-                DebugDevice.print(debug_device, writer, 0)
-            else
-                DebugDevice.print(debug_device, writer.any(), 0);
+        pub inline fn format(debug_device: *align(1) const DebugDevice, writer: *std.Io.Writer) !void {
+            return debug_device.print(writer, 0);
         }
 
         comptime {
@@ -287,33 +261,23 @@ pub const DBG2 = extern struct {
         }
     };
 
-    pub fn print(dbg2: *const DBG2, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(dbg2: *const DBG2, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("DBG2{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("offset_of_debug_device_info: {d},\n", .{dbg2.offset_of_debug_device_info});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("number_of_debug_device_info: {d},\n", .{dbg2.number_of_debug_device_info});
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
-    pub inline fn format(
-        dbg2: *const DBG2,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(dbg2, writer, 0)
-        else
-            print(dbg2, writer.any(), 0);
+    pub inline fn format(dbg2: *const DBG2, writer: *std.Io.Writer) !void {
+        return dbg2.print(writer, 0);
     }
 
     comptime {

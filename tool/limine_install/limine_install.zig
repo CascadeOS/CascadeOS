@@ -11,10 +11,10 @@ pub fn main() u8 {
         cwd,
         parse_args_result.output_file_path,
         .{},
-    ) catch |e| err("failed to copy file '{s}' to '{s}': {s}", .{
+    ) catch |e| err("failed to copy file '{s}' to '{s}': {t}", .{
         parse_args_result.input_file_path,
         parse_args_result.output_file_path,
-        @errorName(e),
+        e,
     });
 
     return @intCast(limine_main(

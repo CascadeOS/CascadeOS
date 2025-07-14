@@ -72,9 +72,9 @@ pub fn faultCheck(
         return error.NotMapped;
     }
 
-    log.verbose("fault_lookup found entry with range {} and protection {s}", .{
+    log.verbose("fault_lookup found entry with range {f} and protection {t}", .{
         fault_info.entry.range(),
-        @tagName(fault_info.entry.protection),
+        fault_info.entry.protection,
     });
 
     // check protection
@@ -120,7 +120,7 @@ pub fn faultCheck(
         }
     }
 
-    log.verbose("page enter protection: {s}", .{@tagName(fault_info.enter_protection)});
+    log.verbose("page enter protection: {t}", .{fault_info.enter_protection});
 
     const anonymous_map_reference = fault_info.entry.anonymous_map_reference;
     const object_reference = fault_info.entry.object_reference;
@@ -198,8 +198,8 @@ pub fn faultObjectOrZeroFill(
     };
 
     log.verbose(
-        "determined object page {s} with promote_to_anonymous_map {}",
-        .{ @tagName(object_page), fault_info.promote_to_anonymous_map },
+        "determined object page {t} with promote_to_anonymous_map {}",
+        .{ object_page, fault_info.promote_to_anonymous_map },
     );
 
     switch (object_page) {
@@ -282,7 +282,7 @@ pub fn faultObjectOrZeroFill(
             },
         };
 
-        log.verbose("mapping {} with {}", .{ fault_info.faulting_address, map_type });
+        log.verbose("mapping {f} with {f}", .{ fault_info.faulting_address, map_type });
 
         fault_info.address_space.page_table_lock.lock(current_task);
         defer fault_info.address_space.page_table_lock.unlock(current_task);
@@ -376,7 +376,10 @@ fn promote(
         // MUST clean up `page` as well
     };
 
-    log.verbose("allocated anonymous page for {} at {}", .{ fault_info.faulting_address, allocated_frame.baseAddress() });
+    log.verbose(
+        "allocated anonymous page for {f} at {f}",
+        .{ fault_info.faulting_address, allocated_frame.baseAddress() },
+    );
 
     switch (object_page) {
         .zero_fill => {

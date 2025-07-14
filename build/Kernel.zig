@@ -264,19 +264,19 @@ fn constructUACPIStaticLib(
     architecture: CascadeTarget.Architecture,
 ) !*std.Build.Step.Compile {
     // in uACPI DEBUG is more verbose than TRACE
-    const uacpi_log_level: []const u8 = if (options.kernel_log_level) |force_log_level|
-        switch (force_log_level) {
-            .debug => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE",
-            .verbose => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG",
+    const uacpi_log_level: []const u8 = blk: {
+        if (options.kernel_log_level) |force_log_level|
+            break :blk switch (force_log_level) {
+                .debug => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE",
+                .verbose => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG",
+            };
+
+        for (options.kernel_log_scopes) |scope| {
+            if (std.mem.eql(u8, scope, "uacpi")) break :blk "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG";
         }
-    else if (std.mem.indexOf(
-        u8,
-        options.kernel_log_scopes,
-        "uacpi",
-    ) != null)
-        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG"
-    else
-        "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
+
+        break :blk "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
+    };
 
     const uacpi_dep = b.dependency("uacpi", .{});
 
@@ -341,8 +341,8 @@ fn constructKernelModule(
     for (dependencies) |dep| {
         const library_module = dep.library.cascade_modules.get(architecture) orelse
             std.debug.panic(
-                "no module available for library '{s}' for architecture '{s}'",
-                .{ dep.library.name, @tagName(architecture) },
+                "no module available for library '{s}' for architecture '{t}'",
+                .{ dep.library.name, architecture },
             );
 
         kernel_module.addImport(dep.import_name, library_module);
@@ -417,8 +417,8 @@ fn constructKernelModule(
         while (try iter.next()) |entry| {
             if (entry.kind != .file) {
                 std.debug.panic(
-                    "found entry '{s}' with unexpected type '{s}' in assembly directory '{s}'\n",
-                    .{ entry.name, @tagName(entry.kind), assembly_files_dir_path },
+                    "found entry '{s}' with unexpected type '{t}' in assembly directory '{s}'\n",
+                    .{ entry.name, entry.kind, assembly_files_dir_path },
                 );
             }
 

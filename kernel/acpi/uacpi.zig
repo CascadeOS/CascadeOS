@@ -2480,7 +2480,7 @@ pub const Table = extern struct {
             fn handlerWrapper(
                 header: *acpi.tables.SharedHeader,
                 out_override_address: *u64,
-            ) callconv(.C) TableInstallationDisposition {
+            ) callconv(.c) TableInstallationDisposition {
                 return handler(header, out_override_address);
             }
         }.handlerWrapper;
@@ -3655,8 +3655,8 @@ pub const WorkType = enum(c_uacpi.uacpi_work_type) {
     work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
 };
 
-pub const WorkHandler = *const fn (*anyopaque) callconv(.C) void;
-pub const RawInterruptHandler = *const fn (?*anyopaque) callconv(.C) InterruptReturn;
+pub const WorkHandler = *const fn (*anyopaque) callconv(.c) void;
+pub const RawInterruptHandler = *const fn (?*anyopaque) callconv(.c) InterruptReturn;
 pub const CpuFlags = c_uacpi.uacpi_cpu_flags;
 
 pub const DataView = extern struct {
@@ -3698,7 +3698,7 @@ inline fn makeIterationCallbackWrapper(
             user_ctx: ?*anyopaque,
             node: *Node,
             node_depth: u32,
-        ) callconv(.C) IterationDecision {
+        ) callconv(.c) IterationDecision {
             return callback(node, node_depth, @ptrCast(user_ctx));
         }
     }.callbackWrapper);
@@ -3716,7 +3716,7 @@ inline fn makeResourceIterationCallbackWrapper(
     callback: ResourceIterationCallback(UserContextT),
 ) c_uacpi.uacpi_resource_iteration_callback {
     return comptime @ptrCast(&struct {
-        fn callbackWrapper(user_ctx: ?*anyopaque, resource: *const Resource) callconv(.C) Node.IterationDecision {
+        fn callbackWrapper(user_ctx: ?*anyopaque, resource: *const Resource) callconv(.c) Node.IterationDecision {
             return callback(resource, @ptrCast(user_ctx));
         }
     }.callbackWrapper);
@@ -3739,7 +3739,7 @@ inline fn makeNotifyHandlerWrapper(
             user_ctx: ?*anyopaque,
             node: *Node,
             value: u64,
-        ) callconv(.C) Status {
+        ) callconv(.c) Status {
             return handler(node, value, @ptrCast(user_ctx));
         }
     }.handlerWrapper);
@@ -3762,7 +3762,7 @@ inline fn makeGPEHandlerWrapper(
             user_ctx: ?*anyopaque,
             gpe_device: *Node,
             index: u16,
-        ) callconv(.C) InterruptReturn {
+        ) callconv(.c) InterruptReturn {
             return handler(gpe_device, index, @ptrCast(user_ctx));
         }
     }.handlerWrapper);
@@ -3781,7 +3781,7 @@ inline fn makeInterruptHandlerWrapper(
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
             user_ctx: ?*anyopaque,
-        ) callconv(.C) InterruptReturn {
+        ) callconv(.c) InterruptReturn {
             return handler(@ptrCast(user_ctx));
         }
     }.handlerWrapper);
@@ -3994,7 +3994,7 @@ inline fn makeRegionHandlerWrapper(
         fn handlerWrapper(
             op: RegionOperationType,
             op_data: *anyopaque,
-        ) callconv(.C) Status {
+        ) callconv(.c) Status {
             return handler(switch (op) {
                 .attach => .{ .attach = @ptrCast(@alignCast(op_data)) },
                 .detach => .{ .detach = @ptrCast(@alignCast(op_data)) },
@@ -4025,7 +4025,7 @@ inline fn makeInterfaceHandlerWrapper(
         fn handlerWrapper(
             name: [*:0]const u8,
             supported: bool,
-        ) callconv(.C) bool {
+        ) callconv(.c) bool {
             return handler(std.mem.sliceTo(name, 0), supported);
         }
     }.handlerWrapper);

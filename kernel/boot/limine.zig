@@ -163,7 +163,7 @@ pub const CpuDescriptorIterator = struct {
         comptime targetFn: fn (user_data: *anyopaque) noreturn,
     ) void {
         const trampolineFn = struct {
-            fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.C) noreturn {
+            fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.c) noreturn {
                 targetFn(@ptrFromInt(smp_info.extra_argument));
             }
         }.trampolineFn;
@@ -179,7 +179,7 @@ pub const CpuDescriptorIterator = struct {
         );
 
         @atomicStore(
-            ?*const fn (*const limine.MP.Response.MPInfo) callconv(.C) noreturn,
+            ?*const fn (*const limine.MP.Response.MPInfo) callconv(.c) noreturn,
             &smp_info.goto_address,
             &trampolineFn,
             .release,
@@ -240,7 +240,7 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
     return resp.address;
 }
 
-fn limineEntryPoint() callconv(.C) noreturn {
+fn limineEntryPoint() callconv(.c) noreturn {
     kernel.arch.init.onBootEntry();
 
     kernel.boot.bootloader_api = .limine;
@@ -251,7 +251,7 @@ fn limineEntryPoint() callconv(.C) noreturn {
     }
 
     @call(.never_inline, kernel.init.initStage1, .{}) catch |err| {
-        std.debug.panic("unhandled error: {s}", .{@errorName(err)});
+        std.debug.panic("unhandled error: {t}", .{err});
     };
     @panic("`initStage1` returned");
 }

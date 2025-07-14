@@ -72,8 +72,9 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     var output_file = try std.fs.cwd().createFile(dep_grap_file_path, .{});
     defer output_file.close();
 
-    var buffered_writer = std.io.bufferedWriter(output_file.writer());
-    const writer = buffered_writer.writer();
+    var writer_buffer: [std.heap.page_size_min]u8 = undefined;
+    var file_writer = output_file.writer(&writer_buffer);
+    const writer = &file_writer.interface;
 
     try writer.writeAll(
         \\classes: {
@@ -88,8 +89,8 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
     while (kernel_iterator.next()) |kernel| {
         const kernel_name = try std.fmt.allocPrint(
             dep_grap_step.b.allocator,
-            "{s}_kernel",
-            .{@tagName(kernel.key_ptr.*)},
+            "{t}_kernel",
+            .{kernel.key_ptr.*},
         );
         try writer.print("{s}: {{class: binary}}\n", .{kernel_name});
 
@@ -126,7 +127,7 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
         node.completeOne();
     }
 
-    try buffered_writer.flush();
+    try writer.flush();
 
     dep_grap_step.dep_file.path = dep_grap_file_path;
 

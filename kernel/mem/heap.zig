@@ -190,7 +190,7 @@ fn heapPageArenaImport(
     );
     errdefer arena.deallocate(current_task, allocation);
 
-    log.verbose("mapping {} into heap", .{allocation});
+    log.verbose("mapping {f} into heap", .{allocation});
 
     const virtual_range: core.VirtualRange = .{
         .address = .fromInt(allocation.base),
@@ -225,7 +225,7 @@ fn heapPageArenaRelease(
 ) void {
     const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
 
-    log.verbose("unmapping {} from heap", .{allocation});
+    log.verbose("unmapping {f} from heap", .{allocation});
 
     {
         globals.heap_page_table_mutex.lock(current_task);
@@ -327,10 +327,7 @@ pub const init = struct {
                 heap_range.address.value,
                 heap_range.size.value,
             ) catch |err| {
-                std.debug.panic(
-                    "failed to add heap range to `heap_address_space_arena`: {s}",
-                    .{@errorName(err)},
-                );
+                std.debug.panic("failed to add heap range to `heap_address_space_arena`: {t}", .{err});
             };
         }
 
@@ -349,8 +346,8 @@ pub const init = struct {
                 special_heap_range.size.value,
             ) catch |err| {
                 std.debug.panic(
-                    "failed to add special heap range to `special_heap_address_space_arena`: {s}",
-                    .{@errorName(err)},
+                    "failed to add special heap range to `special_heap_address_space_arena`: {t}",
+                    .{err},
                 );
             };
         }

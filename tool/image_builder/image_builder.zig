@@ -51,7 +51,7 @@ fn getArguments(allocator: std.mem.Allocator) !Arguments {
 
     const image_description_contents = blk: {
         if (std.mem.eql(u8, args[1], "-")) {
-            break :blk try std.io.getStdIn().readToEndAlloc(allocator, std.math.maxInt(usize));
+            break :blk try std.fs.File.stdin().readToEndAlloc(allocator, std.math.maxInt(usize));
         }
 
         const image_description_file = try std.fs.cwd().openFile(args[1], .{});

@@ -17,7 +17,7 @@ pub fn onPageFault(
     current_task.decrementInterruptDisable();
     switch (page_fault_details.context) {
         .kernel => kernel.mem.onKernelPageFault(current_task, page_fault_details, interrupt_frame),
-        .user => std.debug.panic("user page fault\n{}", .{page_fault_details}), // TODO
+        .user => std.debug.panic("user page fault\n{f}", .{page_fault_details}), // TODO
     }
 }
 

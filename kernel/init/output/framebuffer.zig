@@ -20,14 +20,23 @@ pub fn tryGetFramebufferOutput() ?kernel.init.Output {
     };
 
     return .{
-        .writeFn = write,
+        .writeFn = struct {
+            fn writeFn(_: *anyopaque, str: []const u8) void {
+                writeSlice(str);
+            }
+        }.writeFn,
+        .splatFn = struct {
+            fn splatFn(_: *anyopaque, str: []const u8, splat: usize) void {
+                for (0..splat) |_| writeSlice(str);
+            }
+        }.splatFn,
         .remapFn = remapFramebuffer,
         .context = undefined,
     };
 }
 
 /// Writes the given string to the framebuffer using the SSFN console bitmap font.
-fn write(_: *anyopaque, str: []const u8) void {
+fn writeSlice(str: []const u8) void {
     var iter: std.unicode.Utf8Iterator = .{
         .bytes = str,
         .i = 0,

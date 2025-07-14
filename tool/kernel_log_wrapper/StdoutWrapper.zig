@@ -5,14 +5,14 @@ const StdoutWrapper = @This();
 
 allocator: std.mem.Allocator,
 
-poller: std.io.Poller(StdoutEnum),
+poller: std.Io.Poller(StdoutEnum),
 stdout_window: []const u8 = &.{},
 partial_read_buffer: std.ArrayListUnmanaged(u8) = .{},
 
 pub fn init(allocator: std.mem.Allocator, stdout: std.fs.File) !StdoutWrapper {
     return .{
         .allocator = allocator,
-        .poller = std.io.poll(allocator, StdoutEnum, .{ .stdout = stdout }),
+        .poller = std.Io.poll(allocator, StdoutEnum, .{ .stdout = stdout }),
     };
 }
 

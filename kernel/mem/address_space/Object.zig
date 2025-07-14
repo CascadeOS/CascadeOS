@@ -30,7 +30,7 @@ pub const Reference = struct {
     pub fn print(
         object_reference: Reference,
         current_task: *kernel.Task,
-        writer: std.io.AnyWriter,
+        writer: *std.Io.Writer,
         indent: usize,
     ) !void {
         const new_indent = indent + 2;
@@ -38,10 +38,10 @@ pub const Reference = struct {
         if (object_reference.object) |object| {
             try writer.writeAll("Object.Reference{\n");
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("start_offset: {d}\n", .{object_reference.start_offset});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try object.print(
                 current_task,
                 writer,
@@ -49,19 +49,14 @@ pub const Reference = struct {
             );
             try writer.writeAll(",\n");
 
-            try writer.writeByteNTimes(' ', indent);
+            try writer.splatByteAll(' ', indent);
             try writer.writeAll("}");
         } else {
             try writer.writeAll("Object.Reference{ none }");
         }
     }
 
-    pub inline fn format(
-        _: Reference,
-        comptime _: []const u8,
-        _: std.fmt.FormatOptions,
-        _: anytype,
-    ) !void {
+    pub inline fn format(_: Reference, _: *std.Io.Writer) !void {
         @compileError("use `Reference.print` instead");
     }
 };
@@ -72,7 +67,7 @@ pub const Reference = struct {
 pub fn print(
     object: *Object,
     current_task: *kernel.Task,
-    writer: std.io.AnyWriter,
+    writer: *std.Io.Writer,
     indent: usize,
 ) !void {
     const new_indent = indent + 2;
@@ -82,20 +77,15 @@ pub fn print(
 
     try writer.writeAll("Object{\n");
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.writeAll("TODO\n");
     if (true) @panic("NOT IMPLEMENTED"); // TODO: implement object debug printing
 
-    try writer.writeByteNTimes(' ', indent);
+    try writer.splatByteAll(' ', indent);
     try writer.writeAll("}");
 }
 
-pub inline fn format(
-    _: *const *Object,
-    comptime _: []const u8,
-    _: std.fmt.FormatOptions,
-    _: anytype,
-) !void {
+pub inline fn format(_: *const *Object, _: *std.Io.Writer) !void {
     @compileError("use `Object.print` instead");
 }
 

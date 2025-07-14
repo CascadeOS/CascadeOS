@@ -48,7 +48,7 @@ pub const PageFaultErrorCode = packed struct(u64) {
         return @bitCast(error_code);
     }
 
-    pub fn print(page_fault_error_code: PageFaultErrorCode, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(page_fault_error_code: PageFaultErrorCode, writer: *std.Io.Writer, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("PageFaultErrorCode{ ");
@@ -97,18 +97,8 @@ pub const PageFaultErrorCode = packed struct(u64) {
         try writer.writeAll(" }");
     }
 
-    pub inline fn format(
-        page_fault_error_code: PageFaultErrorCode,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(page_fault_error_code, writer, 0)
-        else
-            print(page_fault_error_code, writer.any(), 0);
+    pub inline fn format(page_fault_error_code: PageFaultErrorCode, writer: *std.Io.Writer) !void {
+        return page_fault_error_code.print(writer, 0);
     }
 };
 

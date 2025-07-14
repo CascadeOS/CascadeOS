@@ -110,7 +110,7 @@ pub const Duration = extern struct {
         .{ .value = @intFromEnum(Unit.nanosecond), .name = "ns" },
     };
 
-    pub fn print(duration: Duration, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(duration: Duration, writer: *std.Io.Writer, indent: usize) !void {
         _ = indent;
 
         var any_output = false;
@@ -125,7 +125,7 @@ pub const Duration = extern struct {
         value -= days * @intFromEnum(Unit.day);
 
         if (days != 0) {
-            try std.fmt.formatInt(days, 10, .lower, .{}, writer);
+            try writer.printInt(days, 10, .lower, .{});
             try writer.writeByte('.');
             any_output = true;
         }
@@ -134,7 +134,7 @@ pub const Duration = extern struct {
         value -= hours * @intFromEnum(Unit.hour);
 
         if (hours != 0 or any_output) {
-            try std.fmt.formatInt(hours, 10, .lower, .{ .fill = '0', .width = 2 }, writer);
+            try writer.printInt(hours, 10, .lower, .{ .fill = '0', .width = 2 });
             try writer.writeByte(':');
             any_output = true;
         }
@@ -143,7 +143,7 @@ pub const Duration = extern struct {
         value -= minutes * @intFromEnum(Unit.minute);
 
         if (minutes != 0 or any_output) {
-            try std.fmt.formatInt(minutes, 10, .lower, .{ .fill = '0', .width = 2 }, writer);
+            try writer.printInt(minutes, 10, .lower, .{ .fill = '0', .width = 2 });
             try writer.writeByte(':');
             any_output = true;
         }
@@ -151,24 +151,14 @@ pub const Duration = extern struct {
         const seconds = value / @intFromEnum(Unit.second);
         value -= seconds * @intFromEnum(Unit.second);
 
-        try std.fmt.formatInt(seconds, 10, .lower, .{ .fill = '0', .width = 2 }, writer);
+        try writer.printInt(seconds, 10, .lower, .{ .fill = '0', .width = 2 });
         try writer.writeByte('.');
 
-        try std.fmt.formatInt(value, 10, .lower, .{ .fill = '0', .width = 9 }, writer);
+        try writer.printInt(value, 10, .lower, .{ .fill = '0', .width = 9 });
     }
 
-    pub inline fn format(
-        duration: Duration,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(duration, writer, 0)
-        else
-            print(duration, writer.any(), 0);
+    pub inline fn format(duration: Duration, writer: *std.Io.Writer) !void {
+        return print(duration, writer, 0);
     }
 
     comptime {

@@ -191,42 +191,32 @@ pub const SPCR = extern struct {
             return interrupt_type.ioapic or interrupt_type.iosapic or interrupt_type.armh_gic or interrupt_type.riscv_plic;
         }
 
-        pub fn print(interrupt_type: InterruptType, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(interrupt_type: InterruptType, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("InterruptType{\n");
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("pic: {},\n", .{interrupt_type.pic});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("ioapic: {},\n", .{interrupt_type.ioapic});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("iosapic: {},\n", .{interrupt_type.iosapic});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("armh_gic: {},\n", .{interrupt_type.armh_gic});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("riscv_plic: {},\n", .{interrupt_type.riscv_plic});
 
-            try writer.writeByteNTimes(' ', indent);
+            try writer.splatByteAll(' ', indent);
             try writer.writeByte('}');
         }
 
-        pub inline fn format(
-            interrupt_type: InterruptType,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            _ = options;
-            _ = fmt;
-            return if (@TypeOf(writer) == std.io.AnyWriter)
-                InterruptType.print(interrupt_type, writer, 0)
-            else
-                InterruptType.print(interrupt_type, writer.any(), 0);
+        pub inline fn format(interrupt_type: InterruptType, writer: *std.Io.Writer) !void {
+            return interrupt_type.print(writer, 0);
         }
     };
 
@@ -258,36 +248,26 @@ pub const SPCR = extern struct {
 
         _reserved: u5,
 
-        pub fn print(flow_control: FlowControl, writer: std.io.AnyWriter, indent: usize) !void {
+        pub fn print(flow_control: FlowControl, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("FlowControl{\n");
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("dcd: {},\n", .{flow_control.dcd});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("rts_cts: {},\n", .{flow_control.rts_cts});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("xon_xoff: {},\n", .{flow_control.xon_xoff});
 
-            try writer.writeByteNTimes(' ', indent);
+            try writer.splatByteAll(' ', indent);
             try writer.writeByte('}');
         }
 
-        pub inline fn format(
-            flow_control: FlowControl,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            _ = options;
-            _ = fmt;
-            return if (@TypeOf(writer) == std.io.AnyWriter)
-                FlowControl.print(flow_control, writer, 0)
-            else
-                FlowControl.print(flow_control, writer.any(), 0);
+        pub inline fn format(flow_control: FlowControl, writer: *std.Io.Writer) !void {
+            return flow_control.print(writer, 0);
         }
     };
 
@@ -308,61 +288,61 @@ pub const SPCR = extern struct {
         _: u31,
     };
 
-    pub fn print(spcr: *const SPCR, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(spcr: *const SPCR, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         const revision = spcr.header.revision;
 
         try writer.writeAll("SPCR{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("revision: {},\n", .{revision});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         if (revision < 2) {
-            try writer.print("interface_type: {s},\n", .{@tagName(spcr.interface_type.revision_1)});
+            try writer.print("interface_type: {t},\n", .{spcr.interface_type.revision_1});
         } else {
-            try writer.print("interface_type: {s},\n", .{@tagName(spcr.interface_type.revision_2_or_higher)});
+            try writer.print("interface_type: {t},\n", .{spcr.interface_type.revision_2_or_higher});
         }
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("base_address: ");
         try spcr.base_address.print(writer, new_indent);
         try writer.writeAll(",\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("interrupt_type: ");
         try spcr.interrupt_type.print(writer, new_indent);
         try writer.writeAll(",\n");
 
         if (spcr.interrupt_type.hasIrq()) {
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("irq: {},\n", .{spcr.irq});
         }
 
         if (spcr.interrupt_type.hasGlobalSystemInterrupt()) {
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("global_system_interrupt: {},\n", .{spcr.global_system_interrupt});
         }
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("configured_baud_rate: {s},\n", .{@tagName(spcr.configured_baud_rate)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("configured_baud_rate: {t},\n", .{spcr.configured_baud_rate});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("flow_control: ");
         try spcr.flow_control.print(writer, new_indent);
         try writer.writeAll(",\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("terminal_type: {s},\n", .{@tagName(spcr.terminal_type)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("terminal_type: {t},\n", .{spcr.terminal_type});
 
         if (spcr.pciAddress()) |pci_address| {
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.writeAll("pci_address: ");
             try pci_address.print(writer, new_indent);
             try writer.writeAll(",\n");
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print(
                 "pci_flags.dont_suppress_enumeration_or_perform_power_management: {}\n",
                 .{spcr.pci_flags.dont_suppress_enumeration_or_perform_power_management},
@@ -370,39 +350,29 @@ pub const SPCR = extern struct {
         }
 
         if (revision >= 3) {
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("uart_clock_frequency: {},\n", .{spcr.uart_clock_frequency});
         }
 
         if (revision >= 4) {
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("precise_baud_rate: {},\n", .{spcr.precise_baud_rate});
 
             if (spcr.namespaceString()) |namespace_string| {
-                try writer.writeByteNTimes(' ', new_indent);
+                try writer.splatByteAll(' ', new_indent);
                 try writer.print("namespace_string: {s},\n", .{namespace_string});
             } else {
-                try writer.writeByteNTimes(' ', new_indent);
+                try writer.splatByteAll(' ', new_indent);
                 try writer.print("namespace_string: null,\n", .{});
             }
         }
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
-    pub inline fn format(
-        spcr: *const SPCR,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(spcr, writer, 0)
-        else
-            print(spcr, writer.any(), 0);
+    pub inline fn format(spcr: *const SPCR, writer: *std.Io.Writer) !void {
+        return spcr.print(writer, 0);
     }
 
     comptime {

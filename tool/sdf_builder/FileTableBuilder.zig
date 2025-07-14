@@ -24,7 +24,8 @@ pub fn addFile(file_table_builder: *FileTableBuilder, file_entry: sdf.FileEntry)
 pub fn output(file_table_builder: *const FileTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
     const file_table_offset = output_buffer.items.len;
 
-    const writer = output_buffer.writer();
+    var adapter = output_buffer.writer().adaptToNewApi();
+    const writer = &adapter.new_interface;
 
     for (file_table_builder.file_table.items) |file_entry| {
         try file_entry.write(writer);

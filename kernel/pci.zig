@@ -27,29 +27,16 @@ pub const Address = extern struct {
     device: u8,
     function: u8,
 
-    pub fn print(id: Address, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
-
+    pub inline fn format(
+        id: Address,
+        writer: *std.Io.Writer,
+    ) !void {
         try writer.print("Address({x:0>4}:{x:0>2}:{x:0>2}:{x:0>1})", .{
             id.segment,
             id.bus,
             id.device,
             id.function,
         });
-    }
-
-    pub inline fn format(
-        id: Address,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            Address.print(id, writer, 0)
-        else
-            Address.print(id, writer.any(), 0);
     }
 };
 
@@ -58,46 +45,16 @@ pub const VendorID = enum(u16) {
 
     _,
 
-    pub fn print(id: VendorID, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
-        try writer.print("VendorID(0x{x:0>4})", .{@intFromEnum(id)});
-    }
-
-    pub inline fn format(
-        id: VendorID,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            VendorID.print(id, writer, 0)
-        else
-            VendorID.print(id, writer.any(), 0);
+    pub inline fn format(id: VendorID, writer: *std.Io.Writer) !void {
+        return try writer.print("VendorID(0x{x:0>4})", .{@intFromEnum(id)});
     }
 };
 
 pub const DeviceID = enum(u16) {
     _,
 
-    pub fn print(id: DeviceID, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
+    pub inline fn format(id: DeviceID, writer: *std.Io.Writer) !void {
         try writer.print("DeviceID(0x{x:0>4})", .{@intFromEnum(id)});
-    }
-
-    pub inline fn format(
-        id: DeviceID,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            DeviceID.print(id, writer, 0)
-        else
-            DeviceID.print(id, writer.any(), 0);
     }
 };
 
@@ -414,7 +371,7 @@ pub const init = struct {
                 .config_space_address = kernel.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
             };
 
-            init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {}", .{
+            init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
                 ecam.segment_group,
                 ecam.start_bus,
                 ecam.end_bus,

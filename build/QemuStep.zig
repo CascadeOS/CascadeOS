@@ -47,13 +47,13 @@ pub fn registerQemuSteps(
 
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
-            "run_{s}",
-            .{@tagName(architecture)},
+            "run_{t}",
+            .{architecture},
         );
         const qemu_step_description = try std.fmt.allocPrint(
             b.allocator,
-            "Run the image for {s} in qemu",
-            .{@tagName(architecture)},
+            "Run the image for {t} in qemu",
+            .{architecture},
         );
 
         const run_step = b.step(qemu_step_name, qemu_step_description);
@@ -72,8 +72,8 @@ fn create(
 
     const step_name = try std.fmt.allocPrint(
         b.allocator,
-        "run qemu with {s} image",
-        .{@tagName(architecture)},
+        "run qemu with {t} image",
+        .{architecture},
     );
 
     const qemu_step = try b.allocator.create(QemuStep);
@@ -255,7 +255,10 @@ fn make(step: *Step, options: Step.MakeOptions) !void {
             .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
             .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
             .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
-            else => std.debug.panic("unsupported host operating system: {s}", .{@tagName(b.graph.host.result.os.tag)}),
+            else => std.debug.panic(
+                "unsupported host operating system: {t}",
+                .{b.graph.host.result.os.tag},
+            ),
         }
     }
 

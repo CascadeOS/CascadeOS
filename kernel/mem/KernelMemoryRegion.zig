@@ -82,26 +82,14 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
     }
 }
 
-pub fn print(region: KernelMemoryRegion, writer: std.io.AnyWriter, indent: usize) !void {
-    _ = indent;
-    try writer.print("Region{{ {} - {s} }}", .{
-        region.range,
-        @tagName(region.type),
-    });
-}
-
 pub inline fn format(
     region: KernelMemoryRegion,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
+    writer: *std.Io.Writer,
 ) !void {
-    _ = options;
-    _ = fmt;
-    return if (@TypeOf(writer) == std.io.AnyWriter)
-        print(region, writer, 0)
-    else
-        print(region, writer.any(), 0);
+    try writer.print("Region{{ {f} - {t} }}", .{
+        region.range,
+        region.type,
+    });
 }
 
 const core = @import("core");

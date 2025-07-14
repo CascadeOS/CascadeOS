@@ -20,6 +20,7 @@ pub fn initStage1() !noreturn {
     Output.registerOutputs();
 
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+    try Output.writer.flush();
 
     // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
     kernel.mem.init.logEarlyOffsets();
@@ -102,13 +103,13 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
     const executor = current_task.state.running;
     kernel.arch.init.loadExecutor(executor);
 
-    log.debug("configuring per-executor system features on {}", .{executor.id});
+    log.debug("configuring per-executor system features on {f}", .{executor.id});
     kernel.arch.init.configurePerExecutorSystemFeatures(executor);
 
-    log.debug("configuring local interrupt controller on {}", .{executor.id});
+    log.debug("configuring local interrupt controller on {f}", .{executor.id});
     kernel.arch.init.initLocalInterruptController();
 
-    log.debug("enabling per-executor interrupt on {}", .{executor.id});
+    log.debug("enabling per-executor interrupt on {f}", .{executor.id});
     kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
 
     try kernel.arch.scheduling.callOneArgs(
@@ -116,12 +117,9 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
         current_task.stack,
         @intFromPtr(current_task),
         struct {
-            fn initStage3Wrapper(inner_current_task_addr: usize) callconv(.C) noreturn {
+            fn initStage3Wrapper(inner_current_task_addr: usize) callconv(.c) noreturn {
                 initStage3(@ptrFromInt(inner_current_task_addr)) catch |err| {
-                    std.debug.panic(
-                        "unhandled error: {s}",
-                        .{@errorName(err)},
-                    );
+                    std.debug.panic("unhandled error: {t}", .{err});
                 };
             }
         }.initStage3Wrapper,
@@ -159,7 +157,7 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
             defer Output.globals.lock.unlock(current_task);
 
             try Output.writer.print(
-                "initialization complete - time since kernel start: {} - time since system start: {}\n",
+                "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
                 .{
                     kernel.time.wallclock.elapsed(
                         kernel.time.wallclock.kernel_start,
@@ -171,6 +169,7 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
                     ),
                 },
             );
+            try Output.writer.flush();
         }
     } else {
         Barrier.nonBootstrapExecutorReady();
@@ -239,10 +238,7 @@ fn bootNonBootstrapExecutors() !void {
             struct {
                 fn bootFn(user_data: *anyopaque) noreturn {
                     initStage2(@ptrCast(@alignCast(user_data))) catch |err| {
-                        std.debug.panic(
-                            "unhandled error: {s}",
-                            .{@errorName(err)},
-                        );
+                        std.debug.panic("unhandled error: {t}", .{err});
                     };
                 }
             }.bootFn,

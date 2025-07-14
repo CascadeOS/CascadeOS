@@ -105,26 +105,15 @@ pub const Header = extern struct {
     /// Stored in little endian, `write` and `read` perform the conversion if required.
     location_program_length: u64,
 
-    pub fn read(reader: anytype) !Header {
+    pub fn read(reader: *std.Io.Reader) !Header {
         var header: Header = undefined;
-
-        try reader.readNoEof(std.mem.asBytes(&header));
-
+        try reader.readSliceEndian(Header, (&header)[0..1], .little);
         if (!std.mem.eql(u8, &header.magic, &magic)) return error.InvalidSdfMagic;
-
-        if (big_endian) std.mem.byteSwapAllFields(Header, &header);
-
         return header;
     }
 
-    pub fn write(header: Header, writer: anytype) !void {
-        if (big_endian) {
-            var byte_swapped_header = header;
-            std.mem.byteSwapAllFields(Header, &byte_swapped_header);
-            try writer.writeAll(std.mem.asBytes(&byte_swapped_header));
-        } else {
-            try writer.writeAll(std.mem.asBytes(&header));
-        }
+    pub fn write(header: Header, writer: *std.Io.Writer) !void {
+        try writer.writeSliceEndian(Header, (&header)[0..1], .little);
     }
 
     pub fn stringTable(header: Header, memory: []const u8) StringTable {
@@ -170,11 +159,15 @@ pub const Header = extern struct {
 
         var buffer: [@sizeOf(Header)]u8 = undefined;
 
-        var fbs = std.io.fixedBufferStream(&buffer);
-        try orig_header.write(fbs.writer());
+        {
+            var writer = std.Io.Writer.fixed(&buffer);
+            try orig_header.write(&writer);
+        }
 
-        fbs.pos = 0;
-        const new_header = try Header.read(fbs.reader());
+        const new_header = blk: {
+            var reader = std.Io.Reader.fixed(&buffer);
+            break :blk try Header.read(&reader);
+        };
 
         try std.testing.expectEqual(orig_header, new_header);
     }
@@ -205,12 +198,8 @@ pub const FileTable = struct {
 
     pub fn getFile(file_table: FileTable, index: u64) ?FileEntry {
         if (index >= file_table.entry_count) return null;
-
-        var fbs = std.io.fixedBufferStream(
-            file_table.bytes[index * @sizeOf(FileEntry) ..],
-        );
-
-        return FileEntry.read(fbs.reader()) catch null;
+        var reader: std.Io.Reader = .fixed(file_table.bytes[index * @sizeOf(FileEntry) ..]);
+        return FileEntry.read(&reader) catch null;
     }
 };
 
@@ -226,24 +215,14 @@ pub const FileEntry = extern struct {
     /// Stored in little endian, `write` and `read` perform the conversion if required.
     file_offset: u64,
 
-    pub fn read(reader: anytype) !FileEntry {
+    pub fn read(reader: *std.Io.Reader) !FileEntry {
         var file_entry: FileEntry = undefined;
-
-        try reader.readNoEof(std.mem.asBytes(&file_entry));
-
-        if (big_endian) std.mem.byteSwapAllFields(FileEntry, &file_entry);
-
+        try reader.readSliceEndian(FileEntry, (&file_entry)[0..1], .little);
         return file_entry;
     }
 
-    pub fn write(file_entry: FileEntry, writer: anytype) !void {
-        if (big_endian) {
-            var byte_swapped_file_entry = file_entry;
-            std.mem.byteSwapAllFields(FileEntry, &byte_swapped_file_entry);
-            try writer.writeAll(std.mem.asBytes(&byte_swapped_file_entry));
-        } else {
-            try writer.writeAll(std.mem.asBytes(&file_entry));
-        }
+    pub fn write(file_entry: FileEntry, writer: *std.Io.Writer) !void {
+        try writer.writeSliceEndian(FileEntry, (&file_entry)[0..1], .little);
     }
 
     pub fn directory(file_entry: FileEntry, string_table: StringTable) [:0]const u8 {
@@ -262,11 +241,15 @@ pub const FileEntry = extern struct {
 
         var buffer: [@sizeOf(FileEntry)]u8 = undefined;
 
-        var fbs = std.io.fixedBufferStream(&buffer);
-        try orig_file_entry.write(fbs.writer());
+        {
+            var writer: std.Io.Writer = .fixed(&buffer);
+            try orig_file_entry.write(&writer);
+        }
 
-        fbs.pos = 0;
-        const new_file_entry = try FileEntry.read(fbs.reader());
+        const new_file_entry = blk: {
+            var reader: std.Io.Reader = .fixed(&buffer);
+            break :blk try FileEntry.read(&reader);
+        };
 
         try std.testing.expectEqual(orig_file_entry, new_file_entry);
     }
@@ -286,7 +269,7 @@ pub const LocationLookup = struct {
 
     pub fn getStartState(location_lookup: LocationLookup, address: u64) !LocationProgramState {
         const index = blk: {
-            var instruction_addresses = std.io.fixedBufferStream(location_lookup.instruction_addresses_bytes);
+            var instruction_addresses = std.Io.fixedBufferStream(location_lookup.instruction_addresses_bytes);
             const reader = instruction_addresses.reader();
 
             var candidate_index: u64 = 0;
@@ -296,11 +279,10 @@ pub const LocationLookup = struct {
             break :blk if (candidate_index != 0) candidate_index - 1 else 0;
         };
 
-        var location_program_states = std.io.fixedBufferStream(
+        var reader: std.Io.Reader = .fixed(
             location_lookup.location_program_states_bytes[index * @sizeOf(LocationProgramState) ..],
         );
-
-        return LocationProgramState.read(location_program_states.reader());
+        return LocationProgramState.read(&reader);
     }
 };
 
@@ -346,24 +328,14 @@ pub const LocationProgramState = extern struct {
     /// Stored in little endian, `write` and `read` perform the conversion if required.
     column: u64 = 0,
 
-    pub fn read(reader: anytype) !LocationProgramState {
+    pub fn read(reader: *std.Io.Reader) !LocationProgramState {
         var location_program_state: LocationProgramState = undefined;
-
-        try reader.readNoEof(std.mem.asBytes(&location_program_state));
-
-        if (big_endian) std.mem.byteSwapAllFields(LocationProgramState, &location_program_state);
-
+        try reader.readSliceEndian(LocationProgramState, (&location_program_state)[0..1], .little);
         return location_program_state;
     }
 
-    pub fn write(location_program_state: LocationProgramState, writer: anytype) !void {
-        if (big_endian) {
-            var byte_swapped_location_program_state = location_program_state;
-            std.mem.byteSwapAllFields(LocationProgramState, &byte_swapped_location_program_state);
-            try writer.writeAll(std.mem.asBytes(&byte_swapped_location_program_state));
-        } else {
-            try writer.writeAll(std.mem.asBytes(&location_program_state));
-        }
+    pub fn write(location_program_state: LocationProgramState, writer: *std.Io.Writer) !void {
+        try writer.writeSliceEndian(LocationProgramState, (&location_program_state)[0..1], .little);
     }
 
     test LocationProgramState {
@@ -378,11 +350,15 @@ pub const LocationProgramState = extern struct {
 
         var buffer: [@sizeOf(LocationProgramState)]u8 = undefined;
 
-        var fbs = std.io.fixedBufferStream(&buffer);
-        try orig_location_program_state.write(fbs.writer());
+        {
+            var writer: std.Io.Writer = .fixed(&buffer);
+            try orig_location_program_state.write(&writer);
+        }
 
-        fbs.pos = 0;
-        const new_location_program_state = try LocationProgramState.read(fbs.reader());
+        const new_location_program_state = blk: {
+            var reader: std.Io.Reader = .fixed(&buffer);
+            break :blk try LocationProgramState.read(&reader);
+        };
 
         try std.testing.expectEqual(orig_location_program_state, new_location_program_state);
     }
@@ -402,15 +378,12 @@ pub const LocationProgram = struct {
     bytes: []const u8,
 
     pub fn getLocation(location_program: LocationProgram, start_state: LocationProgramState, address: u64) !Location {
-        var fbs = std.io.fixedBufferStream(
-            location_program.bytes[start_state.instruction_offset..],
-        );
-        const reader = fbs.reader();
+        var reader: std.Io.Reader = .fixed(location_program.bytes[start_state.instruction_offset..]);
 
         var state = start_state;
 
         while (state.address < address) {
-            const instruction = try LocationProgramInstruction.read(reader);
+            const instruction = try LocationProgramInstruction.read(&reader);
 
             switch (instruction) {
                 .offset_address => |offset| state.address += offset,
@@ -755,28 +728,28 @@ pub const LocationProgramInstruction = union(LocationProgramOpcode) {
     decrement_line_eleven,
     decrement_line_twelve,
 
-    pub fn read(reader: anytype) !LocationProgramInstruction {
-        const opcode: LocationProgramOpcode = @enumFromInt(try reader.readByte());
+    pub fn read(reader: *std.Io.Reader) !LocationProgramInstruction {
+        const opcode: LocationProgramOpcode = @enumFromInt(try reader.takeByte());
 
         return switch (opcode) {
-            .offset_address => .{ .offset_address = try std.leb.readULEB128(u64, reader) },
-            .set_symbol_offset => .{ .set_symbol_offset = try std.leb.readULEB128(u64, reader) },
-            .set_file_index => .{ .set_file_index = try std.leb.readULEB128(u64, reader) },
-            .offset_column => .{ .offset_column = try std.leb.readILEB128(i64, reader) },
-            .offset_line => .{ .offset_line = try std.leb.readILEB128(i64, reader) },
+            .offset_address => .{ .offset_address = try reader.takeLeb128(u64) },
+            .set_symbol_offset => .{ .set_symbol_offset = try reader.takeLeb128(u64) },
+            .set_file_index => .{ .set_file_index = try reader.takeLeb128(u64) },
+            .offset_column => .{ .offset_column = try reader.takeLeb128(i64) },
+            .offset_line => .{ .offset_line = try reader.takeLeb128(i64) },
             inline else => |op| op,
         };
     }
 
-    pub fn write(location_program_instruction: LocationProgramInstruction, writer: anytype) !void {
+    pub fn write(location_program_instruction: LocationProgramInstruction, writer: *std.Io.Writer) !void {
         try writer.writeByte(@intFromEnum(location_program_instruction));
 
         switch (location_program_instruction) {
-            .offset_address => |value| try std.leb.writeULEB128(writer, value),
-            .set_symbol_offset => |value| try std.leb.writeULEB128(writer, value),
-            .set_file_index => |value| try std.leb.writeULEB128(writer, value),
-            .offset_column => |value| try std.leb.writeILEB128(writer, value),
-            .offset_line => |value| try std.leb.writeILEB128(writer, value),
+            .offset_address => |value| try writer.writeLeb128(value),
+            .set_symbol_offset => |value| try writer.writeLeb128(value),
+            .set_file_index => |value| try writer.writeLeb128(value),
+            .offset_column => |value| try writer.writeLeb128(value),
+            .offset_line => |value| try writer.writeLeb128(value),
             .increment_address_two,
             .increment_address_three,
             .increment_address_four,
@@ -842,4 +815,3 @@ comptime {
 }
 
 const std = @import("std");
-const big_endian = @import("builtin").cpu.arch.endian() == .big;

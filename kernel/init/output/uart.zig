@@ -243,6 +243,12 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                         inner_uart.writeSlice(str);
                     }
                 }.writeFn,
+                .splatFn = struct {
+                    fn splatFn(context: *anyopaque, str: []const u8, splat: usize) void {
+                        const inner_uart: *UartT = @ptrCast(@alignCast(context));
+                        for (0..splat) |_| inner_uart.writeSlice(str);
+                    }
+                }.splatFn,
                 .remapFn = struct {
                     fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
                         switch (mode) {
@@ -532,6 +538,12 @@ pub const PL011 = struct {
                     uart.writeSlice(str);
                 }
             }.writeFn,
+            .splatFn = struct {
+                fn splatFn(context: *anyopaque, str: []const u8, splat: usize) void {
+                    const uart: *PL011 = @ptrCast(@alignCast(context));
+                    for (0..splat) |_| uart.writeSlice(str);
+                }
+            }.splatFn,
             .remapFn = struct {
                 fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(context));

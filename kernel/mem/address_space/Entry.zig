@@ -256,31 +256,31 @@ fn canMergeWithFollowing(entry: *const Entry, curent_task: *kernel.Task, followi
 }
 
 /// Prints the entry.
-pub fn print(entry: *Entry, current_task: *kernel.Task, writer: std.io.AnyWriter, indent: usize) !void {
+pub fn print(entry: *Entry, current_task: *kernel.Task, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     if (entry.number_of_pages == 1) {
         try writer.print("range: {} (1 page),\n", .{entry.range()});
     } else {
         try writer.print("range: {} ({} pages),\n", .{ entry.range(), entry.number_of_pages });
     }
 
-    try writer.writeByteNTimes(' ', new_indent);
-    try writer.print("protection: {s},\n", .{@tagName(entry.protection)});
+    try writer.splatByteAll(' ', new_indent);
+    try writer.print("protection: {t},\n", .{entry.protection});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("copy_on_write: {},\n", .{entry.copy_on_write});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("needs_copy: {},\n", .{entry.needs_copy});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("wired_count: {},\n", .{entry.wired_count});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     if (entry.anonymous_map_reference.anonymous_map != null) {
         try writer.writeAll("anonymous_map: ");
         try entry.anonymous_map_reference.print(
@@ -293,7 +293,7 @@ pub fn print(entry: *Entry, current_task: *kernel.Task, writer: std.io.AnyWriter
         try writer.writeAll("anonymous_map: null,\n");
     }
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     if (entry.object_reference.object != null) {
         try writer.writeAll("object: ");
         try entry.object_reference.print(
@@ -306,16 +306,11 @@ pub fn print(entry: *Entry, current_task: *kernel.Task, writer: std.io.AnyWriter
         try writer.writeAll("object: null,\n");
     }
 
-    try writer.writeByteNTimes(' ', indent);
+    try writer.splatByteAll(' ', indent);
     try writer.writeAll("}");
 }
 
-pub inline fn format(
-    _: *const Entry,
-    comptime _: []const u8,
-    _: std.fmt.FormatOptions,
-    _: anytype,
-) !void {
+pub inline fn format(_: *const Entry, _: *std.Io.Writer) !void {
     @compileError("use `Entry.print` instead");
 }
 

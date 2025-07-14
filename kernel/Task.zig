@@ -193,25 +193,17 @@ pub fn isIdleTask(task: *const Task) bool {
     };
 }
 
-pub fn print(task: *const Task, writer: std.io.AnyWriter, _: usize) !void {
+pub fn format(
+    task: *const Task,
+    writer: *std.Io.Writer,
+) !void {
     switch (task.context) {
-        .kernel => |kernel_context| try writer.print("KernelTask({s})", .{kernel_context.name.constSlice()}),
+        .kernel => |kernel_context| try writer.print(
+            "KernelTask({s})",
+            .{kernel_context.name.constSlice()},
+        ),
         .user => @panic("TODO: implement user task printing"),
     }
-}
-
-pub inline fn format(
-    task: *const Task,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
-    _ = options;
-    _ = fmt;
-    return if (@TypeOf(writer) == std.io.AnyWriter)
-        print(task, writer, 0)
-    else
-        print(task, writer.any(), 0);
 }
 
 pub inline fn fromNode(node: *containers.SingleNode) *Task {
@@ -434,7 +426,7 @@ const TaskCleanupService = struct {
         std.debug.assert(current_task != task);
         std.debug.assert(task.state == .dropped);
 
-        TaskCleanupService.log.debug("queueing {} for cleanup", .{task});
+        TaskCleanupService.log.debug("queueing {f} for cleanup", .{task});
 
         task_cleanup_service.lock.lock(current_task);
         defer task_cleanup_service.lock.unlock(current_task);
@@ -490,7 +482,7 @@ const TaskCleanupService = struct {
                     opt_node = double_node.next.next;
                     task_cleanup_service.to_clean.remove(double_node);
 
-                    TaskCleanupService.log.debug("destroying {}", .{task});
+                    TaskCleanupService.log.debug("destroying {f}", .{task});
                     internal.destroy(current_task, task);
                 }
             }
@@ -550,10 +542,7 @@ pub const init = struct {
             stacks_range.address.value,
             stacks_range.size.value,
         ) catch |err| {
-            std.debug.panic(
-                "failed to add stack range to `stack_arena`: {s}",
-                .{@errorName(err)},
-            );
+            std.debug.panic("failed to add stack range to `stack_arena`: {t}", .{err});
         };
 
         log.debug("initializing task cache", .{});

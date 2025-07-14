@@ -90,78 +90,71 @@ pub const RFlags = packed struct(u64) {
         );
     }
 
-    pub fn print(rflags: RFlags, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(rflags: RFlags, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("RFlags{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("carry: {},\n", .{rflags.carry});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("parity: {},\n", .{rflags.parity});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("auxiliary_carry: {},\n", .{rflags.auxiliary_carry});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("zero: {},\n", .{rflags.zero});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("sign: {},\n", .{rflags.sign});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("trap: {},\n", .{rflags.trap});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("interrupt: {},\n", .{rflags.interrupt});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("direction: {},\n", .{rflags.direction});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("overflow: {},\n", .{rflags.overflow});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("iopl: {s},\n", .{@tagName(rflags.iopl)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("iopl: {t},\n", .{rflags.iopl});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("nested: {},\n", .{rflags.nested});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("resume: {},\n", .{rflags.@"resume"});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("virtual_8086: {},\n", .{rflags.virtual_8086});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("alignment_check: {},\n", .{rflags.alignment_check});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("virtual_interrupt: {},\n", .{rflags.virtual_interrupt});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("virtual_interrupt_pending: {},\n", .{rflags.virtual_interrupt_pending});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("id: {},\n", .{rflags.id});
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeAll("}");
     }
 
     pub inline fn format(
         rflags: RFlags,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(rflags, writer, 0)
-        else
-            print(rflags, writer.any(), 0);
+        return print(rflags, writer, 0);
     }
 
     comptime {
@@ -501,51 +494,44 @@ pub const PAT = packed struct(u64) {
         msr.write(@bitCast(value));
     }
 
-    pub fn print(pat: PAT, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(pat: PAT, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("PAT{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry0: {s},\n", .{@tagName(pat.entry0)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry0: {t},\n", .{pat.entry0});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry1: {s},\n", .{@tagName(pat.entry1)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry1: {t},\n", .{pat.entry1});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry2: {s},\n", .{@tagName(pat.entry2)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry2: {t},\n", .{pat.entry2});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry3: {s},\n", .{@tagName(pat.entry3)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry3: {t},\n", .{pat.entry3});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry4: {s},\n", .{@tagName(pat.entry4)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry4: {t},\n", .{pat.entry4});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry5: {s},\n", .{@tagName(pat.entry5)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry5: {t},\n", .{pat.entry5});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry6: {s},\n", .{@tagName(pat.entry6)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry6: {t},\n", .{pat.entry6});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("entry7: {s},\n", .{@tagName(pat.entry7)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("entry7: {t},\n", .{pat.entry7});
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
     pub inline fn format(
         pat: PAT,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            PAT.print(pat, writer, 0)
-        else
-            PAT.print(pat, writer.any(), 0);
+        return pat.print(pat, writer, 0);
     }
 
     const msr = MSR(u64, 0x277);
