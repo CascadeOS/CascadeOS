@@ -10,18 +10,16 @@ pub fn interruptSourcePanic(
 ) noreturn {
     @branchHint(.cold);
 
-    // TODO: copy of the logic in `std.debug.panicExtra` - using a stack buffer is not ideal
     const size = 0x1000;
     const trunc_msg = "(msg truncated)";
     var buf: [size + trunc_msg.len]u8 = undefined;
+    var bw: std.Io.Writer = .fixed(buf[0..size]);
     // a minor annoyance with this is that it will result in the NoSpaceLeft
     // error being part of the @panic stack trace (but that error should
     // only happen rarely)
-    const msg = std.fmt.bufPrint(buf[0..size], format, args) catch |err| switch (err) {
-        error.NoSpaceLeft => blk: {
-            @memcpy(buf[size..], trunc_msg);
-            break :blk &buf;
-        },
+    const msg = if (bw.print(format, args)) |_| bw.buffered() else |_| blk: {
+        @memcpy(buf[size..], trunc_msg);
+        break :blk &buf;
     };
 
     panicDispatch(
@@ -74,21 +72,21 @@ fn singleExecutorInitPanic(
         var nested_panic_count: usize = 0;
     };
 
+    kernel.init.Output.globals.lock.poison();
+
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
-    const writer = globals.init_panic_buffered_writer.writer();
-
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(kernel.init.Output.writer, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => kernel.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
         else => return,
     }
 
-    globals.init_panic_buffered_writer.flush() catch {};
+    kernel.init.Output.writer.flush() catch {};
 }
 
 fn initPanic(
@@ -110,29 +108,27 @@ fn initPanic(
         if (panicking_executor_id != executor.id) return; // another executor is panicking
     }
 
-    kernel.arch.interrupts.sendPanicIPI();
     kernel.init.Output.globals.lock.poison();
+    kernel.arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
-    const writer = globals.init_panic_buffered_writer.writer();
-
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(kernel.init.Output.writer, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => kernel.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
         else => return,
     }
 
-    globals.init_panic_buffered_writer.flush() catch {};
+    kernel.init.Output.writer.flush() catch {};
 }
 
 const formatting = struct {
     pub fn printPanic(
-        writer: anytype,
+        writer: *std.Io.Writer,
         msg: []const u8,
         panic_type: PanicType,
     ) !void {
@@ -147,7 +143,7 @@ const formatting = struct {
         }
     }
 
-    fn printUserPanicMessage(writer: anytype, msg: []const u8) !void {
+    fn printUserPanicMessage(writer: *std.Io.Writer, msg: []const u8) !void {
         if (msg.len != 0) {
             try writer.writeAll("\nPANIC - ");
 
@@ -162,7 +158,7 @@ const formatting = struct {
     }
 
     fn printInterruptError(
-        writer: anytype,
+        writer: *std.Io.Writer,
         interrupt_frame: kernel.arch.interrupts.InterruptFrame,
     ) !void {
         const symbol_source = SymbolSource.load();
@@ -181,7 +177,7 @@ const formatting = struct {
     }
 
     fn printErrorAndCurrentStackTrace(
-        writer: anytype,
+        writer: *std.Io.Writer,
         error_return_trace: ?*const std.builtin.StackTrace,
         return_address: usize,
     ) !void {
@@ -197,7 +193,7 @@ const formatting = struct {
     }
 
     fn printCurrentBackTrace(
-        writer: anytype,
+        writer: *std.Io.Writer,
         return_address: usize,
         symbol_source: ?SymbolSource,
     ) !void {
@@ -209,7 +205,7 @@ const formatting = struct {
     }
 
     fn printStackTrace(
-        writer: anytype,
+        writer: *std.Io.Writer,
         stack_trace: *const std.builtin.StackTrace,
         symbol_source: ?SymbolSource,
     ) !void {
@@ -230,19 +226,14 @@ const formatting = struct {
 
     const indent = "  ";
 
-    fn printSourceAtAddress(writer: anytype, address: usize, opt_symbol_source: ?SymbolSource) !void {
+    fn printSourceAtAddress(writer: *std.Io.Writer, address: usize, opt_symbol_source: ?SymbolSource) !void {
         if (address == 0) return;
 
         if (address < kernel.arch.paging.higher_half_start.value) {
-            try writer.writeAll(comptime indent ++ "0x");
-            try std.fmt.formatInt(
-                address,
-                16,
-                .lower,
-                .{},
-                writer,
+            try writer.print(
+                comptime indent ++ "0x{x:0>16} - address is not in the higher half so must be userspace\n",
+                .{address},
             );
-            try writer.writeAll(" - address is not in the higher half so must be userspace\n");
             return;
         }
 
@@ -253,24 +244,14 @@ const formatting = struct {
             const symbol_source = opt_symbol_source orelse break :blk null;
             break :blk symbol_source.getSymbol(kernel_source_address);
         } orelse {
-            try writer.writeAll(comptime indent ++ "0x");
-            try std.fmt.formatInt(
-                kernel_source_address,
-                16,
-                .lower,
-                .{},
-                writer,
-            );
-
-            try writer.writeAll(" - ???\n");
-
+            try writer.print(comptime indent ++ "0x{x:0>16} - ???\n", .{kernel_source_address});
             return;
         };
 
         try printSymbol(writer, symbol);
     }
 
-    fn printSymbol(writer: anytype, symbol: SymbolSource.Symbol) !void {
+    fn printSymbol(writer: *std.Io.Writer, symbol: SymbolSource.Symbol) !void {
         try writer.writeAll(indent);
 
         // kernel/setup.zig:43:15 in setup
@@ -291,13 +272,7 @@ const formatting = struct {
 
         // kernel/setup.zig:43:15 in setup
         //                  ^^
-        try std.fmt.formatInt(
-            symbol.line,
-            10,
-            .lower,
-            .{},
-            writer,
-        );
+        try writer.printInt(symbol.line, 10, .lower, .{});
 
         // kernel/setup.zig:43:15 in setup
         //                    ^
@@ -305,12 +280,11 @@ const formatting = struct {
 
         // kernel/setup.zig:43:15 in setup
         //                     ^^
-        try std.fmt.formatInt(
+        try writer.printInt(
             symbol.column,
             10,
             .lower,
             .{},
-            writer,
         );
 
         // kernel/setup.zig:43:15 in setup
@@ -359,7 +333,7 @@ const formatting = struct {
 
         try writer.writeAll(comptime "\n" ++ (indent ** 2));
 
-        try writer.writeByteNTimes(' ', symbol.column - 1 - blank_spaces);
+        try writer.splatByteAll(' ', symbol.column - 1 - blank_spaces);
 
         try writer.writeAll("^\n");
     }
@@ -376,9 +350,10 @@ const SymbolSource = struct {
     pub fn load() ?SymbolSource {
         const sdf_slice = sdfSlice() catch return null;
 
-        var sdf_fbs = std.io.fixedBufferStream(sdf_slice);
-
-        const header = sdf.Header.read(sdf_fbs.reader()) catch return null;
+        const header = blk: {
+            var reader = std.Io.Reader.fixed(sdf_slice);
+            break :blk sdf.Header.read(&reader) catch return null;
+        };
 
         return .{
             .string_table = header.stringTable(sdf_slice),
@@ -491,9 +466,11 @@ pub fn sdfSlice() ![]const u8 {
     if (static.opt_sdf_slice) |s| return s;
 
     const ptr: [*]const u8 = @ptrCast(&static.__sdf_start);
-    var fbs = std.io.fixedBufferStream(ptr[0..@sizeOf(static.sdf.Header)]);
 
-    const header = try static.sdf.Header.read(fbs.reader());
+    const header = blk: {
+        var reader = std.Io.Reader.fixed(ptr[0..@sizeOf(static.sdf.Header)]);
+        break :blk try static.sdf.Header.read(&reader);
+    };
 
     const slice = ptr[0..header.total_size_of_sdf_data];
 
@@ -521,8 +498,8 @@ pub const PanicMode = enum(u8) {
 pub fn setPanicMode(mode: PanicMode) void {
     if (@intFromEnum(globals.panic_mode) + 1 != @intFromEnum(mode)) {
         std.debug.panic(
-            "invalid panic mode transition '{s}' -> '{s}'",
-            .{ @tagName(globals.panic_mode), @tagName(mode) },
+            "invalid panic mode transition '{t}' -> '{t}'",
+            .{ globals.panic_mode, mode },
         );
     }
 
@@ -538,9 +515,6 @@ pub const globals = struct {
     pub var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
 
     var panic_mode: PanicMode = .single_executor_init_panic;
-
-    /// Buffered writer used only during init.
-    var init_panic_buffered_writer = std.io.bufferedWriter(kernel.init.Output.writer);
 };
 
 const std = @import("std");

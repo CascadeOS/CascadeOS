@@ -85,7 +85,7 @@ pub const init = struct {
         switch (wallclock.kernel_start_type) {
             .kernel_start => {
                 init_log.debug(
-                    "time initialized {} after kernel start, spent {} in firmware and bootloader before kernel start",
+                    "time initialized {f} after kernel start, spent {f} in firmware and bootloader before kernel start",
                     .{
                         wallclock.elapsed(wallclock.kernel_start, wallclock.read()),
                         wallclock.elapsed(.zero, wallclock.kernel_start),
@@ -94,7 +94,7 @@ pub const init = struct {
             },
             .time_system_start => {
                 init_log.debug(
-                    "time initialized {} after system start (includes early kernel init, firmware and bootloader time)",
+                    "time initialized {f} after system start (includes early kernel init, firmware and bootloader time)",
                     .{
                         wallclock.elapsed(.zero, wallclock.read()),
                     },

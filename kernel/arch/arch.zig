@@ -57,6 +57,19 @@ pub const interrupts = struct {
             return self.arch.instructionPointer();
         }
 
+        pub inline fn format(
+            interrupt_frame: InterruptFrame,
+            writer: *std.Io.Writer,
+        ) !void {
+            checkSupport(
+                ArchInterruptFrame,
+                "format",
+                fn (*const ArchInterruptFrame, *std.Io.Writer) std.Io.Writer.Error!void,
+            );
+
+            return interrupt_frame.arch.format(writer);
+        }
+
         const ArchInterruptFrame = current.interrupts.ArchInterruptFrame;
     };
 
@@ -506,13 +519,13 @@ pub const scheduling = struct {
         opt_old_task: ?*kernel.Task,
         new_stack: kernel.Task.Stack,
         arg1: usize,
-        target_function: *const fn (usize) callconv(.C) noreturn,
+        target_function: *const fn (usize) callconv(.c) noreturn,
     ) callconv(core.inline_in_non_debug) CallError!void {
         checkSupport(current.scheduling, "callOneArgs", fn (
             ?*kernel.Task,
             kernel.Task.Stack,
             usize,
-            *const fn (usize) callconv(.C) noreturn,
+            *const fn (usize) callconv(.c) noreturn,
         ) CallError!void);
 
         try current.scheduling.callOneArgs(opt_old_task, new_stack, arg1, target_function);
@@ -524,14 +537,14 @@ pub const scheduling = struct {
         new_stack: kernel.Task.Stack,
         arg1: usize,
         arg2: usize,
-        target_function: *const fn (usize, usize) callconv(.C) noreturn,
+        target_function: *const fn (usize, usize) callconv(.c) noreturn,
     ) callconv(core.inline_in_non_debug) CallError!void {
         checkSupport(current.scheduling, "callTwoArgs", fn (
             ?*kernel.Task,
             kernel.Task.Stack,
             usize,
             usize,
-            *const fn (usize, usize) callconv(.C) noreturn,
+            *const fn (usize, usize) callconv(.c) noreturn,
         ) CallError!void);
 
         try current.scheduling.callTwoArgs(opt_old_task, new_stack, arg1, arg2, target_function);

@@ -41,44 +41,51 @@ pub const Cache = enum {
     uncached,
 };
 
-pub fn print(value: MapType, writer: std.io.AnyWriter, indent: usize) !void {
-    _ = indent;
+pub fn format(
+    region: MapType,
+    writer: *std.Io.Writer,
+) !void {
+    try writer.writeAll("Type{ ");
 
-    var buf: std.BoundedArray(u8, 7) = .{};
-
-    buf.appendSliceAssumeCapacity(switch (value.context) {
+    try writer.writeAll(switch (region.context) {
         .user => "U_",
         .kernel => "K_",
     });
 
-    buf.appendSliceAssumeCapacity(switch (value.protection) {
+    try writer.writeAll(switch (region.protection) {
         .none => "NO",
         .read => "RO",
         .read_write => "RW",
         .executable => "XO",
     });
 
-    buf.appendSliceAssumeCapacity(switch (value.cache) {
+    try writer.writeAll(switch (region.cache) {
         .write_back => "_WB",
         .write_combining => "_WC",
         .uncached => "_UC",
     });
 
-    try writer.print("Type{{ {s} }}", .{buf.constSlice()});
-}
+    var buf: std.BoundedArray(u8, 7) = .{};
 
-pub inline fn format(
-    region: MapType,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
-    _ = options;
-    _ = fmt;
-    return if (@TypeOf(writer) == std.io.AnyWriter)
-        print(region, writer, 0)
-    else
-        print(region, writer.any(), 0);
+    buf.appendSliceAssumeCapacity(switch (region.context) {
+        .user => "U_",
+        .kernel => "K_",
+    });
+
+    buf.appendSliceAssumeCapacity(switch (region.protection) {
+        .none => "NO",
+        .read => "RO",
+        .read_write => "RW",
+        .executable => "XO",
+    });
+
+    buf.appendSliceAssumeCapacity(switch (region.cache) {
+        .write_back => "_WB",
+        .write_combining => "_WC",
+        .uncached => "_UC",
+    });
+
+    try writer.writeAll(" }");
 }
 
 const core = @import("core");

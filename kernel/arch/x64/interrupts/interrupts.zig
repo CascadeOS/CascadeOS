@@ -185,73 +185,66 @@ pub const InterruptFrame = extern struct {
 
     pub fn print(
         value: *const InterruptFrame,
-        writer: std.io.AnyWriter,
+        writer: *std.Io.Writer,
         indent: usize,
     ) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("InterruptFrame{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("interrupt: {s},\n", .{@tagName(value.vector_number.interrupt)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("interrupt: {t},\n", .{value.vector_number.interrupt});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("error code: {},\n", .{value.error_code});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("cs: {s}, ss: {s},\n", .{ @tagName(value.cs.selector), @tagName(value.ss.selector) });
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("cs: {t}, ss: {t},\n", .{ value.cs.selector, value.ss.selector });
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("ds: {s}, es: {s},\n", .{ @tagName(value.ds.selector), @tagName(value.es.selector) });
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("ds: {t}, es: {t},\n", .{ value.ds.selector, value.es.selector });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("rsp: 0x{x:0>16}, rip: 0x{x:0>16},\n", .{ value.rsp, value.rip });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("rax: 0x{x:0>16}, rbx: 0x{x:0>16},\n", .{ value.rax, value.rbx });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("rcx: 0x{x:0>16}, rdx: 0x{x:0>16},\n", .{ value.rcx, value.rdx });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("rbp: 0x{x:0>16}, rsi: 0x{x:0>16},\n", .{ value.rbp, value.rsi });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("rdi: 0x{x:0>16}, r8:  0x{x:0>16},\n", .{ value.rdi, value.r8 });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("r9:  0x{x:0>16}, r10: 0x{x:0>16},\n", .{ value.r9, value.r10 });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("r11: 0x{x:0>16}, r12: 0x{x:0>16},\n", .{ value.r11, value.r12 });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("r13: 0x{x:0>16}, r14: 0x{x:0>16},\n", .{ value.r13, value.r14 });
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("r15: 0x{x:0>16},\n", .{value.r15});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("rflags: ");
         try value.rflags.print(writer, new_indent);
         try writer.writeAll(",\n");
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
     pub inline fn format(
         value: *const InterruptFrame,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(value, writer, 0)
-        else
-            print(value, writer.any(), 0);
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        return print(value, writer, 0);
     }
 };
 
@@ -356,9 +349,11 @@ pub const init = struct {
     }
 
     /// Creates an array of raw interrupt handlers, one for each vector.
-    fn makeRawHandlers() [Idt.number_of_handlers](*const fn () callconv(.Naked) void) {
+    fn makeRawHandlers() [Idt.number_of_handlers](*const fn () callconv(.naked) void) {
         comptime {
-            var raw_handlers_temp: [Idt.number_of_handlers](*const fn () callconv(.Naked) void) = undefined;
+            @setEvalBranchQuota(Idt.number_of_handlers * 520);
+
+            var raw_handlers_temp: [Idt.number_of_handlers](*const fn () callconv(.naked) void) = undefined;
 
             var i = 0;
             while (i < Idt.number_of_handlers) : (i += 1) {
@@ -381,7 +376,7 @@ pub const init = struct {
                 );
 
                 const rawInterruptHandler = struct {
-                    fn rawInterruptHandler() callconv(.Naked) void {
+                    fn rawInterruptHandler() callconv(.naked) void {
                         // zig fmt: off
                         asm volatile (error_code_asm ++ vector_number_asm ++
                             \\push %%rax

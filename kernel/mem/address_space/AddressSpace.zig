@@ -58,10 +58,10 @@ pub fn init(
     current_task: *kernel.Task,
     options: InitOptions,
 ) !void {
-    log.debug("{s}: init with {} context {s}", .{
+    log.debug("{s}: init with {f} context {t}", .{
         options.name.constSlice(),
         options.range,
-        @tagName(options.context),
+        options.context,
     });
 
     address_space.* = .{
@@ -129,15 +129,15 @@ pub fn map(
     current_task: *kernel.Task,
     options: MapOptions,
 ) MapError!core.VirtualRange {
-    errdefer |err| log.debug("{s}: map failed {s}", .{ address_space.name(), @errorName(err) });
+    errdefer |err| log.debug("{s}: map failed {t}", .{ address_space.name(), err });
 
     if (options.number_of_pages == 0) return error.ZeroLength;
 
-    log.verbose("{s}: map {} pages with protection {s} of type {s}", .{
+    log.verbose("{s}: map {} pages with protection {t} of type {t}", .{
         address_space.name(),
         options.number_of_pages,
-        @tagName(options.protection),
-        @tagName(options.type),
+        options.protection,
+        options.type,
     });
 
     const allocated_range = address_space.address_arena.allocate(
@@ -293,7 +293,7 @@ pub const UnmapError = error{};
 ///
 /// The size and address of the range must be aligned to the page size.
 pub fn unmap(address_space: *AddressSpace, current_task: *kernel.Task, range: core.VirtualRange) UnmapError!void {
-    errdefer |err| log.debug("{s}: unmap failed {s}", .{ address_space.name(), @errorName(err) });
+    errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
 
     std.debug.assert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(kernel.arch.paging.standard_page_size));
@@ -324,9 +324,9 @@ pub fn handlePageFault(
     current_task: *kernel.Task,
     page_fault_details: kernel.mem.PageFaultDetails,
 ) HandlePageFaultError!void {
-    errdefer |err| log.debug("{s}: page fault failed {s}", .{ address_space.name(), @errorName(err) });
+    errdefer |err| log.debug("{s}: page fault failed {t}", .{ address_space.name(), err });
 
-    log.verbose("{s}: page fault {}", .{
+    log.verbose("{s}: page fault {f}", .{
         address_space.name(),
         page_fault_details,
     });
@@ -374,7 +374,7 @@ pub fn handlePageFault(
 /// Prints the address space.
 ///
 /// Locks the entries lock.
-pub fn print(address_space: *AddressSpace, current_task: *kernel.Task, writer: std.io.AnyWriter, indent: usize) !void {
+pub fn print(address_space: *AddressSpace, current_task: *kernel.Task, writer: *std.Io.Writer, indent: usize) !void {
     address_space.entries_lock.readLock(current_task);
     defer address_space.entries_lock.readUnlock(current_task);
 
@@ -382,39 +382,34 @@ pub fn print(address_space: *AddressSpace, current_task: *kernel.Task, writer: s
 
     try writer.writeAll("AddressSpace{\n");
 
-    try writer.writeByteNTimes(' ', new_indent);
-    try writer.print("mode: {s},\n", .{@tagName(address_space.mode)});
+    try writer.splatByteAll(' ', new_indent);
+    try writer.print("mode: {t},\n", .{address_space.mode});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("entries_version: {d},\n", .{address_space.entries_version});
 
     if (address_space.entries.items.len != 0) {
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("entries: {\n");
 
         for (address_space.entries.items) |entry| {
-            try writer.writeByteNTimes(' ', new_indent + 2);
+            try writer.splatByteAll(' ', new_indent + 2);
             try entry.print(current_task, writer, new_indent + 2);
             try writer.writeAll(",\n");
         }
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("},\n");
     } else {
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("entries: {},\n");
     }
 
-    try writer.writeByteNTimes(' ', indent);
+    try writer.splatByteAll(' ', indent);
     try writer.writeAll("}");
 }
 
-pub inline fn format(
-    _: *const AddressSpace,
-    comptime _: []const u8,
-    _: std.fmt.FormatOptions,
-    _: anytype,
-) !void {
+pub inline fn format(_: *const AddressSpace, _: *std.Io.Writer) !void {
     @compileError("use `AddressSpace.print` instead");
 }
 

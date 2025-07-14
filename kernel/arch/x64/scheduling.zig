@@ -30,7 +30,7 @@ pub fn jumpToTaskFromIdle(
     const impls = struct {
         const jumpToTaskFromIdle: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.C) void = blk: {
+        ) callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -86,7 +86,7 @@ pub fn jumpToTaskFromTask(
         const jumpToTaskFromTask: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
-        ) callconv(.C) void = blk: {
+        ) callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -131,7 +131,7 @@ pub fn prepareNewTaskForScheduling(
     arg2: usize,
 ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
     const impls = struct {
-        const startNewTaskStage1: *const fn () callconv(.C) void = blk: {
+        const startNewTaskStage1: *const fn () callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -166,13 +166,13 @@ pub fn callOneArgs(
     opt_old_task: ?*kernel.Task,
     new_stack: kernel.Task.Stack,
     arg1: usize,
-    target_function: *const fn (usize) callconv(.C) noreturn,
+    target_function: *const fn (usize) callconv(.c) noreturn,
 ) kernel.arch.scheduling.CallError!void {
     const impls = struct {
         const callOneArgs: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
-        ) callconv(.C) void = blk: {
+        ) callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -196,7 +196,7 @@ pub fn callOneArgs(
 
         const callOneArgsNoPrevious: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.C) void = blk: {
+        ) callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -232,13 +232,13 @@ pub fn callTwoArgs(
     new_stack: kernel.Task.Stack,
     arg1: usize,
     arg2: usize,
-    target_function: *const fn (usize, usize) callconv(.C) noreturn,
+    target_function: *const fn (usize, usize) callconv(.c) noreturn,
 ) kernel.arch.scheduling.CallError!void {
     const impls = struct {
         const callTwoArgs: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
-        ) callconv(.C) void = blk: {
+        ) callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -263,7 +263,7 @@ pub fn callTwoArgs(
 
         const callTwoArgsNoPrevious: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.C) void = blk: {
+        ) callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (

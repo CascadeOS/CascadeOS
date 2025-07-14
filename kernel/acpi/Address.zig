@@ -94,42 +94,32 @@ pub const Address = extern struct {
         _,
     };
 
-    pub fn print(address: Address, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(address: Address, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("Address{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("address_space: {s},\n", .{@tagName(address.address_space)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("address_space: {t},\n", .{address.address_space});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("bit_width: {d},\n", .{address.register_bit_width});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("bit_offset: {d},\n", .{address.register_bit_offset});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("access_size: {s},\n", .{@tagName(address.access_size)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("access_size: {t},\n", .{address.access_size});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("address: 0x{x},\n", .{address.address});
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
-    pub inline fn format(
-        address: Address,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(address, writer, 0)
-        else
-            print(address, writer.any(), 0);
+    pub inline fn format(address: Address, writer: *std.Io.Writer) !void {
+        return print(address, writer, 0);
     }
 
     comptime {

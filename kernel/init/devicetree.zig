@@ -47,7 +47,7 @@ fn getDeviceTree() ?DeviceTree {
     const address = kernel.boot.deviceTreeBlob() orelse return null;
     const ptr = address.toPtr([*]align(8) const u8);
     return DeviceTree.fromPtr(ptr) catch |err| {
-        log.warn("failed to parse device tree blob: {s}", .{@errorName(err)});
+        log.warn("failed to parse device tree blob: {t}", .{err});
         return null;
     };
 }

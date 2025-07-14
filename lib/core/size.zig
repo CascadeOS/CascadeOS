@@ -186,7 +186,7 @@ pub const Size = extern struct {
         .{ .value = @intFromEnum(Unit.byte), .name = "B" },
     };
 
-    pub fn print(size: Size, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(size: Size, writer: *std.Io.Writer, indent: usize) !void {
         _ = indent;
 
         var value = size.value;
@@ -205,7 +205,7 @@ pub const Size = extern struct {
 
             if (emitted_anything) try writer.writeAll(", ");
 
-            try std.fmt.formatInt(part, 10, .lower, .{}, writer);
+            try writer.printInt(part, 10, .lower, .{});
             try writer.writeAll(comptime " " ++ unit.name);
 
             value -= part * unit.value;
@@ -213,18 +213,8 @@ pub const Size = extern struct {
         }
     }
 
-    pub inline fn format(
-        size: Size,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(size, writer, 0)
-        else
-            print(size, writer.any(), 0);
+    pub inline fn format(size: Size, writer: *std.Io.Writer) !void {
+        return print(size, writer, 0);
     }
 
     comptime {

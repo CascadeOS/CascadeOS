@@ -169,7 +169,7 @@ pub const init = struct {
         pages_range: core.VirtualRange,
     ) void {
         init_log.debug(
-            "initializing pages array with {} usable pages ({}) in {} regions",
+            "initializing pages array with {} usable pages ({f}) in {} regions",
             .{
                 number_of_usable_pages,
                 kernel.arch.paging.standard_page_size.multiplyScalar(number_of_usable_pages),
@@ -238,7 +238,7 @@ pub const init = struct {
                 if (init_log.levelEnabled(.debug)) {
                     if (in_use_frames == 0) {
                         init_log.debug(
-                            "pulled {} ({}) free frames out of bootstrap frame allocator region",
+                            "pulled {} ({f}) free frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
                                 kernel.arch.paging.standard_page_size.multiplyScalar(free_frames),
@@ -246,7 +246,7 @@ pub const init = struct {
                         );
                     } else if (in_use_frames == bootstrap_region.frame_count) {
                         init_log.debug(
-                            "pulled {} ({}) in use frames out of bootstrap frame allocator region",
+                            "pulled {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 in_use_frames,
                                 kernel.arch.paging.standard_page_size.multiplyScalar(in_use_frames),
@@ -254,7 +254,7 @@ pub const init = struct {
                         );
                     } else {
                         init_log.debug(
-                            "pulled {} ({}) free frames and {} ({}) in use frames out of bootstrap frame allocator region",
+                            "pulled {} ({f}) free frames and {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
                                 kernel.arch.paging.standard_page_size.multiplyScalar(free_frames),
@@ -271,7 +271,7 @@ pub const init = struct {
                 entry.range.size.value,
                 kernel.arch.paging.standard_page_size.value,
             ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {}",
+                "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
             ));
 
@@ -280,7 +280,7 @@ pub const init = struct {
                 entry.range.size.value,
                 kernel.arch.paging.standard_page_size.value,
             ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {}",
+                "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
             ));
 
@@ -318,12 +318,12 @@ pub const init = struct {
             .subtract(reclaimable_memory)
             .subtract(unavailable_memory);
 
-        init_log.debug("total memory:         {}", .{total_memory});
-        init_log.debug("  free memory:        {}", .{free_memory});
-        init_log.debug("  used memory:        {}", .{used_memory});
-        init_log.debug("  reserved memory:    {}", .{reserved_memory});
-        init_log.debug("  reclaimable memory: {}", .{reclaimable_memory});
-        init_log.debug("  unavailable memory: {}", .{unavailable_memory});
+        init_log.debug("total memory:         {f}", .{total_memory});
+        init_log.debug("  free memory:        {f}", .{free_memory});
+        init_log.debug("  used memory:        {f}", .{used_memory});
+        init_log.debug("  reserved memory:    {f}", .{reserved_memory});
+        init_log.debug("  reclaimable memory: {f}", .{reclaimable_memory});
+        init_log.debug("  unavailable memory: {f}", .{unavailable_memory});
 
         globals.total_memory = total_memory;
         globals.free_memory.store(free_memory.value, .release);
@@ -364,7 +364,7 @@ pub const init = struct {
         init_log.debug("bootloader provided memory map:", .{});
 
         while (memory_iter.next()) |entry| {
-            init_log.debug("\t{}", .{entry});
+            init_log.debug("\t{f}", .{entry});
             if (entry.type != .free) continue;
 
             regions.append(.{
@@ -375,7 +375,7 @@ pub const init = struct {
                     entry.range.size.value,
                     kernel.arch.paging.standard_page_size.value,
                 ) catch std.debug.panic(
-                    "memory map entry size is not a multiple of page size: {}",
+                    "memory map entry size is not a multiple of page size: {f}",
                     .{entry},
                 )),
             }) catch @panic("exceeded max number of regions");
@@ -387,7 +387,7 @@ pub const init = struct {
                 frames_available += region.frame_count;
             }
             init_log.debug(
-                "bootstrap physical frame allocator initalized with {} free frames ({})",
+                "bootstrap physical frame allocator initalized with {} free frames ({f})",
                 .{ frames_available, kernel.arch.paging.standard_page_size.multiplyScalar(frames_available) },
             );
         }

@@ -76,7 +76,7 @@ pub const init = struct {
             ).toPtr([*]volatile u8);
         }
 
-        init_log.debug("lapic in mode: {s}", .{@tagName(globals.lapic)});
+        init_log.debug("lapic in mode: {t}", .{globals.lapic});
 
         if (fadt.fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) {
             @panic("physical destination mode is forced");

@@ -31,7 +31,7 @@ pub fn maybePreempt(current_task: *kernel.Task) void {
 
     if (globals.ready_to_run.isEmpty()) return;
 
-    log.verbose("preempting {}", .{current_task});
+    log.verbose("preempting {f}", .{current_task});
 
     yield(current_task);
 }
@@ -61,7 +61,7 @@ pub fn yield(current_task: *kernel.Task) void {
 
     std.debug.assert(current_task != new_task);
 
-    log.verbose("yielding {}", .{current_task});
+    log.verbose("yielding {f}", .{current_task});
 
     globals.ready_to_run.push(&current_task.next_task_node);
 
@@ -106,7 +106,7 @@ pub fn drop(current_task: *kernel.Task) noreturn {
     std.debug.assert(current_task.preemption_disable_count == 0);
     std.debug.assert(current_task.preemption_skipped == false);
 
-    log.verbose("dropping {}", .{current_task});
+    log.verbose("dropping {f}", .{current_task});
 
     const new_task_node = globals.ready_to_run.pop() orelse new_task_node: {
         // TODO: is there a way to remove the redundancy within the two branches here?
@@ -142,7 +142,7 @@ fn switchToIdle(
     const static = struct {
         fn idleEntry(
             idle_task_addr: usize,
-        ) callconv(.C) noreturn {
+        ) callconv(.c) noreturn {
             const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
 
             std.debug.assert(idle_task.isIdleTask());
@@ -156,7 +156,7 @@ fn switchToIdle(
     std.debug.assert(current_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(!current_task.isIdleTask());
 
-    log.verbose("switching from {} to idle", .{current_task});
+    log.verbose("switching from {f} to idle", .{current_task});
 
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(current_executor, current_task);
 
@@ -184,7 +184,7 @@ fn switchToIdleBlock(
         fn idleEntryBlock(
             inner_spinlock_addr: usize,
             idle_task_addr: usize,
-        ) callconv(.C) noreturn {
+        ) callconv(.c) noreturn {
             const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(inner_spinlock_addr);
             const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
 
@@ -201,7 +201,7 @@ fn switchToIdleBlock(
     std.debug.assert(old_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
     std.debug.assert(!old_task.isIdleTask());
 
-    log.verbose("switching from {} to idle and blocking", .{old_task});
+    log.verbose("switching from {f} to idle and blocking", .{old_task});
 
     const current_executor = old_task.state.running;
 
@@ -233,7 +233,7 @@ fn switchToIdleDrop(old_task: *kernel.Task) void {
         fn idleEntryDrop(
             task_to_drop_addr: usize,
             idle_task_addr: usize,
-        ) callconv(.C) noreturn {
+        ) callconv(.c) noreturn {
             const task_to_drop: *kernel.Task = @ptrFromInt(task_to_drop_addr);
             const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
 
@@ -253,7 +253,7 @@ fn switchToIdleDrop(old_task: *kernel.Task) void {
     std.debug.assert(old_task.spinlocks_held == 1); // the scheduler lock is held
     std.debug.assert(!old_task.isIdleTask());
 
-    log.verbose("switching from {} to idle and dropping", .{old_task});
+    log.verbose("switching from {f} to idle and dropping", .{old_task});
 
     const current_executor = old_task.state.running;
 
@@ -283,7 +283,7 @@ fn switchToTaskFromIdleYield(current_task: *kernel.Task, new_task: *kernel.Task)
     std.debug.assert(current_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
 
-    log.verbose("switching from idle to {}", .{new_task});
+    log.verbose("switching from idle to {f}", .{new_task});
 
     const executor = current_task.state.running;
     std.debug.assert(&executor.idle_task == current_task);
@@ -307,7 +307,7 @@ fn switchToTaskFromTaskYield(
     std.debug.assert(!new_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
 
-    log.verbose("switching from {} to {}", .{ old_task, new_task });
+    log.verbose("switching from {f} to {f}", .{ old_task, new_task });
 
     const current_executor = old_task.state.running;
 
@@ -330,7 +330,7 @@ fn switchToTaskFromTaskBlock(
         fn switchToTaskBlock(
             inner_spinlock_addr: usize,
             new_task_inner_addr: usize,
-        ) callconv(.C) noreturn {
+        ) callconv(.c) noreturn {
             const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(inner_spinlock_addr);
             const new_task_inner: *kernel.Task = @ptrFromInt(new_task_inner_addr);
 
@@ -346,7 +346,7 @@ fn switchToTaskFromTaskBlock(
     std.debug.assert(!new_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
 
-    log.verbose("switching from {} to {} and blocking", .{ old_task, new_task });
+    log.verbose("switching from {f} to {f} and blocking", .{ old_task, new_task });
 
     const current_executor = old_task.state.running;
 
@@ -378,7 +378,7 @@ fn switchToTaskFromTaskDrop(old_task: *kernel.Task, new_task: *kernel.Task) void
         fn switchToTaskDrop(
             task_to_drop_addr: usize,
             new_task_inner_addr: usize,
-        ) callconv(.C) noreturn {
+        ) callconv(.c) noreturn {
             const task_to_drop: *kernel.Task = @ptrFromInt(task_to_drop_addr);
             const new_task_inner: *kernel.Task = @ptrFromInt(new_task_inner_addr);
 
@@ -403,7 +403,7 @@ fn switchToTaskFromTaskDrop(old_task: *kernel.Task, new_task: *kernel.Task) void
     std.debug.assert(!new_task.isIdleTask());
     std.debug.assert(new_task.next_task_node.next == null);
 
-    log.verbose("switching from {} to {} and dropping", .{ old_task, new_task });
+    log.verbose("switching from {f} to {f} and dropping", .{ old_task, new_task });
 
     const current_executor = old_task.state.running;
 
@@ -442,7 +442,7 @@ pub fn newTaskEntry(
     target_function_addr: *const anyopaque,
     task_arg1: usize,
     task_arg2: usize,
-) callconv(.C) noreturn {
+) callconv(.c) noreturn {
     globals.lock.unlock(current_task);
 
     const func: kernel.arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);

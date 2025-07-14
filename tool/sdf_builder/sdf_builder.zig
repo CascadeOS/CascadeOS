@@ -43,7 +43,8 @@ fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.Generate
     const output_file = try std.fs.cwd().createFile(generate_arguments.binary_output_path, .{});
     defer output_file.close();
 
-    try output_file.writeAll(created_debug_info);
+    var writer = output_file.writer(&.{});
+    try writer.interface.writeAll(created_debug_info);
 }
 
 fn embed(embed_arguments: Arguments.EmbedArguments) !void {
@@ -218,22 +219,24 @@ const usage =
 ;
 
 fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().writer();
+    var buf: [32]u8 = undefined;
+    var stderr = std.fs.File.stderr().writer(&buf);
+    const writer = &stderr.interface;
 
     if (msg.len == 0) @compileError("no message given");
 
     blk: {
-        stderr.writeAll("error: ") catch break :blk;
+        writer.writeAll("error: ") catch break :blk;
 
-        stderr.print(msg, args) catch break :blk;
+        writer.print(msg, args) catch break :blk;
 
         if (msg[msg.len - 1] != '\n') {
-            stderr.writeAll("\n\n") catch break :blk;
+            writer.writeAll("\n\n") catch break :blk;
         } else {
-            stderr.writeByte('\n') catch break :blk;
+            writer.writeByte('\n') catch break :blk;
         }
 
-        stderr.writeAll(usage) catch break :blk;
+        writer.writeAll(usage) catch break :blk;
     }
 
     std.process.exit(1);
@@ -650,7 +653,7 @@ fn createSdfDebugInfo(
     string_table: *const StringTableBuilder,
     file_table: *const FileTableBuilder,
     location_lookup: *const LocationLookupBuilder,
-    location_program: *const LocationProgramBuilder,
+    location_program: *LocationProgramBuilder,
 ) ![]const u8 {
     var output_buffer = std.ArrayList(u8).init(allocator);
 
@@ -665,8 +668,7 @@ fn createSdfDebugInfo(
 
     // write out header
     {
-        var header_stream = std.io.fixedBufferStream(output_buffer.items[0..@sizeOf(sdf.Header)]);
-        const header_writer = header_stream.writer();
+        var writer: std.Io.Writer = .fixed(output_buffer.items[0..@sizeOf(sdf.Header)]);
 
         try sdf.Header.write(.{
             .total_size_of_sdf_data = output_buffer.items.len,
@@ -679,7 +681,7 @@ fn createSdfDebugInfo(
             .location_lookup_entries = location_lookup_entries,
             .location_program_offset = location_program_offset,
             .location_program_length = location_program_length,
-        }, header_writer);
+        }, &writer);
     }
 
     return try output_buffer.toOwnedSlice();

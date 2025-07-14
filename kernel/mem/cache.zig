@@ -246,19 +246,19 @@ pub const RawCache = struct {
 
         if (is_small) {
             log.debug(
-                "{s}: init small object cache with effective size {} (requested size {} alignment {}) objects per slab {} ({})",
+                "{s}: init small object cache with effective size {f} (requested size {f} alignment {}) objects per slab {} ({f})",
                 .{
                     options.name.constSlice(),
                     core.Size.from(effective_object_size, .byte),
                     core.Size.from(options.size, .byte),
                     options.alignment.toByteUnits(),
                     objects_per_slab,
-                    kernel.arch.paging.standard_page_size,
+                    core.Size.from(effective_object_size * objects_per_slab, .byte),
                 },
             );
         } else {
             log.debug(
-                "{s}: init large object cache with effective size {} (requested size {} alignment {}) objects per slab {} ({})",
+                "{s}: init large object cache with effective size {f} (requested size {f} alignment {}) objects per slab {} ({f})",
                 .{
                     options.name.constSlice(),
                     core.Size.from(effective_object_size, .byte),

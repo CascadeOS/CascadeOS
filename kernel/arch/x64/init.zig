@@ -31,7 +31,7 @@ pub fn tryGetSerialOutput() ?kernel.init.Output {
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
         ) catch continue) |serial| {
-            log.debug("using {s} for serial output", .{@tagName(com_port)});
+            log.debug("using {t} for serial output", .{com_port});
 
             static.init_output_serial_port = serial;
             return static.init_output_serial_port.output();
@@ -313,27 +313,36 @@ const DebugCon = struct {
         return lib_x64.instructions.portReadU8(port) == port;
     }
 
+    fn writeStr(str: []const u8) void {
+        for (0..str.len) |i| {
+            const byte = str[i];
+
+            if (byte == '\n') {
+                @branchHint(.unlikely);
+
+                const newline_first_or_only = str.len == 1 or i == 0;
+
+                if (newline_first_or_only or str[i - 1] != '\r') {
+                    @branchHint(.likely);
+                    lib_x64.instructions.portWriteU8(port, '\r');
+                }
+            }
+
+            lib_x64.instructions.portWriteU8(port, byte);
+        }
+    }
+
     const output: kernel.init.Output = .{
         .writeFn = struct {
             fn writeFn(_: *anyopaque, str: []const u8) void {
-                for (0..str.len) |i| {
-                    const byte = str[i];
-
-                    if (byte == '\n') {
-                        @branchHint(.unlikely);
-
-                        const newline_first_or_only = str.len == 1 or i == 0;
-
-                        if (newline_first_or_only or str[i - 1] != '\r') {
-                            @branchHint(.likely);
-                            lib_x64.instructions.portWriteU8(port, '\r');
-                        }
-                    }
-
-                    lib_x64.instructions.portWriteU8(port, byte);
-                }
+                writeStr(str);
             }
         }.writeFn,
+        .splatFn = struct {
+            fn splatFn(_: *anyopaque, str: []const u8, splat: usize) void {
+                for (0..splat) |_| writeStr(str);
+            }
+        }.splatFn,
         .remapFn = struct {
             fn remapFn(_: *anyopaque, _: *kernel.Task) !void {
                 return;

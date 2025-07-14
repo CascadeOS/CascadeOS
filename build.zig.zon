@@ -7,7 +7,7 @@
     .version = "0.0.3",
 
     // Ensure this is kept in sync with `README.md`
-    .minimum_zig_version = "0.15.0-dev.822+dd75e7bcb",
+    .minimum_zig_version = "0.15.0-dev.1034+bd97b6618",
 
     .dependencies = .{
         .devicetree = .{
@@ -28,11 +28,6 @@
         .limine = .{
             .url = "git+https://github.com/limine-bootloader/limine.git?ref=v9.3.4-binary#3bdb2297c80d7159243462936659bc5c82bc0983",
             .hash = "N-V-__8AAIRpRwAz9-EPrciNtBX6AxrGGdPct5iYU_DIKR25",
-        },
-
-        .serpent = .{
-            .url = "git+https://github.com/leecannon/serpent.git?ref=both_prs#9cb2ca7865bf4bf0f32c0250d1625ba46a3be15a",
-            .hash = "serpent-1.0.0-43UO7ve6BQAwBfx7S9iY_71jHykkr-mnnVzAJGOMRWMK",
         },
 
         .uacpi = .{

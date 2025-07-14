@@ -13,8 +13,8 @@ pub fn main() !void {
 
     var child = std.process.Child.init(command.argv, allocator);
 
-    const stdout = std.io.getStdOut();
-    const config = std.io.tty.detectConfig(stdout);
+    const stdout = std.fs.File.stdout();
+    const config = std.Io.tty.detectConfig(stdout);
 
     if (config == .no_color or config == .windows_api) {
         try child.spawn();
@@ -172,22 +172,24 @@ fn getCommand(allocator: std.mem.Allocator) !Command {
 }
 
 fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
-    const stderr = std.io.getStdErr().writer();
+    var buf: [32]u8 = undefined;
+    var stderr = std.fs.File.stderr().writer(&buf);
+    const writer = &stderr.interface;
 
     if (msg.len == 0) @compileError("no message given");
 
     blk: {
-        stderr.writeAll("error: ") catch break :blk;
+        writer.writeAll("error: ") catch break :blk;
 
-        stderr.print(msg, args) catch break :blk;
+        writer.print(msg, args) catch break :blk;
 
         if (msg[msg.len - 1] != '\n') {
-            stderr.writeAll("\n\n") catch break :blk;
+            writer.writeAll("\n\n") catch break :blk;
         } else {
-            stderr.writeByte('\n') catch break :blk;
+            writer.writeByte('\n') catch break :blk;
         }
 
-        stderr.writeAll(usage) catch break :blk;
+        writer.writeAll(usage) catch break :blk;
     }
 
     std.process.exit(1);

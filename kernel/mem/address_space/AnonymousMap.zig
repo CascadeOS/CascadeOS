@@ -152,7 +152,7 @@ pub const Reference = struct {
         std.debug.assert(faulting_address.isAligned(kernel.arch.paging.standard_page_size));
         std.debug.assert(entry.range().containsAddress(faulting_address));
 
-        log.verbose("adding anonymous page for {} to anonymous map", .{faulting_address});
+        log.verbose("adding anonymous page for {f} to anonymous map", .{faulting_address});
 
         const anonymous_map = reference.anonymous_map.?;
 
@@ -179,7 +179,7 @@ pub const Reference = struct {
     pub fn print(
         anonymous_map_reference: Reference,
         current_task: *kernel.Task,
-        writer: std.io.AnyWriter,
+        writer: *std.Io.Writer,
         indent: usize,
     ) !void {
         const new_indent = indent + 2;
@@ -187,10 +187,10 @@ pub const Reference = struct {
         if (anonymous_map_reference.anonymous_map) |anonymous_map| {
             try writer.writeAll("AnonymousMap.Reference{\n");
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try writer.print("start_offset: {d}\n", .{anonymous_map_reference.start_offset});
 
-            try writer.writeByteNTimes(' ', new_indent);
+            try writer.splatByteAll(' ', new_indent);
             try anonymous_map.print(
                 current_task,
                 writer,
@@ -198,19 +198,14 @@ pub const Reference = struct {
             );
             try writer.writeAll(",\n");
 
-            try writer.writeByteNTimes(' ', indent);
+            try writer.splatByteAll(' ', indent);
             try writer.writeAll("}");
         } else {
             try writer.writeAll("AnonymousMap.Reference{ none }");
         }
     }
 
-    pub inline fn format(
-        _: Reference,
-        comptime _: []const u8,
-        _: std.fmt.FormatOptions,
-        _: anytype,
-    ) !void {
+    pub inline fn format(_: Reference, _: *std.Io.Writer) !void {
         @compileError("use `Reference.print` instead");
     }
 };
@@ -221,7 +216,7 @@ pub const Reference = struct {
 pub fn print(
     anonymous_map: *AnonymousMap,
     current_task: *kernel.Task,
-    writer: std.io.AnyWriter,
+    writer: *std.Io.Writer,
     indent: usize,
 ) !void {
     const new_indent = indent + 2;
@@ -231,25 +226,20 @@ pub fn print(
 
     try writer.writeAll("AnonymousMap{\n");
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("reference_count: {d}\n", .{anonymous_map.reference_count});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("number_of_pages: {d}\n", .{anonymous_map.number_of_pages});
 
-    try writer.writeByteNTimes(' ', new_indent);
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("pages_in_use: {d}\n", .{anonymous_map.pages_in_use});
 
-    try writer.writeByteNTimes(' ', indent);
+    try writer.splatByteAll(' ', indent);
     try writer.writeAll("}");
 }
 
-pub inline fn format(
-    _: *const *AnonymousMap,
-    comptime _: []const u8,
-    _: std.fmt.FormatOptions,
-    _: anytype,
-) !void {
+pub inline fn format(_: *const *AnonymousMap, _: *std.Io.Writer) !void {
     @compileError("use `AnonymousMap.print` instead");
 }
 

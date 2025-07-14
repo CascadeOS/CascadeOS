@@ -70,13 +70,13 @@ no_kaslr: bool,
 /// In the kernel, set the log level to be either debug or verbose.
 kernel_log_level: ?ForceLogLevel,
 
-/// In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers).
+/// In the kernel, force the provided log scopes to be logged.
 ///
 /// If a scope ends with a `+` it will match any scope that starts with the prefix.
 ///
 /// Example:
 /// `virtual,init+,physical` will exact match `virtual` and `physical` and match any scope that starts with `init`.
-kernel_log_scopes: []const u8,
+kernel_log_scopes: []const []const u8,
 
 /// Disable the kernel log wrapper.
 ///
@@ -191,7 +191,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         "In the kernel, set the log level to be either debug or verbose.",
     );
 
-    const kernel_log_scopes = b.option(
+    const kernel_log_scopes_raw = b.option(
         []const u8,
         "kernel_log_scopes",
         "In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
@@ -210,6 +210,18 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
     ) catch unreachable;
 
     const cascade_version_string = try getVersionString(b, cascade_version, root_path);
+
+    const kernel_log_scopes = blk: {
+        var kernel_log_scopes: std.ArrayList([]const u8) = .init(b.allocator);
+        errdefer kernel_log_scopes.deinit();
+
+        var iter = std.mem.splitScalar(u8, kernel_log_scopes_raw, ',');
+        while (iter.next()) |scope| {
+            if (scope.len != 0) try kernel_log_scopes.append(scope);
+        }
+
+        break :blk try kernel_log_scopes.toOwnedSlice();
+    };
 
     return .{
         .root_path = root_path,
@@ -237,7 +249,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         .all_enabled_kernel_option_module = try buildKernelOptionModule(
             b,
             .verbose,
-            "",
+            &.{},
             cascade_version_string,
         ),
         .architecture_specific_kernel_options_modules = try buildKernelArchitectureOptionModules(b, all_architectures),
@@ -271,7 +283,7 @@ fn buildKernelArchitectureOptionModules(
     for (all_architectures) |architecture| {
         const architecture_options = b.addOptions();
 
-        addArchitectureOptions(architecture_options, architecture);
+        architecture_options.addOption(CascadeTarget.Architecture, "arch", architecture);
 
         architecture_option_modules.putAssumeCapacityNoClobber(architecture, architecture_options.createModule());
     }
@@ -283,7 +295,7 @@ fn buildKernelArchitectureOptionModules(
 fn buildKernelOptionModule(
     b: *std.Build,
     kernel_log_level: ?ForceLogLevel,
-    kernel_log_scopes: []const u8,
+    kernel_log_scopes: []const []const u8,
     cascade_version_string: []const u8,
 ) !*std.Build.Module {
     const kernel_options = b.addOptions();
@@ -294,45 +306,9 @@ fn buildKernelOptionModule(
         kernel_options.addOption(ForceLogLevel, "force_log_level", force_log_level);
     }
 
-    addStringLiteralSliceOption(kernel_options, "kernel_log_scopes", kernel_log_scopes);
+    kernel_options.addOption([]const []const u8, "kernel_log_scopes", kernel_log_scopes);
 
     return kernel_options.createModule();
-}
-
-/// Adds a string literal slice option to the options.
-fn addStringLiteralSliceOption(options: *Step.Options, name: []const u8, buffer: []const u8) void {
-    const out = options.contents.writer();
-
-    out.print("pub const {}: []const []const u8 = &.{{", .{std.zig.fmtId(name)}) catch unreachable;
-
-    var iter = std.mem.splitScalar(u8, buffer, ',');
-    while (iter.next()) |value| {
-        if (value.len != 0) out.print("\"{s}\",", .{value}) catch unreachable;
-    }
-
-    out.writeAll("};\n") catch unreachable;
-}
-
-/// Adds an enum type option to the options.
-fn addEnumType(options: *Step.Options, name: []const u8, comptime EnumT: type) void {
-    const out = options.contents.writer();
-
-    out.print("pub const {} = enum {{\n", .{std.zig.fmtId(name)}) catch unreachable;
-
-    for (std.meta.tags(EnumT)) |tag| {
-        out.print("    {},\n", .{std.zig.fmtId(@tagName(tag))}) catch unreachable;
-    }
-
-    out.writeAll("};\n") catch unreachable;
-}
-
-/// Adds architecture-specific options to the options.
-fn addArchitectureOptions(options: *Step.Options, architecture: CascadeTarget.Architecture) void {
-    addEnumType(options, "Architecture", CascadeTarget.Architecture);
-
-    const out = options.contents.writer();
-
-    out.print("pub const arch: Architecture = .{};\n", .{std.zig.fmtId(@tagName(architecture))}) catch unreachable;
 }
 
 /// Gets the version string.
@@ -372,7 +348,7 @@ fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion, r
             const ancestor_version = try std.SemanticVersion.parse(tagged_ancestor_version_string);
             if (base_semantic_version.order(ancestor_version) != .gt) {
                 std.debug.print(
-                    "version '{}' must be greater than tagged ancestor '{}'\n",
+                    "version '{f}' must be greater than tagged ancestor '{f}'\n",
                     .{ base_semantic_version, ancestor_version },
                 );
                 std.process.exit(1);

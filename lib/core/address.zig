@@ -98,23 +98,8 @@ pub const PhysicalAddress = extern struct {
         return .eq;
     }
 
-    pub fn print(physical_address: PhysicalAddress, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
+    pub inline fn format(physical_address: PhysicalAddress, writer: *std.Io.Writer) !void {
         try writer.print("PhysicalAddress{{ 0x{x:0>16} }}", .{physical_address.value});
-    }
-
-    pub inline fn format(
-        physical_address: PhysicalAddress,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(physical_address, writer, 0)
-        else
-            print(physical_address, writer.any(), 0);
     }
 
     comptime {
@@ -228,23 +213,8 @@ pub const VirtualAddress = extern struct {
         return .eq;
     }
 
-    pub fn print(virtual_address: VirtualAddress, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
+    pub inline fn format(virtual_address: VirtualAddress, writer: *std.Io.Writer) !void {
         try writer.print("VirtualAddress{{ 0x{x:0>16} }}", .{virtual_address.value});
-    }
-
-    pub inline fn format(
-        virtual_address: VirtualAddress,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(virtual_address, writer, 0)
-        else
-            print(virtual_address, writer.any(), 0);
     }
 
     comptime {
@@ -321,27 +291,15 @@ pub const PhysicalRange = extern struct {
         return physical_range.containsAddressOrder(address) == .eq;
     }
 
-    pub fn print(value: PhysicalRange, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
-        try writer.print("PhysicalRange{{ 0x{x:0>16} - 0x{x:0>16} - {} }}", .{
+    pub inline fn format(
+        value: PhysicalRange,
+        writer: *std.Io.Writer,
+    ) !void {
+        try writer.print("PhysicalRange{{ 0x{x:0>16} - 0x{x:0>16} - {f} }}", .{
             value.address.value,
             value.last().value,
             value.size,
         });
-    }
-
-    pub inline fn format(
-        value: PhysicalRange,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(value, writer, 0)
-        else
-            print(value, writer.any(), 0);
     }
 };
 
@@ -449,27 +407,15 @@ pub const VirtualRange = extern struct {
         return virtual_range.compareAddressOrder(address) == .eq;
     }
 
-    pub fn print(value: VirtualRange, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
-        try writer.print("VirtualRange{{ 0x{x:0>16} - 0x{x:0>16} - {} }}", .{
+    pub inline fn format(
+        value: VirtualRange,
+        writer: *std.Io.Writer,
+    ) !void {
+        try writer.print("VirtualRange{{ 0x{x:0>16} - 0x{x:0>16} - {f} }}", .{
             value.address.value,
             value.last().value,
             value.size,
         });
-    }
-
-    pub inline fn format(
-        value: VirtualRange,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(value, writer, 0)
-        else
-            print(value, writer.any(), 0);
     }
 };
 

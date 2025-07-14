@@ -18,7 +18,7 @@ pub const testing = @import("testing.zig");
 
 pub inline fn require(value: anytype, comptime msg: []const u8) @TypeOf(value catch unreachable) {
     return value catch |err| {
-        std.debug.panic(comptime msg ++ ": {s}", .{@errorName(err)});
+        std.debug.panic(comptime msg ++ ": {t}", .{err});
     };
 }
 
@@ -93,7 +93,7 @@ pub const endian = struct {
 ///
 /// This allows the effect of inlining for release builds but does result in missing debug information during
 /// debug builds.
-pub const inline_in_non_debug: std.builtin.CallingConvention = if (builtin.mode == .Debug) .Unspecified else .Inline;
+pub const inline_in_non_debug: std.builtin.CallingConvention = if (builtin.mode == .Debug) .auto else .@"inline";
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());

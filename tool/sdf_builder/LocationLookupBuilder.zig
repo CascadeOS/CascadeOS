@@ -36,7 +36,8 @@ pub fn output(
 
     const location_lookup_offset = output_buffer.items.len;
 
-    const writer = output_buffer.writer();
+    var adapter = output_buffer.writer().adaptToNewApi();
+    const writer = &adapter.new_interface;
 
     for (location_lookup_builder.location_lookup.items) |address| {
         try writer.writeInt(u64, address, .little); // address

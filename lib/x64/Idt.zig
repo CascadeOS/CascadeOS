@@ -54,7 +54,7 @@ pub const Entry = extern struct {
         entry: *Entry,
         code_selector: x64.Gdt.Selector,
         gate_type: GateType,
-        handler: *const fn () callconv(.Naked) void,
+        handler: *const fn () callconv(.naked) void,
     ) void {
         entry.* = .{
             .pointer_low = undefined,
@@ -70,7 +70,7 @@ pub const Entry = extern struct {
     }
 
     /// Sets the interrupt handler for this interrupt.
-    pub fn setHandler(entry: *Entry, handler: *const fn () callconv(.Naked) void) void {
+    pub fn setHandler(entry: *Entry, handler: *const fn () callconv(.naked) void) void {
         const address = @intFromPtr(handler);
         entry.pointer_low = @truncate(address);
         entry.pointer_middle = @truncate(address >> 16);

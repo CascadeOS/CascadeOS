@@ -290,7 +290,7 @@ pub fn onKernelPageFault(
 
         kernel.debug.interruptSourcePanic(
             interrupt_frame,
-            "kernel page fault in lower half\n{}",
+            "kernel page fault in lower half\n{f}",
             .{page_fault_details},
         );
     }
@@ -300,7 +300,7 @@ pub fn onKernelPageFault(
 
         kernel.debug.interruptSourcePanic(
             interrupt_frame,
-            "kernel page fault outside of any kernel region\n{}",
+            "kernel page fault outside of any kernel region\n{f}",
             .{page_fault_details},
         );
     };
@@ -310,13 +310,13 @@ pub fn onKernelPageFault(
             @branchHint(.likely);
             globals.kernel_pageable_address_space.handlePageFault(current_task, page_fault_details) catch |err| switch (err) {
                 error.NoMemory => std.debug.panic(
-                    "no memory available to handle page fault in pageable kernel address space\n{}",
+                    "no memory available to handle page fault in pageable kernel address space\n{f}",
                     .{page_fault_details},
                 ),
                 else => |e| kernel.debug.interruptSourcePanic(
                     interrupt_frame,
-                    "failed to handle page fault in pageable kernel address space: {s}\n{}",
-                    .{ @errorName(e), page_fault_details },
+                    "failed to handle page fault in pageable kernel address space: {t}\n{f}",
+                    .{ e, page_fault_details },
                 ),
             };
         },
@@ -325,8 +325,8 @@ pub fn onKernelPageFault(
 
             kernel.debug.interruptSourcePanic(
                 interrupt_frame,
-                "kernel page fault in '{s}'\n{}",
-                .{ @tagName(region_type), page_fault_details },
+                "kernel page fault in '{t}'\n{f}",
+                .{ region_type, page_fault_details },
             );
         },
     }
@@ -352,41 +352,32 @@ pub const PageFaultDetails = struct {
         protection,
     };
 
-    pub fn print(details: PageFaultDetails, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(details: PageFaultDetails, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("PageFaultDetails{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.writeAll("faulting_address: ");
-        try details.faulting_address.print(writer, new_indent);
-        try writer.writeAll(",\n");
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("faulting_address: {f},\n", .{details.faulting_address});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("access_type: {s},\n", .{@tagName(details.access_type)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("access_type: {t},\n", .{details.access_type});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("fault_type: {s},\n", .{@tagName(details.fault_type)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("fault_type: {t},\n", .{details.fault_type});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("context: {s},\n", .{@tagName(details.context)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("context: {t},\n", .{details.context});
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
     pub inline fn format(
         details: PageFaultDetails,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            PageFaultDetails.print(details, writer, 0)
-        else
-            PageFaultDetails.print(details, writer.any(), 0);
+        return details.print(writer, 0);
     }
 };
 
@@ -518,7 +509,7 @@ pub const init = struct {
                 entry.range.size.value,
                 kernel.arch.paging.standard_page_size.value,
             ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {}",
+                "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
             );
         }
@@ -547,7 +538,7 @@ pub const init = struct {
             init_log.debug("kernel memory layout:", .{});
 
             for (globals.regions.constSlice()) |region| {
-                init_log.debug("\t{}", .{region});
+                init_log.debug("\t{f}", .{region});
             }
         }
 
@@ -627,7 +618,7 @@ pub const init = struct {
         // does the direct map range overlap a pre-existing region?
         for (globals.regions.constSlice()) |region| {
             if (region.range.fullyContainsRange(direct_map)) {
-                std.debug.panic("direct map overlaps region: {}", .{region});
+                std.debug.panic("direct map overlaps region: {f}", .{region});
                 return error.DirectMapOverlapsRegion;
             }
         }
@@ -748,7 +739,7 @@ pub const init = struct {
         );
 
         for (globals.regions.constSlice()) |region| {
-            init_log.debug("mapping '{s}' into the core page table", .{@tagName(region.type)});
+            init_log.debug("mapping '{t}' into the core page table", .{region.type});
 
             const map_info = region.mapInfo();
 
@@ -758,7 +749,7 @@ pub const init = struct {
                     region.range,
                     phys.init.bootstrap_allocator,
                 ) catch |err| {
-                    std.debug.panic("failed to fill top level for {}: {s}", .{ region, @errorName(err) });
+                    std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
                 },
                 .full => |full| kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     globals.core_page_table,
@@ -767,7 +758,7 @@ pub const init = struct {
                     full.map_type,
                     phys.init.bootstrap_allocator,
                 ) catch |err| {
-                    std.debug.panic("failed to full map {}: {s}", .{ region, @errorName(err) });
+                    std.debug.panic("failed to full map {f}: {t}", .{ region, err });
                 },
                 .back_with_frames => |map_type| {
                     mapRangeAndBackWithPhysicalFrames(
@@ -779,7 +770,7 @@ pub const init = struct {
                         .nop,
                         phys.init.bootstrap_allocator,
                     ) catch |err| {
-                        std.debug.panic("failed to back with frames {}: {s}", .{ region, @errorName(err) });
+                        std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
                     };
                 },
             }
@@ -835,7 +826,7 @@ pub const init = struct {
 
         init_log.debug("kernel memory offsets:", .{});
 
-        init_log.debug("  virtual base address:       {}", .{globals.virtual_base_address});
+        init_log.debug("  virtual base address:       {f}", .{globals.virtual_base_address});
         init_log.debug("  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
         init_log.debug("  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
     }

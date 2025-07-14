@@ -48,7 +48,7 @@ pub const UUID = extern struct {
                 i += 1;
             }
 
-            const characters_needed = comptime section.charactersNeededToStoreField();
+            const characters_needed = comptime section.characterWidthOfField();
             const ptr: *align(1) section.field_type = @ptrCast(&result.bytes[section.start_index]);
 
             ptr.* = std.fmt.parseUnsigned(
@@ -65,46 +65,19 @@ pub const UUID = extern struct {
 
     pub const uuid_buffer_length: usize = 36;
 
-    /// `buf` must be atleast `uuid_buffer_length`
-    pub fn bufPrint(uuid: UUID, buf: []u8) []const u8 {
-        std.debug.assert(buf.len >= uuid_buffer_length);
-
-        var i: usize = 0;
-
+    pub fn format(uuid: UUID, writer: *std.Io.Writer) !void {
         inline for (uuid_sections) |section| {
-            if (section.proceeded_by_hyphen) {
-                buf[i] = '-';
-                i += 1;
-            }
+            if (section.proceeded_by_hyphen) try writer.writeByte('-');
 
-            const characters_needed = comptime section.charactersNeededToStoreField();
             const ptr: *align(1) const section.field_type = @ptrCast(&uuid.bytes[section.start_index]);
 
-            _ = std.fmt.formatIntBuf(
-                buf[i..][0..characters_needed],
+            try writer.printInt(
                 ptr.*,
                 16,
                 .lower,
-                .{ .width = characters_needed, .fill = '0' },
+                .{ .width = section.characterWidthOfField(), .fill = '0' },
             );
-
-            i += characters_needed;
         }
-
-        return buf[0..uuid_buffer_length];
-    }
-
-    pub inline fn format(
-        uuid: UUID,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = fmt;
-        _ = options;
-
-        var buf: [uuid_buffer_length]u8 = undefined;
-        try writer.writeAll(uuid.bufPrint(&buf));
     }
 
     const UUIDSection = struct {
@@ -112,7 +85,7 @@ pub const UUID = extern struct {
         start_index: usize,
         proceeded_by_hyphen: bool,
 
-        inline fn charactersNeededToStoreField(comptime uuid_section: UUIDSection) usize {
+        inline fn characterWidthOfField(comptime uuid_section: UUIDSection) usize {
             return comptime switch (uuid_section.field_type) {
                 u32 => 8,
                 u16 => 4,
@@ -152,7 +125,7 @@ test "parse and format" {
     };
 
     for (uuids) |uuid| {
-        try std.testing.expectFmt(uuid, "{}", .{try UUID.parse(uuid)});
+        try std.testing.expectFmt(uuid, "{f}", .{try UUID.parse(uuid)});
     }
 }
 

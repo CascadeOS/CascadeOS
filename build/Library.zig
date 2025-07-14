@@ -171,8 +171,6 @@ fn resolveLibrary(
 
     var host_native_module: ?*std.Build.Module = null;
 
-    const serpent_module = b.dependency("serpent", .{}).module("serpent");
-
     for (supported_architectures) |architecture| {
         {
             const cascade_module = try createModule(
@@ -247,10 +245,6 @@ fn resolveLibrary(
             const host_test_exe = b.addTest(.{
                 .name = library_description.name,
                 .root_module = host_test_module,
-                .test_runner = .{
-                    .path = serpent_module.root_source_file.?,
-                    .mode = .simple,
-                },
             });
 
             if (library_description.need_llvm) {
@@ -280,15 +274,15 @@ fn resolveLibrary(
 
             const host_test_step_name = try std.fmt.allocPrint(
                 b.allocator,
-                "{s}_host_{s}",
-                .{ library_description.name, @tagName(architecture) },
+                "{s}_host_{t}",
+                .{ library_description.name, architecture },
             );
 
             const host_test_step_description =
                 try std.fmt.allocPrint(
                     b.allocator,
-                    "Build and attempt to run the tests for {s} on {s} targeting the host os",
-                    .{ library_description.name, @tagName(architecture) },
+                    "Build and attempt to run the tests for {s} on {t} targeting the host os",
+                    .{ library_description.name, architecture },
                 );
 
             const host_test_step = b.step(host_test_step_name, host_test_step_description);

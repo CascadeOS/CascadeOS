@@ -87,12 +87,12 @@ fn logFn(
         .single_executor_init_log => {
             @branchHint(.unlikely);
 
-            const writer = globals.init_log_buffered_writer.writer();
+            const writer = kernel.init.Output.writer;
 
             writer.writeAll(prefix) catch {};
             writer.print(format, args) catch {};
 
-            globals.init_log_buffered_writer.flush() catch {};
+            kernel.init.Output.writer.flush() catch {};
         },
         .init_log => {
             @branchHint(.unlikely);
@@ -102,12 +102,12 @@ fn logFn(
             kernel.init.Output.globals.lock.lock(current_task);
             defer kernel.init.Output.globals.lock.unlock(current_task);
 
-            const writer = globals.init_log_buffered_writer.writer();
+            const writer = kernel.init.Output.writer;
 
             writer.writeAll(prefix) catch {};
             writer.print(format, args) catch {};
 
-            globals.init_log_buffered_writer.flush() catch {};
+            kernel.init.Output.writer.flush() catch {};
         },
     }
 }
@@ -132,8 +132,8 @@ pub const LogMode = enum(u8) {
 pub fn setLogMode(mode: LogMode) void {
     if (@intFromEnum(globals.log_mode) + 1 != @intFromEnum(mode)) {
         std.debug.panic(
-            "invalid log mode transition '{s}' -> '{s}'",
-            .{ @tagName(globals.log_mode), @tagName(mode) },
+            "invalid log mode transition '{t}' -> '{t}'",
+            .{ globals.log_mode, mode },
         );
     }
 
@@ -200,9 +200,6 @@ inline fn isScopeInForceScopeList(comptime scope: @Type(.enum_literal), comptime
 
 const globals = struct {
     var log_mode: LogMode = .single_executor_init_log;
-
-    /// Buffered writer used only during init.
-    var init_log_buffered_writer = std.io.bufferedWriter(kernel.init.Output.writer);
 };
 
 const kernel_log_scopes = kernel_options.kernel_log_scopes;

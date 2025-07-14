@@ -14,10 +14,7 @@ pub fn routeInterrupt(interrupt: u8, vector: x64.interrupts.Interrupt) !void {
         mapping.trigger_mode,
         false,
     ) catch |err|
-        std.debug.panic(
-            "failed to route interrupt {}: {s}",
-            .{ interrupt, @errorName(err) },
-        );
+        std.debug.panic("failed to route interrupt {}: {t}", .{ interrupt, err });
 }
 
 fn getMapping(interrupt: u8) SourceOverride {
@@ -75,28 +72,15 @@ const SourceOverride = struct {
         };
     }
 
-    pub fn print(id: SourceOverride, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
-
-        try writer.print("SourceOverride{{ .gsi = {d}, .polarity = {s}, .trigger_mode = {s} }}", .{
-            id.gsi,
-            @tagName(id.polarity),
-            @tagName(id.trigger_mode),
-        });
-    }
-
     pub inline fn format(
         id: SourceOverride,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            SourceOverride.print(id, writer, 0)
-        else
-            SourceOverride.print(id, writer.any(), 0);
+        try writer.print("SourceOverride{{ .gsi = {d}, .polarity = {t}, .trigger_mode = {t} }}", .{
+            id.gsi,
+            id.polarity,
+            id.trigger_mode,
+        });
     }
 };
 
@@ -123,7 +107,7 @@ pub const init = struct {
                     const madt_iso = entry.specific.interrupt_source_override;
                     const source_override: SourceOverride = .fromMADT(madt_iso);
                     globals.source_overrides[madt_iso.source] = source_override;
-                    init_log.debug("found irq {} has {}", .{ madt_iso.source, source_override });
+                    init_log.debug("found irq {} has {f}", .{ madt_iso.source, source_override });
                 },
                 else => continue,
             }

@@ -387,11 +387,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
             const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
 
-            log.verbose("{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) with policy {s}", .{
+            log.verbose("{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) with policy {t}", .{
                 arena.name(),
                 len,
                 quantum_aligned_len,
-                @tagName(policy),
+                policy,
             });
 
             if (quantum_caching.haveQuantumCache()) {
@@ -443,7 +443,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 .len = quantum_aligned_len,
             };
 
-            log.verbose("{s}: allocated {}", .{ arena.name(), allocation });
+            log.verbose("{s}: allocated {f}", .{ arena.name(), allocation });
 
             return allocation;
         }
@@ -583,7 +583,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
             try arena.addSpanInner(span_tag, free_tag, .nop);
 
-            log.verbose("{s}: imported {} from source {s}", .{ arena.name(), allocation, source.name });
+            log.verbose("{s}: imported {f} from source {s}", .{ arena.name(), allocation, source.name });
 
             return free_tag;
         }
@@ -618,7 +618,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         ///
         /// Panics if the allocation does not match a previous call to `allocate`.
         pub fn deallocate(arena: *@This(), current_task: *kernel.Task, allocation: Allocation) void {
-            log.verbose("{s}: deallocating {}", .{ arena.name(), allocation });
+            log.verbose("{s}: deallocating {f}", .{ arena.name(), allocation });
 
             std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
             std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
@@ -718,7 +718,10 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                     source.callRelease(current_task, allocation_to_release);
 
-                    log.verbose("{s}: released {} to source {s}", .{ arena.name(), allocation_to_release, source.name });
+                    log.verbose(
+                        "{s}: released {f} to source {s}",
+                        .{ arena.name(), allocation_to_release, source.name },
+                    );
 
                     return;
                 }
@@ -938,23 +941,11 @@ pub const Allocation = struct {
     base: usize,
     len: usize,
 
-    pub fn print(allocation: Allocation, writer: std.io.AnyWriter, indent: usize) !void {
-        _ = indent;
-        try writer.print("Allocation{{ base: 0x{x}, len: 0x{x} }}", .{ allocation.base, allocation.len });
-    }
-
     pub inline fn format(
         allocation: Allocation,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(allocation, writer, 0)
-        else
-            print(allocation, writer.any(), 0);
+        try writer.print("Allocation{{ base: 0x{x}, len: 0x{x} }}", .{ allocation.base, allocation.len });
     }
 };
 
@@ -1058,46 +1049,36 @@ const BoundaryTag = struct {
         };
     }
 
-    pub fn print(boundary_tag: BoundaryTag, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(boundary_tag: BoundaryTag, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("BoundaryTag{\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("base: 0x{x},\n", .{boundary_tag.base});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.print("len: 0x{x},\n", .{boundary_tag.len});
 
-        try writer.writeByteNTimes(' ', new_indent);
-        try writer.print("kind: {s},\n", .{@tagName(boundary_tag.kind)});
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("kind: {t},\n", .{boundary_tag.kind});
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("all_tag_node: ");
         try boundary_tag.all_tag_node.print(writer, new_indent);
         try writer.writeAll(",\n");
 
-        try writer.writeByteNTimes(' ', new_indent);
+        try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("kind_node: ");
         try boundary_tag.kind_node.print(writer, new_indent);
         try writer.writeAll(",\n");
 
-        try writer.writeByteNTimes(' ', indent);
+        try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
     }
 
-    pub inline fn format(
-        boundary_tag: BoundaryTag,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(boundary_tag, writer, 0)
-        else
-            print(boundary_tag, writer.any(), 0);
+    pub inline fn format(boundary_tag: BoundaryTag, writer: *std.Io.Writer) !void {
+        return boundary_tag.print(writer, 0);
     }
 };
 
@@ -1111,7 +1092,7 @@ const AllTagNode = struct {
 
     const empty: AllTagNode = .{ .previous = null, .next = null };
 
-    pub fn print(all_tag_node: AllTagNode, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(all_tag_node: AllTagNode, writer: *std.Io.Writer, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("AllTagNode{ previous: ");
@@ -1129,18 +1110,8 @@ const AllTagNode = struct {
         try writer.writeAll(" }");
     }
 
-    pub inline fn format(
-        all_tag_node: AllTagNode,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(all_tag_node, writer, 0)
-        else
-            print(all_tag_node, writer.any(), 0);
+    pub inline fn format(all_tag_node: AllTagNode, writer: *std.Io.Writer) !void {
+        return all_tag_node.print(writer, 0);
     }
 };
 
@@ -1154,7 +1125,7 @@ const KindNode = struct {
 
     const empty: KindNode = .{ .previous = null, .next = null };
 
-    pub fn print(kind_node: KindNode, writer: std.io.AnyWriter, indent: usize) !void {
+    pub fn print(kind_node: KindNode, writer: *std.Io.Writer, indent: usize) !void {
         _ = indent;
 
         try writer.writeAll("KindNode{ previous: ");
@@ -1172,18 +1143,8 @@ const KindNode = struct {
         try writer.writeAll(" }");
     }
 
-    pub inline fn format(
-        kind_node: KindNode,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        _ = options;
-        _ = fmt;
-        return if (@TypeOf(writer) == std.io.AnyWriter)
-            print(kind_node, writer, 0)
-        else
-            print(kind_node, writer.any(), 0);
+    pub inline fn format(kind_node: KindNode, writer: *std.Io.Writer) !void {
+        return kind_node.print(writer, 0);
     }
 };
 

@@ -51,29 +51,39 @@ const SBIDebugConsole = struct {
         return sbi.debug_console.available();
     }
 
+    fn writeStr(str: []const u8) void {
+        // TODO: figure out how to get `sbi.debug_console.write` to work
+        //       as `sbi.debug_console.writeByte` is inefficient
+
+        for (0..str.len) |i| {
+            const byte = str[i];
+
+            if (byte == '\n') {
+                @branchHint(.unlikely);
+
+                const newline_first_or_only = str.len == 1 or i == 0;
+
+                if (newline_first_or_only or str[i - 1] != '\r') {
+                    @branchHint(.likely);
+                    sbi.debug_console.writeByte('\r') catch return;
+                }
+            }
+
+            sbi.debug_console.writeByte(byte) catch return;
+        }
+    }
+
     const output: kernel.init.Output = .{
         .writeFn = struct {
             fn writeFn(_: *anyopaque, str: []const u8) void {
-                // TODO: figure out how to get `sbi.debug_console.write` to work
-                //       as `sbi.debug_console.writeByte` is inefficient
-                for (0..str.len) |i| {
-                    const byte = str[i];
-
-                    if (byte == '\n') {
-                        @branchHint(.unlikely);
-
-                        const newline_first_or_only = str.len == 1 or i == 0;
-
-                        if (newline_first_or_only or str[i - 1] != '\r') {
-                            @branchHint(.likely);
-                            sbi.debug_console.writeByte('\r') catch return;
-                        }
-                    }
-
-                    sbi.debug_console.writeByte(byte) catch return;
-                }
+                writeStr(str);
             }
         }.writeFn,
+        .splatFn = struct {
+            fn splatFn(_: *anyopaque, str: []const u8, splat: usize) void {
+                for (0..splat) |_| writeStr(str);
+            }
+        }.splatFn,
         .remapFn = struct {
             fn remapFn(_: *anyopaque, _: *kernel.Task) !void {
                 return;

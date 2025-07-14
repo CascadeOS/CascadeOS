@@ -51,27 +51,11 @@ pub fn AcpiTable(comptime T: type) type {
             acpi_table.handle.unref() catch unreachable;
         }
 
-        pub fn print(acpi_table: AcpiTableT, writer: std.io.AnyWriter, indent: usize) !void {
-            _ = indent;
-
+        pub inline fn format(acpi_table: AcpiTableT, writer: *std.Io.Writer) !void {
             try writer.print(
                 "AcpiTable{{ signature: {s}, revision: {d} }}",
                 .{ acpi_table.table.header.signatureAsString(), acpi_table.table.header.revision },
             );
-        }
-
-        pub inline fn format(
-            acpi_table: AcpiTableT,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            _ = options;
-            _ = fmt;
-            return if (@TypeOf(writer) == std.io.AnyWriter)
-                print(acpi_table, writer, 0)
-            else
-                print(acpi_table, writer.any(), 0);
         }
     };
 }
@@ -154,7 +138,7 @@ pub const init = struct {
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
         init_log.warn("power button pressed", .{});
         tryShutdown() catch |err| {
-            std.debug.panic("failed to shutdown: {s}", .{@errorName(err)});
+            std.debug.panic("failed to shutdown: {t}", .{err});
         };
         @panic("shutdown failed");
     }

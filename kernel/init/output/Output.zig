@@ -5,23 +5,15 @@ const Output = @This();
 
 writeFn: *const fn (context: *anyopaque, str: []const u8) void,
 
+splatFn: *const fn (context: *anyopaque, str: []const u8, splat: usize) void,
+
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
 remapFn: *const fn (context: *anyopaque, current_task: *kernel.Task) anyerror!void,
 
 context: *anyopaque,
 
-pub const writer = std.io.GenericWriter(
-    void,
-    error{},
-    struct {
-        fn writeFn(_: void, bytes: []const u8) error{}!usize {
-            if (globals.framebuffer_output) |output| output.writeFn(output.context, bytes);
-            if (globals.serial_output) |output| output.writeFn(output.context, bytes);
-            return bytes.len;
-        }
-    }.writeFn,
-){ .context = {} };
+pub const writer = &globals.writer;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
 pub fn remapOutputs(current_task: *kernel.Task) !void {
@@ -73,11 +65,63 @@ pub fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
     return static.init_output_uart.output();
 }
 
+fn writeToOutputs(str: []const u8) void {
+    if (globals.framebuffer_output) |output| {
+        output.writeFn(output.context, str);
+    }
+    if (globals.serial_output) |output| {
+        output.writeFn(output.context, str);
+    }
+}
+
+fn splatToOutputs(str: []const u8, splat: usize) void {
+    if (globals.framebuffer_output) |output| {
+        output.splatFn(output.context, str, splat);
+    }
+    if (globals.serial_output) |output| {
+        output.splatFn(output.context, str, splat);
+    }
+}
+
 pub const globals = struct {
     pub var lock: kernel.sync.TicketSpinLock = .{};
 
     var framebuffer_output: ?Output = null;
     var serial_output: ?Output = null;
+
+    var writer_buffer: [kernel.arch.paging.standard_page_size.value]u8 = undefined;
+
+    var writer: std.Io.Writer = .{
+        .buffer = &globals.writer_buffer,
+        .vtable = &.{
+            .drain = struct {
+                fn drain(w: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
+                    // TODO: is this even correct? the new writer interface is a bit confusing
+
+                    if (w.end != 0) {
+                        writeToOutputs(w.buffered());
+                        w.end = 0;
+                    }
+
+                    var written: usize = 0;
+
+                    for (data[0 .. data.len - 1]) |slice| {
+                        if (slice.len == 0) continue;
+                        writeToOutputs(slice);
+                        written += slice.len;
+                    }
+
+                    const last_data = data[data.len - 1];
+                    if (last_data.len != 0) {
+                        splatToOutputs(last_data, splat);
+                        written += last_data.len * splat;
+                    }
+
+                    return written;
+                }
+            }.drain,
+        },
+    };
 };
 
 pub const uart = @import("uart.zig");

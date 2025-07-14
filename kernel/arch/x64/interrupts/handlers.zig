@@ -8,7 +8,7 @@ pub fn nonMaskableInterruptHandler(
     _: ?*anyopaque,
 ) void {
     if (kernel.debug.globals.panicking_executor.load(.acquire) == .none) {
-        std.debug.panic("non-maskable interrupt\n{}", .{interrupt_frame});
+        std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
     }
 
     // an executor is panicking so this NMI is a panic IPI
@@ -69,8 +69,8 @@ pub fn unhandledException(
     switch (interrupt_frame.arch.context()) {
         .kernel => kernel.debug.interruptSourcePanic(
             interrupt_frame,
-            "unhandled kernel exception: {s}",
-            .{@tagName(interrupt_frame.arch.vector_number.interrupt)},
+            "unhandled kernel exception: {t}",
+            .{interrupt_frame.arch.vector_number.interrupt},
         ),
         .user => @panic("NOT IMPLEMENTED: unhandled exception in user mode"),
     }
@@ -86,7 +86,7 @@ pub fn unhandledInterrupt(
     _: ?*anyopaque,
 ) void {
     const executor = current_task.state.running;
-    std.debug.panic("unhandled interrupt on {}\n{}", .{ executor, interrupt_frame });
+    std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });
 }
 
 const std = @import("std");

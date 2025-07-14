@@ -70,23 +70,11 @@ pub const MemoryMap = struct {
             }
         };
 
-        pub fn print(entry: Entry, writer: std.io.AnyWriter, indent: usize) !void {
-            _ = indent;
-            try writer.print("{s} - {}", .{ @tagName(entry.type), entry.range });
-        }
-
         pub inline fn format(
-            value: Entry,
-            comptime fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
+            entry: Entry,
+            writer: *std.Io.Writer,
         ) !void {
-            _ = options;
-            _ = fmt;
-            return if (@TypeOf(writer) == std.io.AnyWriter)
-                print(value, writer, 0)
-            else
-                print(value, writer.any(), 0);
+            try writer.print("{t} - {f}", .{ entry.type, entry.range });
         }
     };
 
@@ -246,7 +234,7 @@ pub fn exportEntryPoints() void {
         ///
         /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
         /// meaning this function is not expected to ever be called.
-        pub fn unknownBootloaderEntryPoint() callconv(.Naked) noreturn {
+        pub fn unknownBootloaderEntryPoint() callconv(.naked) noreturn {
             kernel.arch.init.onBootEntry();
             @call(.always_inline, kernel.arch.interrupts.disableInterruptsAndHalt, .{});
             unreachable;

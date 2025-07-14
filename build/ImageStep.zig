@@ -33,8 +33,8 @@ pub fn registerImageSteps(
     for (all_architectures) |architecture| {
         const image_file_name = try std.fmt.allocPrint(
             b.allocator,
-            "cascade_{s}.hdd",
-            .{@tagName(architecture)},
+            "cascade_{t}.hdd",
+            .{architecture},
         );
 
         const kernel = kernels.get(architecture).?;
@@ -70,8 +70,8 @@ pub fn registerImageSteps(
 
         const step_name = try std.fmt.allocPrint(
             b.allocator,
-            "build {s} image",
-            .{@tagName(architecture)},
+            "build {t} image",
+            .{architecture},
         );
 
         const image_step = try b.allocator.create(ImageStep);
@@ -127,8 +127,8 @@ const ImageDescriptionStep = struct {
     ) !*ImageDescriptionStep {
         const step_name = try std.fmt.allocPrint(
             b.allocator,
-            "build image description for {s} image",
-            .{@tagName(architecture)},
+            "build image description for {t} image",
+            .{architecture},
         );
 
         // TODO: handling of limine.conf should be better that this, we don't even add it as a dependency...
@@ -213,28 +213,28 @@ const ImageDescriptionStep = struct {
             error.FileNotFound => {
                 const sub_dirname = std.fs.path.dirname(sub_path).?;
                 image_description_step.b.cache_root.handle.makePath(sub_dirname) catch |e| {
-                    return step.fail("unable to make path '{}{s}': {s}", .{
-                        image_description_step.b.cache_root, sub_dirname, @errorName(e),
+                    return step.fail("unable to make path '{f}{s}': {t}", .{
+                        image_description_step.b.cache_root, sub_dirname, e,
                     });
                 };
 
                 const rand_int = std.crypto.random.int(u64);
-                const tmp_sub_path = "tmp" ++ std.fs.path.sep_str ++
-                    std.Build.hex64(rand_int) ++ std.fs.path.sep_str ++
-                    basename;
+                const tmp_sub_path = "tmp" ++
+                    std.fs.path.sep_str ++ std.fmt.hex(rand_int) ++
+                    std.fs.path.sep_str ++ basename;
                 const tmp_sub_path_dirname = std.fs.path.dirname(tmp_sub_path).?;
 
                 image_description_step.b.cache_root.handle.makePath(tmp_sub_path_dirname) catch |err| {
-                    return step.fail("unable to make temporary directory '{}{s}': {s}", .{
-                        image_description_step.b.cache_root, tmp_sub_path_dirname, @errorName(err),
+                    return step.fail("unable to make temporary directory '{f}{s}': {t}", .{
+                        image_description_step.b.cache_root, tmp_sub_path_dirname, err,
                     });
                 };
 
                 image_description_step.b.cache_root.handle.writeFile(
                     .{ .sub_path = tmp_sub_path, .data = image_description.items },
                 ) catch |err| {
-                    return step.fail("unable to write options to '{}{s}': {s}", .{
-                        image_description_step.b.cache_root, tmp_sub_path, @errorName(err),
+                    return step.fail("unable to write options to '{f}{s}': {t}", .{
+                        image_description_step.b.cache_root, tmp_sub_path, err,
                     });
                 };
 
@@ -242,24 +242,24 @@ const ImageDescriptionStep = struct {
                     error.PathAlreadyExists => {
                         // Other process beat us to it. Clean up the temp file.
                         image_description_step.b.cache_root.handle.deleteFile(tmp_sub_path) catch |e| {
-                            try step.addError("warning: unable to delete temp file '{}{s}': {s}", .{
-                                image_description_step.b.cache_root, tmp_sub_path, @errorName(e),
+                            try step.addError("warning: unable to delete temp file '{f}{s}': {t}", .{
+                                image_description_step.b.cache_root, tmp_sub_path, e,
                             });
                         };
                         step.result_cached = true;
                         return;
                     },
                     else => {
-                        return step.fail("unable to rename options from '{}{s}' to '{}{s}': {s}", .{
+                        return step.fail("unable to rename options from '{f}{s}' to '{f}{s}': {t}", .{
                             image_description_step.b.cache_root, tmp_sub_path,
                             image_description_step.b.cache_root, sub_path,
-                            @errorName(err),
+                            err,
                         });
                     },
                 };
             },
-            else => |e| return step.fail("unable to access options file '{}{s}': {s}", .{
-                image_description_step.b.cache_root, sub_path, @errorName(e),
+            else => |e| return step.fail("unable to access options file '{f}{s}': {t}", .{
+                image_description_step.b.cache_root, sub_path, e,
             }),
         }
     }

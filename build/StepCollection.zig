@@ -71,8 +71,8 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         b,
         all_architectures,
         all_kernels_build_step,
-        "kernel_{s}",
-        "Build the kernel for {s}",
+        "kernel_{t}",
+        "Build the kernel for {t}",
     );
 
     // Images
@@ -86,8 +86,8 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         b,
         all_architectures,
         all_images_build_step,
-        "image_{s}",
-        "Build the image for {s}",
+        "image_{t}",
+        "Build the image for {t}",
     );
 
     // Libraries
@@ -107,8 +107,8 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         b,
         all_architectures,
         all_library_host_test_step,
-        "libraries_host_{s}",
-        "Attempt to run all the library tests for {s} targeting the host os",
+        "libraries_host_{t}",
+        "Attempt to run all the library tests for {t} targeting the host os",
     );
 
     // Tools
@@ -156,8 +156,8 @@ fn buildPerArchitectureSteps(
     errdefer map.deinit(b.allocator);
 
     for (all_architectures) |architecture| {
-        const name = try std.fmt.allocPrint(b.allocator, name_fmt, .{@tagName(architecture)});
-        const description = try std.fmt.allocPrint(b.allocator, description_fmt, .{@tagName(architecture)});
+        const name = try std.fmt.allocPrint(b.allocator, name_fmt, .{architecture});
+        const description = try std.fmt.allocPrint(b.allocator, description_fmt, .{architecture});
 
         const step = b.step(name, description);
         relevant_all_step.dependOn(step);
