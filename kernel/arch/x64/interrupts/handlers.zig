@@ -64,10 +64,9 @@ pub fn unhandledException(
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
-    _ = current_task;
-
     switch (interrupt_frame.arch.context()) {
         .kernel => kernel.debug.interruptSourcePanic(
+            current_task,
             interrupt_frame,
             "unhandled kernel exception: {t}",
             .{interrupt_frame.arch.vector_number.interrupt},

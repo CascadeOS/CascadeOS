@@ -14,6 +14,36 @@ arch: kernel.arch.PerExecutor,
 /// List of `kernel.mem.FlushRequest` objects that need to be actioned.
 flush_requests: containers.AtomicSinglyLinkedLIFO = .{},
 
+// used during `kernel.debug.interruptSourcePanic`
+interrupt_source_panic_buffer: [kernel.config.interrupt_source_panic_buffer_size.value + interrupt_source_panic_truncated.len]u8 = undefined,
+const interrupt_source_panic_truncated = "(msg truncated)";
+
+/// Renders the given message using this executor's interrupt source panic buffer.
+///
+/// If the message is too large to fit in the buffer, the message is truncated.
+pub fn renderInterruptSourcePanicMessage(
+    current_executor: *Executor,
+    comptime fmt: []const u8,
+    args: anytype,
+) []const u8 {
+    // TODO: this treatment should be given to all panics
+    std.debug.assert(current_executor == kernel.Task.getCurrent().state.running);
+
+    const full_buffer = current_executor.interrupt_source_panic_buffer[0..];
+
+    var bw: std.Io.Writer = .fixed(full_buffer[0..kernel.config.interrupt_source_panic_buffer_size.value]);
+
+    bw.print(fmt, args) catch {
+        @memcpy(
+            full_buffer[kernel.config.interrupt_source_panic_buffer_size.value..],
+            interrupt_source_panic_truncated,
+        );
+        return full_buffer;
+    };
+
+    return bw.buffered();
+}
+
 pub const Id = enum(u32) {
     bootstrap = 0,
 

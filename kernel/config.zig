@@ -15,6 +15,8 @@ pub const maximum_number_of_time_sources = 8;
 
 pub const maximum_number_of_executors = 64;
 
+pub const interrupt_source_panic_buffer_size = kernel.arch.paging.standard_page_size;
+
 pub const task_name_length = 64;
 pub const resource_arena_name_length = 64;
 // the address spaces resource arena has the same name as the address space but with `_address_arena` appended

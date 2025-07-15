@@ -289,6 +289,7 @@ pub fn onKernelPageFault(
         @branchHint(.cold);
 
         kernel.debug.interruptSourcePanic(
+            current_task,
             interrupt_frame,
             "kernel page fault in lower half\n{f}",
             .{page_fault_details},
@@ -299,6 +300,7 @@ pub fn onKernelPageFault(
         @branchHint(.cold);
 
         kernel.debug.interruptSourcePanic(
+            current_task,
             interrupt_frame,
             "kernel page fault outside of any kernel region\n{f}",
             .{page_fault_details},
@@ -314,6 +316,7 @@ pub fn onKernelPageFault(
                     .{page_fault_details},
                 ),
                 else => |e| kernel.debug.interruptSourcePanic(
+                    current_task,
                     interrupt_frame,
                     "failed to handle page fault in pageable kernel address space: {t}\n{f}",
                     .{ e, page_fault_details },
@@ -324,6 +327,7 @@ pub fn onKernelPageFault(
             @branchHint(.cold);
 
             kernel.debug.interruptSourcePanic(
+                current_task,
                 interrupt_frame,
                 "kernel page fault in '{t}'\n{f}",
                 .{ region_type, page_fault_details },

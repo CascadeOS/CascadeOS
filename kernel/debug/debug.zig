@@ -4,26 +4,18 @@
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
+    current_task: *kernel.Task,
     interrupt_frame: kernel.arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
 ) noreturn {
     @branchHint(.cold);
 
-    const size = 0x1000;
-    const trunc_msg = "(msg truncated)";
-    var buf: [size + trunc_msg.len]u8 = undefined;
-    var bw: std.Io.Writer = .fixed(buf[0..size]);
-    // a minor annoyance with this is that it will result in the NoSpaceLeft
-    // error being part of the @panic stack trace (but that error should
-    // only happen rarely)
-    const msg = if (bw.print(format, args)) |_| bw.buffered() else |_| blk: {
-        @memcpy(buf[size..], trunc_msg);
-        break :blk &buf;
-    };
+    current_task.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
+    const executor = current_task.state.running;
 
     panicDispatch(
-        msg,
+        executor.renderInterruptSourcePanicMessage(format, args),
         .{ .interrupt = interrupt_frame },
     );
 }
