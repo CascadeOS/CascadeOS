@@ -60,7 +60,7 @@ pub const State = union(enum) {
         queued_for_cleanup: bool = false,
         node: containers.DoubleNode = .empty,
 
-        inline fn taskFromNode(node: *containers.DoubleNode) *Task {
+        pub inline fn taskFromNode(node: *containers.DoubleNode) *Task {
             const dropped: *State.Dropped = @fieldParentPtr("node", node);
             const state: *State = @fieldParentPtr("dropped", dropped);
             return @fieldParentPtr("state", state);
@@ -126,7 +126,7 @@ pub fn incrementReferenceCount(task: *Task) void {
 /// If it reaches zero the task is submitted to the task cleanup service.
 pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
     if (task.reference_count.fetchSub(1, .acq_rel) != 1) return;
-    globals.task_cleanup_service.queueForCleanup(current_task, task);
+    kernel.services.task_cleanup.queueTaskForCleanup(current_task, task);
 }
 
 pub fn incrementInterruptDisable(task: *Task) void {
@@ -261,7 +261,7 @@ pub const internal = struct {
         return task;
     }
 
-    fn destroy(current_task: *kernel.Task, task: *Task) void {
+    pub fn destroy(current_task: *kernel.Task, task: *Task) void {
         std.debug.assert(task.state == .dropped);
         std.debug.assert(task.reference_count.load(.monotonic) == 0);
         globals.cache.deallocate(current_task, task);
@@ -413,93 +413,6 @@ pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
     return .{ current_task, .{ .previous_value = previous_value } };
 }
 
-const TaskCleanupService = struct {
-    task: *Task,
-
-    lock: kernel.sync.TicketSpinLock = .{},
-    wait_queue: kernel.sync.WaitQueue = .{},
-
-    incoming: containers.AtomicSinglyLinkedLIFO = .empty,
-    to_clean: containers.DoublyLinkedList = .empty,
-
-    fn queueForCleanup(task_cleanup_service: *TaskCleanupService, current_task: *Task, task: *Task) void {
-        std.debug.assert(current_task != task);
-        std.debug.assert(task.state == .dropped);
-
-        TaskCleanupService.log.debug("queueing {f} for cleanup", .{task});
-
-        task_cleanup_service.lock.lock(current_task);
-        defer task_cleanup_service.lock.unlock(current_task);
-
-        if (!task.state.dropped.queued_for_cleanup) {
-            task_cleanup_service.incoming.push(&task.state.dropped.node.next);
-            task.state.dropped.queued_for_cleanup = true;
-        }
-
-        task_cleanup_service.wait_queue.wakeOne(current_task, &task_cleanup_service.lock);
-    }
-
-    fn execute(current_task: *Task, task_cleanup_service_addr: usize, _: usize) noreturn {
-        std.debug.assert(current_task.interrupt_disable_count == 0);
-        std.debug.assert(current_task.preemption_disable_count == 0);
-        std.debug.assert(current_task.preemption_skipped == false);
-        std.debug.assert(current_task.spinlocks_held == 0);
-        std.debug.assert(kernel.arch.interrupts.areEnabled());
-
-        const task_cleanup_service: *TaskCleanupService = @ptrFromInt(task_cleanup_service_addr);
-
-        while (true) {
-            while (task_cleanup_service.incoming.pop()) |node| {
-                const task: *Task = State.Dropped.taskFromNode(.fromNextNode(node));
-                std.debug.assert(task.state == .dropped);
-
-                switch (task.context) {
-                    .kernel => {
-                        kernel.kernel_tasks_lock.writeLock(current_task);
-                        defer kernel.kernel_tasks_lock.writeUnlock(current_task);
-
-                        if (!kernel.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks");
-                    },
-                    .user => @panic("TODO: implement user task cleanup"),
-                }
-
-                task_cleanup_service.to_clean.append(&task.state.dropped.node);
-            }
-
-            if (task_cleanup_service.to_clean.first) |first| {
-                @branchHint(.likely);
-                var opt_node: ?*containers.SingleNode = &first.next;
-
-                while (opt_node) |node| {
-                    const double_node: *containers.DoubleNode = .fromNextNode(node);
-                    const task: *Task = State.Dropped.taskFromNode(double_node);
-
-                    if (task.reference_count.load(.acquire) != 0) {
-                        opt_node = node.next;
-                        continue;
-                    }
-
-                    opt_node = double_node.next.next;
-                    task_cleanup_service.to_clean.remove(double_node);
-
-                    TaskCleanupService.log.debug("destroying {f}", .{task});
-                    internal.destroy(current_task, task);
-                }
-            }
-
-            if (!task_cleanup_service.incoming.isEmpty()) continue;
-            task_cleanup_service.lock.lock(current_task);
-            if (!task_cleanup_service.incoming.isEmpty()) {
-                task_cleanup_service.lock.unlock(current_task);
-                continue;
-            }
-            task_cleanup_service.wait_queue.wait(current_task, &task_cleanup_service.lock);
-        }
-    }
-
-    const log = kernel.debug.log.scoped(.task_cleanup);
-};
-
 pub const globals = struct {
     /// The source of task objects.
     ///
@@ -521,8 +434,6 @@ pub const globals = struct {
 
     var stack_arena: kernel.mem.resource_arena.Arena(.none) = undefined;
     var stack_page_table_mutex: kernel.sync.Mutex = .{};
-
-    pub var task_cleanup_service: TaskCleanupService = undefined;
 };
 
 pub const init = struct {
@@ -551,20 +462,7 @@ pub const init = struct {
         );
 
         log.debug("initializing task cleanup service", .{});
-        {
-            globals.task_cleanup_service = .{
-                .task = try createKernelTask(current_task, .{
-                    .name = try .fromSlice("task cleanup"),
-                    .start_function = TaskCleanupService.execute,
-                    .arg1 = @intFromPtr(&globals.task_cleanup_service),
-                    .arg2 = undefined,
-                }),
-            };
-            globals.task_cleanup_service.task.state = .blocked;
-            globals.task_cleanup_service.wait_queue.waiting_tasks.push(
-                &globals.task_cleanup_service.task.next_task_node,
-            );
-        }
+        try kernel.services.task_cleanup.init.initializeTaskCleanupService(current_task);
     }
 
     pub fn initializeBootstrapInitTask(
