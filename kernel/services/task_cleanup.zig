@@ -6,7 +6,7 @@ pub fn queueTaskForCleanup(current_task: *Task, task: *Task) void {
     std.debug.assert(current_task != task);
     std.debug.assert(task.state == .dropped);
 
-    log.debug("queueing {f} for cleanup", .{task});
+    log.verbose("queueing {f} for cleanup", .{task});
 
     if (task.state.dropped.queued_for_cleanup.cmpxchgStrong(
         false,
@@ -67,8 +67,23 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
                     defer kernel.kernel_tasks_lock.writeUnlock(current_task);
 
                     if (task.reference_count.load(.acquire) != 0) {
+                        @branchHint(.unlikely);
+
+                        // someone has acquired a reference to the task after it was queued for cleanup
+
                         task.state.dropped.queued_for_cleanup.store(false, .release);
-                        continue;
+
+                        if (task.reference_count.load(.acquire) != 0) {
+                            @branchHint(.likely);
+
+                            // the task is still referenced so someone will eventually requeue it for cleanup
+
+                            log.verbose("{f} still has references", .{task});
+
+                            continue;
+                        }
+
+                        // the task is no longer referenced so we can safely destroy it
                     }
 
                     if (!kernel.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks");
