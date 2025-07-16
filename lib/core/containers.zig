@@ -55,6 +55,10 @@ pub const FIFO = struct {
 pub const AtomicSinglyLinkedList = struct {
     first: std.atomic.Value(?*Node) = .init(null),
 
+    pub fn isEmpty(atomic_singly_linked_list: *const AtomicSinglyLinkedList) bool {
+        return atomic_singly_linked_list.first.load(.acquire) == null;
+    }
+
     /// Removes the first node from the list and returns it.
     pub fn popFirst(atomic_singly_linked_list: *AtomicSinglyLinkedList) ?*Node {
         var opt_first = atomic_singly_linked_list.first.load(.monotonic);
