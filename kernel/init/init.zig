@@ -136,47 +136,70 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     const executor = current_task.state.running;
 
     if (executor.id == .bootstrap) {
-        Barrier.waitForAllNonBootstrapExecutors();
+        Stage3Barrier.waitForAllNonBootstrapExecutors();
 
         log.debug("loading standard interrupt handlers", .{});
         kernel.arch.interrupts.init.loadStandardInterruptHandlers();
 
-        // signal to other executors that standard interrupt handlers are loaded so they can safely enable interrupts
-        Barrier.standardInterruptHandlersLoaded();
-
-        log.debug("initializing PCI ECAM", .{});
-        try kernel.pci.init.initializeECAM();
-
-        log.debug("initializing ACPI", .{});
-        try kernel.acpi.init.initialize();
-
-        try kernel.acpi.init.finializeInitialization();
-
+        log.debug("creating and scheduling init stage 4 task", .{});
         {
-            Output.globals.lock.lock(current_task);
-            defer Output.globals.lock.unlock(current_task);
+            const init_stage4_task: *kernel.Task = try .createKernelTask(current_task, .{
+                .name = try .fromSlice("init stage 4"),
+                .start_function = struct {
+                    fn initStage4Wrapper(inner_current_task: *kernel.Task, _: usize, _: usize) noreturn {
+                        initStage4(inner_current_task) catch |err| {
+                            std.debug.panic("unhandled error: {t}", .{err});
+                        };
+                    }
+                }.initStage4Wrapper,
+                .arg1 = undefined,
+                .arg2 = undefined,
+            });
 
-            try Output.writer.print(
-                "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
-                .{
-                    kernel.time.wallclock.elapsed(
-                        kernel.time.wallclock.kernel_start,
-                        kernel.time.wallclock.read(),
-                    ),
-                    kernel.time.wallclock.elapsed(
-                        .zero,
-                        kernel.time.wallclock.read(),
-                    ),
-                },
-            );
-            try Output.writer.flush();
+            kernel.scheduler.lockScheduler(current_task);
+            defer kernel.scheduler.unlockScheduler(current_task);
+
+            kernel.scheduler.queueTask(current_task, init_stage4_task);
         }
-    } else {
-        Barrier.nonBootstrapExecutorReady();
 
-        // we need to wait for the standard interrupt handlers to be loaded before we can enable interrupts
-        // which will happen when we enter the scheduler
-        Barrier.waitForStandardInterruptHandlers();
+        Stage3Barrier.stage3Complete();
+    } else {
+        Stage3Barrier.nonBootstrapExecutorReady();
+        Stage3Barrier.waitForStage3Completion();
+    }
+
+    _ = kernel.scheduler.lockScheduler(current_task);
+    kernel.scheduler.drop(current_task);
+    unreachable;
+}
+
+fn initStage4(current_task: *kernel.Task) !noreturn {
+    log.debug("initializing PCI ECAM", .{});
+    try kernel.pci.init.initializeECAM();
+
+    log.debug("initializing ACPI", .{});
+    try kernel.acpi.init.initialize();
+
+    try kernel.acpi.init.finializeInitialization();
+
+    {
+        Output.globals.lock.lock(current_task);
+        defer Output.globals.lock.unlock(current_task);
+
+        try Output.writer.print(
+            "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
+            .{
+                kernel.time.wallclock.elapsed(
+                    kernel.time.wallclock.kernel_start,
+                    kernel.time.wallclock.read(),
+                ),
+                kernel.time.wallclock.elapsed(
+                    .zero,
+                    kernel.time.wallclock.read(),
+                ),
+            },
+        );
+        try Output.writer.flush();
     }
 
     _ = kernel.scheduler.lockScheduler(current_task);
@@ -249,9 +272,9 @@ fn bootNonBootstrapExecutors() !void {
 pub const devicetree = @import("devicetree.zig");
 pub const Output = @import("output/Output.zig");
 
-const Barrier = struct {
+const Stage3Barrier = struct {
     var non_bootstrap_executors_ready = std.atomic.Value(usize).init(0);
-    var standard_interrupt_handlers = std.atomic.Value(bool).init(false);
+    var stage3_complete = std.atomic.Value(bool).init(false);
 
     /// Signal that the current executor has completed initialization.
     fn nonBootstrapExecutorReady() void {
@@ -259,18 +282,18 @@ const Barrier = struct {
         _ = non_bootstrap_executors_ready.fetchAdd(1, .release);
     }
 
-    /// Signal that the standard interrupt handlers have been loaded.
+    /// Signal that init stage 3 has completed.
     ///
     /// Called by the bootstrap executor only.
-    fn standardInterruptHandlersLoaded() void {
+    fn stage3Complete() void {
         std.debug.assert(kernel.Task.getCurrent().state.running.id == .bootstrap);
-        _ = standard_interrupt_handlers.store(true, .release);
+        _ = stage3_complete.store(true, .release);
     }
 
-    /// Wait for the bootstrap executor to signal that the standard interrupt handlers have been loaded.
-    fn waitForStandardInterruptHandlers() void {
+    /// Wait for the bootstrap executor to signal that init stage 3 has completed.
+    fn waitForStage3Completion() void {
         std.debug.assert(kernel.Task.getCurrent().state.running.id != .bootstrap);
-        while (!standard_interrupt_handlers.load(.acquire)) {
+        while (!stage3_complete.load(.acquire)) {
             kernel.arch.spinLoopHint();
         }
     }
