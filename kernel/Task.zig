@@ -30,7 +30,10 @@ preemption_skipped: bool = false,
 
 spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked (except for init tasks)
 
-/// Used for various linked lists.
+/// Used for various linked lists including:
+/// - scheduler ready queue
+/// - wait queue
+/// - the kernel task cleanup service
 next_task_node: containers.SingleNode = .empty,
 
 context: Context,
@@ -57,14 +60,7 @@ pub const State = union(enum) {
     dropped: Dropped,
 
     pub const Dropped = struct {
-        queued_for_cleanup: bool = false,
-        node: containers.DoubleNode = .empty,
-
-        pub inline fn taskFromNode(node: *containers.DoubleNode) *Task {
-            const dropped: *State.Dropped = @fieldParentPtr("node", node);
-            const state: *State = @fieldParentPtr("dropped", dropped);
-            return @fieldParentPtr("state", state);
-        }
+        queued_for_cleanup: std.atomic.Value(bool) = .init(false),
     };
 };
 

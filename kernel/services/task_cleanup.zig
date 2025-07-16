@@ -8,14 +8,20 @@ pub fn queueTaskForCleanup(current_task: *Task, task: *Task) void {
 
     log.debug("queueing {f} for cleanup", .{task});
 
-    globals.wait_queue_lock.lock(current_task);
-    defer globals.wait_queue_lock.unlock(current_task);
-
-    if (!task.state.dropped.queued_for_cleanup) {
-        globals.incoming.push(&task.state.dropped.node.next);
-        task.state.dropped.queued_for_cleanup = true;
+    if (task.state.dropped.queued_for_cleanup.cmpxchgStrong(
+        false,
+        true,
+        .acq_rel,
+        .acquire,
+    ) != null) {
+        // someone else already queued this task for cleanup
+        return;
     }
 
+    globals.incoming.push(&task.next_task_node);
+
+    globals.wait_queue_lock.lock(current_task);
+    defer globals.wait_queue_lock.unlock(current_task);
     globals.wait_queue.wakeOne(current_task, &globals.wait_queue_lock);
 }
 
@@ -51,50 +57,35 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
 
     while (true) {
         while (globals.incoming.pop()) |node| {
-            const task: *Task = Task.State.Dropped.taskFromNode(.fromNextNode(node));
+            const task: *Task = .fromNode(node);
             std.debug.assert(task.state == .dropped);
+            std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
 
             switch (task.context) {
                 .kernel => {
                     kernel.kernel_tasks_lock.writeLock(current_task);
                     defer kernel.kernel_tasks_lock.writeUnlock(current_task);
 
+                    if (task.reference_count.load(.acquire) != 0) {
+                        task.state.dropped.queued_for_cleanup.store(false, .release);
+                        continue;
+                    }
+
                     if (!kernel.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks");
                 },
                 .user => @panic("TODO: implement user task cleanup"),
             }
 
-            globals.to_clean.append(&task.state.dropped.node);
-        }
+            log.debug("destroying {f}", .{task});
 
-        if (globals.to_clean.first) |first| {
-            @branchHint(.likely);
-            var opt_node: ?*containers.SingleNode = &first.next;
-
-            while (opt_node) |node| {
-                const double_node: *containers.DoubleNode = .fromNextNode(node);
-                const task: *Task = Task.State.Dropped.taskFromNode(double_node);
-
-                if (task.reference_count.load(.acquire) != 0) {
-                    opt_node = node.next;
-                    continue;
-                }
-
-                log.debug("destroying {f}", .{task});
-
-                switch (task.context) {
-                    .kernel => {},
-                    .user => @panic("TODO: implement user task cleanup"),
-                }
-
-                opt_node = double_node.next.next;
-                globals.to_clean.remove(double_node);
-
-                Task.internal.destroy(current_task, task);
+            switch (task.context) {
+                .kernel => {},
+                .user => @panic("TODO: implement user task cleanup"),
             }
+
+            Task.internal.destroy(current_task, task);
         }
 
-        if (!globals.incoming.isEmpty()) continue;
         globals.wait_queue_lock.lock(current_task);
         if (!globals.incoming.isEmpty()) {
             globals.wait_queue_lock.unlock(current_task);
@@ -113,7 +104,6 @@ const globals = struct {
     var wait_queue: kernel.sync.WaitQueue = .{};
 
     var incoming: containers.AtomicSinglyLinkedLIFO = .empty;
-    var to_clean: containers.DoublyLinkedList = .empty;
 };
 
 pub const init = struct {
