@@ -75,6 +75,7 @@ pub fn yield(current_task: *kernel.Task) void {
 /// This function must be called with the scheduler lock held.
 pub fn block(current_task: *kernel.Task, spinlock: *kernel.sync.TicketSpinLock) void {
     std.debug.assert(current_task.spinlocks_held == 2); // the scheduler lock and `spinlock` is held
+    std.debug.assert(current_task.interrupt_disable_count >= 2);
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
     std.debug.assert(!current_task.isIdleTask()); // block during idle
 
@@ -198,6 +199,7 @@ fn switchToIdleBlock(
     kernel.arch.scheduling.prepareForJumpToIdleFromTask(current_executor, old_task);
 
     old_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.idleEntryBlock`
+    old_task.decrementInterruptDisable(); // as `unsafeUnlock` is used we need to decrement the interrupt disable count separately
 
     current_executor.idle_task.state = .{ .running = current_executor };
     current_executor.current_task = &current_executor.idle_task;
@@ -343,6 +345,7 @@ fn switchToTaskFromTaskBlock(
     kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
 
     old_task.spinlocks_held = 1; // `spinlock` is unlocked in `static.switchToTaskBlock`
+    old_task.decrementInterruptDisable(); // as `unsafeUnlock` is used we need to decrement the interrupt disable count separately
 
     new_task.state = .{ .running = current_executor };
     current_executor.current_task = new_task;
