@@ -102,8 +102,8 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
         }
 
         globals.wait_queue_lock.lock(current_task);
-        if (globals.incoming.first.load(.acquire) == null) {
-            // incoming queue is empty
+        if (!globals.incoming.isEmpty()) {
+            // don't wait if there is work to do
             globals.wait_queue_lock.unlock(current_task);
             continue;
         }
