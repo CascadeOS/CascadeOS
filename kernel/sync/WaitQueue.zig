@@ -3,13 +3,15 @@
 
 const WaitQueue = @This();
 
-waiting_tasks: containers.SinglyLinkedFIFO = .empty,
+waiting_tasks: core.containers.FIFO = .{},
 
-/// Returns the first task in the wait queue.
+/// Access the first task in the wait queue.
+///
+/// Does not remove the task from the wait queue.
 ///
 /// Not thread-safe.
 pub fn firstTask(wait_queue: *WaitQueue) ?*kernel.Task {
-    const node = wait_queue.waiting_tasks.start_node orelse return null;
+    const node = wait_queue.waiting_tasks.first_node orelse return null;
     return kernel.Task.fromNode(node);
 }
 
@@ -57,7 +59,7 @@ pub fn wait(
     std.debug.assert(current_task.interrupt_disable_count != 0);
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
 
-    wait_queue.waiting_tasks.push(&current_task.next_task_node);
+    wait_queue.waiting_tasks.append(&current_task.next_task_node);
 
     kernel.scheduler.lockScheduler(current_task);
     defer kernel.scheduler.unlockScheduler(current_task);
@@ -68,4 +70,3 @@ pub fn wait(
 const core = @import("core");
 const kernel = @import("kernel");
 const std = @import("std");
-const containers = @import("containers");

@@ -5,9 +5,9 @@ const Page = @This();
 
 physical_frame: kernel.mem.phys.Frame,
 
-node: containers.SingleNode = .empty,
+node: std.SinglyLinkedList.Node = .{},
 
-pub inline fn fromNode(node: *containers.SingleNode) *Page {
+pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Page {
     return @fieldParentPtr("node", node);
 }
 
@@ -33,4 +33,3 @@ pub const Index = enum(u32) {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const containers = @import("containers");

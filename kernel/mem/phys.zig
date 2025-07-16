@@ -58,18 +58,29 @@ pub const FrameAllocator = struct {
 };
 
 pub const FrameList = struct {
-    list: containers.SinglyLinkedFIFO = .empty,
+    first_node: ?*std.SinglyLinkedList.Node = null,
+    last_node: ?*std.SinglyLinkedList.Node = null,
     count: usize = 0,
 
     pub fn push(frame_list: *FrameList, frame: Frame) void {
         const page = frame.page() orelse std.debug.panic("page not found for frame: {}", .{frame});
-        frame_list.list.push(&page.node);
+        const node = &page.node;
+
+        node.next = null;
+
+        frame_list.last_node = node;
+        if (frame_list.first_node) |first_node| {
+            first_node.next = node;
+        } else {
+            frame_list.first_node = node;
+        }
+
         frame_list.count += 1;
     }
 };
 
 fn allocate() FrameAllocator.AllocateError!Frame {
-    const node = globals.free_page_list.pop() orelse return error.FramesExhausted;
+    const node = globals.free_page_list.popFirst() orelse return error.FramesExhausted;
 
     _ = globals.free_memory.fetchSub(
         kernel.arch.paging.standard_page_size.value,
@@ -96,7 +107,7 @@ fn deallocate(frame_list: FrameList) void {
         return;
     }
 
-    globals.free_page_list.pushMany(frame_list.list.start_node.?, frame_list.list.end_node.?);
+    globals.free_page_list.prependList(frame_list.first_node.?, frame_list.last_node.?);
 
     _ = globals.free_memory.fetchAdd(
         kernel.arch.paging.standard_page_size.multiplyScalar(frame_list.count).value,
@@ -108,7 +119,7 @@ const globals = struct {
     /// The list of free pages.
     ///
     /// Initialized during `init.initializePhysicalMemory`.
-    var free_page_list: containers.AtomicSinglyLinkedLIFO = .empty;
+    var free_page_list: core.containers.AtomicSinglyLinkedList = .{};
 
     /// The free physical memory.
     ///
@@ -303,7 +314,7 @@ pub const init = struct {
                 if (in_use_frames_left != 0) {
                     in_use_frames_left -= 1;
                 } else {
-                    globals.free_page_list.push(&globals.pages[page_index].node);
+                    globals.free_page_list.prepend(&globals.pages[page_index].node);
                 }
 
                 page_index += 1;
@@ -411,5 +422,4 @@ const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
 const log = kernel.debug.log.scoped(.mem_phys);
-const containers = @import("containers");
 const Page = @import("Page.zig");

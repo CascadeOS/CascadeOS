@@ -9,7 +9,7 @@ pub fn queueTask(current_task: *kernel.Task, task: *kernel.Task) void {
     std.debug.assert(task.state == .ready);
     std.debug.assert(!task.isIdleTask()); // cannot queue an idle task
 
-    globals.ready_to_run.push(&task.next_task_node);
+    globals.ready_to_run.append(&task.next_task_node);
 }
 
 /// Maybe preempt the current task.
@@ -63,7 +63,7 @@ pub fn yield(current_task: *kernel.Task) void {
 
     log.verbose("yielding {f}", .{current_task});
 
-    globals.ready_to_run.push(&current_task.next_task_node);
+    globals.ready_to_run.append(&current_task.next_task_node);
 
     switchToTaskFromTaskYield(current_task, new_task);
 }
@@ -459,11 +459,10 @@ fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
 
 const globals = struct {
     var lock: kernel.sync.TicketSpinLock = .{};
-    var ready_to_run: containers.SinglyLinkedFIFO = .empty;
+    var ready_to_run: core.containers.FIFO = .{};
 };
 
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const containers = @import("containers");
 const log = kernel.debug.log.scoped(.scheduler);

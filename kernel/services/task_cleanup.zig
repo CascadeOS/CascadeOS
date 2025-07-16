@@ -18,7 +18,7 @@ pub fn queueTaskForCleanup(current_task: *Task, task: *Task) void {
         return;
     }
 
-    globals.incoming.push(&task.next_task_node);
+    globals.incoming.prepend(&task.next_task_node);
 
     globals.wait_queue_lock.lock(current_task);
     defer globals.wait_queue_lock.unlock(current_task);
@@ -56,7 +56,7 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
     std.debug.assert(kernel.arch.interrupts.areEnabled());
 
     while (true) {
-        while (globals.incoming.pop()) |node| {
+        while (globals.incoming.popFirst()) |node| {
             const task: *Task = .fromNode(node);
             std.debug.assert(task.state == .dropped);
             std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
@@ -87,7 +87,8 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
         }
 
         globals.wait_queue_lock.lock(current_task);
-        if (!globals.incoming.isEmpty()) {
+        if (globals.incoming.first.load(.acquire) == null) {
+            // incoming queue is empty
             globals.wait_queue_lock.unlock(current_task);
             continue;
         }
@@ -103,7 +104,7 @@ const globals = struct {
     var wait_queue_lock: kernel.sync.TicketSpinLock = .{};
     var wait_queue: kernel.sync.WaitQueue = .{};
 
-    var incoming: containers.AtomicSinglyLinkedLIFO = .empty;
+    var incoming: core.containers.AtomicSinglyLinkedList = .{};
 };
 
 pub const init = struct {
@@ -115,7 +116,7 @@ pub const init = struct {
             .arg2 = undefined,
         });
         globals.task_cleanup_task.state = .blocked;
-        globals.wait_queue.waiting_tasks.push(
+        globals.wait_queue.waiting_tasks.append(
             &globals.task_cleanup_task.next_task_node,
         );
     }
@@ -124,6 +125,5 @@ pub const init = struct {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const containers = @import("containers");
 const Task = kernel.Task;
 const log = kernel.debug.log.scoped(.task_cleanup);

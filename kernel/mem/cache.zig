@@ -166,8 +166,8 @@ pub const RawCache = struct {
     constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
     destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
 
-    available_slabs: DoublyLinkedList,
-    full_slabs: DoublyLinkedList,
+    available_slabs: std.DoublyLinkedList,
+    full_slabs: std.DoublyLinkedList,
 
     /// Used to ensure that only one thread allocates a new slab at a time.
     allocate_mutex: kernel.sync.Mutex,
@@ -218,7 +218,7 @@ pub const RawCache = struct {
         }
 
         const effective_object_size = if (is_small)
-            options.alignment.forward(single_node_alignment.forward(options.size) + @sizeOf(SinglyLinkedList.Node))
+            options.alignment.forward(single_node_alignment.forward(options.size) + @sizeOf(std.SinglyLinkedList.Node))
         else
             options.alignment.forward(options.size);
 
@@ -492,7 +492,7 @@ pub const RawCache = struct {
                         try constructor(object_ptr[0..raw_cache.object_size], current_task);
                     }
 
-                    const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
+                    const object_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
                         object_ptr + single_node_alignment.forward(raw_cache.object_size),
                     ));
 
@@ -593,7 +593,7 @@ pub const RawCache = struct {
 
                     const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
 
-                    const object_node: *SinglyLinkedList.Node = @ptrCast(@alignCast(
+                    const object_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
                         object.ptr + single_node_alignment.forward(raw_cache.object_size),
                     ));
 
@@ -703,8 +703,8 @@ pub const RawCache = struct {
     }
 
     const Slab = struct {
-        linkage: DoublyLinkedList.Node = .{},
-        objects: SinglyLinkedList = .{},
+        linkage: std.DoublyLinkedList.Node = .{},
+        objects: std.SinglyLinkedList = .{},
         allocated_objects: usize = 0,
 
         /// The allocation containing this slabs objects.
@@ -720,10 +720,10 @@ pub const RawCache = struct {
     const LargeObject = struct {
         object: []u8,
         slab: *Slab,
-        node: SinglyLinkedList.Node = .{},
+        node: std.SinglyLinkedList.Node = .{},
     };
 
-    const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(SinglyLinkedList.Node));
+    const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
     const default_large_objects_per_slab = 16;
 };
 
@@ -760,7 +760,3 @@ const core = @import("core");
 const kernel = @import("kernel");
 const builtin = @import("builtin");
 const log = kernel.debug.log.scoped(.cache);
-
-// TODO: use `@import("containers")` instead
-const SinglyLinkedList = std.SinglyLinkedList;
-const DoublyLinkedList = std.DoublyLinkedList;

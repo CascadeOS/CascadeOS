@@ -10,7 +10,7 @@ nodes: std.BoundedArray(Node, kernel.config.maximum_number_of_executors) = .{},
 
 pub const Node = struct {
     request: *FlushRequest,
-    node: containers.SingleNode,
+    node: std.SinglyLinkedList.Node,
 };
 
 pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) void {
@@ -36,7 +36,7 @@ pub fn processFlushRequests(current_task: *kernel.Task) void {
     std.debug.assert(current_task.interrupt_disable_count != 0 or current_task.preemption_disable_count != 0);
     const executor = current_task.state.running;
 
-    while (executor.flush_requests.pop()) |node| {
+    while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
         request_node.request.flush(current_task);
     }
@@ -61,9 +61,9 @@ fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) voi
     const node = flush_request.nodes.addOne() catch @panic("exceeded maximum number of executors");
     node.* = .{
         .request = flush_request,
-        .node = .empty,
+        .node = .{},
     };
-    executor.flush_requests.push(&node.node);
+    executor.flush_requests.prepend(&node.node);
 
     kernel.arch.interrupts.sendFlushIPI(executor);
 }
@@ -79,5 +79,3 @@ fn waitForCompletion(flush_request: *FlushRequest, current_task: *kernel.Task) v
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-
-const containers = @import("containers");

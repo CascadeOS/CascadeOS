@@ -12,7 +12,7 @@ idle_task: kernel.Task,
 arch: kernel.arch.PerExecutor,
 
 /// List of `kernel.mem.FlushRequest` objects that need to be actioned.
-flush_requests: containers.AtomicSinglyLinkedLIFO = .{},
+flush_requests: core.containers.AtomicSinglyLinkedList = .{},
 
 // used during `kernel.debug.interruptSourcePanic`
 interrupt_source_panic_buffer: [kernel.config.interrupt_source_panic_buffer_size.value + interrupt_source_panic_truncated.len]u8 = undefined,
@@ -69,4 +69,3 @@ pub inline fn format(
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const containers = @import("containers");

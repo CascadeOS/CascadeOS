@@ -34,7 +34,7 @@ spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked (except 
 /// - scheduler ready queue
 /// - wait queue
 /// - the kernel task cleanup service
-next_task_node: containers.SingleNode = .empty,
+next_task_node: std.SinglyLinkedList.Node = .{},
 
 context: Context,
 
@@ -202,7 +202,7 @@ pub fn format(
     }
 }
 
-pub inline fn fromNode(node: *containers.SingleNode) *Task {
+pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {
     return @fieldParentPtr("next_task_node", node);
 }
 
@@ -527,5 +527,4 @@ pub const init = struct {
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");
-const containers = @import("containers");
 const log = kernel.debug.log.scoped(.task);

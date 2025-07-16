@@ -16,13 +16,6 @@ pub const libraries: []const LibraryDescription = &.{
             .{ .name = "core" },
         },
     },
-    .{
-        .name = "containers",
-        .dependencies = &.{
-            .{ .name = "core" },
-            .{ .name = "bitjuggle" },
-        },
-    },
     .{ .name = "core" },
     .{
         .name = "fs",
