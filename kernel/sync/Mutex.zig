@@ -16,9 +16,9 @@ spinlock: kernel.sync.TicketSpinLock = .{},
 wait_queue: kernel.sync.WaitQueue = .{},
 
 pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
-    while (true) {
-        current_task.incrementPreemptionDisable();
+    current_task.incrementPreemptionDisable();
 
+    while (true) {
         var locked_by = mutex.locked_by.cmpxchgWeak(
             null,
             current_task,
@@ -57,8 +57,6 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
             @branchHint(.cold);
             @panic("recursive lock");
         }
-
-        current_task.decrementPreemptionDisable();
 
         mutex.wait_queue.wait(current_task, &mutex.spinlock);
     }
