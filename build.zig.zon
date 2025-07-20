@@ -44,8 +44,4 @@
     .paths = .{""},
 
     .fingerprint = 0x953e58ed07a831c1,
-
-    .serpent = .{
-        .print_exe_name = true,
-    },
 }
