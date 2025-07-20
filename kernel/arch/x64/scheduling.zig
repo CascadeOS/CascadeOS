@@ -42,7 +42,16 @@ pub fn jumpToTaskFromIdle(
                         \\pop %rbp
                         \\pop %rbx
                         \\ret
-                    );
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rbp = true,
+                            .r15 = true,
+                            .r14 = true,
+                            .r13 = true,
+                            .r12 = true,
+                            .rbx = true,
+                        });
                 }
             }.impl;
 
@@ -106,7 +115,16 @@ pub fn jumpToTaskFromTask(
                         \\pop %rbp
                         \\pop %rbx
                         \\ret
-                    );
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rbp = true,
+                            .r15 = true,
+                            .r14 = true,
+                            .r13 = true,
+                            .r12 = true,
+                            .rbx = true,
+                        });
                 }
             }.impl;
 
@@ -187,7 +205,11 @@ pub fn callOneArgs(
                         \\mov %rdi, %rsp
                         \\pop %rdi
                         \\ret
-                    );
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rdi = true,
+                        });
                 }
             }.impl;
 
@@ -203,7 +225,11 @@ pub fn callOneArgs(
                         \\mov %rdi, %rsp
                         \\pop %rdi
                         \\ret
-                    );
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rdi = true,
+                        });
                 }
             }.impl;
 
@@ -254,7 +280,12 @@ pub fn callTwoArgs(
                         \\pop %rdi
                         \\pop %rsi
                         \\ret
-                    );
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rdi = true,
+                            .rsi = true,
+                        });
                 }
             }.impl;
 
@@ -271,7 +302,12 @@ pub fn callTwoArgs(
                         \\pop %rdi
                         \\pop %rsi
                         \\ret
-                    );
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rdi = true,
+                            .rsi = true,
+                        });
                 }
             }.impl;
 
