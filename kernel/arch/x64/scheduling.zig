@@ -331,6 +331,97 @@ pub fn callTwoArgs(
     }
 }
 
+/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+pub fn callFourArgs(
+    opt_old_task: ?*kernel.Task,
+    new_stack: kernel.Task.Stack,
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    arg4: usize,
+    target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
+) kernel.arch.scheduling.CallError!void {
+    const impls = struct {
+        const callFourArgs: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
+        ) callconv(.c) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) void {
+                    asm volatile (
+                        \\push %rbx
+                        \\push %rbp
+                        \\push %r12
+                        \\push %r13
+                        \\push %r14
+                        \\push %r15
+                        \\mov %rsp, %rax
+                        \\mov %rax, (%rsi)
+                        \\mov %rdi, %rsp
+                        \\pop %rdi
+                        \\pop %rsi
+                        \\pop %rdx
+                        \\pop %rcx
+                        \\ret
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rdi = true,
+                            .rsi = true,
+                            .rdx = true,
+                            .rcx = true,
+                        });
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+
+        const callFourArgsNoPrevious: *const fn (
+            new_kernel_stack_pointer: core.VirtualAddress, // rdi
+        ) callconv(.c) void = blk: {
+            const impl = struct {
+                fn impl() callconv(.naked) void {
+                    asm volatile (
+                        \\mov %rdi, %rsp
+                        \\pop %rdi
+                        \\pop %rsi
+                        \\pop %rdx
+                        \\pop %rcx
+                        \\ret
+                        ::: .{
+                            .memory = true,
+                            .rsp = true,
+                            .rdi = true,
+                            .rsi = true,
+                            .rdx = true,
+                            .rcx = true,
+                        });
+                }
+            }.impl;
+
+            break :blk @ptrCast(&impl);
+        };
+    };
+
+    var stack = new_stack;
+
+    try stack.push(@intFromPtr(target_function));
+    try stack.push(arg4);
+    try stack.push(arg3);
+    try stack.push(arg2);
+    try stack.push(arg1);
+
+    if (opt_old_task) |old_task| {
+        impls.callFourArgs(
+            stack.stack_pointer,
+            &old_task.stack.stack_pointer,
+        );
+    } else {
+        impls.callFourArgsNoPrevious(stack.stack_pointer);
+    }
+}
+
 const std = @import("std");
 const core = @import("core");
 const kernel = @import("kernel");

@@ -549,6 +549,37 @@ pub const scheduling = struct {
 
         try current.scheduling.callTwoArgs(opt_old_task, new_stack, arg1, arg2, target_function);
     }
+
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+    pub fn callFourArgs(
+        opt_old_task: ?*kernel.Task,
+        new_stack: kernel.Task.Stack,
+        arg1: usize,
+        arg2: usize,
+        arg3: usize,
+        arg4: usize,
+        target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
+    ) callconv(core.inline_in_non_debug) CallError!void {
+        checkSupport(current.scheduling, "callFourArgs", fn (
+            ?*kernel.Task,
+            kernel.Task.Stack,
+            usize,
+            usize,
+            usize,
+            usize,
+            *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
+        ) CallError!void);
+
+        try current.scheduling.callFourArgs(
+            opt_old_task,
+            new_stack,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            target_function,
+        );
+    }
 };
 
 pub const io = struct {
