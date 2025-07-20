@@ -7,7 +7,7 @@
     .version = "0.0.3",
 
     // Ensure this is kept in sync with `README.md`
-    .minimum_zig_version = "0.15.0-dev.1034+bd97b6618",
+    .minimum_zig_version = "0.15.0-dev.1149+4e6a04929",
 
     .dependencies = .{
         .devicetree = .{
@@ -36,8 +36,8 @@
         },
 
         .sbi = .{
-            .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#fc8ff79e7598e3c92d5ad7eeeabb6518c169523c",
-            .hash = "sbi-5.0.0-Muvb-ovtAQB47PaXM__EIa6hiOZoEdBQYDUzpn1sgRdB",
+            .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#847ff0e0afa4757d5f29497aa2e86812ece4bb5e",
+            .hash = "sbi-6.0.0-Muvb-rvuAQC95CCzwePSpgQ5cqKE-8RNZCsPBU0kjKmZ",
         },
     },
 

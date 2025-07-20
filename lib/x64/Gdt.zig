@@ -83,8 +83,7 @@ pub const Gdt = extern struct {
             \\ 1:
             :
             : [csel] "i" (@intFromEnum(Selector.kernel_code)),
-            : "rax"
-        );
+            : .{ .rax = true });
     }
 
     const Gdtr = packed struct {

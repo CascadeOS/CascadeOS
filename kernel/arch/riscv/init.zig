@@ -8,7 +8,10 @@ pub fn onBootEntry() void {
         \\.option norelax
         \\la gp, _global_pointer
         \\.option pop
-        ::: "memory", "gp");
+        ::: .{
+            .memory = true,
+            .x3 = true, // gp
+        });
 }
 
 /// Read current wallclock time from the standard wallclock source of the current architecture.

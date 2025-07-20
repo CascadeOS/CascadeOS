@@ -86,8 +86,7 @@ pub const RFlags = packed struct(u64) {
         asm volatile ("pushq %[val]; popfq"
             :
             : [val] "r" (@as(u64, @bitCast(rflags))),
-            : "flags"
-        );
+            : .{ .flags = true });
     }
 
     pub fn print(rflags: RFlags, writer: *std.Io.Writer, indent: usize) !void {
@@ -241,8 +240,7 @@ pub const Cr3 = struct {
         asm volatile ("mov %[address], %%cr3"
             :
             : [address] "r" (address.value & 0xFFFF_FFFF_FFFF_F000),
-            : "memory"
-        );
+            : .{ .memory = true });
     }
 };
 
@@ -774,8 +772,7 @@ pub inline fn readMSR(comptime T: type, register: u32) T {
             return asm ("rdmsr"
                 : [low] "={eax}" (-> u32),
                 : [register] "{ecx}" (register),
-                : "edx"
-            );
+                : .{ .edx = true });
         },
         else => @compileError("read not implemented for " ++ @typeName(T)),
     }

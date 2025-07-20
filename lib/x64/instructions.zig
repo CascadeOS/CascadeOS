@@ -44,7 +44,7 @@ pub inline fn readTsc() u64 {
 ///
 /// The PAUSE instruction improves the performance of spin-wait loops.
 pub inline fn pause() void {
-    asm volatile ("pause" ::: "memory");
+    asm volatile ("pause" ::: .{ .memory = true });
 }
 
 /// Issues a HLT instruction.

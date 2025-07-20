@@ -16,7 +16,7 @@ pub inline fn halt() void {
 ///
 /// Instruction Synchronization Barrier flushes the pipeline in the PE and is a context synchronization event.
 pub inline fn isb() void {
-    asm volatile ("isb" ::: "memory");
+    asm volatile ("isb" ::: .{ .memory = true });
 }
 
 /// Disable interrupts and put the CPU to sleep.
