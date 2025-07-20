@@ -97,6 +97,11 @@ pub const endian = struct {
 /// debug builds.
 pub const inline_in_non_debug: std.builtin.CallingConvention = if (builtin.mode == .Debug) .auto else .@"inline";
 
+pub const LockState = enum {
+    locked,
+    unlocked,
+};
+
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
