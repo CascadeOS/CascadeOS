@@ -1,11 +1,10 @@
-// SPDX-License-Identifier: MIT AND BSD-2-Clause
+// SPDX-License-Identifier: MIT AND 0BSD
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2019-2025 mintsuki and contributors (https://github.com/limine-bootloader/limine/blob/v9.3.3/COPYING)
+// SPDX-FileCopyrightText: 2022-2025 Mintsuki and contributors (https://github.com/limine-bootloader/limine-protocol/blob/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of v9.3.3.
+//! This module contains the definitions of the Limine protocol as of fedf97facd1c473ee8720f8dfd5a71d03490d928.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine/blob/v9.3.3/PROTOCOL.md)
-//! 1c602bb69ab5acd1dcf06ef9bb62386686b3d534 2025-03-20
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine-protocol/blob/fedf97facd1c473ee8720f8dfd5a71d03490d928/PROTOCOL.md)
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
@@ -714,23 +713,15 @@ pub const MP = extern struct {
 
 /// Memory Map Feature
 ///
-/// All these memory entry types, besides usable and bootloader reclaimable,
-/// are meant to have an illustrative purpose only, and are not authoritative sources
-/// to be used as a means to find the addresses of the executable, modules, framebuffer, ACPI,
-/// or otherwise. Use the specific Limine features to do that, if available, or other
-/// discovery means.
-///
 /// For base revisions <= 2, memory between 0 and 0x1000 is never marked as usable memory.
-///
-/// The executable and modules loaded are not marked as usable memory, but as Executable/Modules.
 ///
 /// The entries are guaranteed to be sorted by base address, lowest to highest.
 ///
 /// Usable and bootloader reclaimable entries are guaranteed to be 4096 byte aligned for both base and length.
 ///
 /// Usable and bootloader reclaimable entries are guaranteed not to overlap with any other entry.
-/// To the contrary, all non-usable entries (including executable/modules) are not guaranteed any alignment,
-/// nor is it guaranteed that they do not overlap other entries.
+/// To the contrary, all non-usable entries (including executable/modules) are not guaranteed any alignment, nor is it
+/// guaranteed that they do not overlap other entries.
 pub const Memmap = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x67cf3d9d378a806f, 0xe304acdfc50c3c62 },
     revision: u64 = 0,
@@ -778,14 +769,50 @@ pub const Memmap = extern struct {
         type: Type,
 
         pub const Type = enum(u64) {
+            /// A region of the address space that is usable RAM, and does not contain other data, the executable,
+            /// bootloader information, or anything valuable, and is therefore free for use.
             usable = 0,
+
+            /// A region of the address space that are reserved for unspecified purposes by the firmware, hardware, or
+            /// otherwise, and should not be touched by the executable.
             reserved = 1,
+
+            /// A region of the address space containing ACPI related data, such as ACPI tables and AML code.
+            ///
+            /// The executable should make absolutely sure that no data contained in these regions is still needed
+            /// before deciding to reclaim these memory regions for itself.
+            ///
+            /// Refer to the ACPI specification for further information.
             acpi_reclaimable = 2,
+
+            /// A region of the address space used for ACPI non-volatile data storage.
+            ///
+            /// Refer to the ACPI specification for further information.
             acpi_nvs = 3,
+
+            /// A region of the address space that contains bad RAM, which may be unreliable, and therefore these
+            /// regions should be treated the same as reserved regions.
             bad_memory = 4,
+
+            /// A region of the address space containing RAM used to store bootloader or firmware information that
+            /// should be available to the executable (or, in some cases, hardware, such as for MP trampolines).
+            ///
+            /// The executable should make absolutely sure that no data contained in these regions is still needed
+            /// before deciding to reclaim these memory regions for itself.
             bootloader_reclaimable = 5,
+
+            /// An entry that is meant to have an illustrative purpose only, and are not authoritative sources to be
+            /// used as a means to find the addresses of the executable or modules.
+            ///
+            /// One must use the specific Limine features (executable address and module features) to do that.
             executable_and_modules = 6,
+
+            /// A region of the address space containing memory-mapped framebuffers.
+            ///
+            /// These entries exist for illustrative purposes only, and are not to be used to acquire the address of any
+            /// framebuffer. One must use the framebuffer feature for that.
             framebuffer = 7,
+
             _,
         };
 
@@ -1201,7 +1228,10 @@ pub const File = extern struct {
     /// The address of the file. This is always at least 4KiB aligned.
     address: core.VirtualAddress,
 
-    /// The size of the file, in bytes.
+    /// The size of the file.
+    ///
+    /// Regardless of the file size, all loaded modules are guaranteed to have all 4KiB chunks of memory they cover for
+    /// themselves exclusively.
     size: core.Size,
 
     /// The path of the file within the volume, with a leading slash
