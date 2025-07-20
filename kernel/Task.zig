@@ -120,9 +120,12 @@ pub fn incrementReferenceCount(task: *Task) void {
 /// Decrements the reference count of the task.
 ///
 /// If it reaches zero the task is submitted to the task cleanup service.
-pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
+///
+/// This must not be called when the task is the current task, see `drop` instead.
+pub fn decrementReferenceCount(task: *Task, current_task: *Task, scheduler_locked: core.LockState) void {
+    std.debug.assert(task != current_task);
     if (task.reference_count.fetchSub(1, .acq_rel) != 1) return;
-    kernel.services.task_cleanup.queueTaskForCleanup(current_task, task);
+    kernel.services.task_cleanup.queueTaskForCleanup(current_task, task, scheduler_locked);
 }
 
 pub fn incrementInterruptDisable(task: *Task) void {
@@ -187,6 +190,34 @@ pub fn isIdleTask(task: *const Task) bool {
         .kernel => |kernel_context| kernel_context.is_idle_task,
         .user => false,
     };
+}
+
+/// Drops the current task out of the scheduler.
+///
+/// Decrements the reference count of the task to remove the implicit self reference.
+///
+/// The scheduler lock must be held when this function is called.
+pub fn drop(current_task: *kernel.Task) noreturn {
+    std.debug.assert(current_task.state == .running);
+
+    std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task));
+    std.debug.assert(current_task.spinlocks_held == 1); // only the scheduler lock is held
+
+    kernel.services.task_cleanup.wake(current_task, .locked);
+
+    kernel.scheduler.drop(current_task, .{
+        .action = struct {
+            fn action(old_task: *kernel.Task, _: ?*anyopaque) void {
+                old_task.state = .{ .dropped = .{} };
+                old_task.decrementReferenceCount(
+                    kernel.Task.getCurrent(), // TODO: maybe this should be passed in?
+                    .locked,
+                );
+            }
+        }.action,
+        .context = null,
+    });
+    @panic("dropped task returned");
 }
 
 pub fn format(

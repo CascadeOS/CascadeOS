@@ -30,6 +30,7 @@ pub fn wakeOne(
     wait_queue: *WaitQueue,
     current_task: *kernel.Task,
     spinlock: *const kernel.sync.TicketSpinLock,
+    scheduler_locked: core.LockState,
 ) void {
     std.debug.assert(current_task.interrupt_disable_count != 0);
     std.debug.assert(spinlock.isLockedByCurrent(current_task));
@@ -40,10 +41,15 @@ pub fn wakeOne(
     std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
-    kernel.scheduler.lockScheduler(current_task);
-    defer kernel.scheduler.unlockScheduler(current_task);
+    switch (scheduler_locked) {
+        .unlocked => {
+            kernel.scheduler.lockScheduler(current_task);
+            defer kernel.scheduler.unlockScheduler(current_task);
 
-    kernel.scheduler.queueTask(current_task, task_to_wake);
+            kernel.scheduler.queueTask(current_task, task_to_wake);
+        },
+        .locked => kernel.scheduler.queueTask(current_task, task_to_wake),
+    }
 }
 
 /// Add the current task to the wait queue.
@@ -64,7 +70,19 @@ pub fn wait(
     kernel.scheduler.lockScheduler(current_task);
     defer kernel.scheduler.unlockScheduler(current_task);
 
-    kernel.scheduler.block(current_task, spinlock);
+    kernel.scheduler.drop(current_task, .{
+        .action = struct {
+            fn action(old_task: *kernel.Task, context: ?*anyopaque) void {
+                old_task.spinlocks_held -= 1;
+                old_task.interrupt_disable_count -= 1;
+                old_task.state = .blocked;
+
+                const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrCast(@alignCast(context));
+                inner_spinlock.unsafeUnlock();
+            }
+        }.action,
+        .context = spinlock,
+    });
 }
 
 const core = @import("core");

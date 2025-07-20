@@ -143,7 +143,7 @@ pub fn readUnlock(rw_lock: *RwLock, current_task: *kernel.Task) void {
         rw_lock.wait_queue_spinlock.lock(current_task);
         defer rw_lock.wait_queue_spinlock.unlock(current_task);
 
-        rw_lock.wait_queue.wakeOne(current_task, &rw_lock.wait_queue_spinlock);
+        rw_lock.wait_queue.wakeOne(current_task, &rw_lock.wait_queue_spinlock, .unlocked);
     }
 }
 

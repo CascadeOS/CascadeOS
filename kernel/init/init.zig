@@ -169,7 +169,7 @@ fn initStage3(current_task: *kernel.Task) !noreturn {
     }
 
     _ = kernel.scheduler.lockScheduler(current_task);
-    kernel.scheduler.drop(current_task);
+    current_task.drop();
     unreachable;
 }
 
@@ -203,7 +203,7 @@ fn initStage4(current_task: *kernel.Task) !noreturn {
     }
 
     _ = kernel.scheduler.lockScheduler(current_task);
-    kernel.scheduler.drop(current_task);
+    current_task.drop();
     unreachable;
 }
 
