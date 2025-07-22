@@ -217,6 +217,11 @@ pub const paging = struct {
     /// All the page sizes supported by the architecture in order of smallest to largest.
     pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
 
+    /// The total size of the lower half.
+    ///
+    /// This includes the zero page.
+    pub const lower_half_size: core.Size = current.paging.lower_half_size;
+
     /// The virtual address of the start of the higher half.
     pub const higher_half_start: core.VirtualAddress = current.paging.higher_half_start;
 

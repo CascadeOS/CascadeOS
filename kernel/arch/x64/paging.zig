@@ -319,6 +319,7 @@ pub const all_page_sizes: []const core.Size = &.{
     large_page_size,
 };
 
+pub const lower_half_size: core.Size = .from(128, .tib);
 pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
 
 /// The largest possible higher half virtual address.
