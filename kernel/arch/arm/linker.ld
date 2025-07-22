@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: CC0-1.0 */
 /* SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz> */
 
-/* TODO: the arm arch will use 16KiB pages so the COMMONPAGESIZE below need to be changed */
-
 OUTPUT_FORMAT(elf64-littleaarch64)
 OUTPUT_ARCH(aarch64)
 
@@ -22,7 +20,7 @@ SECTIONS
     /* This must be kept in sync with `kernel.config.kernel_base_address` */
     . = 0xffffffff80000000;
 
-    . = ALIGN(CONSTANT(COMMONPAGESIZE));
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     __text_start = .;
 
@@ -32,7 +30,7 @@ SECTIONS
 
     __text_end = .;
 
-    . = ALIGN(CONSTANT(COMMONPAGESIZE));
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     __rodata_start = .;
 
@@ -54,7 +52,7 @@ SECTIONS
 
     __rodata_end = .;
 
-    . = ALIGN(CONSTANT(COMMONPAGESIZE));
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     __data_start = .;
 
@@ -73,12 +71,12 @@ SECTIONS
 
     __data_end = .;
 
-    . = ALIGN(CONSTANT(COMMONPAGESIZE));
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     __sdf_start = .;
 
     .sdf : { /* sdf_builder embeds the SDF data into this section */
-        . += CONSTANT(COMMONPAGESIZE);
+        . += CONSTANT(MAXPAGESIZE);
     } :sdf
 
     /DISCARD/ : {
