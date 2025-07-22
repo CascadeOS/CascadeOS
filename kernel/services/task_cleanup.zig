@@ -10,8 +10,6 @@ pub fn queueTaskForCleanup(
     std.debug.assert(current_task != task);
     std.debug.assert(task.state == .dropped);
 
-    log.verbose("queueing {f} for cleanup", .{task});
-
     if (task.state.dropped.queued_for_cleanup.cmpxchgStrong(
         false,
         true,
@@ -21,6 +19,8 @@ pub fn queueTaskForCleanup(
         // someone else already queued this task for cleanup
         return;
     }
+
+    log.verbose("queueing {f} for cleanup", .{task});
 
     globals.incoming.prepend(&task.next_task_node);
     wake(current_task, scheduler_locked);
@@ -37,6 +37,7 @@ pub fn wake(
         .acq_rel,
         .monotonic,
     ) != null) return;
+    std.debug.assert(globals.task_cleanup_task.state == .blocked);
 
     // the task cleanup service was blocked waiting for work
 
@@ -67,31 +68,44 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
             std.debug.assert(task.state == .dropped);
             std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
 
+            const tasks_lock, const tasks = switch (task.context) {
+                .kernel => .{ &kernel.kernel_tasks_lock, &kernel.kernel_tasks },
+                .user => |process| .{ &process.tasks_lock, &process.tasks },
+            };
+
             task.state.dropped.queued_for_cleanup.store(false, .release);
 
-            switch (task.context) {
-                .kernel => {
-                    kernel.kernel_tasks_lock.writeLock(current_task);
-                    defer kernel.kernel_tasks_lock.writeUnlock(current_task);
+            {
+                tasks_lock.writeLock(current_task);
+                defer tasks_lock.writeUnlock(current_task);
 
-                    if (task.reference_count.load(.acquire) != 0) {
-                        @branchHint(.unlikely);
-                        // someone has acquired a reference to the task after it was queued for cleanup
-                        log.verbose("{f} still has references", .{task});
-                        continue;
-                    }
+                if (task.reference_count.load(.acquire) != 0) {
+                    @branchHint(.unlikely);
+                    // someone has acquired a reference to the task after it was queued for cleanup
+                    log.verbose("{f} still has references", .{task});
+                    continue;
+                }
 
-                    // the task is no longer referenced so we can safely destroy it
-                    if (!kernel.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks");
-                },
-                .user => @panic("TODO: implement user task cleanup"),
+                if (task.state.dropped.queued_for_cleanup.swap(true, .acq_rel)) {
+                    @branchHint(.unlikely);
+                    // someone has requeued this task for cleanup
+                    log.verbose("{f} has been requeued for cleanup", .{task});
+                    continue;
+                }
+
+                // the task is no longer referenced so we can safely destroy it
+                if (!tasks.swapRemove(task)) @panic("task not found in tasks");
             }
 
+            // this log must happen before the process reference count is decremented
             log.debug("destroying {f}", .{task});
 
             switch (task.context) {
                 .kernel => {},
-                .user => @panic("TODO: implement user task cleanup"),
+                .user => |process| {
+                    task.context = .{ .user = undefined };
+                    process.decrementReferenceCount(current_task, .unlocked);
+                },
             }
 
             Task.internal.destroy(current_task, task);

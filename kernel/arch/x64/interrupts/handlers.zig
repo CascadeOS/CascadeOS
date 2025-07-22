@@ -40,7 +40,7 @@ pub fn pageFaultHandler(
             .invalid,
 
         .context = if (error_code.user)
-            .user
+            .{ .user = current_task.context.user }
         else
             .kernel,
     }, interrupt_frame);

@@ -43,16 +43,17 @@ pub fn processFlushRequests(current_task: *kernel.Task) void {
 }
 
 fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
-    _ = current_task;
+    defer _ = flush_request.count.fetchSub(1, .monotonic);
 
     switch (flush_request.flush_target) {
         .kernel => {},
-        .user => @panic("NOT IMPLEMENTED"),
+        .user => |target_process| switch (current_task.context) {
+            .kernel => return,
+            .user => |current_process| if (current_process != target_process) return,
+        },
     }
 
     kernel.arch.paging.flushCache(flush_request.range);
-
-    _ = flush_request.count.fetchSub(1, .monotonic);
 }
 
 fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) void {
