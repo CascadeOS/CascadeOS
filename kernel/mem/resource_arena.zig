@@ -319,9 +319,10 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 &span_tag.all_tag_node,
             );
 
-            if (freelist_decision == .add) {
+            switch (freelist_decision) {
                 // insert the new free tag into the appropriate freelist
-                arena.pushToFreelist(free_tag);
+                .add => arena.pushToFreelist(free_tag),
+                .nop => {},
             }
         }
 
