@@ -40,7 +40,7 @@ context: Context,
 
 pub const Context = union(kernel.Context.Type) {
     kernel: Kernel,
-    user: void,
+    user: *kernel.Process,
 
     pub const Kernel = struct {
         /// Name of the task.
@@ -226,10 +226,13 @@ pub fn format(
 ) !void {
     switch (task.context) {
         .kernel => |kernel_context| try writer.print(
-            "KernelTask({s})",
+            "KernelTask('{s}')",
             .{kernel_context.name.constSlice()},
         ),
-        .user => @panic("TODO: implement user task printing"),
+        .user => |process| try writer.print(
+            "UserTask('{s}'@{x:0>16})", // TODO using the pointer is not ideal, might have to introduce an id
+            .{ process.name.constSlice(), @intFromPtr(task) },
+        ),
     }
 }
 
@@ -247,7 +250,7 @@ pub const internal = struct {
 
         pub const CreateContext = union(kernel.Context.Type) {
             kernel: Kernel,
-            user: void,
+            user: *kernel.Process,
 
             pub const Kernel = struct {
                 name: Name,
@@ -255,7 +258,7 @@ pub const internal = struct {
         };
     };
 
-    fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
+    pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
         const task = try globals.cache.allocate(current_task);
         errdefer globals.cache.deallocate(current_task, task);
 
@@ -272,7 +275,7 @@ pub const internal = struct {
                         .is_idle_task = false,
                     },
                 },
-                .user => .user,
+                .user => |process| .{ .user = process },
             },
         };
 
@@ -289,6 +292,8 @@ pub const internal = struct {
     }
 
     pub fn destroy(current_task: *kernel.Task, task: *Task) void {
+        // for user tasks the process reference stored in `context` has been set to `undefined` before this function
+        // is called
         std.debug.assert(task.state == .dropped);
         std.debug.assert(task.reference_count.load(.monotonic) == 0);
         globals.cache.deallocate(current_task, task);

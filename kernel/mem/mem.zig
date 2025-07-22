@@ -484,6 +484,9 @@ pub const init = struct {
         init_log.debug("initializing tasks", .{});
         try kernel.Task.init.initializeTasks(current_task, result.stacks_range);
 
+        init_log.debug("initializing processes", .{});
+        try kernel.Process.init.initializeProcesses(current_task);
+
         init_log.debug("initializing pageable kernel address space", .{});
         try globals.kernel_pageable_address_space.init(
             current_task,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+// TODO: clean up this file, use some namespacing
+
 // build system provided kernel options
 pub const cascade_version = kernel_options.cascade_version;
 pub const cascade_arch = @import("cascade_architecture").arch;
@@ -18,12 +20,20 @@ pub const maximum_number_of_executors = 64;
 pub const interrupt_source_panic_buffer_size = kernel.arch.paging.standard_page_size;
 
 pub const task_name_length = 64;
+// the process name is also used as the name of its address space
+pub const process_name_length = address_space_name_length;
 pub const resource_arena_name_length = 64;
 // the address spaces resource arena has the same name as the address space but with `_address_arena` appended
 pub const address_space_name_length = resource_arena_name_length - "_address_arena".len;
 pub const cache_name_length = 64;
 
 pub const per_executor_interrupt_period = core.Duration.from(5, .millisecond);
+
+pub const user_address_space_range: core.VirtualRange = .{
+    // don't allow the zero page to be mapped
+    .address = .fromInt(kernel.arch.paging.standard_page_size.value),
+    .size = kernel.arch.paging.lower_half_size.subtract(kernel.arch.paging.standard_page_size),
+};
 
 const std = @import("std");
 const core = @import("core");

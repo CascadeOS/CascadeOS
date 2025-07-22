@@ -10,6 +10,7 @@ pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");
 pub const mem = @import("mem/mem.zig");
 pub const pci = @import("pci.zig");
+pub const Process = @import("Process.zig");
 pub const scheduler = @import("scheduler.zig");
 pub const services = @import("services/services.zig");
 pub const sync = @import("sync/sync.zig");
@@ -25,9 +26,12 @@ pub inline fn getExecutor(id: Executor.Id) *Executor {
     return &executors[@intFromEnum(id)];
 }
 
+pub var processes_lock: sync.RwLock = .{};
+pub var processes: std.AutoArrayHashMapUnmanaged(*Process, void) = .{};
+
 pub const Context = union(Type) {
     kernel,
-    user,
+    user: *Process,
 
     pub const Type = enum {
         kernel,
