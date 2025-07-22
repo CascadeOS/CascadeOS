@@ -19,7 +19,7 @@ const AddressSpace = @This();
 _name: Name,
 
 /// Used as the source of addresses in this address space.
-address_arena: kernel.mem.resource_arena.Arena(.none) = undefined,
+address_arena: kernel.mem.resource_arena.Arena(.none),
 
 context: kernel.Context,
 
@@ -33,7 +33,7 @@ page_table_lock: kernel.sync.Mutex = .{},
 /// Called a `vm_map` in uvm.
 ///
 /// Sorted by `base`.
-entries: std.ArrayListUnmanaged(*Entry) = .empty, // TODO: better data structure
+entries: std.ArrayListUnmanaged(*Entry), // TODO: better data structure
 
 /// Protects the `entries` field.
 entries_lock: kernel.sync.RwLock = .{},
@@ -41,7 +41,7 @@ entries_lock: kernel.sync.RwLock = .{},
 /// Used to detect changes to the entries list while it is unlocked.
 ///
 /// Incremented when the entries list is modified.
-entries_version: u32 = 0,
+entries_version: u32,
 
 pub const InitOptions = struct {
     name: Name,
@@ -65,9 +65,12 @@ pub fn init(
     });
 
     address_space.* = .{
+        .address_arena = undefined, // initialized below
         ._name = options.name,
         .page_table = options.page_table,
         .context = options.context,
+        .entries = .empty,
+        .entries_version = 0,
     };
 
     try address_space.address_arena.init(
@@ -85,11 +88,37 @@ pub fn init(
     );
 }
 
-pub fn deinit(address_space: *AddressSpace, current_task: *kernel.Task) void {
-    log.debug("{s}: deinit", .{address_space.name()});
+/// Reinitialize the address space back to its initial state including unmapping everything.
+///
+/// The address space must not be in use by any tasks when this function is called as everything is unmapped without
+/// flushing.
+pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, current_task: *kernel.Task) void {
+    log.debug("{s}: reinitializeAndUnmapAll", .{address_space.name()});
+
+    std.debug.assert(!address_space.page_table_lock.isLocked());
+    std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
 
     _ = current_task;
     @panic("NOT IMPLEMENTED"); // TODO
+}
+
+/// This leaves the address space in an invalid state, if it will be reused see `reinitializeAndUnmapAll`.
+///
+/// `reinitializeAndUnmapAll` is expected to have been called before calling this function.
+///
+/// The address space must not be in use by any tasks when this function is called.
+pub fn deinit(address_space: *AddressSpace, current_task: *kernel.Task) void {
+    // cannot use the name as it will reference a defunct process that this address space is now unrelated to
+    log.debug("deinit", .{});
+
+    std.debug.assert(!address_space.page_table_lock.isLocked());
+    std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
+    std.debug.assert(address_space.entries.items.len == 0);
+    std.debug.assert(address_space.entries.capacity == 0);
+
+    address_space.address_arena.deinit(current_task);
+
+    address_space.* = undefined;
 }
 
 /// Rename the address space.
