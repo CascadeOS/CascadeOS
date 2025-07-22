@@ -191,7 +191,7 @@ const ImageDescriptionStep = struct {
         // Random bytes to make unique. Refresh this with new random bytes when
         // implementation is modified in a non-backwards-compatible way.
         hash.add(@as(u32, 0xde92a821));
-        hash.addBytes(image_description.items);
+        hash.addBytes(image_description);
         const sub_path =
             "cascade" ++ std.fs.path.sep_str ++
             "idesc" ++ std.fs.path.sep_str ++
@@ -231,7 +231,7 @@ const ImageDescriptionStep = struct {
                 };
 
                 image_description_step.b.cache_root.handle.writeFile(
-                    .{ .sub_path = tmp_sub_path, .data = image_description.items },
+                    .{ .sub_path = tmp_sub_path, .data = image_description },
                 ) catch |err| {
                     return step.fail("unable to write options to '{f}{s}': {t}", .{
                         image_description_step.b.cache_root, tmp_sub_path, err,
@@ -266,7 +266,7 @@ const ImageDescriptionStep = struct {
 
     const ImageDescription = @import("../tool/image_builder/ImageDescription.zig");
 
-    fn buildImageDescription(image_description_step: *ImageDescriptionStep) !std.ArrayList(u8) {
+    fn buildImageDescription(image_description_step: *ImageDescriptionStep) ![]const u8 {
         const image_size = 256 * 1024 * 1024; // 256 MiB
         const efi_partition_size = 64 * 1024 * 1024; // 64 MiB
         _ = efi_partition_size;
@@ -328,12 +328,12 @@ const ImageDescriptionStep = struct {
             ),
         });
 
-        var image_description_buffer = std.ArrayList(u8).init(image_description_step.b.allocator);
-        errdefer image_description_buffer.deinit();
+        var image_description: std.Io.Writer.Allocating = .init(image_description_step.b.allocator);
+        errdefer image_description.deinit();
 
-        try builder.serialize(image_description_buffer.writer());
+        try builder.serialize(&image_description.writer);
 
-        return image_description_buffer;
+        return try image_description.toOwnedSlice();
     }
 };
 

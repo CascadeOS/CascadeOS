@@ -136,7 +136,7 @@ pub const Builder = struct {
         return partition_builder;
     }
 
-    pub fn serialize(builder: Builder, writer: anytype) !void {
+    pub fn serialize(builder: Builder, writer: *std.Io.Writer) !void {
         const partitions = blk: {
             var partitions = try std.ArrayListUnmanaged(Partition).initCapacity(
                 builder.allocator,
@@ -164,13 +164,11 @@ pub const Builder = struct {
             .partitions = partitions,
         };
 
-        try std.json.stringify(
-            image_description,
-            std.json.StringifyOptions{
-                .whitespace = .indent_1,
-            },
-            writer,
-        );
+        var j: std.json.Stringify = .{
+            .writer = writer,
+            .options = .{ .whitespace = .indent_1 },
+        };
+        try j.write(image_description);
     }
 };
 
