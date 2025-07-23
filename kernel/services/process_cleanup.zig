@@ -27,27 +27,7 @@ pub fn wake(
     current_task: *kernel.Task,
     scheduler_locked: core.LockState,
 ) void {
-    if (globals.task_waiting.cmpxchgStrong(
-        true,
-        false,
-        .acq_rel,
-        .monotonic,
-    ) != null) return;
-    std.debug.assert(globals.process_cleanup_task.state == .blocked);
-
-    // the process cleanup service was blocked waiting for work
-
-    globals.process_cleanup_task.state = .ready;
-
-    switch (scheduler_locked) {
-        .unlocked => {
-            kernel.scheduler.lockScheduler(current_task);
-            defer kernel.scheduler.unlockScheduler(current_task);
-
-            kernel.scheduler.queueTask(current_task, globals.process_cleanup_task);
-        },
-        .locked => kernel.scheduler.queueTask(current_task, globals.process_cleanup_task),
-    }
+    globals.parker.unpark(current_task, scheduler_locked);
 }
 
 fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
@@ -60,34 +40,10 @@ fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
-            const process: *kernel.Process = @fieldParentPtr("cleanup_node", node);
-            std.debug.assert(process.queued_for_cleanup.load(.monotonic));
-
-            process.queued_for_cleanup.store(false, .release);
-
-            {
-                kernel.processes_lock.writeLock(current_task);
-                defer kernel.processes_lock.writeUnlock(current_task);
-
-                if (process.reference_count.load(.acquire) != 0) {
-                    @branchHint(.unlikely);
-                    // someone has acquired a reference to the process after it was queued for cleanup
-                    log.verbose("{f} still has references", .{process});
-                    continue;
-                }
-
-                if (process.queued_for_cleanup.swap(true, .acq_rel)) {
-                    @branchHint(.unlikely);
-                    // someone has requeued this process for cleanup
-                    log.verbose("{f} has been requeued for cleanup", .{process});
-                    continue;
-                }
-
-                // the process is no longer referenced so we can safely destroy it
-                if (!kernel.processes.swapRemove(process)) @panic("process not found in processes");
-            }
-
-            kernel.Process.internal.destroy(current_task, process);
+            handleProcess(
+                current_task,
+                @fieldParentPtr("cleanup_node", node),
+            );
         }
 
         kernel.scheduler.lockScheduler(current_task);
@@ -95,26 +51,47 @@ fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
 
         if (!globals.incoming.isEmpty()) continue;
 
-        kernel.scheduler.drop(current_task, .{
-            .action = struct {
-                fn action(old_task: *kernel.Task, _: ?*anyopaque) void {
-                    old_task.state = .blocked;
-                    globals.task_waiting.store(true, .release);
-                }
-            }.action,
-            .context = null,
-        });
+        globals.parker.park(current_task, .locked);
     }
+}
+
+fn handleProcess(current_task: *kernel.Task, process: *kernel.Process) void {
+    std.debug.assert(process.queued_for_cleanup.load(.monotonic));
+
+    process.queued_for_cleanup.store(false, .release);
+
+    {
+        kernel.processes_lock.writeLock(current_task);
+        defer kernel.processes_lock.writeUnlock(current_task);
+
+        if (process.reference_count.load(.acquire) != 0) {
+            @branchHint(.unlikely);
+            // someone has acquired a reference to the process after it was queued for cleanup
+            log.verbose("{f} still has references", .{process});
+            return;
+        }
+
+        if (process.queued_for_cleanup.swap(true, .acq_rel)) {
+            @branchHint(.unlikely);
+            // someone has requeued this process for cleanup
+            log.verbose("{f} has been requeued for cleanup", .{process});
+            return;
+        }
+
+        if (!kernel.processes.swapRemove(process)) @panic("process not found in processes");
+    }
+
+    kernel.Process.internal.destroy(current_task, process);
 }
 
 const globals = struct {
     // initialized during `init.initializeProcessCleanupService`
     var process_cleanup_task: *kernel.Task = undefined;
 
-    /// True if the process cleanup service is blocked waiting for work.
+    /// Parker used to block the process cleanup service.
     ///
     /// initialized during `init.initializeProcessCleanupService`
-    var task_waiting: std.atomic.Value(bool) = undefined;
+    var parker: kernel.sync.Parker = undefined;
 
     var incoming: core.containers.AtomicSinglyLinkedList = .{};
 };
@@ -127,8 +104,8 @@ pub const init = struct {
             .arg1 = undefined,
             .arg2 = undefined,
         });
-        globals.process_cleanup_task.state = .blocked;
-        globals.task_waiting = .init(true);
+
+        globals.parker = .withParkedTask(globals.process_cleanup_task);
     }
 };
 
