@@ -31,27 +31,7 @@ pub fn wake(
     current_task: *Task,
     scheduler_locked: core.LockState,
 ) void {
-    if (globals.task_waiting.cmpxchgStrong(
-        true,
-        false,
-        .acq_rel,
-        .monotonic,
-    ) != null) return;
-    std.debug.assert(globals.task_cleanup_task.state == .blocked);
-
-    // the task cleanup service was blocked waiting for work
-
-    globals.task_cleanup_task.state = .ready;
-
-    switch (scheduler_locked) {
-        .unlocked => {
-            kernel.scheduler.lockScheduler(current_task);
-            defer kernel.scheduler.unlockScheduler(current_task);
-
-            kernel.scheduler.queueTask(current_task, globals.task_cleanup_task);
-        },
-        .locked => kernel.scheduler.queueTask(current_task, globals.task_cleanup_task),
-    }
+    globals.parker.unpark(current_task, scheduler_locked);
 }
 
 fn execute(current_task: *Task, _: usize, _: usize) noreturn {
@@ -64,51 +44,10 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
-            const task: *Task = .fromNode(node);
-            std.debug.assert(task.state == .dropped);
-            std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
-
-            const tasks_lock, const tasks = switch (task.context) {
-                .kernel => .{ &kernel.kernel_tasks_lock, &kernel.kernel_tasks },
-                .user => |process| .{ &process.tasks_lock, &process.tasks },
-            };
-
-            task.state.dropped.queued_for_cleanup.store(false, .release);
-
-            {
-                tasks_lock.writeLock(current_task);
-                defer tasks_lock.writeUnlock(current_task);
-
-                if (task.reference_count.load(.acquire) != 0) {
-                    @branchHint(.unlikely);
-                    // someone has acquired a reference to the task after it was queued for cleanup
-                    log.verbose("{f} still has references", .{task});
-                    continue;
-                }
-
-                if (task.state.dropped.queued_for_cleanup.swap(true, .acq_rel)) {
-                    @branchHint(.unlikely);
-                    // someone has requeued this task for cleanup
-                    log.verbose("{f} has been requeued for cleanup", .{task});
-                    continue;
-                }
-
-                // the task is no longer referenced so we can safely destroy it
-                if (!tasks.swapRemove(task)) @panic("task not found in tasks");
-            }
-
-            // this log must happen before the process reference count is decremented
-            log.debug("destroying {f}", .{task});
-
-            switch (task.context) {
-                .kernel => {},
-                .user => |process| {
-                    task.context = .{ .user = undefined };
-                    process.decrementReferenceCount(current_task, .unlocked);
-                },
-            }
-
-            Task.internal.destroy(current_task, task);
+            handleTask(
+                current_task,
+                .fromNode(node),
+            );
         }
 
         kernel.scheduler.lockScheduler(current_task);
@@ -116,26 +55,65 @@ fn execute(current_task: *Task, _: usize, _: usize) noreturn {
 
         if (!globals.incoming.isEmpty()) continue;
 
-        kernel.scheduler.drop(current_task, .{
-            .action = struct {
-                fn action(old_task: *kernel.Task, _: ?*anyopaque) void {
-                    old_task.state = .blocked;
-                    globals.task_waiting.store(true, .release);
-                }
-            }.action,
-            .context = null,
-        });
+        globals.parker.park(current_task, .locked);
     }
+}
+
+fn handleTask(current_task: *Task, task: *Task) void {
+    std.debug.assert(task.state == .dropped);
+    std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
+
+    const tasks_lock, const tasks = switch (task.context) {
+        .kernel => .{ &kernel.kernel_tasks_lock, &kernel.kernel_tasks },
+        .user => |process| .{ &process.tasks_lock, &process.tasks },
+    };
+
+    task.state.dropped.queued_for_cleanup.store(false, .release);
+
+    {
+        tasks_lock.writeLock(current_task);
+        defer tasks_lock.writeUnlock(current_task);
+
+        if (task.reference_count.load(.acquire) != 0) {
+            @branchHint(.unlikely);
+            // someone has acquired a reference to the task after it was queued for cleanup
+            log.verbose("{f} still has references", .{task});
+            return;
+        }
+
+        if (task.state.dropped.queued_for_cleanup.swap(true, .acq_rel)) {
+            @branchHint(.unlikely);
+            // someone has requeued this task for cleanup
+            log.verbose("{f} has been requeued for cleanup", .{task});
+            return;
+        }
+
+        // the task is no longer referenced so we can safely destroy it
+        if (!tasks.swapRemove(task)) @panic("task not found in tasks");
+    }
+
+    // this log must happen before the process reference count is decremented
+    log.debug("destroying {f}", .{task});
+
+    switch (task.context) {
+        .kernel => {},
+        .user => |process| {
+            task.context = .{ .user = undefined };
+            process.decrementReferenceCount(current_task, .unlocked);
+        },
+    }
+
+    Task.internal.destroy(current_task, task);
 }
 
 const globals = struct {
     // initialized during `init.initializeTaskCleanupService`
     var task_cleanup_task: *Task = undefined;
 
-    /// True if the task cleanup service is blocked waiting for work.
+    /// Parker used to block the task cleanup service.
     ///
     /// initialized during `init.initializeTaskCleanupService`
-    var task_waiting: std.atomic.Value(bool) = undefined;
+    var parker: kernel.sync.Parker = undefined;
 
     var incoming: core.containers.AtomicSinglyLinkedList = .{};
 };
@@ -148,8 +126,8 @@ pub const init = struct {
             .arg1 = undefined,
             .arg2 = undefined,
         });
-        globals.task_cleanup_task.state = .blocked;
-        globals.task_waiting = .init(true);
+
+        globals.parker = .withParkedTask(globals.task_cleanup_task);
     }
 };
 
