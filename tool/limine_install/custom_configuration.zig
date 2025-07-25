@@ -15,11 +15,7 @@ pub fn customConfiguration(
     module.addIncludePath(limine.path("."));
     module.addCSourceFile(.{
         .file = limine.path("limine.c"),
-        .flags = &.{
-            "-std=c99",
-            "-Dmain=limine_main",
-            "-fno-sanitize=undefined",
-        },
+        .flags = &.{ "-std=c99", "-Dmain=limine_main" },
     });
 }
 

@@ -76,13 +76,13 @@ fn resolveTool(
         root_file_name,
     }));
 
-    const normal_module = b.createModule(.{
-        .root_source_file = lazy_path,
-        .target = b.graph.host,
-        .optimize = optimize_mode,
-    });
-    addDependenciesToModule(normal_module, tool_description, dependencies);
-    handleToolConfiguration(b, tool_description, normal_module);
+    const normal_module = createModule(
+        b,
+        tool_description,
+        lazy_path,
+        optimize_mode,
+        dependencies,
+    );
 
     {
         const check_exe = b.addExecutable(.{
@@ -100,13 +100,13 @@ fn resolveTool(
     const release_safe_exe = if (optimize_mode == .ReleaseSafe)
         normal_exe
     else release_safe_exe: {
-        const release_safe_module = b.createModule(.{
-            .root_source_file = lazy_path,
-            .target = b.graph.host,
-            .optimize = .ReleaseSafe,
-        });
-        addDependenciesToModule(release_safe_module, tool_description, dependencies);
-        handleToolConfiguration(b, tool_description, release_safe_module);
+        const release_safe_module = createModule(
+            b,
+            tool_description,
+            lazy_path,
+            .ReleaseSafe,
+            dependencies,
+        );
 
         break :release_safe_exe b.addExecutable(.{
             .name = tool_description.name,
@@ -228,19 +228,24 @@ fn resolveTool(
     };
 }
 
-fn handleToolConfiguration(b: *std.Build, tool_description: ToolDescription, module: *std.Build.Module) void {
-    switch (tool_description.configuration) {
-        .simple => {},
-        .link_c => module.link_libc = true,
-        .custom => |f| f(b, tool_description, module),
-    }
-}
-
-fn addDependenciesToModule(
-    module: *std.Build.Module,
+fn createModule(
+    b: *std.Build,
     tool_description: ToolDescription,
+    root_source_file: std.Build.LazyPath,
+    optimize_mode: std.builtin.OptimizeMode,
     dependencies: []const Library.Dependency,
-) void {
+) *std.Build.Module {
+    const module = b.createModule(.{
+        .root_source_file = root_source_file,
+        .target = b.graph.host,
+        .optimize = optimize_mode,
+        .sanitize_c = switch (optimize_mode) {
+            .ReleaseFast => .off,
+            .ReleaseSmall => .trap,
+            else => .full,
+        },
+    });
+
     // self reference
     module.addImport(tool_description.name, module);
 
@@ -253,6 +258,14 @@ fn addDependenciesToModule(
         };
         module.addImport(dep.import_name, dep_module);
     }
+
+    switch (tool_description.configuration) {
+        .simple => {},
+        .link_c => module.link_libc = true,
+        .custom => |f| f(b, tool_description, module),
+    }
+
+    return module;
 }
 
 const std = @import("std");

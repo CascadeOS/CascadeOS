@@ -75,11 +75,7 @@ pub fn customConfiguration(
         "src/lib/libdwarf/dwarf_xu_index.c",
     };
 
-    module.addCSourceFiles(.{
-        .root = lib_dwarf.path(""),
-        .files = c_files,
-        .flags = &.{"-fno-sanitize=undefined"},
-    });
+    module.addCSourceFiles(.{ .root = lib_dwarf.path(""), .files = c_files });
 
     module.addConfigHeader(b.addConfigHeader(.{}, .{
         .HAVE_DLFCN_H = 1,

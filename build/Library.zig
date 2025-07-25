@@ -319,6 +319,11 @@ fn createModule(
 ) !*std.Build.Module {
     const module = b.createModule(.{
         .root_source_file = lazy_path,
+        .sanitize_c = switch (options.optimize) {
+            .ReleaseFast => .off,
+            .ReleaseSmall => .trap,
+            else => .full,
+        },
     });
 
     if (purpose == .exe_root) {

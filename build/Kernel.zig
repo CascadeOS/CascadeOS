@@ -247,7 +247,6 @@ fn constructSSFNStaticLib(b: *std.Build, architecture: CascadeTarget.Architectur
         .root_module = b.createModule(.{
             .target = getKernelCrossTarget(architecture, b),
             .optimize = .ReleaseFast,
-            .sanitize_c = .off,
             .pic = true,
         }),
     });
@@ -293,10 +292,10 @@ fn constructUACPIStaticLib(
         .root_module = b.createModule(.{
             .target = getKernelCrossTarget(architecture, b),
             .optimize = .ReleaseFast,
-            .sanitize_c = .off,
             .pic = true,
         }),
     });
+
     uacpi_static_lib.addCSourceFiles(.{
         .root = uacpi_dep.path("source"),
         .files = &.{
@@ -343,6 +342,11 @@ fn constructKernelModule(
         .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
         .target = getKernelCrossTarget(architecture, b),
         .optimize = options.optimize,
+        .sanitize_c = switch (options.optimize) {
+            .ReleaseFast => .off,
+            .ReleaseSmall => .trap,
+            else => .full,
+        },
     });
 
     for (dependencies) |dep| {
