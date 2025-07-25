@@ -181,32 +181,38 @@ fn create(
         b.pathJoin(&.{ @tagName(architecture), "kernel-dwarf" }),
     );
 
-    const stripped_kernel = blk: {
-        const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
-            .basename = kernel_exe.out_filename,
-            .strip = .debug_and_symbols,
-        });
-        break :blk copy.getOutput();
-    };
-
-    const stripped_kernel_with_sdf = blk: {
-        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
-        // action
-        embed_sdf.addArg("embed");
-        // binary_input_path
-        embed_sdf.addFileArg(stripped_kernel);
-        // binary_output_path
-        const kernel_path = embed_sdf.addOutputFileArg("kernel");
-        // sdf_input_path
-        embed_sdf.addFileArg(sdf_data_path);
-
-        break :blk kernel_path;
-    };
-
-    const install_stripped_kernel_with_sdf = b.addInstallFile(
-        stripped_kernel_with_sdf,
+    const install_fat_kernel_with_sdf_to_stripped_filepath = b.addInstallFile(
+        fat_kernel_with_sdf,
         b.pathJoin(&.{ @tagName(architecture), "kernel" }),
     );
+
+    // TODO: strip dwarf debug info https://github.com/CascadeOS/CascadeOS/issues/103
+    // const stripped_kernel = blk: {
+    //     const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
+    //         .basename = kernel_exe.out_filename,
+    //         .strip = .debug_and_symbols,
+    //     });
+    //     break :blk copy.getOutput();
+    // };
+
+    // const stripped_kernel_with_sdf = blk: {
+    //     const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
+    //     // action
+    //     embed_sdf.addArg("embed");
+    //     // binary_input_path
+    //     embed_sdf.addFileArg(stripped_kernel);
+    //     // binary_output_path
+    //     const kernel_path = embed_sdf.addOutputFileArg("kernel");
+    //     // sdf_input_path
+    //     embed_sdf.addFileArg(sdf_data_path);
+
+    //     break :blk kernel_path;
+    // };
+
+    // const install_stripped_kernel_with_sdf = b.addInstallFile(
+    //     stripped_kernel_with_sdf,
+    //     b.pathJoin(&.{ @tagName(architecture), "kernel" }),
+    // );
 
     const install_both_kernel_binaries = try b.allocator.create(Step);
     install_both_kernel_binaries.* = Step.init(.{
@@ -216,7 +222,8 @@ fn create(
     });
 
     install_both_kernel_binaries.dependOn(&install_fat_kernel_with_sdf.step);
-    install_both_kernel_binaries.dependOn(&install_stripped_kernel_with_sdf.step);
+    install_both_kernel_binaries.dependOn(&install_fat_kernel_with_sdf_to_stripped_filepath.step);
+    // install_both_kernel_binaries.dependOn(&install_stripped_kernel_with_sdf.step);
 
     step_collection.registerKernel(architecture, install_both_kernel_binaries);
 
@@ -227,7 +234,7 @@ fn create(
 
         .install_kernel_binaries = install_both_kernel_binaries,
 
-        .final_kernel_binary_path = stripped_kernel_with_sdf,
+        .final_kernel_binary_path = fat_kernel_with_sdf,
 
         .dependencies = dependencies,
     };
