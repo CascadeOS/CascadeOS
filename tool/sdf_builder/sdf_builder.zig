@@ -48,19 +48,27 @@ fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.Generate
 }
 
 fn embed(embed_arguments: Arguments.EmbedArguments) !void {
+    var write_buffer: [4096]u8 = undefined;
+    var read_buffer: [4096]u8 = undefined;
+
     var atomic_output_file = blk: {
         const binary_input_file = try std.fs.cwd().openFile(embed_arguments.binary_input_path, .{});
         defer binary_input_file.close();
 
         const binary_input_file_stat = try binary_input_file.stat();
 
-        const atomic_output_file = try custom_atomic_file.atomicFileReadAndWrite(
+        var atomic_output_file = try custom_atomic_file.atomicFileReadAndWrite(
             std.fs.cwd(),
             embed_arguments.binary_output_path,
-            .{ .mode = binary_input_file_stat.mode },
+            .{ .mode = binary_input_file_stat.mode, .write_buffer = &write_buffer },
         );
 
-        try atomic_output_file.file.writeFileAll(binary_input_file, .{});
+        var input_file_reader = binary_input_file.reader(&read_buffer);
+
+        _ = try atomic_output_file.file_writer.interface.sendFileAll(
+            &input_file_reader,
+            .unlimited,
+        );
 
         break :blk atomic_output_file;
     };
@@ -68,9 +76,9 @@ fn embed(embed_arguments: Arguments.EmbedArguments) !void {
 
     // ensure sdf data is 8 byte aligned
     const sdf_pos = blk: {
-        const end_pos = try atomic_output_file.file.getEndPos();
+        const end_pos = try atomic_output_file.file_writer.file.getEndPos();
         const aligned_end_pos = std.mem.alignForward(u64, end_pos, 8);
-        if (end_pos != aligned_end_pos) try atomic_output_file.file.setEndPos(aligned_end_pos);
+        if (end_pos != aligned_end_pos) try atomic_output_file.file_writer.seekTo(aligned_end_pos);
         break :blk aligned_end_pos;
     };
 
@@ -79,21 +87,24 @@ fn embed(embed_arguments: Arguments.EmbedArguments) !void {
         const sdf_input_file = try std.fs.cwd().openFile(embed_arguments.sdf_input_path, .{});
         defer sdf_input_file.close();
 
-        const sdf_stat = try sdf_input_file.stat();
+        var sdf_file_reader = sdf_input_file.reader(&read_buffer);
 
-        _ = try sdf_input_file.copyRangeAll(0, atomic_output_file.file, sdf_pos, sdf_stat.size);
-
-        break :blk sdf_stat.size;
+        break :blk try atomic_output_file.file_writer.interface.sendFileAll(
+            &sdf_file_reader,
+            .unlimited,
+        );
     };
 
-    const stat = try atomic_output_file.file.stat();
+    try atomic_output_file.file_writer.interface.flush();
+
+    const stat = try atomic_output_file.file_writer.file.stat();
 
     const elf_mem = try std.posix.mmap(
         null,
         stat.size,
         std.posix.PROT.READ | std.posix.PROT.WRITE,
         .{ .TYPE = .SHARED },
-        atomic_output_file.file.handle,
+        atomic_output_file.file_writer.file.handle,
         0,
     );
     defer std.posix.munmap(elf_mem);
@@ -705,6 +716,7 @@ const custom_atomic_file = struct {
                 options.mode,
                 dir,
                 true,
+                options.write_buffer,
             );
         } else {
             return atomicFileInitReadAndWrite(
@@ -712,6 +724,7 @@ const custom_atomic_file = struct {
                 options.mode,
                 parent_dir,
                 false,
+                options.write_buffer,
             );
         }
     }
@@ -725,26 +738,18 @@ const custom_atomic_file = struct {
         mode: std.fs.File.Mode,
         dir: std.fs.Dir,
         close_dir_on_deinit: bool,
+        write_buffer: []u8,
     ) std.fs.AtomicFile.InitError!std.fs.AtomicFile {
-        var rand_buf: [random_bytes_len]u8 = undefined;
-        var tmp_path_buf: [tmp_path_len:0]u8 = undefined;
-
         while (true) {
-            std.crypto.random.bytes(rand_buf[0..]);
-            const tmp_path = std.fs.base64_encoder.encode(&tmp_path_buf, &rand_buf);
-            tmp_path_buf[tmp_path.len] = 0;
-
-            const file = dir.createFile(
-                tmp_path,
-                .{ .mode = mode, .exclusive = true, .read = true },
-            ) catch |err| switch (err) {
+            const random_integer = std.crypto.random.int(u64);
+            const tmp_sub_path = std.fmt.hex(random_integer);
+            const file = dir.createFile(&tmp_sub_path, .{ .mode = mode, .exclusive = true, .read = true }) catch |err| switch (err) {
                 error.PathAlreadyExists => continue,
                 else => |e| return e,
             };
-
-            return std.fs.AtomicFile{
-                .file = file,
-                .tmp_path_buf = tmp_path_buf,
+            return .{
+                .file_writer = file.writer(write_buffer),
+                .random_integer = random_integer,
                 .dest_basename = dest_basename,
                 .file_open = true,
                 .file_exists = true,

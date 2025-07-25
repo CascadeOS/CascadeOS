@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+// TODO: rewrite this whole thing in light of writergate
+
 const StdoutWrapper = @This();
 
 allocator: std.mem.Allocator,
@@ -22,7 +24,7 @@ pub fn deinit(stdout_wrapper: *StdoutWrapper) void {
 }
 
 pub fn next(stdout_wrapper: *StdoutWrapper) !?[]const u8 {
-    const stdout_fifo = stdout_wrapper.poller.fifo(.stdout);
+    const stdout = stdout_wrapper.poller.reader(.stdout);
 
     stdout_wrapper.partial_read_buffer.clearRetainingCapacity();
 
@@ -39,7 +41,7 @@ pub fn next(stdout_wrapper: *StdoutWrapper) !?[]const u8 {
                 try stdout_wrapper.partial_read_buffer.appendSlice(stdout_wrapper.allocator, stdout_window);
                 stdout_wrapper.stdout_window = &.{};
 
-                stdout_fifo.discard(stdout_fifo.count);
+                stdout.tossBuffered();
                 break :stdout_window_blk;
             };
             const next_line_index = newline_index + 1;
@@ -52,13 +54,13 @@ pub fn next(stdout_wrapper: *StdoutWrapper) !?[]const u8 {
             }
 
             return stdout_window[0..next_line_index];
-        } else if (stdout_fifo.count != 0) {
-            stdout_fifo.discard(stdout_fifo.count);
+        } else if (stdout.bufferedLen() != 0) {
+            stdout.tossBuffered();
         }
 
         if (try stdout_wrapper.poller.poll()) {
-            if (stdout_fifo.count == 0) continue;
-            stdout_wrapper.stdout_window = stdout_fifo.readableSlice(0);
+            if (stdout.bufferedLen() == 0) continue;
+            stdout_wrapper.stdout_window = stdout.buffered();
             continue;
         }
 
