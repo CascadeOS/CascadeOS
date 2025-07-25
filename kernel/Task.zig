@@ -98,7 +98,7 @@ pub fn createKernelTask(current_task: *kernel.Task, options: CreateKernelTaskOpt
         },
     });
     errdefer {
-        _ = task.reference_count.fetchSub(1, .monotonic); // ensure the reference count is zero
+        std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
         internal.destroy(current_task, task);
     }
 
@@ -107,7 +107,7 @@ pub fn createKernelTask(current_task: *kernel.Task, options: CreateKernelTaskOpt
         defer kernel.kernel_tasks_lock.writeUnlock(current_task);
 
         const gop = try kernel.kernel_tasks.getOrPut(kernel.mem.heap.allocator, task);
-        std.debug.assert(gop.found_existing == false);
+        if (gop.found_existing) std.debug.panic("task already in kernel_tasks list", .{});
     }
 
     return task;
@@ -203,16 +203,21 @@ pub fn drop(current_task: *kernel.Task) noreturn {
     std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task));
     std.debug.assert(current_task.spinlocks_held == 1); // only the scheduler lock is held
 
-    kernel.services.task_cleanup.wake(current_task, .locked);
+    if (current_task.reference_count.load(.acquire) == 1) {
+        // the `decrementReferenceCount` call inside `drop` below will _probably_ decrement the reference count to zero
+        // so make sure the task cleanup service is woken up
+        //
+        // this prevents the situation of dropping ourselves with an empty scheduler queue so the scheduler moves us
+        // onto the idle task but then in `drop` we wake the task cleanup service causing idle to immediately go back
+        // into the scheduler as the queue is no longer empty
+        kernel.services.task_cleanup.wake(current_task, .locked);
+    }
 
     kernel.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(old_task: *kernel.Task, _: ?*anyopaque) void {
+            fn action(new_current_task: *kernel.Task, old_task: *kernel.Task, _: ?*anyopaque) void {
                 old_task.state = .{ .dropped = .{} };
-                old_task.decrementReferenceCount(
-                    kernel.Task.getCurrent(), // TODO: maybe this should be passed in?
-                    .locked,
-                );
+                old_task.decrementReferenceCount(new_current_task, .locked);
             }
         }.action,
         .context = null,

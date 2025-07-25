@@ -72,7 +72,7 @@ pub fn wait(
 
     kernel.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(old_task: *kernel.Task, context: ?*anyopaque) void {
+            fn action(_: *kernel.Task, old_task: *kernel.Task, context: ?*anyopaque) void {
                 old_task.spinlocks_held -= 1;
                 old_task.interrupt_disable_count -= 1;
                 old_task.state = .blocked;

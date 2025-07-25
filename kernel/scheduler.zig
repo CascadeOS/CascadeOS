@@ -79,7 +79,11 @@ pub const DeferredAction = struct {
 
     context: ?*anyopaque,
 
-    pub const Action = *const fn (old_task: *kernel.Task, context: ?*anyopaque) void;
+    pub const Action = *const fn (
+        new_current_task: *kernel.Task,
+        old_task: *kernel.Task,
+        context: ?*anyopaque,
+    ) void;
 };
 
 /// Drops the current task out of the scheduler.
@@ -118,10 +122,15 @@ fn switchToIdleDeferredAction(
             action_addr: usize,
             action_context_addr: usize,
         ) callconv(.c) noreturn {
-            const action: DeferredAction.Action = @ptrFromInt(action_addr);
-            action(@ptrFromInt(old_task_addr), @ptrFromInt(action_context_addr));
-
             const idle_task: *kernel.Task = @ptrFromInt(idle_task_addr);
+
+            const action: DeferredAction.Action = @ptrFromInt(action_addr);
+            action(
+                idle_task,
+                @ptrFromInt(old_task_addr),
+                @ptrFromInt(action_context_addr),
+            );
+
             globals.lock.unlock(idle_task);
             idle(idle_task);
             @panic("idle returned");
@@ -213,10 +222,16 @@ fn switchToTaskFromTaskDeferredAction(
             action_addr: usize,
             action_context_addr: usize,
         ) callconv(.c) noreturn {
-            const action: DeferredAction.Action = @ptrFromInt(action_addr);
-            action(@ptrFromInt(old_task_addr), @ptrFromInt(action_context_addr));
+            const new_current_task: *kernel.Task = @ptrFromInt(new_task_addr);
 
-            kernel.arch.scheduling.jumpToTaskFromIdle(@ptrFromInt(new_task_addr));
+            const action: DeferredAction.Action = @ptrFromInt(action_addr);
+            action(
+                new_current_task,
+                @ptrFromInt(old_task_addr),
+                @ptrFromInt(action_context_addr),
+            );
+
+            kernel.arch.scheduling.jumpToTaskFromIdle(new_current_task);
             @panic("task returned");
         }
     };
