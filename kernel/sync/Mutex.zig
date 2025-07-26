@@ -9,8 +9,7 @@ const Mutex = @This();
 
 locked_by: std.atomic.Value(?*kernel.Task) = .init(null),
 
-/// `true` when the mutex is passed directly to a waiter on unlock.
-passed_to_waiter: bool = false,
+unlock_type: UnlockType = .unlocked,
 
 spinlock: kernel.sync.TicketSpinLock = .{},
 wait_queue: kernel.sync.WaitQueue = .{},
@@ -30,13 +29,16 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
         };
 
         if (locked_by == current_task) {
-            if (mutex.passed_to_waiter) {
-                @branchHint(.likely);
-                mutex.passed_to_waiter = false;
-                return;
-            } else {
-                @branchHint(.cold);
-                @panic("recursive lock");
+            switch (mutex.unlock_type) {
+                .passed_to_waiter => {
+                    @branchHint(.likely);
+                    // the mutex was passed directly to us
+                    return;
+                },
+                .unlocked => {
+                    @branchHint(.cold);
+                    @panic("recursive lock");
+                },
             }
         }
 
@@ -54,8 +56,18 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
         };
 
         if (locked_by == current_task) {
-            @branchHint(.cold);
-            @panic("recursive lock");
+            switch (mutex.unlock_type) {
+                .passed_to_waiter => {
+                    @branchHint(.likely);
+                    // the mutex was passed directly to us
+                    mutex.spinlock.unlock(current_task);
+                    return;
+                },
+                .unlocked => {
+                    @branchHint(.cold);
+                    @panic("recursive lock");
+                },
+            }
         }
 
         mutex.wait_queue.wait(current_task, &mutex.spinlock);
@@ -75,7 +87,7 @@ pub fn tryLock(mutex: *Mutex, current_task: *kernel.Task) bool {
 
     if (locked_by == current_task) {
         @branchHint(.cold);
-        std.debug.assert(!mutex.passed_to_waiter); // this should never happen
+        std.debug.assert(mutex.unlock_type != .passed_to_waiter); // this could only happen if we were queued for the mutex but then how would we call tryLock?
 
         // we don't support recursive locks so this is a failure to acquire the lock
     }
@@ -92,6 +104,8 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     defer mutex.spinlock.unlock(current_task);
 
     const waiting_task = mutex.wait_queue.firstTask() orelse {
+        mutex.unlock_type = .unlocked;
+
         if (mutex.locked_by.cmpxchgStrong(
             current_task,
             null,
@@ -101,13 +115,12 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
             @branchHint(.cold);
             @panic("not locked by current task");
         }
+
         return;
     };
 
     // pass the mutex directly to the waiting task
-
-    std.debug.assert(mutex.passed_to_waiter == false);
-    mutex.passed_to_waiter = true;
+    mutex.unlock_type = .passed_to_waiter;
 
     if (mutex.locked_by.cmpxchgStrong(
         current_task,
@@ -126,6 +139,13 @@ pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
 pub fn isLocked(mutex: *Mutex) bool {
     return mutex.locked_by.load(.monotonic) != null;
 }
+
+const UnlockType = enum {
+    /// The mutex was passed directly to the first waiting task.
+    passed_to_waiter,
+    /// The mutex was unlocked normally.
+    unlocked,
+};
 
 const core = @import("core");
 const kernel = @import("kernel");
