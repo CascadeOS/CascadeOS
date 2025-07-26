@@ -49,10 +49,7 @@ pub fn sendFlushIPI(executor: *kernel.Executor) void {
 
 const globals = struct {
     /// Initialized in `init.captureApicInformation`.
-    var lapic: lib_x64.LAPIC = .{
-        // FIXME: must be initialized to the `xapic` variant to prevent a zig bug in `init.captureApicInformation`
-        .xapic = undefined,
-    };
+    var lapic: lib_x64.LAPIC = undefined;
 
     /// The duration of a tick in femptoseconds.
     ///
@@ -69,11 +66,11 @@ pub const init = struct {
         if (x2apic_enabled) {
             globals.lapic = .x2apic;
         } else {
-            // FIXME: if this is changed to union initialization then zig panics
-            //        assigning directly to the xapic field is safe as `lapic` is initialized to a dummy xapic value
-            globals.lapic.xapic = kernel.mem.nonCachedDirectMapFromPhysical(
-                core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address),
-            ).toPtr([*]volatile u8);
+            globals.lapic = .{
+                .xapic = kernel.mem.nonCachedDirectMapFromPhysical(
+                    core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address),
+                ).toPtr([*]volatile u8),
+            };
         }
 
         init_log.debug("lapic in mode: {t}", .{globals.lapic});
