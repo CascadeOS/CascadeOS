@@ -100,36 +100,38 @@ pub fn tryLock(mutex: *Mutex, current_task: *kernel.Task) bool {
 pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
     defer current_task.decrementPreemptionDisable();
 
-    mutex.spinlock.lock(current_task);
-    defer mutex.spinlock.unlock(current_task);
+    {
+        mutex.spinlock.lock(current_task);
+        defer mutex.spinlock.unlock(current_task);
 
-    const waiting_task = mutex.wait_queue.firstTask() orelse {
-        mutex.unlock_type = .unlocked;
+        const waiting_task = mutex.wait_queue.firstTask() orelse {
+            mutex.unlock_type = .unlocked;
+
+            if (mutex.locked_by.cmpxchgStrong(
+                current_task,
+                null,
+                .release,
+                .monotonic,
+            )) |_| {
+                @branchHint(.cold);
+                @panic("not locked by current task");
+            }
+
+            return;
+        };
+
+        // pass the mutex directly to the waiting task
+        mutex.unlock_type = .passed_to_waiter;
 
         if (mutex.locked_by.cmpxchgStrong(
             current_task,
-            null,
+            waiting_task,
             .release,
             .monotonic,
         )) |_| {
             @branchHint(.cold);
             @panic("not locked by current task");
         }
-
-        return;
-    };
-
-    // pass the mutex directly to the waiting task
-    mutex.unlock_type = .passed_to_waiter;
-
-    if (mutex.locked_by.cmpxchgStrong(
-        current_task,
-        waiting_task,
-        .release,
-        .monotonic,
-    )) |_| {
-        @branchHint(.cold);
-        @panic("not locked by current task");
     }
 
     mutex.wait_queue.wakeOne(current_task, &mutex.spinlock, .unlocked);
