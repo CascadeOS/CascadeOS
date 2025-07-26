@@ -137,7 +137,7 @@ pub const internal = struct {
                 @panic("janky leaking process destory failed to allocate frame");
 
             const page_table: kernel.arch.paging.PageTable = kernel.arch.paging.PageTable.create(frame);
-            kernel.mem.globals.core_page_table.copyInto(page_table);
+            kernel.mem.globals.core_page_table.copyTopLevelInto(page_table);
 
             process.address_space.init(current_task, .{
                 .name = kernel.mem.AddressSpace.Name.fromSlice(
@@ -179,7 +179,7 @@ fn cacheConstructor(process: *Process, current_task: *kernel.Task) kernel.mem.ca
     }
 
     const page_table: kernel.arch.paging.PageTable = kernel.arch.paging.PageTable.create(frame);
-    kernel.mem.globals.core_page_table.copyInto(page_table);
+    kernel.mem.globals.core_page_table.copyTopLevelInto(page_table);
 
     process.address_space.init(current_task, .{
         .name = kernel.mem.AddressSpace.Name.fromSlice(

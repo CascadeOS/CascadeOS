@@ -13,7 +13,7 @@ pub fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
 }
 
 /// Copies the top level of `page_table` into `target_page_table`.
-pub fn copyIntoPageTable(page_table: *PageTable, target_page_table: *PageTable) void {
+pub fn copyTopLevelIntoPageTable(page_table: *PageTable, target_page_table: *PageTable) void {
     std.debug.assert(page_table != target_page_table);
     @memcpy(&target_page_table.entries, &page_table.entries);
 }
