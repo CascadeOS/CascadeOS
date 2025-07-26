@@ -102,6 +102,11 @@ pub const LockState = enum {
     unlocked,
 };
 
+pub const CleanupDecision = enum {
+    keep,
+    free,
+};
+
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
