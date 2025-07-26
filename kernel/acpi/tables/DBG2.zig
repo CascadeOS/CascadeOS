@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// FIXME: the `align(1)` in this file is weird especially on arm64, it is probably a bug in qemu
-
 /// [Microsoft Debug Port Table 2 (DBG2)](https://github.com/MicrosoftDocs/windows-driver-docs/blob/staging/windows-driver-docs-pr/bringup/acpi-debug-port-table.md)
 pub const DBG2 = extern struct {
     header: acpi.tables.SharedHeader align(1),
