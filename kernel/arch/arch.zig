@@ -423,45 +423,6 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
-    /// Prepares the executor for jumping to the idle state.
-    pub fn prepareForJumpToIdleFromTask(
-        executor: *kernel.Executor,
-        old_task: *kernel.Task,
-    ) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.scheduling, "prepareForJumpToIdleFromTask", fn (
-            *kernel.Executor,
-            *kernel.Task,
-        ) void);
-
-        current.scheduling.prepareForJumpToIdleFromTask(executor, old_task);
-    }
-
-    /// Prepares the executor for jumping to the given task from the idle state.
-    pub fn prepareForJumpToTaskFromIdle(
-        executor: *kernel.Executor,
-        new_task: *kernel.Task,
-    ) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.scheduling, "prepareForJumpToTaskFromIdle", fn (
-            *kernel.Executor,
-            *kernel.Task,
-        ) void);
-
-        current.scheduling.prepareForJumpToTaskFromIdle(executor, new_task);
-    }
-
-    /// Jumps to the given task from the idle state.
-    ///
-    /// Saves the old task's state to allow it to be resumed later.
-    ///
-    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
-    pub fn jumpToTaskFromIdle(
-        task: *kernel.Task,
-    ) callconv(core.inline_in_non_debug) noreturn {
-        checkSupport(current.scheduling, "jumpToTaskFromIdle", fn (*kernel.Task) noreturn);
-
-        current.scheduling.jumpToTaskFromIdle(task);
-    }
-
     /// Prepares the executor for jumping from `old_task` to `new_task`.
     pub fn prepareForJumpToTaskFromTask(
         executor: *kernel.Executor,
@@ -475,6 +436,19 @@ pub const scheduling = struct {
         ) void);
 
         current.scheduling.prepareForJumpToTaskFromTask(executor, old_task, new_task);
+    }
+
+    /// Jumps to the given task without saving the old task's state.
+    ///
+    /// If the old task is ever rescheduled undefined behaviour may occur.
+    ///
+    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+    pub fn jumpToTask(
+        task: *kernel.Task,
+    ) callconv(core.inline_in_non_debug) noreturn {
+        checkSupport(current.scheduling, "jumpToTask", fn (*kernel.Task) noreturn);
+
+        current.scheduling.jumpToTask(task);
     }
 
     /// Jumps from `old_task` to `new_task`.

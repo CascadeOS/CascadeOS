@@ -33,7 +33,7 @@ pub fn initStage1() !noreturn {
         .id = .bootstrap,
         .current_task = &bootstrap_init_task,
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
-        .idle_task = undefined, // never used
+        .utility_task = undefined, // never used
     };
 
     try kernel.Task.init.initializeBootstrapInitTask(&bootstrap_init_task, &bootstrap_executor);
@@ -232,11 +232,11 @@ fn createExecutors() ![]kernel.Executor {
             .id = @enumFromInt(i),
             .arch = undefined, // set by `arch.init.prepareExecutor`
             .current_task = undefined, // set below by `Task.init.createAndAssignInitTask`
-            .idle_task = undefined, // set below by `Task.init.initializeIdleTask`
+            .utility_task = undefined, // set below by `Task.init.initializeUtilityTask`
         };
 
         try kernel.Task.init.createAndAssignInitTask(current_task, executor);
-        try kernel.Task.init.initializeIdleTask(current_task, &executor.idle_task, executor);
+        try kernel.Task.init.initializeUtilityTask(current_task, &executor.utility_task, executor);
 
         kernel.arch.init.prepareExecutor(
             executor,

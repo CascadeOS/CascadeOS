@@ -7,7 +7,8 @@ id: Id,
 
 current_task: *kernel.Task,
 
-idle_task: kernel.Task,
+/// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
+utility_task: kernel.Task,
 
 arch: kernel.arch.PerExecutor,
 
@@ -44,6 +45,17 @@ pub fn renderInterruptSourcePanicMessage(
     return bw.buffered();
 }
 
+pub fn isUtilityTask(executor: *const Executor, task: *const kernel.Task) bool {
+    return task == &executor.utility_task;
+}
+
+pub inline fn format(
+    executor: *const Executor,
+    writer: *std.Io.Writer,
+) !void {
+    return executor.id.format(writer);
+}
+
 pub const Id = enum(u32) {
     bootstrap = 0,
 
@@ -58,13 +70,6 @@ pub const Id = enum(u32) {
         try writer.print("Executor({d})", .{@intFromEnum(id)});
     }
 };
-
-pub inline fn format(
-    executor: *const Executor,
-    writer: *std.Io.Writer,
-) !void {
-    return executor.id.format(writer);
-}
 
 const std = @import("std");
 const core = @import("core");

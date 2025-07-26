@@ -1,39 +1,46 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-/// Prepares the executor for jumping to the idle state.
-pub fn prepareForJumpToIdleFromTask(executor: *kernel.Executor, old_task: *kernel.Task) void {
-    _ = executor;
+/// Prepares the executor for jumping from `old_task` to `new_task`.
+pub fn prepareForJumpToTaskFromTask(
+    executor: *kernel.Executor,
+    old_task: *kernel.Task,
+    new_task: *kernel.Task,
+) void {
     switch (old_task.context) {
-        .kernel => {},
-        .user => kernel.mem.globals.core_page_table.load(),
-    }
-}
-
-/// Prepares the executor for jumping to the given task from the idle state.
-pub fn prepareForJumpToTaskFromIdle(executor: *kernel.Executor, new_task: *kernel.Task) void {
-    switch (new_task.context) {
-        .kernel => {},
-        .user => |process| {
-            process.address_space.page_table.load();
-            executor.arch.tss.setPrivilegeStack(
-                .ring0,
-                new_task.stack.top_stack_pointer,
-            );
+        .kernel => switch (new_task.context) {
+            .kernel => {},
+            .user => |process| {
+                process.address_space.page_table.load();
+                executor.arch.tss.setPrivilegeStack(
+                    .ring0,
+                    new_task.stack.top_stack_pointer,
+                );
+            },
+        },
+        .user => |old_process| switch (new_task.context) {
+            .kernel => kernel.mem.globals.core_page_table.load(),
+            .user => |new_process| if (old_process != new_process) {
+                new_process.address_space.page_table.load();
+                executor.arch.tss.setPrivilegeStack(
+                    .ring0,
+                    new_task.stack.top_stack_pointer,
+                );
+            },
         },
     }
 }
 
-/// Jumps to the given task from the idle state.
+/// Jumps to the given task without saving the old task's state.
 ///
-/// Saves the old task's state to allow it to be resumed later.
+/// If the old task is ever rescheduled undefined behaviour may occur.
 ///
-/// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromIdle` before calling this function.
-pub fn jumpToTaskFromIdle(
+/// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+pub fn jumpToTask(
     task: *kernel.Task,
 ) noreturn {
     const impls = struct {
-        const jumpToTaskFromIdle: *const fn (
+        const jumpToTask: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
         ) callconv(.c) void = blk: {
             const impl = struct {
@@ -64,38 +71,8 @@ pub fn jumpToTaskFromIdle(
         };
     };
 
-    impls.jumpToTaskFromIdle(task.stack.stack_pointer);
-    @panic("task returned to idle");
-}
-
-/// Prepares the executor for jumping from `old_task` to `new_task`.
-pub fn prepareForJumpToTaskFromTask(
-    executor: *kernel.Executor,
-    old_task: *kernel.Task,
-    new_task: *kernel.Task,
-) void {
-    switch (old_task.context) {
-        .kernel => switch (new_task.context) {
-            .kernel => {},
-            .user => |process| {
-                process.address_space.page_table.load();
-                executor.arch.tss.setPrivilegeStack(
-                    .ring0,
-                    new_task.stack.top_stack_pointer,
-                );
-            },
-        },
-        .user => |old_process| switch (new_task.context) {
-            .kernel => kernel.mem.globals.core_page_table.load(),
-            .user => |new_process| if (old_process != new_process) {
-                new_process.address_space.page_table.load();
-                executor.arch.tss.setPrivilegeStack(
-                    .ring0,
-                    new_task.stack.top_stack_pointer,
-                );
-            },
-        },
-    }
+    impls.jumpToTask(task.stack.stack_pointer);
+    @panic("task returned");
 }
 
 /// Jumps from `old_task` to `new_task`.

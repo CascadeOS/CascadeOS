@@ -39,8 +39,6 @@ pub const Context = union(kernel.Context.Type) {
         ///
         /// Kernel tasks always have a name.
         name: Name,
-
-        is_idle_task: bool,
     };
 };
 
@@ -154,13 +152,6 @@ pub fn decrementInterruptDisable(task: *Task) void {
     }
 }
 
-pub fn isIdleTask(task: *const Task) bool {
-    return switch (task.context) {
-        .kernel => |kernel_context| kernel_context.is_idle_task,
-        .user => false,
-    };
-}
-
 /// Drops the current task out of the scheduler.
 ///
 /// Decrements the reference count of the task to remove the implicit self reference.
@@ -177,8 +168,8 @@ pub fn drop(current_task: *kernel.Task) noreturn {
         // so make sure the task cleanup service is woken up
         //
         // this prevents the situation of dropping ourselves with an empty scheduler queue so the scheduler moves us
-        // onto the idle task but then in `drop` we wake the task cleanup service causing idle to immediately go back
-        // into the scheduler as the queue is no longer empty
+        // into idle but then in `drop` we wake the task cleanup service causing idle to immediately go back into the
+        // scheduler as the queue is no longer empty
         kernel.services.task_cleanup.wake(current_task, .locked);
     }
 
@@ -244,10 +235,7 @@ pub const internal = struct {
 
             .context = switch (options.context) {
                 .kernel => |kernel_context| .{
-                    .kernel = .{
-                        .name = kernel_context.name,
-                        .is_idle_task = false,
-                    },
+                    .kernel = .{ .name = kernel_context.name },
                 },
                 .user => |process| .{ .user = process },
             },
@@ -481,10 +469,7 @@ pub const init = struct {
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
             .context = .{
-                .kernel = .{
-                    .name = try .fromSlice("bootstrap init"),
-                    .is_idle_task = false,
-                },
+                .kernel = .{ .name = try .fromSlice("bootstrap init") },
             },
         };
     }
@@ -512,23 +497,20 @@ pub const init = struct {
         executor.current_task = task;
     }
 
-    pub fn initializeIdleTask(
+    pub fn initializeUtilityTask(
         current_task: *kernel.Task,
-        idle_task: *kernel.Task,
+        utility_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
         var name: Name = .{};
-        try name.writer().print("idle {}", .{@intFromEnum(executor.id)});
+        try name.writer().print("utility {}", .{@intFromEnum(executor.id)});
 
-        idle_task.* = .{
+        utility_task.* = .{
             .state = .ready,
             .stack = try .createStack(current_task),
 
             .context = .{
-                .kernel = .{
-                    .name = name,
-                    .is_idle_task = true,
-                },
+                .kernel = .{ .name = name },
             },
         };
     }
