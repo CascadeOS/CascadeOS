@@ -395,7 +395,7 @@ pub const Stack = struct {
                 usable_range,
                 .{ .context = .kernel, .protection = .read_write },
                 .kernel,
-                .nop,
+                .keep,
                 kernel.mem.phys.allocator,
             ) catch return error.ObjectConstructionFailed;
         }
@@ -414,7 +414,7 @@ pub const Stack = struct {
                 stack.usable_range,
                 .kernel,
                 .free,
-                .nop,
+                .keep,
                 kernel.mem.phys.allocator,
             );
         }

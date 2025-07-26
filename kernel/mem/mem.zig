@@ -49,7 +49,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     virtual_range: core.VirtualRange,
     map_type: MapType,
     flush_target: kernel.Context,
-    top_level_decision: UnmapDecision,
+    top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
@@ -111,7 +111,7 @@ pub fn mapRangeToPhysicalRange(
     physical_range: core.PhysicalRange,
     map_type: MapType,
     flush_target: kernel.Context,
-    top_level_decision: UnmapDecision,
+    top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
@@ -134,7 +134,7 @@ pub fn mapRangeToPhysicalRange(
                 .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
             },
             flush_target,
-            .nop,
+            .keep,
             top_level_decision,
             physical_frame_allocator,
         );
@@ -166,19 +166,19 @@ pub fn unmapSinglePage(
     current_task: *kernel.Task,
     page_table: kernel.arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
-    free_backing_pages: bool,
-    flush_target: kernel.Mode,
-    top_level_decision: UnmapDecision,
+    backing_pages: core.CleanupDecision,
+    flush_target: kernel.Context,
+    top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
     std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
 
     var deallocate_frame_list: phys.FrameList = .{};
 
-    kernel.arch.paging.unmap(
+    kernel.arch.paging.unmapSinglePage(
         page_table,
         virtual_address,
-        free_backing_pages,
+        backing_pages,
         top_level_decision,
         &deallocate_frame_list,
     );
@@ -203,8 +203,8 @@ pub fn unmapRange(
     page_table: kernel.arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     flush_target: kernel.Context,
-    backing_page_decision: UnmapDecision,
-    top_level_decision: UnmapDecision,
+    backing_page_decision: core.CleanupDecision,
+    top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
     std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
@@ -383,11 +383,6 @@ pub const PageFaultDetails = struct {
     ) !void {
         return details.print(writer, 0);
     }
-};
-
-pub const UnmapDecision = enum {
-    nop,
-    free,
 };
 
 pub const MapError = error{
@@ -774,7 +769,7 @@ pub const init = struct {
                         region.range,
                         map_type,
                         .kernel,
-                        .nop,
+                        .keep,
                         phys.init.bootstrap_allocator,
                     ) catch |err| {
                         std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });

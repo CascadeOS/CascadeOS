@@ -313,8 +313,8 @@ pub const paging = struct {
     pub fn unmapSinglePage(
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
-        backing_page_decision: kernel.mem.UnmapDecision,
-        top_level_decision: kernel.mem.UnmapDecision,
+        backing_page_decision: core.CleanupDecision,
+        top_level_decision: core.CleanupDecision,
         deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) callconv(core.inline_in_non_debug) void {
         checkSupport(
@@ -323,8 +323,8 @@ pub const paging = struct {
             fn (
                 *paging.PageTable.ArchPageTable,
                 core.VirtualAddress,
-                kernel.mem.UnmapDecision,
-                kernel.mem.UnmapDecision,
+                core.CleanupDecision,
+                core.CleanupDecision,
                 *kernel.mem.phys.FrameList,
             ) void,
         );

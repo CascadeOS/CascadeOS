@@ -135,8 +135,8 @@ fn mapTo4KiB(
 fn unmap4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
-    backing_page_decision: kernel.mem.UnmapDecision,
-    top_level_decision: kernel.mem.UnmapDecision,
+    backing_page_decision: core.CleanupDecision,
+    top_level_decision: core.CleanupDecision,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
@@ -235,6 +235,9 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
     }
 }
 
+/// Ensures that the next table is present in the page table.
+///
+/// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
     raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
