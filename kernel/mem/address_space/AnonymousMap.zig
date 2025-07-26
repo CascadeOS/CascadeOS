@@ -134,6 +134,11 @@ pub const Reference = struct {
         return anonymous_map.anonymous_page_chunks.get(target_index);
     }
 
+    pub const AddOperation = enum {
+        add,
+        replace,
+    };
+
     /// Add or replace an anonymous page in the referenced anonymous map.
     ///
     /// The anonymous map must be locked by the caller.
@@ -144,7 +149,7 @@ pub const Reference = struct {
         entry: *const Entry,
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
-        replace: bool,
+        operation: AddOperation,
     ) error{NoMemory}!void {
         std.debug.assert(reference.anonymous_map != null);
         std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
@@ -166,11 +171,12 @@ pub const Reference = struct {
 
         const chunk_offset = AnonymousPageChunkMap.chunkOffset(target_index);
 
-        if (replace) {
-            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_amap.c#L1223
-        } else {
-            std.debug.assert(chunk[chunk_offset] == null);
-            anonymous_map.pages_in_use += 1;
+        switch (operation) {
+            .add => {
+                std.debug.assert(chunk[chunk_offset] == null);
+                anonymous_map.pages_in_use += 1;
+            },
+            .replace => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_amap.c#L1223
         }
         chunk[chunk_offset] = anonymous_page;
     }

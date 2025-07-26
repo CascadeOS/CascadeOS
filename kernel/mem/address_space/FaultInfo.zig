@@ -256,7 +256,7 @@ pub fn faultObjectOrZeroFill(
             fault_info.entry,
             fault_info.faulting_address,
             anonymous_page,
-            false,
+            .add,
         ); // TODO: on error maybe we need https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1508-L1523
     } else {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1430
