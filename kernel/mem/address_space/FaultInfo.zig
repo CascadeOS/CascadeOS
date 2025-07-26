@@ -68,7 +68,7 @@ pub fn faultCheck(
     _ = fault_type;
 
     // lookup entry and lock `entries_lock` for reading
-    if (!fault_info.faultLookup(current_task, false)) {
+    if (!fault_info.faultLookup(current_task, .read)) {
         return error.NotMapped;
     }
 
@@ -315,20 +315,20 @@ pub fn faultObjectOrZeroFill(
 /// If `write_lock` is `true` the `entries_lock` is acquired in write mode.
 ///
 /// Called `uvmfault_lookup` in OpenBSD uvm.
-fn faultLookup(fault_info: *FaultInfo, current_task: *kernel.Task, write_lock: bool) bool {
-    if (write_lock)
-        fault_info.address_space.entries_lock.writeLock(current_task)
-    else
-        fault_info.address_space.entries_lock.readLock(current_task);
+fn faultLookup(fault_info: *FaultInfo, current_task: *kernel.Task, lock_type: LockType) bool {
+    switch (lock_type) {
+        .read => fault_info.address_space.entries_lock.readLock(current_task),
+        .write => fault_info.address_space.entries_lock.writeLock(current_task),
+    }
 
     const entry_index = Entry.entryIndexByAddress(
         fault_info.faulting_address,
         fault_info.address_space.entries.items,
     ) orelse {
-        if (write_lock)
-            fault_info.address_space.entries_lock.writeUnlock(current_task)
-        else
-            fault_info.address_space.entries_lock.readUnlock(current_task);
+        switch (lock_type) {
+            .read => fault_info.address_space.entries_lock.readUnlock(current_task),
+            .write => fault_info.address_space.entries_lock.writeUnlock(current_task),
+        }
 
         return false;
     };
@@ -403,7 +403,7 @@ fn promote(
 /// Called `uvmfault_amapcopy` in OpenBSD uvm.
 fn anonymousMapCopy(fault_info: *FaultInfo, current_task: *kernel.Task) error{ NotMapped, NoMemory }!void {
     // lookup entry and lock `entries_lock` for writing
-    if (!fault_info.faultLookup(current_task, true)) return error.NotMapped;
+    if (!fault_info.faultLookup(current_task, .write)) return error.NotMapped;
     defer fault_info.address_space.entries_lock.writeUnlock(current_task);
 
     if (!fault_info.entry.needs_copy) return; // someone else already copied the anonymous map
