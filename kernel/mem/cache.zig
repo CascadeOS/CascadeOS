@@ -24,15 +24,15 @@ pub fn Cache(
         pub const InitOptions = struct {
             name: Name,
 
-            /// Should the last available slab be deallocated when it is unused?
-            deallocate_last_available_slab: bool = false,
+            /// What should happen to the last available slab when it is unused?
+            last_slab: core.CleanupDecision = .keep,
 
             /// The source of slabs.
             ///
             /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
             ///
             /// `.pmm` is only valid for small object caches.
-            slab_source: RawCache.SlabSource = .heap,
+            slab_source: RawCache.InitOptions.SlabSource = .heap,
         };
 
         /// Initialize the cache.
@@ -64,7 +64,7 @@ pub fn Cache(
                     }.innerDestructor
                 else
                     null,
-                .deallocate_last_available_slab = options.deallocate_last_available_slab,
+                .last_slab = options.last_slab,
                 .slab_source = options.slab_source,
             });
         }
@@ -153,15 +153,15 @@ pub const RawCache = struct {
 
     objects_per_slab: usize,
 
-    /// Should the last available slab be deallocated when it is unused?
-    deallocate_last_available_slab: bool,
+    /// What should happen to the last available slab when it is unused?
+    last_slab: core.CleanupDecision = .keep,
 
     /// The source of slabs.
     ///
     /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
     ///
     /// `.pmm` is only valid for small object caches.
-    slab_source: SlabSource = .heap,
+    slab_source: InitOptions.SlabSource = .heap,
 
     constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
     destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
@@ -190,8 +190,8 @@ pub const RawCache = struct {
         constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void = null,
         destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void = null,
 
-        /// Should the last available slab be deallocated when it is unused?
-        deallocate_last_available_slab: bool = false,
+        /// What should happen to the last available slab when it is unused?
+        last_slab: core.CleanupDecision = .keep,
 
         /// The source of slabs.
         ///
@@ -199,11 +199,11 @@ pub const RawCache = struct {
         ///
         /// `.pmm` is only valid for small object caches.
         slab_source: SlabSource = .heap,
-    };
 
-    pub const SlabSource = enum {
-        heap,
-        pmm,
+        pub const SlabSource = enum {
+            heap,
+            pmm,
+        };
     };
 
     /// Initialize the cache.
@@ -281,7 +281,7 @@ pub const RawCache = struct {
             .available_slabs = .{},
             .full_slabs = .{},
             .objects_per_slab = objects_per_slab,
-            .deallocate_last_available_slab = options.deallocate_last_available_slab,
+            .last_slab = options.last_slab,
             .slab_source = options.slab_source,
             .size_class = if (is_small)
                 .small
@@ -628,8 +628,8 @@ pub const RawCache = struct {
 
             // slab is unused
 
-            if (!raw_cache.deallocate_last_available_slab) {
-                if (raw_cache.available_slabs.first == raw_cache.available_slabs.last) {
+            switch (raw_cache.last_slab) {
+                .keep => if (raw_cache.available_slabs.first == raw_cache.available_slabs.last) {
                     @branchHint(.unlikely);
 
                     std.debug.assert(raw_cache.available_slabs.first == &slab.linkage);
@@ -637,7 +637,8 @@ pub const RawCache = struct {
                     // this is the last available slab so we leave it in the available list and don't deallocate it
 
                     continue;
-                }
+                },
+                .free => {},
             }
 
             // slab is unused remove it from available list and deallocate it
