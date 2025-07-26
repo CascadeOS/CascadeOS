@@ -14,26 +14,30 @@ pub const Node = struct {
 };
 
 pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) void {
-    current_task.incrementPreemptionDisable();
+    {
+        current_task.incrementInterruptDisable();
+        defer current_task.decrementInterruptDisable();
 
-    const current_executor = current_task.state.running;
+        const current_executor = current_task.state.running;
 
-    // TODO: all except self IPI
-    // TODO: is there a better way to determine which executors to target?
-    for (kernel.executors) |*executor| {
-        if (executor == current_executor) continue; // skip ourselves
-        flush_request.requestExecutor(executor);
+        // TODO: all except self IPI
+        // TODO: is there a better way to determine which executors to target?
+        for (kernel.executors) |*executor| {
+            if (executor == current_executor) continue; // skip ourselves
+            flush_request.requestExecutor(executor);
+        }
+
+        flush_request.flush(current_task);
     }
 
-    flush_request.flush(current_task);
-
-    current_task.decrementPreemptionDisable();
-
-    flush_request.waitForCompletion(current_task);
+    while (flush_request.count.load(.monotonic) != 0) {
+        kernel.arch.spinLoopHint();
+    }
 }
 
 pub fn processFlushRequests(current_task: *kernel.Task) void {
-    std.debug.assert(current_task.interrupt_disable_count != 0 or current_task.preemption_disable_count != 0);
+    std.debug.assert(current_task.interrupt_disable_count != 0);
+
     const executor = current_task.state.running;
 
     while (executor.flush_requests.popFirst()) |node| {
@@ -43,6 +47,8 @@ pub fn processFlushRequests(current_task: *kernel.Task) void {
 }
 
 fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
+    std.debug.assert(current_task.interrupt_disable_count != 0);
+
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 
     switch (flush_request.flush_target) {
@@ -67,14 +73,6 @@ fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) voi
     executor.flush_requests.prepend(&node.node);
 
     kernel.arch.interrupts.sendFlushIPI(executor);
-}
-
-fn waitForCompletion(flush_request: *FlushRequest, current_task: *kernel.Task) void {
-    while (true) {
-        processFlushRequests(current_task);
-        if (flush_request.count.load(.monotonic) == 0) break;
-        kernel.arch.spinLoopHint();
-    }
 }
 
 const std = @import("std");

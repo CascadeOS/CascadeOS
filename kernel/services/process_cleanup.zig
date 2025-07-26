@@ -33,8 +33,6 @@ pub fn wake(
 fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
     std.debug.assert(current_task == globals.process_cleanup_task);
     std.debug.assert(current_task.interrupt_disable_count == 0);
-    std.debug.assert(current_task.preemption_disable_count == 0);
-    std.debug.assert(current_task.preemption_skipped == false);
     std.debug.assert(current_task.spinlocks_held == 0);
     std.debug.assert(kernel.arch.interrupts.areEnabled());
 

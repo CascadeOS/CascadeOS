@@ -20,14 +20,6 @@ stack: Stack,
 /// Tracks the depth of nested interrupt disables.
 interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
 
-/// Tracks the depth of nested preemption disables.
-preemption_disable_count: u32 = 0,
-
-/// Whenever we skip preemption, we set this to true.
-///
-/// When we re-enable preemption, we check this flag.
-preemption_skipped: bool = false,
-
 spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked (except for init tasks)
 
 /// Used for various linked lists including:
@@ -159,29 +151,6 @@ pub fn decrementInterruptDisable(task: *Task) void {
 
     if (previous == 1) {
         kernel.arch.interrupts.enableInterrupts();
-    }
-}
-
-pub fn incrementPreemptionDisable(task: *Task) void {
-    task.preemption_disable_count += 1;
-
-    const executor = task.state.running;
-    std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
-    std.debug.assert(executor.current_task == task);
-}
-
-pub fn decrementPreemptionDisable(task: *Task) void {
-    const executor = task.state.running;
-    std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
-    std.debug.assert(executor.current_task == task);
-
-    const previous = task.preemption_disable_count;
-    std.debug.assert(previous > 0);
-
-    task.preemption_disable_count = previous - 1;
-
-    if (previous == 1 and task.preemption_skipped) {
-        kernel.scheduler.maybePreempt(task);
     }
 }
 

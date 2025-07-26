@@ -15,8 +15,6 @@ spinlock: kernel.sync.TicketSpinLock = .{},
 wait_queue: kernel.sync.WaitQueue = .{},
 
 pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
-    current_task.incrementPreemptionDisable();
-
     while (true) {
         var locked_by = mutex.locked_by.cmpxchgWeak(
             null,
@@ -76,8 +74,6 @@ pub fn lock(mutex: *Mutex, current_task: *kernel.Task) void {
 
 /// Try to lock the mutex.
 pub fn tryLock(mutex: *Mutex, current_task: *kernel.Task) bool {
-    current_task.incrementPreemptionDisable();
-
     const locked_by = mutex.locked_by.cmpxchgStrong(
         null,
         current_task,
@@ -88,18 +84,13 @@ pub fn tryLock(mutex: *Mutex, current_task: *kernel.Task) bool {
     if (locked_by == current_task) {
         @branchHint(.cold);
         std.debug.assert(mutex.unlock_type != .passed_to_waiter); // this could only happen if we were queued for the mutex but then how would we call tryLock?
-
-        // we don't support recursive locks so this is a failure to acquire the lock
+        @panic("recursive lock");
     }
-
-    current_task.decrementPreemptionDisable();
 
     return false;
 }
 
 pub fn unlock(mutex: *Mutex, current_task: *kernel.Task) void {
-    defer current_task.decrementPreemptionDisable();
-
     {
         mutex.spinlock.lock(current_task);
         defer mutex.spinlock.unlock(current_task);
