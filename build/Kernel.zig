@@ -433,6 +433,13 @@ fn constructKernelModule(
                 );
             }
 
+            // only add assembly files with the .s or .S extension
+            if (!std.mem.endsWith(u8, entry.name, ".s") and
+                !std.mem.endsWith(u8, entry.name, ".S"))
+            {
+                continue;
+            }
+
             const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
             kernel_module.addAssemblyFile(b.path(file_path));
         }
