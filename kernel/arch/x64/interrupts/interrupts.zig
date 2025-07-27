@@ -270,7 +270,6 @@ const Handler = struct {
 
 const globals = struct {
     var idt: Idt = .{};
-    const raw_interrupt_handlers = init.makeRawHandlers();
     var handlers: [Idt.number_of_handlers]Handler = handlers: {
         @setEvalBranchQuota(4 * Idt.number_of_handlers);
 
@@ -296,7 +295,7 @@ pub const init = struct {
     ///
     /// The handler is not expected to do anything other than panic.
     pub fn initializeEarlyInterrupts() void {
-        for (globals.raw_interrupt_handlers, 0..) |raw_handler, i| {
+        for (raw_interrupt_handlers, 0..) |raw_handler, i| {
             globals.idt.handlers[i].init(
                 .kernel_code,
                 .interrupt,
@@ -348,94 +347,30 @@ pub const init = struct {
         globals.idt.load();
     }
 
-    /// Creates an array of raw interrupt handlers, one for each vector.
-    fn makeRawHandlers() [Idt.number_of_handlers](*const fn () callconv(.naked) void) {
-        comptime {
-            @setEvalBranchQuota(Idt.number_of_handlers * 520);
+    const raw_interrupt_handlers: [Idt.number_of_handlers](*const fn () callconv(.naked) void) = blk: {
+        @setEvalBranchQuota(Idt.number_of_handlers * 210);
 
-            var raw_handlers_temp: [Idt.number_of_handlers](*const fn () callconv(.naked) void) = undefined;
+        var raw_interrupt_handlers_temp: [Idt.number_of_handlers](*const fn () callconv(.naked) void) = undefined;
 
-            var i = 0;
-            while (i < Idt.number_of_handlers) : (i += 1) {
-                const vector_number: u8 = @intCast(i);
-                const interrupt: Interrupt = @enumFromInt(vector_number);
+        for (0..Idt.number_of_handlers) |interrupt_number| {
+            const name = std.fmt.comptimePrint(
+                "_interrupt_handler_{d}",
+                .{interrupt_number},
+            );
 
-                // if the cpu does not push an error code, we push a dummy error code to ensure the stack
-                // is always aligned in the same way for every vector
-                const error_code_asm = if (!interrupt.hasErrorCode())
-                    "push $0\n"
-                else
-                    "";
-                const vector_number_asm = std.fmt.comptimePrint(
-                    "push ${d}\n",
-                    .{vector_number},
-                );
-                const data_selector_asm = std.fmt.comptimePrint(
-                    "\nmov ${d}, %%ax\n",
-                    .{@intFromEnum(Gdt.Selector.kernel_data)},
-                );
-
-                const rawInterruptHandler = struct {
-                    fn rawInterruptHandler() callconv(.naked) void {
-                        // zig fmt: off
-                        asm volatile (error_code_asm ++ vector_number_asm ++
-                            \\push %%rax
-                            \\push %%rbx
-                            \\push %%rcx
-                            \\push %%rdx
-                            \\push %%rbp
-                            \\push %%rsi
-                            \\push %%rdi
-                            \\push %%r8
-                            \\push %%r9
-                            \\push %%r10
-                            \\push %%r11
-                            \\push %%r12
-                            \\push %%r13
-                            \\push %%r14
-                            \\push %%r15
-                            \\mov %%ds, %%rax
-                            \\push %%rax
-                            \\mov %%es, %%rax
-                            \\push %%rax
-                            \\mov %%rsp, %%rdi
-                            ++ data_selector_asm ++
-                            \\mov %%ax, %%es
-                            \\mov %%ax, %%ds
-                            \\call interruptDispatch
-                            \\pop %%rax
-                            \\mov %%rax, %%es
-                            \\pop %%rax
-                            \\mov %%rax, %%ds
-                            \\pop %%r15
-                            \\pop %%r14
-                            \\pop %%r13
-                            \\pop %%r12
-                            \\pop %%r11
-                            \\pop %%r10
-                            \\pop %%r9
-                            \\pop %%r8
-                            \\pop %%rdi
-                            \\pop %%rsi
-                            \\pop %%rbp
-                            \\pop %%rdx
-                            \\pop %%rcx
-                            \\pop %%rbx
-                            \\pop %%rax
-                            \\add $16, %%rsp
-                            \\iretq
-                        );
-                        // zig fmt: on
-                    }
-                }.rawInterruptHandler;
-
-                raw_handlers_temp[vector_number] = rawInterruptHandler;
-            }
-
-            return raw_handlers_temp;
+            raw_interrupt_handlers_temp[interrupt_number] = @extern(*const fn () callconv(.naked) void, .{
+                .name = name,
+            });
         }
-    }
+
+        break :blk raw_interrupt_handlers_temp;
+    };
 };
+
+comptime {
+    // assumed by 'arch/interruptHandlers.S' and 'arch/interruptHandlerHelpers.inc'
+    std.debug.assert(@intFromEnum(Gdt.Selector.kernel_data) == 0x10);
+}
 
 const std = @import("std");
 const core = @import("core");
