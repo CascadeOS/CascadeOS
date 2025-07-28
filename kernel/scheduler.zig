@@ -7,7 +7,7 @@
 pub fn queueTask(current_task: *kernel.Task, task: *kernel.Task) void {
     std.debug.assert(isLockedByCurrent(current_task));
     std.debug.assert(task.state == .ready);
-    std.debug.assert(!current_task.state.running.isUtilityTask(task)); // cannot queue a utility task
+    std.debug.assert(!current_task.state.running.isSchedulerTask(task)); // cannot queue a scheduler task
 
     globals.ready_to_run.append(&task.next_task_node);
 }
@@ -44,7 +44,7 @@ pub fn yield(current_task: *kernel.Task) void {
     const new_task = kernel.Task.fromNode(new_task_node);
     std.debug.assert(new_task.state == .ready);
 
-    if (current_task.state.running.isUtilityTask(current_task)) {
+    if (current_task.state.running.isSchedulerTask(current_task)) {
         log.verbose("leaving idle", .{});
 
         switchToTaskFromIdleYield(current_task, new_task);
@@ -63,7 +63,7 @@ pub fn yield(current_task: *kernel.Task) void {
 pub const DeferredAction = struct {
     /// The action to perform after the current task has been switched away from.
     ///
-    /// This action will be called while executing as the utility task with the scheduler lock held which must not be
+    /// This action will be called while executing as the scheduler task with the scheduler lock held which must not be
     /// unlocked by the action.
     ///
     /// It is the responsibility of the action to set the state of the old task to the correct value.
@@ -86,7 +86,7 @@ pub const DeferredAction = struct {
 ///
 /// Must be called with the scheduler lock held.
 pub fn drop(current_task: *kernel.Task, deferred_action: DeferredAction) void {
-    std.debug.assert(!current_task.state.running.isUtilityTask(current_task)); // drop by the utility task
+    std.debug.assert(!current_task.state.running.isSchedulerTask(current_task)); // drop by the scheduler task
 
     std.debug.assert(isLockedByCurrent(current_task)); // the scheduler lock is held
     std.debug.assert(current_task.spinlocks_held >= 1);
@@ -110,50 +110,50 @@ fn switchToIdleDeferredAction(
 ) void {
     const static = struct {
         fn idleEntryDeferredAction(
-            utility_task_addr: usize,
+            scheduler_task_addr: usize,
             old_task_addr: usize,
             action_addr: usize,
             action_context_addr: usize,
         ) callconv(.c) noreturn {
-            const utility_task: *kernel.Task = @ptrFromInt(utility_task_addr);
+            const scheduler_task: *kernel.Task = @ptrFromInt(scheduler_task_addr);
 
             const action: DeferredAction.Action = @ptrFromInt(action_addr);
             action(
-                utility_task,
+                scheduler_task,
                 @ptrFromInt(old_task_addr),
                 @ptrFromInt(action_context_addr),
             );
-            std.debug.assert(utility_task.interrupt_disable_count == 1);
-            std.debug.assert(utility_task.spinlocks_held == 1);
+            std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+            std.debug.assert(scheduler_task.spinlocks_held == 1);
 
-            globals.lock.unlock(utility_task);
-            idle(utility_task);
+            globals.lock.unlock(scheduler_task);
+            idle(scheduler_task);
             @panic("idle returned");
         }
     };
 
     std.debug.assert(old_task.state == .running);
-    std.debug.assert(!old_task.state.running.isUtilityTask(old_task));
+    std.debug.assert(!old_task.state.running.isSchedulerTask(old_task));
 
     log.verbose("switching from {f} to idle with a deferred action", .{old_task});
 
     const current_executor = old_task.state.running;
-    std.debug.assert(current_executor.utility_task.state == .ready);
+    std.debug.assert(current_executor.scheduler_task.state == .ready);
 
-    const utility_task = &current_executor.utility_task;
+    const scheduler_task = &current_executor.scheduler_task;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, utility_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, scheduler_task);
 
-    utility_task.state = .{ .running = current_executor };
-    utility_task.spinlocks_held = 1;
-    utility_task.interrupt_disable_count = 1;
-    current_executor.current_task = utility_task;
+    scheduler_task.state = .{ .running = current_executor };
+    scheduler_task.spinlocks_held = 1;
+    scheduler_task.interrupt_disable_count = 1;
+    current_executor.current_task = scheduler_task;
 
     kernel.arch.scheduling.callFourArgs(
         old_task,
-        utility_task.stack,
+        scheduler_task.stack,
 
-        @intFromPtr(utility_task),
+        @intFromPtr(scheduler_task),
         @intFromPtr(old_task),
         @intFromPtr(deferred_action.action),
         @intFromPtr(deferred_action.context),
@@ -161,28 +161,28 @@ fn switchToIdleDeferredAction(
         static.idleEntryDeferredAction,
     ) catch |err| {
         switch (err) {
-            error.StackOverflow => @panic("insufficent space on the utility task stack"),
+            error.StackOverflow => @panic("insufficent space on the scheduler task stack"),
         }
     };
 }
 
 fn switchToTaskFromIdleYield(current_task: *kernel.Task, new_task: *kernel.Task) void {
     std.debug.assert(current_task.spinlocks_held == 1); // only the scheduler lock is held
-    std.debug.assert(current_task.state.running.isUtilityTask(current_task));
+    std.debug.assert(current_task.state.running.isSchedulerTask(current_task));
     std.debug.assert(new_task.next_task_node.next == null);
 
     log.verbose("switching from idle to {f}", .{new_task});
 
     const executor = current_task.state.running;
-    std.debug.assert(&executor.utility_task == current_task);
+    std.debug.assert(&executor.scheduler_task == current_task);
 
-    const utility_task = current_task;
+    const scheduler_task = current_task;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(executor, utility_task, new_task);
+    kernel.arch.scheduling.prepareForJumpToTaskFromTask(executor, scheduler_task, new_task);
 
     new_task.state = .{ .running = executor };
     executor.current_task = new_task;
-    utility_task.state = .ready;
+    scheduler_task.state = .ready;
 
     kernel.arch.scheduling.jumpToTask(new_task);
     @panic("task returned");
@@ -195,8 +195,8 @@ fn switchToTaskFromTaskYield(
     std.debug.assert(old_task.spinlocks_held == 1); // only the scheduler lock is held
     std.debug.assert(old_task.state == .running);
     std.debug.assert(new_task.state == .ready);
-    std.debug.assert(!old_task.state.running.isUtilityTask(old_task));
-    std.debug.assert(!old_task.state.running.isUtilityTask(new_task));
+    std.debug.assert(!old_task.state.running.isSchedulerTask(old_task));
+    std.debug.assert(!old_task.state.running.isSchedulerTask(new_task));
     std.debug.assert(new_task.next_task_node.next == null);
 
     log.verbose("switching from {f} to {f}", .{ old_task, new_task });
@@ -229,20 +229,20 @@ fn switchToTaskFromTaskDeferredAction(
             const inner_new_task: *kernel.Task = @ptrFromInt(new_task_addr);
 
             const current_executor = inner_old_task.state.running;
-            const utility_task = &current_executor.utility_task;
+            const scheduler_task = &current_executor.scheduler_task;
 
             const action: DeferredAction.Action = @ptrFromInt(action_addr);
             action(
-                utility_task,
+                scheduler_task,
                 inner_old_task,
                 @ptrFromInt(action_context_addr),
             );
-            std.debug.assert(utility_task.interrupt_disable_count == 1);
-            std.debug.assert(utility_task.spinlocks_held == 1);
+            std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+            std.debug.assert(scheduler_task.spinlocks_held == 1);
 
             inner_new_task.state = .{ .running = current_executor };
             current_executor.current_task = inner_new_task;
-            utility_task.state = .ready;
+            scheduler_task.state = .ready;
 
             kernel.arch.scheduling.jumpToTask(inner_new_task);
             @panic("task returned");
@@ -251,8 +251,8 @@ fn switchToTaskFromTaskDeferredAction(
 
     std.debug.assert(old_task.state == .running);
     std.debug.assert(new_task.state == .ready);
-    std.debug.assert(!old_task.state.running.isUtilityTask(old_task));
-    std.debug.assert(!old_task.state.running.isUtilityTask(new_task));
+    std.debug.assert(!old_task.state.running.isSchedulerTask(old_task));
+    std.debug.assert(!old_task.state.running.isSchedulerTask(new_task));
 
     log.verbose("switching from {f} to {f} with a deferred action", .{ old_task, new_task });
 
@@ -260,16 +260,16 @@ fn switchToTaskFromTaskDeferredAction(
 
     kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
 
-    const utility_task = &current_executor.utility_task;
+    const scheduler_task = &current_executor.scheduler_task;
 
-    utility_task.state = .{ .running = current_executor };
-    utility_task.spinlocks_held = 1;
-    utility_task.interrupt_disable_count = 1;
-    current_executor.current_task = utility_task;
+    scheduler_task.state = .{ .running = current_executor };
+    scheduler_task.spinlocks_held = 1;
+    scheduler_task.interrupt_disable_count = 1;
+    current_executor.current_task = scheduler_task;
 
     kernel.arch.scheduling.callFourArgs(
         old_task,
-        current_executor.utility_task.stack,
+        current_executor.scheduler_task.stack,
 
         @intFromPtr(old_task),
         @intFromPtr(new_task),
@@ -279,7 +279,7 @@ fn switchToTaskFromTaskDeferredAction(
         static.switchToTaskDeferredAction,
     ) catch |err| {
         switch (err) {
-            error.StackOverflow => @panic("insufficent space on the utility task stack"),
+            error.StackOverflow => @panic("insufficent space on the scheduler task stack"),
         }
     };
 }

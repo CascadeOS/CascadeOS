@@ -8,7 +8,7 @@ id: Id,
 current_task: *kernel.Task,
 
 /// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
-utility_task: kernel.Task,
+scheduler_task: kernel.Task,
 
 arch: kernel.arch.PerExecutor,
 
@@ -45,8 +45,8 @@ pub fn renderInterruptSourcePanicMessage(
     return bw.buffered();
 }
 
-pub inline fn isUtilityTask(executor: *const Executor, task: *const kernel.Task) bool {
-    return task == &executor.utility_task;
+pub inline fn isSchedulerTask(executor: *const Executor, task: *const kernel.Task) bool {
+    return task == &executor.scheduler_task;
 }
 
 pub inline fn format(

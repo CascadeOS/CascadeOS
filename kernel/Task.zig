@@ -492,15 +492,15 @@ pub const init = struct {
         executor.current_task = task;
     }
 
-    pub fn initializeUtilityTask(
+    pub fn initializeSchedulerTask(
         current_task: *kernel.Task,
-        utility_task: *kernel.Task,
+        scheduler_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
         var name: Name = .{};
-        try name.writer().print("utility {}", .{@intFromEnum(executor.id)});
+        try name.writer().print("scheduler {}", .{@intFromEnum(executor.id)});
 
-        utility_task.* = .{
+        scheduler_task.* = .{
             .name = name,
 
             .state = .ready,

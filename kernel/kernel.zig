@@ -41,7 +41,7 @@ pub const Context = union(Type) {
 
 /// All currently living kernel tasks.
 ///
-/// This does not include the per-executor utility or bootstrap init tasks.
+/// This does not include the per-executor scheduler or bootstrap init tasks.
 pub var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
 pub var kernel_tasks_lock: sync.RwLock = .{};
 
