@@ -263,9 +263,9 @@ pub fn print(entry: *Entry, current_task: *kernel.Task, writer: *std.Io.Writer, 
 
     try writer.splatByteAll(' ', new_indent);
     if (entry.number_of_pages == 1) {
-        try writer.print("range: {} (1 page),\n", .{entry.range()});
+        try writer.print("range: {f} (1 page),\n", .{entry.range()});
     } else {
-        try writer.print("range: {} ({} pages),\n", .{ entry.range(), entry.number_of_pages });
+        try writer.print("range: {f} ({} pages),\n", .{ entry.range(), entry.number_of_pages });
     }
 
     try writer.splatByteAll(' ', new_indent);

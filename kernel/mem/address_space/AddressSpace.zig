@@ -311,7 +311,7 @@ pub fn map(
         },
     }
 
-    log.verbose("{s}: mapped {}", .{ address_space.name(), result });
+    log.verbose("{s}: mapped {f}", .{ address_space.name(), result });
 
     return result;
 }
@@ -327,7 +327,7 @@ pub fn unmap(address_space: *AddressSpace, current_task: *kernel.Task, range: co
     std.debug.assert(range.address.isAligned(kernel.arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(kernel.arch.paging.standard_page_size));
 
-    log.verbose("{s}: unmap {}", .{ address_space.name(), range });
+    log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
 
     _ = current_task;
 
