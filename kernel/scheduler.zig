@@ -302,6 +302,10 @@ pub fn newTaskEntry(
 }
 
 fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
+    std.debug.assert(current_task.interrupt_disable_count == 0);
+    std.debug.assert(current_task.spinlocks_held == 0);
+    std.debug.assert(kernel.arch.interrupts.areEnabled());
+
     log.verbose("entering idle", .{});
 
     while (true) {

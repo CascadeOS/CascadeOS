@@ -45,7 +45,7 @@ pub fn renderInterruptSourcePanicMessage(
     return bw.buffered();
 }
 
-pub fn isUtilityTask(executor: *const Executor, task: *const kernel.Task) bool {
+pub inline fn isUtilityTask(executor: *const Executor, task: *const kernel.Task) bool {
     return task == &executor.utility_task;
 }
 
