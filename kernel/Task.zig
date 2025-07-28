@@ -192,7 +192,7 @@ pub fn format(
             .{task.name.constSlice()},
         ),
         .user => |process| try writer.print(
-            "User('{s}'@'{s}')",
+            "User('{s}'-'{s}')",
             .{ process.name.constSlice(), task.name.constSlice() },
         ),
     }
