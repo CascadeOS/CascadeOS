@@ -7,6 +7,13 @@
 
 const Task = @This();
 
+/// The name of the task.
+///
+/// For kernel tasks this is always explicitly provided.
+///
+/// For user tasks this starts as a process local incrementing number but can be changed by the user.
+name: Name,
+
 state: State,
 
 /// The number of references to this task.
@@ -31,15 +38,8 @@ next_task_node: std.SinglyLinkedList.Node = .{},
 context: Context,
 
 pub const Context = union(kernel.Context.Type) {
-    kernel: Kernel,
+    kernel: void,
     user: *kernel.Process,
-
-    pub const Kernel = struct {
-        /// Name of the task.
-        ///
-        /// Kernel tasks always have a name.
-        name: Name,
-    };
 };
 
 pub const State = union(enum) {
@@ -78,14 +78,11 @@ pub const CreateKernelTaskOptions = struct {
 
 pub fn createKernelTask(current_task: *kernel.Task, options: CreateKernelTaskOptions) !*Task {
     const task = try internal.create(current_task, .{
+        .name = options.name,
         .start_function = options.start_function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
-        .context = .{
-            .kernel = .{
-                .name = options.name,
-            },
-        },
+        .context = .kernel,
     });
     errdefer {
         std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
@@ -190,13 +187,13 @@ pub fn format(
     writer: *std.Io.Writer,
 ) !void {
     switch (task.context) {
-        .kernel => |kernel_context| try writer.print(
-            "KernelTask('{s}')",
-            .{kernel_context.name.constSlice()},
+        .kernel => try writer.print(
+            "Kernel('{s}')",
+            .{task.name.constSlice()},
         ),
         .user => |process| try writer.print(
-            "UserTask('{s}'@{x:0>16})", // TODO using the pointer is not ideal, might have to introduce an id
-            .{ process.name.constSlice(), @intFromPtr(task) },
+            "User('{s}'@'{s}')",
+            .{ process.name.constSlice(), task.name.constSlice() },
         ),
     }
 }
@@ -207,6 +204,8 @@ pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {
 
 pub const internal = struct {
     pub const CreateOptions = struct {
+        name: Name,
+
         start_function: kernel.arch.scheduling.NewTaskFunction,
         arg1: u64,
         arg2: u64,
@@ -214,12 +213,8 @@ pub const internal = struct {
         context: CreateContext,
 
         pub const CreateContext = union(kernel.Context.Type) {
-            kernel: Kernel,
+            kernel: void,
             user: *kernel.Process,
-
-            pub const Kernel = struct {
-                name: Name,
-            };
         };
     };
 
@@ -230,13 +225,13 @@ pub const internal = struct {
         const preconstructed_stack = task.stack;
 
         task.* = .{
+            .name = options.name,
+
             .state = .ready,
             .stack = preconstructed_stack,
 
             .context = switch (options.context) {
-                .kernel => |kernel_context| .{
-                    .kernel = .{ .name = kernel_context.name },
-                },
+                .kernel => .kernel,
                 .user => |process| .{ .user = process },
             },
         };
@@ -464,13 +459,13 @@ pub const init = struct {
         bootstrap_executor: *kernel.Executor,
     ) !void {
         bootstrap_init_task.* = .{
+            .name = try .fromSlice("bootstrap init"),
+
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
-            .context = .{
-                .kernel = .{ .name = try .fromSlice("bootstrap init") },
-            },
+            .context = .kernel,
         };
     }
 
@@ -506,12 +501,11 @@ pub const init = struct {
         try name.writer().print("utility {}", .{@intFromEnum(executor.id)});
 
         utility_task.* = .{
+            .name = name,
+
             .state = .ready,
             .stack = try .createStack(current_task),
-
-            .context = .{
-                .kernel = .{ .name = name },
-            },
+            .context = .kernel,
         };
     }
 };

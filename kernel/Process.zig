@@ -23,6 +23,9 @@ queued_for_cleanup: std.atomic.Value(bool) = .init(false),
 /// Used for the process cleanup queue.
 cleanup_node: std.SinglyLinkedList.Node = .{},
 
+/// Used for generating task names.
+next_task_id: std.atomic.Value(usize) = .init(0),
+
 pub const CreateOptions = struct {
     name: Name,
 
@@ -66,6 +69,8 @@ pub fn create(current_task: *kernel.Task, scheduler_locked: core.LockState, opti
 }
 
 pub const CreateTaskOptions = struct {
+    name: ?kernel.Task.Name = null,
+
     start_function: kernel.arch.scheduling.NewTaskFunction,
     arg1: u64,
     arg2: u64,
@@ -80,7 +85,17 @@ pub fn createUserTask(
     scheduler_locked: core.LockState,
     options: CreateTaskOptions,
 ) !*kernel.Task {
+    var name: kernel.Task.Name = .{};
+    if (options.name) |provided_name|
+        name = provided_name
+    else
+        try name.writer().print(
+            "{d}",
+            .{process.next_task_id.fetchAdd(1, .monotonic)},
+        );
+
     const entry_task = try kernel.Task.internal.create(current_task, .{
+        .name = name,
         .start_function = options.start_function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
