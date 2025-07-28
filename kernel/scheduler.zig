@@ -63,8 +63,8 @@ pub fn yield(current_task: *kernel.Task) void {
 pub const DeferredAction = struct {
     /// The action to perform after the current task has been switched away from.
     ///
-    /// This action will be called while executing as another task with the scheduler lock held and the scheduler lock
-    /// must be held when the action returns.
+    /// This action will be called while executing as the utility task with the scheduler lock held which must not be
+    /// unlocked by the action.
     ///
     /// It is the responsibility of the action to set the state of the old task to the correct value.
     action: Action,
@@ -90,6 +90,7 @@ pub fn drop(current_task: *kernel.Task, deferred_action: DeferredAction) void {
 
     std.debug.assert(isLockedByCurrent(current_task)); // the scheduler lock is held
     std.debug.assert(current_task.spinlocks_held >= 1);
+    std.debug.assert(current_task.interrupt_disable_count >= 1);
 
     const new_task_node = globals.ready_to_run.pop() orelse {
         switchToIdleDeferredAction(current_task, deferred_action);
@@ -122,6 +123,8 @@ fn switchToIdleDeferredAction(
                 @ptrFromInt(old_task_addr),
                 @ptrFromInt(action_context_addr),
             );
+            std.debug.assert(utility_task.interrupt_disable_count == 1);
+            std.debug.assert(utility_task.spinlocks_held == 1);
 
             globals.lock.unlock(utility_task);
             idle(utility_task);
@@ -142,6 +145,8 @@ fn switchToIdleDeferredAction(
     kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, utility_task);
 
     utility_task.state = .{ .running = current_executor };
+    utility_task.spinlocks_held = 1;
+    utility_task.interrupt_disable_count = 1;
     current_executor.current_task = utility_task;
 
     kernel.arch.scheduling.callFourArgs(
@@ -232,6 +237,8 @@ fn switchToTaskFromTaskDeferredAction(
                 inner_old_task,
                 @ptrFromInt(action_context_addr),
             );
+            std.debug.assert(utility_task.interrupt_disable_count == 1);
+            std.debug.assert(utility_task.spinlocks_held == 1);
 
             inner_new_task.state = .{ .running = current_executor };
             current_executor.current_task = inner_new_task;
@@ -256,6 +263,8 @@ fn switchToTaskFromTaskDeferredAction(
     const utility_task = &current_executor.utility_task;
 
     utility_task.state = .{ .running = current_executor };
+    utility_task.spinlocks_held = 1;
+    utility_task.interrupt_disable_count = 1;
     current_executor.current_task = utility_task;
 
     kernel.arch.scheduling.callFourArgs(
