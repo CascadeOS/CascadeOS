@@ -10,18 +10,6 @@ const TicketSpinLock = @This();
 container: Container = .{ .full = 0 },
 holding_executor: kernel.Executor.Id = .none,
 
-const Container = extern union {
-    contents: extern struct {
-        current: u32 = 0,
-        ticket: u32 = 0,
-    },
-    full: u64,
-
-    comptime {
-        std.debug.assert(@sizeOf(Container) == @sizeOf(u64));
-    }
-};
-
 /// Locks the spinlock.
 pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void {
     std.debug.assert(!ticket_spin_lock.isLockedByCurrent(current_task)); // recursive locks are not supported
@@ -31,8 +19,6 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void 
     const ticket = @atomicRmw(u32, &ticket_spin_lock.container.contents.ticket, .Add, 1, .monotonic);
 
     if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire) != ticket) {
-        @branchHint(.unlikely);
-
         while (true) {
             kernel.arch.spinLoopHint();
             if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .monotonic) == ticket) break;
@@ -55,8 +41,6 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bo
     const old_container: Container = @bitCast(@atomicLoad(u64, &ticket_spin_lock.container.full, .monotonic));
 
     if (old_container.contents.current != old_container.contents.ticket) {
-        @branchHint(.unlikely);
-
         current_task.decrementInterruptDisable();
         return false;
     }
@@ -99,10 +83,10 @@ pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) voi
 
 /// Unlock the spinlock.
 ///
-/// Performs no checks and is unsafe, prefer `unlock` instead.
+/// Performs no checks prefer `unlock` instead.
 pub inline fn unsafeUnlock(ticket_spin_lock: *TicketSpinLock) void {
     ticket_spin_lock.holding_executor = .none;
-    @atomicStore(u32, &ticket_spin_lock.container.contents.current, ticket_spin_lock.container.contents.current +% 1, .release);
+    _ = @atomicRmw(u32, &ticket_spin_lock.container.contents.current, .Add, 1, .release);
 }
 
 /// Poison the spinlock, this will cause any future attempts to lock the spinlock to deadlock.
@@ -114,6 +98,18 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *const kernel.Task) bool {
     return ticket_spin_lock.holding_executor == current_task.state.running.id;
 }
+
+const Container = extern union {
+    contents: extern struct {
+        current: u32 = 0,
+        ticket: u32 = 0,
+    },
+    full: u64,
+
+    comptime {
+        std.debug.assert(@sizeOf(Container) == @sizeOf(u64));
+    }
+};
 
 const core = @import("core");
 const kernel = @import("kernel");
