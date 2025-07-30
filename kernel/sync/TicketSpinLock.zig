@@ -81,9 +81,9 @@ pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) voi
     current_task.decrementInterruptDisable();
 }
 
-/// Unlock the spinlock.
+/// Unlocks the spinlock, without decrementing interrupt disable count or spinlock held count.
 ///
-/// Performs no checks prefer `unlock` instead.
+/// Performs no checks, prefer `unlock` instead.
 pub inline fn unsafeUnlock(ticket_spin_lock: *TicketSpinLock) void {
     ticket_spin_lock.holding_executor = .none;
     _ = @atomicRmw(u32, &ticket_spin_lock.container.contents.current, .Add, 1, .release);
