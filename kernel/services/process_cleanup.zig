@@ -44,12 +44,7 @@ fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
             );
         }
 
-        kernel.scheduler.lockScheduler(current_task);
-        defer kernel.scheduler.unlockScheduler(current_task);
-
-        if (!globals.incoming.isEmpty()) continue;
-
-        globals.parker.park(current_task, .locked);
+        globals.parker.park(current_task);
     }
 }
 

@@ -7,12 +7,12 @@
 
 const Parker = @This();
 
-parked_task: std.atomic.Value(?*kernel.Task),
+lock: kernel.sync.TicketSpinLock = .{},
+parked_task: ?*kernel.Task,
 
-// used to make sure that we don't lose any wakeups
 unpark_attempts: std.atomic.Value(usize) = .init(0),
 
-pub const empty: Parker = .{ .parked_task = .init(null) };
+pub const empty: Parker = .{ .parked_task = null };
 
 /// Initialize the parker with a already parked task.
 ///
@@ -23,64 +23,46 @@ pub const empty: Parker = .{ .parked_task = .init(null) };
 pub fn withParkedTask(parked_task: *kernel.Task) Parker {
     std.debug.assert(parked_task.state == .ready);
     parked_task.state = .blocked;
-    return .{ .parked_task = .init(parked_task) };
+    return .{ .parked_task = parked_task };
 }
 
 /// Park (block) the current task.
-///
-/// Spurious wakeups are possible.
-pub fn park(parker: *Parker, current_task: *kernel.Task, scheduler_locked: core.LockState) void {
+pub fn park(parker: *Parker, current_task: *kernel.Task) void {
     std.debug.assert(current_task.state == .running);
 
+    if (parker.unpark_attempts.load(.acquire) != 0) {
+        parker.unpark_attempts.store(0, .release);
+        return;
+    }
+
+    parker.lock.lock(current_task);
+    std.debug.assert(parker.parked_task == null);
+
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
-        return; // there were some wakeups, they might be spurious
+        parker.lock.unlock(current_task);
+        return;
     }
 
-    switch (scheduler_locked) {
-        .unlocked => {
-            kernel.scheduler.lockScheduler(current_task);
+    parker.parked_task = current_task;
 
-            // recheck for unpark attempts that happened while we were locking the scheduler
-            if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
-                kernel.scheduler.unlockScheduler(current_task);
-                return;
-            }
-        },
-        .locked => std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task)),
-    }
+    kernel.scheduler.lockScheduler(current_task);
+    defer kernel.scheduler.unlockScheduler(current_task);
 
     kernel.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(new_current_task: *kernel.Task, old_task: *kernel.Task, context: ?*anyopaque) void {
+            fn action(_: *kernel.Task, old_task: *kernel.Task, context: ?*anyopaque) void {
                 const inner_parker: *Parker = @ptrCast(@alignCast(context));
 
-                if (inner_parker.unpark_attempts.swap(0, .acq_rel) != 0) {
-                    // someone has attempted to unpark the task, so reschedule it
-                    old_task.state = .ready;
-                    kernel.scheduler.queueTask(new_current_task, old_task);
-                    return;
-                }
-
-                // TODO: there is still a window right here where a task can attempt to unpark us but we park ourselves
-                // anyway, we would need to use a lock to prevent this...
-
                 old_task.state = .blocked;
+                old_task.spinlocks_held -= 1;
+                old_task.interrupt_disable_count -= 1;
 
-                std.debug.assert(
-                    inner_parker.parked_task.swap(
-                        old_task,
-                        .acq_rel,
-                    ) == null,
-                );
+                inner_parker.parked_task = old_task;
+                inner_parker.lock.unsafeUnlock();
             }
         }.action,
         .context = parker,
     });
-
-    switch (scheduler_locked) {
-        .unlocked => kernel.scheduler.unlockScheduler(current_task),
-        .locked => {},
-    }
 }
 
 /// Unpark (wake) the parked task if it is currently parked.
@@ -89,9 +71,19 @@ pub fn unpark(
     current_task: *kernel.Task,
     scheduler_locked: core.LockState,
 ) void {
-    _ = parker.unpark_attempts.fetchAdd(1, .acq_rel);
+    if (parker.unpark_attempts.fetchAdd(1, .acq_rel) != 0) {
+        // someone else was the first to attempt to unpark the task, so we can leave waking the task to them
+        return;
+    }
 
-    const parked_task = parker.parked_task.swap(null, .acq_rel) orelse return;
+    const parked_task = blk: {
+        parker.lock.lock(current_task);
+        defer parker.lock.unlock(current_task);
+
+        const parked_task = parker.parked_task orelse return;
+        parker.parked_task = null;
+        break :blk parked_task;
+    };
     std.debug.assert(parked_task.state == .blocked);
 
     parked_task.state = .ready;
