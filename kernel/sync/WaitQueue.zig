@@ -42,14 +42,15 @@ pub fn wakeOne(
     task_to_wake.state = .ready;
 
     switch (scheduler_locked) {
-        .unlocked => {
-            kernel.scheduler.lockScheduler(current_task);
-            defer kernel.scheduler.unlockScheduler(current_task);
-
-            kernel.scheduler.queueTask(current_task, task_to_wake);
-        },
-        .locked => kernel.scheduler.queueTask(current_task, task_to_wake),
+        .unlocked => kernel.scheduler.lockScheduler(current_task),
+        .locked => std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task)),
     }
+    defer switch (scheduler_locked) {
+        .unlocked => kernel.scheduler.unlockScheduler(current_task),
+        .locked => {},
+    };
+
+    kernel.scheduler.queueTask(current_task, task_to_wake);
 }
 
 /// Add the current task to the wait queue.

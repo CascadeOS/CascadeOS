@@ -46,7 +46,7 @@ pub fn park(parker: *Parker, current_task: *kernel.Task, scheduler_locked: core.
                 return;
             }
         },
-        .locked => {},
+        .locked => std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task)),
     }
 
     kernel.scheduler.drop(current_task, .{
@@ -98,7 +98,7 @@ pub fn unpark(
 
     switch (scheduler_locked) {
         .unlocked => kernel.scheduler.lockScheduler(current_task),
-        .locked => {},
+        .locked => std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task)),
     }
     defer switch (scheduler_locked) {
         .unlocked => kernel.scheduler.unlockScheduler(current_task),
