@@ -57,10 +57,6 @@ pub inline fn format(
 }
 
 pub const Id = enum(u32) {
-    bootstrap = 0,
-
-    none = std.math.maxInt(u32),
-
     _,
 
     pub inline fn format(

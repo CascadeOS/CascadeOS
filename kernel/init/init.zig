@@ -28,24 +28,26 @@ pub fn initStage1() !noreturn {
     try kernel.acpi.init.logAcpiTables();
 
     var bootstrap_init_task: kernel.Task = undefined;
+    var current_task = &bootstrap_init_task;
 
-    var bootstrap_executor: kernel.Executor = .{
-        .id = .bootstrap,
-        .current_task = &bootstrap_init_task,
+    var bootstrap_executor_backing: kernel.Executor = .{
+        .id = @enumFromInt(0),
+        .current_task = current_task,
         .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
         .scheduler_task = undefined, // not used
     };
+    var bootstrap_executor = &bootstrap_executor_backing;
 
-    try kernel.Task.init.initializeBootstrapInitTask(&bootstrap_init_task, &bootstrap_executor);
+    try kernel.Task.init.initializeBootstrapInitTask(&bootstrap_init_task, bootstrap_executor);
 
-    kernel.globals.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
+    kernel.globals.executors = @as([*]kernel.Executor, @ptrCast(bootstrap_executor))[0..1];
 
     log.debug("loading bootstrap executor", .{});
     kernel.arch.init.prepareBootstrapExecutor(
-        &bootstrap_executor,
+        bootstrap_executor,
         kernel.boot.bootstrapArchitectureProcessorId(),
     );
-    kernel.arch.init.loadExecutor(&bootstrap_executor);
+    kernel.arch.init.loadExecutor(bootstrap_executor);
 
     log.debug("initializing early interrupts", .{});
     kernel.arch.interrupts.init.initializeEarlyInterrupts();
@@ -54,13 +56,13 @@ pub fn initStage1() !noreturn {
     kernel.arch.init.captureEarlySystemInformation();
 
     log.debug("configuring per-executor system features", .{});
-    kernel.arch.init.configurePerExecutorSystemFeatures(&bootstrap_executor);
+    kernel.arch.init.configurePerExecutorSystemFeatures(bootstrap_executor);
 
     log.debug("initializing memory system", .{});
-    try kernel.mem.init.initializeMemorySystem(&bootstrap_init_task);
+    try kernel.mem.init.initializeMemorySystem(current_task);
 
     log.debug("remapping init outputs", .{});
-    try Output.remapOutputs(&bootstrap_init_task);
+    try Output.remapOutputs(current_task);
 
     log.debug("capturing system information", .{});
     try kernel.arch.init.captureSystemInformation(switch (kernel.config.cascade_arch) {
@@ -75,13 +77,15 @@ pub fn initStage1() !noreturn {
     try kernel.time.init.initializeTime();
 
     log.debug("initializing interrupt routing", .{});
-    try kernel.arch.interrupts.init.initializeInterruptRouting(&bootstrap_init_task);
+    try kernel.arch.interrupts.init.initializeInterruptRouting(current_task);
 
     log.debug("initializing kernel executors", .{});
-    kernel.globals.executors = try createExecutors();
+    const executors, bootstrap_executor = try createExecutors();
+    kernel.globals.executors = executors;
+    current_task = bootstrap_executor.current_task;
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
-    kernel.arch.init.loadExecutor(kernel.getExecutor(.bootstrap));
+    kernel.arch.init.loadExecutor(bootstrap_executor);
 
     kernel.debug.setPanicMode(.init_panic);
     kernel.debug.log.setLogMode(.init_log);
@@ -89,7 +93,7 @@ pub fn initStage1() !noreturn {
     log.debug("booting non-bootstrap executors", .{});
     try bootNonBootstrapExecutors();
 
-    try initStage2(kernel.Task.getCurrent());
+    try initStage2(current_task, true);
     unreachable;
 }
 
@@ -98,7 +102,7 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(current_task: *kernel.Task) !noreturn {
+fn initStage2(current_task: *kernel.Task, is_bootstrap_executor: bool) !noreturn {
     kernel.mem.globals.core_page_table.load();
     const executor = current_task.state.running;
     kernel.arch.init.loadExecutor(executor);
@@ -112,13 +116,20 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
     log.debug("enabling per-executor interrupt on {f}", .{executor.id});
     kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
 
-    try kernel.arch.scheduling.callOneArgs(
+    try kernel.arch.scheduling.callTwoArgs(
         null,
         current_task.stack,
         @intFromPtr(current_task),
+        @intFromBool(is_bootstrap_executor),
         struct {
-            fn initStage3Wrapper(inner_current_task_addr: usize) callconv(.c) noreturn {
-                initStage3(@ptrFromInt(inner_current_task_addr)) catch |err| {
+            fn initStage3Wrapper(
+                inner_current_task_addr: usize,
+                inner_is_bootstrap_executor: usize,
+            ) callconv(.c) noreturn {
+                initStage3(
+                    @ptrFromInt(inner_current_task_addr),
+                    inner_is_bootstrap_executor != 0,
+                ) catch |err| {
                     std.debug.panic("unhandled error: {t}", .{err});
                 };
             }
@@ -132,10 +143,8 @@ fn initStage2(current_task: *kernel.Task) !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(current_task: *kernel.Task) !noreturn {
-    const executor = current_task.state.running;
-
-    if (executor.id == .bootstrap) {
+fn initStage3(current_task: *kernel.Task, bootstrap_executor: bool) !noreturn {
+    if (bootstrap_executor) {
         Stage3Barrier.waitForAllNonBootstrapExecutors();
 
         log.debug("loading standard interrupt handlers", .{});
@@ -207,7 +216,10 @@ fn initStage4(current_task: *kernel.Task) !noreturn {
     unreachable;
 }
 
-fn createExecutors() ![]kernel.Executor {
+/// Creates an executor for each CPU.
+///
+/// Returns the slice of executors and the bootstrap executor.
+fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
     const current_task = kernel.Task.getCurrent();
 
     var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
@@ -222,6 +234,9 @@ fn createExecutors() ![]kernel.Executor {
     log.debug("initializing {} executors", .{descriptors.count()});
 
     const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
+
+    const bootstrap_architecture_processor_id = kernel.boot.bootstrapArchitectureProcessorId();
+    var opt_bootstrap_executor: ?*kernel.Executor = null;
 
     var i: u32 = 0;
 
@@ -243,24 +258,32 @@ fn createExecutors() ![]kernel.Executor {
             desc.architectureProcessorId(),
             current_task,
         );
+
+        if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) {
+            opt_bootstrap_executor = executor;
+        }
     }
 
-    return executors;
+    return .{ executors, opt_bootstrap_executor.? };
 }
 
 fn bootNonBootstrapExecutors() !void {
     var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
     var i: u32 = 0;
 
+    const bootstrap_architecture_processor_id = kernel.boot.bootstrapArchitectureProcessorId();
+
     while (descriptors.next()) |desc| : (i += 1) {
-        const executor = &kernel.globals.executors[i];
-        if (executor.id == .bootstrap) continue;
+        if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
 
         desc.boot(
-            executor.current_task,
+            kernel.globals.executors[i].current_task,
             struct {
                 fn bootFn(user_data: *anyopaque) noreturn {
-                    initStage2(@ptrCast(@alignCast(user_data))) catch |err| {
+                    initStage2(
+                        @ptrCast(@alignCast(user_data)),
+                        false,
+                    ) catch |err| {
                         std.debug.panic("unhandled error: {t}", .{err});
                     };
                 }
@@ -278,7 +301,6 @@ const Stage3Barrier = struct {
 
     /// Signal that the current executor has completed initialization.
     fn nonBootstrapExecutorReady() void {
-        std.debug.assert(kernel.Task.getCurrent().state.running.id != .bootstrap);
         _ = non_bootstrap_executors_ready.fetchAdd(1, .release);
     }
 
@@ -286,13 +308,11 @@ const Stage3Barrier = struct {
     ///
     /// Called by the bootstrap executor only.
     fn stage3Complete() void {
-        std.debug.assert(kernel.Task.getCurrent().state.running.id == .bootstrap);
         _ = stage3_complete.store(true, .release);
     }
 
     /// Wait for the bootstrap executor to signal that init stage 3 has completed.
     fn waitForStage3Completion() void {
-        std.debug.assert(kernel.Task.getCurrent().state.running.id != .bootstrap);
         while (!stage3_complete.load(.acquire)) {
             kernel.arch.spinLoopHint();
         }
@@ -302,7 +322,6 @@ const Stage3Barrier = struct {
     ///
     /// Called by the bootstrap executor only.
     fn waitForAllNonBootstrapExecutors() void {
-        std.debug.assert(kernel.Task.getCurrent().state.running.id == .bootstrap);
         while (non_bootstrap_executors_ready.load(.acquire) != (kernel.globals.executors.len - 1)) {
             kernel.arch.spinLoopHint();
         }

@@ -19,13 +19,6 @@ pub const time = @import("time.zig");
 
 pub const init = @import("init/init.zig");
 
-/// Get the executor with the given id.
-///
-/// It is the caller's responsibility to ensure the executor exists.
-pub inline fn getExecutor(id: Executor.Id) *Executor {
-    return &globals.executors[@intFromEnum(id)];
-}
-
 pub const Context = union(Type) {
     kernel,
     user: *Process,
