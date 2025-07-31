@@ -35,12 +35,7 @@ spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked (except 
 /// - the kernel task cleanup service
 next_task_node: std.SinglyLinkedList.Node = .{},
 
-context: Context,
-
-pub const Context = union(kernel.Context.Type) {
-    kernel: void,
-    user: *kernel.Process,
-};
+context: kernel.Context,
 
 pub const State = union(enum) {
     ready,
@@ -210,12 +205,7 @@ pub const internal = struct {
         arg1: u64,
         arg2: u64,
 
-        context: CreateContext,
-
-        pub const CreateContext = union(kernel.Context.Type) {
-            kernel: void,
-            user: *kernel.Process,
-        };
+        context: kernel.Context,
     };
 
     pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {

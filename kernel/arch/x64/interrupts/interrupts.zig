@@ -167,19 +167,23 @@ pub const InterruptFrame = extern struct {
         selector: Gdt.Selector,
     },
 
-    pub inline fn instructionPointer(interrupt_frame: *const InterruptFrame) usize {
+    pub fn instructionPointer(interrupt_frame: *const InterruptFrame) usize {
         return interrupt_frame.rip;
     }
 
-    pub inline fn context(interrupt_frame: *const InterruptFrame) kernel.Context.Type {
+    /// Returns the context that the interrupt was triggered from.
+    ///
+    /// Even if the current task is a user task the context will be `.kernel` if the interrupt was triggered while in
+    /// kernel mode.
+    pub fn context(interrupt_frame: *const InterruptFrame, current_task: *kernel.Task) kernel.Context {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .user,
+            .user_code => return .{ .user = current_task.context.user },
             else => unreachable,
         };
     }
 
-    pub inline fn createStackIterator(interrupt_frame: *const InterruptFrame) std.debug.StackIterator {
+    pub fn createStackIterator(interrupt_frame: *const InterruptFrame) std.debug.StackIterator {
         return .init(null, interrupt_frame.rbp);
     }
 
