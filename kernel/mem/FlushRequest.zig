@@ -22,7 +22,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) v
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
-        for (kernel.executors) |*executor| {
+        for (kernel.globals.executors) |*executor| {
             if (executor == current_executor) continue; // skip ourselves
             flush_request.requestExecutor(executor);
         }

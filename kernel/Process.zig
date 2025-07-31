@@ -57,10 +57,10 @@ pub fn create(current_task: *kernel.Task, scheduler_locked: core.LockState, opti
     std.debug.assert(process.reference_count.load(.monotonic) == 1);
 
     {
-        kernel.processes_lock.writeLock(current_task);
-        defer kernel.processes_lock.writeUnlock(current_task);
+        kernel.globals.processes_lock.writeLock(current_task);
+        defer kernel.globals.processes_lock.writeUnlock(current_task);
 
-        const gop = try kernel.processes.getOrPut(kernel.mem.heap.allocator, process);
+        const gop = try kernel.globals.processes.getOrPut(kernel.mem.heap.allocator, process);
         if (gop.found_existing) @panic("process already in processes list");
     }
     errdefer comptime unreachable;

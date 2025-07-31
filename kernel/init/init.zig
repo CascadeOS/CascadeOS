@@ -38,7 +38,7 @@ pub fn initStage1() !noreturn {
 
     try kernel.Task.init.initializeBootstrapInitTask(&bootstrap_init_task, &bootstrap_executor);
 
-    kernel.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
+    kernel.globals.executors = @as([*]kernel.Executor, @ptrCast(&bootstrap_executor))[0..1];
 
     log.debug("loading bootstrap executor", .{});
     kernel.arch.init.prepareBootstrapExecutor(
@@ -78,7 +78,7 @@ pub fn initStage1() !noreturn {
     try kernel.arch.interrupts.init.initializeInterruptRouting(&bootstrap_init_task);
 
     log.debug("initializing kernel executors", .{});
-    kernel.executors = try createExecutors();
+    kernel.globals.executors = try createExecutors();
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
     kernel.arch.init.loadExecutor(kernel.getExecutor(.bootstrap));
@@ -253,7 +253,7 @@ fn bootNonBootstrapExecutors() !void {
     var i: u32 = 0;
 
     while (descriptors.next()) |desc| : (i += 1) {
-        const executor = &kernel.executors[i];
+        const executor = &kernel.globals.executors[i];
         if (executor.id == .bootstrap) continue;
 
         desc.boot(
@@ -303,7 +303,7 @@ const Stage3Barrier = struct {
     /// Called by the bootstrap executor only.
     fn waitForAllNonBootstrapExecutors() void {
         std.debug.assert(kernel.Task.getCurrent().state.running.id == .bootstrap);
-        while (non_bootstrap_executors_ready.load(.acquire) != (kernel.executors.len - 1)) {
+        while (non_bootstrap_executors_ready.load(.acquire) != (kernel.globals.executors.len - 1)) {
             kernel.arch.spinLoopHint();
         }
     }

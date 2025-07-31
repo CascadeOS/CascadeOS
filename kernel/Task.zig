@@ -85,10 +85,10 @@ pub fn createKernelTask(current_task: *kernel.Task, options: CreateKernelTaskOpt
     }
 
     {
-        kernel.kernel_tasks_lock.writeLock(current_task);
-        defer kernel.kernel_tasks_lock.writeUnlock(current_task);
+        kernel.globals.kernel_tasks_lock.writeLock(current_task);
+        defer kernel.globals.kernel_tasks_lock.writeUnlock(current_task);
 
-        const gop = try kernel.kernel_tasks.getOrPut(kernel.mem.heap.allocator, task);
+        const gop = try kernel.globals.kernel_tasks.getOrPut(kernel.mem.heap.allocator, task);
         if (gop.found_existing) std.debug.panic("task already in kernel_tasks list", .{});
     }
 

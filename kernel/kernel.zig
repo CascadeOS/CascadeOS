@@ -17,17 +17,14 @@ pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 
-pub var executors: []Executor = &.{};
+pub const init = @import("init/init.zig");
 
 /// Get the executor with the given id.
 ///
 /// It is the caller's responsibility to ensure the executor exists.
 pub inline fn getExecutor(id: Executor.Id) *Executor {
-    return &executors[@intFromEnum(id)];
+    return &globals.executors[@intFromEnum(id)];
 }
-
-pub var processes_lock: sync.RwLock = .{};
-pub var processes: std.AutoArrayHashMapUnmanaged(*Process, void) = .{};
 
 pub const Context = union(Type) {
     kernel,
@@ -39,23 +36,27 @@ pub const Context = union(Type) {
     };
 };
 
-/// All currently living kernel tasks.
-///
-/// This does not include the per-executor scheduler or bootstrap init tasks.
-pub var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
-pub var kernel_tasks_lock: sync.RwLock = .{};
+pub const globals = struct {
+    pub var executors: []Executor = &.{};
 
-pub const init = @import("init/init.zig");
+    /// All currently living kernel tasks.
+    ///
+    /// This does not include the per-executor scheduler or bootstrap init tasks.
+    pub var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
+    pub var kernel_tasks_lock: sync.RwLock = .{};
+
+    pub var processes_lock: sync.RwLock = .{};
+    pub var processes: std.AutoArrayHashMapUnmanaged(*Process, void) = .{};
+};
 
 pub const panic = debug.panic_interface;
-
-comptime {
-    boot.exportEntryPoints();
-}
-
 pub const std_options: std.Options = .{
     .log_level = debug.log.log_level.toStd(),
     .logFn = debug.log.stdLogImpl,
 };
+
+comptime {
+    boot.exportEntryPoints();
+}
 
 const std = @import("std");

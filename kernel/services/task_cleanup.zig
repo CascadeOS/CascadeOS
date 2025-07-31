@@ -57,7 +57,7 @@ fn handleTask(current_task: *Task, task: *Task) void {
     std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
 
     const tasks_lock, const tasks = switch (task.context) {
-        .kernel => .{ &kernel.kernel_tasks_lock, &kernel.kernel_tasks },
+        .kernel => .{ &kernel.globals.kernel_tasks_lock, &kernel.globals.kernel_tasks },
         .user => |process| .{ &process.tasks_lock, &process.tasks },
     };
 

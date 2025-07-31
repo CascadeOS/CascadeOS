@@ -54,8 +54,8 @@ fn handleProcess(current_task: *kernel.Task, process: *kernel.Process) void {
     process.queued_for_cleanup.store(false, .release);
 
     {
-        kernel.processes_lock.writeLock(current_task);
-        defer kernel.processes_lock.writeUnlock(current_task);
+        kernel.globals.processes_lock.writeLock(current_task);
+        defer kernel.globals.processes_lock.writeUnlock(current_task);
 
         if (process.reference_count.load(.acquire) != 0) {
             @branchHint(.unlikely);
@@ -71,7 +71,7 @@ fn handleProcess(current_task: *kernel.Task, process: *kernel.Process) void {
             return;
         }
 
-        if (!kernel.processes.swapRemove(process)) @panic("process not found in processes");
+        if (!kernel.globals.processes.swapRemove(process)) @panic("process not found in processes");
     }
 
     kernel.Process.internal.destroy(current_task, process);
