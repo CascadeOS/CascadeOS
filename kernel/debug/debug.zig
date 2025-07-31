@@ -92,12 +92,12 @@ fn initPanic(
     const executor = kernel.arch.rawGetCurrentExecutor();
 
     if (globals.panicking_executor.cmpxchgStrong(
-        .none,
-        executor.id,
+        null,
+        executor,
         .acq_rel,
         .acquire,
-    )) |panicking_executor_id| {
-        if (panicking_executor_id != executor.id) return; // another executor is panicking
+    )) |panicking_executor| {
+        if (panicking_executor != executor) return; // another executor is panicking
     }
 
     kernel.init.Output.globals.lock.poison();
@@ -504,7 +504,7 @@ pub const globals = struct {
     /// The executor that is currently panicking.
     ///
     /// Public to allow other executors to check after receiving a panic IPI.
-    pub var panicking_executor: std.atomic.Value(kernel.Executor.Id) = .init(.none);
+    pub var panicking_executor: std.atomic.Value(?*const kernel.Executor) = .init(null);
 
     var panic_mode: PanicMode = .single_executor_init_panic;
 };

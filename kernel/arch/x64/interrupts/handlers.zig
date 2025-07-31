@@ -7,7 +7,7 @@ pub fn nonMaskableInterruptHandler(
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
-    if (kernel.debug.globals.panicking_executor.load(.acquire) == .none) {
+    if (kernel.debug.globals.panicking_executor.load(.acquire) == null) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
     }
 
