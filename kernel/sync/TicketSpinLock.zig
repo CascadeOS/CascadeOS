@@ -8,7 +8,7 @@
 const TicketSpinLock = @This();
 
 container: Container = .{ .full = 0 },
-holding_executor: kernel.Executor.Id = .none,
+holding_executor: ?*const kernel.Executor = null,
 
 /// Locks the spinlock.
 pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void {
@@ -27,7 +27,7 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void 
         _ = @atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire);
     }
 
-    ticket_spin_lock.holding_executor = current_task.state.running.id;
+    ticket_spin_lock.holding_executor = current_task.state.running;
     current_task.spinlocks_held += 1;
 }
 
@@ -62,7 +62,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) bo
         return false;
     }
 
-    ticket_spin_lock.holding_executor = current_task.state.running.id;
+    ticket_spin_lock.holding_executor = current_task.state.running;
     current_task.spinlocks_held += 1;
 
     return true;
@@ -85,7 +85,7 @@ pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) voi
 ///
 /// Performs no checks, prefer `unlock` instead.
 pub inline fn unsafeUnlock(ticket_spin_lock: *TicketSpinLock) void {
-    ticket_spin_lock.holding_executor = .none;
+    ticket_spin_lock.holding_executor = null;
     _ = @atomicRmw(u32, &ticket_spin_lock.container.contents.current, .Add, 1, .release);
 }
 
@@ -96,7 +96,7 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 
 /// Returns true if the spinlock is locked by the current executor.
 pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *const kernel.Task) bool {
-    return ticket_spin_lock.holding_executor == current_task.state.running.id;
+    return ticket_spin_lock.holding_executor == current_task.state.running;
 }
 
 const Container = extern union {
