@@ -51,8 +51,6 @@ pub fn build(b: *std.Build) !void {
         options,
         all_architectures,
     );
-
-    try DepGraphStep.register(b, kernels, libraries, tools);
 }
 
 fn disableUnsupportedSteps(b: *std.Build) !void {
@@ -126,7 +124,6 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
-const DepGraphStep = @import("build/DepGraphStep.zig");
 const ImageStep = @import("build/ImageStep.zig");
 const Kernel = @import("build/Kernel.zig");
 const Library = @import("build/Library.zig");

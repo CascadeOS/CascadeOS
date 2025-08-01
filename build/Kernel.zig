@@ -15,9 +15,6 @@ final_kernel_binary_path: std.Build.LazyPath,
 /// Installs both the stripped and fat kernel binaries.
 install_kernel_binaries: *Step,
 
-/// only used for generating a dependency graph
-dependencies: []const Library.Dependency,
-
 pub fn getKernels(
     b: *std.Build,
     step_collection: StepCollection,
@@ -235,8 +232,6 @@ fn create(
         .install_kernel_binaries = install_both_kernel_binaries,
 
         .final_kernel_binary_path = fat_kernel_with_sdf,
-
-        .dependencies = dependencies,
     };
 }
 
