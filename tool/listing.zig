@@ -2,20 +2,8 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const tools: []const ToolDescription = &.{
-    .{
-        .name = "image_builder",
-        .dependencies = &.{
-            .{ .name = "core" },
-            .{ .name = "fs" },
-            .{ .name = "uuid" },
-        },
-    },
-    .{
-        .name = "kernel_log_wrapper",
-        .dependencies = &.{
-            .{ .name = "core" },
-        },
-    },
+    .{ .name = "image_builder", .dependencies = &.{ "core", "fs", "uuid" } },
+    .{ .name = "kernel_log_wrapper", .dependencies = &.{"core"} },
     .{
         .name = "limine_install",
         .configuration = .{
@@ -24,10 +12,7 @@ pub const tools: []const ToolDescription = &.{
     },
     .{
         .name = "sdf_builder",
-        .dependencies = &.{
-            .{ .name = "core" },
-            .{ .name = "sdf" },
-        },
+        .dependencies = &.{ "core", "sdf" },
         .configuration = .{
             .custom = @import("sdf_builder/custom_configuration.zig").customConfiguration,
         },
@@ -35,4 +20,3 @@ pub const tools: []const ToolDescription = &.{
 };
 
 const ToolDescription = @import("../build/ToolDescription.zig");
-const LibraryDependency = @import("../build/LibraryDependency.zig");

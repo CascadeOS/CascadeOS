@@ -8,8 +8,8 @@ const ToolDescription = @This();
 ///   - used in any build steps created for the tool
 name: []const u8,
 
-/// The tools's dependencies.
-dependencies: []const LibraryDependency = &.{},
+/// The names of the libraries this tool depends on.
+dependencies: []const []const u8 = &.{},
 
 /// Allows for custom configuration of the tool.
 configuration: Configuration = .simple,
@@ -30,5 +30,3 @@ pub const Configuration = union(enum) {
 };
 
 const std = @import("std");
-
-const LibraryDependency = @import("LibraryDependency.zig");

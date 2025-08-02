@@ -7,8 +7,8 @@
 ///   - used in any build steps created for the library
 name: []const u8,
 
-/// The library's dependencies.
-dependencies: []const LibraryDependency = &.{},
+/// The names of the libraries this library depends on.
+dependencies: []const []const u8 = &.{},
 
 /// The architectures supported by the library.
 ///
@@ -17,11 +17,6 @@ supported_architectures: ?[]const CascadeTarget.Architecture = null,
 
 /// Whether the library can only be used or tested within Cascade.
 is_cascade_only: bool = false,
-
-/// The file name of the libraries root file.
-///
-/// If `null`, defaults to "name.zig".
-root_file_name: ?[]const u8 = null,
 
 /// Whether the library needs to be built with the LLVM backend.
 ///
@@ -32,4 +27,3 @@ need_llvm: bool = false,
 const std = @import("std");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const LibraryDependency = @import("LibraryDependency.zig");

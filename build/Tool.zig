@@ -20,9 +20,6 @@ test_exe: *Step.Compile,
 /// Installs the artifact produced by `normal_exe`
 exe_install_step: *Step,
 
-/// only used for generating a dependency graph
-dependencies: []const Library.Dependency,
-
 /// Resolves all tools and their dependencies.
 pub fn getTools(
     b: *std.Build,
@@ -51,18 +48,19 @@ fn resolveTool(
     optimize_mode: std.builtin.OptimizeMode,
 ) !Tool {
     const dependencies = blk: {
-        var dependencies = try std.ArrayList(Library.Dependency).initCapacity(b.allocator, tool_description.dependencies.len);
+        var dependencies: std.ArrayList(*const Library) = try .initCapacity(
+            b.allocator,
+            tool_description.dependencies.len,
+        );
         defer dependencies.deinit();
 
-        for (tool_description.dependencies) |dep| {
-            if (libraries.get(dep.name)) |dep_library| {
-                dependencies.appendAssumeCapacity(.{
-                    .import_name = dep.import_name orelse dep.name,
-                    .library = dep_library,
-                });
-            } else {
-                std.debug.panic("tool '{s}' has unresolvable dependency: {s}\n", .{ tool_description.name, dep.name });
-            }
+        for (tool_description.dependencies) |dep_name| {
+            const dep_library = libraries.get(dep_name) orelse std.debug.panic(
+                "tool '{s}' has unresolvable dependency: {s}\n",
+                .{ tool_description.name, dep_name },
+            );
+
+            dependencies.appendAssumeCapacity(dep_library);
         }
 
         break :blk try dependencies.toOwnedSlice();
@@ -223,8 +221,6 @@ fn resolveTool(
         .release_safe_exe = release_safe_exe,
         .test_exe = test_exe,
         .exe_install_step = &exe_install_step.step,
-
-        .dependencies = dependencies,
     };
 }
 
@@ -233,7 +229,7 @@ fn createModule(
     tool_description: ToolDescription,
     root_source_file: std.Build.LazyPath,
     optimize_mode: std.builtin.OptimizeMode,
-    dependencies: []const Library.Dependency,
+    dependencies: []const *const Library,
 ) *std.Build.Module {
     const module = b.createModule(.{
         .root_source_file = root_source_file,
@@ -250,13 +246,13 @@ fn createModule(
     module.addImport(tool_description.name, module);
 
     for (dependencies) |dep| {
-        const dep_module = dep.library.non_cascade_module_for_host orelse {
+        const dep_module = dep.non_cascade_module_for_host orelse {
             std.debug.panic(
                 "tool '{s}' depends on '{s}' that does not support the host architecture.\n",
-                .{ tool_description.name, dep.library.name },
+                .{ tool_description.name, dep.name },
             );
         };
-        module.addImport(dep.import_name, dep_module);
+        module.addImport(dep.name, dep_module);
     }
 
     switch (tool_description.configuration) {

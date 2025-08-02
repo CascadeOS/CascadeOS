@@ -47,8 +47,8 @@ fn getDependencies(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
     libraries: Library.Collection,
-) ![]const Library.Dependency {
-    var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
+) ![]const *const Library {
+    var dependencies: std.ArrayList(*const Library) = .init(b.allocator);
     errdefer dependencies.deinit();
 
     const kernel_component = @import("../kernel/listing.zig").components[0];
@@ -68,7 +68,7 @@ fn getDependencies(
         const library = libraries.get(dep.name) orelse
             std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
 
-        try dependencies.append(.{ .import_name = dep.name, .library = library });
+        try dependencies.append(library);
     }
 
     return try dependencies.toOwnedSlice();
@@ -320,7 +320,7 @@ fn constructUACPIStaticLib(
 fn constructKernelModule(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
-    dependencies: []const Library.Dependency,
+    dependencies: []const *const Library,
     source_file_modules: []const SourceFileModule,
     options: Options,
     kernel_option_module: *std.Build.Module,
@@ -339,13 +339,13 @@ fn constructKernelModule(
     });
 
     for (dependencies) |dep| {
-        const library_module = dep.library.cascade_modules.get(architecture) orelse
+        const library_module = dep.cascade_modules.get(architecture) orelse
             std.debug.panic(
                 "no module available for library '{s}' for architecture '{t}'",
-                .{ dep.library.name, architecture },
+                .{ dep.name, architecture },
             );
 
-        kernel_module.addImport(dep.import_name, library_module);
+        kernel_module.addImport(dep.name, library_module);
     }
 
     // self reference
@@ -527,7 +527,7 @@ const SourceFileModule = struct {
 ///
 /// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
 /// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
-fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const Library.Dependency) ![]const SourceFileModule {
+fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const *const Library) ![]const SourceFileModule {
     var modules = std.ArrayList(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
 
@@ -540,7 +540,7 @@ fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const L
     // add each dependencies files
     var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
     for (dependencies) |dep| {
-        try addFilesFromLibrary(b, &modules, &file_paths, options.root_path, dep.library, &processed_libraries);
+        try addFilesFromLibrary(b, &modules, &file_paths, options.root_path, dep, &processed_libraries);
     }
 
     const files_option = b.addOptions();
@@ -574,7 +574,7 @@ fn addFilesFromLibrary(
     try processed_libraries.put(library, {});
 
     for (library.dependencies) |dep| {
-        try addFilesFromLibrary(b, modules, file_paths, root_path, dep.library, processed_libraries);
+        try addFilesFromLibrary(b, modules, file_paths, root_path, dep, processed_libraries);
     }
 }
 

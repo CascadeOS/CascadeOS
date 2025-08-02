@@ -17,7 +17,7 @@ name: []const u8,
 directory_path: []const u8,
 
 /// The list of dependencies.
-dependencies: []const Dependency,
+dependencies: []const *const Library,
 
 /// The modules for each supported Cascade architecture.
 cascade_modules: Modules,
@@ -27,11 +27,6 @@ non_cascade_modules: Modules,
 
 /// If this library supports the hosts architecture the native module from `non_cascade_modules` will be stored here.
 non_cascade_module_for_host: ?*std.Build.Module,
-
-pub const Dependency = struct {
-    import_name: []const u8,
-    library: *Library,
-};
 
 /// Resolves all libraries and their dependencies.
 ///
@@ -101,23 +96,23 @@ fn resolveLibrary(
     all_library_descriptions: []const LibraryDescription,
 ) !?*Library {
     const dependencies = blk: {
-        var dependencies = try std.ArrayList(Dependency).initCapacity(b.allocator, library_description.dependencies.len);
+        var dependencies: std.ArrayList(*const Library) = try .initCapacity(
+            b.allocator,
+            library_description.dependencies.len,
+        );
         defer dependencies.deinit();
 
-        for (library_description.dependencies) |dep| {
-            if (resolved_libraries.get(dep.name)) |dep_library| {
-                dependencies.appendAssumeCapacity(.{
-                    .import_name = dep.import_name orelse dep.name,
-                    .library = dep_library,
-                });
+        for (library_description.dependencies) |dep_name| {
+            if (resolved_libraries.get(dep_name)) |dep_library| {
+                dependencies.appendAssumeCapacity(dep_library);
             } else {
                 // check if the dependency is a library that actually exists
                 for (all_library_descriptions) |desc| {
-                    if (std.mem.eql(u8, dep.name, desc.name)) break;
+                    if (std.mem.eql(u8, dep_name, desc.name)) break;
                 } else {
                     std.debug.panic(
                         "library '{s}' depends on non-existant library '{s}'",
-                        .{ library_description.name, dep.name },
+                        .{ library_description.name, dep_name },
                     );
                 }
 
@@ -133,8 +128,11 @@ fn resolveLibrary(
         library_description.name,
     });
 
-    const root_file_name = library_description.root_file_name orelse
-        try std.fmt.allocPrint(b.allocator, "{s}.zig", .{library_description.name});
+    const root_file_name = try std.fmt.allocPrint(
+        b.allocator,
+        "{s}.zig",
+        .{library_description.name},
+    );
 
     const lazy_path = b.path(b.pathJoin(&.{
         directory_path,
@@ -315,7 +313,7 @@ fn createModule(
     options: Options,
     cascade_target: CascadeTarget,
     purpose: enum { exe_root, dependency },
-    dependencies: []const Dependency,
+    dependencies: []const *const Library,
 ) !*std.Build.Module {
     const module = b.createModule(.{
         .root_source_file = lazy_path,
@@ -340,11 +338,11 @@ fn createModule(
 
     for (dependencies) |dependency| {
         const dependency_module = switch (cascade_target.context) {
-            .cascade => dependency.library.cascade_modules.get(cascade_target.architecture) orelse unreachable,
-            .non_cascade => dependency.library.non_cascade_modules.get(cascade_target.architecture) orelse unreachable,
+            .cascade => dependency.cascade_modules.get(cascade_target.architecture) orelse unreachable,
+            .non_cascade => dependency.non_cascade_modules.get(cascade_target.architecture) orelse unreachable,
         };
 
-        module.addImport(dependency.import_name, dependency_module);
+        module.addImport(dependency.name, dependency_module);
     }
 
     return module;
