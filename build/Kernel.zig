@@ -51,31 +51,24 @@ fn getDependencies(
     var dependencies = std.ArrayList(Library.Dependency).init(b.allocator);
     errdefer dependencies.deinit();
 
-    for (kernel_dependencies.dependencies) |dep| {
+    const kernel_component = @import("../kernel/listing.zig").components[0];
+    std.debug.assert(std.mem.eql(u8, kernel_component.name, "kernel"));
+
+    for (kernel_component.library_dependencies) |dep| {
+        switch (dep.condition) {
+            .always => {},
+            .architecture => |dep_architectures| blk: {
+                for (dep_architectures) |dep_architecture| {
+                    if (architecture == dep_architecture) break :blk;
+                }
+                continue;
+            },
+        }
+
         const library = libraries.get(dep.name) orelse
             std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
 
-        const import_name = dep.import_name orelse library.name;
-
-        try dependencies.append(.{ .import_name = import_name, .library = library });
-    }
-
-    // architecture specific dependencies
-    switch (architecture) {
-        inline else => |tag| {
-            const decl_name = comptime @tagName(tag) ++ "_dependencies";
-
-            if (@hasDecl(kernel_dependencies, decl_name)) {
-                for (@field(kernel_dependencies, decl_name)) |dep| {
-                    const library = libraries.get(dep.name) orelse
-                        std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
-
-                    const import_name = dep.import_name orelse library.name;
-
-                    try dependencies.append(.{ .import_name = import_name, .library = library });
-                }
-            }
-        },
+        try dependencies.append(.{ .import_name = dep.name, .library = library });
     }
 
     return try dependencies.toOwnedSlice();
@@ -634,5 +627,3 @@ const Library = @import("Library.zig");
 const Options = @import("Options.zig");
 const Tool = @import("Tool.zig");
 const StepCollection = @import("StepCollection.zig");
-
-const kernel_dependencies = @import("../kernel/dependencies.zig");
