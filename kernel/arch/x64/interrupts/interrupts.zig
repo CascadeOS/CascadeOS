@@ -45,7 +45,7 @@ pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {
     try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
 }
 
-export fn interruptDispatch(interrupt_frame: *InterruptFrame) void {
+export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
     const current_task, const restorer = kernel.Task.onInterruptEntry();
     defer restorer.exit(current_task);
     globals.handlers[interrupt_frame.vector_number.full].call(current_task, interrupt_frame);
@@ -127,14 +127,6 @@ pub const Interrupt = enum(u8) {
 
 pub const ArchInterruptFrame = InterruptFrame;
 pub const InterruptFrame = extern struct {
-    es: extern union {
-        full: u64,
-        selector: Gdt.Selector,
-    },
-    ds: extern union {
-        full: u64,
-        selector: Gdt.Selector,
-    },
     r15: u64,
     r14: u64,
     r13: u64,
@@ -204,9 +196,6 @@ pub const InterruptFrame = extern struct {
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("cs: {t}, ss: {t},\n", .{ value.cs.selector, value.ss.selector });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("ds: {t}, es: {t},\n", .{ value.ds.selector, value.es.selector });
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("rsp: 0x{x:0>16}, rip: 0x{x:0>16},\n", .{ value.rsp, value.rip });
@@ -370,11 +359,6 @@ pub const init = struct {
         break :blk raw_interrupt_handlers_temp;
     };
 };
-
-comptime {
-    // assumed by 'arch/interruptHandlers.S' and 'arch/interruptHandlerHelpers.inc'
-    std.debug.assert(@intFromEnum(Gdt.Selector.kernel_data) == 0x10);
-}
 
 const std = @import("std");
 const core = @import("core");
