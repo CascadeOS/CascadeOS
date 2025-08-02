@@ -143,6 +143,7 @@ fn create(
     kernel_exe.setLinkerScript(b.path(
         b.pathJoin(&.{
             "kernel",
+            "kernel",
             "arch",
             @tagName(architecture),
             "linker.ld",
@@ -247,12 +248,12 @@ fn constructSSFNStaticLib(b: *std.Build, architecture: CascadeTarget.Architectur
     });
     try ssfn_static_lib.installed_headers.append(.{
         .file = .{
-            .source = b.path("kernel/init/output/ssfn.h"),
+            .source = b.path("kernel/kernel/init/output/ssfn.h"),
             .dest_rel_path = "ssfn.h",
         },
     });
     ssfn_static_lib.addCSourceFile(.{
-        .file = b.path("kernel/init/output/ssfn.h"),
+        .file = b.path("kernel/kernel/init/output/ssfn.h"),
         .flags = &.{"-DSSFN_CONSOLEBITMAP_TRUECOLOR=1"},
         .language = .c,
     });
@@ -334,7 +335,7 @@ fn constructKernelModule(
     uacpi_static_lib: *std.Build.Step.Compile,
 ) !*std.Build.Module {
     const kernel_module = b.createModule(.{
-        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel.zig" })),
+        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel", "kernel.zig" })),
         .target = getKernelCrossTarget(architecture, b),
         .optimize = options.optimize,
         .sanitize_c = switch (options.optimize) {
@@ -410,6 +411,7 @@ fn constructKernelModule(
     // Add assembly files
     assembly_files_blk: {
         const assembly_files_dir_path = b.pathJoin(&.{
+            "kernel",
             "kernel",
             "arch",
             @tagName(architecture),
