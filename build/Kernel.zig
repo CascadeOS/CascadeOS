@@ -5,11 +5,6 @@ pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, Kern
 
 const Kernel = @This();
 
-b: *std.Build,
-
-architecture: CascadeTarget.Architecture,
-options: Options,
-
 final_kernel_binary_path: std.Build.LazyPath,
 
 /// Installs both the stripped and fat kernel binaries.
@@ -23,116 +18,114 @@ pub fn getKernels(
     options: Options,
     all_architectures: []const CascadeTarget.Architecture,
 ) !Collection {
+    const sdf_builder = tools.get("sdf_builder").?;
+
     var kernels: Collection = .{};
     try kernels.ensureTotalCapacity(b.allocator, @intCast(all_architectures.len));
 
-    const sdf_builder = tools.get("sdf_builder").?;
-
     for (all_architectures) |architecture| {
-        const kernel = try Kernel.create(
-            b,
+        kernels.putAssumeCapacityNoClobber(
             architecture,
-            libraries,
-            sdf_builder,
-            options,
-            step_collection,
+            try constructKernel(
+                b,
+                step_collection,
+                libraries,
+                sdf_builder,
+                options,
+                architecture,
+            ),
         );
-        kernels.putAssumeCapacityNoClobber(architecture, kernel);
     }
 
     return kernels;
 }
 
-fn getDependencies(
+fn constructKernel(
     b: *std.Build,
+    step_collection: StepCollection,
+    all_libraries: Library.Collection,
+    sdf_builder: Tool,
+    options: Options,
     architecture: CascadeTarget.Architecture,
-    libraries: Library.Collection,
-) ![]const *const Library {
-    var dependencies: std.ArrayList(*const Library) = .init(b.allocator);
-    errdefer dependencies.deinit();
+) !Kernel {
+    // TODO: create both a 'kernel' and a 'kernel-check' component, both exactly the same but with different kernel options
+    //       this allows us to enable as many code paths as possible in the kernel check step
 
-    const kernel_component = @import("../kernel/listing.zig").components[0];
-    std.debug.assert(std.mem.eql(u8, kernel_component.name, "kernel"));
+    const required_components = try getAllRequiredComponents(b, architecture);
 
-    for (kernel_component.library_dependencies) |dep| {
-        switch (dep.condition) {
-            .always => {},
-            .architecture => |dep_architectures| blk: {
-                for (dep_architectures) |dep_architecture| {
-                    if (architecture == dep_architecture) break :blk;
-                }
-                continue;
+    const required_libraries = try getAllRequiredLibraries(b, architecture, all_libraries, required_components);
+
+    try configureComponents(
+        b,
+        architecture,
+        required_components,
+        required_libraries,
+        options,
+    );
+
+    const kernel_module = blk: {
+        const kernel_module = required_components.get("kernel").?.module;
+
+        kernel_module.resolved_target = kernelCrossTarget(architecture, b);
+        kernel_module.optimize = options.optimize;
+        kernel_module.sanitize_c = switch (options.optimize) {
+            .ReleaseFast => .off,
+            .ReleaseSmall => .trap,
+            else => .full,
+        };
+
+        // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
+        kernel_module.strip = false;
+        kernel_module.omit_frame_pointer = false;
+
+        // apply architecture-specific configuration to the kernel
+        switch (architecture) {
+            .arm => {},
+            .riscv => {},
+            .x64 => {
+                kernel_module.code_model = .kernel;
+                kernel_module.red_zone = false;
             },
         }
 
-        const library = libraries.get(dep.name) orelse
-            std.debug.panic("kernel depends on non-existant library '{s}'", .{dep.name});
-
-        try dependencies.append(library);
-    }
-
-    return try dependencies.toOwnedSlice();
-}
-
-fn create(
-    b: *std.Build,
-    architecture: CascadeTarget.Architecture,
-    libraries: Library.Collection,
-    sdf_builder: Tool,
-    options: Options,
-    step_collection: StepCollection,
-) !Kernel {
-    const dependencies = try getDependencies(b, architecture, libraries);
-
-    const source_file_modules = try getSourceFileModules(b, options, dependencies);
-
-    const ssfn_static_lib = try constructSSFNStaticLib(b, architecture);
-    const uacpi_static_lib = try constructUACPIStaticLib(b, options, architecture);
-
-    {
-        const check_kernel_module = try constructKernelModule(
+        const source_file_modules = try getSourceFileModules(
             b,
-            architecture,
-            dependencies,
-            source_file_modules,
-            options,
-            options.all_enabled_kernel_option_module,
-            ssfn_static_lib,
-            uacpi_static_lib,
+            required_components,
+            required_libraries,
         );
+        for (source_file_modules) |module| {
+            kernel_module.addImport(module.name, module.module);
+        }
 
+        break :blk kernel_module;
+    };
+
+    // check exe
+    {
         const check_exe = b.addExecutable(.{
             .name = "kernel_check",
-            .root_module = check_kernel_module,
+            .root_module = kernel_module,
         });
         step_collection.registerCheck(check_exe);
     }
-
-    const kernel_module = try constructKernelModule(
-        b,
-        architecture,
-        dependencies,
-        source_file_modules,
-        options,
-        options.kernel_option_module,
-        ssfn_static_lib,
-        uacpi_static_lib,
-    );
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
         .root_module = kernel_module,
     });
 
-    // TODO: disable the x86 backend for now, as it does not support disabling SSE
-    // https://github.com/CascadeOS/CascadeOS/issues/99
-    kernel_exe.use_llvm = true;
+    if (architecture == .x64) {
+        // TODO: disable the x86 backend for now, as it does not support disabling SSE
+        // https://github.com/CascadeOS/CascadeOS/issues/99
+        kernel_exe.use_llvm = true;
+    }
 
     kernel_exe.entry = .disabled;
     kernel_exe.want_lto = false;
     kernel_exe.pie = true; // allow kaslr
     kernel_exe.linkage = .static;
 
+    // TODO: is there a better way to do this?
     kernel_exe.setLinkerScript(b.path(
         b.pathJoin(&.{
             "kernel",
@@ -218,228 +211,302 @@ fn create(
 
     step_collection.registerKernel(architecture, install_both_kernel_binaries);
 
-    return Kernel{
-        .b = b,
-        .architecture = architecture,
-        .options = options,
-
+    return .{
         .install_kernel_binaries = install_both_kernel_binaries,
-
         .final_kernel_binary_path = fat_kernel_with_sdf,
     };
 }
 
-fn constructSSFNStaticLib(b: *std.Build, architecture: CascadeTarget.Architecture) !*std.Build.Step.Compile {
-    const ssfn_static_lib = b.addLibrary(.{
-        .name = "ssfn",
-        .linkage = .static,
-        .root_module = b.createModule(.{
-            .target = getKernelCrossTarget(architecture, b),
-            .optimize = .ReleaseFast,
-            .pic = true,
-        }),
-    });
-    try ssfn_static_lib.installed_headers.append(.{
-        .file = .{
-            .source = b.path("kernel/kernel/init/output/ssfn.h"),
-            .dest_rel_path = "ssfn.h",
-        },
-    });
-    ssfn_static_lib.addCSourceFile(.{
-        .file = b.path("kernel/kernel/init/output/ssfn.h"),
-        .flags = &.{"-DSSFN_CONSOLEBITMAP_TRUECOLOR=1"},
-        .language = .c,
-    });
-    return ssfn_static_lib;
+/// Returns the kernel components required to build the kernel for the given architecture.
+///
+/// The modules for each component are created but not configured in any way.
+fn getAllRequiredComponents(
+    b: *std.Build,
+    architecture: CascadeTarget.Architecture,
+) !WipComponent.Collection {
+    var todo_components: std.StringArrayHashMapUnmanaged(void) = .empty;
+    try todo_components.putNoClobber(b.allocator, "kernel", {});
+
+    var required_components: WipComponent.Collection = .{};
+
+    while (todo_components.pop()) |entry| {
+        const component_name = entry.key;
+        if (required_components.contains(component_name)) continue;
+
+        const component = kernel_components.get(component_name) orelse {
+            std.debug.panic(
+                "kernel dependency graph contains non-existant kernel component '{s}'",
+                .{component_name},
+            );
+        };
+
+        for (component.component_dependencies) |dep| {
+            switch (dep.condition) {
+                .always => {},
+                .architecture => |dep_architectures| blk: {
+                    for (dep_architectures) |dep_architecture| {
+                        if (architecture == dep_architecture) break :blk;
+                    }
+                    continue;
+                },
+            }
+
+            try todo_components.put(b.allocator, dep.name, {});
+        }
+
+        try required_components.putNoClobber(b.allocator, component_name, .{
+            .kernel_component = component,
+            .directory_path = b.pathJoin(&.{
+                "kernel",
+                component.name,
+            }),
+            .module = b.createModule(.{}),
+        });
+    }
+
+    return required_components;
 }
 
-fn constructUACPIStaticLib(
+const WipComponent = struct {
+    kernel_component: *const KernelComponent,
+    directory_path: []const u8,
+    module: *std.Build.Module,
+    const Collection = std.StringArrayHashMapUnmanaged(WipComponent);
+};
+
+/// Returns the libraries required to build the kernel for the given architecture.
+fn getAllRequiredLibraries(
     b: *std.Build,
-    options: Options,
     architecture: CascadeTarget.Architecture,
-) !*std.Build.Step.Compile {
-    // in uACPI DEBUG is more verbose than TRACE
-    const uacpi_log_level: []const u8 = blk: {
-        if (options.kernel_log_level) |force_log_level|
-            break :blk switch (force_log_level) {
-                .debug => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_TRACE",
-                .verbose => "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG",
+    all_libraries: Library.Collection,
+    components: WipComponent.Collection,
+) !Library.Collection {
+    var required_libraries: Library.Collection = .{};
+
+    for (components.values()) |component| {
+        for (component.kernel_component.library_dependencies) |dep| {
+            if (required_libraries.contains(dep.name)) continue;
+
+            switch (dep.condition) {
+                .always => {},
+                .architecture => |dep_architectures| blk: {
+                    for (dep_architectures) |dep_architecture| {
+                        if (architecture == dep_architecture) break :blk;
+                    }
+                    continue;
+                },
+            }
+
+            const library = all_libraries.get(dep.name) orelse {
+                std.debug.panic(
+                    "kernel component '{s}' depends on non-existant library '{s}'",
+                    .{ component.kernel_component.name, dep.name },
+                );
             };
 
-        for (options.kernel_log_scopes) |scope| {
-            if (std.mem.eql(u8, scope, "uacpi")) break :blk "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_DEBUG";
+            try required_libraries.putNoClobber(b.allocator, dep.name, library);
         }
+    }
 
-        break :blk "-DUACPI_DEFAULT_LOG_LEVEL=UACPI_LOG_WARN";
-    };
-
-    const uacpi_dep = b.dependency("uacpi", .{});
-
-    const uacpi_static_lib = b.addLibrary(.{
-        .name = "uacpi",
-        .linkage = .static,
-        .root_module = b.createModule(.{
-            .target = getKernelCrossTarget(architecture, b),
-            .optimize = .ReleaseFast,
-            .pic = true,
-        }),
-    });
-
-    uacpi_static_lib.addCSourceFiles(.{
-        .root = uacpi_dep.path("source"),
-        .files = &.{
-            "default_handlers.c",
-            "event.c",
-            "interpreter.c",
-            "io.c",
-            "mutex.c",
-            "namespace.c",
-            "notify.c",
-            "opcodes.c",
-            "opregion.c",
-            "osi.c",
-            "registers.c",
-            "resources.c",
-            "shareable.c",
-            "sleep.c",
-            "stdlib.c",
-            "tables.c",
-            "types.c",
-            "uacpi.c",
-            "utilities.c",
-        },
-        .flags = &.{uacpi_log_level},
-    });
-    uacpi_static_lib.addIncludePath(uacpi_dep.path("include"));
-
-    uacpi_static_lib.installHeadersDirectory(uacpi_dep.path("include"), "", .{});
-
-    return uacpi_static_lib;
+    return required_libraries;
 }
 
-fn constructKernelModule(
+/// Configure each component in the given collection.
+fn configureComponents(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
-    dependencies: []const *const Library,
-    source_file_modules: []const SourceFileModule,
+    components: WipComponent.Collection,
+    libraries: Library.Collection,
     options: Options,
-    kernel_option_module: *std.Build.Module,
-    ssfn_static_lib: *std.Build.Step.Compile,
-    uacpi_static_lib: *std.Build.Step.Compile,
-) !*std.Build.Module {
-    const kernel_module = b.createModule(.{
-        .root_source_file = b.path(b.pathJoin(&.{ "kernel", "kernel", "kernel.zig" })),
-        .target = getKernelCrossTarget(architecture, b),
-        .optimize = options.optimize,
-        .sanitize_c = switch (options.optimize) {
-            .ReleaseFast => .off,
-            .ReleaseSmall => .trap,
-            else => .full,
-        },
-    });
+) !void {
+    for (components.values()) |c| {
+        const kernel_component = c.kernel_component;
+        const module = c.module;
 
-    for (dependencies) |dep| {
-        const library_module = dep.cascade_modules.get(architecture) orelse
-            std.debug.panic(
-                "no module available for library '{s}' for architecture '{t}'",
-                .{ dep.name, architecture },
+        // root source file
+        module.root_source_file = blk: {
+            const root_file_name = try std.fmt.allocPrint(
+                b.allocator,
+                "{s}.zig",
+                .{kernel_component.name},
             );
 
-        kernel_module.addImport(dep.name, library_module);
-    }
+            break :blk b.path(b.pathJoin(&.{
+                c.directory_path,
+                root_file_name,
+            }));
+        };
 
-    // self reference
-    kernel_module.addImport("kernel", kernel_module);
+        // library dependencies
+        for (kernel_component.library_dependencies) |dep| {
+            switch (dep.condition) {
+                .always => {},
+                .architecture => |dep_architectures| blk: {
+                    for (dep_architectures) |dep_architecture| {
+                        if (architecture == dep_architecture) break :blk;
+                    }
+                    continue;
+                },
+            }
 
-    // architecture options
-    kernel_module.addImport(
-        "cascade_architecture",
-        options.architecture_specific_kernel_options_modules.get(architecture).?,
-    );
-
-    // kernel options
-    kernel_module.addImport("kernel_options", kernel_option_module);
-
-    // ssfn
-    kernel_module.linkLibrary(ssfn_static_lib);
-
-    // uacpi
-    kernel_module.linkLibrary(uacpi_static_lib);
-
-    // devicetree
-    kernel_module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
-
-    // sbi
-    if (architecture == .riscv) {
-        kernel_module.addImport("sbi", b.dependency("sbi", .{}).module("sbi"));
-    }
-
-    // source file modules
-    for (source_file_modules) |module| {
-        kernel_module.addImport(module.name, module.module);
-    }
-
-    // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
-    kernel_module.strip = false;
-    ssfn_static_lib.root_module.strip = false;
-    uacpi_static_lib.root_module.strip = false;
-    kernel_module.omit_frame_pointer = false;
-    ssfn_static_lib.root_module.omit_frame_pointer = false;
-    uacpi_static_lib.root_module.omit_frame_pointer = false;
-
-    // apply architecture-specific configuration to the kernel
-    switch (architecture) {
-        .arm => {},
-        .riscv => {},
-        .x64 => {
-            kernel_module.code_model = .kernel;
-            ssfn_static_lib.root_module.code_model = .kernel;
-            uacpi_static_lib.root_module.code_model = .kernel;
-            kernel_module.red_zone = false;
-            ssfn_static_lib.root_module.red_zone = false;
-            uacpi_static_lib.root_module.red_zone = false;
-        },
-    }
-
-    // Add assembly files
-    assembly_files_blk: {
-        const assembly_files_dir_path = b.pathJoin(&.{
-            "kernel",
-            "kernel",
-            "arch",
-            @tagName(architecture),
-            "asm",
-        });
-
-        var assembly_files_dir = std.fs.cwd().openDir(assembly_files_dir_path, .{ .iterate = true }) catch break :assembly_files_blk;
-        defer assembly_files_dir.close();
-
-        var iter = assembly_files_dir.iterateAssumeFirstIteration();
-        while (try iter.next()) |entry| {
-            if (entry.kind != .file) {
+            const library = libraries.get(dep.name) orelse {
                 std.debug.panic(
-                    "found entry '{s}' with unexpected type '{t}' in assembly directory '{s}'\n",
-                    .{ entry.name, entry.kind, assembly_files_dir_path },
+                    "kernel component '{s}' depends on non-existant library '{s}'",
+                    .{ kernel_component.name, dep.name },
                 );
+            };
+
+            module.addImport(
+                dep.name,
+                library.cascade_modules.get(architecture) orelse unreachable,
+            );
+        }
+
+        // component dependencies
+        for (kernel_component.component_dependencies) |dep| {
+            switch (dep.condition) {
+                .always => {},
+                .architecture => |dep_architectures| blk: {
+                    for (dep_architectures) |dep_architecture| {
+                        if (architecture == dep_architecture) break :blk;
+                    }
+                    continue;
+                },
             }
 
-            // only add assembly files with the .s or .S extension
-            if (!std.mem.endsWith(u8, entry.name, ".s") and
-                !std.mem.endsWith(u8, entry.name, ".S"))
-            {
-                continue;
-            }
+            const component = components.get(dep.name) orelse {
+                std.debug.panic(
+                    "kernel component '{s}' depends on non-existant kernel component '{s}'",
+                    .{ kernel_component.name, dep.name },
+                );
+            };
 
-            const file_path = b.pathJoin(&.{ assembly_files_dir_path, entry.name });
-            kernel_module.addAssemblyFile(b.path(file_path));
+            module.addImport(dep.name, component.module);
+        }
+
+        // self reference
+        module.addImport(kernel_component.name, module);
+
+        // custom configuration
+        if (kernel_component.configuration) |configuration| {
+            try configuration(
+                b,
+                architecture,
+                module,
+                options,
+            );
         }
     }
-
-    return kernel_module;
 }
 
+/// Build the data for a source file map.
+///
+/// Returns a `std.Build.Module` per source file with the name of the file as the module import name,
+/// with a `embedded_source_files` module containing an array of the file names.
+///
+/// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
+/// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
+fn getSourceFileModules(
+    b: *std.Build,
+    required_components: WipComponent.Collection,
+    required_libraries: Library.Collection,
+) ![]const SourceFileModule {
+    var modules = std.ArrayList(SourceFileModule).init(b.allocator);
+    errdefer modules.deinit();
+
+    var file_paths = std.ArrayList([]const u8).init(b.allocator);
+    defer file_paths.deinit();
+
+    // add each component's files
+    for (required_components.values()) |component| {
+        try addFilesRecursive(
+            b,
+            &modules,
+            &file_paths,
+            component.directory_path,
+        );
+    }
+
+    // add each libraries files
+    var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
+    for (required_libraries.values()) |library| {
+        try addFilesFromLibrary(b, &modules, &file_paths, library, &processed_libraries);
+    }
+
+    const files_option = b.addOptions();
+    files_option.addOption([]const []const u8, "file_paths", file_paths.items);
+    try modules.append(.{ .name = "embedded_source_files", .module = files_option.createModule() });
+
+    return try modules.toOwnedSlice();
+}
+
+fn addFilesFromLibrary(
+    b: *std.Build,
+    modules: *std.ArrayList(SourceFileModule),
+    file_paths: *std.ArrayList([]const u8),
+    library: *const Library,
+    processed_libraries: *std.AutoHashMap(*const Library, void),
+) !void {
+    if (processed_libraries.contains(library)) return;
+
+    try addFilesRecursive(b, modules, file_paths, library.directory_path);
+
+    try processed_libraries.put(library, {});
+
+    for (library.dependencies) |dep| {
+        try addFilesFromLibrary(b, modules, file_paths, dep, processed_libraries);
+    }
+}
+
+/// Adds all files recursively in the given target path to the build.
+///
+/// Creates a `SourceFileModule` for each `.zig` file found, and adds the file path to the `files` array.
+fn addFilesRecursive(
+    b: *std.Build,
+    modules: *std.ArrayList(SourceFileModule),
+    files: *std.ArrayList([]const u8),
+    target_path: []const u8,
+) !void {
+    var dir = try std.fs.cwd().openDir(target_path, .{ .iterate = true });
+    defer dir.close();
+
+    var it = dir.iterate();
+
+    while (try it.next()) |file| {
+        switch (file.kind) {
+            .file => {
+                const extension = std.fs.path.extension(file.name);
+                // for now only zig files should be included
+                if (std.mem.eql(u8, extension, ".zig")) {
+                    const path = b.pathJoin(&.{ target_path, file.name });
+
+                    try files.append(path);
+                    const module = b.createModule(.{
+                        .root_source_file = b.path(path),
+                    });
+                    try modules.append(.{ .name = path, .module = module });
+                }
+            },
+            .directory => {
+                if (file.name[0] == '.') continue; // skip hidden directories
+
+                const path = b.pathJoin(&.{ target_path, file.name });
+                try addFilesRecursive(b, modules, files, path);
+            },
+            else => {},
+        }
+    }
+}
+
+/// Module created from a source file.
+const SourceFileModule = struct {
+    /// The file name and also the name of the module.
+    name: []const u8,
+    module: *std.Build.Module,
+};
+
 /// Returns a CrossTarget for building the kernel for the given architecture.
-fn getKernelCrossTarget(architecture: CascadeTarget.Architecture, b: *std.Build) std.Build.ResolvedTarget {
+pub fn kernelCrossTarget(architecture: CascadeTarget.Architecture, b: *std.Build) std.Build.ResolvedTarget {
     switch (architecture) {
         .arm => {
             const features = std.Target.aarch64.Feature;
@@ -513,116 +580,23 @@ fn getKernelCrossTarget(architecture: CascadeTarget.Architecture, b: *std.Build)
     }
 }
 
-/// Module created from a source file.
-const SourceFileModule = struct {
-    /// The file name and also the name of the module.
-    name: []const u8,
-    module: *std.Build.Module,
-};
+const kernel_components: std.StaticStringMap(*const KernelComponent) = .initComptime(blk: {
+    const component_listing = @import("../kernel/listing.zig").components;
 
-/// Build the data for a source file map.
-///
-/// Returns a `std.Build.Module` per source file with the name of the file as the module import name,
-/// with a `embedded_source_files` module containing an array of the file names.
-///
-/// This allows combining `ComptimeStringHashMap` and `@embedFile(file_name)`, providing access to the contents of
-/// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
-fn getSourceFileModules(b: *std.Build, options: Options, dependencies: []const *const Library) ![]const SourceFileModule {
-    var modules = std.ArrayList(SourceFileModule).init(b.allocator);
-    errdefer modules.deinit();
+    var components: [component_listing.len]struct { []const u8, *const KernelComponent } = undefined;
 
-    var file_paths = std.ArrayList([]const u8).init(b.allocator);
-    defer file_paths.deinit();
-
-    // add the kernel's files
-    try addFilesRecursive(b, &modules, &file_paths, options.root_path, b.pathJoin(&.{"kernel"}));
-
-    // add each dependencies files
-    var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
-    for (dependencies) |dep| {
-        try addFilesFromLibrary(b, &modules, &file_paths, options.root_path, dep, &processed_libraries);
+    for (component_listing, 0..) |component, i| {
+        components[i] = .{ component.name, &component };
     }
 
-    const files_option = b.addOptions();
-    files_option.addOption([]const []const u8, "file_paths", file_paths.items);
-    try modules.append(.{ .name = "embedded_source_files", .module = files_option.createModule() });
-
-    return try modules.toOwnedSlice();
-}
-
-const DependencyIterator = struct {
-    current_state: union(enum) {
-        core: struct {
-            dependencies: []const []const u8,
-            index: usize,
-        },
-    },
-};
-
-fn addFilesFromLibrary(
-    b: *std.Build,
-    modules: *std.ArrayList(SourceFileModule),
-    file_paths: *std.ArrayList([]const u8),
-    root_path: []const u8,
-    library: *const Library,
-    processed_libraries: *std.AutoHashMap(*const Library, void),
-) !void {
-    if (processed_libraries.contains(library)) return;
-
-    try addFilesRecursive(b, modules, file_paths, root_path, library.directory_path);
-
-    try processed_libraries.put(library, {});
-
-    for (library.dependencies) |dep| {
-        try addFilesFromLibrary(b, modules, file_paths, root_path, dep, processed_libraries);
-    }
-}
-
-/// Adds all files recursively in the given target path to the build.
-///
-/// Creates a `SourceFileModule` for each `.zig` file found, and adds the file path to the `files` array.
-fn addFilesRecursive(
-    b: *std.Build,
-    modules: *std.ArrayList(SourceFileModule),
-    files: *std.ArrayList([]const u8),
-    root_path: []const u8,
-    target_path: []const u8,
-) !void {
-    var dir = try std.fs.cwd().openDir(target_path, .{ .iterate = true });
-    defer dir.close();
-
-    var it = dir.iterate();
-
-    while (try it.next()) |file| {
-        switch (file.kind) {
-            .file => {
-                const extension = std.fs.path.extension(file.name);
-                // for now only zig files should be included
-                if (std.mem.eql(u8, extension, ".zig")) {
-                    const path = b.pathJoin(&.{ target_path, file.name });
-
-                    try files.append(path);
-                    const module = b.createModule(.{
-                        .root_source_file = b.path(path),
-                    });
-                    try modules.append(.{ .name = path, .module = module });
-                }
-            },
-            .directory => {
-                if (file.name[0] == '.') continue; // skip hidden directories
-
-                const path = b.pathJoin(&.{ target_path, file.name });
-                try addFilesRecursive(b, modules, files, root_path, path);
-            },
-            else => {},
-        }
-    }
-}
+    break :blk components;
+});
 
 const std = @import("std");
 const Step = std.Build.Step;
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const KernelComponent = @import("KernelComponent.zig");
 const Library = @import("Library.zig");
 const Options = @import("Options.zig");
 const Tool = @import("Tool.zig");

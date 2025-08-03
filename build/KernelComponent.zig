@@ -14,6 +14,13 @@ component_dependencies: []const Dependency = &.{},
 /// The libraries that this component can access via `@import`.
 library_dependencies: []const Dependency = &.{},
 
+configuration: ?*const fn (
+    b: *std.Build,
+    architecture: CascadeTarget.Architecture,
+    module: *std.Build.Module,
+    options: Options,
+) anyerror!void = null,
+
 pub const Dependency = struct {
     name: []const u8,
     condition: Condition = .always,
@@ -27,3 +34,4 @@ pub const Dependency = struct {
 const std = @import("std");
 
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Options = @import("Options.zig");

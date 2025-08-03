@@ -4,6 +4,7 @@
 pub const components: []const KernelComponent = &.{
     .{
         .name = "kernel",
+        .component_dependencies = &.{},
         .library_dependencies = &.{
             .{ .name = "core" },
             .{ .name = "limine" },
@@ -27,6 +28,7 @@ pub const components: []const KernelComponent = &.{
                 },
             },
         },
+        .configuration = @import("kernel/custom_configuration.zig").customConfiguration,
     },
 };
 
