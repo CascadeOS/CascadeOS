@@ -140,6 +140,7 @@ const UnlockType = enum {
     unlocked,
 };
 
-const core = @import("core");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const std = @import("std");

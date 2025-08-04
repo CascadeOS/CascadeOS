@@ -4036,10 +4036,6 @@ comptime {
     std.debug.assert(@sizeOf(acpi.Address) == @sizeOf(c_uacpi.acpi_gas));
 }
 
-const std = @import("std");
-const core = @import("core");
-const kernel = @import("kernel");
-const acpi = kernel.acpi;
 const c_uacpi = @cImport({
     @cInclude("uacpi/event.h");
     @cInclude("uacpi/io.h");
@@ -4056,3 +4052,9 @@ const c_uacpi = @cImport({
     @cInclude("uacpi/uacpi.h");
     @cInclude("uacpi/utilities.h");
 });
+
+const kernel = @import("kernel");
+
+const acpi = kernel.acpi;
+const core = @import("core");
+const std = @import("std");

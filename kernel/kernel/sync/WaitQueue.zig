@@ -87,6 +87,7 @@ pub fn wait(
     });
 }
 
-const core = @import("core");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const std = @import("std");

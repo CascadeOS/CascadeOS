@@ -521,11 +521,12 @@ const small_page_size = PageTable.small_page_size;
 const medium_page_size = PageTable.medium_page_size;
 const large_page_size = PageTable.large_page_size;
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
+
+const core = @import("core");
 const lib_x64 = @import("x64");
-const PageTable = lib_x64.PageTable;
-const MapType = kernel.mem.MapType;
 const log = kernel.debug.log.scoped(.paging);
+const MapType = kernel.mem.MapType;
+const PageTable = lib_x64.PageTable;
+const std = @import("std");
+const x64 = @import("x64.zig");

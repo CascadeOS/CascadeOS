@@ -532,7 +532,8 @@ pub const SPCR = extern struct {
     };
 };
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+
 const acpi = kernel.acpi;
+const core = @import("core");
+const std = @import("std");

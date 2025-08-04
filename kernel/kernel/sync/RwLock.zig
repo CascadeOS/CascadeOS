@@ -154,6 +154,7 @@ const WRITER_MASK: usize = std.math.maxInt(Count) << @ctz(WRITER);
 const READER_MASK: usize = std.math.maxInt(Count) << @ctz(READER);
 const Count = std.meta.Int(.unsigned, @divFloor(@bitSizeOf(usize) - 1, 2));
 
-const core = @import("core");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const std = @import("std");

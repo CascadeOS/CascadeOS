@@ -39,8 +39,9 @@ pub var mtrr_number_of_variable_registers: u8 = 0;
 /// Are write combining memory types supported?
 pub var mtrr_write_combining_supported: bool = false;
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
+
+const core = @import("core");
 const lib_x64 = @import("x64");
+const std = @import("std");
+const x64 = @import("x64.zig");

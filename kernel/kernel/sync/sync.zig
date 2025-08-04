@@ -7,6 +7,7 @@ pub const RwLock = @import("RwLock.zig");
 pub const TicketSpinLock = @import("TicketSpinLock.zig");
 pub const WaitQueue = @import("WaitQueue.zig");
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

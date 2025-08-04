@@ -96,10 +96,11 @@ const SBIDebugConsole = struct {
     };
 };
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const riscv = @import("riscv.zig");
+
+const core = @import("core");
 const lib_riscv = @import("riscv");
 const log = kernel.debug.log.scoped(.init_riscv);
+const riscv = @import("riscv.zig");
 const sbi = @import("sbi");
+const std = @import("std");

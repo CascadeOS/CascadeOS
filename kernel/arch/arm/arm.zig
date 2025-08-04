@@ -21,6 +21,7 @@ pub const io = struct {
     pub const Port = u64;
 };
 
-const std = @import("std");
 const kernel = @import("kernel");
+
 const lib_arm = @import("arm");
+const std = @import("std");

@@ -4,6 +4,7 @@
 pub const process_cleanup = @import("process_cleanup.zig");
 pub const task_cleanup = @import("task_cleanup.zig");
 
+const kernel = @import("kernel");
+
 const std = @import("std");
 const core = @import("core");
-const kernel = @import("kernel");

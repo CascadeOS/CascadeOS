@@ -9,8 +9,9 @@ tss: lib_x64.Tss = .{},
 double_fault_stack: kernel.Task.Stack,
 non_maskable_interrupt_stack: kernel.Task.Stack,
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
+
+const core = @import("core");
 const lib_x64 = @import("x64");
+const std = @import("std");
+const x64 = @import("x64.zig");

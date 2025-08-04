@@ -105,6 +105,7 @@ pub fn unpark(
     parker.unpark_attempts.store(0, .release);
 }
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

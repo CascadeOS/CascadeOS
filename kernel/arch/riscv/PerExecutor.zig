@@ -3,8 +3,9 @@
 
 hartid: u32,
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const riscv = @import("riscv.zig");
+
+const core = @import("core");
 const lib_riscv = @import("riscv");
+const riscv = @import("riscv.zig");
+const std = @import("std");

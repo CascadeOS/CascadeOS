@@ -43,5 +43,6 @@ comptime {
     std.debug.assert(std.math.isPowerOfTwo(slots_per_chunk));
 }
 
-const std = @import("std");
 const kernel = @import("kernel");
+
+const std = @import("std");

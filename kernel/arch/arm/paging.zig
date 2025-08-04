@@ -24,8 +24,9 @@ pub const ArchPageTable = struct {};
 
 pub const init = struct {};
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+
 const arm = @import("arm.zig");
+const core = @import("core");
 const lib_arm = @import("arm");
+const std = @import("std");

@@ -206,9 +206,9 @@ const GetSerialOutputError = DeviceTree.IteratorError ||
     uart.Baud.DivisorError;
 const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart;
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
 
-const uart = kernel.init.Output.uart;
+const core = @import("core");
 const log = kernel.debug.log.scoped(.devicetree);
+const std = @import("std");
+const uart = kernel.init.Output.uart;

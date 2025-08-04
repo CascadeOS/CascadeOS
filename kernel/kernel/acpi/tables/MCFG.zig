@@ -45,7 +45,8 @@ pub const MCFG = extern struct {
     }
 };
 
+const kernel = @import("kernel");
+
+const acpi = kernel.acpi;
 const core = @import("core");
 const std = @import("std");
-const kernel = @import("kernel");
-const acpi = kernel.acpi;

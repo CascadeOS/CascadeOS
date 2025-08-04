@@ -92,7 +92,8 @@ pub inline fn format(
     });
 }
 
-const core = @import("core");
 const kernel = @import("kernel");
-const std = @import("std");
+
+const core = @import("core");
 const MapType = kernel.mem.MapType;
+const std = @import("std");

@@ -129,9 +129,10 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_ioapic);
 };
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
-const lib_x64 = @import("x64");
+
+const core = @import("core");
 const IOAPIC = lib_x64.IOAPIC;
+const lib_x64 = @import("x64");
+const std = @import("std");
+const x64 = @import("x64.zig");

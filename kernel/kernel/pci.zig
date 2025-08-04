@@ -388,7 +388,8 @@ pub const init = struct {
 const DEVICES_PER_BUS = 32;
 const FUNCTIONS_PER_DEVICE = 8;
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+
 const acpi = kernel.acpi;
+const core = @import("core");
+const std = @import("std");

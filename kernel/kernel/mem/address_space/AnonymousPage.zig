@@ -78,8 +78,9 @@ pub const init = struct {
 
 const Page = kernel.mem.Page; // called a `vm_page` in uvm
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const log = kernel.debug.log.scoped(.address_space);
+
 const Cache = kernel.mem.cache.Cache;
+const core = @import("core");
+const log = kernel.debug.log.scoped(.address_space);
+const std = @import("std");

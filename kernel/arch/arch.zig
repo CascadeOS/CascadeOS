@@ -775,7 +775,8 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     }
 }
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
+
 const cascade_arch = kernel.config.cascade_arch;
+const core = @import("core");
+const std = @import("std");
