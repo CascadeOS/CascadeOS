@@ -148,7 +148,7 @@ pub const log_level: Level = blk: {
         };
     }
 
-    break :blk switch (builtin.mode) {
+    break :blk switch (@import("builtin").mode) {
         .Debug => .info,
         .ReleaseSafe, .ReleaseFast, .ReleaseSmall => .warn,
     };
@@ -204,8 +204,8 @@ const globals = struct {
 
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
-const std = @import("std");
-const core = @import("core");
 const kernel = @import("kernel");
-const builtin = @import("builtin");
+
+const core = @import("core");
 const kernel_options = @import("kernel_options");
+const std = @import("std");

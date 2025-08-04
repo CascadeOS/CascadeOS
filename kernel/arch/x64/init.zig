@@ -78,19 +78,19 @@ fn prepareExecutorShared(
     double_fault_stack: kernel.Task.Stack,
     non_maskable_interrupt_stack: kernel.Task.Stack,
 ) void {
-    executor.arch = .{
+    executor.arch_specific = .{
         .apic_id = apic_id,
         .double_fault_stack = double_fault_stack,
         .non_maskable_interrupt_stack = non_maskable_interrupt_stack,
     };
 
-    executor.arch.tss.setInterruptStack(
+    executor.arch_specific.tss.setInterruptStack(
         @intFromEnum(x64.interrupts.InterruptStackSelector.double_fault),
-        executor.arch.double_fault_stack.stack_pointer,
+        executor.arch_specific.double_fault_stack.stack_pointer,
     );
-    executor.arch.tss.setInterruptStack(
+    executor.arch_specific.tss.setInterruptStack(
         @intFromEnum(x64.interrupts.InterruptStackSelector.non_maskable_interrupt),
-        executor.arch.non_maskable_interrupt_stack.stack_pointer,
+        executor.arch_specific.non_maskable_interrupt_stack.stack_pointer,
     );
 }
 
@@ -98,8 +98,8 @@ fn prepareExecutorShared(
 pub fn loadExecutor(executor: *kernel.Executor) void {
     x64.interrupts.disableInterrupts(); // some CPUs don't have interrupts disabled on load
 
-    executor.arch.gdt.load();
-    executor.arch.gdt.setTss(&executor.arch.tss);
+    executor.arch_specific.gdt.load();
+    executor.arch_specific.gdt.setTss(&executor.arch_specific.tss);
 
     x64.interrupts.init.loadIdt();
 

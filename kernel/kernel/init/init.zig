@@ -33,7 +33,7 @@ pub fn initStage1() !noreturn {
     var bootstrap_executor_backing: kernel.Executor = .{
         .id = @enumFromInt(0),
         .current_task = current_task,
-        .arch = undefined, // set by `arch.init.prepareBootstrapExecutor`
+        .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
         .scheduler_task = undefined, // not used
     };
     var bootstrap_executor = &bootstrap_executor_backing;
@@ -43,20 +43,20 @@ pub fn initStage1() !noreturn {
     kernel.globals.executors = @as([*]kernel.Executor, @ptrCast(bootstrap_executor))[0..1];
 
     log.debug("loading bootstrap executor", .{});
-    kernel.arch.init.prepareBootstrapExecutor(
+    arch.init.prepareBootstrapExecutor(
         bootstrap_executor,
         kernel.boot.bootstrapArchitectureProcessorId(),
     );
-    kernel.arch.init.loadExecutor(bootstrap_executor);
+    arch.init.loadExecutor(bootstrap_executor);
 
     log.debug("initializing early interrupts", .{});
-    kernel.arch.interrupts.init.initializeEarlyInterrupts();
+    arch.interrupts.init.initializeEarlyInterrupts();
 
     log.debug("capturing early system information", .{});
-    kernel.arch.init.captureEarlySystemInformation();
+    arch.init.captureEarlySystemInformation();
 
     log.debug("configuring per-executor system features", .{});
-    kernel.arch.init.configurePerExecutorSystemFeatures(bootstrap_executor);
+    arch.init.configurePerExecutorSystemFeatures(bootstrap_executor);
 
     log.debug("initializing memory system", .{});
     try kernel.mem.init.initializeMemorySystem(current_task);
@@ -65,19 +65,19 @@ pub fn initStage1() !noreturn {
     try Output.remapOutputs(current_task);
 
     log.debug("capturing system information", .{});
-    try kernel.arch.init.captureSystemInformation(switch (kernel.config.cascade_arch) {
+    try arch.init.captureSystemInformation(switch (kernel.config.cascade_arch) {
         .x64 => .{ .x2apic_enabled = kernel.boot.x2apicEnabled() },
         else => .{},
     });
 
     log.debug("configuring global system features", .{});
-    try kernel.arch.init.configureGlobalSystemFeatures();
+    try arch.init.configureGlobalSystemFeatures();
 
     log.debug("initializing time", .{});
     try kernel.time.init.initializeTime();
 
     log.debug("initializing interrupt routing", .{});
-    try kernel.arch.interrupts.init.initializeInterruptRouting(current_task);
+    try arch.interrupts.init.initializeInterruptRouting(current_task);
 
     log.debug("initializing kernel executors", .{});
     const executors, bootstrap_executor = try createExecutors();
@@ -85,7 +85,7 @@ pub fn initStage1() !noreturn {
     current_task = bootstrap_executor.current_task;
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
-    kernel.arch.init.loadExecutor(bootstrap_executor);
+    arch.init.loadExecutor(bootstrap_executor);
 
     kernel.debug.setPanicMode(.init_panic);
     kernel.debug.log.setLogMode(.init_log);
@@ -105,18 +105,18 @@ pub fn initStage1() !noreturn {
 fn initStage2(current_task: *kernel.Task, is_bootstrap_executor: bool) !noreturn {
     kernel.mem.globals.core_page_table.load();
     const executor = current_task.state.running;
-    kernel.arch.init.loadExecutor(executor);
+    arch.init.loadExecutor(executor);
 
     log.debug("configuring per-executor system features on {f}", .{executor.id});
-    kernel.arch.init.configurePerExecutorSystemFeatures(executor);
+    arch.init.configurePerExecutorSystemFeatures(executor);
 
     log.debug("configuring local interrupt controller on {f}", .{executor.id});
-    kernel.arch.init.initLocalInterruptController();
+    arch.init.initLocalInterruptController();
 
     log.debug("enabling per-executor interrupt on {f}", .{executor.id});
     kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
 
-    try kernel.arch.scheduling.callTwoArgs(
+    try arch.scheduling.callTwoArgs(
         null,
         current_task.stack,
         @intFromPtr(current_task),
@@ -148,7 +148,7 @@ fn initStage3(current_task: *kernel.Task, bootstrap_executor: bool) !noreturn {
         Stage3Barrier.waitForAllNonBootstrapExecutors();
 
         log.debug("loading standard interrupt handlers", .{});
-        kernel.arch.interrupts.init.loadStandardInterruptHandlers();
+        arch.interrupts.init.loadStandardInterruptHandlers();
 
         log.debug("creating and scheduling init stage 4 task", .{});
         {
@@ -245,7 +245,7 @@ fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
 
         executor.* = .{
             .id = @enumFromInt(i),
-            .arch = undefined, // set by `arch.init.prepareExecutor`
+            .arch_specific = undefined, // set by `arch.init.prepareExecutor`
             .current_task = undefined, // set below by `Task.init.createAndAssignInitTask`
             .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
         };
@@ -253,7 +253,7 @@ fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
         try kernel.Task.init.createAndAssignInitTask(current_task, executor);
         try kernel.Task.init.initializeSchedulerTask(current_task, &executor.scheduler_task, executor);
 
-        kernel.arch.init.prepareExecutor(
+        arch.init.prepareExecutor(
             executor,
             desc.architectureProcessorId(),
             current_task,
@@ -314,7 +314,7 @@ const Stage3Barrier = struct {
     /// Wait for the bootstrap executor to signal that init stage 3 has completed.
     fn waitForStage3Completion() void {
         while (!stage3_complete.load(.acquire)) {
-            kernel.arch.spinLoopHint();
+            arch.spinLoopHint();
         }
     }
 
@@ -323,12 +323,14 @@ const Stage3Barrier = struct {
     /// Called by the bootstrap executor only.
     fn waitForAllNonBootstrapExecutors() void {
         while (non_bootstrap_executors_ready.load(.acquire) != (kernel.globals.executors.len - 1)) {
-            kernel.arch.spinLoopHint();
+            arch.spinLoopHint();
         }
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.init);
+const std = @import("std");

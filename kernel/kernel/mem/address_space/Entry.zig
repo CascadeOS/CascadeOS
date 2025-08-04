@@ -52,7 +52,7 @@ pub fn destroy(entry: *Entry, current_task: *kernel.Task) void {
 pub fn range(entry: *const Entry) core.VirtualRange {
     return .fromAddr(
         entry.base,
-        kernel.arch.paging.standard_page_size.multiplyScalar(entry.number_of_pages),
+        arch.paging.standard_page_size.multiplyScalar(entry.number_of_pages),
     );
 }
 
@@ -77,7 +77,7 @@ pub fn offsetOfAddressInEntry(entry: *const Entry, address: core.VirtualAddress)
 
     return @intCast(address
         .subtract(entry.base)
-        .divide(kernel.arch.paging.standard_page_size)
+        .divide(arch.paging.standard_page_size)
         .value);
 }
 
@@ -336,8 +336,10 @@ const Object = @import("Object.zig");
 
 const Protection = kernel.mem.MapType.Protection;
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const log = kernel.debug.log.scoped(.address_space);
+
 const Cache = kernel.mem.cache.Cache;
+const core = @import("core");
+const log = kernel.debug.log.scoped(.address_space);
+const std = @import("std");

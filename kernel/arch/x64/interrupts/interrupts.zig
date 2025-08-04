@@ -360,12 +360,14 @@ pub const init = struct {
     };
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const x64 = @import("../x64.zig");
-const lib_x64 = @import("x64");
-const Idt = lib_x64.Idt;
+
+const core = @import("core");
 const Gdt = lib_x64.Gdt;
-const InterruptHandler = kernel.arch.interrupts.InterruptHandler;
+const Idt = lib_x64.Idt;
 const interrupt_handlers = @import("handlers.zig");
+const InterruptHandler = arch.interrupts.InterruptHandler;
+const lib_x64 = @import("x64");
+const std = @import("std");
+const x64 = @import("../x64.zig");

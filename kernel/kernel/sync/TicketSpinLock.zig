@@ -20,7 +20,7 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *kernel.Task) void 
 
     if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire) != ticket) {
         while (true) {
-            kernel.arch.spinLoopHint();
+            arch.spinLoopHint();
             if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .monotonic) == ticket) break;
         }
 
@@ -111,6 +111,8 @@ const Container = extern union {
     }
 };
 
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const std = @import("std");

@@ -142,14 +142,14 @@ fn switchToIdleDeferredAction(
 
     const scheduler_task = &current_executor.scheduler_task;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, scheduler_task);
+    arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, scheduler_task);
 
     scheduler_task.state = .{ .running = current_executor };
     scheduler_task.spinlocks_held = 1;
     scheduler_task.interrupt_disable_count = 1;
     current_executor.current_task = scheduler_task;
 
-    kernel.arch.scheduling.callFourArgs(
+    arch.scheduling.callFourArgs(
         old_task,
         scheduler_task.stack,
 
@@ -178,13 +178,13 @@ fn switchToTaskFromIdleYield(current_task: *kernel.Task, new_task: *kernel.Task)
 
     const scheduler_task = current_task;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(executor, scheduler_task, new_task);
+    arch.scheduling.prepareForJumpToTaskFromTask(executor, scheduler_task, new_task);
 
     new_task.state = .{ .running = executor };
     executor.current_task = new_task;
     scheduler_task.state = .ready;
 
-    kernel.arch.scheduling.jumpToTask(new_task);
+    arch.scheduling.jumpToTask(new_task);
     @panic("task returned");
 }
 
@@ -203,14 +203,14 @@ fn switchToTaskFromTaskYield(
 
     const current_executor = old_task.state.running;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
+    arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
 
     new_task.state = .{ .running = current_executor };
     current_executor.current_task = new_task;
 
     old_task.state = .ready;
 
-    kernel.arch.scheduling.jumpToTaskFromTask(old_task, new_task);
+    arch.scheduling.jumpToTaskFromTask(old_task, new_task);
 }
 
 fn switchToTaskFromTaskDeferredAction(
@@ -244,7 +244,7 @@ fn switchToTaskFromTaskDeferredAction(
             current_executor.current_task = inner_new_task;
             scheduler_task.state = .ready;
 
-            kernel.arch.scheduling.jumpToTask(inner_new_task);
+            arch.scheduling.jumpToTask(inner_new_task);
             @panic("task returned");
         }
     };
@@ -258,7 +258,7 @@ fn switchToTaskFromTaskDeferredAction(
 
     const current_executor = old_task.state.running;
 
-    kernel.arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
+    arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
 
     const scheduler_task = &current_executor.scheduler_task;
 
@@ -267,7 +267,7 @@ fn switchToTaskFromTaskDeferredAction(
     scheduler_task.interrupt_disable_count = 1;
     current_executor.current_task = scheduler_task;
 
-    kernel.arch.scheduling.callFourArgs(
+    arch.scheduling.callFourArgs(
         old_task,
         current_executor.scheduler_task.stack,
 
@@ -298,14 +298,14 @@ pub fn isLockedByCurrent(current_task: *kernel.Task) bool {
 
 pub fn newTaskEntry(
     current_task: *kernel.Task,
-    /// must be a function compatible with `kernel.arch.scheduling.NewTaskFunction`
+    /// must be a function compatible with `arch.scheduling.NewTaskFunction`
     target_function_addr: *const anyopaque,
     task_arg1: usize,
     task_arg2: usize,
 ) callconv(.c) noreturn {
     globals.lock.unlock(current_task);
 
-    const func: kernel.arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
+    const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
     func(current_task, task_arg1, task_arg2);
     @panic("task returned to entry point");
 }
@@ -313,7 +313,7 @@ pub fn newTaskEntry(
 fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
     std.debug.assert(current_task.interrupt_disable_count == 0);
     std.debug.assert(current_task.spinlocks_held == 0);
-    std.debug.assert(kernel.arch.interrupts.areEnabled());
+    std.debug.assert(arch.interrupts.areEnabled());
 
     log.verbose("entering idle", .{});
 
@@ -327,7 +327,7 @@ fn idle(current_task: *kernel.Task) callconv(.c) noreturn {
             }
         }
 
-        kernel.arch.halt();
+        arch.halt();
     }
 }
 
@@ -336,7 +336,9 @@ const globals = struct {
     var ready_to_run: core.containers.FIFO = .{};
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.scheduler);
+const std = @import("std");

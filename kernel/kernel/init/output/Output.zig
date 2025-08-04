@@ -26,7 +26,7 @@ pub fn registerOutputs() void {
         globals.framebuffer_output = output;
     }
 
-    if (kernel.arch.init.tryGetSerialOutput()) |output| {
+    if (arch.init.tryGetSerialOutput()) |output| {
         globals.serial_output = output;
     }
 }
@@ -89,7 +89,7 @@ pub const globals = struct {
     var framebuffer_output: ?Output = null;
     var serial_output: ?Output = null;
 
-    var writer_buffer: [kernel.arch.paging.standard_page_size.value]u8 = undefined;
+    var writer_buffer: [arch.paging.standard_page_size.value]u8 = undefined;
 
     var writer: std.Io.Writer = .{
         .buffer = &globals.writer_buffer,
@@ -126,7 +126,9 @@ pub const globals = struct {
 
 pub const uart = @import("uart.zig");
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.init_output);
+const std = @import("std");

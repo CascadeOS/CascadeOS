@@ -10,7 +10,7 @@ current_task: *kernel.Task,
 /// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
 scheduler_task: kernel.Task,
 
-arch: kernel.arch.PerExecutor,
+arch_specific: arch.PerExecutor,
 
 /// List of `kernel.mem.FlushRequest` objects that need to be actioned.
 flush_requests: core.containers.AtomicSinglyLinkedList = .{},
@@ -67,6 +67,8 @@ pub const Id = enum(u32) {
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

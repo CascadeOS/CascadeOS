@@ -17,16 +17,16 @@ pub const Page = @import("Page.zig");
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
-    page_table: kernel.arch.paging.PageTable,
+    page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: phys.Frame,
     map_type: MapType,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
-    std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
 
-    try kernel.arch.paging.mapSinglePage(
+    try arch.paging.mapSinglePage(
         page_table,
         virtual_address,
         physical_frame,
@@ -45,7 +45,7 @@ pub fn mapSinglePage(
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalFrames(
     current_task: *kernel.Task,
-    page_table: kernel.arch.paging.PageTable,
+    page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
     flush_target: kernel.Context,
@@ -53,8 +53,8 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
-    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
 
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
@@ -83,7 +83,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             physical_frame_allocator.deallocate(deallocate_frame_list);
         }
 
-        try kernel.arch.paging.mapSinglePage(
+        try arch.paging.mapSinglePage(
             page_table,
             current_virtual_address,
             physical_frame,
@@ -91,7 +91,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             physical_frame_allocator,
         );
 
-        current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
     }
 }
 
@@ -106,7 +106,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
     current_task: *kernel.Task,
-    page_table: kernel.arch.paging.PageTable,
+    page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: MapType,
@@ -115,10 +115,10 @@ pub fn mapRangeToPhysicalRange(
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
     std.debug.assert(map_type.protection != .none);
-    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
-    std.debug.assert(physical_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    std.debug.assert(physical_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
     std.debug.assert(virtual_range.size.equal(physical_range.size));
 
     const last_virtual_address = virtual_range.last();
@@ -143,7 +143,7 @@ pub fn mapRangeToPhysicalRange(
     var current_physical_address = physical_range.address;
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        try kernel.arch.paging.mapSinglePage(
+        try arch.paging.mapSinglePage(
             page_table,
             current_virtual_address,
             .fromAddress(current_physical_address),
@@ -151,8 +151,8 @@ pub fn mapRangeToPhysicalRange(
             physical_frame_allocator,
         );
 
-        current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
-        current_physical_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+        current_physical_address.moveForwardInPlace(arch.paging.standard_page_size);
     }
 }
 
@@ -164,18 +164,18 @@ pub fn mapRangeToPhysicalRange(
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapSinglePage(
     current_task: *kernel.Task,
-    page_table: kernel.arch.paging.PageTable,
+    page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     backing_pages: core.CleanupDecision,
     flush_target: kernel.Context,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
-    std.debug.assert(virtual_address.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
 
     var deallocate_frame_list: phys.FrameList = .{};
 
-    kernel.arch.paging.unmapSinglePage(
+    arch.paging.unmapSinglePage(
         page_table,
         virtual_address,
         backing_pages,
@@ -184,7 +184,7 @@ pub fn unmapSinglePage(
     );
 
     var request: FlushRequest = .{
-        .range = .fromAddr(virtual_address, kernel.arch.paging.standard_page_size),
+        .range = .fromAddr(virtual_address, arch.paging.standard_page_size),
         .flush_target = flush_target,
     };
 
@@ -200,15 +200,15 @@ pub fn unmapSinglePage(
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapRange(
     current_task: *kernel.Task,
-    page_table: kernel.arch.paging.PageTable,
+    page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     flush_target: kernel.Context,
     backing_page_decision: core.CleanupDecision,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
-    std.debug.assert(virtual_range.address.isAligned(kernel.arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
 
     var deallocate_frame_list: phys.FrameList = .{};
 
@@ -216,14 +216,14 @@ pub fn unmapRange(
     var current_virtual_address = virtual_range.address;
 
     while (current_virtual_address.lessThan(last_virtual_address)) {
-        kernel.arch.paging.unmapSinglePage(
+        arch.paging.unmapSinglePage(
             page_table,
             current_virtual_address,
             backing_page_decision,
             top_level_decision,
             &deallocate_frame_list,
         );
-        current_virtual_address.moveForwardInPlace(kernel.arch.paging.standard_page_size);
+        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
     }
 
     var request: FlushRequest = .{
@@ -283,9 +283,9 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
 pub fn onKernelPageFault(
     current_task: *kernel.Task,
     page_fault_details: PageFaultDetails,
-    interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
-    if (page_fault_details.faulting_address.lessThan(kernel.arch.paging.higher_half_start)) {
+    if (page_fault_details.faulting_address.lessThan(arch.paging.higher_half_start)) {
         @branchHint(.cold);
 
         kernel.debug.interruptSourcePanic(
@@ -405,7 +405,7 @@ pub const globals = struct {
     /// All other page tables start as a copy of this one.
     ///
     /// Initialized during `init.buildCorePageTable`.
-    pub var core_page_table: kernel.arch.paging.PageTable = undefined;
+    pub var core_page_table: arch.paging.PageTable = undefined;
 
     /// The kernel pageable address space.
     ///
@@ -509,7 +509,7 @@ pub const init = struct {
             number_of_usable_pages += std.math.divExact(
                 usize,
                 entry.range.size.value,
-                kernel.arch.paging.standard_page_size.value,
+                arch.paging.standard_page_size.value,
             ) catch std.debug.panic(
                 "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
@@ -604,7 +604,7 @@ pub const init = struct {
             const virtual_range: core.VirtualRange = .fromAddr(
                 start_address,
                 core.Size.from(end_address.value - start_address.value, .byte)
-                    .alignForward(kernel.arch.paging.standard_page_size),
+                    .alignForward(arch.paging.standard_page_size),
             );
 
             globals.regions.appendAssumeCapacity(.{
@@ -632,7 +632,7 @@ pub const init = struct {
 
         const non_cached_direct_map = findFreeRange(
             direct_map.size,
-            kernel.arch.paging.largest_page_size,
+            arch.paging.largest_page_size,
         ) orelse @panic("no free range for non-cached direct map");
 
         globals.non_cached_direct_map = non_cached_direct_map;
@@ -652,7 +652,7 @@ pub const init = struct {
     };
 
     fn registerHeaps() RegisterHeapsResult {
-        const size_of_top_level = kernel.arch.paging.init.sizeOfTopLevelEntry();
+        const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
 
         const kernel_heap_range = findFreeRange(
             size_of_top_level,
@@ -708,7 +708,7 @@ pub const init = struct {
     }
 
     fn registerPages(number_of_usable_pages: usize, number_of_usable_regions: usize) core.VirtualRange {
-        std.debug.assert(@alignOf(Page.Region) <= kernel.arch.paging.standard_page_size.value);
+        std.debug.assert(@alignOf(Page.Region) <= arch.paging.standard_page_size.value);
 
         const size_of_regions = core.Size.of(Page.Region)
             .multiplyScalar(number_of_usable_regions);
@@ -720,11 +720,11 @@ pub const init = struct {
             size_of_regions
                 .alignForward(.from(@alignOf(Page), .byte))
                 .add(size_of_pages)
-                .alignForward(kernel.arch.paging.standard_page_size);
+                .alignForward(arch.paging.standard_page_size);
 
         const pages_range = findFreeRange(
             range_size,
-            kernel.arch.paging.standard_page_size,
+            arch.paging.standard_page_size,
         ) orelse @panic("no space in kernel memory layout for the pages array");
 
         globals.regions.appendAssumeCapacity(.{
@@ -736,7 +736,7 @@ pub const init = struct {
     }
 
     fn buildAndLoadCorePageTable(current_task: *kernel.Task) void {
-        globals.core_page_table = kernel.arch.paging.PageTable.create(
+        globals.core_page_table = arch.paging.PageTable.create(
             phys.init.bootstrap_allocator.allocate() catch unreachable,
         );
 
@@ -746,14 +746,14 @@ pub const init = struct {
             const map_info = region.mapInfo();
 
             switch (map_info) {
-                .top_level => kernel.arch.paging.init.fillTopLevel(
+                .top_level => arch.paging.init.fillTopLevel(
                     globals.core_page_table,
                     region.range,
                     phys.init.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
                 },
-                .full => |full| kernel.arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                .full => |full| arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     globals.core_page_table,
                     region.range,
                     full.physical_range,
@@ -812,7 +812,7 @@ pub const init = struct {
             if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
 
             // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-            direct_map_size.alignForwardInPlace(kernel.arch.paging.largest_page_size);
+            direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
 
             break :direct_map_size direct_map_size;
         };
@@ -848,7 +848,7 @@ pub const init = struct {
 
         const regions = globals.regions.constSlice();
 
-        var current_address = kernel.arch.paging.higher_half_start;
+        var current_address = arch.paging.higher_half_start;
         current_address.alignForwardInPlace(alignment);
 
         var i: usize = 0;
@@ -856,7 +856,7 @@ pub const init = struct {
         while (true) {
             const region = if (i < regions.len) regions[i] else {
                 const size_of_free_range = core.Size.from(
-                    (kernel.arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                    (arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
                     .byte,
                 );
 
@@ -893,8 +893,10 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_mem);
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
 const log = kernel.debug.log.scoped(.mem);
+const std = @import("std");

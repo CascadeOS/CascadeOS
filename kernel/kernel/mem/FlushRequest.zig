@@ -31,7 +31,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) v
     }
 
     while (flush_request.count.load(.monotonic) != 0) {
-        kernel.arch.spinLoopHint();
+        arch.spinLoopHint();
     }
 }
 
@@ -59,7 +59,7 @@ fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
         },
     }
 
-    kernel.arch.paging.flushCache(flush_request.range);
+    arch.paging.flushCache(flush_request.range);
 }
 
 fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) void {
@@ -72,9 +72,11 @@ fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) voi
     };
     executor.flush_requests.prepend(&node.node);
 
-    kernel.arch.interrupts.sendFlushIPI(executor);
+    arch.interrupts.sendFlushIPI(executor);
 }
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

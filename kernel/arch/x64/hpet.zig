@@ -70,7 +70,7 @@ pub const init = struct {
         const target_value = current_value + duration_ticks;
 
         while (globals.hpet.readCounterRegister() < target_value) {
-            kernel.arch.spinLoopHint();
+            arch.spinLoopHint();
         }
     }
 
@@ -93,9 +93,11 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_hpet);
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
+
+const core = @import("core");
 const lib_x64 = @import("x64");
+const std = @import("std");
 const Tick = kernel.time.wallclock.Tick;
+const x64 = @import("x64.zig");

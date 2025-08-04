@@ -129,7 +129,6 @@ fn constructKernel(
     kernel_exe.setLinkerScript(b.path(
         b.pathJoin(&.{
             "kernel",
-            "kernel",
             "arch",
             @tagName(architecture),
             "linker.ld",

@@ -2,11 +2,11 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn main() !void {
-    var gpa_impl = if (builtin.mode == .Debug) std.heap.GeneralPurposeAllocator(.{}){} else {};
+    var gpa_impl = if (core.is_debug) std.heap.GeneralPurposeAllocator(.{}){} else {};
     defer {
-        if (builtin.mode == .Debug) _ = gpa_impl.deinit();
+        if (core.is_debug) _ = gpa_impl.deinit();
     }
-    const allocator = if (builtin.mode == .Debug) gpa_impl.allocator() else std.heap.smp_allocator;
+    const allocator = if (core.is_debug) gpa_impl.allocator() else std.heap.smp_allocator;
 
     const command = try getCommand(allocator);
     defer command.deinit(allocator);
@@ -198,7 +198,6 @@ fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
 const std = @import("std");
 const core = @import("core");
 const ansi = @import("ansi.zig");
-const builtin = @import("builtin");
 const StdoutWrapper = @import("StdoutWrapper.zig");
 
 comptime {

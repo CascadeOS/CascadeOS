@@ -94,7 +94,7 @@ pub const endian = struct {
 /// A calling convention that is `inline` in non-debug builds and `auto` in debug builds.
 ///
 /// This allows the effect of inlining for release builds but prevents missing debug information during debug builds.
-pub const inline_in_non_debug: std.builtin.CallingConvention = if (builtin.mode == .Debug) .auto else .@"inline";
+pub const inline_in_non_debug: std.builtin.CallingConvention = if (is_debug) .auto else .@"inline";
 
 pub const LockState = enum {
     locked,

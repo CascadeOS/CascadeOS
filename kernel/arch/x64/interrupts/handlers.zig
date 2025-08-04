@@ -12,7 +12,7 @@ pub fn nonMaskableInterruptHandler(
     }
 
     // an executor is panicking so this NMI is a panic IPI
-    kernel.arch.interrupts.disableInterruptsAndHalt();
+    arch.interrupts.disableInterruptsAndHalt();
 }
 
 pub fn pageFaultHandler(
@@ -88,9 +88,11 @@ pub fn unhandledInterrupt(
     std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });
 }
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const x64 = @import("../x64.zig");
+
+const core = @import("core");
+const InterruptFrame = arch.interrupts.InterruptFrame;
 const lib_x64 = @import("x64");
-const InterruptFrame = kernel.arch.interrupts.InterruptFrame;
+const std = @import("std");
+const x64 = @import("../x64.zig");

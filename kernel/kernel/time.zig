@@ -67,13 +67,13 @@ pub const init = struct {
     ///
     /// For example on x86_64 this is the TSC.
     pub fn tryCaptureStandardWallclockStartTime() void {
-        wallclock.kernel_start = kernel.arch.init.getStandardWallclockStartTime();
+        wallclock.kernel_start = arch.init.getStandardWallclockStartTime();
         // wallclock.kernel_start_type already set to .kernel_start
     }
 
     pub fn initializeTime() !void {
         var candidate_time_sources: CandidateTimeSources = .{};
-        kernel.arch.init.registerArchitecturalTimeSources(&candidate_time_sources);
+        arch.init.registerArchitecturalTimeSources(&candidate_time_sources);
 
         const time_sources = candidate_time_sources.candidate_time_sources.slice();
 
@@ -342,6 +342,8 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_time);
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

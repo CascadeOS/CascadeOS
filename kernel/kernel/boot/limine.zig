@@ -241,7 +241,7 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
 }
 
 fn limineEntryPoint() callconv(.c) noreturn {
-    kernel.arch.init.onBootEntry();
+    arch.init.onBootEntry();
 
     kernel.boot.bootloader_api = .limine;
 
@@ -284,8 +284,10 @@ const requests = struct {
     var device_tree_blob: limine.DeviceTreeBlob = .{};
 };
 
-const std = @import("std");
+const arch = @import("arch");
+const boot = @import("boot.zig");
+const kernel = @import("kernel");
+
 const core = @import("core");
 const limine = @import("limine");
-const kernel = @import("kernel");
-const boot = @import("boot.zig");
+const std = @import("std");

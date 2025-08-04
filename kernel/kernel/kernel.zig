@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const acpi = @import("acpi/acpi.zig");
-pub const arch = @import("arch/arch.zig");
 pub const boot = @import("boot/boot.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug/debug.zig");

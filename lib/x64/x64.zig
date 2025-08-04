@@ -72,7 +72,6 @@ comptime {
 }
 
 fn refAllDeclsRecursive(comptime T: type) void {
-    if (!@import("builtin").is_test) return;
     @setEvalBranchQuota(1_000_000);
 
     inline for (comptime std.meta.declarations(T)) |decl| {

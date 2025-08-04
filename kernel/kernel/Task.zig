@@ -50,14 +50,14 @@ pub const State = union(enum) {
 };
 
 pub fn getCurrent() *Task {
-    kernel.arch.interrupts.disableInterrupts();
+    arch.interrupts.disableInterrupts();
 
-    const executor = kernel.arch.rawGetCurrentExecutor();
+    const executor = arch.rawGetCurrentExecutor();
     const current_task = executor.current_task;
     std.debug.assert(current_task.state.running == executor);
 
     if (current_task.interrupt_disable_count == 0) {
-        kernel.arch.interrupts.enableInterrupts();
+        arch.interrupts.enableInterrupts();
     }
 
     return current_task;
@@ -66,7 +66,7 @@ pub fn getCurrent() *Task {
 pub const CreateKernelTaskOptions = struct {
     name: Name,
 
-    start_function: kernel.arch.scheduling.NewTaskFunction,
+    start_function: arch.scheduling.NewTaskFunction,
     arg1: u64,
     arg2: u64,
 };
@@ -114,24 +114,24 @@ pub fn incrementInterruptDisable(task: *Task) void {
     const previous = task.interrupt_disable_count;
 
     if (previous == 0) {
-        std.debug.assert(kernel.arch.interrupts.areEnabled());
-        kernel.arch.interrupts.disableInterrupts();
+        std.debug.assert(arch.interrupts.areEnabled());
+        arch.interrupts.disableInterrupts();
     } else {
-        std.debug.assert(!kernel.arch.interrupts.areEnabled());
+        std.debug.assert(!arch.interrupts.areEnabled());
     }
 
     task.interrupt_disable_count = previous + 1;
 
     const executor = task.state.running;
-    std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == task);
 }
 
 pub fn decrementInterruptDisable(task: *Task) void {
-    std.debug.assert(!kernel.arch.interrupts.areEnabled());
+    std.debug.assert(!arch.interrupts.areEnabled());
 
     const executor = task.state.running;
-    std.debug.assert(executor == kernel.arch.rawGetCurrentExecutor());
+    std.debug.assert(executor == arch.rawGetCurrentExecutor());
     std.debug.assert(executor.current_task == task);
 
     const previous = task.interrupt_disable_count;
@@ -140,7 +140,7 @@ pub fn decrementInterruptDisable(task: *Task) void {
     task.interrupt_disable_count = previous - 1;
 
     if (previous == 1) {
-        kernel.arch.interrupts.enableInterrupts();
+        arch.interrupts.enableInterrupts();
     }
 }
 
@@ -201,7 +201,7 @@ pub const internal = struct {
     pub const CreateOptions = struct {
         name: Name,
 
-        start_function: kernel.arch.scheduling.NewTaskFunction,
+        start_function: arch.scheduling.NewTaskFunction,
         arg1: u64,
         arg2: u64,
 
@@ -228,7 +228,7 @@ pub const internal = struct {
 
         task.stack.reset();
 
-        try kernel.arch.scheduling.prepareNewTaskForScheduling(
+        try arch.scheduling.prepareNewTaskForScheduling(
             task,
             options.start_function,
             options.arg1,
@@ -367,7 +367,7 @@ pub const Stack = struct {
         });
     }
 
-    const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(kernel.arch.paging.standard_page_size);
+    const stack_size_including_guard_page = kernel.config.kernel_stack_size.add(arch.paging.standard_page_size);
 };
 
 pub const InterruptRestorer = struct {
@@ -379,9 +379,9 @@ pub const InterruptRestorer = struct {
 };
 
 pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
-    std.debug.assert(!kernel.arch.interrupts.areEnabled());
+    std.debug.assert(!arch.interrupts.areEnabled());
 
-    const executor = kernel.arch.rawGetCurrentExecutor();
+    const executor = arch.rawGetCurrentExecutor();
 
     const current_task = executor.current_task;
     std.debug.assert(current_task.state.running == executor);
@@ -423,7 +423,7 @@ pub const init = struct {
         try globals.stack_arena.init(
             .{
                 .name = try .fromSlice("stacks"),
-                .quantum = kernel.arch.paging.standard_page_size.value,
+                .quantum = arch.paging.standard_page_size.value,
             },
         );
 
@@ -500,7 +500,9 @@ pub const init = struct {
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.task);
+const std = @import("std");

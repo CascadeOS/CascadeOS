@@ -11,12 +11,12 @@ pub const Frame = enum(u32) {
 
     /// Returns the base address of the given physical frame.
     pub fn baseAddress(frame: Frame) core.PhysicalAddress {
-        return .fromInt(@intFromEnum(frame) * kernel.arch.paging.standard_page_size.value);
+        return .fromInt(@intFromEnum(frame) * arch.paging.standard_page_size.value);
     }
 
     /// Returns the physical frame that contains the given physical address.
     pub fn fromAddress(physical_address: core.PhysicalAddress) Frame {
-        return @enumFromInt(physical_address.value / kernel.arch.paging.standard_page_size.value);
+        return @enumFromInt(physical_address.value / arch.paging.standard_page_size.value);
     }
 
     pub fn page(frame: Frame) ?*Page {
@@ -83,7 +83,7 @@ fn allocate() FrameAllocator.AllocateError!Frame {
     const node = globals.free_page_list.popFirst() orelse return error.FramesExhausted;
 
     _ = globals.free_memory.fetchSub(
-        kernel.arch.paging.standard_page_size.value,
+        arch.paging.standard_page_size.value,
         .release,
     );
 
@@ -92,7 +92,7 @@ fn allocate() FrameAllocator.AllocateError!Frame {
     if (core.is_debug) {
         const virtual_range = core.VirtualRange.fromAddr(
             kernel.mem.directMapFromPhysical(page.physical_frame.baseAddress()),
-            kernel.arch.paging.standard_page_size,
+            arch.paging.standard_page_size,
         );
 
         @memset(virtual_range.toByteSlice(), undefined);
@@ -110,7 +110,7 @@ fn deallocate(frame_list: FrameList) void {
     globals.free_page_list.prependList(frame_list.first_node.?, frame_list.last_node.?);
 
     _ = globals.free_memory.fetchAdd(
-        kernel.arch.paging.standard_page_size.multiplyScalar(frame_list.count).value,
+        arch.paging.standard_page_size.multiplyScalar(frame_list.count).value,
         .release,
     );
 }
@@ -183,7 +183,7 @@ pub const init = struct {
             "initializing pages array with {} usable pages ({f}) in {} regions",
             .{
                 number_of_usable_pages,
-                kernel.arch.paging.standard_page_size.multiplyScalar(number_of_usable_pages),
+                arch.paging.standard_page_size.multiplyScalar(number_of_usable_pages),
                 number_of_usable_regions,
             },
         );
@@ -232,8 +232,8 @@ pub const init = struct {
                 },
             }
 
-            std.debug.assert(entry.range.address.isAligned(kernel.arch.paging.standard_page_size));
-            std.debug.assert(entry.range.size.isAligned(kernel.arch.paging.standard_page_size));
+            std.debug.assert(entry.range.address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
 
             var in_use_frames_left: u32 = if (entry.type == .free) blk: {
                 // pull the free region out of the bootstrap allocator
@@ -244,7 +244,7 @@ pub const init = struct {
                 const in_use_frames = bootstrap_region.first_free_frame_index;
 
                 const free_frames = bootstrap_region.frame_count - in_use_frames;
-                free_memory.addInPlace(kernel.arch.paging.standard_page_size.multiplyScalar(free_frames));
+                free_memory.addInPlace(arch.paging.standard_page_size.multiplyScalar(free_frames));
 
                 if (init_log.levelEnabled(.debug)) {
                     if (in_use_frames == 0) {
@@ -252,7 +252,7 @@ pub const init = struct {
                             "pulled {} ({f}) free frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
-                                kernel.arch.paging.standard_page_size.multiplyScalar(free_frames),
+                                arch.paging.standard_page_size.multiplyScalar(free_frames),
                             },
                         );
                     } else if (in_use_frames == bootstrap_region.frame_count) {
@@ -260,7 +260,7 @@ pub const init = struct {
                             "pulled {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 in_use_frames,
-                                kernel.arch.paging.standard_page_size.multiplyScalar(in_use_frames),
+                                arch.paging.standard_page_size.multiplyScalar(in_use_frames),
                             },
                         );
                     } else {
@@ -268,9 +268,9 @@ pub const init = struct {
                             "pulled {} ({f}) free frames and {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
-                                kernel.arch.paging.standard_page_size.multiplyScalar(free_frames),
+                                arch.paging.standard_page_size.multiplyScalar(free_frames),
                                 in_use_frames,
-                                kernel.arch.paging.standard_page_size.multiplyScalar(in_use_frames),
+                                arch.paging.standard_page_size.multiplyScalar(in_use_frames),
                             },
                         );
                     }
@@ -280,7 +280,7 @@ pub const init = struct {
             } else @intCast(std.math.divExact(
                 u64,
                 entry.range.size.value,
-                kernel.arch.paging.standard_page_size.value,
+                arch.paging.standard_page_size.value,
             ) catch std.debug.panic(
                 "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
@@ -289,7 +289,7 @@ pub const init = struct {
             const usable_pages_in_range: u32 = @intCast(std.math.divExact(
                 usize,
                 entry.range.size.value,
-                kernel.arch.paging.standard_page_size.value,
+                arch.paging.standard_page_size.value,
             ) catch std.debug.panic(
                 "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
@@ -384,7 +384,7 @@ pub const init = struct {
                 .frame_count = @intCast(std.math.divExact(
                     usize,
                     entry.range.size.value,
-                    kernel.arch.paging.standard_page_size.value,
+                    arch.paging.standard_page_size.value,
                 ) catch std.debug.panic(
                     "memory map entry size is not a multiple of page size: {f}",
                     .{entry},
@@ -399,7 +399,7 @@ pub const init = struct {
             }
             init_log.debug(
                 "bootstrap physical frame allocator initalized with {} free frames ({f})",
-                .{ frames_available, kernel.arch.paging.standard_page_size.multiplyScalar(frames_available) },
+                .{ frames_available, arch.paging.standard_page_size.multiplyScalar(frames_available) },
             );
         }
     }
@@ -418,8 +418,10 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_mem_phys);
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.mem_phys);
 const Page = @import("Page.zig");
+const std = @import("std");

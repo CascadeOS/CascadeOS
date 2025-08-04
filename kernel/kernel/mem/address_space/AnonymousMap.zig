@@ -121,7 +121,7 @@ pub const Reference = struct {
         std.debug.assert(reference.anonymous_map != null);
         std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
         std.debug.assert(entry.anonymous_map_reference.start_offset == reference.start_offset);
-        std.debug.assert(faulting_address.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
         std.debug.assert(entry.range().containsAddress(faulting_address));
 
         const anonymous_map = reference.anonymous_map.?;
@@ -154,7 +154,7 @@ pub const Reference = struct {
         std.debug.assert(reference.anonymous_map != null);
         std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
         std.debug.assert(entry.anonymous_map_reference.start_offset == reference.start_offset);
-        std.debug.assert(faulting_address.isAligned(kernel.arch.paging.standard_page_size));
+        std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
         std.debug.assert(entry.range().containsAddress(faulting_address));
 
         log.verbose("adding anonymous page for {f} to anonymous map", .{faulting_address});
@@ -267,8 +267,10 @@ const AnonymousPage = @import("AnonymousPage.zig");
 const AnonymousPageChunkMap = @import("chunk_map.zig").ChunkMap(AnonymousPage);
 const Entry = @import("Entry.zig");
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const log = kernel.debug.log.scoped(.address_space);
+
 const Cache = kernel.mem.cache.Cache;
+const core = @import("core");
+const log = kernel.debug.log.scoped(.address_space);
+const std = @import("std");

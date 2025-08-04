@@ -17,7 +17,7 @@ pub fn allocate(len: usize, current_task: *kernel.Task) !core.VirtualRange {
         .size = .from(allocation.len, .byte),
     };
 
-    if (builtin.mode == .Debug) @memset(virtual_range.toByteSlice(), undefined);
+    if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
 
     return virtual_range;
 }
@@ -213,7 +213,7 @@ fn heapPageArenaImport(
     }
     errdefer comptime unreachable;
 
-    if (builtin.mode == .Debug) @memset(virtual_range.toByteSlice(), undefined);
+    if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
 
     return allocation;
 }
@@ -299,14 +299,14 @@ pub const init = struct {
             try globals.heap_address_space_arena.init(
                 .{
                     .name = try .fromSlice("heap_address_space"),
-                    .quantum = kernel.arch.paging.standard_page_size.value,
+                    .quantum = arch.paging.standard_page_size.value,
                 },
             );
 
             try globals.heap_page_arena.init(
                 .{
                     .name = try .fromSlice("heap_page"),
-                    .quantum = kernel.arch.paging.standard_page_size.value,
+                    .quantum = arch.paging.standard_page_size.value,
                     .source = globals.heap_address_space_arena.createSource(.{
                         .custom_import = heapPageArenaImport,
                         .custom_release = heapPageArenaRelease,
@@ -336,7 +336,7 @@ pub const init = struct {
             try globals.special_heap_address_space_arena.init(
                 .{
                     .name = try .fromSlice("special_heap_address_space"),
-                    .quantum = kernel.arch.paging.standard_page_size.value,
+                    .quantum = arch.paging.standard_page_size.value,
                 },
             );
 
@@ -358,8 +358,9 @@ const resource_arena = kernel.mem.resource_arena;
 const Arena = resource_arena.Arena(.none);
 const HeapArena = resource_arena.Arena(.{ .heap = heap_arena_quantum_caches });
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const builtin = @import("builtin");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.heap);
+const std = @import("std");

@@ -765,7 +765,6 @@ comptime {
 }
 
 const std = @import("std");
-const builtin = @import("builtin");
 const core = @import("core");
 
 const libdwarf = @import("libdwarf.zig");

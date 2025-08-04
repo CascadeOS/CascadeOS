@@ -98,6 +98,5 @@ pub fn customConfiguration(
 }
 
 const std = @import("std");
-const builtin = @import("builtin");
 
 const ToolDescription = @import("../../build/ToolDescription.zig");

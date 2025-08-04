@@ -386,7 +386,7 @@ fn promote(
             log.verbose("zero filling anonymous page", .{});
             const mapped_frame = kernel.mem
                 .directMapFromPhysical(allocated_frame.baseAddress())
-                .toPtr(*[kernel.arch.paging.standard_page_size.value]u8);
+                .toPtr(*[arch.paging.standard_page_size.value]u8);
             @memset(mapped_frame, 0);
         },
         .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L545
@@ -493,7 +493,9 @@ const Entry = @import("Entry.zig");
 const Page = kernel.mem.Page; // called a `vm_page` in uvm
 const Object = @import("Object.zig");
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.address_space);
+const std = @import("std");

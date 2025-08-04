@@ -235,8 +235,8 @@ pub fn exportEntryPoints() void {
         /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
         /// meaning this function is not expected to ever be called.
         pub fn unknownBootloaderEntryPoint() callconv(.naked) noreturn {
-            kernel.arch.init.onBootEntry();
-            @call(.always_inline, kernel.arch.interrupts.disableInterruptsAndHalt, .{});
+            arch.init.onBootEntry();
+            @call(.always_inline, arch.interrupts.disableInterruptsAndHalt, .{});
             unreachable;
         }
     }.unknownBootloaderEntryPoint;
@@ -254,7 +254,9 @@ pub const BootloaderAPI = enum {
     limine,
 };
 
-const std = @import("std");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const limine = @import("limine.zig");
+
 const core = @import("core");
+const limine = @import("limine.zig");
+const std = @import("std");

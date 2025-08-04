@@ -146,7 +146,7 @@ export fn uacpi_kernel_io_read8(
 
     const port: u16 = @intCast(@intFromPtr(handle) + offset);
 
-    value.* = kernel.arch.io.readPort(u8, port) catch return .invalid_argument;
+    value.* = arch.io.readPort(u8, port) catch return .invalid_argument;
     return .ok;
 }
 
@@ -165,7 +165,7 @@ export fn uacpi_kernel_io_read16(
     const port: u16 = @intCast(@intFromPtr(handle) + offset);
     std.debug.assert(std.mem.isAligned(port, @sizeOf(u16)));
 
-    value.* = kernel.arch.io.readPort(u16, port) catch return .invalid_argument;
+    value.* = arch.io.readPort(u16, port) catch return .invalid_argument;
     return .ok;
 }
 
@@ -184,7 +184,7 @@ export fn uacpi_kernel_io_read32(
     const port: u16 = @intCast(@intFromPtr(handle) + offset);
     std.debug.assert(std.mem.isAligned(port, @sizeOf(u32)));
 
-    value.* = kernel.arch.io.readPort(u32, port) catch return .invalid_argument;
+    value.* = arch.io.readPort(u32, port) catch return .invalid_argument;
     return .ok;
 }
 
@@ -202,7 +202,7 @@ export fn uacpi_kernel_io_write8(
 
     const port: u16 = @intCast(@intFromPtr(handle) + offset);
 
-    kernel.arch.io.writePort(u8, port, value) catch return .invalid_argument;
+    arch.io.writePort(u8, port, value) catch return .invalid_argument;
     return .ok;
 }
 
@@ -221,7 +221,7 @@ export fn uacpi_kernel_io_write16(
     const port: u16 = @intCast(@intFromPtr(handle) + offset);
     std.debug.assert(std.mem.isAligned(port, @sizeOf(u16)));
 
-    kernel.arch.io.writePort(u16, port, value) catch return .invalid_argument;
+    arch.io.writePort(u16, port, value) catch return .invalid_argument;
     return .ok;
 }
 
@@ -240,7 +240,7 @@ export fn uacpi_kernel_io_write32(
     const port: u16 = @intCast(@intFromPtr(handle) + offset);
     std.debug.assert(std.mem.isAligned(port, @sizeOf(u32)));
 
-    kernel.arch.io.writePort(u32, port, value) catch return .invalid_argument;
+    arch.io.writePort(u32, port, value) catch return .invalid_argument;
     return .ok;
 }
 
@@ -348,7 +348,7 @@ export fn uacpi_kernel_stall(usec: u8) void {
     const duration: core.Duration = .from(usec, .microsecond);
 
     while (kernel.time.wallclock.elapsed(start, kernel.time.wallclock.read()).lessThan(duration)) {
-        kernel.arch.spinLoopHint();
+        arch.spinLoopHint();
     }
 }
 
@@ -492,7 +492,7 @@ export fn uacpi_kernel_install_interrupt_handler(
     const HandlerWrapper = struct {
         fn HandlerWrapper(
             _: *kernel.Task,
-            _: kernel.arch.interrupts.InterruptFrame,
+            _: arch.interrupts.InterruptFrame,
             _handler: ?*anyopaque,
             _ctx: ?*anyopaque,
         ) void {
@@ -503,7 +503,7 @@ export fn uacpi_kernel_install_interrupt_handler(
 
     const current_task = kernel.Task.getCurrent();
 
-    const interrupt = kernel.arch.interrupts.allocateInterrupt(
+    const interrupt = arch.interrupts.allocateInterrupt(
         current_task,
         HandlerWrapper,
         @constCast(handler),
@@ -513,8 +513,8 @@ export fn uacpi_kernel_install_interrupt_handler(
         return .internal_error;
     };
 
-    kernel.arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
-        kernel.arch.interrupts.deallocateInterrupt(current_task, interrupt);
+    arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
+        arch.interrupts.deallocateInterrupt(current_task, interrupt);
 
         log.err("failed to route interrupt: {}", .{err});
         return .internal_error;
@@ -534,8 +534,8 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_uninstall_interrupt_handler called", .{});
 
-    const interrupt: kernel.arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
-    kernel.arch.interrupts.deallocateInterrupt(kernel.Task.getCurrent(), interrupt);
+    const interrupt: arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
+    arch.interrupts.deallocateInterrupt(kernel.Task.getCurrent(), interrupt);
 
     return .ok;
 }
@@ -607,8 +607,10 @@ export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
     @panic("uacpi_kernel_wait_for_work_completion()");
 }
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const uacpi = @import("uacpi.zig");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.uacpi_kernel_api);
+const std = @import("std");
+const uacpi = @import("uacpi.zig");

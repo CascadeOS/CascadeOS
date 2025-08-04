@@ -26,9 +26,9 @@ pub fn tryShutdown() !void {
     if (globals.acpi_initialized) {
         try uacpi.prepareForSleep(.S5);
 
-        const interrupts_enabled = kernel.arch.interrupts.areEnabled();
-        kernel.arch.interrupts.disableInterrupts();
-        defer if (interrupts_enabled) kernel.arch.interrupts.enableInterrupts();
+        const interrupts_enabled = arch.interrupts.areEnabled();
+        arch.interrupts.disableInterrupts();
+        defer if (interrupts_enabled) arch.interrupts.enableInterrupts();
 
         try uacpi.sleep(.S5);
     }
@@ -68,7 +68,7 @@ const globals = struct {
 pub const init = struct {
     pub fn initializeACPITables() void {
         const static = struct {
-            var buffer: [kernel.arch.paging.standard_page_size.value]u8 = undefined;
+            var buffer: [arch.paging.standard_page_size.value]u8 = undefined;
         };
 
         uacpi.setupEarlyTableAccess(&static.buffer) catch return; // suppress error to allow non-ACPI systems to boot
@@ -247,14 +247,14 @@ const hack = struct {
 
         if (fadt.SMI_CMD != 0 and fadt.ACPI_ENABLE != 0) {
             // we have SMM and we need to enable ACPI mode first
-            try kernel.arch.io.writePort(u8, @intCast(fadt.SMI_CMD), fadt.ACPI_ENABLE);
+            try arch.io.writePort(u8, @intCast(fadt.SMI_CMD), fadt.ACPI_ENABLE);
 
             for (0..100) |_| {
-                _ = try kernel.arch.io.readPort(u8, 0x80);
+                _ = try arch.io.readPort(u8, 0x80);
             }
 
             while (try readAddress(u16, PM1a_CNT) & SCI_EN == 0) {
-                kernel.arch.spinLoopHint();
+                arch.spinLoopHint();
             }
         }
 
@@ -264,23 +264,23 @@ const hack = struct {
             try writeAddress(PM1b_CNT, SLP_TYPb | SLP_EN);
         }
 
-        for (0..100) |_| _ = try kernel.arch.io.readPort(u8, 0x80);
+        for (0..100) |_| _ = try arch.io.readPort(u8, 0x80);
     }
 
     const ReadAddressError = error{
         UnsupportedAddressSpace,
         InvalidPort,
-    } || kernel.arch.io.PortError;
+    } || arch.io.PortError;
 
     fn readAddress(comptime T: type, address: Address) ReadAddressError!T {
         switch (address.address_space) {
             .io => {
                 const port = std.math.cast(
-                    kernel.arch.io.Port,
+                    arch.io.Port,
                     address.address,
                 ) orelse return ReadAddressError.InvalidPort;
 
-                return kernel.arch.io.readPort(T, port);
+                return arch.io.readPort(T, port);
             },
             else => return ReadAddressError.UnsupportedAddressSpace,
         }
@@ -291,7 +291,7 @@ const hack = struct {
         UnsupportedRegisterBitWidth,
         InvalidPort,
         ValueOutOfRange,
-    } || kernel.arch.io.PortError;
+    } || arch.io.PortError;
 
     fn writeAddress(address: Address, value: u64) WriteAddressError!void {
         switch (address.address_space) {
@@ -304,7 +304,7 @@ const hack = struct {
                 inline for (.{ 8, 16, 32 }) |bit_width| if (bit_width == address.register_bit_width) {
                     const T = std.meta.Int(.unsigned, bit_width);
 
-                    try kernel.arch.io.writePort(
+                    try arch.io.writePort(
                         T,
                         port,
                         std.math.cast(
@@ -387,8 +387,10 @@ comptime {
     _ = @import("uacpi_kernel_api.zig"); // ensure kernel api is exported
 }
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.acpi);
+const std = @import("std");
 const uacpi = @import("uacpi.zig");

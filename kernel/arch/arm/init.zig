@@ -21,7 +21,7 @@ pub fn prepareBootstrapExecutor(
     bootstrap_executor: *kernel.Executor,
     architecture_processor_id: u64,
 ) void {
-    bootstrap_executor.arch = .{
+    bootstrap_executor.arch_specific = .{
         .mpidr = architecture_processor_id,
     };
 }

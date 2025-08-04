@@ -280,14 +280,14 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
 
         inline fn writeRegister(target: AddressT, byte: u8) void {
             switch (mode) {
-                .io_port => kernel.arch.io.writePort(u8, target, byte) catch unreachable,
+                .io_port => arch.io.writePort(u8, target, byte) catch unreachable,
                 .memory => target[0] = byte,
             }
         }
 
         inline fn readRegister(target: AddressT) u8 {
             return switch (mode) {
-                .io_port => kernel.arch.io.readPort(u8, target) catch unreachable,
+                .io_port => arch.io.readPort(u8, target) catch unreachable,
                 .memory => target[0],
             };
         }
@@ -705,6 +705,8 @@ pub const Baud = struct {
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

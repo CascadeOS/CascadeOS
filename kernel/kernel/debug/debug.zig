@@ -5,7 +5,7 @@ pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
     current_task: *kernel.Task,
-    interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
 ) noreturn {
@@ -40,20 +40,20 @@ const PanicType = union(enum) {
         return_address: usize,
         error_return_trace: ?*const std.builtin.StackTrace,
     },
-    interrupt: kernel.arch.interrupts.InterruptFrame,
+    interrupt: arch.interrupts.InterruptFrame,
 };
 
 fn panicDispatch(msg: []const u8, panic_type: PanicType) noreturn {
     @branchHint(.cold);
 
-    kernel.arch.interrupts.disableInterrupts();
+    arch.interrupts.disableInterrupts();
 
     switch (globals.panic_mode) {
         .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
         .init_panic => initPanic(msg, panic_type),
     }
 
-    kernel.arch.interrupts.disableInterruptsAndHalt();
+    arch.interrupts.disableInterruptsAndHalt();
 }
 
 fn singleExecutorInitPanic(
@@ -89,7 +89,7 @@ fn initPanic(
         var nested_panic_count: usize = 0;
     };
 
-    const executor = kernel.arch.rawGetCurrentExecutor();
+    const executor = arch.rawGetCurrentExecutor();
 
     if (globals.panicking_executor.cmpxchgStrong(
         null,
@@ -101,7 +101,7 @@ fn initPanic(
     }
 
     kernel.init.Output.globals.lock.poison();
-    kernel.arch.interrupts.sendPanicIPI();
+    arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
@@ -151,7 +151,7 @@ const formatting = struct {
 
     fn printInterruptError(
         writer: *std.Io.Writer,
-        interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+        interrupt_frame: arch.interrupts.InterruptFrame,
     ) !void {
         const symbol_source = SymbolSource.load();
 
@@ -221,7 +221,7 @@ const formatting = struct {
     fn printSourceAtAddress(writer: *std.Io.Writer, address: usize, opt_symbol_source: ?SymbolSource) !void {
         if (address == 0) return;
 
-        if (address < kernel.arch.paging.higher_half_start.value) {
+        if (address < arch.paging.higher_half_start.value) {
             try writer.print(
                 comptime indent ++ "0x{x:0>16} - address is not in the higher half so must be userspace\n",
                 .{address},
@@ -509,6 +509,8 @@ pub const globals = struct {
     var panic_mode: PanicMode = .single_executor_init_panic;
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

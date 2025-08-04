@@ -90,7 +90,7 @@ fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
     const framebuffer = kernel.boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
-    if (!physical_address.isAligned(kernel.arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
+    if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
 
     const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
 
@@ -111,9 +111,12 @@ const font: *const c.ssfn_font_t = blk: {
     break :blk @ptrCast(@embedFile("ter-v14n.sfn"));
 };
 
-const std = @import("std");
-const core = @import("core");
-const kernel = @import("kernel");
 const c = @cImport({
     @cInclude("ssfn.h");
 });
+
+const arch = @import("arch");
+const kernel = @import("kernel");
+
+const core = @import("core");
+const std = @import("std");

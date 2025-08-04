@@ -35,7 +35,6 @@ comptime {
 }
 
 const std = @import("std");
-const builtin = @import("builtin");
 
 const sdf = @import("sdf");
 

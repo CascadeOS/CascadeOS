@@ -106,7 +106,7 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
 }
 
 comptime {
-    const current_zig = builtin.zig_version;
+    const current_zig = @import("builtin").zig_version;
     const min_zig = std.SemanticVersion.parse(build_zig_zon.minimum_zig_version) catch unreachable;
     if (current_zig.order(min_zig) == .lt) {
         @compileError(std.fmt.comptimePrint(
@@ -119,7 +119,6 @@ comptime {
 const cascade_version = std.SemanticVersion.parse(build_zig_zon.version) catch unreachable;
 const build_zig_zon = @import("build.zig.zon");
 
-const builtin = @import("builtin");
 const std = @import("std");
 const Step = std.Build.Step;
 

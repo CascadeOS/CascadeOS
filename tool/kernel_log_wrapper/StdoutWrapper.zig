@@ -77,7 +77,6 @@ const StdoutEnum = enum { stdout };
 const std = @import("std");
 const core = @import("core");
 const ansi = @import("ansi.zig");
-const builtin = @import("builtin");
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());

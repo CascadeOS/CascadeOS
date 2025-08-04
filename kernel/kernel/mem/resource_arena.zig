@@ -111,7 +111,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                     var caches_created: usize = 0;
 
-                    const frames_to_allocate = kernel.arch.paging.standard_page_size.amountToCover(
+                    const frames_to_allocate = arch.paging.standard_page_size.amountToCover(
                         core.Size.of(RawCache).multiplyScalar(count),
                     );
 
@@ -1296,7 +1296,7 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
 }
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
-const QUANTUM_CACHES_PER_FRAME = kernel.arch.paging.standard_page_size.divide(core.Size.of(RawCache)).value;
+const QUANTUM_CACHES_PER_FRAME = arch.paging.standard_page_size.divide(core.Size.of(RawCache)).value;
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));
@@ -1309,7 +1309,7 @@ const TAGS_PER_EXACT_ALLOCATION = 0;
 const TAGS_PER_PARTIAL_ALLOCATION = 1;
 const MAX_TAGS_PER_ALLOCATION = TAGS_PER_SPAN_CREATE + TAGS_PER_PARTIAL_ALLOCATION;
 
-const TAGS_PER_PAGE = kernel.arch.paging.standard_page_size.value / @sizeOf(BoundaryTag);
+const TAGS_PER_PAGE = arch.paging.standard_page_size.value / @sizeOf(BoundaryTag);
 
 const globals = struct {
     /// Initialized during `global_init.initializeCache`.
@@ -1325,10 +1325,11 @@ pub const global_init = struct {
     }
 };
 
-const RawCache = kernel.mem.cache.RawCache;
+const arch = @import("arch");
+const kernel = @import("kernel");
 
+const core = @import("core");
+const log = kernel.debug.log.scoped(.resource_arena);
+const RawCache = kernel.mem.cache.RawCache;
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
-const core = @import("core");
-const kernel = @import("kernel");
-const log = kernel.debug.log.scoped(.resource_arena);

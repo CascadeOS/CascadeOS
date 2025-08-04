@@ -23,7 +23,7 @@ address_arena: kernel.mem.resource_arena.Arena(.none),
 
 context: kernel.Context,
 
-page_table: kernel.arch.paging.PageTable,
+page_table: arch.paging.PageTable,
 
 /// Protects the `page_table` field.
 page_table_lock: kernel.sync.Mutex = .{},
@@ -48,7 +48,7 @@ pub const InitOptions = struct {
 
     range: core.VirtualRange,
 
-    page_table: kernel.arch.paging.PageTable,
+    page_table: arch.paging.PageTable,
 
     context: kernel.Context,
 };
@@ -76,7 +76,7 @@ pub fn init(
     try address_space.address_arena.init(
         .{
             .name = resourceArenaName(options.name),
-            .quantum = kernel.arch.paging.standard_page_size.value,
+            .quantum = arch.paging.standard_page_size.value,
         },
     );
     errdefer address_space.address_arena.deinit(current_task);
@@ -171,7 +171,7 @@ pub fn map(
 
     const allocated_range = address_space.address_arena.allocate(
         current_task,
-        options.number_of_pages * kernel.arch.paging.standard_page_size.value,
+        options.number_of_pages * arch.paging.standard_page_size.value,
         .instant_fit,
     ) catch |err| switch (err) {
         error.ZeroLength => unreachable, // `options.number_of_pages` is greater than 0
@@ -256,7 +256,7 @@ pub fn map(
                         const old_number_of_pages = after_entry.number_of_pages;
                         after_entry.number_of_pages = old_number_of_pages + local_entry.number_of_pages;
                         after_entry.base.moveBackwardInPlace(
-                            kernel.arch.paging.standard_page_size.multiplyScalar(local_entry.number_of_pages),
+                            arch.paging.standard_page_size.multiplyScalar(local_entry.number_of_pages),
                         );
 
                         if (after_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
@@ -324,8 +324,8 @@ pub const UnmapError = error{};
 pub fn unmap(address_space: *AddressSpace, current_task: *kernel.Task, range: core.VirtualRange) UnmapError!void {
     errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
 
-    std.debug.assert(range.address.isAligned(kernel.arch.paging.standard_page_size));
-    std.debug.assert(range.size.isAligned(kernel.arch.paging.standard_page_size));
+    std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
 
     log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
 
@@ -363,7 +363,7 @@ pub fn handlePageFault(
     var fault_info: FaultInfo = .{
         .address_space = address_space,
         .faulting_address = page_fault_details.faulting_address.alignBackward(
-            kernel.arch.paging.standard_page_size,
+            arch.paging.standard_page_size,
         ),
         .access_type = page_fault_details.access_type,
     };
@@ -470,8 +470,9 @@ const Object = @import("Object.zig");
 
 const Protection = kernel.mem.MapType.Protection;
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const builtin = @import("builtin");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.address_space);
+const std = @import("std");

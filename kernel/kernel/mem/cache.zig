@@ -223,16 +223,16 @@ pub const RawCache = struct {
             options.alignment.forward(options.size);
 
         const objects_per_slab = if (is_small)
-            (kernel.arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_object_size
+            (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_object_size
         else blk: {
             var candidate_large_objects_per_slab: usize = default_large_objects_per_slab;
 
-            const initial_pages_for_allocation = kernel.arch.paging.standard_page_size.amountToCover(
+            const initial_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
                 .from(candidate_large_objects_per_slab * effective_object_size, .byte),
             );
 
             while (true) {
-                const next_pages_for_allocation = kernel.arch.paging.standard_page_size.amountToCover(
+                const next_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
                     .from((candidate_large_objects_per_slab + 1) * effective_object_size, .byte),
                 );
 
@@ -437,10 +437,10 @@ pub const RawCache = struct {
                     .heap => slab_base_ptr: {
                         const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
                             current_task,
-                            kernel.arch.paging.standard_page_size.value,
+                            arch.paging.standard_page_size.value,
                             .instant_fit,
                         ) catch return AllocateError.SlabAllocationFailed;
-                        std.debug.assert(slab_allocation.len == kernel.arch.paging.standard_page_size.value);
+                        std.debug.assert(slab_allocation.len == arch.paging.standard_page_size.value);
                         break :slab_base_ptr @ptrFromInt(slab_allocation.base);
                     },
                     .pmm => slab_base_ptr: {
@@ -449,7 +449,7 @@ pub const RawCache = struct {
 
                         const slab_base_ptr = kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
 
-                        if (builtin.mode == .Debug) @memset(slab_base_ptr[0..kernel.arch.paging.standard_page_size.value], undefined);
+                        if (core.is_debug) @memset(slab_base_ptr[0..arch.paging.standard_page_size.value], undefined);
 
                         break :slab_base_ptr slab_base_ptr;
                     },
@@ -458,7 +458,7 @@ pub const RawCache = struct {
                 errdefer switch (raw_cache.slab_source) {
                     .heap => kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
                         .base = @intFromPtr(slab_base_ptr),
-                        .len = kernel.arch.paging.standard_page_size.value,
+                        .len = arch.paging.standard_page_size.value,
                     }),
                     .pmm => {
                         var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
@@ -470,7 +470,7 @@ pub const RawCache = struct {
                 };
 
                 const slab: *Slab = @alignCast(@ptrCast(
-                    slab_base_ptr + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab),
+                    slab_base_ptr + arch.paging.standard_page_size.value - @sizeOf(Slab),
                 ));
                 slab.* = .{
                     .large_object_allocation = undefined,
@@ -514,7 +514,7 @@ pub const RawCache = struct {
                     .large_object_allocation = large_object_allocation,
                 };
 
-                if (builtin.mode == .Debug) {
+                if (core.is_debug) {
                     const virtual_range: core.VirtualRange = .{
                         .address = .fromInt(slab.large_object_allocation.base),
                         .size = .from(slab.large_object_allocation.len, .byte),
@@ -588,10 +588,10 @@ pub const RawCache = struct {
                     const page_start = std.mem.alignBackward(
                         usize,
                         @intFromPtr(object.ptr),
-                        kernel.arch.paging.standard_page_size.value,
+                        arch.paging.standard_page_size.value,
                     );
 
-                    const slab: *Slab = @ptrFromInt(page_start + kernel.arch.paging.standard_page_size.value - @sizeOf(Slab));
+                    const slab: *Slab = @ptrFromInt(page_start + arch.paging.standard_page_size.value - @sizeOf(Slab));
 
                     const object_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
                         object.ptr + single_node_alignment.forward(raw_cache.object_size),
@@ -657,7 +657,7 @@ pub const RawCache = struct {
         switch (raw_cache.size_class) {
             .small => {
                 const slab_info_ptr: [*]u8 = @ptrCast(slab);
-                const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - kernel.arch.paging.standard_page_size.value;
+                const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - arch.paging.standard_page_size.value;
 
                 if (raw_cache.destructor) |destructor| {
                     for (0..raw_cache.objects_per_slab) |i| {
@@ -671,7 +671,7 @@ pub const RawCache = struct {
                         current_task,
                         .{
                             .base = @intFromPtr(slab_base_ptr),
-                            .len = kernel.arch.paging.standard_page_size.value,
+                            .len = arch.paging.standard_page_size.value,
                         },
                     ),
                     .pmm => {
@@ -728,7 +728,7 @@ pub const RawCache = struct {
     const default_large_objects_per_slab = 16;
 };
 
-const small_object_size = kernel.arch.paging.standard_page_size.divideScalar(8);
+const small_object_size = arch.paging.standard_page_size.divideScalar(8);
 
 pub fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
     return alignment.forward(size) <= small_object_size.value;
@@ -756,8 +756,9 @@ pub const init = struct {
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const builtin = @import("builtin");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.cache);
+const std = @import("std");

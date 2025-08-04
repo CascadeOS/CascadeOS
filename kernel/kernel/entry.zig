@@ -10,7 +10,7 @@ pub fn onPerExecutorPeriodic(current_task: *kernel.Task) void {
 pub fn onPageFault(
     current_task: *kernel.Task,
     page_fault_details: kernel.mem.PageFaultDetails,
-    interrupt_frame: kernel.arch.interrupts.InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
     current_task.decrementInterruptDisable();
     switch (page_fault_details.context) {
@@ -33,7 +33,9 @@ pub fn onFlushRequest(current_task: *kernel.Task) void {
     kernel.mem.FlushRequest.processFlushRequests(current_task);
 }
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.entry);
+const std = @import("std");

@@ -71,7 +71,7 @@ pub fn create(current_task: *kernel.Task, scheduler_locked: core.LockState, opti
 pub const CreateTaskOptions = struct {
     name: ?kernel.Task.Name = null,
 
-    start_function: kernel.arch.scheduling.NewTaskFunction,
+    start_function: arch.scheduling.NewTaskFunction,
     arg1: u64,
     arg2: u64,
 };
@@ -151,7 +151,7 @@ pub const internal = struct {
             const frame = kernel.mem.phys.allocator.allocate() catch
                 @panic("janky leaking process destory failed to allocate frame");
 
-            const page_table: kernel.arch.paging.PageTable = kernel.arch.paging.PageTable.create(frame);
+            const page_table: arch.paging.PageTable = arch.paging.PageTable.create(frame);
             kernel.mem.globals.core_page_table.copyTopLevelInto(page_table);
 
             process.address_space.init(current_task, .{
@@ -193,7 +193,7 @@ fn cacheConstructor(process: *Process, current_task: *kernel.Task) kernel.mem.ca
         kernel.mem.phys.allocator.deallocate(frame_list);
     }
 
-    const page_table: kernel.arch.paging.PageTable = kernel.arch.paging.PageTable.create(frame);
+    const page_table: arch.paging.PageTable = arch.paging.PageTable.create(frame);
     kernel.mem.globals.core_page_table.copyTopLevelInto(page_table);
 
     process.address_space.init(current_task, .{
@@ -245,8 +245,9 @@ pub const init = struct {
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.process);
-const builtin = @import("builtin");
+const std = @import("std");

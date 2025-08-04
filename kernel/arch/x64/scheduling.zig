@@ -12,7 +12,7 @@ pub fn prepareForJumpToTaskFromTask(
             .kernel => {},
             .user => |process| {
                 process.address_space.page_table.load();
-                executor.arch.tss.setPrivilegeStack(
+                executor.arch_specific.tss.setPrivilegeStack(
                     .ring0,
                     new_task.stack.top_stack_pointer,
                 );
@@ -22,7 +22,7 @@ pub fn prepareForJumpToTaskFromTask(
             .kernel => kernel.mem.globals.core_page_table.load(),
             .user => |new_process| if (old_process != new_process) {
                 new_process.address_space.page_table.load();
-                executor.arch.tss.setPrivilegeStack(
+                executor.arch_specific.tss.setPrivilegeStack(
                     .ring0,
                     new_task.stack.top_stack_pointer,
                 );
@@ -137,7 +137,7 @@ pub fn jumpToTaskFromTask(
 /// the given arguments.
 pub fn prepareNewTaskForScheduling(
     task: *kernel.Task,
-    target_function: kernel.arch.scheduling.NewTaskFunction,
+    target_function: arch.scheduling.NewTaskFunction,
     arg1: usize,
     arg2: usize,
 ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
@@ -178,7 +178,7 @@ pub fn callOneArgs(
     new_stack: kernel.Task.Stack,
     arg1: usize,
     target_function: *const fn (usize) callconv(.c) noreturn,
-) kernel.arch.scheduling.CallError!void {
+) arch.scheduling.CallError!void {
     const impls = struct {
         const callOneArgs: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
@@ -252,7 +252,7 @@ pub fn callTwoArgs(
     arg1: usize,
     arg2: usize,
     target_function: *const fn (usize, usize) callconv(.c) noreturn,
-) kernel.arch.scheduling.CallError!void {
+) arch.scheduling.CallError!void {
     const impls = struct {
         const callTwoArgs: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
@@ -333,7 +333,7 @@ pub fn callFourArgs(
     arg3: usize,
     arg4: usize,
     target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
-) kernel.arch.scheduling.CallError!void {
+) arch.scheduling.CallError!void {
     const impls = struct {
         const callFourArgs: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
@@ -415,8 +415,10 @@ pub fn callFourArgs(
     }
 }
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
-const x64 = @import("x64.zig");
+
+const core = @import("core");
 const lib_x64 = @import("x64");
+const std = @import("std");
+const x64 = @import("x64.zig");

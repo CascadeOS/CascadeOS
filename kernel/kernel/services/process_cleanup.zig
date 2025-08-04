@@ -34,7 +34,7 @@ fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
     std.debug.assert(current_task == globals.process_cleanup_task);
     std.debug.assert(current_task.interrupt_disable_count == 0);
     std.debug.assert(current_task.spinlocks_held == 0);
-    std.debug.assert(kernel.arch.interrupts.areEnabled());
+    std.debug.assert(arch.interrupts.areEnabled());
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
@@ -102,7 +102,9 @@ pub const init = struct {
     }
 };
 
-const std = @import("std");
-const core = @import("core");
+const arch = @import("arch");
 const kernel = @import("kernel");
+
+const core = @import("core");
 const log = kernel.debug.log.scoped(.process_cleanup);
+const std = @import("std");

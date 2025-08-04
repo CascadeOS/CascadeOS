@@ -39,9 +39,9 @@ pub fn sendFlushIPI(executor: *kernel.Executor) void {
 
     switch (globals.lapic) {
         .xapic => icr.destination_field = .{ .xapic = .{
-            .destination = @intCast(executor.arch.apic_id),
+            .destination = @intCast(executor.arch_specific.apic_id),
         } },
-        .x2apic => icr.destination_field = .{ .x2apic = executor.arch.apic_id },
+        .x2apic => icr.destination_field = .{ .x2apic = executor.arch_specific.apic_id },
     }
 
     globals.lapic.writeInterruptCommandRegister(icr);
