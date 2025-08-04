@@ -241,8 +241,6 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
 }
 
 fn limineEntryPoint() callconv(.c) noreturn {
-    arch.init.onBootEntry();
-
     boot.bootloader_api = .limine;
 
     if (requests.limine_base_revison.revison == .@"0") {

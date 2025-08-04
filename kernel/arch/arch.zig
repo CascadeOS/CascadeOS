@@ -583,13 +583,6 @@ pub const io = struct {
 
 /// Functionality that is used during kernel init only.
 pub const init = struct {
-    /// Called immediately after the bootloader has loaded the kernel.
-    ///
-    /// This function is optional.
-    pub inline fn onBootEntry() void {
-        if (@hasDecl(current.init, "onBootEntry")) @call(.always_inline, current.init.onBootEntry, .{});
-    }
-
     /// Read current wallclock time from the standard wallclock source of the current architecture.
     ///
     /// For example on x86_64 this is the TSC.
