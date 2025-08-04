@@ -44,7 +44,7 @@ fn tryGetSerialOutputInner() GetSerialOutputError!?uart.Uart {
 }
 
 fn getDeviceTree() ?DeviceTree {
-    const address = kernel.boot.deviceTreeBlob() orelse return null;
+    const address = boot.deviceTreeBlob() orelse return null;
     const ptr = address.toPtr([*]align(8) const u8);
     return DeviceTree.fromPtr(ptr) catch |err| {
         log.warn("failed to parse device tree blob: {t}", .{err});
@@ -206,6 +206,7 @@ const GetSerialOutputError = DeviceTree.IteratorError ||
     uart.Baud.DivisorError;
 const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart;
 
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");

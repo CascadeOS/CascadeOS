@@ -5,7 +5,7 @@
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.Status {
     log.verbose("uacpi_kernel_get_rsdp called", .{});
 
-    const address = kernel.boot.rsdp() orelse return uacpi.Status.not_found;
+    const address = boot.rsdp() orelse return uacpi.Status.not_found;
 
     switch (address) {
         .physical => |addr| out_rsdp_address.* = addr,
@@ -608,6 +608,7 @@ export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
 }
 
 const arch = @import("arch");
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");

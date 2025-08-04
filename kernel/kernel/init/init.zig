@@ -45,7 +45,7 @@ pub fn initStage1() !noreturn {
     log.debug("loading bootstrap executor", .{});
     arch.init.prepareBootstrapExecutor(
         bootstrap_executor,
-        kernel.boot.bootstrapArchitectureProcessorId(),
+        boot.bootstrapArchitectureProcessorId(),
     );
     arch.init.loadExecutor(bootstrap_executor);
 
@@ -66,7 +66,7 @@ pub fn initStage1() !noreturn {
 
     log.debug("capturing system information", .{});
     try arch.init.captureSystemInformation(switch (arch.current_arch) {
-        .x64 => .{ .x2apic_enabled = kernel.boot.x2apicEnabled() },
+        .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
         else => .{},
     });
 
@@ -222,7 +222,7 @@ fn initStage4(current_task: *kernel.Task) !noreturn {
 fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
     const current_task = kernel.Task.getCurrent();
 
-    var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
+    var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > kernel.config.maximum_number_of_executors) {
         std.debug.panic(
@@ -235,7 +235,7 @@ fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
 
     const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
-    const bootstrap_architecture_processor_id = kernel.boot.bootstrapArchitectureProcessorId();
+    const bootstrap_architecture_processor_id = boot.bootstrapArchitectureProcessorId();
     var opt_bootstrap_executor: ?*kernel.Executor = null;
 
     var i: u32 = 0;
@@ -268,10 +268,10 @@ fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
 }
 
 fn bootNonBootstrapExecutors() !void {
-    var descriptors = kernel.boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
+    var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
     var i: u32 = 0;
 
-    const bootstrap_architecture_processor_id = kernel.boot.bootstrapArchitectureProcessorId();
+    const bootstrap_architecture_processor_id = boot.bootstrapArchitectureProcessorId();
 
     while (descriptors.next()) |desc| : (i += 1) {
         if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
@@ -329,6 +329,7 @@ const Stage3Barrier = struct {
 };
 
 const arch = @import("arch");
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");

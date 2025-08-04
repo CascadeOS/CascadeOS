@@ -202,7 +202,7 @@ pub const init = struct {
             globals.pages = page_ptr[0..number_of_usable_pages];
         }
 
-        var iter = kernel.boot.memoryMap(.forward) catch @panic("no memory map");
+        var iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         var total_memory: core.Size = .zero;
         var free_memory: core.Size = .zero;
@@ -370,7 +370,7 @@ pub const init = struct {
     };
 
     pub fn initializeBootstrapFrameAllocator() void {
-        var memory_iter = kernel.boot.memoryMap(.forward) catch @panic("no memory map");
+        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         init_log.debug("bootloader provided memory map:", .{});
 
@@ -419,6 +419,7 @@ pub const init = struct {
 };
 
 const arch = @import("arch");
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");

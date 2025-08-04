@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const acpi = @import("acpi/acpi.zig");
-pub const boot = @import("boot/boot.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug/debug.zig");
 pub const entry = @import("entry.zig");
@@ -48,7 +47,7 @@ pub const std_options: std.Options = .{
 };
 
 comptime {
-    boot.exportEntryPoints();
+    @import("boot").exportEntryPoints();
 }
 
 const std = @import("std");

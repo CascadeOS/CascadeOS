@@ -243,7 +243,7 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
 fn limineEntryPoint() callconv(.c) noreturn {
     arch.init.onBootEntry();
 
-    kernel.boot.bootloader_api = .limine;
+    boot.bootloader_api = .limine;
 
     if (requests.limine_base_revison.revison == .@"0") {
         // limine sets the `revison` field to `0` to signal that the requested revision is supported
@@ -285,7 +285,7 @@ const requests = struct {
 };
 
 const arch = @import("arch");
-const boot = @import("boot.zig");
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");

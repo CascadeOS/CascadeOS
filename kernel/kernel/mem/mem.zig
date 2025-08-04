@@ -495,7 +495,7 @@ pub const init = struct {
     }
 
     fn numberOfUsablePagesAndRegions() struct { usize, usize } {
-        var memory_iter = kernel.boot.memoryMap(.forward) catch @panic("no memory map");
+        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         var number_of_usable_pages: usize = 0;
         var number_of_usable_regions: usize = 0;
@@ -784,8 +784,7 @@ pub const init = struct {
 
     /// Determine various offsets used by the kernel early in the boot process.
     pub fn earlyDetermineOffsets() void {
-        const base_address = kernel.boot.kernelBaseAddress() orelse
-            @panic("no kernel base address");
+        const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
 
         globals.virtual_base_address = base_address.virtual;
 
@@ -801,7 +800,7 @@ pub const init = struct {
 
         const direct_map_size = direct_map_size: {
             const last_memory_map_entry = last_memory_map_entry: {
-                var memory_map_iterator = kernel.boot.memoryMap(.backward) catch @panic("no memory map");
+                var memory_map_iterator = boot.memoryMap(.backward) catch @panic("no memory map");
                 break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
             };
 
@@ -818,7 +817,7 @@ pub const init = struct {
         };
 
         globals.direct_map = core.VirtualRange.fromAddr(
-            kernel.boot.directMapAddress() orelse @panic("direct map address not provided"),
+            boot.directMapAddress() orelse @panic("direct map address not provided"),
             direct_map_size,
         );
     }
@@ -894,6 +893,7 @@ pub const init = struct {
 };
 
 const arch = @import("arch");
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");

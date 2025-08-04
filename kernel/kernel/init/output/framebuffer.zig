@@ -5,7 +5,7 @@
 // Due to this is needs to clear the entire line with when a new line is started.
 
 pub fn tryGetFramebufferOutput() ?kernel.init.Output {
-    const framebuffer = kernel.boot.framebuffer() orelse return null;
+    const framebuffer = boot.framebuffer() orelse return null;
 
     c.ssfn_src = @constCast(font);
     c.ssfn_dst = .{
@@ -87,7 +87,7 @@ fn newLine() void {
 
 /// Map the framebuffer into the special heap as write combining.
 fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
-    const framebuffer = kernel.boot.framebuffer().?;
+    const framebuffer = boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
     if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
@@ -116,6 +116,7 @@ const c = @cImport({
 });
 
 const arch = @import("arch");
+const boot = @import("boot");
 const kernel = @import("kernel");
 
 const core = @import("core");
