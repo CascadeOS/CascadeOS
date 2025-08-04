@@ -65,7 +65,7 @@ pub fn initStage1() !noreturn {
     try Output.remapOutputs(current_task);
 
     log.debug("capturing system information", .{});
-    try arch.init.captureSystemInformation(switch (kernel.config.cascade_arch) {
+    try arch.init.captureSystemInformation(switch (arch.current_arch) {
         .x64 => .{ .x2apic_enabled = kernel.boot.x2apicEnabled() },
         else => .{},
     });

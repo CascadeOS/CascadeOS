@@ -3,16 +3,10 @@
 
 pub fn customConfiguration(
     b: *std.Build,
-    architecture: CascadeTarget.Architecture,
+    _: CascadeTarget.Architecture,
     module: *std.Build.Module,
     options: Options,
 ) anyerror!void {
-    // architecture options
-    module.addImport(
-        "cascade_architecture",
-        options.architecture_specific_kernel_options_modules.get(architecture).?,
-    );
-
     // kernel options
     module.addImport("kernel_options", options.kernel_option_module);
 

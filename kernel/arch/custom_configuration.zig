@@ -5,8 +5,14 @@ pub fn customConfiguration(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
     module: *std.Build.Module,
-    _: Options,
+    options: Options,
 ) anyerror!void {
+    // architecture options
+    module.addImport(
+        "cascade_architecture",
+        options.architecture_specific_kernel_options_modules.get(architecture).?,
+    );
+
     // sbi
     if (architecture == .riscv) {
         module.addImport("sbi", b.dependency("sbi", .{}).module("sbi"));

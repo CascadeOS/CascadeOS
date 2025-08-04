@@ -3,6 +3,8 @@
 
 //! Defines the interface of the architecture specific code.
 
+pub const current_arch = @import("cascade_architecture").arch;
+
 /// Architecture specific per-executor data.
 pub const PerExecutor = current.PerExecutor;
 
@@ -716,7 +718,7 @@ pub const init = struct {
     }
 };
 
-const current = switch (cascade_arch) {
+const current = switch (current_arch) {
     // x64 is first to help zls, atleast while x64 is the main architecture.
     .x64 => @import("x64/x64.zig"),
     .arm => @import("arm/arm.zig"),
@@ -732,7 +734,7 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
     if (comptime name.len == 0) @compileError("zero-length name");
 
     if (comptime !@hasDecl(Container, name)) {
-        @panic(comptime "`" ++ @tagName(cascade_arch) ++ "` does not implement `" ++ name ++ "`");
+        @panic(comptime "`" ++ @tagName(current_arch) ++ "` does not implement `" ++ name ++ "`");
     }
 
     const DeclT = @TypeOf(@field(Container, name));
@@ -777,6 +779,5 @@ inline fn checkSupport(comptime Container: type, comptime name: []const u8, comp
 
 const kernel = @import("kernel");
 
-const cascade_arch = kernel.config.cascade_arch;
 const core = @import("core");
 const std = @import("std");
