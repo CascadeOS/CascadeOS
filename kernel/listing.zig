@@ -3,42 +3,13 @@
 
 pub const components: []const KernelComponent = &.{
     .{
-        .name = "kernel",
-        .component_dependencies = &.{
-            .{ .name = "arch" },
-            .{ .name = "boot" }, // TODO: remove this once `init` is made its own component
-        },
-        .library_dependencies = &.{
-            .{ .name = "core" },
-            .{ .name = "sdf" },
-        },
-        .configuration = @import("kernel/custom_configuration.zig").customConfiguration,
-    },
-    .{
         .name = "arch",
-        .component_dependencies = &.{
-            .{ .name = "kernel" },
-        },
+        .component_dependencies = &.{.{ .name = "kernel" }},
         .library_dependencies = &.{
             .{ .name = "core" },
-            .{
-                .name = "arm",
-                .condition = .{
-                    .architecture = &.{.arm},
-                },
-            },
-            .{
-                .name = "riscv",
-                .condition = .{
-                    .architecture = &.{.riscv},
-                },
-            },
-            .{
-                .name = "x64",
-                .condition = .{
-                    .architecture = &.{.x64},
-                },
-            },
+            .{ .name = "arm", .condition = .{ .architecture = &.{.arm} } },
+            .{ .name = "riscv", .condition = .{ .architecture = &.{.riscv} } },
+            .{ .name = "x64", .condition = .{ .architecture = &.{.x64} } },
         },
         .configuration = @import("arch/custom_configuration.zig").customConfiguration,
     },
@@ -48,10 +19,16 @@ pub const components: []const KernelComponent = &.{
             .{ .name = "arch" },
             .{ .name = "kernel" }, // TODO: remove this once `init` is made its own component
         },
-        .library_dependencies = &.{
-            .{ .name = "core" },
-            .{ .name = "limine" },
+        .library_dependencies = &.{ .{ .name = "core" }, .{ .name = "limine" } },
+    },
+    .{
+        .name = "kernel",
+        .component_dependencies = &.{
+            .{ .name = "arch" },
+            .{ .name = "boot" }, // TODO: remove this once `init` is made its own component
         },
+        .library_dependencies = &.{ .{ .name = "core" }, .{ .name = "sdf" } },
+        .configuration = @import("kernel/custom_configuration.zig").customConfiguration,
     },
 };
 
