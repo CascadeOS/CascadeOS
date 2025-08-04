@@ -30,8 +30,6 @@ SECTIONS
 
     __text_end = .;
 
-    PROVIDE(_global_pointer = .);
-
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 
     __rodata_start = .;

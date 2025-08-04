@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-/// Called immediately after the bootloader has loaded the kernel.
-pub fn onBootEntry() void {
-    asm volatile (
-        \\.option push
-        \\.option norelax
-        \\la gp, _global_pointer
-        \\.option pop
-        ::: .{
-            .memory = true,
-            .x3 = true, // gp
-        });
-}
-
 /// Read current wallclock time from the standard wallclock source of the current architecture.
 ///
 /// For example on x86_64 this is the TSC.
