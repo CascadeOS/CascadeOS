@@ -104,7 +104,7 @@ pub const init = struct {
     }
 
     pub const CandidateTimeSources = struct {
-        candidate_time_sources: std.BoundedArray(
+        candidate_time_sources: core.containers.BoundedArray(
             CandidateTimeSource,
             kernel.config.maximum_number_of_time_sources,
         ) = .{},

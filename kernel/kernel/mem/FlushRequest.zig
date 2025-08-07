@@ -6,7 +6,7 @@ const FlushRequest = @This();
 range: core.VirtualRange,
 flush_target: kernel.Context,
 count: std.atomic.Value(usize) = .init(1), // starts at `1` to account for the current executor
-nodes: std.BoundedArray(Node, kernel.config.maximum_number_of_executors) = .{},
+nodes: core.containers.BoundedArray(Node, kernel.config.maximum_number_of_executors) = .{},
 
 pub const Node = struct {
     request: *FlushRequest,

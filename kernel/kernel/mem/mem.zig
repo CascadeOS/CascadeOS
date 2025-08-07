@@ -446,7 +446,7 @@ pub const globals = struct {
     /// Initialized during `init.buildMemoryLayout`.
     var regions: Regions = undefined;
 
-    const Regions = std.BoundedArray(
+    const Regions = core.containers.BoundedArray(
         KernelMemoryRegion,
         std.meta.tags(KernelMemoryRegion.Type).len,
     );

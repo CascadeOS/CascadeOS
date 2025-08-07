@@ -442,7 +442,7 @@ pub inline fn format(_: *const AddressSpace, _: *std.Io.Writer) !void {
     @compileError("use `AddressSpace.print` instead");
 }
 
-pub const Name = std.BoundedArray(u8, kernel.config.address_space_name_length);
+pub const Name = core.containers.BoundedArray(u8, kernel.config.address_space_name_length);
 
 fn resourceArenaName(address_space_name: Name) kernel.mem.resource_arena.Name {
     var resource_arena_name: kernel.mem.resource_arena.Name = .{};

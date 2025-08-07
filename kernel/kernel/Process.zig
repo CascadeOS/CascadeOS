@@ -85,17 +85,14 @@ pub fn createUserTask(
     scheduler_locked: core.LockState,
     options: CreateTaskOptions,
 ) !*kernel.Task {
-    var name: kernel.Task.Name = .{};
-    if (options.name) |provided_name|
-        name = provided_name
-    else
-        try name.writer().print(
-            "{d}",
-            .{process.next_task_id.fetchAdd(1, .monotonic)},
-        );
-
     const entry_task = try kernel.Task.internal.create(current_task, .{
-        .name = name,
+        .name = if (options.name) |provided_name|
+            provided_name
+        else
+            try .initPrint(
+                "{d}",
+                .{process.next_task_id.fetchAdd(1, .monotonic)},
+            ),
         .start_function = options.start_function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
@@ -171,11 +168,10 @@ pub const internal = struct {
     }
 };
 
-pub const Name = std.BoundedArray(u8, kernel.config.process_name_length);
+pub const Name = core.containers.BoundedArray(u8, kernel.config.process_name_length);
 
 fn cacheConstructor(process: *Process, current_task: *kernel.Task) kernel.mem.cache.ConstructorError!void {
-    var temp_name: Name = .{};
-    temp_name.writer().print("temp {*}", .{process}) catch @panic("failed to set temporary name");
+    const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
     process.* = .{
         .name = temp_name,

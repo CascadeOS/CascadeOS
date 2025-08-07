@@ -40,7 +40,7 @@ fn getIOAPIC(gsi: u32) !IOAPIC {
 }
 
 const globals = struct {
-    var io_apics: std.BoundedArray(IOAPIC, x64.config.maximum_number_of_io_apics) = .{};
+    var io_apics: core.containers.BoundedArray(IOAPIC, x64.config.maximum_number_of_io_apics) = .{};
     var source_overrides: [lib_x64.PageTable.number_of_entries]?SourceOverride = @splat(null);
 };
 

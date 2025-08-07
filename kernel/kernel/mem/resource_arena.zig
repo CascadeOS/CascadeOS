@@ -126,11 +126,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                         for (frame_caches) |*cache| {
                             caches_created += 1;
 
-                            var cache_name: kernel.mem.cache.Name = .{};
-                            cache_name.writer().print("heap qcache {}", .{caches_created}) catch unreachable;
-
                             cache.init(.{
-                                .name = cache_name,
+                                .name = kernel.mem.cache.Name.initPrint(
+                                    "heap qcache {}",
+                                    .{caches_created},
+                                ) catch unreachable,
                                 .size = options.quantum * (caches_created),
                                 .alignment = .fromByteUnits(options.quantum),
                             });
@@ -199,7 +199,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             var any_tags_to_release = tags_to_release.first != null;
             while (any_tags_to_release) {
                 const capacity = MAX_TAGS_PER_ALLOCATION * 4;
-                var temp_tag_buffer: std.BoundedArray(*BoundaryTag, capacity) = .{};
+                var temp_tag_buffer: core.containers.BoundedArray(*BoundaryTag, capacity) = .{};
 
                 while (temp_tag_buffer.len < capacity) {
                     const node = tags_to_release.pop() orelse {
@@ -740,7 +740,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
             if (arena.unused_tags_count >= MAX_TAGS_PER_ALLOCATION) return;
 
-            var tags = std.BoundedArray(
+            var tags = core.containers.BoundedArray(
                 *BoundaryTag,
                 MAX_TAGS_PER_ALLOCATION,
             ).init(MAX_TAGS_PER_ALLOCATION - arena.unused_tags_count) catch unreachable;
@@ -883,7 +883,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
         const QuantumCaches = struct {
             caches: if (quantum_caching != .none)
-                std.BoundedArray(*RawCache, MAX_NUMBER_OF_QUANTUM_CACHES)
+                core.containers.BoundedArray(*RawCache, MAX_NUMBER_OF_QUANTUM_CACHES)
             else
                 void = if (quantum_caching != .none) .{} else {},
 
@@ -1007,7 +1007,7 @@ pub const EnsureBoundaryTagsError = error{
     OutOfBoundaryTags,
 };
 
-pub const Name = std.BoundedArray(u8, kernel.config.resource_arena_name_length);
+pub const Name = core.containers.BoundedArray(u8, kernel.config.resource_arena_name_length);
 
 const BoundaryTag = struct {
     base: usize,

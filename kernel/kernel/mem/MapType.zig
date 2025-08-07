@@ -65,26 +65,6 @@ pub fn format(
         .uncached => "_UC",
     });
 
-    var buf: std.BoundedArray(u8, 7) = .{};
-
-    buf.appendSliceAssumeCapacity(switch (region.context) {
-        .user => "U_",
-        .kernel => "K_",
-    });
-
-    buf.appendSliceAssumeCapacity(switch (region.protection) {
-        .none => "NO",
-        .read => "RO",
-        .read_write => "RW",
-        .executable => "XO",
-    });
-
-    buf.appendSliceAssumeCapacity(switch (region.cache) {
-        .write_back => "_WB",
-        .write_combining => "_WC",
-        .uncached => "_UC",
-    });
-
     try writer.writeAll(" }");
 }
 

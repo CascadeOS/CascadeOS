@@ -9,7 +9,7 @@
 // TODO: use `core.Size`
 
 pub const ConstructorError = error{ObjectConstructionFailed};
-pub const Name = std.BoundedArray(u8, kernel.config.cache_name_length);
+pub const Name = core.containers.BoundedArray(u8, kernel.config.cache_name_length);
 
 pub fn Cache(
     comptime T: type,

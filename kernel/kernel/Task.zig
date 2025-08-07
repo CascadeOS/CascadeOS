@@ -247,7 +247,7 @@ pub const internal = struct {
     }
 };
 
-pub const Name = std.BoundedArray(u8, kernel.config.task_name_length);
+pub const Name = core.containers.BoundedArray(u8, kernel.config.task_name_length);
 
 pub const Stack = struct {
     /// The entire virtual range including the guard page.
@@ -463,11 +463,8 @@ pub const init = struct {
         current_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
-        var name: Name = .{};
-        try name.writer().print("init {}", .{@intFromEnum(executor.id)});
-
         const task = try createKernelTask(current_task, .{
-            .name = name,
+            .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
             .start_function = undefined,
             .arg1 = undefined,
             .arg2 = undefined,
@@ -487,11 +484,8 @@ pub const init = struct {
         scheduler_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {
-        var name: Name = .{};
-        try name.writer().print("scheduler {}", .{@intFromEnum(executor.id)});
-
         scheduler_task.* = .{
-            .name = name,
+            .name = try .initPrint("scheduler {}", .{@intFromEnum(executor.id)}),
 
             .state = .ready,
             .stack = try .createStack(current_task),

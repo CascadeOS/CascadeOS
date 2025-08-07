@@ -168,7 +168,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    var regions: std.BoundedArray(Region, max_regions) = .{};
+    var regions: core.containers.BoundedArray(Region, max_regions) = .{};
     const max_regions: usize = 64;
 
     /// Initializes the normal physical frame allocator and the pages array.
