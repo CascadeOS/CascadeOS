@@ -11,11 +11,13 @@ pub const sendFlushIPI = x64.apic.sendFlushIPI;
 
 pub fn allocateInterrupt(
     current_task: *kernel.Task,
-    interrupt_handler: InterruptHandler,
+    interrupt_handler: arch.interrupts.Interrupt.Handler,
     context1: ?*anyopaque,
     context2: ?*anyopaque,
-) !Interrupt {
-    const allocation = try globals.interrupt_arena.allocate(current_task, 1, .instant_fit);
+) arch.interrupts.Interrupt.AllocateError!Interrupt {
+    const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
+        return error.InterruptAllocationFailed;
+    };
 
     const interrupt_number: u8 = @intCast(allocation.base);
 
@@ -28,7 +30,7 @@ pub fn allocateInterrupt(
     return @enumFromInt(interrupt_number);
 }
 
-pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) void {
+pub fn deallocateInterrupt(interrupt: Interrupt, current_task: *kernel.Task) void {
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
@@ -41,7 +43,7 @@ pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) voi
     });
 }
 
-pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) !void {
+pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
     try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
 }
 
@@ -125,7 +127,6 @@ pub const Interrupt = enum(u8) {
     }
 };
 
-pub const ArchInterruptFrame = InterruptFrame;
 pub const InterruptFrame = extern struct {
     r15: u64,
     r14: u64,
@@ -159,10 +160,6 @@ pub const InterruptFrame = extern struct {
         selector: Gdt.Selector,
     },
 
-    pub fn instructionPointer(interrupt_frame: *const InterruptFrame) usize {
-        return interrupt_frame.rip;
-    }
-
     /// Returns the context that the interrupt was triggered from.
     ///
     /// Even if the current task is a user task the context will be `.kernel` if the interrupt was triggered while in
@@ -173,10 +170,6 @@ pub const InterruptFrame = extern struct {
             .user_code => return .{ .user = current_task.context.user },
             else => unreachable,
         };
-    }
-
-    pub fn createStackIterator(interrupt_frame: *const InterruptFrame) std.debug.StackIterator {
-        return .init(null, interrupt_frame.rbp);
     }
 
     pub fn print(
@@ -247,14 +240,14 @@ pub const InterruptStackSelector = enum(u3) {
 };
 
 const Handler = struct {
-    interrupt_handler: InterruptHandler,
+    interrupt_handler: arch.interrupts.Interrupt.Handler,
     context1: ?*anyopaque = null,
     context2: ?*anyopaque = null,
 
     inline fn call(handler: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
         handler.interrupt_handler(
             current_task,
-            .{ .arch = interrupt_frame },
+            .{ .arch_specific = interrupt_frame },
             handler.context1,
             handler.context2,
         );
@@ -304,19 +297,23 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(current_task: *kernel.Task) !void {
-        try globals.interrupt_arena.init(
+    pub fn initializeInterruptRouting(current_task: *kernel.Task) void {
+        globals.interrupt_arena.init(
             .{
-                .name = try .fromSlice("interrupts"),
+                .name = kernel.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
                 .quantum = 1,
             },
-        );
+        ) catch |err| {
+            std.debug.panic("failed to initialize interrupt arena: {t}", .{err});
+        };
 
-        try globals.interrupt_arena.addSpan(
+        globals.interrupt_arena.addSpan(
             current_task,
             Interrupt.first_available_interrupt,
             Interrupt.last_available_interrupt - Interrupt.first_available_interrupt,
-        );
+        ) catch |err| {
+            std.debug.panic("failed to add interrupt span: {t}", .{err});
+        };
     }
 
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
@@ -367,7 +364,6 @@ const core = @import("core");
 const Gdt = lib_x64.Gdt;
 const Idt = lib_x64.Idt;
 const interrupt_handlers = @import("handlers.zig");
-const InterruptHandler = arch.interrupts.InterruptHandler;
 const lib_x64 = @import("x64");
 const std = @import("std");
 const x64 = @import("../x64.zig");

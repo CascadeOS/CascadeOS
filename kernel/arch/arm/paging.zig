@@ -17,10 +17,7 @@ pub const all_page_sizes = &.{
 pub const lower_half_size: core.Size = .from(128, .tib);
 pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
 
-/// The largest possible higher half virtual address.
-pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
-
-pub const ArchPageTable = struct {};
+pub const PageTable = struct {};
 
 pub const init = struct {};
 

@@ -25,7 +25,9 @@ pub fn initStage1() !noreturn {
     // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
     kernel.mem.init.logEarlyOffsets();
 
-    try kernel.acpi.init.logAcpiTables();
+    if (boot.rsdp()) |rsdp_address| {
+        try kernel.acpi.init.logAcpiTables(rsdp_address);
+    }
 
     var bootstrap_init_task: kernel.Task = undefined;
     var current_task = &bootstrap_init_task;
@@ -71,7 +73,7 @@ pub fn initStage1() !noreturn {
     });
 
     log.debug("configuring global system features", .{});
-    try arch.init.configureGlobalSystemFeatures();
+    arch.init.configureGlobalSystemFeatures();
 
     log.debug("initializing time", .{});
     try kernel.time.init.initializeTime();

@@ -855,7 +855,7 @@ pub const init = struct {
         while (true) {
             const region = if (i < regions.len) regions[i] else {
                 const size_of_free_range = core.Size.from(
-                    (arch.paging.largest_higher_half_virtual_address.value) - current_address.value,
+                    std.math.maxInt(u64) - current_address.value,
                     .byte,
                 );
 

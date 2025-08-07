@@ -9,16 +9,16 @@ pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
 }
 
 /// Attempt to get some form of init output.
-///
-/// This function can return an architecture specific output if it is available and if not is expected to call into
-/// `kernel.init.Output.tryGetSerialOutputFromGenericSources`.
-pub fn tryGetSerialOutput() ?kernel.init.Output {
+pub fn tryGetSerialOutput() ?arch.init.InitOutput {
     if (SBIDebugConsole.detect()) {
         log.debug("using sbi debug console for serial output", .{});
-        return SBIDebugConsole.output;
+        return .{
+            .output = SBIDebugConsole.output,
+            .preference = .use,
+        };
     }
 
-    return kernel.init.Output.tryGetSerialOutputFromGenericSources();
+    return null;
 }
 
 /// Prepares the provided `Executor` for the bootstrap executor.
@@ -83,6 +83,7 @@ const SBIDebugConsole = struct {
     };
 };
 
+const arch = @import("arch");
 const kernel = @import("kernel");
 
 const core = @import("core");

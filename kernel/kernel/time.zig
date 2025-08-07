@@ -68,7 +68,7 @@ pub const init = struct {
     /// For example on x86_64 this is the TSC.
     pub fn tryCaptureStandardWallclockStartTime() void {
         wallclock.kernel_start = arch.init.getStandardWallclockStartTime();
-        // wallclock.kernel_start_type already set to .kernel_start
+        wallclock.kernel_start_type = .kernel_start;
     }
 
     pub fn initializeTime() !void {

@@ -50,14 +50,14 @@ pub const State = union(enum) {
 };
 
 pub fn getCurrent() *Task {
-    arch.interrupts.disableInterrupts();
+    arch.interrupts.disable();
 
-    const executor = arch.rawGetCurrentExecutor();
+    const executor = arch.getCurrentExecutor();
     const current_task = executor.current_task;
     std.debug.assert(current_task.state.running == executor);
 
     if (current_task.interrupt_disable_count == 0) {
-        arch.interrupts.enableInterrupts();
+        arch.interrupts.enable();
     }
 
     return current_task;
@@ -115,7 +115,7 @@ pub fn incrementInterruptDisable(task: *Task) void {
 
     if (previous == 0) {
         std.debug.assert(arch.interrupts.areEnabled());
-        arch.interrupts.disableInterrupts();
+        arch.interrupts.disable();
     } else {
         std.debug.assert(!arch.interrupts.areEnabled());
     }
@@ -123,7 +123,7 @@ pub fn incrementInterruptDisable(task: *Task) void {
     task.interrupt_disable_count = previous + 1;
 
     const executor = task.state.running;
-    std.debug.assert(executor == arch.rawGetCurrentExecutor());
+    std.debug.assert(executor == arch.getCurrentExecutor());
     std.debug.assert(executor.current_task == task);
 }
 
@@ -131,7 +131,7 @@ pub fn decrementInterruptDisable(task: *Task) void {
     std.debug.assert(!arch.interrupts.areEnabled());
 
     const executor = task.state.running;
-    std.debug.assert(executor == arch.rawGetCurrentExecutor());
+    std.debug.assert(executor == arch.getCurrentExecutor());
     std.debug.assert(executor.current_task == task);
 
     const previous = task.interrupt_disable_count;
@@ -140,7 +140,7 @@ pub fn decrementInterruptDisable(task: *Task) void {
     task.interrupt_disable_count = previous - 1;
 
     if (previous == 1) {
-        arch.interrupts.enableInterrupts();
+        arch.interrupts.enable();
     }
 }
 
@@ -381,7 +381,7 @@ pub const InterruptRestorer = struct {
 pub fn onInterruptEntry() struct { *Task, InterruptRestorer } {
     std.debug.assert(!arch.interrupts.areEnabled());
 
-    const executor = arch.rawGetCurrentExecutor();
+    const executor = arch.getCurrentExecutor();
 
     const current_task = executor.current_task;
     std.debug.assert(current_task.state.running == executor);

@@ -25,11 +25,11 @@ pub fn disableInterruptsAndHalt() noreturn {
 }
 
 /// Disable interrupts.
-pub inline fn disableInterrupts() void {
+pub fn disableInterrupts() void {
     riscv.registers.SupervisorStatus.csr.clearBitsImmediate(0b10);
 }
 /// Enable interrupts.
-pub inline fn enableInterrupts() void {
+pub fn enableInterrupts() void {
     riscv.registers.SupervisorStatus.csr.setBitsImmediate(0b10);
 }
 /// Are interrupts enabled?

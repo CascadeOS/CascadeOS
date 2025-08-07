@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub fn routeInterrupt(interrupt: u8, vector: x64.interrupts.Interrupt) !void {
+pub fn routeInterrupt(
+    interrupt: u8,
+    vector: x64.interrupts.Interrupt,
+) arch.interrupts.Interrupt.RouteError!void {
     const mapping = getMapping(interrupt);
-    const ioapic = try getIOAPIC(mapping.gsi);
+    const ioapic = getIOAPIC(mapping.gsi) catch return error.UnableToRouteExternalInterrupt;
 
     ioapic.setRedirectionTableEntry(
         @intCast(mapping.gsi - ioapic.gsi_base),
@@ -13,8 +16,10 @@ pub fn routeInterrupt(interrupt: u8, vector: x64.interrupts.Interrupt) !void {
         mapping.polarity,
         mapping.trigger_mode,
         false,
-    ) catch |err|
+    ) catch |err| {
+        // TODO: return error
         std.debug.panic("failed to route interrupt {}: {t}", .{ interrupt, err });
+    };
 }
 
 fn getMapping(interrupt: u8) SourceOverride {
@@ -129,6 +134,7 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_ioapic);
 };
 
+const arch = @import("arch");
 const kernel = @import("kernel");
 
 const core = @import("core");

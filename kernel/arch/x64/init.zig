@@ -4,16 +4,14 @@
 pub const getStandardWallclockStartTime = x64.tsc.init.getStandardWallclockStartTime;
 
 /// Attempt to get some form of init output.
-///
-/// This function can return an architecture specific output if it is available and if not is expected to call into
-/// `kernel.init.Output.tryGetSerialOutputFromGenericSources`.
-pub fn tryGetSerialOutput() ?kernel.init.Output {
+pub fn tryGetSerialOutput() ?arch.init.InitOutput {
     if (DebugCon.detect()) {
         log.debug("using debug console for serial output", .{});
-        return DebugCon.output;
+        return .{
+            .output = DebugCon.output,
+            .preference = .use,
+        };
     }
-
-    if (kernel.init.Output.tryGetSerialOutputFromGenericSources()) |output| return output;
 
     const static = struct {
         var init_output_serial_port: SerialPort = undefined;
@@ -34,7 +32,10 @@ pub fn tryGetSerialOutput() ?kernel.init.Output {
             log.debug("using {t} for serial output", .{com_port});
 
             static.init_output_serial_port = serial;
-            return static.init_output_serial_port.output();
+            return .{
+                .output = static.init_output_serial_port.output(),
+                .preference = .prefer_generic,
+            };
         }
     }
 
@@ -188,7 +189,7 @@ pub fn captureSystemInformation(
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures() !void {
+pub fn configureGlobalSystemFeatures() void {
     if (x64.info.have_pic) {
         log.debug("disabling pic", .{});
         lib_x64.disablePic();
@@ -352,6 +353,7 @@ const DebugCon = struct {
     };
 };
 
+const arch = @import("arch");
 const kernel = @import("kernel");
 
 const core = @import("core");

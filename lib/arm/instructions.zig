@@ -28,12 +28,12 @@ pub fn disableInterruptsAndHalt() noreturn {
 }
 
 /// Disable interrupts.
-pub inline fn disableInterrupts() void {
+pub fn disableInterrupts() void {
     asm volatile ("msr DAIFSet, #0b1111");
 }
 
 /// Enable interrupts.
-pub inline fn enableInterrupts() void {
+pub fn enableInterrupts() void {
     asm volatile ("msr DAIFClr, #0b1111;");
 }
 

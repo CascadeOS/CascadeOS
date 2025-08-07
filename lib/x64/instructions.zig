@@ -2,17 +2,17 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Are interrupts enabled?
-pub inline fn interruptsEnabled() bool {
+pub fn interruptsEnabled() bool {
     return x64.registers.RFlags.read().interrupt;
 }
 
 /// Enable interrupts.
-pub inline fn enableInterrupts() void {
+pub fn enableInterrupts() void {
     asm volatile ("sti");
 }
 
 /// Disable interrupts.
-pub inline fn disableInterrupts() void {
+pub fn disableInterrupts() void {
     asm volatile ("cli");
 }
 
@@ -43,12 +43,12 @@ pub inline fn readTsc() u64 {
 /// Issues a PAUSE instruction.
 ///
 /// The PAUSE instruction improves the performance of spin-wait loops.
-pub inline fn pause() void {
+pub fn pause() void {
     asm volatile ("pause" ::: .{ .memory = true });
 }
 
 /// Issues a HLT instruction.
-pub inline fn halt() void {
+pub fn halt() void {
     asm volatile ("hlt");
 }
 

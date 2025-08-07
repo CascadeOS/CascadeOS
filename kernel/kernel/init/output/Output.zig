@@ -27,12 +27,20 @@ pub fn registerOutputs() void {
     }
 
     if (arch.init.tryGetSerialOutput()) |output| {
-        globals.serial_output = output;
-    }
+        switch (output.preference) {
+            .use => globals.serial_output = output.output,
+            .prefer_generic => {
+                if (tryGetSerialOutputFromGenericSources()) |generic_output|
+                    globals.serial_output = generic_output
+                else
+                    globals.serial_output = output.output;
+            },
+        }
+    } else globals.serial_output = tryGetSerialOutputFromGenericSources();
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-pub fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
+fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };

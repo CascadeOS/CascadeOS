@@ -325,16 +325,13 @@ pub const all_page_sizes: []const core.Size = &.{
 pub const lower_half_size: core.Size = .from(128, .tib);
 pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
 
-/// The largest possible higher half virtual address.
-pub const largest_higher_half_virtual_address: core.VirtualAddress = core.VirtualAddress.fromInt(0xffffffffffffffff);
-
 pub const ArchPageTable = PageTable;
 pub const page_table_alignment = PageTable.small_page_size;
 pub const page_table_size = PageTable.small_page_size;
 
 pub const init = struct {
     /// The total size of the virtual address space that one entry in the top level of the page table covers.
-    pub inline fn sizeOfTopLevelEntry() core.Size {
+    pub fn sizeOfTopLevelEntry() core.Size {
         // TODO: Only correct for 4 level paging
         return core.Size.from(0x8000000000, .byte);
     }
@@ -358,7 +355,7 @@ pub const init = struct {
         const raw_entry = &page_table.entries[PageTable.p4Index(range.address)];
 
         const entry = raw_entry.load();
-        if (entry.present.read()) @panic("already mapped");
+        if (entry.present.read()) return error.AlreadyMapped;
 
         _ = try ensureNextTable(raw_entry, physical_frame_allocator);
     }

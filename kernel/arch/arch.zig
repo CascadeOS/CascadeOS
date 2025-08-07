@@ -1,274 +1,256 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+// TODO: duplication of doc comments is annoying, but having them available to each arch as well as externally
+//       in the rest of the kernel is useful
+
 //! Defines the interface of the architecture specific code.
 
 pub const current_arch = @import("cascade_architecture").arch;
 
 /// Architecture specific per-executor data.
-pub const PerExecutor = current.PerExecutor;
+pub const PerExecutor = current_decls.PerExecutor;
 
 /// Get the current `Executor`.
 ///
-/// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
-pub fn rawGetCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
-    checkSupport(current, "getCurrentExecutor", fn () *kernel.Executor);
-
-    return current.getCurrentExecutor();
+/// Assumes that `init.loadExecutor` has been called on the currently running executor.
+pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
+    return getFunction(
+        current_functions,
+        "getCurrentExecutor",
+    )();
 }
 
-/// Issues an architecture specific hint to the CPU that we are spinning in a loop.
+/// Issues an architecture specific hint to the executor that we are spinning in a loop.
 pub fn spinLoopHint() callconv(core.inline_in_non_debug) void {
-    // `checkSupport` intentionally not called - mandatory function
-
-    current.spinLoopHint();
+    getFunction(
+        current_functions,
+        "spinLoopHint",
+    )();
 }
 
-/// Halts the current executor
+/// Halts the current executor.
 pub fn halt() callconv(core.inline_in_non_debug) void {
-    checkSupport(current, "halt", fn () void);
-
-    current.halt();
+    getFunction(
+        current_functions,
+        "halt",
+    )();
 }
 
 pub const interrupts = struct {
-    pub const Interrupt = current.interrupts.Interrupt;
+    // This is a decl not a wrapper function like the others so that it can be inlined into a naked function.
+    pub const disableAndHalt = current_functions.interrupts.disableAndHalt;
 
-    pub const InterruptFrame = struct {
-        arch: *ArchInterruptFrame,
+    pub fn areEnabled() callconv(core.inline_in_non_debug) bool {
+        return getFunction(
+            current_functions.interrupts,
+            "areEnabled",
+        )();
+    }
 
-        pub fn createStackIterator(self: InterruptFrame) std.debug.StackIterator {
-            // TODO: this is used during panics, so if it is not implemented we will panic during a panic
-            checkSupport(
-                ArchInterruptFrame,
-                "createStackIterator",
-                fn (*const ArchInterruptFrame) std.debug.StackIterator,
-            );
+    pub fn enable() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.interrupts,
+            "enable",
+        )();
+    }
 
-            return self.arch.createStackIterator();
+    pub fn disable() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.interrupts,
+            "disable",
+        )();
+    }
+
+    /// Signal end of interrupt.
+    pub fn eoi() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.interrupts,
+            "eoi",
+        )();
+    }
+
+    /// Send a panic IPI to all other executors.
+    pub fn sendPanicIPI() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.interrupts,
+            "sendPanicIPI",
+        )();
+    }
+
+    /// Send a flush IPI to the given executor.
+    pub fn sendFlushIPI(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.interrupts,
+            "sendFlushIPI",
+        )(executor);
+    }
+
+    pub const Interrupt = struct {
+        arch_specific: current_decls.interrupts.Interrupt,
+
+        pub const Handler = *const fn (
+            current_task: *kernel.Task,
+            frame: InterruptFrame,
+            context1: ?*anyopaque,
+            context2: ?*anyopaque,
+        ) void;
+
+        pub const AllocateError = error{InterruptAllocationFailed};
+
+        pub fn allocate(
+            current_task: *kernel.Task,
+            handler: Handler,
+            context1: ?*anyopaque,
+            context2: ?*anyopaque,
+        ) callconv(core.inline_in_non_debug) AllocateError!Interrupt {
+            return .{
+                .arch_specific = try getFunction(
+                    current_functions.interrupts,
+                    "allocateInterrupt",
+                )(current_task, handler, context1, context2),
+            };
         }
 
+        pub fn deallocate(interrupt: Interrupt, current_task: *kernel.Task) callconv(core.inline_in_non_debug) void {
+            getFunction(
+                current_functions.interrupts,
+                "deallocateInterrupt",
+            )(interrupt.arch_specific, current_task);
+        }
+
+        pub const RouteError = error{UnableToRouteExternalInterrupt};
+
+        pub fn route(interrupt: Interrupt, external_interrupt: u32) callconv(core.inline_in_non_debug) RouteError!void {
+            return getFunction(
+                current_functions.interrupts,
+                "routeInterrupt",
+            )(interrupt.arch_specific, external_interrupt);
+        }
+
+        pub fn toUsize(interrupt: Interrupt) callconv(core.inline_in_non_debug) usize {
+            return getFunction(
+                current_functions.interrupts,
+                "interruptToUsize",
+            )(interrupt.arch_specific);
+        }
+
+        pub fn fromUsize(interrupt: usize) callconv(core.inline_in_non_debug) Interrupt {
+            return .{
+                .arch_specific = getFunction(
+                    current_functions.interrupts,
+                    "interruptFromUsize",
+                )(interrupt),
+            };
+        }
+    };
+
+    pub const InterruptFrame = struct {
+        arch_specific: *current_decls.interrupts.InterruptFrame,
+
+        /// Creates a stack iterator for the context this interrupt was triggered from.
+        pub fn createStackIterator(self: InterruptFrame) std.debug.StackIterator {
+            // TODO: this is used during panics, so if it is not implemented we will panic during a panic
+            return getFunction(
+                current_functions.interrupts,
+                "createStackIterator",
+            )(self.arch_specific);
+        }
+
+        /// Returns the instruction pointer of the context this interrupt was triggered from.
         pub fn instructionPointer(self: InterruptFrame) usize {
             // TODO: this is used during panics, so if it is not implemented we will panic during a panic
-            checkSupport(
-                ArchInterruptFrame,
+            return getFunction(
+                current_functions.interrupts,
                 "instructionPointer",
-                fn (*const ArchInterruptFrame) usize,
-            );
-
-            return self.arch.instructionPointer();
+            )(self.arch_specific);
         }
 
         pub inline fn format(
             interrupt_frame: InterruptFrame,
             writer: *std.Io.Writer,
         ) !void {
-            checkSupport(
-                ArchInterruptFrame,
-                "format",
-                fn (*const ArchInterruptFrame, *std.Io.Writer) std.Io.Writer.Error!void,
-            );
-
-            return interrupt_frame.arch.format(writer);
+            return interrupt_frame.arch_specific.format(writer);
         }
-
-        const ArchInterruptFrame = current.interrupts.ArchInterruptFrame;
     };
-
-    pub const InterruptHandler = *const fn (
-        current_task: *kernel.Task,
-        frame: InterruptFrame,
-        context1: ?*anyopaque,
-        context2: ?*anyopaque,
-    ) void;
-
-    /// Disable interrupts and halt the CPU.
-    ///
-    /// This is a decl not a wrapper function like the other functions so that it can be inlined into a naked function.
-    pub const disableInterruptsAndHalt = current.interrupts.disableInterruptsAndHalt;
-
-    /// Returns true if interrupts are enabled.
-    pub fn areEnabled() callconv(core.inline_in_non_debug) bool {
-        // `checkSupport` intentionally not called - mandatory function
-
-        return current.interrupts.areEnabled();
-    }
-
-    /// Enable interrupts.
-    pub fn enableInterrupts() callconv(core.inline_in_non_debug) void {
-        // `checkSupport` intentionally not called - mandatory function
-
-        current.interrupts.enableInterrupts();
-    }
-
-    /// Disable interrupts.
-    pub fn disableInterrupts() callconv(core.inline_in_non_debug) void {
-        // `checkSupport` intentionally not called - mandatory function
-
-        current.interrupts.disableInterrupts();
-    }
-
-    pub fn allocateInterrupt(
-        current_task: *kernel.Task,
-        handler: InterruptHandler,
-        context1: ?*anyopaque,
-        context2: ?*anyopaque,
-    ) callconv(core.inline_in_non_debug) !Interrupt {
-        checkSupport(
-            current.interrupts,
-            "allocateInterrupt",
-            fn (*kernel.Task, InterruptHandler, ?*anyopaque, ?*anyopaque) anyerror!Interrupt,
-        );
-
-        return current.interrupts.allocateInterrupt(current_task, handler, context1, context2);
-    }
-
-    pub fn deallocateInterrupt(current_task: *kernel.Task, interrupt: Interrupt) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.interrupts, "deallocateInterrupt", fn (*kernel.Task, Interrupt) void);
-
-        current.interrupts.deallocateInterrupt(current_task, interrupt);
-    }
-
-    pub fn routeInterrupt(external_interrupt: u32, interrupt: Interrupt) callconv(core.inline_in_non_debug) !void {
-        checkSupport(
-            current.interrupts,
-            "routeInterrupt",
-            fn (u32, Interrupt) anyerror!void,
-        );
-
-        return current.interrupts.routeInterrupt(external_interrupt, interrupt);
-    }
-
-    pub fn unrouteInterrupt(external_interrupt: u32) callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.interrupts,
-            "unrouteInterrupt",
-            fn (u32) void,
-        );
-
-        current.interrupts.unrouteInterrupt(external_interrupt);
-    }
-
-    /// Signal end of interrupt.
-    pub fn eoi() callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.interrupts,
-            "eoi",
-            fn () void,
-        );
-
-        current.interrupts.eoi();
-    }
-
-    /// Send a panic IPI to all other executors.
-    pub fn sendPanicIPI() callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.interrupts,
-            "sendPanicIPI",
-            fn () void,
-        );
-
-        current.interrupts.sendPanicIPI();
-    }
-
-    /// Send a flush IPI to the given executor.
-    pub fn sendFlushIPI(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.interrupts,
-            "sendFlushIPI",
-            fn (*kernel.Executor) void,
-        );
-
-        current.interrupts.sendFlushIPI(executor);
-    }
 
     pub const init = struct {
         /// Ensure that any exceptions/faults that occur during early initialization are handled.
         ///
         /// The handler is not expected to do anything other than panic.
         pub fn initializeEarlyInterrupts() callconv(core.inline_in_non_debug) void {
-            checkSupport(current.interrupts.init, "initializeEarlyInterrupts", fn () void);
-
-            current.interrupts.init.initializeEarlyInterrupts();
+            getFunction(
+                current_functions.interrupts.init,
+                "initializeEarlyInterrupts",
+            )();
         }
 
         /// Prepare interrupt allocation and routing.
         pub fn initializeInterruptRouting(current_task: *kernel.Task) callconv(core.inline_in_non_debug) !void {
-            checkSupport(current.interrupts.init, "initializeInterruptRouting", fn (*kernel.Task) anyerror!void);
-
-            try current.interrupts.init.initializeInterruptRouting(current_task);
+            return getFunction(
+                current_functions.interrupts.init,
+                "initializeInterruptRouting",
+            )(current_task);
         }
 
         /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
         /// system interrupt handlers.
         pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
-            checkSupport(current.interrupts.init, "loadStandardInterruptHandlers", fn () void);
-
-            current.interrupts.init.loadStandardInterruptHandlers();
+            getFunction(
+                current_functions.interrupts.init,
+                "loadStandardInterruptHandlers",
+            )();
         }
     };
 };
 
 pub const paging = struct {
-    // The standard page size for the architecture.
-    pub const standard_page_size: core.Size = all_page_sizes[0];
+    /// The standard page size for the architecture.
+    pub const standard_page_size: core.Size = current_decls.paging.standard_page_size;
 
     /// The largest page size supported by the architecture.
-    pub const largest_page_size: core.Size = all_page_sizes[all_page_sizes.len - 1];
-
-    /// All the page sizes supported by the architecture in order of smallest to largest.
-    pub const all_page_sizes: []const core.Size = current.paging.all_page_sizes;
+    pub const largest_page_size: core.Size = current_decls.paging.largest_page_size;
 
     /// The total size of the lower half.
     ///
     /// This includes the zero page.
-    pub const lower_half_size: core.Size = current.paging.lower_half_size;
+    pub const lower_half_size: core.Size = current_decls.paging.lower_half_size;
 
     /// The virtual address of the start of the higher half.
-    pub const higher_half_start: core.VirtualAddress = current.paging.higher_half_start;
-
-    /// The largest possible higher half virtual address.
-    pub const largest_higher_half_virtual_address: core.VirtualAddress = current.paging.largest_higher_half_virtual_address;
+    pub const higher_half_start: core.VirtualAddress = current_decls.paging.higher_half_start;
 
     pub const PageTable = struct {
         physical_frame: kernel.mem.phys.Frame,
-        arch: *ArchPageTable,
+        arch_specific: *current_decls.paging.PageTable,
 
         /// Create a new page table in the given physical frame.
         pub fn create(physical_frame: kernel.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
-            checkSupport(
-                current.paging,
-                "createPageTable",
-                fn (kernel.mem.phys.Frame) *ArchPageTable,
-            );
-
             return .{
                 .physical_frame = physical_frame,
-                .arch = current.paging.createPageTable(physical_frame),
+                .arch_specific = getFunction(
+                    current_functions.paging,
+                    "createPageTable",
+                )(physical_frame),
             };
         }
 
         pub fn load(page_table: PageTable) callconv(core.inline_in_non_debug) void {
-            checkSupport(current.paging, "loadPageTable", fn (kernel.mem.phys.Frame) void);
-
-            current.paging.loadPageTable(page_table.physical_frame);
+            getFunction(
+                current_functions.paging,
+                "loadPageTable",
+            )(page_table.physical_frame);
         }
 
         /// Copies the top level of `page_table` into `target_page_table`.
-        pub fn copyTopLevelInto(page_table: PageTable, target_page_table: PageTable) callconv(core.inline_in_non_debug) void {
-            checkSupport(
-                current.paging,
+        pub fn copyTopLevelInto(
+            page_table: PageTable,
+            target_page_table: PageTable,
+        ) callconv(core.inline_in_non_debug) void {
+            getFunction(
+                current_functions.paging,
                 "copyTopLevelIntoPageTable",
-                fn (*ArchPageTable, *ArchPageTable) void,
-            );
-
-            current.paging.copyTopLevelIntoPageTable(page_table.arch, target_page_table.arch);
+            )(page_table.arch_specific, target_page_table.arch_specific);
         }
-
-        pub const page_table_alignment: core.Size = current.paging.page_table_alignment;
-        pub const page_table_size: core.Size = current.paging.page_table_size;
-
-        const ArchPageTable = current.paging.ArchPageTable;
     };
 
     /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
@@ -287,21 +269,10 @@ pub const paging = struct {
         map_type: kernel.mem.MapType,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
-        checkSupport(current.paging, "mapSinglePage", fn (
-            *paging.PageTable.ArchPageTable,
-            core.VirtualAddress,
-            kernel.mem.phys.Frame,
-            kernel.mem.MapType,
-            kernel.mem.phys.FrameAllocator,
-        ) kernel.mem.MapError!void);
-
-        return current.paging.mapSinglePage(
-            page_table.arch,
-            virtual_address,
-            physical_frame,
-            map_type,
-            physical_frame_allocator,
-        );
+        return getFunction(
+            current_functions.paging,
+            "mapSinglePage",
+        )(page_table.arch_specific, virtual_address, physical_frame, map_type, physical_frame_allocator);
     }
 
     /// Unmaps `virtual_address`.
@@ -319,42 +290,29 @@ pub const paging = struct {
         top_level_decision: core.CleanupDecision,
         deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.paging,
+        getFunction(
+            current_functions.paging,
             "unmapSinglePage",
-            fn (
-                *paging.PageTable.ArchPageTable,
-                core.VirtualAddress,
-                core.CleanupDecision,
-                core.CleanupDecision,
-                *kernel.mem.phys.FrameList,
-            ) void,
-        );
-
-        current.paging.unmapSinglePage(
-            page_table.arch,
-            virtual_address,
-            backing_page_decision,
-            top_level_decision,
-            deallocate_frame_list,
-        );
+        )(page_table.arch_specific, virtual_address, backing_page_decision, top_level_decision, deallocate_frame_list);
     }
 
     /// Flushes the cache for the given virtual range on the current executor.
     ///
     /// The `virtual_range` address and size must be aligned to the standard page size.
     pub fn flushCache(virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.paging, "flushCache", fn (core.VirtualRange) void);
-
-        current.paging.flushCache(virtual_range);
+        getFunction(
+            current_functions.paging,
+            "flushCache",
+        )(virtual_range);
     }
 
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
-            checkSupport(current.paging.init, "sizeOfTopLevelEntry", fn () core.Size);
-
-            return current.paging.init.sizeOfTopLevelEntry();
+            return getFunction(
+                current_functions.paging.init,
+                "sizeOfTopLevelEntry",
+            )();
         }
 
         /// This function fills in the top level of the page table for the given range.
@@ -365,25 +323,14 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn fillTopLevel(
-            page_table: paging.PageTable,
+            page_table: PageTable,
             range: core.VirtualRange,
             physical_frame_allocator: kernel.mem.phys.FrameAllocator,
-        ) callconv(core.inline_in_non_debug) !void {
-            checkSupport(
-                current.paging.init,
+        ) callconv(core.inline_in_non_debug) anyerror!void {
+            return getFunction(
+                current_functions.paging.init,
                 "fillTopLevel",
-                fn (
-                    *paging.PageTable.ArchPageTable,
-                    core.VirtualRange,
-                    kernel.mem.phys.FrameAllocator,
-                ) anyerror!void,
-            );
-
-            return current.paging.init.fillTopLevel(
-                page_table.arch,
-                range,
-                physical_frame_allocator,
-            );
+            )(page_table.arch_specific, range, physical_frame_allocator);
         }
 
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -399,27 +346,16 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
-            page_table: paging.PageTable,
+            page_table: PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: kernel.mem.MapType,
             physical_frame_allocator: kernel.mem.phys.FrameAllocator,
-        ) callconv(core.inline_in_non_debug) !void {
-            checkSupport(current.paging.init, "mapToPhysicalRangeAllPageSizes", fn (
-                *paging.PageTable.ArchPageTable,
-                core.VirtualRange,
-                core.PhysicalRange,
-                kernel.mem.MapType,
-                kernel.mem.phys.FrameAllocator,
-            ) anyerror!void);
-
-            return current.paging.init.mapToPhysicalRangeAllPageSizes(
-                page_table.arch,
-                virtual_range,
-                physical_range,
-                map_type,
-                physical_frame_allocator,
-            );
+        ) callconv(core.inline_in_non_debug) anyerror!void {
+            return getFunction(
+                current_functions.paging.init,
+                "mapToPhysicalRangeAllPageSizes",
+            )(page_table.arch_specific, virtual_range, physical_range, map_type, physical_frame_allocator);
         }
     };
 };
@@ -431,13 +367,10 @@ pub const scheduling = struct {
         old_task: *kernel.Task,
         new_task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.scheduling, "prepareForJumpToTaskFromTask", fn (
-            *kernel.Executor,
-            *kernel.Task,
-            *kernel.Task,
-        ) void);
-
-        current.scheduling.prepareForJumpToTaskFromTask(executor, old_task, new_task);
+        getFunction(
+            current_functions.scheduling,
+            "prepareForJumpToTaskFromTask",
+        )(executor, old_task, new_task);
     }
 
     /// Jumps to the given task without saving the old task's state.
@@ -448,9 +381,10 @@ pub const scheduling = struct {
     pub fn jumpToTask(
         task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) noreturn {
-        checkSupport(current.scheduling, "jumpToTask", fn (*kernel.Task) noreturn);
-
-        current.scheduling.jumpToTask(task);
+        getFunction(
+            current_functions.scheduling,
+            "jumpToTask",
+        )(task);
     }
 
     /// Jumps from `old_task` to `new_task`.
@@ -462,9 +396,10 @@ pub const scheduling = struct {
         old_task: *kernel.Task,
         new_task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.scheduling, "jumpToTaskFromTask", fn (*kernel.Task, *kernel.Task) void);
-
-        current.scheduling.jumpToTaskFromTask(old_task, new_task);
+        getFunction(
+            current_functions.scheduling,
+            "jumpToTaskFromTask",
+        )(old_task, new_task);
     }
 
     pub const NewTaskFunction = *const fn (
@@ -483,34 +418,13 @@ pub const scheduling = struct {
         arg1: usize,
         arg2: usize,
     ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
-        checkSupport(current.scheduling, "prepareNewTaskForScheduling", fn (
-            *kernel.Task,
-            NewTaskFunction,
-            usize,
-            usize,
-        ) error{StackOverflow}!void);
-
-        return current.scheduling.prepareNewTaskForScheduling(task, target_function, arg1, arg2);
+        return getFunction(
+            current_functions.scheduling,
+            "prepareNewTaskForScheduling",
+        )(task, target_function, arg1, arg2);
     }
 
     pub const CallError = error{StackOverflow};
-
-    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-    pub fn callOneArgs(
-        opt_old_task: ?*kernel.Task,
-        new_stack: kernel.Task.Stack,
-        arg1: usize,
-        target_function: *const fn (usize) callconv(.c) noreturn,
-    ) callconv(core.inline_in_non_debug) CallError!void {
-        checkSupport(current.scheduling, "callOneArgs", fn (
-            ?*kernel.Task,
-            kernel.Task.Stack,
-            usize,
-            *const fn (usize) callconv(.c) noreturn,
-        ) CallError!void);
-
-        try current.scheduling.callOneArgs(opt_old_task, new_stack, arg1, target_function);
-    }
 
     /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub fn callTwoArgs(
@@ -520,15 +434,10 @@ pub const scheduling = struct {
         arg2: usize,
         target_function: *const fn (usize, usize) callconv(.c) noreturn,
     ) callconv(core.inline_in_non_debug) CallError!void {
-        checkSupport(current.scheduling, "callTwoArgs", fn (
-            ?*kernel.Task,
-            kernel.Task.Stack,
-            usize,
-            usize,
-            *const fn (usize, usize) callconv(.c) noreturn,
-        ) CallError!void);
-
-        try current.scheduling.callTwoArgs(opt_old_task, new_stack, arg1, arg2, target_function);
+        return getFunction(
+            current_functions.scheduling,
+            "callTwoArgs",
+        )(opt_old_task, new_stack, arg1, arg2, target_function);
     }
 
     /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
@@ -541,44 +450,65 @@ pub const scheduling = struct {
         arg4: usize,
         target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
     ) callconv(core.inline_in_non_debug) CallError!void {
-        checkSupport(current.scheduling, "callFourArgs", fn (
-            ?*kernel.Task,
-            kernel.Task.Stack,
-            usize,
-            usize,
-            usize,
-            usize,
-            *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
-        ) CallError!void);
-
-        try current.scheduling.callFourArgs(
-            opt_old_task,
-            new_stack,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            target_function,
-        );
+        return getFunction(
+            current_functions.scheduling,
+            "callFourArgs",
+        )(opt_old_task, new_stack, arg1, arg2, arg3, arg4, target_function);
     }
 };
 
 pub const io = struct {
-    pub const Port = current.io.Port;
+    pub const Port = struct {
+        arch_specific: current_decls.io.Port,
 
-    pub const PortError = error{UnsupportedPortSize};
+        pub const FromError = error{InvalidPort};
 
-    pub fn readPort(comptime T: type, port: Port) callconv(core.inline_in_non_debug) PortError!T {
-        checkSupport(current.io, "readPort", fn (type, Port) PortError!T);
+        /// Creates a port.
+        pub fn from(port: usize) FromError!Port {
+            return .{
+                .arch_specific = @enumFromInt(std.math.cast(
+                    @typeInfo(current_decls.io.Port).@"enum".tag_type,
+                    port,
+                ) orelse return error.InvalidPort),
+            };
+        }
 
-        return current.io.readPort(T, port);
-    }
+        pub fn read(port: Port, comptime T: type) callconv(core.inline_in_non_debug) T {
+            return switch (T) {
+                u8 => return getFunction(
+                    current_functions.io,
+                    "readPortU8",
+                )(port.arch_specific),
+                u16 => return getFunction(
+                    current_functions.io,
+                    "readPortU16",
+                )(port.arch_specific),
+                u32 => return getFunction(
+                    current_functions.io,
+                    "readPortU32",
+                )(port.arch_specific),
+                else => @compileError("unsupported port size"),
+            };
+        }
 
-    pub fn writePort(comptime T: type, port: Port, value: T) callconv(core.inline_in_non_debug) PortError!void {
-        checkSupport(current.io, "writePort", fn (type, Port, T) PortError!void);
-
-        return current.io.writePort(T, port, value);
-    }
+        pub fn write(port: Port, comptime T: type, value: T) callconv(core.inline_in_non_debug) void {
+            switch (T) {
+                u8 => getFunction(
+                    current_functions.io,
+                    "writePortU8",
+                )(port.arch_specific, value),
+                u16 => getFunction(
+                    current_functions.io,
+                    "writePortU16",
+                )(port.arch_specific, value),
+                u32 => getFunction(
+                    current_functions.io,
+                    "writePortU32",
+                )(port.arch_specific, value),
+                else => @compileError("unsupported port size"),
+            }
+        }
+    };
 };
 
 /// Functionality that is used during kernel init only.
@@ -587,19 +517,31 @@ pub const init = struct {
     ///
     /// For example on x86_64 this is the TSC.
     pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
-        // `checkSupport` intentionally not called - mandatory function
-
-        return current.init.getStandardWallclockStartTime();
+        return getFunction(
+            current_functions.init,
+            "getStandardWallclockStartTime",
+        )();
     }
 
-    /// Attempt to get some form of init output.
-    ///
-    /// This function can return an architecture specific output if it is available and if not is expected to call into
-    /// `kernel.init.Output.tryGetSerialOutputFromGenericSources`.
-    pub fn tryGetSerialOutput() callconv(core.inline_in_non_debug) ?kernel.init.Output {
-        // `checkSupport` intentionally not called - mandatory function
+    pub const InitOutput = struct {
+        output: kernel.init.Output,
+        preference: Preference,
 
-        return current.init.tryGetSerialOutput();
+        pub const Preference = enum {
+            /// Use this output.
+            use,
+
+            /// Only use this output if a generic output is not available.
+            prefer_generic,
+        };
+    };
+
+    /// Attempt to get some form of architecture specific init output if it is available.
+    pub fn tryGetSerialOutput() callconv(core.inline_in_non_debug) ?InitOutput {
+        return getFunction(
+            current_functions.init,
+            "tryGetSerialOutput",
+        )();
     }
 
     /// Prepares the provided `Executor` for the bootstrap executor.
@@ -607,9 +549,10 @@ pub const init = struct {
         bootstrap_executor: *kernel.Executor,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "prepareBootstrapExecutor", fn (*kernel.Executor, u64) void);
-
-        current.init.prepareBootstrapExecutor(bootstrap_executor, architecture_processor_id);
+        getFunction(
+            current_functions.init,
+            "prepareBootstrapExecutor",
+        )(bootstrap_executor, architecture_processor_id);
     }
 
     /// Prepares the provided `Executor` for use.
@@ -620,153 +563,453 @@ pub const init = struct {
         architecture_processor_id: u64,
         current_task: *kernel.Task,
     ) callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.init,
+        getFunction(
+            current_functions.init,
             "prepareExecutor",
-            fn (*kernel.Executor, u64, *kernel.Task) void,
-        );
-
-        current.init.prepareExecutor(executor, architecture_processor_id, current_task);
+        )(executor, architecture_processor_id, current_task);
     }
 
     /// Load the provided `Executor` as the current executor.
     pub fn loadExecutor(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "loadExecutor", fn (*kernel.Executor) void);
-
-        current.init.loadExecutor(executor);
+        getFunction(
+            current_functions.init,
+            "loadExecutor",
+        )(executor);
     }
 
     /// Capture any system information that can be without using mmio.
     ///
     /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
     pub fn captureEarlySystemInformation() callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.init,
+        getFunction(
+            current_functions.init,
             "captureEarlySystemInformation",
-            fn () void,
-        );
-
-        return current.init.captureEarlySystemInformation();
+        )();
     }
 
-    pub const CaptureSystemInformationOptions: type =
-        if (@hasDecl(current.init, "CaptureSystemInformationOptions"))
-            current.init.CaptureSystemInformationOptions
-        else
-            struct {};
+    pub const CaptureSystemInformationOptions = current_decls.init.CaptureSystemInformationOptions;
 
     /// Capture any system information that needs mmio.
     ///
     /// For example, on x64 this should capture APIC and ACPI information.
     pub fn captureSystemInformation(
         options: CaptureSystemInformationOptions,
-    ) callconv(core.inline_in_non_debug) !void {
-        checkSupport(
-            current.init,
+    ) callconv(core.inline_in_non_debug) anyerror!void {
+        return getFunction(
+            current_functions.init,
             "captureSystemInformation",
-            fn (CaptureSystemInformationOptions) anyerror!void,
-        );
-
-        return current.init.captureSystemInformation(options);
+        )(options);
     }
 
     /// Configure any global system features.
-    pub fn configureGlobalSystemFeatures() callconv(core.inline_in_non_debug) !void {
-        checkSupport(current.init, "configureGlobalSystemFeatures", fn () anyerror!void);
-
-        return current.init.configureGlobalSystemFeatures();
+    pub fn configureGlobalSystemFeatures() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.init,
+            "configureGlobalSystemFeatures",
+        )();
     }
 
     /// Configure any per-executor system features.
     ///
     /// **WARNING**: The `executor` provided must be the current executor.
-    pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "configurePerExecutorSystemFeatures", fn (*const kernel.Executor) void);
-
-        std.debug.assert(executor == rawGetCurrentExecutor());
-
-        current.init.configurePerExecutorSystemFeatures(executor);
+    pub fn configurePerExecutorSystemFeatures(
+        executor: *const kernel.Executor,
+    ) callconv(core.inline_in_non_debug) void {
+        std.debug.assert(executor == getCurrentExecutor());
+        getFunction(
+            current_functions.init,
+            "configurePerExecutorSystemFeatures",
+        )(executor);
     }
 
     /// Register any architectural time sources.
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
-    pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) callconv(core.inline_in_non_debug) void {
-        checkSupport(
-            current.init,
+    pub fn registerArchitecturalTimeSources(
+        candidate_time_sources: *kernel.time.init.CandidateTimeSources,
+    ) callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.init,
             "registerArchitecturalTimeSources",
-            fn (*kernel.time.init.CandidateTimeSources) void,
-        );
-
-        current.init.registerArchitecturalTimeSources(candidate_time_sources);
+        )(candidate_time_sources);
     }
 
     /// Initialize the local interrupt controller for the current executor.
     ///
     /// For example, on x86_64 this should initialize the APIC.
     pub fn initLocalInterruptController() callconv(core.inline_in_non_debug) void {
-        checkSupport(current.init, "initLocalInterruptController", fn () void);
-
-        current.init.initLocalInterruptController();
+        getFunction(
+            current_functions.init,
+            "initLocalInterruptController",
+        )();
     }
 };
 
-const current = switch (current_arch) {
-    // x64 is first to help zls, atleast while x64 is the main architecture.
-    .x64 => @import("x64/x64.zig"),
-    .arm => @import("arm/arm.zig"),
-    .riscv => @import("riscv/riscv.zig"),
+/// This contains the functions that the architecture specific code must implement.
+///
+/// Any optional functions that are not implemented will result in runtime panics when called.
+pub const Functions = struct {
+    /// Get the current `Executor`.
+    ///
+    /// Assumes that `init.loadExecutor` has been called on the currently running executor.
+    getCurrentExecutor: ?fn () *kernel.Executor = null,
+
+    /// Issues an architecture specific hint to the executor that we are spinning in a loop.
+    spinLoopHint: ?fn () void = null,
+
+    /// Halts the current executor.
+    halt: ?fn () void = null,
+
+    interrupts: struct {
+        /// Disables interrupts and halts the current executor.
+        ///
+        /// Non-optional because it is used during early initialization.
+        disableAndHalt: fn () noreturn,
+
+        /// Returns whether interrupts are enabled.
+        areEnabled: ?fn () bool = null,
+
+        /// Enables interrupts.
+        enable: ?fn () void = null,
+
+        /// Disables interrupts.
+        ///
+        /// Non-optional because it is used during early initialization.
+        disable: fn () void,
+
+        /// Signal end of interrupt.
+        eoi: ?fn () void = null,
+
+        /// Send a panic IPI to all other executors.
+        sendPanicIPI: ?fn () void = null,
+
+        /// Send a flush IPI to the given executor.
+        sendFlushIPI: ?fn (*kernel.Executor) void = null,
+
+        allocateInterrupt: ?fn (
+            current_task: *kernel.Task,
+            handler: interrupts.Interrupt.Handler,
+            context1: ?*anyopaque,
+            context2: ?*anyopaque,
+        ) interrupts.Interrupt.AllocateError!current_decls.interrupts.Interrupt = null,
+
+        deallocateInterrupt: ?fn (
+            interrupt: current_decls.interrupts.Interrupt,
+            current_task: *kernel.Task,
+        ) void = null,
+
+        routeInterrupt: ?fn (
+            interrupt: current_decls.interrupts.Interrupt,
+            external_interrupt: u32,
+        ) interrupts.Interrupt.RouteError!void = null,
+
+        interruptToUsize: ?fn (interrupt: current_decls.interrupts.Interrupt) usize = null,
+        interruptFromUsize: ?fn (interrupt: usize) current_decls.interrupts.Interrupt = null,
+
+        /// Creates a stack iterator for the context this interrupt was triggered from.
+        createStackIterator: ?fn (
+            interrupt_frame: *const current_decls.interrupts.InterruptFrame,
+        ) std.debug.StackIterator = null,
+
+        /// Returns the instruction pointer of the context this interrupt was triggered from.
+        instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) usize = null,
+
+        init: struct {
+            /// Ensure that any exceptions/faults that occur during early initialization are handled.
+            ///
+            /// The handler is not expected to do anything other than panic.
+            initializeEarlyInterrupts: ?fn () void = null,
+
+            /// Prepare interrupt allocation and routing.
+            initializeInterruptRouting: ?fn (*kernel.Task) void = null,
+
+            /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
+            /// system interrupt handlers.
+            loadStandardInterruptHandlers: ?fn () void = null,
+        },
+    },
+
+    paging: struct {
+        /// Create a new page table in the given physical frame.
+        createPageTable: ?fn (physical_frame: kernel.mem.phys.Frame) *current_decls.paging.PageTable = null,
+
+        loadPageTable: ?fn (physical_frame: kernel.mem.phys.Frame) void = null,
+
+        /// Copies the top level of `page_table` into `target_page_table`.
+        copyTopLevelIntoPageTable: ?fn (
+            page_table: *current_decls.paging.PageTable,
+            target_page_table: *current_decls.paging.PageTable,
+        ) void = null,
+
+        /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual address is aligned to the standard page size
+        ///  - the virtual address is not already mapped
+        ///
+        /// This function:
+        ///  - only supports the standard page size for the architecture
+        ///  - does not flush the TLB
+        mapSinglePage: ?fn (
+            page_table: *current_decls.paging.PageTable,
+            virtual_address: core.VirtualAddress,
+            physical_frame: kernel.mem.phys.Frame,
+            map_type: kernel.mem.MapType,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        ) kernel.mem.MapError!void = null,
+
+        /// Unmaps `virtual_address`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual address is aligned to the standard page size
+        ///
+        /// This function:
+        ///  - only supports the standard page size for the architecture
+        ///  - does not flush the TLB
+        unmapSinglePage: ?fn (
+            page_table: *current_decls.paging.PageTable,
+            virtual_address: core.VirtualAddress,
+            backing_page_decision: core.CleanupDecision,
+            top_level_decision: core.CleanupDecision,
+            deallocate_frame_list: *kernel.mem.phys.FrameList,
+        ) void = null,
+
+        /// Flushes the cache for the given virtual range on the current executor.
+        ///
+        /// The `virtual_range` address and size must be aligned to the standard page size.
+        flushCache: ?fn (virtual_range: core.VirtualRange) void = null,
+
+        init: struct {
+            /// The total size of the virtual address space that one entry in the top level of the page table covers.
+            sizeOfTopLevelEntry: ?fn () core.Size = null,
+
+            /// This function fills in the top level of the page table for the given range.
+            ///
+            /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
+            ///
+            /// This function:
+            ///  - does not flush the TLB
+            ///  - does not rollback on error
+            fillTopLevel: ?fn (
+                page_table: *current_decls.paging.PageTable,
+                range: core.VirtualRange,
+                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            ) anyerror!void = null,
+
+            /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
+            ///
+            /// Caller must ensure:
+            ///  - the virtual range address and size are aligned to the standard page size
+            ///  - the physical range address and size are aligned to the standard page size
+            ///  - the virtual range size is equal to the physical range size
+            ///  - the virtual range is not already mapped
+            ///
+            /// This function:
+            ///  - uses all page sizes available to the architecture
+            ///  - does not flush the TLB
+            ///  - does not rollback on error
+            mapToPhysicalRangeAllPageSizes: ?fn (
+                page_table: *current_decls.paging.PageTable,
+                virtual_range: core.VirtualRange,
+                physical_range: core.PhysicalRange,
+                map_type: kernel.mem.MapType,
+                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            ) anyerror!void = null,
+        },
+    },
+
+    scheduling: struct {
+        /// Prepares the executor for jumping from `old_task` to `new_task`.
+        prepareForJumpToTaskFromTask: ?fn (
+            executor: *kernel.Executor,
+            old_task: *kernel.Task,
+            new_task: *kernel.Task,
+        ) void = null,
+
+        /// Jumps to the given task without saving the old task's state.
+        ///
+        /// If the old task is ever rescheduled undefined behaviour may occur.
+        ///
+        /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+        jumpToTask: ?fn (task: *kernel.Task) noreturn = null,
+
+        /// Jumps from `old_task` to `new_task`.
+        ///
+        /// Saves the old task's state to allow it to be resumed later.
+        ///
+        /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
+        jumpToTaskFromTask: ?fn (old_task: *kernel.Task, new_task: *kernel.Task) void = null,
+
+        /// Prepares the given task for being scheduled.
+        ///
+        /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
+        /// the given arguments.
+        prepareNewTaskForScheduling: ?fn (
+            task: *kernel.Task,
+            target_function: scheduling.NewTaskFunction,
+            arg1: usize,
+            arg2: usize,
+        ) error{StackOverflow}!void = null,
+
+        /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+        callTwoArgs: ?fn (
+            opt_old_task: ?*kernel.Task,
+            new_stack: kernel.Task.Stack,
+            arg1: usize,
+            arg2: usize,
+            target_function: *const fn (usize, usize) callconv(.c) noreturn,
+        ) scheduling.CallError!void = null,
+
+        /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+        callFourArgs: ?fn (
+            opt_old_task: ?*kernel.Task,
+            new_stack: kernel.Task.Stack,
+            arg1: usize,
+            arg2: usize,
+            arg3: usize,
+            arg4: usize,
+            target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
+        ) scheduling.CallError!void = null,
+    },
+
+    io: struct {
+        readPortU8: ?fn (port: current_decls.io.Port) u8 = null,
+        readPortU16: ?fn (port: current_decls.io.Port) u16 = null,
+        readPortU32: ?fn (port: current_decls.io.Port) u32 = null,
+
+        writePortU8: ?fn (port: current_decls.io.Port, value: u8) void = null,
+        writePortU16: ?fn (port: current_decls.io.Port, value: u16) void = null,
+        writePortU32: ?fn (port: current_decls.io.Port, value: u32) void = null,
+    },
+
+    init: struct {
+        /// Read current wallclock time from the standard wallclock source of the current architecture.
+        ///
+        /// For example on x86_64 this is the TSC.
+        ///
+        /// Non-optional because it is used during early initialization.
+        getStandardWallclockStartTime: fn () kernel.time.wallclock.Tick,
+
+        /// Attempt to get some form of architecture specific init output if it is available.
+        ///
+        /// Non-optional because it is used during early initialization.
+        tryGetSerialOutput: fn () ?init.InitOutput,
+
+        /// Prepares the provided `Executor` for the bootstrap executor.
+        prepareBootstrapExecutor: ?fn (*kernel.Executor, u64) void = null,
+
+        /// Prepares the provided `Executor` for use.
+        ///
+        /// **WARNING**: This function will panic if the cpu cannot be prepared.
+        prepareExecutor: ?fn (*kernel.Executor, u64, *kernel.Task) void = null,
+
+        /// Load the provided `Executor` as the current executor.
+        loadExecutor: ?fn (*kernel.Executor) void = null,
+
+        /// Capture any system information that can be without using mmio.
+        ///
+        /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
+        captureEarlySystemInformation: ?fn () void = null,
+
+        /// Capture any system information that needs mmio.
+        ///
+        /// For example, on x64 this should capture APIC and ACPI information.
+        captureSystemInformation: ?fn (options: current_decls.init.CaptureSystemInformationOptions) anyerror!void = null,
+
+        /// Configure any global system features.
+        configureGlobalSystemFeatures: ?fn () void = null,
+
+        /// Configure any per-executor system features.
+        ///
+        /// **WARNING**: The `executor` provided must be the current executor.
+        configurePerExecutorSystemFeatures: ?fn (*const kernel.Executor) void = null,
+
+        /// Register any architectural time sources.
+        ///
+        /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
+        registerArchitecturalTimeSources: ?fn (*kernel.time.init.CandidateTimeSources) void = null,
+
+        /// Initialize the local interrupt controller for the current executor.
+        ///
+        /// For example, on x86_64 this should initialize the APIC.
+        initLocalInterruptController: ?fn () void = null,
+    },
 };
 
-/// Checks if the current architecture implements the given function.
-///
-/// If it is unimplemented, this function will panic at runtime.
-///
-/// If it is implemented, this function will validate it's signature at compile time and do nothing at runtime.
-inline fn checkSupport(comptime Container: type, comptime name: []const u8, comptime TargetT: type) void {
-    if (comptime name.len == 0) @compileError("zero-length name");
+/// This contains the declarations that the architecture specific code must export.
+pub const Decls = struct {
+    /// Architecture specific per-executor data.
+    PerExecutor: type,
 
-    if (comptime !@hasDecl(Container, name)) {
-        @panic(comptime "`" ++ @tagName(current_arch) ++ "` does not implement `" ++ name ++ "`");
+    interrupts: struct {
+        /// Handle to an interrupt.
+        ///
+        /// Expected to be an enum.
+        Interrupt: type,
+
+        InterruptFrame: type,
+    },
+
+    paging: struct {
+        /// The standard page size for the architecture.
+        standard_page_size: core.Size,
+
+        /// The largest page size supported by the architecture.
+        largest_page_size: core.Size,
+
+        /// The total size of the lower half.
+        ///
+        /// This includes the zero page.
+        lower_half_size: core.Size,
+
+        /// The virtual address of the start of the higher half.
+        higher_half_start: core.VirtualAddress,
+
+        PageTable: type,
+    },
+
+    io: struct {
+        /// Handle to a port.
+        ///
+        /// Expected to be an enum.
+        Port: type,
+    },
+
+    init: struct {
+        CaptureSystemInformationOptions: type,
+    },
+};
+
+const current_interface = switch (current_arch) {
+    .arm => @import("arm/arm.zig").interface,
+    .riscv => @import("riscv/riscv.zig").interface,
+    .x64 => @import("x64/x64.zig").interface,
+};
+
+// `Functions` and `Decls` must be seperate types to avoid dependency loops.
+const current_functions: Functions = current_interface.functions;
+const current_decls: Decls = current_interface.decls;
+
+inline fn getFunction(comptime container: anytype, comptime name: []const u8) GetFunctionReturnType(container, name) {
+    const T: type = @FieldType(@TypeOf(container), name);
+    switch (@typeInfo(T)) {
+        .@"fn" => return @field(container, name),
+        .optional => {
+            if (@field(container, name)) |func| return func;
+            @panic(comptime "`" ++ @tagName(current_arch) ++ "` does not implement `" ++ name ++ "`");
+        },
+        // TODO: the error here is not perfect as it does not gives the full path to the function
+        else => @compileError("field `" ++ name ++ "` has unsupported type " ++ @typeName(T)),
     }
+}
 
-    const DeclT = @TypeOf(@field(Container, name));
-
-    const mismatch_type_msg =
-        comptime "Expected `" ++ name ++ "` to be compatible with `" ++ @typeName(TargetT) ++
-        "`, but it is `" ++ @typeName(DeclT) ++ "`";
-
-    const decl_type_info = @typeInfo(DeclT).@"fn";
-    const target_type_info = @typeInfo(TargetT).@"fn";
-
-    if (decl_type_info.return_type != target_type_info.return_type) blk: {
-        const DeclReturnT = decl_type_info.return_type orelse break :blk;
-        const TargetReturnT = target_type_info.return_type orelse @compileError(mismatch_type_msg);
-
-        const target_return_type_info = @typeInfo(TargetReturnT);
-        if (target_return_type_info != .error_union) @compileError(mismatch_type_msg);
-
-        const target_return_error_union = target_return_type_info.error_union;
-        if (target_return_error_union.error_set != anyerror) @compileError(mismatch_type_msg);
-
-        // the target return type is an error union with anyerror, so the decl return type just needs to be an
-        // error union with the right child type.
-
-        const decl_return_type_info = @typeInfo(DeclReturnT);
-        if (decl_return_type_info != .error_union) @compileError(mismatch_type_msg);
-
-        const decl_return_error_union = decl_return_type_info.error_union;
-        if (decl_return_error_union.payload != target_return_error_union.payload) @compileError(mismatch_type_msg);
-    }
-
-    if (decl_type_info.params.len != target_type_info.params.len) @compileError(mismatch_type_msg);
-
-    inline for (decl_type_info.params, target_type_info.params) |decl_param, target_param| {
-        // `null` means generics/anytype, so we just assume the types match and let zig catch mismatches.
-        if (decl_param.type == null) continue;
-        if (target_param.type == null) continue;
-
-        if (decl_param.type != target_param.type) @compileError(mismatch_type_msg);
+fn GetFunctionReturnType(comptime container: anytype, comptime name: []const u8) type {
+    const T: type = @FieldType(@TypeOf(container), name);
+    switch (@typeInfo(T)) {
+        .@"fn" => return T,
+        .optional => |opt| return opt.child,
+        // TODO: the error here is not perfect as it does not gives the full path to the function
+        else => @compileError("field `" ++ name ++ "` has unsupported type " ++ @typeName(T)),
     }
 }
 

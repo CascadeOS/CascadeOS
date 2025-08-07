@@ -142,11 +142,11 @@ export fn uacpi_kernel_io_read8(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_read8 called", .{});
 
-    // TODO: only supports x86 ports
+    const port = arch.io.Port.from(
+        @intFromPtr(handle) + offset,
+    ) catch return .invalid_argument;
 
-    const port: u16 = @intCast(@intFromPtr(handle) + offset);
-
-    value.* = arch.io.readPort(u8, port) catch return .invalid_argument;
+    value.* = port.read(u8);
     return .ok;
 }
 
@@ -160,12 +160,11 @@ export fn uacpi_kernel_io_read16(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_read16 called", .{});
 
-    // TODO: only supports x86 ports
+    const port = arch.io.Port.from(
+        @intFromPtr(handle) + offset,
+    ) catch return .invalid_argument;
 
-    const port: u16 = @intCast(@intFromPtr(handle) + offset);
-    std.debug.assert(std.mem.isAligned(port, @sizeOf(u16)));
-
-    value.* = arch.io.readPort(u16, port) catch return .invalid_argument;
+    value.* = port.read(u16);
     return .ok;
 }
 
@@ -179,12 +178,11 @@ export fn uacpi_kernel_io_read32(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_read32 called", .{});
 
-    // TODO: only supports x86 ports
+    const port = arch.io.Port.from(
+        @intFromPtr(handle) + offset,
+    ) catch return .invalid_argument;
 
-    const port: u16 = @intCast(@intFromPtr(handle) + offset);
-    std.debug.assert(std.mem.isAligned(port, @sizeOf(u32)));
-
-    value.* = arch.io.readPort(u32, port) catch return .invalid_argument;
+    value.* = port.read(u32);
     return .ok;
 }
 
@@ -198,11 +196,11 @@ export fn uacpi_kernel_io_write8(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_write8 called", .{});
 
-    // TODO: only supports x86 ports
+    const port = arch.io.Port.from(
+        @intFromPtr(handle) + offset,
+    ) catch return .invalid_argument;
 
-    const port: u16 = @intCast(@intFromPtr(handle) + offset);
-
-    arch.io.writePort(u8, port, value) catch return .invalid_argument;
+    port.write(u8, value);
     return .ok;
 }
 
@@ -216,12 +214,11 @@ export fn uacpi_kernel_io_write16(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_write16 called", .{});
 
-    // TODO: only supports x86 ports
+    const port = arch.io.Port.from(
+        @intFromPtr(handle) + offset,
+    ) catch return .invalid_argument;
 
-    const port: u16 = @intCast(@intFromPtr(handle) + offset);
-    std.debug.assert(std.mem.isAligned(port, @sizeOf(u16)));
-
-    arch.io.writePort(u16, port, value) catch return .invalid_argument;
+    port.write(u16, value);
     return .ok;
 }
 
@@ -235,12 +232,11 @@ export fn uacpi_kernel_io_write32(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_write32 called", .{});
 
-    // TODO: only supports x86 ports
+    const port = arch.io.Port.from(
+        @intFromPtr(handle) + offset,
+    ) catch return .invalid_argument;
 
-    const port: u16 = @intCast(@intFromPtr(handle) + offset);
-    std.debug.assert(std.mem.isAligned(port, @sizeOf(u32)));
-
-    arch.io.writePort(u32, port, value) catch return .invalid_argument;
+    port.write(u32, value);
     return .ok;
 }
 
@@ -503,7 +499,7 @@ export fn uacpi_kernel_install_interrupt_handler(
 
     const current_task = kernel.Task.getCurrent();
 
-    const interrupt = arch.interrupts.allocateInterrupt(
+    const interrupt = arch.interrupts.Interrupt.allocate(
         current_task,
         HandlerWrapper,
         @constCast(handler),
@@ -513,14 +509,14 @@ export fn uacpi_kernel_install_interrupt_handler(
         return .internal_error;
     };
 
-    arch.interrupts.routeInterrupt(irq, interrupt) catch |err| {
-        arch.interrupts.deallocateInterrupt(current_task, interrupt);
+    interrupt.route(irq) catch |err| {
+        interrupt.deallocate(current_task);
 
         log.err("failed to route interrupt: {}", .{err});
         return .internal_error;
     };
 
-    out_irq_handle.* = @ptrFromInt(@intFromEnum(interrupt));
+    out_irq_handle.* = @ptrFromInt(interrupt.toUsize());
 
     return .ok;
 }
@@ -534,8 +530,8 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_uninstall_interrupt_handler called", .{});
 
-    const interrupt: arch.interrupts.Interrupt = @enumFromInt(@intFromPtr(irq_handle));
-    arch.interrupts.deallocateInterrupt(kernel.Task.getCurrent(), interrupt);
+    const interrupt: arch.interrupts.Interrupt = .fromUsize(@intFromPtr(irq_handle));
+    interrupt.deallocate(kernel.Task.getCurrent());
 
     return .ok;
 }

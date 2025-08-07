@@ -46,14 +46,14 @@ const PanicType = union(enum) {
 fn panicDispatch(msg: []const u8, panic_type: PanicType) noreturn {
     @branchHint(.cold);
 
-    arch.interrupts.disableInterrupts();
+    arch.interrupts.disable();
 
     switch (globals.panic_mode) {
         .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
         .init_panic => initPanic(msg, panic_type),
     }
 
-    arch.interrupts.disableInterruptsAndHalt();
+    arch.interrupts.disableAndHalt();
 }
 
 fn singleExecutorInitPanic(
@@ -89,7 +89,7 @@ fn initPanic(
         var nested_panic_count: usize = 0;
     };
 
-    const executor = arch.rawGetCurrentExecutor();
+    const executor = arch.getCurrentExecutor();
 
     if (globals.panicking_executor.cmpxchgStrong(
         null,

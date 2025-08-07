@@ -27,8 +27,8 @@ pub fn tryShutdown() !void {
         try uacpi.prepareForSleep(.S5);
 
         const interrupts_enabled = arch.interrupts.areEnabled();
-        arch.interrupts.disableInterrupts();
-        defer if (interrupts_enabled) arch.interrupts.enableInterrupts();
+        arch.interrupts.disable();
+        defer if (interrupts_enabled) arch.interrupts.enable();
 
         try uacpi.sleep(.S5);
     }
@@ -76,12 +76,10 @@ pub const init = struct {
         globals.acpi_tables_initialized = true;
     }
 
-    pub fn logAcpiTables() !void {
+    pub fn logAcpiTables(rsdp_address: core.Address) !void {
         // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
 
         if (!init_log.levelEnabled(.debug)) return;
-
-        const rsdp_address = kernel.boot.rsdp() orelse return; // not an error to allow non-ACPI systems to boot
 
         const rsdp = switch (rsdp_address) {
             .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const tables.RSDP),
@@ -247,10 +245,11 @@ const hack = struct {
 
         if (fadt.SMI_CMD != 0 and fadt.ACPI_ENABLE != 0) {
             // we have SMM and we need to enable ACPI mode first
-            try arch.io.writePort(u8, @intCast(fadt.SMI_CMD), fadt.ACPI_ENABLE);
+            const smi: arch.io.Port = try .from(fadt.SMI_CMD);
+            smi.write(u8, fadt.ACPI_ENABLE);
 
             for (0..100) |_| {
-                _ = try arch.io.readPort(u8, 0x80);
+                _ = port_0x80.read(u8);
             }
 
             while (try readAddress(u16, PM1a_CNT) & SCI_EN == 0) {
@@ -264,23 +263,20 @@ const hack = struct {
             try writeAddress(PM1b_CNT, SLP_TYPb | SLP_EN);
         }
 
-        for (0..100) |_| _ = try arch.io.readPort(u8, 0x80);
+        for (0..100) |_| _ = port_0x80.read(u8);
     }
+
+    const port_0x80 = arch.io.Port.from(0x80) catch unreachable;
 
     const ReadAddressError = error{
         UnsupportedAddressSpace,
-        InvalidPort,
-    } || arch.io.PortError;
+    } || arch.io.Port.FromError;
 
     fn readAddress(comptime T: type, address: Address) ReadAddressError!T {
         switch (address.address_space) {
             .io => {
-                const port = std.math.cast(
-                    arch.io.Port,
-                    address.address,
-                ) orelse return ReadAddressError.InvalidPort;
-
-                return arch.io.readPort(T, port);
+                const port: arch.io.Port = try .from(address.address);
+                return port.read(T);
             },
             else => return ReadAddressError.UnsupportedAddressSpace,
         }
@@ -289,34 +285,26 @@ const hack = struct {
     const WriteAddressError = error{
         UnsupportedAddressSpace,
         UnsupportedRegisterBitWidth,
-        InvalidPort,
         ValueOutOfRange,
-    } || arch.io.PortError;
+    } || arch.io.Port.FromError;
 
     fn writeAddress(address: Address, value: u64) WriteAddressError!void {
         switch (address.address_space) {
             .io => {
-                const port = std.math.cast(
-                    u16,
-                    address.address,
-                ) orelse return WriteAddressError.InvalidPort;
+                const port: arch.io.Port = try .from(address.address);
 
                 inline for (.{ 8, 16, 32 }) |bit_width| if (bit_width == address.register_bit_width) {
                     const T = std.meta.Int(.unsigned, bit_width);
 
-                    try arch.io.writePort(
+                    port.write(T, std.math.cast(
                         T,
-                        port,
-                        std.math.cast(
-                            T,
-                            value,
-                        ) orelse return WriteAddressError.ValueOutOfRange,
-                    );
+                        value,
+                    ) orelse return WriteAddressError.ValueOutOfRange);
 
                     return;
                 };
 
-                return WriteAddressError.UnsupportedPortSize;
+                return WriteAddressError.UnsupportedRegisterBitWidth;
             },
             else => return WriteAddressError.UnsupportedAddressSpace,
         }

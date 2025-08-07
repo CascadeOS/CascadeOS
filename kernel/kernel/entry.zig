@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Executed upon per executor periodic interrupt.
+///
+/// The timers interrupt has already been acknowledged by the architecture specific code.
 pub fn onPerExecutorPeriodic(current_task: *kernel.Task) void {
     kernel.scheduler.maybePreempt(current_task);
 }

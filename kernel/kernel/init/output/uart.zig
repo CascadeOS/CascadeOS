@@ -280,16 +280,22 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
 
         inline fn writeRegister(target: AddressT, byte: u8) void {
             switch (mode) {
-                .io_port => arch.io.writePort(u8, target, byte) catch unreachable,
+                .io_port => {
+                    const port = arch.io.Port.from(target) catch unreachable;
+                    port.write(u8, byte);
+                },
                 .memory => target[0] = byte,
             }
         }
 
         inline fn readRegister(target: AddressT) u8 {
-            return switch (mode) {
-                .io_port => arch.io.readPort(u8, target) catch unreachable,
-                .memory => target[0],
-            };
+            switch (mode) {
+                .io_port => {
+                    const port = arch.io.Port.from(target) catch unreachable;
+                    return port.read(u8);
+                },
+                .memory => return target[0],
+            }
         }
 
         const RegisterOffset = enum(u3) {

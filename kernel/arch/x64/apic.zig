@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Signal end of interrupt.
-pub inline fn eoi() void {
+pub fn eoi() void {
     globals.lapic.eoi();
 }
 

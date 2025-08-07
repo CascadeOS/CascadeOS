@@ -140,7 +140,7 @@ pub fn prepareNewTaskForScheduling(
     target_function: arch.scheduling.NewTaskFunction,
     arg1: usize,
     arg2: usize,
-) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
+) error{StackOverflow}!void {
     const impls = struct {
         const startNewTaskStage1: *const fn () callconv(.c) void = blk: {
             const impl = struct {
@@ -170,79 +170,6 @@ pub fn prepareNewTaskForScheduling(
 
     // general purpose registers
     for (0..6) |_| try task.stack.push(0);
-}
-
-/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-pub fn callOneArgs(
-    opt_old_task: ?*kernel.Task,
-    new_stack: kernel.Task.Stack,
-    arg1: usize,
-    target_function: *const fn (usize) callconv(.c) noreturn,
-) arch.scheduling.CallError!void {
-    const impls = struct {
-        const callOneArgs: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\push %rbx
-                        \\push %rbp
-                        \\push %r12
-                        \\push %r13
-                        \\push %r14
-                        \\push %r15
-                        \\mov %rsp, %rax
-                        \\mov %rax, (%rsi)
-                        \\mov %rdi, %rsp
-                        \\pop %rdi
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
-
-        const callOneArgsNoPrevious: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\pop %rdi
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
-    };
-
-    var stack = new_stack;
-
-    try stack.push(@intFromPtr(target_function));
-    try stack.push(arg1);
-
-    if (opt_old_task) |old_task| {
-        impls.callOneArgs(
-            stack.stack_pointer,
-            &old_task.stack.stack_pointer,
-        );
-    } else {
-        impls.callOneArgsNoPrevious(stack.stack_pointer);
-    }
 }
 
 /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.

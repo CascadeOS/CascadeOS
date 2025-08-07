@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const interface = @import("interface.zig");
+
 pub const interrupts = @import("interrupts.zig");
 pub const paging = @import("paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
@@ -16,10 +18,6 @@ pub fn getCurrentExecutor() *kernel.Executor {
 }
 
 pub const spinLoopHint = lib_arm.instructions.isb;
-
-pub const io = struct {
-    pub const Port = u64;
-};
 
 const kernel = @import("kernel");
 

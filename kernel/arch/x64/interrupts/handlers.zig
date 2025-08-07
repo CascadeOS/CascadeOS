@@ -3,7 +3,7 @@
 
 pub fn nonMaskableInterruptHandler(
     _: *kernel.Task,
-    interrupt_frame: InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
@@ -12,17 +12,19 @@ pub fn nonMaskableInterruptHandler(
     }
 
     // an executor is panicking so this NMI is a panic IPI
-    arch.interrupts.disableInterruptsAndHalt();
+    x64.interrupts.disableInterruptsAndHalt();
 }
 
 pub fn pageFaultHandler(
     current_task: *kernel.Task,
-    interrupt_frame: InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
     const faulting_address = lib_x64.registers.Cr2.readAddress();
-    const error_code: lib_x64.PageFaultErrorCode = .fromErrorCode(interrupt_frame.arch.error_code);
+
+    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
+    const error_code: lib_x64.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
     kernel.entry.onPageFault(current_task, .{
         .faulting_address = faulting_address,
@@ -46,13 +48,23 @@ pub fn pageFaultHandler(
     }, interrupt_frame);
 }
 
-pub fn flushRequestHandler(current_task: *kernel.Task, _: InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
+pub fn flushRequestHandler(
+    current_task: *kernel.Task,
+    _: arch.interrupts.InterruptFrame,
+    _: ?*anyopaque,
+    _: ?*anyopaque,
+) void {
     kernel.entry.onFlushRequest(current_task);
     // eoi after all current flush requests have been handled
     x64.apic.eoi();
 }
 
-pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: InterruptFrame, _: ?*anyopaque, _: ?*anyopaque) void {
+pub fn perExecutorPeriodicHandler(
+    current_task: *kernel.Task,
+    _: arch.interrupts.InterruptFrame,
+    _: ?*anyopaque,
+    _: ?*anyopaque,
+) void {
     // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
     kernel.entry.onPerExecutorPeriodic(current_task);
@@ -60,16 +72,17 @@ pub fn perExecutorPeriodicHandler(current_task: *kernel.Task, _: InterruptFrame,
 
 pub fn unhandledException(
     current_task: *kernel.Task,
-    interrupt_frame: InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
-    switch (interrupt_frame.arch.context(current_task)) {
+    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
+    switch (arch_interrupt_frame.context(current_task)) {
         .kernel => kernel.debug.interruptSourcePanic(
             current_task,
             interrupt_frame,
             "unhandled kernel exception: {t}",
-            .{interrupt_frame.arch.vector_number.interrupt},
+            .{arch_interrupt_frame.vector_number.interrupt},
         ),
         .user => @panic("NOT IMPLEMENTED: unhandled exception in user mode"),
     }
@@ -80,7 +93,7 @@ pub fn unhandledException(
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(
     current_task: *kernel.Task,
-    interrupt_frame: InterruptFrame,
+    interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
@@ -92,7 +105,6 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 
 const core = @import("core");
-const InterruptFrame = arch.interrupts.InterruptFrame;
 const lib_x64 = @import("x64");
 const std = @import("std");
 const x64 = @import("../x64.zig");

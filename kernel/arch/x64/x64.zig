@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const interface = @import("interface.zig");
+
 pub const apic = @import("apic.zig");
 pub const config = @import("config.zig");
 pub const hpet = @import("hpet.zig");
@@ -17,34 +19,12 @@ pub const init = @import("init.zig");
 /// Get the current `Executor`.
 ///
 /// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
-pub inline fn getCurrentExecutor() *kernel.Executor {
+pub fn getCurrentExecutor() *kernel.Executor {
     return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
 }
 
 pub const spinLoopHint = lib_x64.instructions.pause;
 pub const halt = lib_x64.instructions.halt;
-
-pub const io = struct {
-    pub const Port = u16;
-
-    pub inline fn readPort(comptime T: type, port: Port) arch.io.PortError!T {
-        return switch (T) {
-            u8 => lib_x64.instructions.portReadU8(port),
-            u16 => lib_x64.instructions.portReadU16(port),
-            u32 => lib_x64.instructions.portReadU32(port),
-            else => arch.io.PortError.UnsupportedPortSize,
-        };
-    }
-
-    pub inline fn writePort(comptime T: type, port: Port, value: T) arch.io.PortError!void {
-        return switch (T) {
-            u8 => lib_x64.instructions.portWriteU8(port, value),
-            u16 => lib_x64.instructions.portWriteU16(port, value),
-            u32 => lib_x64.instructions.portWriteU32(port, value),
-            else => arch.io.PortError.UnsupportedPortSize,
-        };
-    }
-};
 
 const arch = @import("arch");
 const kernel = @import("kernel");
