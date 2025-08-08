@@ -8,14 +8,14 @@ pub inline fn readPhysicalCount() u64 {
 }
 
 /// Halt the CPU.
-pub inline fn halt() void {
+pub fn halt() void {
     asm volatile ("wfe");
 }
 
 /// Instruction synchronization barrier.
 ///
 /// Instruction Synchronization Barrier flushes the pipeline in the PE and is a context synchronization event.
-pub inline fn isb() void {
+pub fn isb() void {
     asm volatile ("isb" ::: .{ .memory = true });
 }
 

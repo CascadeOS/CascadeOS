@@ -191,6 +191,8 @@ pub const init = struct {
 
 const hack = struct {
     fn tryHackyShutdown() !void {
+        if (arch.current_arch != .x64) return; // this code uses io ports
+
         // this is ported from https://github.com/lowlevelmemes/acpi-shutdown-hack/blob/trunk/acpi_shutdown_hack.c
 
         const acpi_table = getTable(tables.FADT, 0) orelse return error.FADTNotPresent;

@@ -2,11 +2,20 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const functions: arch.Functions = .{
+    .getCurrentExecutor = struct {
+        fn getCurrentExecutor() *kernel.Executor {
+            return @ptrFromInt(lib_arm.registers.TPIDR_EL1.read());
+        }
+    }.getCurrentExecutor,
+
+    .spinLoopHint = lib_arm.instructions.isb,
+    .halt = lib_arm.instructions.halt,
+
     .interrupts = .{
-        .disableAndHalt = arm.interrupts.disableInterruptsAndHalt,
-        .areEnabled = arm.interrupts.areEnabled,
-        .enable = arm.interrupts.enableInterrupts,
-        .disable = arm.interrupts.disableInterrupts,
+        .disableAndHalt = lib_arm.instructions.disableInterruptsAndHalt,
+        .areEnabled = lib_arm.instructions.interruptsEnabled,
+        .enable = lib_arm.instructions.enableInterrupts,
+        .disable = lib_arm.instructions.disableInterrupts,
 
         .init = .{},
     },
@@ -20,31 +29,56 @@ pub const functions: arch.Functions = .{
     .io = .{},
 
     .init = .{
-        .getStandardWallclockStartTime = arm.init.getStandardWallclockStartTime,
-        .tryGetSerialOutput = arm.init.tryGetSerialOutput,
-        .prepareBootstrapExecutor = arm.init.prepareBootstrapExecutor,
-        .loadExecutor = arm.init.loadExecutor,
+        .getStandardWallclockStartTime = struct {
+            fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+                return @enumFromInt(lib_arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
+            }
+        }.getStandardWallclockStartTime,
+
+        .tryGetSerialOutput = struct {
+            fn tryGetSerialOutput() ?arch.init.InitOutput {
+                return null;
+            }
+        }.tryGetSerialOutput,
+
+        .prepareBootstrapExecutor = struct {
+            fn prepareBootstrapExecutor(
+                bootstrap_executor: *kernel.Executor,
+                architecture_processor_id: u64,
+            ) void {
+                bootstrap_executor.arch_specific = .{
+                    .mpidr = architecture_processor_id,
+                };
+            }
+        }.prepareBootstrapExecutor,
+
+        .loadExecutor = struct {
+            fn loadExecutor(executor: *kernel.Executor) void {
+                lib_arm.registers.TPIDR_EL1.write(@intFromPtr(executor));
+            }
+        }.loadExecutor,
     },
 };
 
 pub const decls: arch.Decls = .{
-    .PerExecutor = arm.PerExecutor,
+    .PerExecutor = struct { mpidr: u64 },
 
     .interrupts = .{
-        .Interrupt = arm.interrupts.Interrupt,
-        .InterruptFrame = arm.interrupts.InterruptFrame,
+        .Interrupt = enum(u0) { _ },
+        .InterruptFrame = extern struct {},
     },
 
     .paging = .{
-        .standard_page_size = arm.paging.all_page_sizes[0],
-        .largest_page_size = arm.paging.all_page_sizes[arm.paging.all_page_sizes.len - 1],
-        .lower_half_size = arm.paging.lower_half_size,
-        .higher_half_start = arm.paging.higher_half_start,
-        .PageTable = arm.paging.PageTable,
+        // TODO: most of these values are copied from the x64, so all of them need to be checked
+        .standard_page_size = .from(4, .kib),
+        .largest_page_size = .from(1, .gib),
+        .lower_half_size = .from(128, .tib),
+        .higher_half_start = .fromInt(0xffff800000000000),
+        .PageTable = extern struct {},
     },
 
     .io = .{
-        .Port = enum(u64) { _ },
+        .Port = enum(u0) { _ },
     },
 
     .init = .{
@@ -56,6 +90,7 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 
 const arm = @import("arm.zig");
+const lib_arm = @import("arm");
 
 const core = @import("core");
 const std = @import("std");

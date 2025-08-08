@@ -981,9 +981,9 @@ pub const Decls = struct {
 };
 
 const current_interface = switch (current_arch) {
-    .arm => @import("arm/arm.zig").interface,
-    .riscv => @import("riscv/riscv.zig").interface,
-    .x64 => @import("x64/x64.zig").interface,
+    .arm => @import("arm/interface.zig"),
+    .riscv => @import("riscv/interface.zig"),
+    .x64 => @import("x64/interface.zig"),
 };
 
 // `Functions` and `Decls` must be seperate types to avoid dependency loops.
