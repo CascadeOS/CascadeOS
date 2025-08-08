@@ -245,10 +245,6 @@ fn resolveLibrary(
                 .root_module = host_test_module,
             });
 
-            if (library_description.need_llvm) {
-                host_test_exe.use_llvm = true;
-            }
-
             const host_test_install_step = b.addInstallArtifact(
                 host_test_exe,
                 .{
