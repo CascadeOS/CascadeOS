@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub inline fn readTime() u64 {
+pub fn readTime() u64 {
     return asm ("rdtime %[ret]"
         : [ret] "=r" (-> u64),
     );
 }
 
-pub inline fn pause() void {
+pub fn pause() void {
     asm volatile ("pause");
 }
 
 /// Halt the CPU.
-pub inline fn halt() void {
+pub fn halt() void {
     asm volatile ("wfi");
 }
 
