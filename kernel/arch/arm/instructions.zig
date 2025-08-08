@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub inline fn readPhysicalCount() u64 {
+pub fn readPhysicalCount() u64 {
     return asm ("mrs %[ret], cntpct_el0"
         : [ret] "=r" (-> u64),
     );
@@ -46,11 +46,5 @@ pub fn interruptsEnabled() bool {
     return (daif & mask) == 0;
 }
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const core = @import("core");
 const std = @import("std");
-
-const arm = @import("arm");

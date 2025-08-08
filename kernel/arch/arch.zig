@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// TODO: duplication of doc comments is annoying, but having them available to each arch as well as externally
-//       in the rest of the kernel is useful
+// TODO: duplication of doc comments is annoying, but having them accessible to each arch as well to the rest of the
+//       kernel is useful
 
 //! Defines the interface of the architecture specific code.
 

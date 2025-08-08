@@ -7,7 +7,6 @@ pub const components: []const KernelComponent = &.{
         .component_dependencies = &.{.{ .name = "kernel" }},
         .library_dependencies = &.{
             .{ .name = "core" },
-            .{ .name = "arm", .condition = .{ .architecture = &.{.arm} } },
             .{ .name = "riscv", .condition = .{ .architecture = &.{.riscv} } },
             .{ .name = "x64", .condition = .{ .architecture = &.{.x64} } },
         },

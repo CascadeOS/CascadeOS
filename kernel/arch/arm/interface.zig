@@ -4,18 +4,18 @@
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
         fn getCurrentExecutor() *kernel.Executor {
-            return @ptrFromInt(lib_arm.registers.TPIDR_EL1.read());
+            return @ptrFromInt(arm.registers.TPIDR_EL1.read());
         }
     }.getCurrentExecutor,
 
-    .spinLoopHint = lib_arm.instructions.isb,
-    .halt = lib_arm.instructions.halt,
+    .spinLoopHint = arm.instructions.isb,
+    .halt = arm.instructions.halt,
 
     .interrupts = .{
-        .disableAndHalt = lib_arm.instructions.disableInterruptsAndHalt,
-        .areEnabled = lib_arm.instructions.interruptsEnabled,
-        .enable = lib_arm.instructions.enableInterrupts,
-        .disable = lib_arm.instructions.disableInterrupts,
+        .disableAndHalt = arm.instructions.disableInterruptsAndHalt,
+        .areEnabled = arm.instructions.interruptsEnabled,
+        .enable = arm.instructions.enableInterrupts,
+        .disable = arm.instructions.disableInterrupts,
 
         .init = .{},
     },
@@ -31,7 +31,7 @@ pub const functions: arch.Functions = .{
     .init = .{
         .getStandardWallclockStartTime = struct {
             fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
-                return @enumFromInt(lib_arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
+                return @enumFromInt(arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
             }
         }.getStandardWallclockStartTime,
 
@@ -54,7 +54,7 @@ pub const functions: arch.Functions = .{
 
         .loadExecutor = struct {
             fn loadExecutor(executor: *kernel.Executor) void {
-                lib_arm.registers.TPIDR_EL1.write(@intFromPtr(executor));
+                arm.registers.TPIDR_EL1.write(@intFromPtr(executor));
             }
         }.loadExecutor,
     },
@@ -90,7 +90,6 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 
 const arm = @import("arm.zig");
-const lib_arm = @import("arm");
 
 const core = @import("core");
 const std = @import("std");

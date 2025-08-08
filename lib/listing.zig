@@ -2,11 +2,6 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const libraries: []const LibraryDescription = &.{
-    .{
-        .name = "arm",
-        .dependencies = &.{ "core", "bitjuggle" },
-        .supported_architectures = &.{.arm},
-    },
     .{ .name = "bitjuggle", .dependencies = &.{"core"} },
     .{ .name = "core" },
     .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
