@@ -9,10 +9,10 @@ const KernelComponent = @This();
 name: []const u8,
 
 /// The other kernel components that this component can access via `@import`.
-component_dependencies: []const Dependency = &.{},
+component_dependencies: []const []const u8 = &.{},
 
 /// The libraries that this component can access via `@import`.
-library_dependencies: []const Dependency = &.{},
+library_dependencies: []const []const u8 = &.{},
 
 configuration: ?*const fn (
     b: *std.Build,
@@ -20,16 +20,6 @@ configuration: ?*const fn (
     module: *std.Build.Module,
     options: Options,
 ) anyerror!void = null,
-
-pub const Dependency = struct {
-    name: []const u8,
-    condition: Condition = .always,
-
-    pub const Condition = union(enum) {
-        always,
-        architecture: []const CascadeTarget.Architecture,
-    };
-};
 
 const std = @import("std");
 

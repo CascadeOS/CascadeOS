@@ -51,9 +51,9 @@ fn constructKernel(
     // TODO: create both a 'kernel' and a 'kernel-check' component, both exactly the same but with different kernel options
     //       this allows us to enable as many code paths as possible in the kernel check step
 
-    const required_components = try getAllRequiredComponents(b, architecture);
+    const required_components = try getAllRequiredComponents(b);
 
-    const required_libraries = try getAllRequiredLibraries(b, architecture, all_libraries, required_components);
+    const required_libraries = try getAllRequiredLibraries(b, all_libraries, required_components);
 
     try configureComponents(
         b,
@@ -216,12 +216,11 @@ fn constructKernel(
     };
 }
 
-/// Returns the kernel components required to build the kernel for the given architecture.
+/// Returns the kernel components required to build the kernel.
 ///
 /// The modules for each component are created but not configured in any way.
 fn getAllRequiredComponents(
     b: *std.Build,
-    architecture: CascadeTarget.Architecture,
 ) !WipComponent.Collection {
     var todo_components: std.StringArrayHashMapUnmanaged(void) = .empty;
     try todo_components.putNoClobber(b.allocator, "kernel", {});
@@ -240,17 +239,7 @@ fn getAllRequiredComponents(
         };
 
         for (component.component_dependencies) |dep| {
-            switch (dep.condition) {
-                .always => {},
-                .architecture => |dep_architectures| blk: {
-                    for (dep_architectures) |dep_architecture| {
-                        if (architecture == dep_architecture) break :blk;
-                    }
-                    continue;
-                },
-            }
-
-            try todo_components.put(b.allocator, dep.name, {});
+            try todo_components.put(b.allocator, dep, {});
         }
 
         try required_components.putNoClobber(b.allocator, component_name, .{
@@ -276,7 +265,6 @@ const WipComponent = struct {
 /// Returns the libraries required to build the kernel for the given architecture.
 fn getAllRequiredLibraries(
     b: *std.Build,
-    architecture: CascadeTarget.Architecture,
     all_libraries: Library.Collection,
     components: WipComponent.Collection,
 ) !Library.Collection {
@@ -284,26 +272,16 @@ fn getAllRequiredLibraries(
 
     for (components.values()) |component| {
         for (component.kernel_component.library_dependencies) |dep| {
-            if (required_libraries.contains(dep.name)) continue;
+            if (required_libraries.contains(dep)) continue;
 
-            switch (dep.condition) {
-                .always => {},
-                .architecture => |dep_architectures| blk: {
-                    for (dep_architectures) |dep_architecture| {
-                        if (architecture == dep_architecture) break :blk;
-                    }
-                    continue;
-                },
-            }
-
-            const library = all_libraries.get(dep.name) orelse {
+            const library = all_libraries.get(dep) orelse {
                 std.debug.panic(
                     "kernel component '{s}' depends on non-existant library '{s}'",
-                    .{ component.kernel_component.name, dep.name },
+                    .{ component.kernel_component.name, dep },
                 );
             };
 
-            try required_libraries.putNoClobber(b.allocator, dep.name, library);
+            try required_libraries.putNoClobber(b.allocator, dep, library);
         }
     }
 
@@ -338,49 +316,29 @@ fn configureComponents(
 
         // library dependencies
         for (kernel_component.library_dependencies) |dep| {
-            switch (dep.condition) {
-                .always => {},
-                .architecture => |dep_architectures| blk: {
-                    for (dep_architectures) |dep_architecture| {
-                        if (architecture == dep_architecture) break :blk;
-                    }
-                    continue;
-                },
-            }
-
-            const library = libraries.get(dep.name) orelse {
+            const library = libraries.get(dep) orelse {
                 std.debug.panic(
                     "kernel component '{s}' depends on non-existant library '{s}'",
-                    .{ kernel_component.name, dep.name },
+                    .{ kernel_component.name, dep },
                 );
             };
 
             module.addImport(
-                dep.name,
+                dep,
                 library.cascade_modules.get(architecture) orelse unreachable,
             );
         }
 
         // component dependencies
         for (kernel_component.component_dependencies) |dep| {
-            switch (dep.condition) {
-                .always => {},
-                .architecture => |dep_architectures| blk: {
-                    for (dep_architectures) |dep_architecture| {
-                        if (architecture == dep_architecture) break :blk;
-                    }
-                    continue;
-                },
-            }
-
-            const component = components.get(dep.name) orelse {
+            const component = components.get(dep) orelse {
                 std.debug.panic(
                     "kernel component '{s}' depends on non-existant kernel component '{s}'",
-                    .{ kernel_component.name, dep.name },
+                    .{ kernel_component.name, dep },
                 );
             };
 
-            module.addImport(dep.name, component.module);
+            module.addImport(dep, component.module);
         }
 
         // self reference
