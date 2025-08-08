@@ -134,19 +134,11 @@ pub const interrupts = struct {
         }
 
         pub fn toUsize(interrupt: Interrupt) callconv(core.inline_in_non_debug) usize {
-            return getFunction(
-                current_functions.interrupts,
-                "interruptToUsize",
-            )(interrupt.arch_specific);
+            return @intFromEnum(interrupt.arch_specific);
         }
 
         pub fn fromUsize(interrupt: usize) callconv(core.inline_in_non_debug) Interrupt {
-            return .{
-                .arch_specific = getFunction(
-                    current_functions.interrupts,
-                    "interruptFromUsize",
-                )(interrupt),
-            };
+            return .{ .arch_specific = @enumFromInt(interrupt) };
         }
     };
 
@@ -707,9 +699,6 @@ pub const Functions = struct {
             interrupt: current_decls.interrupts.Interrupt,
             external_interrupt: u32,
         ) interrupts.Interrupt.RouteError!void = null,
-
-        interruptToUsize: ?fn (interrupt: current_decls.interrupts.Interrupt) usize = null,
-        interruptFromUsize: ?fn (interrupt: usize) current_decls.interrupts.Interrupt = null,
 
         /// Creates a stack iterator for the context this interrupt was triggered from.
         createStackIterator: ?fn (

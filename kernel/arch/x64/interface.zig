@@ -20,17 +20,6 @@ pub const functions: arch.Functions = .{
         .deallocateInterrupt = x64.interrupts.deallocateInterrupt,
         .routeInterrupt = x64.interrupts.routeInterrupt,
 
-        .interruptToUsize = struct {
-            fn interruptToUsize(interrupt: x64.interrupts.Interrupt) usize {
-                return @intFromEnum(interrupt);
-            }
-        }.interruptToUsize,
-        .interruptFromUsize = struct {
-            fn interruptFromUsize(interrupt: usize) x64.interrupts.Interrupt {
-                return @enumFromInt(interrupt);
-            }
-        }.interruptFromUsize,
-
         .createStackIterator = struct {
             fn createStackIterator(interrupt_frame: *const x64.interrupts.InterruptFrame) std.debug.StackIterator {
                 return .init(null, interrupt_frame.rbp);
