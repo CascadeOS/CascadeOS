@@ -28,11 +28,11 @@ pub const SupervisorStatus = packed struct(u64) {
     _reserved8: u29,
     sd: u1,
 
-    pub fn read() SupervisorStatus {
+    pub inline fn read() SupervisorStatus {
         return @bitCast(csr.read());
     }
 
-    pub fn write(supervisor_status: SupervisorStatus) void {
+    pub inline fn write(supervisor_status: SupervisorStatus) void {
         csr.write(@bitCast(supervisor_status));
     }
 
@@ -78,10 +78,6 @@ pub fn CSR(comptime name: []const u8) type {
             asm volatile ("csrsi " ++ name ++ ", " ++ immediate_str);
         }
     };
-}
-
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
 }
 
 const std = @import("std");

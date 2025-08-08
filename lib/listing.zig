@@ -6,11 +6,6 @@ pub const libraries: []const LibraryDescription = &.{
     .{ .name = "core" },
     .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
     .{ .name = "limine", .dependencies = &.{ "core", "uuid" } },
-    .{
-        .name = "riscv",
-        .dependencies = &.{ "core", "bitjuggle" },
-        .supported_architectures = &.{.riscv},
-    },
     .{ .name = "sdf" },
     .{ .name = "uuid", .dependencies = &.{"core"} },
     .{

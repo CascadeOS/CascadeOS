@@ -3,20 +3,20 @@
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        fn getCurrentExecutor() *kernel.Executor {
-            return @ptrFromInt(lib_riscv.registers.SupervisorScratch.read());
+        inline fn getCurrentExecutor() *kernel.Executor {
+            return @ptrFromInt(riscv.registers.SupervisorScratch.read());
         }
     }.getCurrentExecutor,
 
-    .spinLoopHint = lib_riscv.instructions.pause,
+    .spinLoopHint = riscv.instructions.pause,
 
-    .halt = lib_riscv.instructions.halt,
+    .halt = riscv.instructions.halt,
 
     .interrupts = .{
-        .disableAndHalt = lib_riscv.instructions.disableInterruptsAndHalt,
-        .areEnabled = lib_riscv.instructions.interruptsEnabled,
-        .enable = lib_riscv.instructions.enableInterrupts,
-        .disable = lib_riscv.instructions.disableInterrupts,
+        .disableAndHalt = riscv.instructions.disableInterruptsAndHalt,
+        .areEnabled = riscv.instructions.interruptsEnabled,
+        .enable = riscv.instructions.enableInterrupts,
+        .disable = riscv.instructions.disableInterrupts,
 
         .init = .{},
     },
@@ -32,7 +32,7 @@ pub const functions: arch.Functions = .{
     .init = .{
         .getStandardWallclockStartTime = struct {
             fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
-                return @enumFromInt(lib_riscv.instructions.readTime());
+                return @enumFromInt(riscv.instructions.readTime());
             }
         }.getStandardWallclockStartTime,
 
@@ -65,7 +65,7 @@ pub const functions: arch.Functions = .{
 
         .loadExecutor = struct {
             fn loadExecutor(executor: *kernel.Executor) void {
-                lib_riscv.registers.SupervisorScratch.write(@intFromPtr(executor));
+                riscv.registers.SupervisorScratch.write(@intFromPtr(executor));
             }
         }.loadExecutor,
     },
@@ -101,7 +101,6 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 
 const riscv = @import("riscv.zig");
-const lib_riscv = @import("riscv");
 
 const core = @import("core");
 const std = @import("std");
