@@ -12,7 +12,7 @@ pub fn nonMaskableInterruptHandler(
     }
 
     // an executor is panicking so this NMI is a panic IPI
-    x64.interrupts.disableInterruptsAndHalt();
+    lib_x64.instructions.disableInterruptsAndHalt();
 }
 
 pub fn pageFaultHandler(

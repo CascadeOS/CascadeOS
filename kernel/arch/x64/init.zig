@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const getStandardWallclockStartTime = x64.tsc.init.getStandardWallclockStartTime;
-
 /// Attempt to get some form of init output.
 pub fn tryGetSerialOutput() ?arch.init.InitOutput {
     if (DebugCon.detect()) {

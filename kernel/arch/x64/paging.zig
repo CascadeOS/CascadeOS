@@ -8,37 +8,6 @@ pub fn createPageTable(physical_frame: kernel.mem.phys.Frame) *PageTable {
     return page_table;
 }
 
-pub fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
-    lib_x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
-}
-
-/// Copies the top level of `page_table` into `target_page_table`.
-pub fn copyTopLevelIntoPageTable(page_table: *PageTable, target_page_table: *PageTable) void {
-    std.debug.assert(page_table != target_page_table);
-    @memcpy(&target_page_table.entries, &page_table.entries);
-}
-
-/// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
-///
-/// Caller must ensure:
-///  - the virtual address is aligned to the standard page size
-///  - the virtual address is not already mapped
-///
-/// This function:
-///  - only supports the standard page size for the architecture
-///  - does not flush the TLB
-pub const mapSinglePage = mapTo4KiB;
-
-/// Unmaps `virtual_address`.
-///
-/// Caller must ensure:
-///  - the virtual address is aligned to the standard page size
-///
-/// This function:
-///  - only supports the standard page size for the architecture
-///  - does not flush the TLB
-pub const unmapSinglePage = unmap4KiB;
-
 /// Flushes the cache for the given virtual range on the current executor.
 ///
 /// The `virtual_range` address and size must be aligned to the standard page size.
@@ -57,7 +26,7 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
 }
 
 /// Maps a 4 KiB page.
-fn mapTo4KiB(
+pub fn map4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: kernel.mem.phys.Frame,
@@ -132,7 +101,7 @@ fn mapTo4KiB(
 /// Unmaps a 4 KiB page.
 ///
 /// Panics if the page is not present or is a huge page.
-fn unmap4KiB(
+pub fn unmap4KiB(
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     backing_page_decision: core.CleanupDecision,
@@ -316,26 +285,7 @@ fn setEntry(
     page_table.entries[index].store(entry);
 }
 
-pub const all_page_sizes: []const core.Size = &.{
-    small_page_size,
-    medium_page_size,
-    large_page_size,
-};
-
-pub const lower_half_size: core.Size = .from(128, .tib);
-pub const higher_half_start = core.VirtualAddress.fromInt(0xffff800000000000);
-
-pub const ArchPageTable = PageTable;
-pub const page_table_alignment = PageTable.small_page_size;
-pub const page_table_size = PageTable.small_page_size;
-
 pub const init = struct {
-    /// The total size of the virtual address space that one entry in the top level of the page table covers.
-    pub fn sizeOfTopLevelEntry() core.Size {
-        // TODO: Only correct for 4 level paging
-        return core.Size.from(0x8000000000, .byte);
-    }
-
     /// This function fills in the top level of the page table for the given range.
     ///
     /// The range is expected to have both size and alignment of `sizeOfTopLevelEntry()`.
@@ -348,7 +298,7 @@ pub const init = struct {
         range: core.VirtualRange,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
     ) !void {
-        const size_of_top_level_entry = sizeOfTopLevelEntry();
+        const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
         std.debug.assert(range.size.equal(size_of_top_level_entry));
         std.debug.assert(range.address.isAligned(size_of_top_level_entry));
 
@@ -514,10 +464,7 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_paging);
 };
 
-const small_page_size = PageTable.small_page_size;
-const medium_page_size = PageTable.medium_page_size;
-const large_page_size = PageTable.large_page_size;
-
+const arch = @import("arch");
 const kernel = @import("kernel");
 
 const core = @import("core");

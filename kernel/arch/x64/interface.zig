@@ -2,19 +2,24 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub const functions: arch.Functions = .{
-    .getCurrentExecutor = x64.getCurrentExecutor,
-    .spinLoopHint = x64.spinLoopHint,
-    .halt = x64.halt,
+    .getCurrentExecutor = struct {
+        inline fn getCurrentExecutor() *kernel.Executor {
+            return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
+        }
+    }.getCurrentExecutor,
+
+    .spinLoopHint = lib_x64.instructions.pause,
+    .halt = lib_x64.instructions.halt,
 
     .interrupts = .{
-        .disableAndHalt = x64.interrupts.disableInterruptsAndHalt,
-        .areEnabled = x64.interrupts.areEnabled,
-        .enable = x64.interrupts.enableInterrupts,
-        .disable = x64.interrupts.disableInterrupts,
+        .disableAndHalt = lib_x64.instructions.disableInterruptsAndHalt,
+        .areEnabled = lib_x64.instructions.interruptsEnabled,
+        .enable = lib_x64.instructions.enableInterrupts,
+        .disable = lib_x64.instructions.disableInterrupts,
 
-        .eoi = x64.interrupts.eoi,
-        .sendPanicIPI = x64.interrupts.sendPanicIPI,
-        .sendFlushIPI = x64.interrupts.sendFlushIPI,
+        .eoi = x64.apic.eoi,
+        .sendPanicIPI = x64.apic.sendPanicIPI,
+        .sendFlushIPI = x64.apic.sendFlushIPI,
 
         .allocateInterrupt = x64.interrupts.allocateInterrupt,
         .deallocateInterrupt = x64.interrupts.deallocateInterrupt,
@@ -40,14 +45,35 @@ pub const functions: arch.Functions = .{
 
     .paging = .{
         .createPageTable = x64.paging.createPageTable,
-        .loadPageTable = x64.paging.loadPageTable,
-        .copyTopLevelIntoPageTable = x64.paging.copyTopLevelIntoPageTable,
-        .mapSinglePage = x64.paging.mapSinglePage,
-        .unmapSinglePage = x64.paging.unmapSinglePage,
+
+        .loadPageTable = struct {
+            fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
+                lib_x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
+            }
+        }.loadPageTable,
+
+        .copyTopLevelIntoPageTable = struct {
+            fn copyTopLevelIntoPageTable(
+                page_table: *lib_x64.PageTable,
+                target_page_table: *lib_x64.PageTable,
+            ) void {
+                std.debug.assert(page_table != target_page_table);
+                @memcpy(&target_page_table.entries, &page_table.entries);
+            }
+        }.copyTopLevelIntoPageTable,
+
+        .mapSinglePage = x64.paging.map4KiB,
+        .unmapSinglePage = x64.paging.unmap4KiB,
         .flushCache = x64.paging.flushCache,
 
         .init = .{
-            .sizeOfTopLevelEntry = x64.paging.init.sizeOfTopLevelEntry,
+            .sizeOfTopLevelEntry = struct {
+                fn sizeOfTopLevelEntry() core.Size {
+                    // TODO: Only correct for 4 level paging
+                    return core.Size.from(0x8000000000, .byte);
+                }
+            }.sizeOfTopLevelEntry,
+
             .fillTopLevel = x64.paging.init.fillTopLevel,
             .mapToPhysicalRangeAllPageSizes = x64.paging.init.mapToPhysicalRangeAllPageSizes,
         },
@@ -96,7 +122,7 @@ pub const functions: arch.Functions = .{
     },
 
     .init = .{
-        .getStandardWallclockStartTime = x64.init.getStandardWallclockStartTime,
+        .getStandardWallclockStartTime = x64.tsc.init.getStandardWallclockStartTime,
         .tryGetSerialOutput = x64.init.tryGetSerialOutput,
         .prepareBootstrapExecutor = x64.init.prepareBootstrapExecutor,
         .prepareExecutor = x64.init.prepareExecutor,
@@ -119,10 +145,10 @@ pub const decls: arch.Decls = .{
     },
 
     .paging = .{
-        .standard_page_size = x64.paging.all_page_sizes[0],
-        .largest_page_size = x64.paging.all_page_sizes[x64.paging.all_page_sizes.len - 1],
-        .lower_half_size = x64.paging.lower_half_size,
-        .higher_half_start = x64.paging.higher_half_start,
+        .standard_page_size = .from(4, .kib),
+        .largest_page_size = .from(1, .gib),
+        .lower_half_size = .from(128, .tib),
+        .higher_half_start = .fromInt(0xffff800000000000),
         .PageTable = lib_x64.PageTable,
     },
 

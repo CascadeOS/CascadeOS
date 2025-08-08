@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const disableInterruptsAndHalt = lib_x64.instructions.disableInterruptsAndHalt;
-pub const disableInterrupts = lib_x64.instructions.disableInterrupts;
-pub const enableInterrupts = lib_x64.instructions.enableInterrupts;
-pub const areEnabled = lib_x64.instructions.interruptsEnabled;
-pub const eoi = x64.apic.eoi;
-pub const sendPanicIPI = x64.apic.sendPanicIPI;
-pub const sendFlushIPI = x64.apic.sendFlushIPI;
-
 pub fn allocateInterrupt(
     current_task: *kernel.Task,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
