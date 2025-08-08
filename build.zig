@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) !void {
         all_architectures,
     );
 
-    try QemuStep.registerQemuSteps(
+    try qemu.registerQemuSteps(
         b,
         image_steps,
         tools,
@@ -127,6 +127,6 @@ const ImageStep = @import("build/ImageStep.zig");
 const Kernel = @import("build/Kernel.zig");
 const Library = @import("build/Library.zig");
 const Options = @import("build/Options.zig");
-const QemuStep = @import("build/QemuStep.zig");
+const qemu = @import("build/qemu.zig");
 const StepCollection = @import("build/StepCollection.zig");
 const Tool = @import("build/Tool.zig");
