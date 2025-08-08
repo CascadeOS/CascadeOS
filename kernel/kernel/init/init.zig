@@ -105,6 +105,8 @@ pub fn initStage1() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage2(current_task: *kernel.Task, is_bootstrap_executor: bool) !noreturn {
+    arch.interrupts.disable(); // some executors don't have interrupts disabled on load
+
     kernel.mem.globals.core_page_table.load();
     const executor = current_task.state.running;
     arch.init.loadExecutor(executor);

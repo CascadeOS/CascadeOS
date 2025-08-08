@@ -97,8 +97,6 @@ fn prepareExecutorShared(
 
 /// Load the provided `Executor` as the current executor.
 pub fn loadExecutor(executor: *kernel.Executor) void {
-    x64.interrupts.disableInterrupts(); // some CPUs don't have interrupts disabled on load
-
     executor.arch_specific.gdt.load();
     executor.arch_specific.gdt.setTss(&executor.arch_specific.tss);
 
