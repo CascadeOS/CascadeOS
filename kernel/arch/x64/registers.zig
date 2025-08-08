@@ -854,11 +854,7 @@ fn DebugAddressRegister(comptime register: enum { DR0, DR1, DR2, DR3 }) type {
     };
 }
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
+const x64 = @import("x64.zig");
 
 const core = @import("core");
 const std = @import("std");
-
-const x64 = @import("x64");

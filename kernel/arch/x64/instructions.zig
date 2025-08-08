@@ -89,11 +89,7 @@ pub inline fn portWriteU32(port: u16, value: u32) void {
     );
 }
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
+const x64 = @import("x64.zig");
 
 const core = @import("core");
 const std = @import("std");
-
-const x64 = @import("x64");

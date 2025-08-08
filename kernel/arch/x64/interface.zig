@@ -4,18 +4,18 @@
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
         inline fn getCurrentExecutor() *kernel.Executor {
-            return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
+            return @ptrFromInt(x64.registers.KERNEL_GS_BASE.read());
         }
     }.getCurrentExecutor,
 
-    .spinLoopHint = lib_x64.instructions.pause,
-    .halt = lib_x64.instructions.halt,
+    .spinLoopHint = x64.instructions.pause,
+    .halt = x64.instructions.halt,
 
     .interrupts = .{
-        .disableAndHalt = lib_x64.instructions.disableInterruptsAndHalt,
-        .areEnabled = lib_x64.instructions.interruptsEnabled,
-        .enable = lib_x64.instructions.enableInterrupts,
-        .disable = lib_x64.instructions.disableInterrupts,
+        .disableAndHalt = x64.instructions.disableInterruptsAndHalt,
+        .areEnabled = x64.instructions.interruptsEnabled,
+        .enable = x64.instructions.enableInterrupts,
+        .disable = x64.instructions.disableInterrupts,
 
         .eoi = x64.apic.eoi,
         .sendPanicIPI = x64.apic.sendPanicIPI,
@@ -48,14 +48,14 @@ pub const functions: arch.Functions = .{
 
         .loadPageTable = struct {
             fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
-                lib_x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
+                x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
             }
         }.loadPageTable,
 
         .copyTopLevelIntoPageTable = struct {
             fn copyTopLevelIntoPageTable(
-                page_table: *lib_x64.PageTable,
-                target_page_table: *lib_x64.PageTable,
+                page_table: *x64.paging.PageTable,
+                target_page_table: *x64.paging.PageTable,
             ) void {
                 std.debug.assert(page_table != target_page_table);
                 @memcpy(&target_page_table.entries, &page_table.entries);
@@ -91,32 +91,32 @@ pub const functions: arch.Functions = .{
     .io = .{
         .readPortU8 = struct {
             fn readPortU8(port: decls.io.Port) u8 {
-                return lib_x64.instructions.portReadU8(@intFromEnum(port));
+                return x64.instructions.portReadU8(@intFromEnum(port));
             }
         }.readPortU8,
         .readPortU16 = struct {
             fn readPortU16(port: decls.io.Port) u16 {
-                return lib_x64.instructions.portReadU16(@intFromEnum(port));
+                return x64.instructions.portReadU16(@intFromEnum(port));
             }
         }.readPortU16,
         .readPortU32 = struct {
             fn readPortU32(port: decls.io.Port) u32 {
-                return lib_x64.instructions.portReadU32(@intFromEnum(port));
+                return x64.instructions.portReadU32(@intFromEnum(port));
             }
         }.readPortU32,
         .writePortU8 = struct {
             fn writePortU8(port: decls.io.Port, value: u8) void {
-                lib_x64.instructions.portWriteU8(@intFromEnum(port), value);
+                x64.instructions.portWriteU8(@intFromEnum(port), value);
             }
         }.writePortU8,
         .writePortU16 = struct {
             fn writePortU16(port: decls.io.Port, value: u16) void {
-                lib_x64.instructions.portWriteU16(@intFromEnum(port), value);
+                x64.instructions.portWriteU16(@intFromEnum(port), value);
             }
         }.writePortU16,
         .writePortU32 = struct {
             fn writePortU32(port: decls.io.Port, value: u32) void {
-                lib_x64.instructions.portWriteU32(@intFromEnum(port), value);
+                x64.instructions.portWriteU32(@intFromEnum(port), value);
             }
         }.writePortU32,
     },
@@ -149,7 +149,7 @@ pub const decls: arch.Decls = .{
         .largest_page_size = .from(1, .gib),
         .lower_half_size = .from(128, .tib),
         .higher_half_start = .fromInt(0xffff800000000000),
-        .PageTable = lib_x64.PageTable,
+        .PageTable = x64.paging.PageTable,
     },
 
     .io = .{
@@ -165,7 +165,6 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 
 const x64 = @import("x64.zig");
-const lib_x64 = @import("x64");
 
 const core = @import("core");
 const std = @import("std");

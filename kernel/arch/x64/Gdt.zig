@@ -92,11 +92,7 @@ pub const Gdt = extern struct {
     };
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
+const x64 = @import("x64.zig");
 
 const core = @import("core");
 const std = @import("std");
-
-const x64 = @import("x64");

@@ -108,11 +108,11 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.init_tsc);
 };
 
+const readTsc = x64.instructions.readTsc;
+
 const kernel = @import("kernel");
+const x64 = @import("x64.zig");
 
 const core = @import("core");
-const lib_x64 = @import("x64");
-const readTsc = lib_x64.instructions.readTsc;
 const std = @import("std");
 const Tick = kernel.time.wallclock.Tick;
-const x64 = @import("x64.zig");

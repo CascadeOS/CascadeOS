@@ -12,7 +12,7 @@ pub fn nonMaskableInterruptHandler(
     }
 
     // an executor is panicking so this NMI is a panic IPI
-    lib_x64.instructions.disableInterruptsAndHalt();
+    x64.instructions.disableInterruptsAndHalt();
 }
 
 pub fn pageFaultHandler(
@@ -21,10 +21,10 @@ pub fn pageFaultHandler(
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
-    const faulting_address = lib_x64.registers.Cr2.readAddress();
+    const faulting_address = x64.registers.Cr2.readAddress();
 
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
-    const error_code: lib_x64.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
+    const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
     kernel.entry.onPageFault(current_task, .{
         .faulting_address = faulting_address,
@@ -103,8 +103,7 @@ pub fn unhandledInterrupt(
 
 const arch = @import("arch");
 const kernel = @import("kernel");
+const x64 = @import("../x64.zig");
 
 const core = @import("core");
-const lib_x64 = @import("x64");
 const std = @import("std");
-const x64 = @import("../x64.zig");

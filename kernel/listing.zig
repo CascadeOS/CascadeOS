@@ -7,7 +7,7 @@ pub const components: []const KernelComponent = &.{
         .component_dependencies = &.{.{ .name = "kernel" }},
         .library_dependencies = &.{
             .{ .name = "core" },
-            .{ .name = "x64", .condition = .{ .architecture = &.{.x64} } },
+            .{ .name = "bitjuggle" },
         },
         .configuration = @import("arch/custom_configuration.zig").customConfiguration,
     },

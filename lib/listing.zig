@@ -8,12 +8,6 @@ pub const libraries: []const LibraryDescription = &.{
     .{ .name = "limine", .dependencies = &.{ "core", "uuid" } },
     .{ .name = "sdf" },
     .{ .name = "uuid", .dependencies = &.{"core"} },
-    .{
-        .name = "x64",
-        .dependencies = &.{ "core", "bitjuggle" },
-        .supported_architectures = &.{.x64},
-        .need_llvm = true,
-    },
 };
 
 const LibraryDescription = @import("../build/LibraryDescription.zig");

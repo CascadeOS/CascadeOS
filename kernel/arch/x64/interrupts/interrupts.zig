@@ -106,16 +106,32 @@ pub const Interrupt = enum(u8) {
     const first_available_interrupt = @intFromEnum(Interrupt.per_executor_periodic) + 1;
     const last_available_interrupt = @intFromEnum(Interrupt.spurious_interrupt) - 1;
 
-    pub inline fn toInterruptVector(interrupt: Interrupt) lib_x64.InterruptVector {
-        return @enumFromInt(@intFromEnum(interrupt));
+    /// Checks if the given interrupt vector pushes an error code.
+    pub fn hasErrorCode(vector: Interrupt) bool {
+        return switch (@intFromEnum(vector)) {
+            // Exceptions
+            0x00...0x07 => false,
+            0x08 => true,
+            0x09 => false,
+            0x0A...0x0E => true,
+            0x0F...0x10 => false,
+            0x11 => true,
+            0x12...0x14 => false,
+            //0x15 ... 0x1D => unreachable,
+            0x1E => true,
+            //0x1F          => unreachable,
+
+            // Other interrupts
+            else => false,
+        };
     }
 
-    pub inline fn hasErrorCode(interrupt: Interrupt) bool {
-        return interrupt.toInterruptVector().hasErrorCode();
-    }
-
-    pub inline fn isException(interrupt: Interrupt) bool {
-        return interrupt.toInterruptVector().isException();
+    /// Checks if the given interrupt vector is an exception.
+    pub fn isException(vector: Interrupt) bool {
+        if (@intFromEnum(vector) <= @intFromEnum(Interrupt._reserved8)) {
+            return vector != Interrupt.non_maskable_interrupt;
+        }
+        return false;
     }
 };
 
@@ -143,13 +159,13 @@ pub const InterruptFrame = extern struct {
     rip: u64,
     cs: extern union {
         full: u64,
-        selector: Gdt.Selector,
+        selector: x64.Gdt.Selector,
     },
-    rflags: lib_x64.registers.RFlags,
+    rflags: x64.registers.RFlags,
     rsp: u64,
     ss: extern union {
         full: u64,
-        selector: Gdt.Selector,
+        selector: x64.Gdt.Selector,
     },
 
     /// Returns the context that the interrupt was triggered from.
@@ -245,6 +261,8 @@ const Handler = struct {
         );
     }
 };
+
+const Idt = @import("Idt.zig");
 
 const globals = struct {
     var idt: Idt = .{};
@@ -351,11 +369,8 @@ pub const init = struct {
 
 const arch = @import("arch");
 const kernel = @import("kernel");
+const x64 = @import("../x64.zig");
 
 const core = @import("core");
-const Gdt = lib_x64.Gdt;
-const Idt = lib_x64.Idt;
 const interrupt_handlers = @import("handlers.zig");
-const lib_x64 = @import("x64");
 const std = @import("std");
-const x64 = @import("../x64.zig");

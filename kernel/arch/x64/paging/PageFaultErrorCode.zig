@@ -102,9 +102,5 @@ pub const PageFaultErrorCode = packed struct(u64) {
     }
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const std = @import("std");
 const core = @import("core");

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const PageTable = @import("PageTable.zig").PageTable;
+pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
+
 /// Create a new page table in the given physical frame.
 pub fn createPageTable(physical_frame: kernel.mem.phys.Frame) *PageTable {
     const page_table = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
@@ -19,7 +22,7 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
     const last_virtual_address = virtual_range.last();
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        lib_x64.instructions.invlpg(current_virtual_address);
+        x64.instructions.invlpg(current_virtual_address);
 
         current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
     }
@@ -466,11 +469,9 @@ pub const init = struct {
 
 const arch = @import("arch");
 const kernel = @import("kernel");
+const x64 = @import("../x64.zig");
 
 const core = @import("core");
-const lib_x64 = @import("x64");
 const log = kernel.debug.log.scoped(.paging);
 const MapType = kernel.mem.MapType;
-const PageTable = lib_x64.PageTable;
 const std = @import("std");
-const x64 = @import("x64.zig");

@@ -346,6 +346,4 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 
 const core = @import("core");
-const lib_x64 = @import("x64");
 const std = @import("std");
-const x64 = @import("x64.zig");

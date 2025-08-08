@@ -3555,15 +3555,11 @@ pub const ProcessorType = enum(u2) {
     reserved = 0b11,
 };
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
+const x64 = @import("../x64.zig");
 
 const std = @import("std");
 const core = @import("core");
 const bitjuggle = @import("bitjuggle");
-
-const x64 = @import("x64");
 
 // TODO: CPUID.02H - TLB/Cache/Prefetch Information (Intel Only)
 // TODO: CPUID.03H - Processor Serial Number (Intel Only)

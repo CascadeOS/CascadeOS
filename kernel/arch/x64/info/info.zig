@@ -3,7 +3,7 @@
 
 //! Architecture specific runtime discovered/calculated values.
 
-pub const cpu_id = lib_x64.cpu_id;
+pub const cpu_id = @import("cpu_id.zig");
 
 /// The duration of a TSC tick in femptopseconds, if known from CPUID.
 pub var tsc_tick_duration_fs: ?u64 = null;
@@ -42,6 +42,4 @@ pub var mtrr_write_combining_supported: bool = false;
 const kernel = @import("kernel");
 
 const core = @import("core");
-const lib_x64 = @import("x64");
 const std = @import("std");
-const x64 = @import("x64.zig");

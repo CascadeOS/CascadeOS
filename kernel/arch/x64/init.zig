@@ -100,7 +100,7 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 
     x64.interrupts.init.loadIdt();
 
-    lib_x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
+    x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
 
 /// Capture any system information that can be without using mmio.
@@ -114,7 +114,7 @@ pub fn captureEarlySystemInformation() void {
         @panic("MTRRs not supported");
     }
 
-    const mtrr_cap = lib_x64.registers.IA32_MTRRCAP.read();
+    const mtrr_cap = x64.registers.IA32_MTRRCAP.read();
     x64.info.mtrr_number_of_variable_registers = mtrr_cap.number_of_variable_range_registers;
     x64.info.mtrr_write_combining_supported = mtrr_cap.write_combining_supported;
     log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
@@ -188,8 +188,53 @@ pub fn captureSystemInformation(
 pub fn configureGlobalSystemFeatures() void {
     if (x64.info.have_pic) {
         log.debug("disabling pic", .{});
-        lib_x64.disablePic();
+        disablePic();
     }
+}
+
+/// Remaps the PIC interrupts to 0x20-0x2f and masks all of them.
+fn disablePic() void {
+    const portWriteU8 = x64.instructions.portWriteU8;
+
+    const PRIMARY_COMMAND_PORT = 0x20;
+    const PRIMARY_DATA_PORT = 0x21;
+    const SECONDARY_COMMAND_PORT = 0xA0;
+    const SECONDARY_DATA_PORT = 0xA1;
+
+    const CMD_INIT = 0x11;
+    const MODE_8086: u8 = 0x01;
+
+    // Tell each PIC that we're going to send it a three-byte initialization sequence on its data port.
+    portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
+    portWriteU8(0x80, 0); // wait
+
+    // Remap master PIC to 0x20
+    portWriteU8(PRIMARY_DATA_PORT, 0x20);
+    portWriteU8(0x80, 0); // wait
+
+    // Remap slave PIC to 0x28
+    portWriteU8(SECONDARY_DATA_PORT, 0x28);
+    portWriteU8(0x80, 0); // wait
+
+    // Configure chaining between master and slave
+    portWriteU8(PRIMARY_DATA_PORT, 4);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 2);
+    portWriteU8(0x80, 0); // wait
+
+    // Set our mode.
+    portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
+    portWriteU8(0x80, 0); // wait
+
+    // Mask all interrupts
+    portWriteU8(PRIMARY_DATA_PORT, 0xFF);
+    portWriteU8(0x80, 0); // wait
+    portWriteU8(SECONDARY_DATA_PORT, 0xFF);
+    portWriteU8(0x80, 0); // wait
 }
 
 /// Configure any per-executor system features.
@@ -197,14 +242,14 @@ pub fn configureGlobalSystemFeatures() void {
 /// **WARNING**: The `executor` provided must be the current executor.
 pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void {
     if (x64.info.cpu_id.rdtscp) {
-        lib_x64.registers.IA32_TSC_AUX.write(@intFromEnum(executor.id));
+        x64.registers.IA32_TSC_AUX.write(@intFromEnum(executor.id));
     }
 
     // TODO: be more thorough with setting up these registers
 
     // CR0
     {
-        var cr0 = lib_x64.registers.Cr0.read();
+        var cr0 = x64.registers.Cr0.read();
 
         if (!cr0.protected_mode_enable) {
             @panic("protected mode not enabled");
@@ -220,7 +265,7 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
 
     // CR4
     {
-        var cr4 = lib_x64.registers.Cr4.read();
+        var cr4 = x64.registers.Cr4.read();
 
         if (!cr4.physical_address_extension) {
             @panic("physical address extension not enabled");
@@ -246,7 +291,7 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
 
     // EFER
     {
-        var efer = lib_x64.registers.EFER.read();
+        var efer = x64.registers.EFER.read();
 
         if (!efer.long_mode_active or !efer.long_mode_enable) {
             @panic("not in long mode");
@@ -264,7 +309,7 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         // Using entry 6 as write combining allows us to access it using `PAT = 1 PCD = 1` in the page table, which
         // during the small window after starting an executor and before setting the PAT means accesses to it will be
         // uncached.
-        var pat = lib_x64.registers.PAT.read();
+        var pat = x64.registers.PAT.read();
 
         pat.entry0 = .write_back;
         pat.entry1 = .write_through;
@@ -274,10 +319,10 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
         pat.entry5 = .write_through;
         pat.entry6 = .write_combining; // defaults to uncached
         pat.entry7 = .unchacheable;
-        lib_x64.registers.PAT.write(pat);
+        x64.registers.PAT.write(pat);
 
         // flip the page global bit to ensure the PAT is applied
-        var cr4 = lib_x64.registers.Cr4.read();
+        var cr4 = x64.registers.Cr4.read();
         cr4.page_global = false;
         cr4.write();
         cr4.page_global = true;
@@ -307,7 +352,7 @@ const DebugCon = struct {
     const port = 0xe9;
 
     fn detect() bool {
-        return lib_x64.instructions.portReadU8(port) == port;
+        return x64.instructions.portReadU8(port) == port;
     }
 
     fn writeStr(str: []const u8) void {
@@ -321,11 +366,11 @@ const DebugCon = struct {
 
                 if (newline_first_or_only or str[i - 1] != '\r') {
                     @branchHint(.likely);
-                    lib_x64.instructions.portWriteU8(port, '\r');
+                    x64.instructions.portWriteU8(port, '\r');
                 }
             }
 
-            lib_x64.instructions.portWriteU8(port, byte);
+            x64.instructions.portWriteU8(port, byte);
         }
     }
 
@@ -351,10 +396,9 @@ const DebugCon = struct {
 
 const arch = @import("arch");
 const kernel = @import("kernel");
+const x64 = @import("x64.zig");
 
 const core = @import("core");
-const lib_x64 = @import("x64");
 const log = kernel.debug.log.scoped(.init_x64);
 const SerialPort = kernel.init.Output.uart.IoPort16550;
 const std = @import("std");
-const x64 = @import("x64.zig");

@@ -529,12 +529,6 @@ const type_of_1gib: type = std.meta.Int(
     maximum_physical_address_bit - level_3_shift,
 );
 
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
-
 const core = @import("core");
 const std = @import("std");
 const bitjuggle = @import("bitjuggle");
-
-const x64 = @import("x64");
