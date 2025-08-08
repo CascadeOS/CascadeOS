@@ -3,7 +3,7 @@
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        fn getCurrentExecutor() *kernel.Executor {
+        inline fn getCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(arm.registers.TPIDR_EL1.read());
         }
     }.getCurrentExecutor,

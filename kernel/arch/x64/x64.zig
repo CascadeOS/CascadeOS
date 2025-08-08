@@ -19,7 +19,7 @@ pub const init = @import("init.zig");
 /// Get the current `Executor`.
 ///
 /// Assumes that `init.loadExecutor()` has been called on the currently running CPU.
-pub fn getCurrentExecutor() *kernel.Executor {
+pub inline fn getCurrentExecutor() *kernel.Executor {
     return @ptrFromInt(lib_x64.registers.KERNEL_GS_BASE.read());
 }
 

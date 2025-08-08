@@ -38,8 +38,13 @@ pub fn halt() callconv(core.inline_in_non_debug) void {
 }
 
 pub const interrupts = struct {
-    // This is a decl not a wrapper function like the others so that it can be inlined into a naked function.
-    pub const disableAndHalt = current_functions.interrupts.disableAndHalt;
+    // marked as `inline` unconditionally so that it can be called from a naked function.
+    pub inline fn disableAndHalt() noreturn {
+        getFunction(
+            current_functions.interrupts,
+            "disableAndHalt",
+        )();
+    }
 
     pub fn areEnabled() callconv(core.inline_in_non_debug) bool {
         return getFunction(
@@ -652,30 +657,30 @@ pub const Functions = struct {
     /// Get the current `Executor`.
     ///
     /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-    getCurrentExecutor: ?fn () *kernel.Executor = null,
+    getCurrentExecutor: ?fn () callconv(.@"inline") *kernel.Executor = null,
 
     /// Issues an architecture specific hint to the executor that we are spinning in a loop.
-    spinLoopHint: ?fn () void = null,
+    spinLoopHint: ?fn () callconv(.@"inline") void = null,
 
     /// Halts the current executor.
-    halt: ?fn () void = null,
+    halt: ?fn () callconv(.@"inline") void = null,
 
     interrupts: struct {
         /// Disables interrupts and halts the current executor.
         ///
         /// Non-optional because it is used during early initialization.
-        disableAndHalt: fn () noreturn,
+        disableAndHalt: fn () callconv(.@"inline") noreturn,
 
         /// Returns whether interrupts are enabled.
-        areEnabled: ?fn () bool = null,
+        areEnabled: ?fn () callconv(.@"inline") bool = null,
 
         /// Enables interrupts.
-        enable: ?fn () void = null,
+        enable: ?fn () callconv(.@"inline") void = null,
 
         /// Disables interrupts.
         ///
         /// Non-optional because it is used during early initialization.
-        disable: fn () void,
+        disable: fn () callconv(.@"inline") void,
 
         /// Signal end of interrupt.
         eoi: ?fn () void = null,
