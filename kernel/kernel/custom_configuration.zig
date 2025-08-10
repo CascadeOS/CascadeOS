@@ -6,10 +6,14 @@ pub fn customConfiguration(
     _: CascadeTarget.Architecture,
     module: *std.Build.Module,
     options: Options,
-    _: bool,
+    is_check: bool,
 ) anyerror!void {
     // kernel options
-    module.addImport("kernel_options", options.kernel_option_module);
+    if (is_check) {
+        module.addImport("kernel_options", options.all_enabled_kernel_option_module);
+    } else {
+        module.addImport("kernel_options", options.kernel_option_module);
+    }
 
     // ssfn
     module.addCSourceFile(.{
