@@ -218,7 +218,7 @@ pub const RawCache = struct {
         }
 
         const effective_object_size = if (is_small)
-            options.alignment.forward(single_node_alignment.forward(options.size) + @sizeOf(std.SinglyLinkedList.Node))
+            sizeOfObjectWithNodeAppended(options.size, options.alignment)
         else
             options.alignment.forward(options.size);
 
@@ -724,14 +724,18 @@ pub const RawCache = struct {
         node: std.SinglyLinkedList.Node = .{},
     };
 
-    const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
     const default_large_objects_per_slab = 16;
 };
 
-const small_object_size = arch.paging.standard_page_size.divideScalar(8);
+const maximum_small_object_size = arch.paging.standard_page_size.subtract(.of(RawCache.Slab)).divideScalar(8);
+const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
 
 pub fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
-    return alignment.forward(size) <= small_object_size.value;
+    return sizeOfObjectWithNodeAppended(size, alignment) <= maximum_small_object_size.value;
+}
+
+fn sizeOfObjectWithNodeAppended(size: usize, alignment: std.mem.Alignment) usize {
+    return alignment.forward(single_node_alignment.forward(size) + @sizeOf(std.SinglyLinkedList.Node));
 }
 
 const globals = struct {
