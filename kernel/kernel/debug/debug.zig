@@ -64,21 +64,21 @@ fn singleExecutorInitPanic(
         var nested_panic_count: usize = 0;
     };
 
-    kernel.init.Output.globals.lock.poison();
+    init.Output.globals.lock.poison();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(kernel.init.Output.writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(init.Output.writer, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => kernel.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
         else => return,
     }
 
-    kernel.init.Output.writer.flush() catch {};
+    init.Output.writer.flush() catch {};
 }
 
 fn initPanic(
@@ -100,7 +100,7 @@ fn initPanic(
         if (panicking_executor != executor) return; // another executor is panicking
     }
 
-    kernel.init.Output.globals.lock.poison();
+    init.Output.globals.lock.poison();
     arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;
@@ -108,14 +108,14 @@ fn initPanic(
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(kernel.init.Output.writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(init.Output.writer, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => kernel.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
         else => return,
     }
 
-    kernel.init.Output.writer.flush() catch {};
+    init.Output.writer.flush() catch {};
 }
 
 const formatting = struct {
@@ -510,6 +510,7 @@ pub const globals = struct {
 };
 
 const arch = @import("arch");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");

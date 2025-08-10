@@ -9,7 +9,7 @@ pub const Uart = union(enum) {
 
     pl011: PL011,
 
-    pub fn output(uart: *Uart) kernel.init.Output {
+    pub fn output(uart: *Uart) init.Output {
         switch (uart.*) {
             inline else => |*u| return u.output(),
         }
@@ -41,7 +41,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
             .io_port => u16,
         };
 
-        pub fn init(base: AddressT, baud: ?Baud) Baud.DivisorError!?UartT {
+        pub fn create(base: AddressT, baud: ?Baud) Baud.DivisorError!?UartT {
             // write to scratch register to check if the UART is connected
             writeRegister(base + @intFromEnum(RegisterOffset.scratch), 0xBA);
 
@@ -235,7 +235,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
             }
         }
 
-        pub fn output(uart: *UartT) kernel.init.Output {
+        pub fn output(uart: *UartT) init.Output {
             return .{
                 .writeFn = struct {
                     fn writeFn(context: *anyopaque, str: []const u8) void {
@@ -400,7 +400,7 @@ pub const PL011 = struct {
     write_register: [*]volatile u32,
     flag_register: [*]volatile u32,
 
-    pub fn init(base: [*]volatile u32, baud: ?Baud) Baud.DivisorError!?PL011 {
+    pub fn create(base: [*]volatile u32, baud: ?Baud) Baud.DivisorError!?PL011 {
         const identification =
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification3)) << 24 |
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification2)) << 16 |
@@ -536,7 +536,7 @@ pub const PL011 = struct {
         }
     }
 
-    pub fn output(pl011: *PL011) kernel.init.Output {
+    pub fn output(pl011: *PL011) init.Output {
         return .{
             .writeFn = struct {
                 fn writeFn(context: *anyopaque, str: []const u8) void {
@@ -712,6 +712,7 @@ pub const Baud = struct {
 };
 
 const arch = @import("arch");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");

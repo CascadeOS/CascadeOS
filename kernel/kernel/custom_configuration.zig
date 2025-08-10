@@ -15,14 +15,6 @@ pub fn customConfiguration(
         module.addImport("kernel_options", options.kernel_option_module);
     }
 
-    // ssfn
-    module.addCSourceFile(.{
-        .file = b.path("kernel/kernel/init/output/ssfn.h"),
-        .flags = &.{"-DSSFN_CONSOLEBITMAP_TRUECOLOR=1"},
-        .language = .c,
-    });
-    module.addIncludePath(b.path(("kernel/kernel/init/output")));
-
     // uacpi
     {
         // in uACPI DEBUG is more verbose than TRACE
@@ -71,10 +63,7 @@ pub fn customConfiguration(
     }
 
     // devicetree
-    module.addImport(
-        "DeviceTree",
-        b.dependency("devicetree", .{}).module("DeviceTree"),
-    );
+    module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
 }
 
 const std = @import("std");

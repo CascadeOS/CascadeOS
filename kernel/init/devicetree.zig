@@ -116,7 +116,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
     };
 
     return .{
-        .memory_16550 = (try uart.Memory16550.init(
+        .memory_16550 = (try uart.Memory16550.create(
             kernel.mem.directMapFromPhysical(
                 .fromInt(address),
             ).toPtr([*]volatile u8),
@@ -180,7 +180,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutp
     };
 
     return .{
-        .pl011 = (try uart.PL011.init(
+        .pl011 = (try uart.PL011.create(
             kernel.mem.directMapFromPhysical(
                 .fromInt(address),
             ).toPtr([*]volatile u32),
@@ -207,9 +207,10 @@ const GetSerialOutputError = DeviceTree.IteratorError ||
 const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart;
 
 const boot = @import("boot");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");
 const log = kernel.debug.log.scoped(.devicetree);
 const std = @import("std");
-const uart = kernel.init.Output.uart;
+const uart = init.Output.uart;

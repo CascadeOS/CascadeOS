@@ -106,7 +106,7 @@ pub fn rsdp() ?core.Address {
 }
 
 pub fn x2apicEnabled() bool {
-    if (arch.current_arch != .x64) {
+    if (init.exports.current_arch != .x64) {
         @compileError("x2apicEnabled can only be called on x64");
     }
 
@@ -235,7 +235,7 @@ pub fn exportEntryPoints() void {
         /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
         /// meaning this function is not expected to ever be called.
         pub fn unknownBootloaderEntryPoint() callconv(.naked) noreturn {
-            @call(.always_inline, arch.interrupts.disableAndHalt, .{});
+            @call(.always_inline, init.exports.disableAndHalt, .{});
             unreachable;
         }
     }.unknownBootloaderEntryPoint;
@@ -253,7 +253,7 @@ pub const BootloaderAPI = enum {
     limine,
 };
 
-const arch = @import("arch");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");

@@ -521,8 +521,10 @@ pub const init = struct {
     }
 
     pub const InitOutput = struct {
-        output: kernel.init.Output,
+        output: Output,
         preference: Preference,
+
+        pub const Output = kernel.exports.Output;
 
         pub const Preference = enum {
             /// Use this output.

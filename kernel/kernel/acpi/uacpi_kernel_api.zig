@@ -5,13 +5,7 @@
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.Status {
     log.verbose("uacpi_kernel_get_rsdp called", .{});
 
-    const address = boot.rsdp() orelse return uacpi.Status.not_found;
-
-    switch (address) {
-        .physical => |addr| out_rsdp_address.* = addr,
-        .virtual => |addr| out_rsdp_address.* =
-            kernel.mem.physicalFromDirectMap(addr) catch return .internal_error,
-    }
+    out_rsdp_address.* = kernel.mem.physicalFromDirectMap(.fromPtr(acpi.globals.rsdp)) catch return .internal_error;
 
     return .ok;
 }
@@ -604,8 +598,9 @@ export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
 }
 
 const arch = @import("arch");
-const boot = @import("boot");
 const kernel = @import("kernel");
+
+const acpi = @import("acpi.zig");
 
 const core = @import("core");
 const log = kernel.debug.log.scoped(.uacpi_kernel_api);

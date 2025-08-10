@@ -9,7 +9,7 @@ pub fn detect() bool {
     return sbi.debug_console.available();
 }
 
-pub const output: kernel.init.Output = .{
+pub const output: arch.init.InitOutput.Output = .{
     .writeFn = struct {
         fn writeFn(_: *anyopaque, str: []const u8) void {
             writeStr(str);
@@ -36,6 +36,7 @@ fn writeStr(str: []const u8) void {
     }
 }
 
+const arch = @import("arch");
 const kernel = @import("kernel");
 
 const sbi = @import("sbi");

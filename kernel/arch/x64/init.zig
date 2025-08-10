@@ -23,7 +23,7 @@ pub fn tryGetSerialOutput() ?arch.init.InitOutput {
     };
 
     for (std.meta.tags(static.COMPort)) |com_port| {
-        if (SerialPort.init(
+        if (SerialPort.create(
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
         ) catch continue) |serial| {
@@ -374,7 +374,7 @@ const DebugCon = struct {
         }
     }
 
-    const output: kernel.init.Output = .{
+    const output: arch.init.InitOutput.Output = .{
         .writeFn = struct {
             fn writeFn(_: *anyopaque, str: []const u8) void {
                 writeStr(str);
@@ -400,5 +400,5 @@ const x64 = @import("x64.zig");
 
 const core = @import("core");
 const log = kernel.debug.log.scoped(.init_x64);
-const SerialPort = kernel.init.Output.uart.IoPort16550;
+const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
 const std = @import("std");

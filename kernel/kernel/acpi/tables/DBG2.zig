@@ -283,9 +283,6 @@ pub const DBG2 = extern struct {
     }
 
     pub const init = struct {
-        const uart = kernel.init.Output.uart;
-        const log = kernel.debug.log.scoped(.init_output);
-
         pub fn tryGetSerialOutput() ?uart.Uart {
             const dbg2 = kernel.acpi.getTable(kernel.acpi.tables.DBG2, 0) orelse return null;
             defer dbg2.deinit();
@@ -304,7 +301,7 @@ pub const DBG2 = extern struct {
                         .@"16550", .@"16550-GAS" => {
                             switch (address.address_space) {
                                 .memory => return .{
-                                    .memory_16550 = (uart.Memory16550.init(
+                                    .memory_16550 = (uart.Memory16550.create(
                                         kernel.mem.directMapFromPhysical(
                                             .fromInt(address.address),
                                         ).toPtr([*]volatile u8),
@@ -312,7 +309,7 @@ pub const DBG2 = extern struct {
                                     ) catch unreachable) orelse continue,
                                 },
                                 .io => return .{
-                                    .io_port_16550 = (uart.IoPort16550.init(
+                                    .io_port_16550 = (uart.IoPort16550.create(
                                         @intCast(address.address),
                                         null,
                                     ) catch unreachable) orelse continue,
@@ -323,7 +320,7 @@ pub const DBG2 = extern struct {
                         .@"16450" => {
                             switch (address.address_space) {
                                 .memory => return .{
-                                    .memory_16450 = (uart.Memory16450.init(
+                                    .memory_16450 = (uart.Memory16450.create(
                                         kernel.mem.directMapFromPhysical(
                                             .fromInt(address.address),
                                         ).toPtr([*]volatile u8),
@@ -331,7 +328,7 @@ pub const DBG2 = extern struct {
                                     ) catch unreachable) orelse continue,
                                 },
                                 .io => return .{
-                                    .io_port_16450 = (uart.IoPort16450.init(
+                                    .io_port_16450 = (uart.IoPort16450.create(
                                         @intCast(address.address),
                                         null,
                                     ) catch unreachable) orelse continue,
@@ -344,7 +341,7 @@ pub const DBG2 = extern struct {
                             std.debug.assert(address.access_size == .dword);
 
                             return .{
-                                .pl011 = (uart.PL011.init(
+                                .pl011 = (uart.PL011.create(
                                     kernel.mem.directMapFromPhysical(
                                         .fromInt(address.address),
                                     ).toPtr([*]volatile u32),
@@ -360,6 +357,9 @@ pub const DBG2 = extern struct {
 
             return null;
         }
+
+        const uart = @import("init").Output.uart;
+        const log = kernel.debug.log.scoped(.init_output);
     };
 };
 

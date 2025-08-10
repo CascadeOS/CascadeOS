@@ -15,8 +15,6 @@ pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 
-pub const init = @import("init/init.zig");
-
 pub const Context = union(Type) {
     kernel,
     user: *Process,
@@ -46,8 +44,15 @@ pub const std_options: std.Options = .{
     .logFn = debug.log.stdLogImpl,
 };
 
+// Exports the init API needed by the arch component.
+pub const exports = struct {
+    pub const Output = init.Output;
+};
+
 comptime {
-    @import("boot").exportEntryPoints();
+    _ = &init;
 }
+
+const init = @import("init");
 
 const std = @import("std");

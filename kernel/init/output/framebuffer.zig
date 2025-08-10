@@ -4,7 +4,7 @@
 // Does not scroll instead wraps to the top of the screen.
 // Due to this is needs to clear the entire line with when a new line is started.
 
-pub fn tryGetFramebufferOutput() ?kernel.init.Output {
+pub fn tryGetFramebufferOutput() ?init.Output {
     const framebuffer = boot.framebuffer() orelse return null;
 
     c.ssfn_src = @constCast(font);
@@ -117,6 +117,7 @@ const c = @cImport({
 
 const arch = @import("arch");
 const boot = @import("boot");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");

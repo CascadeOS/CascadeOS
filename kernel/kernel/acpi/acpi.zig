@@ -6,7 +6,7 @@
 ///
 /// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
 pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
-    if (!globals.acpi_tables_initialized) return null;
+    if (!globals.early_initialization_complete) return null;
 
     var table = uacpi.Table.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
 
@@ -60,49 +60,33 @@ pub fn AcpiTable(comptime T: type) type {
     };
 }
 
-const globals = struct {
-    var acpi_tables_initialized: bool = false;
+pub const globals = struct {
+    /// Pointer to the RSDP table.
+    ///
+    /// Set by `earlyInitialize`, only valid if `early_initialization_complete` is true.
+    pub var rsdp: *const tables.RSDP = undefined;
+
+    /// If this is true, the ACPI tables have been initialized and the RSDP pointer is valid.
+    var early_initialization_complete: bool = false;
+
     var acpi_initialized: bool = false;
 };
 
 pub const init = struct {
-    pub fn initializeACPITables() void {
+    pub fn earlyInitialize(rsdp_address: core.Address) !void {
         const static = struct {
             var buffer: [arch.paging.standard_page_size.value]u8 = undefined;
         };
 
-        uacpi.setupEarlyTableAccess(&static.buffer) catch return; // suppress error to allow non-ACPI systems to boot
-
-        globals.acpi_tables_initialized = true;
-    }
-
-    pub fn logAcpiTables(rsdp_address: core.Address) !void {
-        // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
-
-        if (!init_log.levelEnabled(.debug)) return;
-
-        const rsdp = switch (rsdp_address) {
+        globals.rsdp = switch (rsdp_address) {
+            // using `directMapFromPhysical` as the non-cached direct map is not yet initialized
             .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const tables.RSDP),
             .virtual => |addr| addr.toPtr(*const tables.RSDP),
         };
-        if (!rsdp.isValid()) return error.InvalidRSDP;
+        if (!globals.rsdp.isValid()) return error.InvalidRSDP;
 
-        const sdt_header = kernel.mem.directMapFromPhysical(rsdp.sdtAddress())
-            .toPtr(*const tables.SharedHeader);
-
-        if (!sdt_header.isValid()) return error.InvalidSDT;
-
-        var iter = tableIterator(sdt_header);
-
-        init_log.debug("ACPI tables:", .{});
-
-        while (iter.next()) |table| {
-            if (table.isValid()) {
-                init_log.debug("  {s}", .{table.signatureAsString()});
-            } else {
-                init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
-            }
-        }
+        try uacpi.setupEarlyTableAccess(&static.buffer);
+        globals.early_initialization_complete = true;
     }
 
     pub fn initialize() !void {
@@ -139,6 +123,29 @@ pub const init = struct {
             std.debug.panic("failed to shutdown: {t}", .{err});
         };
         @panic("shutdown failed");
+    }
+
+    pub fn logAcpiTables() !void {
+        // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
+
+        if (!init_log.levelEnabled(.debug)) return;
+
+        const sdt_header = kernel.mem.directMapFromPhysical(globals.rsdp.sdtAddress())
+            .toPtr(*const tables.SharedHeader);
+
+        if (!sdt_header.isValid()) return error.InvalidSDT;
+
+        var iter = tableIterator(sdt_header);
+
+        init_log.debug("ACPI tables:", .{});
+
+        while (iter.next()) |table| {
+            if (table.isValid()) {
+                init_log.debug("  {s}", .{table.signatureAsString()});
+            } else {
+                init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
+            }
+        }
     }
 
     fn tableIterator(

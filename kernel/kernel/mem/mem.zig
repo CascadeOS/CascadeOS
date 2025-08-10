@@ -416,22 +416,22 @@ pub const globals = struct {
 
     /// The virtual base address that the kernel was loaded at.
     ///
-    /// Initialized during `init.earlyDetermineOffsets`.
+    /// Initialized during `init.setEarlyOffsets`.
     var virtual_base_address: core.VirtualAddress = undefined;
 
     /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
     ///
-    /// Initialized during `init.earlyDetermineOffsets`.
+    /// Initialized during `init.setEarlyOffsets`.
     pub var virtual_offset: core.Size = undefined;
 
     /// Offset from the virtual address of kernel sections to the physical address of the section.
     ///
-    /// Initialized during `init.earlyDetermineOffsets`.
+    /// Initialized during `init.setEarlyOffsets`.
     pub var physical_to_virtual_offset: core.Size = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
-    /// Initialized during `init.earlyDetermineOffsets`.
+    /// Initialized during `init.setEarlyOffsets`.
     var direct_map: core.VirtualRange = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
@@ -452,21 +452,33 @@ pub const globals = struct {
     );
 };
 
-pub const init = struct {
-    pub fn initializeMemorySystem(current_task: *kernel.Task) !void {
-        init_log.debug("initializing bootstrap physical frame allocator", .{});
-        phys.init.initializeBootstrapFrameAllocator();
+pub const initialization = struct {
+    pub const MemorySystemInputs = struct {
+        number_of_usable_pages: usize,
+        number_of_usable_regions: usize,
+        memory_map: []const init.exports.MemoryMapEntry,
+    };
 
-        const number_of_usable_pages, const number_of_usable_regions = numberOfUsablePagesAndRegions();
+    pub fn initializeMemorySystem(current_task: *kernel.Task, inputs: MemorySystemInputs) !void {
+        init_log.debug("initializing bootstrap physical frame allocator", .{});
+        phys.initialization.initializeBootstrapFrameAllocator(inputs.memory_map);
 
         init_log.debug("building kernel memory layout", .{});
-        const result = buildMemoryLayout(number_of_usable_pages, number_of_usable_regions);
+        const result = buildMemoryLayout(
+            inputs.number_of_usable_pages,
+            inputs.number_of_usable_regions,
+        );
 
         init_log.debug("building core page table", .{});
         buildAndLoadCorePageTable(current_task);
 
         init_log.debug("initializing physical memory", .{});
-        phys.init.initializePhysicalMemory(number_of_usable_pages, number_of_usable_regions, result.pages_range);
+        phys.initialization.initializePhysicalMemory(
+            inputs.number_of_usable_pages,
+            inputs.number_of_usable_regions,
+            result.pages_range,
+            inputs.memory_map,
+        );
 
         init_log.debug("initializing caches", .{});
         try resource_arena.global_init.initializeCache();
@@ -492,31 +504,6 @@ pub const init = struct {
                 .context = .kernel,
             },
         );
-    }
-
-    fn numberOfUsablePagesAndRegions() struct { usize, usize } {
-        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
-
-        var number_of_usable_pages: usize = 0;
-        var number_of_usable_regions: usize = 0;
-
-        while (memory_iter.next()) |entry| {
-            if (!entry.type.isUsable()) continue;
-            if (entry.range.size.value == 0) continue;
-
-            number_of_usable_regions += 1;
-
-            number_of_usable_pages += std.math.divExact(
-                usize,
-                entry.range.size.value,
-                arch.paging.standard_page_size.value,
-            ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {f}",
-                .{entry},
-            );
-        }
-
-        return .{ number_of_usable_pages, number_of_usable_regions };
     }
 
     const MemoryLayoutResult = struct {
@@ -737,7 +724,7 @@ pub const init = struct {
 
     fn buildAndLoadCorePageTable(current_task: *kernel.Task) void {
         globals.core_page_table = arch.paging.PageTable.create(
-            phys.init.bootstrap_allocator.allocate() catch unreachable,
+            phys.initialization.bootstrap_allocator.allocate() catch unreachable,
         );
 
         for (globals.regions.constSlice()) |region| {
@@ -749,7 +736,7 @@ pub const init = struct {
                 .top_level => arch.paging.init.fillTopLevel(
                     globals.core_page_table,
                     region.range,
-                    phys.init.bootstrap_allocator,
+                    phys.initialization.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
                 },
@@ -758,7 +745,7 @@ pub const init = struct {
                     region.range,
                     full.physical_range,
                     full.map_type,
-                    phys.init.bootstrap_allocator,
+                    phys.initialization.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to full map {f}: {t}", .{ region, err });
                 },
@@ -770,7 +757,7 @@ pub const init = struct {
                         map_type,
                         .kernel,
                         .keep,
-                        phys.init.bootstrap_allocator,
+                        phys.initialization.bootstrap_allocator,
                     ) catch |err| {
                         std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
                     };
@@ -782,44 +769,23 @@ pub const init = struct {
         globals.core_page_table.load();
     }
 
-    /// Determine various offsets used by the kernel early in the boot process.
-    pub fn earlyDetermineOffsets() void {
-        const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
+    pub const EarlyOffsets = struct {
+        /// The virtual base address that the kernel was loaded at.
+        virtual_base_address: core.VirtualAddress,
+        /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
+        virtual_offset: core.Size,
+        /// Offset from the virtual address of kernel sections to the physical address of the section.
+        physical_to_virtual_offset: core.Size,
+        /// Provides an identity mapping between virtual and physical addresses.
+        direct_map: core.VirtualRange,
+    };
 
-        globals.virtual_base_address = base_address.virtual;
-
-        globals.virtual_offset = core.Size.from(
-            base_address.virtual.value - kernel.config.kernel_base_address.value,
-            .byte,
-        );
-
-        globals.physical_to_virtual_offset = core.Size.from(
-            base_address.virtual.value - base_address.physical.value,
-            .byte,
-        );
-
-        const direct_map_size = direct_map_size: {
-            const last_memory_map_entry = last_memory_map_entry: {
-                var memory_map_iterator = boot.memoryMap(.backward) catch @panic("no memory map");
-                break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
-            };
-
-            var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
-
-            // We ensure that the lowest 4GiB are always mapped.
-            const four_gib = core.Size.from(4, .gib);
-            if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
-
-            // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-            direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
-
-            break :direct_map_size direct_map_size;
-        };
-
-        globals.direct_map = core.VirtualRange.fromAddr(
-            boot.directMapAddress() orelse @panic("direct map address not provided"),
-            direct_map_size,
-        );
+    /// Set various offsets used by the kernel early in the boot process.
+    pub fn setEarlyOffsets(early_offsets: EarlyOffsets) void {
+        globals.virtual_base_address = early_offsets.virtual_base_address;
+        globals.virtual_offset = early_offsets.virtual_offset;
+        globals.physical_to_virtual_offset = early_offsets.physical_to_virtual_offset;
+        globals.direct_map = early_offsets.direct_map;
     }
 
     pub fn logEarlyOffsets() void {
@@ -893,7 +859,7 @@ pub const init = struct {
 };
 
 const arch = @import("arch");
-const boot = @import("boot");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");

@@ -40,7 +40,7 @@ pub fn registerOutputs() void {
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
+fn tryGetSerialOutputFromGenericSources() ?init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
@@ -60,7 +60,7 @@ fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
             break :blk;
         }
 
-        if (kernel.init.devicetree.tryGetSerialOutput()) |output_uart| {
+        if (init.devicetree.tryGetSerialOutput()) |output_uart| {
             log.debug("got serial output from device tree", .{});
 
             static.init_output_uart = output_uart;
@@ -135,6 +135,7 @@ pub const globals = struct {
 pub const uart = @import("uart.zig");
 
 const arch = @import("arch");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");

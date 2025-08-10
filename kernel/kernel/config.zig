@@ -12,7 +12,7 @@ pub const kernel_base_address: core.VirtualAddress = .fromInt(0xffffffff80000000
 pub const kernel_stack_size = arch.paging.standard_page_size.multiplyScalar(16);
 
 pub const maximum_number_of_time_sources = 8;
-
+pub const maximum_number_of_memory_map_entries = 128;
 pub const maximum_number_of_executors = 64;
 
 pub const interrupt_source_panic_buffer_size = arch.paging.standard_page_size;

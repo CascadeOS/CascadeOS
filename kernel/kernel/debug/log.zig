@@ -87,27 +87,27 @@ fn logFn(
         .single_executor_init_log => {
             @branchHint(.unlikely);
 
-            const writer = kernel.init.Output.writer;
+            const writer = init.Output.writer;
 
             writer.writeAll(prefix) catch {};
             writer.print(format, args) catch {};
 
-            kernel.init.Output.writer.flush() catch {};
+            init.Output.writer.flush() catch {};
         },
         .init_log => {
             @branchHint(.unlikely);
 
             const current_task = kernel.Task.getCurrent();
 
-            kernel.init.Output.globals.lock.lock(current_task);
-            defer kernel.init.Output.globals.lock.unlock(current_task);
+            init.Output.globals.lock.lock(current_task);
+            defer init.Output.globals.lock.unlock(current_task);
 
-            const writer = kernel.init.Output.writer;
+            const writer = init.Output.writer;
 
             writer.writeAll(prefix) catch {};
             writer.print(format, args) catch {};
 
-            kernel.init.Output.writer.flush() catch {};
+            init.Output.writer.flush() catch {};
         },
     }
 }
@@ -205,6 +205,7 @@ const globals = struct {
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
 const kernel = @import("kernel");
+const init = @import("init");
 
 const core = @import("core");
 const kernel_options = @import("kernel_options");

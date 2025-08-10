@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const devicetree = @import("devicetree.zig");
+pub const Output = @import("output/Output.zig");
+
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
@@ -8,14 +11,16 @@ pub fn initStage1() !noreturn {
     kernel.time.init.tryCaptureStandardWallclockStartTime();
 
     // we need the direct map to be available as early as possible
-    kernel.mem.init.earlyDetermineOffsets();
+    kernel.mem.initialization.setEarlyOffsets(determineEarlyOffsets());
 
     // TODO: initialize the bootstrap frame allocator here then ensure all physical memory regions are mapped in the
     //       bootloader provided memory map, this would allow us to switch to latter limine revisions and also
     //       allow us to support unusual systems with MMIO above 4GiB
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
-    kernel.acpi.init.initializeACPITables();
+    if (boot.rsdp()) |rsdp_address| {
+        try kernel.acpi.init.earlyInitialize(rsdp_address);
+    }
 
     Output.registerOutputs();
 
@@ -23,11 +28,9 @@ pub fn initStage1() !noreturn {
     try Output.writer.flush();
 
     // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
-    kernel.mem.init.logEarlyOffsets();
+    kernel.mem.initialization.logEarlyOffsets();
 
-    if (boot.rsdp()) |rsdp_address| {
-        try kernel.acpi.init.logAcpiTables(rsdp_address);
-    }
+    try kernel.acpi.init.logAcpiTables();
 
     var bootstrap_init_task: kernel.Task = undefined;
     var current_task = &bootstrap_init_task;
@@ -61,7 +64,7 @@ pub fn initStage1() !noreturn {
     arch.init.configurePerExecutorSystemFeatures(bootstrap_executor);
 
     log.debug("initializing memory system", .{});
-    try kernel.mem.init.initializeMemorySystem(current_task);
+    try kernel.mem.initialization.initializeMemorySystem(current_task, try collectMemorySystemInputs());
 
     log.debug("remapping init outputs", .{});
     try Output.remapOutputs(current_task);
@@ -220,6 +223,89 @@ fn initStage4(current_task: *kernel.Task) !noreturn {
     unreachable;
 }
 
+/// Determine various offsets used by the kernel early in the boot process.
+pub fn determineEarlyOffsets() kernel.mem.initialization.EarlyOffsets {
+    const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
+
+    const virtual_offset = core.Size.from(
+        base_address.virtual.value - kernel.config.kernel_base_address.value,
+        .byte,
+    );
+
+    const physical_to_virtual_offset = core.Size.from(
+        base_address.virtual.value - base_address.physical.value,
+        .byte,
+    );
+
+    const direct_map_size = direct_map_size: {
+        const last_memory_map_entry = last_memory_map_entry: {
+            var memory_map_iterator = boot.memoryMap(.backward) catch @panic("no memory map");
+            break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
+        };
+
+        var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
+
+        // We ensure that the lowest 4GiB are always mapped.
+        const four_gib = core.Size.from(4, .gib);
+        if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
+
+        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
+        direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
+
+        break :direct_map_size direct_map_size;
+    };
+
+    const direct_map = core.VirtualRange.fromAddr(
+        boot.directMapAddress() orelse @panic("direct map address not provided"),
+        direct_map_size,
+    );
+
+    return .{
+        .virtual_base_address = base_address.virtual,
+        .virtual_offset = virtual_offset,
+        .physical_to_virtual_offset = physical_to_virtual_offset,
+        .direct_map = direct_map,
+    };
+}
+
+pub fn collectMemorySystemInputs() !kernel.mem.initialization.MemorySystemInputs {
+    const static = struct {
+        var memory_map: core.containers.BoundedArray(
+            exports.MemoryMapEntry,
+            kernel.config.maximum_number_of_memory_map_entries,
+        ) = .{};
+    };
+
+    var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+
+    var number_of_usable_pages: usize = 0;
+    var number_of_usable_regions: usize = 0;
+
+    while (memory_iter.next()) |entry| {
+        try static.memory_map.append(entry);
+
+        if (!entry.type.isUsable()) continue;
+        if (entry.range.size.value == 0) continue;
+
+        number_of_usable_regions += 1;
+
+        number_of_usable_pages += std.math.divExact(
+            usize,
+            entry.range.size.value,
+            arch.paging.standard_page_size.value,
+        ) catch std.debug.panic(
+            "memory map entry size is not a multiple of page size: {f}",
+            .{entry},
+        );
+    }
+
+    return .{
+        .number_of_usable_pages = number_of_usable_pages,
+        .number_of_usable_regions = number_of_usable_regions,
+        .memory_map = static.memory_map.constSlice(),
+    };
+}
+
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
@@ -296,9 +382,6 @@ fn bootNonBootstrapExecutors() !void {
     }
 }
 
-pub const devicetree = @import("devicetree.zig");
-pub const Output = @import("output/Output.zig");
-
 const Stage3Barrier = struct {
     var non_bootstrap_executors_ready = std.atomic.Value(usize).init(0);
     var stage3_complete = std.atomic.Value(bool).init(false);
@@ -331,6 +414,20 @@ const Stage3Barrier = struct {
         }
     }
 };
+
+/// Exports the arch API needed by the boot component.
+///
+/// And the boot API needed by the kernel component.
+pub const exports = struct {
+    pub const current_arch = arch.current_arch;
+    pub const disableAndHalt = arch.interrupts.disableAndHalt;
+
+    pub const MemoryMapEntry = boot.MemoryMap.Entry;
+};
+
+comptime {
+    @import("boot").exportEntryPoints();
+}
 
 const arch = @import("arch");
 const boot = @import("boot");

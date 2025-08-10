@@ -167,7 +167,7 @@ const globals = struct {
     var page_regions: []Page.Region = undefined;
 };
 
-pub const init = struct {
+pub const initialization = struct {
     var regions: core.containers.BoundedArray(Region, max_regions) = .{};
     const max_regions: usize = 64;
 
@@ -178,6 +178,7 @@ pub const init = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,
+        memory_map: []const init.exports.MemoryMapEntry,
     ) void {
         init_log.debug(
             "initializing pages array with {} usable pages ({f}) in {} regions",
@@ -202,8 +203,6 @@ pub const init = struct {
             globals.pages = page_ptr[0..number_of_usable_pages];
         }
 
-        var iter = boot.memoryMap(.forward) catch @panic("no memory map");
-
         var total_memory: core.Size = .zero;
         var free_memory: core.Size = .zero;
         var reserved_memory: core.Size = .zero;
@@ -213,7 +212,7 @@ pub const init = struct {
         var page_index: u32 = 0;
         var usable_range_index: u32 = 0;
 
-        while (iter.next()) |entry| {
+        for (memory_map) |entry| {
             total_memory.addInPlace(entry.range.size);
 
             switch (entry.type) {
@@ -369,12 +368,10 @@ pub const init = struct {
         }.deallocate,
     };
 
-    pub fn initializeBootstrapFrameAllocator() void {
-        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
-
+    pub fn initializeBootstrapFrameAllocator(memory_map: []const init.exports.MemoryMapEntry) void {
         init_log.debug("bootloader provided memory map:", .{});
 
-        while (memory_iter.next()) |entry| {
+        for (memory_map) |entry| {
             init_log.debug("\t{f}", .{entry});
             if (entry.type != .free) continue;
 
@@ -419,7 +416,7 @@ pub const init = struct {
 };
 
 const arch = @import("arch");
-const boot = @import("boot");
+const init = @import("init");
 const kernel = @import("kernel");
 
 const core = @import("core");
