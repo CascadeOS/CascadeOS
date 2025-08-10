@@ -907,14 +907,14 @@ pub const QuantumCaching = union(enum) {
     /// The number of multiples of the quantum to cache.
     ///
     /// Uses the heap resource arena to allocate the caches.
-    normal: u6,
+    normal: u8,
 
     /// The number of multiples of the quantum to cache.
     ///
     /// This should only be used by the heap resource arena itself.
     ///
     /// Uses the physical memory allocator and the hhdm to allocate the caches.
-    heap: u6,
+    heap: u8,
 
     inline fn haveQuantumCache(comptime quantum_caching: QuantumCaching) bool {
         return switch (quantum_caching) {
