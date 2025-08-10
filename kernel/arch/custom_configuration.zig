@@ -6,6 +6,7 @@ pub fn customConfiguration(
     architecture: CascadeTarget.Architecture,
     module: *std.Build.Module,
     options: Options,
+    _: bool,
 ) anyerror!void {
     // architecture options
     module.addImport(

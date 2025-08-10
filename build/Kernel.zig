@@ -48,66 +48,28 @@ fn constructKernel(
     options: Options,
     architecture: CascadeTarget.Architecture,
 ) !Kernel {
-    // TODO: create both a 'kernel' and a 'kernel-check' component, both exactly the same but with different kernel options
-    //       this allows us to enable as many code paths as possible in the kernel check step
-
-    const required_components = try getAllRequiredComponents(b);
-
-    const required_libraries = try getAllRequiredLibraries(b, all_libraries, required_components);
-
-    try configureComponents(
-        b,
-        architecture,
-        required_components,
-        required_libraries,
-        options,
-    );
-
-    const kernel_module = blk: {
-        const kernel_module = required_components.get("kernel").?.module;
-
-        kernel_module.resolved_target = kernelCrossTarget(architecture, b);
-        kernel_module.optimize = options.optimize;
-        kernel_module.sanitize_c = switch (options.optimize) {
-            .ReleaseFast => .off,
-            .ReleaseSmall => .trap,
-            else => .full,
-        };
-
-        // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
-        kernel_module.strip = false;
-        kernel_module.omit_frame_pointer = false;
-
-        // apply architecture-specific configuration to the kernel
-        switch (architecture) {
-            .arm => {},
-            .riscv => {},
-            .x64 => {
-                kernel_module.code_model = .kernel;
-                kernel_module.red_zone = false;
-            },
-        }
-
-        const source_file_modules = try getSourceFileModules(
+    { // check exe
+        const check_module = try constructKernelModule(
             b,
-            required_components,
-            required_libraries,
+            all_libraries,
+            options,
+            architecture,
+            true,
         );
-        for (source_file_modules) |module| {
-            kernel_module.addImport(module.name, module.module);
-        }
-
-        break :blk kernel_module;
-    };
-
-    // check exe
-    {
         const check_exe = b.addExecutable(.{
             .name = "kernel_check",
-            .root_module = kernel_module,
+            .root_module = check_module,
         });
         step_collection.registerCheck(check_exe);
     }
+
+    const kernel_module = try constructKernelModule(
+        b,
+        all_libraries,
+        options,
+        architecture,
+        false,
+    );
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
@@ -216,6 +178,61 @@ fn constructKernel(
     };
 }
 
+fn constructKernelModule(
+    b: *std.Build,
+    all_libraries: Library.Collection,
+    options: Options,
+    architecture: CascadeTarget.Architecture,
+    is_check: bool,
+) !*std.Build.Module {
+    const required_components = try getAllRequiredComponents(b);
+    const required_libraries = try getAllRequiredLibraries(b, all_libraries, required_components);
+
+    try configureComponents(
+        b,
+        architecture,
+        required_components,
+        required_libraries,
+        options,
+        is_check,
+    );
+
+    const kernel_module = required_components.get("kernel").?.module;
+
+    kernel_module.resolved_target = kernelCrossTarget(architecture, b);
+    kernel_module.optimize = options.optimize;
+    kernel_module.sanitize_c = switch (options.optimize) {
+        .ReleaseFast => .off,
+        .ReleaseSmall => .trap,
+        else => .full,
+    };
+
+    // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
+    kernel_module.strip = false;
+    kernel_module.omit_frame_pointer = false;
+
+    // apply architecture-specific configuration to the kernel
+    switch (architecture) {
+        .arm => {},
+        .riscv => {},
+        .x64 => {
+            kernel_module.code_model = .kernel;
+            kernel_module.red_zone = false;
+        },
+    }
+
+    const source_file_modules = try getSourceFileModules(
+        b,
+        required_components,
+        required_libraries,
+    );
+    for (source_file_modules) |module| {
+        kernel_module.addImport(module.name, module.module);
+    }
+
+    return kernel_module;
+}
+
 /// Returns the kernel components required to build the kernel.
 ///
 /// The modules for each component are created but not configured in any way.
@@ -295,6 +312,7 @@ fn configureComponents(
     components: WipComponent.Collection,
     libraries: Library.Collection,
     options: Options,
+    is_check: bool,
 ) !void {
     for (components.values()) |c| {
         const kernel_component = c.kernel_component;
@@ -351,6 +369,7 @@ fn configureComponents(
                 architecture,
                 module,
                 options,
+                is_check,
             );
         }
     }

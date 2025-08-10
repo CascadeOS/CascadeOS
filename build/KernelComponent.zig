@@ -19,6 +19,7 @@ configuration: ?*const fn (
     architecture: CascadeTarget.Architecture,
     module: *std.Build.Module,
     options: Options,
+    is_check: bool,
 ) anyerror!void = null,
 
 const std = @import("std");
