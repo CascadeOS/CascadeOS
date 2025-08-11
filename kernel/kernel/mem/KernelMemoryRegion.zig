@@ -40,9 +40,9 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
             );
 
             const map_type: MapType = switch (kernel_memory_region.type) {
-                .direct_map => .{ .context = .kernel, .protection = .read_write },
+                .direct_map => .{ .environment_type = .kernel, .protection = .read_write },
                 .non_cached_direct_map => .{
-                    .context = .kernel,
+                    .environment_type = .kernel,
                     .protection = .read_write,
                     .cache = .uncached,
                 },
@@ -64,9 +64,9 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
             );
 
             const map_type: MapType = switch (kernel_memory_region.type) {
-                .executable_section => .{ .context = .kernel, .protection = .executable },
-                .readonly_section, .sdf_section => .{ .context = .kernel, .protection = .read },
-                .writeable_section => .{ .context = .kernel, .protection = .read_write },
+                .executable_section => .{ .environment_type = .kernel, .protection = .executable },
+                .readonly_section, .sdf_section => .{ .environment_type = .kernel, .protection = .read },
+                .writeable_section => .{ .environment_type = .kernel, .protection = .read_write },
                 else => unreachable,
             };
 
@@ -76,7 +76,7 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
         .kernel_heap, .kernel_stacks, .special_heap, .pageable_kernel_address_space => return .top_level,
 
         .pages => return .{ .back_with_frames = .{
-            .context = .kernel,
+            .environment_type = .kernel,
             .protection = .read_write,
         } },
     }

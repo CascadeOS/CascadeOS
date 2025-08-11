@@ -7,8 +7,8 @@ pub fn prepareForJumpToTaskFromTask(
     old_task: *kernel.Task,
     new_task: *kernel.Task,
 ) void {
-    switch (old_task.context) {
-        .kernel => switch (new_task.context) {
+    switch (old_task.environment) {
+        .kernel => switch (new_task.environment) {
             .kernel => {},
             .user => |process| {
                 process.address_space.page_table.load();
@@ -18,7 +18,7 @@ pub fn prepareForJumpToTaskFromTask(
                 );
             },
         },
-        .user => |old_process| switch (new_task.context) {
+        .user => |old_process| switch (new_task.environment) {
             .kernel => kernel.mem.globals.core_page_table.load(),
             .user => |new_process| if (old_process != new_process) {
                 new_process.address_space.page_table.load();

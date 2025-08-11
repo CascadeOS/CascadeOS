@@ -238,23 +238,23 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
         pub fn output(uart: *UartT) init.Output {
             return .{
                 .writeFn = struct {
-                    fn writeFn(context: *anyopaque, str: []const u8) void {
-                        const inner_uart: *UartT = @ptrCast(@alignCast(context));
+                    fn writeFn(state: *anyopaque, str: []const u8) void {
+                        const inner_uart: *UartT = @ptrCast(@alignCast(state));
                         inner_uart.writeSlice(str);
                     }
                 }.writeFn,
                 .splatFn = struct {
-                    fn splatFn(context: *anyopaque, str: []const u8, splat: usize) void {
-                        const inner_uart: *UartT = @ptrCast(@alignCast(context));
+                    fn splatFn(state: *anyopaque, str: []const u8, splat: usize) void {
+                        const inner_uart: *UartT = @ptrCast(@alignCast(state));
                         for (0..splat) |_| inner_uart.writeSlice(str);
                     }
                 }.splatFn,
                 .remapFn = struct {
-                    fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
+                    fn remapFn(state: *anyopaque, _: *kernel.Task) anyerror!void {
                         switch (mode) {
                             .io_port => {},
                             .memory => {
-                                const inner_uart: *UartT = @ptrCast(@alignCast(context));
+                                const inner_uart: *UartT = @ptrCast(@alignCast(state));
                                 const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
                                     .fromPtr(@volatileCast(inner_uart.write_register)),
                                 );
@@ -266,7 +266,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                         }
                     }
                 }.remapFn,
-                .context = uart,
+                .state = uart,
             };
         }
 
@@ -539,20 +539,20 @@ pub const PL011 = struct {
     pub fn output(pl011: *PL011) init.Output {
         return .{
             .writeFn = struct {
-                fn writeFn(context: *anyopaque, str: []const u8) void {
-                    const uart: *PL011 = @ptrCast(@alignCast(context));
+                fn writeFn(state: *anyopaque, str: []const u8) void {
+                    const uart: *PL011 = @ptrCast(@alignCast(state));
                     uart.writeSlice(str);
                 }
             }.writeFn,
             .splatFn = struct {
-                fn splatFn(context: *anyopaque, str: []const u8, splat: usize) void {
-                    const uart: *PL011 = @ptrCast(@alignCast(context));
+                fn splatFn(state: *anyopaque, str: []const u8, splat: usize) void {
+                    const uart: *PL011 = @ptrCast(@alignCast(state));
                     for (0..splat) |_| uart.writeSlice(str);
                 }
             }.splatFn,
             .remapFn = struct {
-                fn remapFn(context: *anyopaque, _: *kernel.Task) anyerror!void {
-                    const uart: *PL011 = @ptrCast(@alignCast(context));
+                fn remapFn(state: *anyopaque, _: *kernel.Task) anyerror!void {
+                    const uart: *PL011 = @ptrCast(@alignCast(state));
                     const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
                         .fromPtr(@volatileCast(uart.write_register)),
                     );
@@ -562,7 +562,7 @@ pub const PL011 = struct {
                     uart.flag_register = uart.write_register + @intFromEnum(RegisterOffset.Flag);
                 }
             }.remapFn,
-            .context = pl011,
+            .state = pl011,
         };
     }
 

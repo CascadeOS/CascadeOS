@@ -69,12 +69,12 @@ pub const DeferredAction = struct {
     /// It is the responsibility of the action to set the state of the old task to the correct value.
     action: Action,
 
-    context: ?*anyopaque,
+    arg: usize,
 
     pub const Action = *const fn (
         new_current_task: *kernel.Task,
         old_task: *kernel.Task,
-        context: ?*anyopaque,
+        arg: usize,
     ) void;
 };
 
@@ -113,7 +113,7 @@ fn switchToIdleDeferredAction(
             scheduler_task_addr: usize,
             old_task_addr: usize,
             action_addr: usize,
-            action_context_addr: usize,
+            action_arg: usize,
         ) callconv(.c) noreturn {
             const scheduler_task: *kernel.Task = @ptrFromInt(scheduler_task_addr);
 
@@ -121,7 +121,7 @@ fn switchToIdleDeferredAction(
             action(
                 scheduler_task,
                 @ptrFromInt(old_task_addr),
-                @ptrFromInt(action_context_addr),
+                action_arg,
             );
             std.debug.assert(scheduler_task.interrupt_disable_count == 1);
             std.debug.assert(scheduler_task.spinlocks_held == 1);
@@ -156,7 +156,7 @@ fn switchToIdleDeferredAction(
         @intFromPtr(scheduler_task),
         @intFromPtr(old_task),
         @intFromPtr(deferred_action.action),
-        @intFromPtr(deferred_action.context),
+        deferred_action.arg,
 
         static.idleEntryDeferredAction,
     ) catch |err| {
@@ -223,7 +223,7 @@ fn switchToTaskFromTaskDeferredAction(
             old_task_addr: usize,
             new_task_addr: usize,
             action_addr: usize,
-            action_context_addr: usize,
+            action_arg: usize,
         ) callconv(.c) noreturn {
             const inner_old_task: *kernel.Task = @ptrFromInt(old_task_addr);
             const inner_new_task: *kernel.Task = @ptrFromInt(new_task_addr);
@@ -235,7 +235,7 @@ fn switchToTaskFromTaskDeferredAction(
             action(
                 scheduler_task,
                 inner_old_task,
-                @ptrFromInt(action_context_addr),
+                action_arg,
             );
             std.debug.assert(scheduler_task.interrupt_disable_count == 1);
             std.debug.assert(scheduler_task.spinlocks_held == 1);
@@ -274,7 +274,7 @@ fn switchToTaskFromTaskDeferredAction(
         @intFromPtr(old_task),
         @intFromPtr(new_task),
         @intFromPtr(deferred_action.action),
-        @intFromPtr(deferred_action.context),
+        deferred_action.arg,
 
         static.switchToTaskDeferredAction,
     ) catch |err| {

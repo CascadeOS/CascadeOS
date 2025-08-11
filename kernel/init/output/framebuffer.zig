@@ -31,7 +31,7 @@ pub fn tryGetFramebufferOutput() ?init.Output {
             }
         }.splatFn,
         .remapFn = remapFramebuffer,
-        .context = undefined,
+        .state = undefined,
     };
 }
 
@@ -101,7 +101,11 @@ fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
             physical_address,
             framebuffer_size,
         ),
-        .{ .context = .kernel, .protection = .read_write, .cache = .write_combining },
+        .{
+            .environment_type = .kernel,
+            .protection = .read_write,
+            .cache = .write_combining,
+        },
     );
 
     c.ssfn_dst.ptr = virtual_range.address.toPtr([*]u8);

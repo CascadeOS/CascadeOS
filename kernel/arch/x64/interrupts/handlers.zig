@@ -41,8 +41,8 @@ pub fn pageFaultHandler(
         else
             .invalid,
 
-        .context = if (error_code.user)
-            .{ .user = current_task.context.user }
+        .environment = if (error_code.user)
+            .{ .user = current_task.environment.user }
         else
             .kernel,
     }, interrupt_frame);
@@ -77,7 +77,7 @@ pub fn unhandledException(
     _: ?*anyopaque,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
-    switch (arch_interrupt_frame.context(current_task)) {
+    switch (arch_interrupt_frame.environment(current_task)) {
         .kernel => kernel.debug.interruptSourcePanic(
             current_task,
             interrupt_frame,

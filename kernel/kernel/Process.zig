@@ -96,7 +96,7 @@ pub fn createUserTask(
         .start_function = options.start_function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
-        .context = .{ .user = process },
+        .environment = .{ .user = process },
     });
     errdefer {
         entry_task.state = .{ .dropped = .{} }; // `destroy` will assert this
@@ -157,7 +157,7 @@ pub const internal = struct {
                 ) catch unreachable, // ensured in `kernel.config`
                 .range = kernel.config.user_address_space_range,
                 .page_table = page_table,
-                .context = .{ .user = process },
+                .environment = .{ .user = process },
             }) catch @panic("janky leaking process destroy failed to init address space");
         } else {
             // TODO: not called as `reinitialize` is not implemented
@@ -198,7 +198,7 @@ fn cacheConstructor(process: *Process, current_task: *kernel.Task) kernel.mem.ca
         ) catch unreachable, // ensured in `kernel.config`
         .range = kernel.config.user_address_space_range,
         .page_table = page_table,
-        .context = .{ .user = process },
+        .environment = .{ .user = process },
     }) catch |err| {
         log.warn(
             "process constructor failed during address space initialization: {s}",

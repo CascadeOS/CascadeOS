@@ -15,7 +15,7 @@ pub const sync = @import("sync/sync.zig");
 pub const Task = @import("Task.zig");
 pub const time = @import("time.zig");
 
-pub const Context = union(Type) {
+pub const Environment = union(Type) {
     kernel,
     user: *Process,
 

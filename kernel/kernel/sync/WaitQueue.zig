@@ -73,8 +73,8 @@ pub fn wait(
 
     kernel.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(_: *kernel.Task, old_task: *kernel.Task, context: ?*anyopaque) void {
-                const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrCast(@alignCast(context));
+            fn action(_: *kernel.Task, old_task: *kernel.Task, arg: usize) void {
+                const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
                 old_task.spinlocks_held -= 1;
@@ -83,7 +83,7 @@ pub fn wait(
                 inner_spinlock.unsafeUnlock();
             }
         }.action,
-        .context = spinlock,
+        .arg = @intFromPtr(spinlock),
     });
 }
 

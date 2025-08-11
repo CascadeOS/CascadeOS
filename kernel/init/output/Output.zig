@@ -3,22 +3,22 @@
 
 const Output = @This();
 
-writeFn: *const fn (context: *anyopaque, str: []const u8) void,
+writeFn: *const fn (state: *anyopaque, str: []const u8) void,
 
-splatFn: *const fn (context: *anyopaque, str: []const u8, splat: usize) void,
+splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
-remapFn: *const fn (context: *anyopaque, current_task: *kernel.Task) anyerror!void,
+remapFn: *const fn (state: *anyopaque, current_task: *kernel.Task) anyerror!void,
 
-context: *anyopaque,
+state: *anyopaque,
 
 pub const writer = &globals.writer;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
 pub fn remapOutputs(current_task: *kernel.Task) !void {
-    if (globals.framebuffer_output) |output| try output.remapFn(output.context, current_task);
-    if (globals.serial_output) |output| try output.remapFn(output.context, current_task);
+    if (globals.framebuffer_output) |output| try output.remapFn(output.state, current_task);
+    if (globals.serial_output) |output| try output.remapFn(output.state, current_task);
 }
 
 pub fn registerOutputs() void {
@@ -75,19 +75,19 @@ fn tryGetSerialOutputFromGenericSources() ?init.Output {
 
 fn writeToOutputs(str: []const u8) void {
     if (globals.framebuffer_output) |output| {
-        output.writeFn(output.context, str);
+        output.writeFn(output.state, str);
     }
     if (globals.serial_output) |output| {
-        output.writeFn(output.context, str);
+        output.writeFn(output.state, str);
     }
 }
 
 fn splatToOutputs(str: []const u8, splat: usize) void {
     if (globals.framebuffer_output) |output| {
-        output.splatFn(output.context, str, splat);
+        output.splatFn(output.state, str, splat);
     }
     if (globals.serial_output) |output| {
-        output.splatFn(output.context, str, splat);
+        output.splatFn(output.state, str, splat);
     }
 }
 

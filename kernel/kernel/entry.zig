@@ -15,7 +15,7 @@ pub fn onPageFault(
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
     current_task.decrementInterruptDisable();
-    switch (page_fault_details.context) {
+    switch (page_fault_details.environment) {
         .kernel => kernel.mem.onKernelPageFault(
             current_task,
             page_fault_details,

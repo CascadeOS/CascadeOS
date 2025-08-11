@@ -173,7 +173,7 @@ pub fn unmap4KiB(
 }
 
 fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
-    switch (map_type.context) {
+    switch (map_type.environment_type) {
         .user => entry.user_accessible.write(true),
         .kernel => entry.global.write(true),
     }

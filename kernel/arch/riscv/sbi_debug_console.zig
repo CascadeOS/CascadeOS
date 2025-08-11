@@ -25,7 +25,7 @@ pub const output: arch.init.InitOutput.Output = .{
             return;
         }
     }.remapFn,
-    .context = undefined,
+    .state = undefined,
 };
 
 fn writeStr(str: []const u8) void {

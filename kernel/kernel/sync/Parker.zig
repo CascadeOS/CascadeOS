@@ -54,8 +54,8 @@ pub fn park(parker: *Parker, current_task: *kernel.Task) void {
 
     kernel.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(_: *kernel.Task, old_task: *kernel.Task, context: ?*anyopaque) void {
-                const inner_parker: *Parker = @ptrCast(@alignCast(context));
+            fn action(_: *kernel.Task, old_task: *kernel.Task, arg: usize) void {
+                const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
                 old_task.spinlocks_held -= 1;
@@ -65,7 +65,7 @@ pub fn park(parker: *Parker, current_task: *kernel.Task) void {
                 inner_parker.lock.unsafeUnlock();
             }
         }.action,
-        .context = parker,
+        .arg = @intFromPtr(parker),
     });
 }
 

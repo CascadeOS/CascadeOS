@@ -56,7 +56,7 @@ fn handleTask(current_task: *Task, task: *Task) void {
     std.debug.assert(task.state == .dropped);
     std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
 
-    const tasks_lock, const tasks = switch (task.context) {
+    const tasks_lock, const tasks = switch (task.environment) {
         .kernel => .{ &kernel.globals.kernel_tasks_lock, &kernel.globals.kernel_tasks },
         .user => |process| .{ &process.tasks_lock, &process.tasks },
     };
@@ -88,10 +88,10 @@ fn handleTask(current_task: *Task, task: *Task) void {
     // this log must happen before the process reference count is decremented
     log.debug("destroying {f}", .{task});
 
-    switch (task.context) {
+    switch (task.environment) {
         .kernel => {},
         .user => |process| {
-            task.context = .{ .user = undefined };
+            task.environment = .{ .user = undefined };
             process.decrementReferenceCount(current_task, .unlocked);
         },
     }

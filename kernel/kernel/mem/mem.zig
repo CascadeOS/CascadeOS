@@ -48,7 +48,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
-    flush_target: kernel.Context,
+    flush_target: kernel.Environment,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -110,7 +110,7 @@ pub fn mapRangeToPhysicalRange(
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: MapType,
-    flush_target: kernel.Context,
+    flush_target: kernel.Environment,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -167,7 +167,7 @@ pub fn unmapSinglePage(
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     backing_pages: core.CleanupDecision,
-    flush_target: kernel.Context,
+    flush_target: kernel.Environment,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
@@ -202,7 +202,7 @@ pub fn unmapRange(
     current_task: *kernel.Task,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
-    flush_target: kernel.Context,
+    flush_target: kernel.Environment,
     backing_page_decision: core.CleanupDecision,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
@@ -340,7 +340,7 @@ pub const PageFaultDetails = struct {
     faulting_address: core.VirtualAddress,
     access_type: AccessType,
     fault_type: FaultType,
-    context: kernel.Context,
+    environment: kernel.Environment,
 
     pub const AccessType = enum {
         read,
@@ -371,7 +371,7 @@ pub const PageFaultDetails = struct {
         try writer.print("fault_type: {t},\n", .{details.fault_type});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("context: {t},\n", .{details.context});
+        try writer.print("environment: {t},\n", .{details.environment});
 
         try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
@@ -501,7 +501,7 @@ pub const initialization = struct {
                 .name = try .fromSlice("pageable_kernel"),
                 .range = result.pageable_kernel_address_space_range,
                 .page_table = globals.core_page_table,
-                .context = .kernel,
+                .environment = .kernel,
             },
         );
     }

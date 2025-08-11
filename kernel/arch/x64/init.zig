@@ -390,7 +390,7 @@ const DebugCon = struct {
                 return;
             }
         }.remapFn,
-        .context = undefined,
+        .state = undefined,
     };
 };
 

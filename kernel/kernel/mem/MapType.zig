@@ -3,14 +3,13 @@
 
 const MapType = @This();
 
-/// The context of the mapping.
+/// The environment type of the mapping.
 ///
-/// If the context is `.kernel` then the mapping is inaccessible from userspace, and is not flushed on context switch if
-/// supported.
+/// If `.kernel` then the mapping is inaccessible from userspace, and is not flushed on context switch if supported.
 ///
-/// If the context is `.user` then the mapping is accessible from userspace and if supported is not accessible from
-/// kernelspace by default.
-context: kernel.Context.Type,
+/// If` .user` then the mapping is accessible from userspace and if supported is not accessible from kernelspace by
+/// default.
+environment_type: kernel.Environment.Type,
 
 /// The protection of the mapping.
 protection: Protection,
@@ -47,7 +46,7 @@ pub fn format(
 ) !void {
     try writer.writeAll("Type{ ");
 
-    try writer.writeAll(switch (region.context) {
+    try writer.writeAll(switch (region.environment_type) {
         .user => "U_",
         .kernel => "K_",
     });

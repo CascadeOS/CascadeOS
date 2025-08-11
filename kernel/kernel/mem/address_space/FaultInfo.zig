@@ -273,7 +273,7 @@ pub fn faultObjectOrZeroFill(
 
     {
         const map_type: kernel.mem.MapType = .{
-            .context = fault_info.address_space.context,
+            .environment_type = fault_info.address_space.environment,
             .protection = switch (fault_info.enter_protection) {
                 .none => unreachable, // `error.Protection` is returned by `faultCheck` if protection is `.none`
                 .read => .read,

@@ -4,7 +4,7 @@
 const FlushRequest = @This();
 
 range: core.VirtualRange,
-flush_target: kernel.Context,
+flush_target: kernel.Environment,
 count: std.atomic.Value(usize) = .init(1), // starts at `1` to account for the current executor
 nodes: core.containers.BoundedArray(Node, kernel.config.maximum_number_of_executors) = .{},
 
@@ -53,7 +53,7 @@ fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
 
     switch (flush_request.flush_target) {
         .kernel => {},
-        .user => |target_process| switch (current_task.context) {
+        .user => |target_process| switch (current_task.environment) {
             .kernel => return,
             .user => |current_process| if (current_process != target_process) return,
         },

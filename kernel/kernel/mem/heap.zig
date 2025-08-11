@@ -205,7 +205,7 @@ fn heapPageArenaImport(
             current_task,
             kernel.mem.globals.core_page_table,
             virtual_range,
-            .{ .context = .kernel, .protection = .read_write },
+            .{ .environment_type = .kernel, .protection = .read_write },
             .kernel,
             .keep,
             kernel.mem.phys.allocator,

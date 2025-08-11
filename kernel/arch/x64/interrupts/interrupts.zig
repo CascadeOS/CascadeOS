@@ -4,8 +4,8 @@
 pub fn allocateInterrupt(
     current_task: *kernel.Task,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
-    context1: ?*anyopaque,
-    context2: ?*anyopaque,
+    arg1: ?*anyopaque,
+    arg2: ?*anyopaque,
 ) arch.interrupts.Interrupt.AllocateError!Interrupt {
     const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
         return error.InterruptAllocationFailed;
@@ -15,8 +15,8 @@ pub fn allocateInterrupt(
 
     globals.handlers[interrupt_number] = .{
         .interrupt_handler = interrupt_handler,
-        .context1 = context1,
-        .context2 = context2,
+        .arg1 = arg1,
+        .arg2 = arg2,
     };
 
     return @enumFromInt(interrupt_number);
@@ -168,14 +168,11 @@ pub const InterruptFrame = extern struct {
         selector: x64.Gdt.Selector,
     },
 
-    /// Returns the context that the interrupt was triggered from.
-    ///
-    /// Even if the current task is a user task the context will be `.kernel` if the interrupt was triggered while in
-    /// kernel mode.
-    pub fn context(interrupt_frame: *const InterruptFrame, current_task: *kernel.Task) kernel.Context {
+    /// Returns the environment that the interrupt was triggered from.
+    pub fn environment(interrupt_frame: *const InterruptFrame, current_task: *kernel.Task) kernel.Environment {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .{ .user = current_task.context.user },
+            .user_code => return .{ .user = current_task.environment.user },
             else => unreachable,
         };
     }
@@ -249,15 +246,15 @@ pub const InterruptStackSelector = enum(u3) {
 
 const Handler = struct {
     interrupt_handler: arch.interrupts.Interrupt.Handler,
-    context1: ?*anyopaque = null,
-    context2: ?*anyopaque = null,
+    arg1: ?*anyopaque = null,
+    arg2: ?*anyopaque = null,
 
     inline fn call(handler: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
         handler.interrupt_handler(
             current_task,
             .{ .arch_specific = interrupt_frame },
-            handler.context1,
-            handler.context2,
+            handler.arg1,
+            handler.arg2,
         );
     }
 };

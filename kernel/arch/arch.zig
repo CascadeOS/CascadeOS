@@ -97,8 +97,8 @@ pub const interrupts = struct {
         pub const Handler = *const fn (
             current_task: *kernel.Task,
             frame: InterruptFrame,
-            context1: ?*anyopaque,
-            context2: ?*anyopaque,
+            arg1: ?*anyopaque,
+            arg2: ?*anyopaque,
         ) void;
 
         pub const AllocateError = error{InterruptAllocationFailed};
@@ -106,14 +106,14 @@ pub const interrupts = struct {
         pub fn allocate(
             current_task: *kernel.Task,
             handler: Handler,
-            context1: ?*anyopaque,
-            context2: ?*anyopaque,
+            arg1: ?*anyopaque,
+            arg2: ?*anyopaque,
         ) callconv(core.inline_in_non_debug) AllocateError!Interrupt {
             return .{
                 .arch_specific = try getFunction(
                     current_functions.interrupts,
                     "allocateInterrupt",
-                )(current_task, handler, context1, context2),
+                )(current_task, handler, arg1, arg2),
             };
         }
 
@@ -688,8 +688,8 @@ pub const Functions = struct {
         allocateInterrupt: ?fn (
             current_task: *kernel.Task,
             handler: interrupts.Interrupt.Handler,
-            context1: ?*anyopaque,
-            context2: ?*anyopaque,
+            arg1: ?*anyopaque,
+            arg2: ?*anyopaque,
         ) interrupts.Interrupt.AllocateError!current_decls.interrupts.Interrupt = null,
 
         deallocateInterrupt: ?fn (

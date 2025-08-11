@@ -21,7 +21,7 @@ _name: Name,
 /// Used as the source of addresses in this address space.
 address_arena: kernel.mem.resource_arena.Arena(.none),
 
-context: kernel.Context,
+environment: kernel.Environment,
 
 page_table: arch.paging.PageTable,
 
@@ -50,7 +50,7 @@ pub const InitOptions = struct {
 
     page_table: arch.paging.PageTable,
 
-    context: kernel.Context,
+    environment: kernel.Environment,
 };
 
 pub fn init(
@@ -58,17 +58,17 @@ pub fn init(
     current_task: *kernel.Task,
     options: InitOptions,
 ) !void {
-    log.debug("{s}: init with {f} context {t}", .{
+    log.debug("{s}: init with {f} environment {t}", .{
         options.name.constSlice(),
         options.range,
-        options.context,
+        options.environment,
     });
 
     address_space.* = .{
         .address_arena = undefined, // initialized below
         ._name = options.name,
         .page_table = options.page_table,
-        .context = options.context,
+        .environment = options.environment,
         .entries = .empty,
         .entries_version = 0,
     };

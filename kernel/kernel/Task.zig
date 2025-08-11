@@ -35,7 +35,7 @@ spinlocks_held: u32 = 1, // fresh tasks start with the scheduler locked (except 
 /// - the kernel task cleanup service
 next_task_node: std.SinglyLinkedList.Node = .{},
 
-context: kernel.Context,
+environment: kernel.Environment,
 
 pub const State = union(enum) {
     ready,
@@ -77,7 +77,7 @@ pub fn createKernelTask(current_task: *kernel.Task, options: CreateKernelTaskOpt
         .start_function = options.start_function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
-        .context = .kernel,
+        .environment = .kernel,
     });
     errdefer {
         std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
@@ -167,12 +167,12 @@ pub fn drop(current_task: *kernel.Task) noreturn {
 
     kernel.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(new_current_task: *kernel.Task, old_task: *kernel.Task, _: ?*anyopaque) void {
+            fn action(new_current_task: *kernel.Task, old_task: *kernel.Task, _: usize) void {
                 old_task.state = .{ .dropped = .{} };
                 old_task.decrementReferenceCount(new_current_task, .locked);
             }
         }.action,
-        .context = null,
+        .arg = undefined,
     });
     @panic("dropped task returned");
 }
@@ -181,7 +181,7 @@ pub fn format(
     task: *const Task,
     writer: *std.Io.Writer,
 ) !void {
-    switch (task.context) {
+    switch (task.environment) {
         .kernel => try writer.print(
             "Kernel('{s}')",
             .{task.name.constSlice()},
@@ -205,7 +205,7 @@ pub const internal = struct {
         arg1: u64,
         arg2: u64,
 
-        context: kernel.Context,
+        environment: kernel.Environment,
     };
 
     pub fn create(current_task: *kernel.Task, options: CreateOptions) !*Task {
@@ -220,7 +220,7 @@ pub const internal = struct {
             .state = .ready,
             .stack = preconstructed_stack,
 
-            .context = switch (options.context) {
+            .environment = switch (options.environment) {
                 .kernel => .kernel,
                 .user => |process| .{ .user = process },
             },
@@ -239,7 +239,7 @@ pub const internal = struct {
     }
 
     pub fn destroy(current_task: *kernel.Task, task: *Task) void {
-        // for user tasks the process reference stored in `context` has been set to `undefined` before this function
+        // for user tasks the process reference stored in `environment` has been set to `undefined` before this function
         // is called
         std.debug.assert(task.state == .dropped);
         std.debug.assert(task.reference_count.load(.monotonic) == 0);
@@ -335,7 +335,7 @@ pub const Stack = struct {
                 current_task,
                 kernel.mem.globals.core_page_table,
                 usable_range,
-                .{ .context = .kernel, .protection = .read_write },
+                .{ .environment_type = .kernel, .protection = .read_write },
                 .kernel,
                 .keep,
                 kernel.mem.phys.allocator,
@@ -455,7 +455,7 @@ pub const init = struct {
             .stack = undefined, // never used
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
 
-            .context = .kernel,
+            .environment = .kernel,
         };
     }
 
@@ -489,7 +489,7 @@ pub const init = struct {
 
             .state = .ready,
             .stack = try .createStack(current_task),
-            .context = .kernel,
+            .environment = .kernel,
         };
     }
 };
