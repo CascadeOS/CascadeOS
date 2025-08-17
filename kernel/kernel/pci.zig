@@ -360,10 +360,10 @@ pub const init = struct {
         const base_allocations = mcfg.baseAllocations();
 
         var ecams: std.ArrayList(ECAM) = try .initCapacity(kernel.mem.heap.allocator, base_allocations.len);
-        defer ecams.deinit();
+        defer ecams.deinit(kernel.mem.heap.allocator);
 
         for (mcfg.baseAllocations()) |base_allocation| {
-            const ecam = try ecams.addOne();
+            const ecam = ecams.addOneAssumeCapacity();
             ecam.* = .{
                 .start_bus = base_allocation.start_pci_bus,
                 .end_bus = base_allocation.end_pci_bus,
@@ -379,7 +379,7 @@ pub const init = struct {
             });
         }
 
-        globals.ecams = try ecams.toOwnedSlice();
+        globals.ecams = try ecams.toOwnedSlice(kernel.mem.heap.allocator);
     }
 
     const init_log = kernel.debug.log.scoped(.init_pci);

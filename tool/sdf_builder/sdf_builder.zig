@@ -277,18 +277,18 @@ fn getArguments(allocator: std.mem.Allocator) !Arguments {
 
     switch (action) {
         .generate => {
-            var directory_prefixes_to_strip = std.ArrayList([]const u8).init(allocator);
-            errdefer directory_prefixes_to_strip.deinit();
+            var directory_prefixes_to_strip: std.ArrayList([]const u8) = .empty;
+            errdefer directory_prefixes_to_strip.deinit(allocator);
 
             while (args_iter.next()) |arg| {
-                try directory_prefixes_to_strip.append(try allocator.dupe(u8, arg));
+                try directory_prefixes_to_strip.append(allocator, try allocator.dupe(u8, arg));
             }
 
             return .{
                 .generate = .{
                     .binary_input_path = binary_input_path,
                     .binary_output_path = binary_output_path,
-                    .directory_prefixes_to_strip = try directory_prefixes_to_strip.toOwnedSlice(),
+                    .directory_prefixes_to_strip = try directory_prefixes_to_strip.toOwnedSlice(allocator),
                 },
             };
         },
@@ -323,7 +323,7 @@ const LineDebugInfo = struct {
 fn getDwarfLineDebugInfo(allocator: std.mem.Allocator, input_path: [:0]const u8) ![]const LineDebugInfo {
     const dwarf_debug = libdwarf.initPath(input_path);
 
-    var result = std.ArrayList(LineDebugInfo).init(allocator);
+    var result: std.ArrayList(LineDebugInfo) = .empty;
 
     while (dwarf_debug.nextCompileUnit()) |compile_unit| {
         const function_low_highs = try collectFunctionLowHighs(
@@ -336,7 +336,7 @@ fn getDwarfLineDebugInfo(allocator: std.mem.Allocator, input_path: [:0]const u8)
 
         const lines = line_context.getLines();
 
-        try result.ensureUnusedCapacity(lines.len);
+        try result.ensureUnusedCapacity(allocator, lines.len);
 
         for (lines) |line| {
             const address = line.address();
@@ -345,8 +345,8 @@ fn getDwarfLineDebugInfo(allocator: std.mem.Allocator, input_path: [:0]const u8)
             const column = line.column();
 
             const symbol = blk: {
-                var candidate_stack = std.ArrayList(FunctionLowHigh).init(allocator);
-                defer candidate_stack.deinit();
+                // var candidate_stack: std.ArrayList(FunctionLowHigh) = .empty;
+                // defer candidate_stack.deinit(allocator);
 
                 var opt_best_candidate: ?FunctionLowHigh = null;
 
@@ -373,7 +373,7 @@ fn getDwarfLineDebugInfo(allocator: std.mem.Allocator, input_path: [:0]const u8)
 
     std.sort.insertion(LineDebugInfo, result.items, {}, LineDebugInfo.lessThanFn);
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
 const FunctionLowHigh = struct {
@@ -392,7 +392,8 @@ fn collectFunctionLowHighs(
     dwarf_debug: libdwarf.DwarfDebug,
     compile_unit: libdwarf.CompileUnit,
 ) ![]const FunctionLowHigh {
-    var result = std.ArrayList(FunctionLowHigh).init(allocator);
+    var result: std.ArrayList(FunctionLowHigh) = .empty;
+    errdefer result.deinit(allocator);
 
     const compile_unit_die = compile_unit.getDie();
 
@@ -403,6 +404,7 @@ fn collectFunctionLowHighs(
             0;
 
     try collectFunctionLowHighsRecurse(
+        allocator,
         &result,
         dwarf_debug,
         compile_unit_die,
@@ -411,10 +413,11 @@ fn collectFunctionLowHighs(
 
     std.sort.insertion(FunctionLowHigh, result.items, {}, FunctionLowHigh.lessThanFn);
 
-    return try result.toOwnedSlice();
+    return try result.toOwnedSlice(allocator);
 }
 
 fn collectFunctionLowHighsRecurse(
+    allocator: std.mem.Allocator,
     result: *std.ArrayList(FunctionLowHigh),
     dwarf_debug: libdwarf.DwarfDebug,
     die: libdwarf.Die,
@@ -425,6 +428,7 @@ fn collectFunctionLowHighsRecurse(
     // iterate through the die and its siblings
     while (opt_current_die) |current_die| : ({
         if (current_die.child()) |child| try collectFunctionLowHighsRecurse(
+            allocator,
             result,
             dwarf_debug,
             child,
@@ -438,7 +442,7 @@ fn collectFunctionLowHighsRecurse(
                 const name = current_die.name(dwarf_debug) orelse "NO_NAME";
 
                 if (current_die.getLowHighPC()) |low_high| {
-                    try result.append(.{
+                    try result.append(allocator, .{
                         .low_pc = low_high.low_pc,
                         .high_pc = low_high.high_pc,
                         .symbol = name,
@@ -457,7 +461,7 @@ fn collectFunctionLowHighsRecurse(
                 for (ranges) |range| {
                     switch (range.getType()) {
                         .ENTRY => {
-                            try result.append(.{
+                            try result.append(allocator, .{
                                 .low_pc = base_address + range.address1(),
                                 .high_pc = base_address + range.address2(),
                                 .symbol = name,
@@ -666,23 +670,24 @@ fn createSdfDebugInfo(
     location_lookup: *const LocationLookupBuilder,
     location_program: *LocationProgramBuilder,
 ) ![]const u8 {
-    var output_buffer = std.ArrayList(u8).init(allocator);
+    var output: std.Io.Writer.Allocating = .init(allocator);
+    errdefer output.deinit();
 
     // save space for the header
-    try output_buffer.appendNTimes(0, @sizeOf(sdf.Header));
+    try output.writer.splatByteAll(0, @sizeOf(sdf.Header));
 
-    const string_table_offset, const string_table_length = try string_table.output(&output_buffer);
-    const file_table_offset, const file_table_entries = try file_table.output(&output_buffer);
+    const string_table_offset, const string_table_length = try string_table.output(&output);
+    const file_table_offset, const file_table_entries = try file_table.output(&output);
     const location_lookup_offset, const location_program_states_offset, const location_lookup_entries =
-        try location_lookup.output(&output_buffer);
-    const location_program_offset, const location_program_length = try location_program.output(&output_buffer);
+        try location_lookup.output(&output);
+    const location_program_offset, const location_program_length = try location_program.output(&output);
 
     // write out header
     {
-        var writer: std.Io.Writer = .fixed(output_buffer.items[0..@sizeOf(sdf.Header)]);
+        var writer: std.Io.Writer = .fixed(output.writer.buffer[0..@sizeOf(sdf.Header)]);
 
         try sdf.Header.write(.{
-            .total_size_of_sdf_data = output_buffer.items.len,
+            .total_size_of_sdf_data = output.writer.end,
             .string_table_offset = string_table_offset,
             .string_table_length = string_table_length,
             .file_table_offset = file_table_offset,
@@ -695,7 +700,7 @@ fn createSdfDebugInfo(
         }, &writer);
     }
 
-    return try output_buffer.toOwnedSlice();
+    return try output.toOwnedSlice();
 }
 
 const custom_atomic_file = struct {

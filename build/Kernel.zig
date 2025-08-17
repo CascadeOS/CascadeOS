@@ -387,10 +387,10 @@ fn getSourceFileModules(
     required_components: WipComponent.Collection,
     required_libraries: Library.Collection,
 ) ![]const SourceFileModule {
-    var modules = std.ArrayList(SourceFileModule).init(b.allocator);
+    var modules = std.array_list.Managed(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
 
-    var file_paths = std.ArrayList([]const u8).init(b.allocator);
+    var file_paths = std.array_list.Managed([]const u8).init(b.allocator);
     defer file_paths.deinit();
 
     // add each component's files
@@ -418,8 +418,8 @@ fn getSourceFileModules(
 
 fn addFilesFromLibrary(
     b: *std.Build,
-    modules: *std.ArrayList(SourceFileModule),
-    file_paths: *std.ArrayList([]const u8),
+    modules: *std.array_list.Managed(SourceFileModule),
+    file_paths: *std.array_list.Managed([]const u8),
     library: *const Library,
     processed_libraries: *std.AutoHashMap(*const Library, void),
 ) !void {
@@ -439,8 +439,8 @@ fn addFilesFromLibrary(
 /// Creates a `SourceFileModule` for each `.zig` file found, and adds the file path to the `files` array.
 fn addFilesRecursive(
     b: *std.Build,
-    modules: *std.ArrayList(SourceFileModule),
-    files: *std.ArrayList([]const u8),
+    modules: *std.array_list.Managed(SourceFileModule),
+    files: *std.array_list.Managed([]const u8),
     target_path: []const u8,
 ) !void {
     var dir = try std.fs.cwd().openDir(target_path, .{ .iterate = true });

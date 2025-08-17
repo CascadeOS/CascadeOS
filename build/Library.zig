@@ -100,7 +100,7 @@ fn resolveLibrary(
             b.allocator,
             library_description.dependencies.len,
         );
-        defer dependencies.deinit();
+        defer dependencies.deinit(b.allocator);
 
         for (library_description.dependencies) |dep_name| {
             if (resolved_libraries.get(dep_name)) |dep_library| {
@@ -120,7 +120,7 @@ fn resolveLibrary(
             }
         }
 
-        break :blk try dependencies.toOwnedSlice();
+        break :blk try dependencies.toOwnedSlice(b.allocator);
     };
 
     const directory_path = b.pathJoin(&.{

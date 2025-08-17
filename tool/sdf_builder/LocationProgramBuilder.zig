@@ -10,7 +10,7 @@ pub fn init(allocator: std.mem.Allocator) LocationProgramBuilder {
 }
 
 pub fn currentOffset(location_program_builder: *LocationProgramBuilder) u64 {
-    return location_program_builder.location_table.getWritten().len;
+    return location_program_builder.location_table.writer.end;
 }
 
 pub fn addInstruction(
@@ -22,11 +22,11 @@ pub fn addInstruction(
 
 pub fn output(
     location_program_builder: *LocationProgramBuilder,
-    output_buffer: *std.ArrayList(u8),
+    output_buffer: *std.Io.Writer.Allocating,
 ) !struct { u64, u64 } {
-    const offset = output_buffer.items.len;
-    const written = location_program_builder.location_table.getWritten();
-    try output_buffer.appendSlice(written);
+    const offset = output_buffer.writer.end;
+    const written = location_program_builder.location_table.written();
+    try output_buffer.writer.writeAll(written);
     return .{ offset, written.len };
 }
 

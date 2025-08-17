@@ -193,13 +193,13 @@ pub const initialization = struct {
         {
             var byte_ptr = pages_range.address.toPtr([*]u8);
 
-            const page_regions_ptr: [*]Page.Region = @alignCast(@ptrCast(byte_ptr));
+            const page_regions_ptr: [*]Page.Region = @ptrCast(@alignCast(byte_ptr));
             globals.page_regions = page_regions_ptr[0..number_of_usable_regions];
 
             byte_ptr += @sizeOf(Page.Region) * number_of_usable_regions;
             byte_ptr = std.mem.alignPointer(byte_ptr, @alignOf(Page)).?;
 
-            const page_ptr: [*]Page = @alignCast(@ptrCast(byte_ptr));
+            const page_ptr: [*]Page = @ptrCast(@alignCast(byte_ptr));
             globals.pages = page_ptr[0..number_of_usable_pages];
         }
 

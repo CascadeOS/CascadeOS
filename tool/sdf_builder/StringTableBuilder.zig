@@ -25,11 +25,14 @@ pub fn addString(string_table_builder: *StringTableBuilder, string: []const u8) 
     return offset;
 }
 
-pub fn output(string_table_builder: *const StringTableBuilder, output_buffer: *std.ArrayList(u8)) !struct { u64, u64 } {
-    const offset = output_buffer.items.len;
+pub fn output(
+    string_table_builder: *const StringTableBuilder,
+    output_buffer: *std.Io.Writer.Allocating,
+) !struct { u64, u64 } {
+    const offset = output_buffer.writer.end;
 
-    try output_buffer.appendSlice(string_table_builder.string_table.items);
-    try output_buffer.append(0);
+    try output_buffer.writer.writeAll(string_table_builder.string_table.items);
+    try output_buffer.writer.writeByte(0);
 
     return .{ offset, string_table_builder.string_table.items.len };
 }

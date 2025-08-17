@@ -151,10 +151,10 @@ fn getCommand(allocator: std.mem.Allocator) !Command {
 
     if (!args_iter.skip()) argumentError("no self path argument?", .{});
 
-    var child_argv = std.ArrayList([]const u8).init(allocator);
+    var child_argv: std.ArrayList([]const u8) = .empty;
     errdefer {
         for (child_argv.items) |arg| allocator.free(arg);
-        child_argv.deinit();
+        child_argv.deinit(allocator);
     }
 
     while (args_iter.next()) |arg| {
@@ -163,12 +163,12 @@ fn getCommand(allocator: std.mem.Allocator) !Command {
         const arg_owned = try allocator.dupe(u8, arg);
         errdefer allocator.free(arg_owned);
 
-        try child_argv.append(arg_owned);
+        try child_argv.append(allocator, arg_owned);
     }
 
     if (child_argv.items.len == 0) argumentError("no command given", .{});
 
-    return .{ .argv = try child_argv.toOwnedSlice() };
+    return .{ .argv = try child_argv.toOwnedSlice(allocator) };
 }
 
 fn argumentError(comptime msg: []const u8, args: anytype) noreturn {

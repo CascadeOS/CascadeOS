@@ -469,7 +469,7 @@ pub const RawCache = struct {
                     },
                 };
 
-                const slab: *Slab = @alignCast(@ptrCast(
+                const slab: *Slab = @ptrCast(@alignCast(
                     slab_base_ptr + arch.paging.standard_page_size.value - @sizeOf(Slab),
                 ));
                 slab.* = .{

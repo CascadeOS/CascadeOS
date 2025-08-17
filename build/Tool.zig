@@ -52,7 +52,7 @@ fn resolveTool(
             b.allocator,
             tool_description.dependencies.len,
         );
-        defer dependencies.deinit();
+        defer dependencies.deinit(b.allocator);
 
         for (tool_description.dependencies) |dep_name| {
             const dep_library = libraries.get(dep_name) orelse std.debug.panic(
@@ -63,7 +63,7 @@ fn resolveTool(
             dependencies.appendAssumeCapacity(dep_library);
         }
 
-        break :blk try dependencies.toOwnedSlice();
+        break :blk try dependencies.toOwnedSlice(b.allocator);
     };
 
     const root_file_name = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{tool_description.name});

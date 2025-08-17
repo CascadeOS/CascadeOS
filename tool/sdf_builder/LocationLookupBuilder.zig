@@ -30,30 +30,27 @@ pub fn addLocationLookup(
 
 pub fn output(
     location_lookup_builder: *const LocationLookupBuilder,
-    output_buffer: *std.ArrayList(u8),
+    output_buffer: *std.Io.Writer.Allocating,
 ) !struct { u64, u64, u64 } {
     std.debug.assert(location_lookup_builder.location_lookup.items.len == location_lookup_builder.location_program_states.items.len);
 
-    const location_lookup_offset = output_buffer.items.len;
-
-    var adapter = output_buffer.writer().adaptToNewApi();
-    const writer = &adapter.new_interface;
+    const location_lookup_offset = output_buffer.writer.end;
 
     for (location_lookup_builder.location_lookup.items) |address| {
-        try writer.writeInt(u64, address, .little); // address
+        try output_buffer.writer.writeInt(u64, address, .little); // address
     }
 
     const location_program_states_offset = std.mem.alignForward(
         u64,
-        output_buffer.items.len,
+        output_buffer.writer.end,
         @alignOf(sdf.LocationProgramState),
     );
-    if (location_program_states_offset != output_buffer.items.len) {
-        try output_buffer.appendNTimes(0, location_program_states_offset - output_buffer.items.len);
+    if (location_program_states_offset != output_buffer.writer.end) {
+        try output_buffer.writer.splatByteAll(0, location_program_states_offset - output_buffer.writer.end);
     }
 
     for (location_lookup_builder.location_program_states.items) |location_program_state| {
-        try location_program_state.write(writer);
+        try location_program_state.write(&output_buffer.writer);
     }
 
     return .{ location_lookup_offset, location_program_states_offset, location_lookup_builder.location_lookup.items.len };

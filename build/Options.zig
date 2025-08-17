@@ -212,15 +212,15 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
     const cascade_version_string = try getVersionString(b, cascade_version, root_path);
 
     const kernel_log_scopes = blk: {
-        var kernel_log_scopes: std.ArrayList([]const u8) = .init(b.allocator);
-        errdefer kernel_log_scopes.deinit();
+        var kernel_log_scopes: std.ArrayList([]const u8) = .empty;
+        errdefer kernel_log_scopes.deinit(b.allocator);
 
         var iter = std.mem.splitScalar(u8, kernel_log_scopes_raw, ',');
         while (iter.next()) |scope| {
-            if (scope.len != 0) try kernel_log_scopes.append(scope);
+            if (scope.len != 0) try kernel_log_scopes.append(b.allocator, scope);
         }
 
-        break :blk try kernel_log_scopes.toOwnedSlice();
+        break :blk try kernel_log_scopes.toOwnedSlice(b.allocator);
     };
 
     return .{

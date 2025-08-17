@@ -2379,14 +2379,14 @@ pub const Table = extern struct {
 
     pub fn ref(table: Table) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_table_ref(
-            @constCast(@ptrCast(&table)),
+            @ptrCast(@constCast(&table)),
         ));
         try ret.toError();
     }
 
     pub fn unref(table: Table) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_table_unref(
-            @constCast(@ptrCast(&table)),
+            @ptrCast(@constCast(&table)),
         ));
         try ret.toError();
     }
