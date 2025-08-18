@@ -201,6 +201,18 @@ fn switchToTaskFromIdleYield(context: *kernel.Task.Context, new_task: *kernel.Ta
 
     scheduler_task.state = .ready;
 
+    if (core.is_debug) std.debug.assert(
+        switch (scheduler_task.context.interrupt_disable_count) {
+            1, 2 => true, // either we are here due to an explicit yield (1) or due to preemption by an interrupt (2)
+            else => false,
+        },
+    );
+
+    // we are abadoning the current scheduler tasks call stack, which means the interrupt increment that would have
+    // happened if we are here due to preemption by an interrupt will not be decremented normally, so we set it to 1
+    // which is the value is is expected to have upon entry to idle
+    scheduler_task.context.interrupt_disable_count = 1;
+
     arch.scheduling.jumpToTask(new_task);
     @panic("task returned");
 }
