@@ -22,10 +22,6 @@ pub fn queueTaskForCleanup(
     log.verbose(context, "queueing {f} for cleanup", .{task});
 
     globals.incoming.prepend(&task.next_task_node);
-    wake(context);
-}
-
-pub fn wake(context: *kernel.Task.Context) void {
     globals.parker.unpark(context);
 }
 

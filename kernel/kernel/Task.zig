@@ -222,18 +222,6 @@ pub const Context = struct {
             std.debug.assert(context.spinlocks_held == 1); // only the scheduler lock is held
         }
 
-        if (context.task().reference_count.load(.acquire) == 1) {
-            // TODO: this optimization is only really valid for single executor systems
-
-            // the `decrementReferenceCount` call inside `drop` below will _probably_ decrement the reference count to zero
-            // so make sure the task cleanup service is woken up
-            //
-            // this prevents the situation of dropping ourselves with an empty scheduler queue so the scheduler moves us
-            // into idle but then in `drop` we wake the task cleanup service causing idle to immediately go back into the
-            // scheduler as the queue is no longer empty
-            kernel.services.task_cleanup.wake(context);
-        }
-
         kernel.scheduler.drop(context, .{
             .action = struct {
                 fn action(new_context: *kernel.Task.Context, old_task: *kernel.Task, _: usize) void {
