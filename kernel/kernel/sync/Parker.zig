@@ -96,7 +96,7 @@ pub fn unpark(
     const scheduler_already_locked = context.scheduler_locked;
 
     switch (scheduler_already_locked) {
-        true => if (core.is_debug) std.debug.assert(kernel.scheduler.isLockedByCurrent(context)),
+        true => if (core.is_debug) kernel.scheduler.assertSchedulerLocked(context),
         false => kernel.scheduler.lockScheduler(context),
     }
     defer switch (scheduler_already_locked) {
