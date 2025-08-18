@@ -16,7 +16,7 @@ pub fn interruptSourcePanic(
 
     panicDispatch(
         context,
-        executor.renderInterruptSourcePanicMessage(format, args),
+        executor.renderInterruptSourcePanicMessage(context, format, args),
         .{ .interrupt = interrupt_frame },
     );
 }
