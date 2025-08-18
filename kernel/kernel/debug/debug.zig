@@ -15,6 +15,7 @@ pub fn interruptSourcePanic(
     const executor = context.executor.?;
 
     panicDispatch(
+        context,
         executor.renderInterruptSourcePanicMessage(format, args),
         .{ .interrupt = interrupt_frame },
     );
@@ -27,6 +28,7 @@ fn zigPanic(
 ) noreturn {
     @branchHint(.cold);
     panicDispatch(
+        .current(),
         msg,
         .{ .normal = .{
             .return_address = return_address_opt orelse @returnAddress(),
@@ -43,20 +45,21 @@ const PanicType = union(enum) {
     interrupt: arch.interrupts.InterruptFrame,
 };
 
-fn panicDispatch(msg: []const u8, panic_type: PanicType) noreturn {
+fn panicDispatch(context: *kernel.Task.Context, msg: []const u8, panic_type: PanicType) noreturn {
     @branchHint(.cold);
 
     arch.interrupts.disable();
 
     switch (globals.panic_mode) {
-        .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
-        .init_panic => initPanic(msg, panic_type),
+        .single_executor_init_panic => singleExecutorInitPanic(context, msg, panic_type),
+        .init_panic => initPanic(context, msg, panic_type),
     }
 
     arch.interrupts.disableAndHalt();
 }
 
 fn singleExecutorInitPanic(
+    _: *kernel.Task.Context,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -82,6 +85,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
+    context: *kernel.Task.Context,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -89,7 +93,7 @@ fn initPanic(
         var nested_panic_count: usize = 0;
     };
 
-    const executor = arch.getCurrentExecutor();
+    const executor = context.executor.?;
 
     if (globals.panicking_executor.cmpxchgStrong(
         null,
