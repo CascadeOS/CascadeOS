@@ -90,7 +90,7 @@ const SourceOverride = struct {
 };
 
 pub const init = struct {
-    pub fn captureMADTInformation(context: *kernel.Task.Context, madt: *const kernel.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(context: *kernel.Context, madt: *const kernel.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {

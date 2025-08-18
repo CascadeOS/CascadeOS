@@ -9,19 +9,19 @@ splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
-remapFn: *const fn (state: *anyopaque, context: *kernel.Task.Context) anyerror!void,
+remapFn: *const fn (state: *anyopaque, context: *kernel.Context) anyerror!void,
 
 state: *anyopaque,
 
 pub const writer = &globals.writer;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
-pub fn remapOutputs(context: *kernel.Task.Context) !void {
+pub fn remapOutputs(context: *kernel.Context) !void {
     if (globals.framebuffer_output) |output| try output.remapFn(output.state, context);
     if (globals.serial_output) |output| try output.remapFn(output.state, context);
 }
 
-pub fn registerOutputs(context: *kernel.Task.Context) void {
+pub fn registerOutputs(context: *kernel.Context) void {
     if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
         globals.framebuffer_output = output;
     }
@@ -40,7 +40,7 @@ pub fn registerOutputs(context: *kernel.Task.Context) void {
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources(context: *kernel.Task.Context) ?init.Output {
+fn tryGetSerialOutputFromGenericSources(context: *kernel.Context) ?init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };

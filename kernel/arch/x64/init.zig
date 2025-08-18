@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput(context: *kernel.Task.Context) ?arch.init.InitOutput {
+pub fn tryGetSerialOutput(context: *kernel.Context) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
         log.debug(context, "using debug console for serial output", .{});
         return .{
@@ -42,7 +42,7 @@ pub fn tryGetSerialOutput(context: *kernel.Task.Context) ?arch.init.InitOutput {
 
 /// Prepares the provided `Executor` for the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
@@ -62,7 +62,7 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(context: *kernel.Task.Context, executor: *kernel.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(context: *kernel.Context, executor: *kernel.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
@@ -94,7 +94,7 @@ fn prepareExecutorShared(
 }
 
 /// Load the provided `Executor` as the current executor.
-pub fn loadExecutor(context: *kernel.Task.Context) void {
+pub fn loadExecutor(context: *kernel.Context) void {
     const executor = context.executor.?;
 
     executor.arch_specific.gdt.load();
@@ -108,7 +108,7 @@ pub fn loadExecutor(context: *kernel.Task.Context) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation(context: *kernel.Task.Context) void {
+pub fn captureEarlySystemInformation(context: *kernel.Context) void {
     log.debug(context, "capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
@@ -147,7 +147,7 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     options: CaptureSystemInformationOptions,
 ) !void {
     const madt_acpi_table = kernel.acpi.getTable(kernel.acpi.tables.MADT, 0) orelse
@@ -188,7 +188,7 @@ pub fn captureSystemInformation(
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures(context: *kernel.Task.Context) void {
+pub fn configureGlobalSystemFeatures(context: *kernel.Context) void {
     if (x64.info.have_pic) {
         log.debug(context, "disabling pic", .{});
         disablePic();
@@ -241,7 +241,7 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
-pub fn configurePerExecutorSystemFeatures(context: *kernel.Task.Context) void {
+pub fn configurePerExecutorSystemFeatures(context: *kernel.Context) void {
     if (x64.info.cpu_id.rdtscp) {
         x64.registers.IA32_TSC_AUX.write(@intFromEnum(context.executor.?.id));
     }
@@ -335,7 +335,7 @@ pub fn configurePerExecutorSystemFeatures(context: *kernel.Task.Context) void {
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     candidate_time_sources: *kernel.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(context, candidate_time_sources);
@@ -390,7 +390,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: *kernel.Task.Context) !void {
+            fn remapFn(_: *anyopaque, _: *kernel.Context) !void {
                 return;
             }
         }.remapFn,

@@ -16,7 +16,7 @@ pub const init = struct {
         return @enumFromInt(readTsc());
     }
 
-    pub fn registerTimeSource(context: *kernel.Task.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(context: *kernel.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         if (!shouldUseTsc()) return;
 
         candidate_time_sources.addTimeSource(context, .{
@@ -26,7 +26,7 @@ pub const init = struct {
             .initialization = if (x64.info.tsc_tick_duration_fs != null)
                 .{
                     .simple = struct {
-                        fn simple(inner_context: *kernel.Task.Context) void {
+                        fn simple(inner_context: *kernel.Context) void {
                             std.debug.assert(shouldUseTsc());
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
@@ -77,7 +77,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         reference_counter: kernel.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());

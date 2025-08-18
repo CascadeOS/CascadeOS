@@ -22,7 +22,7 @@ reference_count: u32 = 1,
 
 page: *Page,
 
-pub fn create(context: *kernel.Task.Context, page: *Page) !*AnonymousPage {
+pub fn create(context: *kernel.Context, page: *Page) !*AnonymousPage {
     const anonymous_page = try globals.anonymous_page_cache.allocate(context);
     anonymous_page.* = .{
         .page = page,
@@ -33,7 +33,7 @@ pub fn create(context: *kernel.Task.Context, page: *Page) !*AnonymousPage {
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *kernel.Task.Context) void {
+pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *kernel.Context) void {
     std.debug.assert(anonymous_page.reference_count != 0);
     std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
 
@@ -43,7 +43,7 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *kernel.
 /// Decrement the reference count.
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *kernel.Task.Context) void {
+pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *kernel.Context) void {
     std.debug.assert(anonymous_page.reference_count != 0);
     std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
 
@@ -69,7 +69,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCache(context: *kernel.Task.Context) !void {
+    pub fn initializeCache(context: *kernel.Context) !void {
         globals.anonymous_page_cache.init(context, .{
             .name = try .fromSlice("anonymous page"),
         });

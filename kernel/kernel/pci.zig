@@ -352,7 +352,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeECAM(context: *kernel.Task.Context) !void {
+    pub fn initializeECAM(context: *kernel.Context) !void {
         const acpi_table = kernel.acpi.getTable(acpi.tables.MCFG, 0) orelse return error.MCFGNotPresent;
         defer acpi_table.deinit();
         const mcfg = acpi_table.table;

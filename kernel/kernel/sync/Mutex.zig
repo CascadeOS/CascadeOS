@@ -14,7 +14,7 @@ unlock_type: UnlockType = .unlocked,
 spinlock: kernel.sync.TicketSpinLock = .{},
 wait_queue: kernel.sync.WaitQueue = .{},
 
-pub fn lock(mutex: *Mutex, context: *kernel.Task.Context) void {
+pub fn lock(mutex: *Mutex, context: *kernel.Context) void {
     const current_task = context.task();
 
     while (true) {
@@ -75,7 +75,7 @@ pub fn lock(mutex: *Mutex, context: *kernel.Task.Context) void {
 }
 
 /// Try to lock the mutex.
-pub fn tryLock(mutex: *Mutex, context: *kernel.Task.Context) bool {
+pub fn tryLock(mutex: *Mutex, context: *kernel.Context) bool {
     const current_task = context.task();
 
     const locked_by = mutex.locked_by.cmpxchgStrong(
@@ -94,7 +94,7 @@ pub fn tryLock(mutex: *Mutex, context: *kernel.Task.Context) bool {
     return false;
 }
 
-pub fn unlock(mutex: *Mutex, context: *kernel.Task.Context) void {
+pub fn unlock(mutex: *Mutex, context: *kernel.Context) void {
     const current_task = context.task();
 
     {

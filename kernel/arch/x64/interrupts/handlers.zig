@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn nonMaskableInterruptHandler(
-    _: *kernel.Task.Context,
+    _: *kernel.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -16,7 +16,7 @@ pub fn nonMaskableInterruptHandler(
 }
 
 pub fn pageFaultHandler(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -49,7 +49,7 @@ pub fn pageFaultHandler(
 }
 
 pub fn flushRequestHandler(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     _: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -60,7 +60,7 @@ pub fn flushRequestHandler(
 }
 
 pub fn perExecutorPeriodicHandler(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     _: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -71,7 +71,7 @@ pub fn perExecutorPeriodicHandler(
 }
 
 pub fn unhandledException(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -92,7 +92,7 @@ pub fn unhandledException(
 ///
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,

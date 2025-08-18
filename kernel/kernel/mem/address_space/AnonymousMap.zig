@@ -29,7 +29,7 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: support shared anonymous maps
 
-pub fn create(context: *kernel.Task.Context, number_of_pages: u32) error{NoMemory}!*AnonymousMap {
+pub fn create(context: *kernel.Context, number_of_pages: u32) error{NoMemory}!*AnonymousMap {
     const anonymous_map = globals.anonymous_map_cache.allocate(context) catch
         return error.NoMemory;
     anonymous_map.* = .{
@@ -41,7 +41,7 @@ pub fn create(context: *kernel.Task.Context, number_of_pages: u32) error{NoMemor
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Task.Context) void {
+pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Context) void {
     std.debug.assert(anonymous_map.reference_count != 0);
     std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
 
@@ -51,7 +51,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Ta
 /// Decrement the reference count.
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Task.Context) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Context) void {
     std.debug.assert(anonymous_map.reference_count != 0);
     std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
 
@@ -80,7 +80,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Ta
 ///
 /// Called `amap_copy` in OpenBSD uvm.
 pub fn copy(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     address_space: *AddressSpace,
     entry: *Entry,
     faulting_address: core.VirtualAddress,
@@ -146,7 +146,7 @@ pub const Reference = struct {
     /// Called `amap_add` in OpenBSD uvm.
     pub fn add(
         reference: Reference,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         entry: *const Entry,
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
@@ -185,7 +185,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         anonymous_map_reference: Reference,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -222,7 +222,7 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     anonymous_map: *AnonymousMap,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
@@ -256,7 +256,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCache(context: *kernel.Task.Context) !void {
+    pub fn initializeCache(context: *kernel.Context) !void {
         globals.anonymous_map_cache.init(context, .{
             .name = try .fromSlice("anonymous map"),
         });

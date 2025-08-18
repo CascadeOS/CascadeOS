@@ -55,7 +55,7 @@ pub const InitOptions = struct {
 
 pub fn init(
     address_space: *AddressSpace,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     options: InitOptions,
 ) !void {
     log.debug(context, "{s}: init with {f} environment {t}", .{
@@ -93,7 +93,7 @@ pub fn init(
 ///
 /// The address space must not be in use by any tasks when this function is called as everything is unmapped without
 /// flushing.
-pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *kernel.Task.Context) void {
+pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *kernel.Context) void {
     log.debug(context, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
     std.debug.assert(!address_space.page_table_lock.isLocked());
@@ -107,7 +107,7 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *kernel.Ta
 /// `reinitializeAndUnmapAll` is expected to have been called before calling this function.
 ///
 /// The address space must not be in use by any tasks when this function is called.
-pub fn deinit(address_space: *AddressSpace, context: *kernel.Task.Context) void {
+pub fn deinit(address_space: *AddressSpace, context: *kernel.Context) void {
     // cannot use the name as it will reference a defunct process that this address space is now unrelated to
     log.debug(context, "deinit", .{});
 
@@ -155,7 +155,7 @@ pub const MapError = error{
 /// Map a range of pages into the address space.
 pub fn map(
     address_space: *AddressSpace,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     options: MapOptions,
 ) MapError!core.VirtualRange {
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
@@ -321,7 +321,7 @@ pub const UnmapError = error{};
 /// Unmap a range of pages from the address space.
 ///
 /// The size and address of the range must be aligned to the page size.
-pub fn unmap(address_space: *AddressSpace, context: *kernel.Task.Context, range: core.VirtualRange) UnmapError!void {
+pub fn unmap(address_space: *AddressSpace, context: *kernel.Context, range: core.VirtualRange) UnmapError!void {
     errdefer |err| log.debug(context, "{s}: unmap failed {t}", .{ address_space.name(), err });
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
@@ -348,7 +348,7 @@ pub const HandlePageFaultError = error{
 /// Called `uvm_fault` in OpenBSD uvm.
 pub fn handlePageFault(
     address_space: *AddressSpace,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_fault_details: kernel.mem.PageFaultDetails,
 ) HandlePageFaultError!void {
     errdefer |err| log.debug(context, "{s}: page fault failed {t}", .{ address_space.name(), err });
@@ -401,7 +401,7 @@ pub fn handlePageFault(
 /// Prints the address space.
 ///
 /// Locks the entries lock.
-pub fn print(address_space: *AddressSpace, context: *kernel.Task.Context, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(address_space: *AddressSpace, context: *kernel.Context, writer: *std.Io.Writer, indent: usize) !void {
     address_space.entries_lock.readLock(context);
     defer address_space.entries_lock.readUnlock(context);
 
@@ -452,7 +452,7 @@ fn resourceArenaName(address_space_name: Name) kernel.mem.resource_arena.Name {
 }
 
 pub const global_init = struct {
-    pub fn initializeCaches(context: *kernel.Task.Context) !void {
+    pub fn initializeCaches(context: *kernel.Context) !void {
         try AnonymousMap.init.initializeCache(context);
         try AnonymousPage.init.initializeCache(context);
         try Entry.init.initializeCache(context);

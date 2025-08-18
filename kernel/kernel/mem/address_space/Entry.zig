@@ -37,7 +37,7 @@ needs_copy: bool,
 
 wired_count: u32 = 0,
 
-pub fn create(context: *kernel.Task.Context) !*Entry {
+pub fn create(context: *kernel.Context) !*Entry {
     return globals.entry_cache.allocate(context) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
         error.ObjectConstructionFailed => unreachable, // no constructor is provided
@@ -45,7 +45,7 @@ pub fn create(context: *kernel.Task.Context) !*Entry {
     };
 }
 
-pub fn destroy(entry: *Entry, context: *kernel.Task.Context) void {
+pub fn destroy(entry: *Entry, context: *kernel.Context) void {
     globals.entry_cache.deallocate(context, entry);
 }
 
@@ -94,7 +94,7 @@ pub const EntryMerge = union(enum) {
 /// Determine if and how an entry should be merged into the list of entries.
 ///
 /// The caller must ensure the entries are locked.
-pub fn determineEntryMerge(entry: *const Entry, context: *kernel.Task.Context, entries: []const *Entry) EntryMerge {
+pub fn determineEntryMerge(entry: *const Entry, context: *kernel.Context, entries: []const *Entry) EntryMerge {
     if (entries.len == 0) return .{ .new = 0 };
 
     const insertion_index = entry.insertionIndex(entries);
@@ -256,7 +256,7 @@ fn canMergeWithFollowing(entry: *const Entry, curent_task: *kernel.Task, followi
 }
 
 /// Prints the entry.
-pub fn print(entry: *Entry, context: *kernel.Task.Context, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(entry: *Entry, context: *kernel.Context, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
@@ -320,7 +320,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCache(context: *kernel.Task.Context) !void {
+    pub fn initializeCache(context: *kernel.Context) !void {
         if (!kernel.mem.cache.isSmallObject(@sizeOf(Entry), .of(Entry))) {
             @panic("`Entry` is a large cache object");
         }

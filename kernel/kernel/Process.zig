@@ -33,7 +33,7 @@ pub const CreateOptions = struct {
 };
 
 /// Create a process with an initial task.
-pub fn create(context: *kernel.Task.Context, options: CreateOptions) !struct { *Process, *kernel.Task } {
+pub fn create(context: *kernel.Context, options: CreateOptions) !struct { *Process, *kernel.Task } {
     const process = blk: {
         const process = try globals.cache.allocate(context);
         errdefer globals.cache.deallocate(context, process);
@@ -77,7 +77,7 @@ pub const CreateTaskOptions = struct {
 /// The task is in the `ready` state and is not scheduled.
 pub fn createUserTask(
     process: *Process,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     options: CreateTaskOptions,
 ) !*kernel.Task {
     const entry_task = try kernel.Task.internal.create(context, .{
@@ -117,7 +117,7 @@ pub fn incrementReferenceCount(process: *Process) void {
     _ = process.reference_count.fetchAdd(1, .acq_rel);
 }
 
-pub fn decrementReferenceCount(process: *Process, context: *kernel.Task.Context) void {
+pub fn decrementReferenceCount(process: *Process, context: *kernel.Context) void {
     if (process.reference_count.fetchSub(1, .acq_rel) != 1) return;
     kernel.services.process_cleanup.queueProcessForCleanup(context, process);
 }
@@ -127,7 +127,7 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
 }
 
 pub const internal = struct {
-    pub fn destroy(context: *kernel.Task.Context, process: *Process) void {
+    pub fn destroy(context: *kernel.Context, process: *Process) void {
         std.debug.assert(process.reference_count.load(.monotonic) == 0);
 
         std.debug.assert(process.queued_for_cleanup.load(.monotonic));
@@ -165,7 +165,7 @@ pub const internal = struct {
 
 pub const Name = core.containers.BoundedArray(u8, kernel.config.process_name_length);
 
-fn cacheConstructor(process: *Process, context: *kernel.Task.Context) kernel.mem.cache.ConstructorError!void {
+fn cacheConstructor(process: *Process, context: *kernel.Context) kernel.mem.cache.ConstructorError!void {
     const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
     process.* = .{
@@ -204,7 +204,7 @@ fn cacheConstructor(process: *Process, context: *kernel.Task.Context) kernel.mem
     };
 }
 
-fn cacheDestructor(process: *Process, context: *kernel.Task.Context) void {
+fn cacheDestructor(process: *Process, context: *kernel.Context) void {
     const page_table = process.address_space.page_table;
 
     process.address_space.deinit(context);
@@ -226,7 +226,7 @@ pub const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcesses(context: *kernel.Task.Context) !void {
+    pub fn initializeProcesses(context: *kernel.Context) !void {
         log.debug(context, "initializing process cache", .{});
         globals.cache.init(context, .{
             .name = try .fromSlice("process"),

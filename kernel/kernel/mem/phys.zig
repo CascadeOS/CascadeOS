@@ -53,8 +53,8 @@ pub const FrameAllocator = struct {
 
     pub const AllocateError = error{FramesExhausted};
 
-    pub const Allocate = *const fn (context: *kernel.Task.Context) AllocateError!Frame;
-    pub const Deallocate = *const fn (context: *kernel.Task.Context, frame_list: FrameList) void;
+    pub const Allocate = *const fn (context: *kernel.Context) AllocateError!Frame;
+    pub const Deallocate = *const fn (context: *kernel.Context, frame_list: FrameList) void;
 };
 
 pub const FrameList = struct {
@@ -79,7 +79,7 @@ pub const FrameList = struct {
     }
 };
 
-fn allocate(_: *kernel.Task.Context) FrameAllocator.AllocateError!Frame {
+fn allocate(_: *kernel.Context) FrameAllocator.AllocateError!Frame {
     const node = globals.free_page_list.popFirst() orelse return error.FramesExhausted;
 
     _ = globals.free_memory.fetchSub(
@@ -101,7 +101,7 @@ fn allocate(_: *kernel.Task.Context) FrameAllocator.AllocateError!Frame {
     return page.physical_frame;
 }
 
-fn deallocate(_: *kernel.Task.Context, frame_list: FrameList) void {
+fn deallocate(_: *kernel.Context, frame_list: FrameList) void {
     if (frame_list.count == 0) {
         @branchHint(.unlikely);
         return;
@@ -175,7 +175,7 @@ pub const initialization = struct {
     ///
     /// Pulls all memory out of the bootstrap physical frame allocator and uses it to populate the normal allocator.
     pub fn initializePhysicalMemory(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,
@@ -349,7 +349,7 @@ pub const initialization = struct {
 
     pub const bootstrap_allocator: FrameAllocator = .{
         .allocate = struct {
-            fn allocate(context: *kernel.Task.Context) !Frame {
+            fn allocate(context: *kernel.Context) !Frame {
                 const non_empty_region: *Region = region: for (regions.slice()) |*region| {
                     if (region.first_free_frame_index < region.frame_count) break :region region;
                 } else {
@@ -367,14 +367,14 @@ pub const initialization = struct {
             }
         }.allocate,
         .deallocate = struct {
-            fn deallocate(_: *kernel.Task.Context, _: FrameList) void {
+            fn deallocate(_: *kernel.Context, _: FrameList) void {
                 @panic("deallocate not supported");
             }
         }.deallocate,
     };
 
     pub fn initializeBootstrapFrameAllocator(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         memory_map: []const init.exports.MemoryMapEntry,
     ) void {
         init_log.debug(context, "bootloader provided memory map:", .{});

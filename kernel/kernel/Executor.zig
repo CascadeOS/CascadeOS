@@ -24,7 +24,7 @@ const interrupt_source_panic_truncated = " (msg truncated)";
 /// If the message is too large to fit in the buffer, the message is truncated.
 pub fn renderInterruptSourcePanicMessage(
     current_executor: *Executor,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     comptime fmt: []const u8,
     args: anytype,
 ) []const u8 {

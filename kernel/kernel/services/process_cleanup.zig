@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn queueProcessForCleanup(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     process: *kernel.Process,
 ) void {
     if (process.queued_for_cleanup.cmpxchgStrong(
@@ -21,7 +21,7 @@ pub fn queueProcessForCleanup(
     globals.parker.unpark(context);
 }
 
-fn execute(context: *kernel.Task.Context, _: usize, _: usize) noreturn {
+fn execute(context: *kernel.Context, _: usize, _: usize) noreturn {
     std.debug.assert(context.task() == globals.process_cleanup_task);
     std.debug.assert(context.interrupt_disable_count == 0);
     std.debug.assert(context.spinlocks_held == 0);
@@ -40,7 +40,7 @@ fn execute(context: *kernel.Task.Context, _: usize, _: usize) noreturn {
     }
 }
 
-fn handleProcess(context: *kernel.Task.Context, process: *kernel.Process) void {
+fn handleProcess(context: *kernel.Context, process: *kernel.Process) void {
     std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
     process.queued_for_cleanup.store(false, .release);
@@ -82,7 +82,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcessCleanupService(context: *kernel.Task.Context) !void {
+    pub fn initializeProcessCleanupService(context: *kernel.Context) !void {
         globals.process_cleanup_task = try kernel.Task.createKernelTask(context, .{
             .name = try .fromSlice("process cleanup"),
             .start_function = execute,

@@ -61,7 +61,7 @@ const FaultCheckError =
 /// Called `uvm_faultcheck` in OpenBSD uvm.
 pub fn faultCheck(
     fault_info: *FaultInfo,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     anonymous_page: *?*AnonymousPage,
     fault_type: kernel.mem.PageFaultDetails.FaultType,
 ) FaultCheckError!void {
@@ -165,7 +165,7 @@ pub fn faultCheck(
 /// Called `uvm_fault_lower` in OpenBSD uvm.
 pub fn faultObjectOrZeroFill(
     fault_info: *FaultInfo,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
 ) error{ Restart, NoMemory }!void {
     log.verbose(context, "handling object or zero fill fault", .{});
 
@@ -318,7 +318,7 @@ pub fn faultObjectOrZeroFill(
 /// If `write_lock` is `true` the `entries_lock` is acquired in write mode.
 ///
 /// Called `uvmfault_lookup` in OpenBSD uvm.
-fn faultLookup(fault_info: *FaultInfo, context: *kernel.Task.Context, lock_type: LockType) bool {
+fn faultLookup(fault_info: *FaultInfo, context: *kernel.Context, lock_type: LockType) bool {
     switch (lock_type) {
         .read => fault_info.address_space.entries_lock.readLock(context),
         .write => fault_info.address_space.entries_lock.writeLock(context),
@@ -352,7 +352,7 @@ fn faultLookup(fault_info: *FaultInfo, context: *kernel.Task.Context, lock_type:
 /// Called `uvmfault_promote` in OpenBSD uvm.
 fn promote(
     fault_info: *FaultInfo,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     object_page: ObjectPage,
     anonymous_page: **AnonymousPage,
     page: **Page,
@@ -405,7 +405,7 @@ fn promote(
 /// The `entries_lock` must be unlocked.
 ///
 /// Called `uvmfault_amapcopy` in OpenBSD uvm.
-fn anonymousMapCopy(fault_info: *FaultInfo, context: *kernel.Task.Context) error{ NotMapped, NoMemory }!void {
+fn anonymousMapCopy(fault_info: *FaultInfo, context: *kernel.Context) error{ NotMapped, NoMemory }!void {
     // lookup entry and lock `entries_lock` for writing
     if (!fault_info.faultLookup(context, .write)) return error.NotMapped;
     defer fault_info.address_space.entries_lock.writeUnlock(context);
@@ -429,7 +429,7 @@ fn anonymousMapCopy(fault_info: *FaultInfo, context: *kernel.Task.Context) error
 /// Called `uvm_fault_upper_upgrade` in OpenBSD uvm.
 fn faultAnonymousMapLockUpgrade(
     fault_info: *FaultInfo,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     anonymous_map: *AnonymousMap,
 ) bool {
     std.debug.assert(switch (fault_info.anonymous_map_lock_type) {
@@ -463,7 +463,7 @@ fn faultAnonymousMapLockUpgrade(
 /// Called `uvmfault_unlockall` in OpenBSD uvm.
 fn unlockAll(
     fault_info: *FaultInfo,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     opt_anonymous_map: ?*AnonymousMap,
     opt_object: ?*Object,
 ) void {

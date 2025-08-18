@@ -13,7 +13,7 @@ pub const Node = struct {
     node: std.SinglyLinkedList.Node,
 };
 
-pub fn submitAndWait(flush_request: *FlushRequest, context: *kernel.Task.Context) void {
+pub fn submitAndWait(flush_request: *FlushRequest, context: *kernel.Context) void {
     {
         context.incrementInterruptDisable();
         defer context.decrementInterruptDisable();
@@ -35,7 +35,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, context: *kernel.Task.Context
     }
 }
 
-pub fn processFlushRequests(context: *kernel.Task.Context) void {
+pub fn processFlushRequests(context: *kernel.Context) void {
     std.debug.assert(context.interrupt_disable_count != 0);
 
     const executor = context.executor.?;
@@ -46,7 +46,7 @@ pub fn processFlushRequests(context: *kernel.Task.Context) void {
     }
 }
 
-fn flush(flush_request: *FlushRequest, context: *kernel.Task.Context) void {
+fn flush(flush_request: *FlushRequest, context: *kernel.Context) void {
     std.debug.assert(context.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);

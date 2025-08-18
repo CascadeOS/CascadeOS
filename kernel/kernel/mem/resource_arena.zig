@@ -57,7 +57,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
         pub fn init(
             arena: *@This(),
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             options: InitOptions,
         ) InitError!void {
             if (!std.mem.isValidAlign(options.quantum)) return InitError.InvalidQuantum;
@@ -153,7 +153,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Assumes that no concurrent access to the resource arena is happening, does not lock.
         ///
         /// Panics if there are any allocations in the resource arena.
-        pub fn deinit(arena: *@This(), context: *kernel.Task.Context) void {
+        pub fn deinit(arena: *@This(), context: *kernel.Context) void {
             log.debug(context, "{s}: deinit", .{arena.name()});
 
             if (quantum_caching.haveQuantumCache()) {
@@ -230,7 +230,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Both `base` and `len` must be aligned to the arena's quantum.
         ///
         /// O(N) runtime.
-        pub fn addSpan(arena: *@This(), context: *kernel.Task.Context, base: usize, len: usize) AddSpanError!void {
+        pub fn addSpan(arena: *@This(), context: *kernel.Context, base: usize, len: usize) AddSpanError!void {
             log.debug(context, "{s}: adding span [0x{x}, 0x{x})", .{ arena.name(), base, base + len });
 
             try arena.ensureBoundaryTags(context);
@@ -384,7 +384,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         }
 
         /// Allocate a block of length `len` from the arena.
-        pub fn allocate(arena: *@This(), context: *kernel.Task.Context, len: usize, policy: Policy) AllocateError!Allocation {
+        pub fn allocate(arena: *@This(), context: *kernel.Context, len: usize, policy: Policy) AllocateError!Allocation {
             if (len == 0) return AllocateError.ZeroLength;
 
             const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
@@ -559,7 +559,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// The mutex must be locked upon entry and will be locked upon exit.
         fn importFromSource(
             arena: *@This(),
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             source: Source,
             len: usize,
         ) (AllocateError || AddSpanError)!*BoundaryTag {
@@ -619,7 +619,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Deallocate the allocation.
         ///
         /// Panics if the allocation does not match a previous call to `allocate`.
-        pub fn deallocate(arena: *@This(), context: *kernel.Task.Context, allocation: Allocation) void {
+        pub fn deallocate(arena: *@This(), context: *kernel.Context, allocation: Allocation) void {
             log.verbose(context, "{s}: deallocating {f}", .{ arena.name(), allocation });
 
             std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
@@ -736,7 +736,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Attempts to ensure that there are at least `min_unused_tags_count` unused tags.
         ///
         /// Upon non-error return, the mutex is locked.
-        fn ensureBoundaryTags(arena: *@This(), context: *kernel.Task.Context) EnsureBoundaryTagsError!void {
+        fn ensureBoundaryTags(arena: *@This(), context: *kernel.Context) EnsureBoundaryTagsError!void {
             arena.mutex.lock(context);
             errdefer arena.mutex.unlock(context);
 
@@ -836,14 +836,14 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         pub const CreateSourceOptions = struct {
             custom_import: ?fn (
                 arena_ptr: *anyopaque,
-                context: *kernel.Task.Context,
+                context: *kernel.Context,
                 len: usize,
                 policy: Policy,
             ) AllocateError!Allocation = null,
 
             custom_release: ?fn (
                 arena_ptr: *anyopaque,
-                context: *kernel.Task.Context,
+                context: *kernel.Context,
                 allocation: Allocation,
             ) void = null,
         };
@@ -859,7 +859,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     struct {
                         fn importWrapper(
                             arena_ptr: *anyopaque,
-                            context: *kernel.Task.Context,
+                            context: *kernel.Context,
                             len: usize,
                             policy: Policy,
                         ) AllocateError!Allocation {
@@ -873,7 +873,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     struct {
                         fn releaseWrapper(
                             arena_ptr: *anyopaque,
-                            context: *kernel.Task.Context,
+                            context: *kernel.Context,
                             allocation: Allocation,
                         ) void {
                             const a: *ArenaT = @ptrCast(@alignCast(arena_ptr));
@@ -959,20 +959,20 @@ pub const Source = struct {
 
     import: *const fn (
         arena_ptr: *anyopaque,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         len: usize,
         policy: Policy,
     ) AllocateError!Allocation,
 
     release: *const fn (
         arena_ptr: *anyopaque,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         allocation: Allocation,
     ) void,
 
     fn callImport(
         source: *const Source,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         len: usize,
         policy: Policy,
     ) callconv(core.inline_in_non_debug) AllocateError!Allocation {
@@ -981,7 +981,7 @@ pub const Source = struct {
 
     fn callRelease(
         source: *const Source,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         allocation: Allocation,
     ) callconv(core.inline_in_non_debug) void {
         source.release(source.arena_ptr, context, allocation);
@@ -1319,7 +1319,7 @@ const globals = struct {
 };
 
 pub const global_init = struct {
-    pub fn initializeCache(context: *kernel.Task.Context) !void {
+    pub fn initializeCache(context: *kernel.Context) !void {
         globals.tag_cache.init(context, .{
             .name = try .fromSlice("boundary tag"),
             .slab_source = .pmm,

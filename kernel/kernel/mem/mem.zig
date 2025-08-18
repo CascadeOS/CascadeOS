@@ -17,7 +17,7 @@ pub const Page = @import("Page.zig");
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: phys.Frame,
@@ -46,7 +46,7 @@ pub fn mapSinglePage(
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalFrames(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
@@ -108,7 +108,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 /// - `virtual_range.size` must be equal to `physical_range.size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
@@ -167,7 +167,7 @@ pub fn mapRangeToPhysicalRange(
 /// **REQUIREMENTS**:
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapSinglePage(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     backing_pages: core.CleanupDecision,
@@ -203,7 +203,7 @@ pub fn unmapSinglePage(
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapRange(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     flush_target: kernel.Environment,
@@ -285,7 +285,7 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
 }
 
 pub fn onKernelPageFault(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
@@ -468,7 +468,7 @@ pub const initialization = struct {
         memory_map: []const init.exports.MemoryMapEntry,
     };
 
-    pub fn initializeMemorySystem(context: *kernel.Task.Context, inputs: MemorySystemInputs) !void {
+    pub fn initializeMemorySystem(context: *kernel.Context, inputs: MemorySystemInputs) !void {
         init_log.debug(context, "initializing bootstrap physical frame allocator", .{});
         phys.initialization.initializeBootstrapFrameAllocator(context, inputs.memory_map);
 
@@ -527,7 +527,7 @@ pub const initialization = struct {
     };
 
     fn buildMemoryLayout(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
     ) MemoryLayoutResult {
@@ -737,7 +737,7 @@ pub const initialization = struct {
         return pages_range;
     }
 
-    fn buildAndLoadCorePageTable(context: *kernel.Task.Context) void {
+    fn buildAndLoadCorePageTable(context: *kernel.Context) void {
         globals.core_page_table = arch.paging.PageTable.create(
             phys.initialization.bootstrap_allocator.allocate(context) catch unreachable,
         );
@@ -805,7 +805,7 @@ pub const initialization = struct {
         globals.direct_map = early_offsets.direct_map;
     }
 
-    pub fn logEarlyOffsets(context: *kernel.Task.Context) void {
+    pub fn logEarlyOffsets(context: *kernel.Context) void {
         if (!init_log.levelEnabled(.debug)) return;
 
         init_log.debug(context, "kernel memory offsets:", .{});

@@ -32,7 +32,7 @@ stack: Stack,
 /// - the kernel task cleanup service
 next_task_node: std.SinglyLinkedList.Node = .{},
 
-context: Context,
+context: kernel.Context,
 
 pub const State = union(enum) {
     ready,
@@ -67,7 +67,7 @@ pub const CreateKernelTaskOptions = struct {
     kernel_task_type: Environment.KernelTaskType,
 };
 
-pub fn createKernelTask(context: *kernel.Task.Context, options: CreateKernelTaskOptions) !*Task {
+pub fn createKernelTask(context: *kernel.Context, options: CreateKernelTaskOptions) !*Task {
     const task = try internal.create(context, .{
         .name = options.name,
         .start_function = options.start_function,
@@ -100,127 +100,11 @@ pub fn incrementReferenceCount(task: *Task) void {
 /// If it reaches zero the task is submitted to the task cleanup service.
 ///
 /// This must not be called when the task is the current task, see `Context.drop` instead.
-pub fn decrementReferenceCount(task: *Task, context: *Task.Context) void {
+pub fn decrementReferenceCount(task: *Task, context: *kernel.Context) void {
     std.debug.assert(task != context.task());
     if (task.reference_count.fetchSub(1, .acq_rel) != 1) return;
     kernel.services.task_cleanup.queueTaskForCleanup(context, task);
 }
-
-pub const Context = struct {
-    /// Set to the executor the current task is running on if the state of the context means that the executor cannot
-    /// change underneath us (for example when interrupts are disabled).
-    ///
-    /// Set to null otherwise.
-    ///
-    /// The value is undefined when the task is not running.
-    executor: ?*kernel.Executor,
-
-    /// Tracks the depth of nested interrupt disables.
-    interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
-
-    spinlocks_held: u32,
-    scheduler_locked: bool,
-
-    pub inline fn task(context: *Context) *Task {
-        return @fieldParentPtr("context", context);
-    }
-
-    pub fn current() *Context {
-        // TODO: some architectures can do this without disabling interrupts
-
-        arch.interrupts.disable();
-
-        const executor = arch.getCurrentExecutor();
-        const current_task = executor.current_task;
-        if (core.is_debug) std.debug.assert(current_task.state.running == executor);
-
-        const context: *Context = &current_task.context;
-        if (context.interrupt_disable_count == 0) arch.interrupts.enable();
-
-        return context;
-    }
-
-    pub const InterruptExit = struct {
-        previous_interrupt_disable_count: u32,
-
-        pub fn exit(interrupt_exit: InterruptExit, context: *Context) void {
-            context.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
-            context.setExecutor();
-        }
-    };
-
-    pub fn onInterruptEntry() struct { *Context, InterruptExit } {
-        if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-        const executor = arch.getCurrentExecutor();
-        const current_task = executor.current_task;
-        if (core.is_debug) std.debug.assert(current_task.state.running == executor);
-
-        const context: *Context = &current_task.context;
-        const previous_interrupt_disable_count = context.interrupt_disable_count;
-
-        context.interrupt_disable_count = previous_interrupt_disable_count + 1;
-        context.executor = current_task.state.running;
-
-        return .{ context, .{ .previous_interrupt_disable_count = previous_interrupt_disable_count } };
-    }
-
-    pub fn incrementInterruptDisable(context: *Context) void {
-        const previous = context.interrupt_disable_count;
-
-        if (previous == 0) {
-            if (core.is_debug) std.debug.assert(arch.interrupts.areEnabled());
-            arch.interrupts.disable();
-            context.executor = context.task().state.running;
-        } else if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-        context.interrupt_disable_count = previous + 1;
-    }
-
-    pub fn decrementInterruptDisable(context: *Context) void {
-        if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-        const previous = context.interrupt_disable_count;
-        context.interrupt_disable_count = previous - 1;
-
-        if (previous == 1) {
-            context.setExecutor();
-            arch.interrupts.enable();
-        }
-    }
-
-    /// Drops the current task out of the scheduler.
-    ///
-    /// Decrements the reference count of the task to remove the implicit self reference.
-    ///
-    /// The scheduler lock must be held when this function is called.
-    pub fn drop(context: *kernel.Task.Context) noreturn {
-        if (core.is_debug) {
-            kernel.scheduler.assertSchedulerLocked(context);
-            std.debug.assert(context.spinlocks_held == 1); // only the scheduler lock is held
-        }
-
-        kernel.scheduler.drop(context, .{
-            .action = struct {
-                fn action(new_context: *kernel.Task.Context, old_task: *kernel.Task, _: usize) void {
-                    old_task.state = .{ .dropped = .{} };
-                    old_task.decrementReferenceCount(new_context);
-                }
-            }.action,
-            .arg = undefined,
-        });
-        @panic("dropped task returned");
-    }
-
-    /// Set the `executor` field of the context based on the state of the context.
-    inline fn setExecutor(context: *kernel.Task.Context) void {
-        if (context.interrupt_disable_count != 0) {
-            context.executor = context.task().state.running;
-        } else {
-            context.executor = null;
-        }
-    }
-};
 
 pub fn format(
     task: *const Task,
@@ -253,7 +137,7 @@ pub const internal = struct {
         environment: Environment,
     };
 
-    pub fn create(context: *kernel.Task.Context, options: CreateOptions) !*Task {
+    pub fn create(context: *kernel.Context, options: CreateOptions) !*Task {
         const task = try globals.cache.allocate(context);
         errdefer globals.cache.deallocate(context, task);
 
@@ -283,7 +167,7 @@ pub const internal = struct {
         return task;
     }
 
-    pub fn destroy(context: *kernel.Task.Context, task: *Task) void {
+    pub fn destroy(context: *kernel.Context, task: *Task) void {
         // for user tasks the process reference stored in `environment` has been set to `undefined` before this function
         // is called
         std.debug.assert(task.state == .dropped);
@@ -355,7 +239,7 @@ pub const Stack = struct {
         stack.top_stack_pointer = stack.stack_pointer;
     }
 
-    fn createStack(context: *kernel.Task.Context) !Stack {
+    fn createStack(context: *kernel.Context) !Stack {
         const stack_range = globals.stack_arena.allocate(
             context,
             stack_size_including_guard_page.value,
@@ -390,7 +274,7 @@ pub const Stack = struct {
         return .fromRange(range, usable_range);
     }
 
-    fn destroyStack(stack: Stack, context: *kernel.Task.Context) void {
+    fn destroyStack(stack: Stack, context: *kernel.Context) void {
         {
             globals.stack_page_table_mutex.lock(context);
             defer globals.stack_page_table_mutex.unlock(context);
@@ -422,13 +306,13 @@ pub const globals = struct {
     var cache: kernel.mem.cache.Cache(
         Task,
         struct {
-            fn constructor(task: *Task, context: *Task.Context) kernel.mem.cache.ConstructorError!void {
+            fn constructor(task: *Task, context: *kernel.Context) kernel.mem.cache.ConstructorError!void {
                 task.* = undefined;
                 task.stack = try .createStack(context);
             }
         }.constructor,
         struct {
-            fn destructor(task: *Task, context: *Task.Context) void {
+            fn destructor(task: *Task, context: *kernel.Context) void {
                 task.stack.destroyStack(context);
             }
         }.destructor,
@@ -441,7 +325,7 @@ pub const globals = struct {
 pub const init = struct {
     pub const earlyCreateStack = Stack.createStack;
 
-    pub fn initializeTasks(context: *kernel.Task.Context, stacks_range: core.VirtualRange) !void {
+    pub fn initializeTasks(context: *kernel.Context, stacks_range: core.VirtualRange) !void {
         log.debug(context, "initializing task stacks", .{});
         try globals.stack_arena.init(
             context,
@@ -472,7 +356,7 @@ pub const init = struct {
     pub fn initializeBootstrapInitTask(
         bootstrap_init_task: *kernel.Task,
         bootstrap_executor: *kernel.Executor,
-    ) !*kernel.Task.Context {
+    ) !*kernel.Context {
         bootstrap_init_task.* = .{
             .name = try .fromSlice("bootstrap init"),
 
@@ -491,7 +375,7 @@ pub const init = struct {
     }
 
     pub fn createAndAssignInitTask(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         executor: *kernel.Executor,
     ) !void {
         const task = try createKernelTask(context, .{
@@ -516,7 +400,7 @@ pub const init = struct {
     }
 
     pub fn initializeSchedulerTask(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         scheduler_task: *kernel.Task,
         executor: *kernel.Executor,
     ) !void {

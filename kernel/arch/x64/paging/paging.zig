@@ -30,7 +30,7 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
 
 /// Maps a 4 KiB page.
 pub fn map4KiB(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: kernel.mem.phys.Frame,
@@ -215,7 +215,7 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
@@ -302,7 +302,7 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn fillTopLevel(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         page_table: *PageTable,
         range: core.VirtualRange,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
@@ -332,7 +332,7 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn mapToPhysicalRangeAllPageSizes(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         level4_table: *PageTable,
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,

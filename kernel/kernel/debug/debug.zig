@@ -4,7 +4,7 @@
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
@@ -45,7 +45,7 @@ const PanicType = union(enum) {
     interrupt: arch.interrupts.InterruptFrame,
 };
 
-fn panicDispatch(context: *kernel.Task.Context, msg: []const u8, panic_type: PanicType) noreturn {
+fn panicDispatch(context: *kernel.Context, msg: []const u8, panic_type: PanicType) noreturn {
     @branchHint(.cold);
 
     arch.interrupts.disable();
@@ -59,7 +59,7 @@ fn panicDispatch(context: *kernel.Task.Context, msg: []const u8, panic_type: Pan
 }
 
 fn singleExecutorInitPanic(
-    _: *kernel.Task.Context,
+    _: *kernel.Context,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -85,7 +85,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     msg: []const u8,
     panic_type: PanicType,
 ) void {

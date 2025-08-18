@@ -392,7 +392,7 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 
             if (!uacpi_log.levelEnabled(kernel_log_level)) return;
 
-            const context: *kernel.Task.Context = .current();
+            const context: *kernel.Context = .current();
 
             const full_msg = std.mem.sliceTo(c_msg, 0);
 
@@ -477,7 +477,7 @@ export fn uacpi_kernel_free_mutex(mutex: *kernel.sync.Mutex) void {
 
 /// Create/free an opaque kernel (semaphore-like) event object.
 export fn uacpi_kernel_create_event() *anyopaque {
-    const context: *kernel.Task.Context = .current(); // TODO: once this is implemented move this in to the if
+    const context: *kernel.Context = .current(); // TODO: once this is implemented move this in to the if
 
     if (log.levelEnabled(.verbose)) log.verbose(
         context,
@@ -509,7 +509,7 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 ///
 /// The returned thread id cannot be UACPI_THREAD_ID_NONE.
 export fn uacpi_kernel_get_thread_id() usize {
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_get_thread_id called", .{});
 
@@ -529,7 +529,7 @@ export fn uacpi_kernel_get_thread_id() usize {
 ///                           successful for calls with timeout=.none)
 /// 3. Any other value - signifies a host internal error and is treated as such
 export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: uacpi.Timeout) uacpi.Status {
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_acquire_mutex called", .{});
 
@@ -543,7 +543,7 @@ export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: uacpi.T
 }
 
 export fn uacpi_kernel_release_mutex(mutex: *kernel.sync.Mutex) void {
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_release_mutex called", .{});
 
@@ -619,7 +619,7 @@ export fn uacpi_kernel_install_interrupt_handler(
 ) uacpi.Status {
     const HandlerWrapper = struct {
         fn HandlerWrapper(
-            _: *kernel.Task.Context,
+            _: *kernel.Context,
             _: arch.interrupts.InterruptFrame,
             _handler: ?*anyopaque,
             _ctx: ?*anyopaque,
@@ -629,7 +629,7 @@ export fn uacpi_kernel_install_interrupt_handler(
         }
     }.HandlerWrapper;
 
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_install_interrupt_handler called", .{});
 
@@ -662,7 +662,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
     _: uacpi.RawInterruptHandler,
     irq_handle: *anyopaque,
 ) uacpi.Status {
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_uninstall_interrupt_handler called", .{});
 
@@ -707,7 +707,7 @@ export fn uacpi_kernel_free_spinlock(spinlock: *kernel.sync.TicketSpinLock) void
 ///
 /// Note that lock is infalliable.
 export fn uacpi_kernel_lock_spinlock(spinlock: *kernel.sync.TicketSpinLock) uacpi.CpuFlags {
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_lock_spinlock called", .{});
 
@@ -716,7 +716,7 @@ export fn uacpi_kernel_lock_spinlock(spinlock: *kernel.sync.TicketSpinLock) uacp
 }
 
 export fn uacpi_kernel_unlock_spinlock(spinlock: *kernel.sync.TicketSpinLock, cpu_flags: uacpi.CpuFlags) void {
-    const context: *kernel.Task.Context = .current();
+    const context: *kernel.Context = .current();
 
     log.verbose(context, "uacpi_kernel_unlock_spinlock called", .{});
 

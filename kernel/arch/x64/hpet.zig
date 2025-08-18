@@ -13,7 +13,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn registerTimeSource(context: *kernel.Task.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(context: *kernel.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         const acpi_table = kernel.acpi.getTable(kernel.acpi.tables.HPET, 0) orelse return;
         acpi_table.deinit();
 
@@ -28,7 +28,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET(context: *kernel.Task.Context) void {
+    fn initializeHPET(context: *kernel.Context) void {
         globals.hpet = .{ .base = getHpetBase() };
         init_log.debug(context, "using hpet: {}", .{globals.hpet});
 

@@ -26,7 +26,7 @@ pub fn withParkedTask(parked_task: *kernel.Task) Parker {
 /// Park (block) the current task.
 ///
 /// Spurious wakeups are possible.
-pub fn park(parker: *Parker, context: *kernel.Task.Context) void {
+pub fn park(parker: *Parker, context: *kernel.Context) void {
     std.debug.assert(context.task().state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -54,7 +54,7 @@ pub fn park(parker: *Parker, context: *kernel.Task.Context) void {
 
     kernel.scheduler.drop(context, .{
         .action = struct {
-            fn action(_: *kernel.Task.Context, old_task: *kernel.Task, arg: usize) void {
+            fn action(_: *kernel.Context, old_task: *kernel.Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
@@ -74,7 +74,7 @@ pub fn park(parker: *Parker, context: *kernel.Task.Context) void {
 /// Unpark (wake) the parked task if it is currently parked.
 pub fn unpark(
     parker: *Parker,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
 ) void {
     if (parker.unpark_attempts.fetchAdd(1, .acq_rel) != 0) {
         // someone else was the first to attempt to unpark the task, so we can leave waking the task to them

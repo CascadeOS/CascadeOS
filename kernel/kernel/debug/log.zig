@@ -4,7 +4,7 @@
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub fn err(
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -13,7 +13,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn warn(
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -22,7 +22,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn info(
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -31,7 +31,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn debug(
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -40,7 +40,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn verbose(
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -99,7 +99,7 @@ pub const Level = enum {
 };
 
 fn logFn(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     prefix: []const u8,
     comptime format: []const u8,
     args: anytype,

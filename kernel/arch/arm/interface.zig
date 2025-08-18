@@ -36,14 +36,14 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(_: *kernel.Task.Context) ?arch.init.InitOutput {
+            fn tryGetSerialOutput(_: *kernel.Context) ?arch.init.InitOutput {
                 return null;
             }
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                context: *kernel.Task.Context,
+                context: *kernel.Context,
                 architecture_processor_id: u64,
             ) void {
                 context.executor.?.arch_specific = .{
@@ -53,7 +53,7 @@ pub const functions: arch.Functions = .{
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(context: *kernel.Task.Context) void {
+            fn loadExecutor(context: *kernel.Context) void {
                 arm.registers.TPIDR_EL1.write(@intFromPtr(context.executor.?));
             }
         }.loadExecutor,

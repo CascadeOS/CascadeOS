@@ -5,7 +5,7 @@
 //!
 //! Each allocation is a multiple of the standard page size.
 
-pub fn allocate(len: usize, context: *kernel.Task.Context) !core.VirtualRange {
+pub fn allocate(len: usize, context: *kernel.Context) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         context,
         len,
@@ -22,7 +22,7 @@ pub fn allocate(len: usize, context: *kernel.Task.Context) !core.VirtualRange {
     return virtual_range;
 }
 
-pub fn deallocate(range: core.VirtualRange, context: *kernel.Task.Context) void {
+pub fn deallocate(range: core.VirtualRange, context: *kernel.Context) void {
     globals.heap_arena.deallocate(context, .{
         .base = range.address.value,
         .len = range.size.value,
@@ -45,7 +45,7 @@ pub fn freeWithNoSize(ptr: [*]u8) void {
 }
 
 pub fn allocateSpecial(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: kernel.mem.MapType,
@@ -80,7 +80,7 @@ pub fn allocateSpecial(
 }
 
 pub fn deallocateSpecial(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     virtual_range: core.VirtualRange,
 ) void {
     {
@@ -171,7 +171,7 @@ const allocator_impl = struct {
 
 fn heapPageArenaImport(
     arena_ptr: *anyopaque,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     len: usize,
     policy: resource_arena.Policy,
 ) resource_arena.AllocateError!resource_arena.Allocation {
@@ -214,7 +214,7 @@ fn heapPageArenaImport(
 
 fn heapPageArenaRelease(
     arena_ptr: *anyopaque,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     allocation: resource_arena.Allocation,
 ) void {
     const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
@@ -284,7 +284,7 @@ pub const globals = struct {
 
 pub const init = struct {
     pub fn initializeHeaps(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         heap_range: core.VirtualRange,
         special_heap_range: core.VirtualRange,
     ) !void {

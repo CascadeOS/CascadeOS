@@ -29,7 +29,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         object_reference: Reference,
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -66,7 +66,7 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     object: *Object,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {

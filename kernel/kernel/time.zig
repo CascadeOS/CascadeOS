@@ -71,7 +71,7 @@ pub const init = struct {
         wallclock.kernel_start_type = .kernel_start;
     }
 
-    pub fn initializeTime(context: *kernel.Task.Context) !void {
+    pub fn initializeTime(context: *kernel.Context) !void {
         var candidate_time_sources: CandidateTimeSources = .{};
         arch.init.registerArchitecturalTimeSources(context, &candidate_time_sources);
 
@@ -113,7 +113,7 @@ pub const init = struct {
 
         pub fn addTimeSource(
             candidate_time_sources: *CandidateTimeSources,
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             time_source: CandidateTimeSource,
         ) void {
             if (time_source.reference_counter != null) {
@@ -165,7 +165,7 @@ pub const init = struct {
 
         fn initialize(
             candidate_time_source: *CandidateTimeSource,
-            context: *kernel.Task.Context,
+            context: *kernel.Context,
             reference_counter: ReferenceCounter,
         ) void {
             if (candidate_time_source.initialized) return;
@@ -179,8 +179,8 @@ pub const init = struct {
 
         pub const Initialization = union(enum) {
             none,
-            simple: *const fn (context: *kernel.Task.Context) void,
-            calibration_required: *const fn (context: *kernel.Task.Context, reference_counter: ReferenceCounter) void,
+            simple: *const fn (context: *kernel.Context) void,
+            calibration_required: *const fn (context: *kernel.Context, reference_counter: ReferenceCounter) void,
         };
 
         pub const ReferenceCounterOptions = struct {
@@ -253,7 +253,7 @@ pub const init = struct {
     };
 
     fn getReferenceCounter(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         time_sources: []CandidateTimeSource,
     ) ReferenceCounter {
         const time_source = findAndInitializeTimeSource(context, time_sources, .{
@@ -272,7 +272,7 @@ pub const init = struct {
     }
 
     fn configureWallclockTimeSource(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) void {
@@ -299,7 +299,7 @@ pub const init = struct {
     }
 
     fn configurePerExecutorPeriodicTimeSource(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) void {
@@ -325,7 +325,7 @@ pub const init = struct {
     };
 
     fn findAndInitializeTimeSource(
-        context: *kernel.Task.Context,
+        context: *kernel.Context,
         time_sources: []CandidateTimeSource,
         query: TimeSourceQuery,
         reference_counter: ReferenceCounter,

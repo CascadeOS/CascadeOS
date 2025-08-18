@@ -3,7 +3,7 @@
 
 /// Queues a task to be cleaned up by the task cleanup service.
 pub fn queueTaskForCleanup(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     task: *Task,
 ) void {
     std.debug.assert(context.task() != task);
@@ -25,7 +25,7 @@ pub fn queueTaskForCleanup(
     globals.parker.unpark(context);
 }
 
-fn execute(context: *kernel.Task.Context, _: usize, _: usize) noreturn {
+fn execute(context: *kernel.Context, _: usize, _: usize) noreturn {
     std.debug.assert(context.task() == globals.task_cleanup_task);
     std.debug.assert(context.interrupt_disable_count == 0);
     std.debug.assert(context.spinlocks_held == 0);
@@ -44,7 +44,7 @@ fn execute(context: *kernel.Task.Context, _: usize, _: usize) noreturn {
     }
 }
 
-fn handleTask(context: *kernel.Task.Context, task: *Task) void {
+fn handleTask(context: *kernel.Context, task: *Task) void {
     std.debug.assert(task.state == .dropped);
     std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
 
@@ -104,7 +104,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeTaskCleanupService(context: *kernel.Task.Context) !void {
+    pub fn initializeTaskCleanupService(context: *kernel.Context) !void {
         globals.task_cleanup_task = try Task.createKernelTask(context, .{
             .name = try .fromSlice("task cleanup"),
             .start_function = execute,

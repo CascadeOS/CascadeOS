@@ -112,7 +112,7 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(context: *kernel.Task.Context, is_bootstrap_executor: bool) !noreturn {
+fn initStage2(context: *kernel.Context, is_bootstrap_executor: bool) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     kernel.mem.globals.core_page_table.load();
@@ -155,7 +155,7 @@ fn initStage2(context: *kernel.Task.Context, is_bootstrap_executor: bool) !noret
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(context: *kernel.Task.Context, bootstrap_executor: bool) !noreturn {
+fn initStage3(context: *kernel.Context, bootstrap_executor: bool) !noreturn {
     if (bootstrap_executor) {
         Stage3Barrier.waitForAllNonBootstrapExecutors();
 
@@ -167,7 +167,7 @@ fn initStage3(context: *kernel.Task.Context, bootstrap_executor: bool) !noreturn
             const init_stage4_task: *kernel.Task = try .createKernelTask(context, .{
                 .name = try .fromSlice("init stage 4"),
                 .start_function = struct {
-                    fn initStage4Wrapper(inner_context: *kernel.Task.Context, _: usize, _: usize) noreturn {
+                    fn initStage4Wrapper(inner_context: *kernel.Context, _: usize, _: usize) noreturn {
                         initStage4(inner_context) catch |err| {
                             std.debug.panic("unhandled error: {t}", .{err});
                         };
@@ -195,7 +195,7 @@ fn initStage3(context: *kernel.Task.Context, bootstrap_executor: bool) !noreturn
     unreachable;
 }
 
-fn initStage4(context: *kernel.Task.Context) !noreturn {
+fn initStage4(context: *kernel.Context) !noreturn {
     log.debug(context, "initializing PCI ECAM", .{});
     try kernel.pci.init.initializeECAM(context);
 
@@ -315,7 +315,7 @@ pub fn collectMemorySystemInputs() !kernel.mem.initialization.MemorySystemInputs
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(context: *kernel.Task.Context) !struct { []kernel.Executor, *kernel.Executor } {
+fn createExecutors(context: *kernel.Context) !struct { []kernel.Executor, *kernel.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > kernel.config.maximum_number_of_executors) {

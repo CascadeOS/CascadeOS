@@ -4,13 +4,13 @@
 /// Executed upon per executor periodic interrupt.
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
-pub fn onPerExecutorPeriodic(context: *kernel.Task.Context) void {
+pub fn onPerExecutorPeriodic(context: *kernel.Context) void {
     kernel.scheduler.maybePreempt(context);
 }
 
 /// Executed upon page fault.
 pub fn onPageFault(
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     page_fault_details: kernel.mem.PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
@@ -31,7 +31,7 @@ pub fn onPageFault(
 }
 
 /// Executed upon cross-executor flush request.
-pub fn onFlushRequest(context: *kernel.Task.Context) void {
+pub fn onFlushRequest(context: *kernel.Context) void {
     kernel.mem.FlushRequest.processFlushRequests(context);
 }
 

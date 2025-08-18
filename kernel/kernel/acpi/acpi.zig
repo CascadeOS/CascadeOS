@@ -89,7 +89,7 @@ pub const init = struct {
         globals.early_initialization_complete = true;
     }
 
-    pub fn initialize(context: *kernel.Task.Context) !void {
+    pub fn initialize(context: *kernel.Context) !void {
         init_log.debug(context, "entering ACPI mode", .{});
         try uacpi.initialize(.{});
 
@@ -112,7 +112,7 @@ pub const init = struct {
         globals.acpi_initialized = true;
     }
 
-    pub fn finializeInitialization(context: *kernel.Task.Context) !void {
+    pub fn finializeInitialization(context: *kernel.Context) !void {
         init_log.debug(context, "finializing GPEs", .{});
         try uacpi.finializeGpeInitialization();
     }
@@ -125,7 +125,7 @@ pub const init = struct {
         @panic("shutdown failed");
     }
 
-    pub fn logAcpiTables(context: *kernel.Task.Context) !void {
+    pub fn logAcpiTables(context: *kernel.Context) !void {
         // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
 
         if (!init_log.levelEnabled(.debug)) return;

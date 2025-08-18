@@ -28,7 +28,7 @@ pub fn popFirst(wait_queue: *WaitQueue) ?*kernel.Task {
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wakeOne(
     wait_queue: *WaitQueue,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     spinlock: *const kernel.sync.TicketSpinLock,
 ) void {
     std.debug.assert(context.interrupt_disable_count != 0);
@@ -61,7 +61,7 @@ pub fn wakeOne(
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     wait_queue: *WaitQueue,
-    context: *kernel.Task.Context,
+    context: *kernel.Context,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
     std.debug.assert(context.interrupt_disable_count != 0);
@@ -74,7 +74,7 @@ pub fn wait(
 
     kernel.scheduler.drop(context, .{
         .action = struct {
-            fn action(_: *kernel.Task.Context, old_task: *kernel.Task, arg: usize) void {
+            fn action(_: *kernel.Context, old_task: *kernel.Task, arg: usize) void {
                 const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
