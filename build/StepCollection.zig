@@ -80,7 +80,8 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         "images",
         "Build all the images",
     );
-    all_test_step.dependOn(all_images_build_step);
+    // TODO: building multiple disk images when running tests is is a bad idea
+    // all_test_step.dependOn(all_images_build_step);
 
     const image_build_steps_per_architecture = try buildPerArchitectureSteps(
         b,
