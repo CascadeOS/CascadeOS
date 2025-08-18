@@ -4,15 +4,15 @@
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
 ) noreturn {
     @branchHint(.cold);
 
-    current_task.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
-    const executor = current_task.state.running;
+    context.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
+    const executor = context.executor.?;
 
     panicDispatch(
         executor.renderInterruptSourcePanicMessage(format, args),

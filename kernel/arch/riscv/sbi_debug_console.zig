@@ -21,7 +21,7 @@ pub const output: arch.init.InitOutput.Output = .{
         }
     }.splatFn,
     .remapFn = struct {
-        fn remapFn(_: *anyopaque, _: *kernel.Task) !void {
+        fn remapFn(_: *anyopaque, _: *kernel.Task.Context) !void {
             return;
         }
     }.remapFn,

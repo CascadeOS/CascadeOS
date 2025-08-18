@@ -5,22 +5,22 @@
 
 pub const DeviceTree = @import("DeviceTree");
 
-pub fn tryGetSerialOutput() ?uart.Uart {
-    const output_uart = tryGetSerialOutputInner() catch |err| switch (err) {
+pub fn tryGetSerialOutput(context: *kernel.Task.Context) ?uart.Uart {
+    const output_uart = tryGetSerialOutputInner(context) catch |err| switch (err) {
         error.BadOffset => {
-            log.warn("attempted to use a bad offset into the device tree", .{});
+            log.warn(context, "attempted to use a bad offset into the device tree", .{});
             return null;
         },
         error.Truncated => {
-            log.warn("the device tree blob is truncated", .{});
+            log.warn(context, "the device tree blob is truncated", .{});
             return null;
         },
         error.DivisorTooLarge => {
-            log.warn("baud divisor too large", .{});
+            log.warn(context, "baud divisor too large", .{});
             return null;
         },
         error.SizeNotMultiple => {
-            log.warn("the regs property size is not a multiple of the address-cells + size-cells", .{});
+            log.warn(context, "the regs property size is not a multiple of the address-cells + size-cells", .{});
             return null;
         },
     } orelse return null;
@@ -28,31 +28,31 @@ pub fn tryGetSerialOutput() ?uart.Uart {
     return output_uart;
 }
 
-fn tryGetSerialOutputInner() GetSerialOutputError!?uart.Uart {
-    const dt = getDeviceTree() orelse return null;
+fn tryGetSerialOutputInner(context: *kernel.Task.Context) GetSerialOutputError!?uart.Uart {
+    const dt = getDeviceTree(context) orelse return null;
 
-    if (try getSerialOutputFromChosenNode(dt)) |output_uart| return output_uart;
+    if (try getSerialOutputFromChosenNode(context, dt)) |output_uart| return output_uart;
 
     var iter = dt.compatibleMatchIterator({}, matchFunction);
 
     while (try iter.next(dt)) |compatible_match| {
         const func = compatible_lookup.get(compatible_match.compatible).?;
-        if (try func(dt, compatible_match.node.node)) |output_uart| return output_uart;
+        if (try func(context, dt, compatible_match.node.node)) |output_uart| return output_uart;
     }
 
     return null;
 }
 
-fn getDeviceTree() ?DeviceTree {
+fn getDeviceTree(context: *kernel.Task.Context) ?DeviceTree {
     const address = boot.deviceTreeBlob() orelse return null;
     const ptr = address.toPtr([*]align(8) const u8);
     return DeviceTree.fromPtr(ptr) catch |err| {
-        log.warn("failed to parse device tree blob: {t}", .{err});
+        log.warn(context, "failed to parse device tree blob: {t}", .{err});
         return null;
     };
 }
 
-fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromChosenNode(context: *kernel.Task.Context, dt: DeviceTree) GetSerialOutputError!?uart.Uart {
     const chosen_node = (try DeviceTree.Node.root.firstMatchingSubnode(
         dt,
         .direct_children,
@@ -69,7 +69,7 @@ fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart
     const node = (dt.nodeFromPath(stdout_path) catch |err| switch (err) {
         error.BadOffset, error.Truncated => |e| return e,
         error.BadPath => {
-            log.warn("the chosen nodes stdout-path property is not a valid path", .{});
+            log.warn(context, "the chosen nodes stdout-path property is not a valid path", .{});
             return null;
         },
     }) orelse return null;
@@ -78,20 +78,20 @@ fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart
 
     while (try compatible_iter.next()) |compatible| {
         if (compatible_lookup.get(compatible)) |getSerialOutputFn| {
-            return try getSerialOutputFn(dt, node.node);
+            return try getSerialOutputFn(context, dt, node.node);
         }
     }
 
     return null;
 }
 
-fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromNS16550a(context: *kernel.Task.Context, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = blk: {
         const clock_frequency_property = (try node.firstMatchingProperty(
             dt,
             .{ .name = "clock-frequency" },
         )) orelse {
-            log.warn("no clock-frequency property found for ns16550a", .{});
+            log.warn(context, "no clock-frequency property found for ns16550a", .{});
             return null;
         };
         break :blk clock_frequency_property.value.toU32();
@@ -101,7 +101,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
             dt,
             .{ .name = "reg" },
         )) orelse {
-            log.warn("no reg property found for ns16550a", .{});
+            log.warn(context, "no reg property found for ns16550a", .{});
             return null;
         };
 
@@ -109,7 +109,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
         var reg_iter = try reg_property.value.regIterator(2, 2);
 
         const reg = reg_iter.next() orelse {
-            log.warn("no reg property found for ns16550a", .{});
+            log.warn(context, "no reg property found for ns16550a", .{});
             return null;
         };
         break :blk reg.address;
@@ -128,25 +128,25 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
     };
 }
 
-fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromPL011(context: *kernel.Task.Context, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = clock_frequency: {
         const clocks_property = (try node.firstMatchingProperty(
             dt,
             .{ .name = "clocks" },
         )) orelse {
-            log.warn("no clocks property found for pl011", .{});
+            log.warn(context, "no clocks property found for pl011", .{});
             return null;
         };
 
         // there are multiple clocks, but the first one happens to be the one we want
         var clocks_iter = try clocks_property.value.pHandleListIterator();
         const clock_phandle = clocks_iter.next() orelse {
-            log.warn("no clocks phandle found for pl011", .{});
+            log.warn(context, "no clocks phandle found for pl011", .{});
             return null;
         };
 
         const clock_node = (try clock_phandle.node(dt)) orelse {
-            log.warn("no clock node found for pl011", .{});
+            log.warn(context, "no clock node found for pl011", .{});
             return null;
         };
 
@@ -154,7 +154,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutp
             dt,
             .{ .name = "clock-frequency" },
         )) orelse {
-            log.warn("no clock-frequency property found for pl011", .{});
+            log.warn(context, "no clock-frequency property found for pl011", .{});
             return null;
         };
 
@@ -165,7 +165,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutp
             dt,
             .{ .name = "reg" },
         )) orelse {
-            log.warn("no reg property found for pl011", .{});
+            log.warn(context, "no reg property found for pl011", .{});
             return null;
         };
 
@@ -173,7 +173,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutp
         var reg_iter = try reg_property.value.regIterator(2, 2);
 
         const reg = reg_iter.next() orelse {
-            log.warn("no reg property found for pl011", .{});
+            log.warn(context, "no reg property found for pl011", .{});
             return null;
         };
         break :blk reg.address;
@@ -204,7 +204,11 @@ const compatible_lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
 const GetSerialOutputError = DeviceTree.IteratorError ||
     DeviceTree.Property.Value.ListIteratorError ||
     uart.Baud.DivisorError;
-const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart;
+const GetSerialOutputFn = *const fn (
+    context: *kernel.Task.Context,
+    dt: DeviceTree,
+    node: DeviceTree.Node,
+) GetSerialOutputError!?uart.Uart;
 
 const boot = @import("boot");
 const init = @import("init");

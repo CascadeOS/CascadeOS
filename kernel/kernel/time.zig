@@ -71,20 +71,21 @@ pub const init = struct {
         wallclock.kernel_start_type = .kernel_start;
     }
 
-    pub fn initializeTime() !void {
+    pub fn initializeTime(context: *kernel.Task.Context) !void {
         var candidate_time_sources: CandidateTimeSources = .{};
-        arch.init.registerArchitecturalTimeSources(&candidate_time_sources);
+        arch.init.registerArchitecturalTimeSources(context, &candidate_time_sources);
 
         const time_sources = candidate_time_sources.candidate_time_sources.slice();
 
-        const reference_counter = getReferenceCounter(time_sources);
+        const reference_counter = getReferenceCounter(context, time_sources);
 
-        configureWallclockTimeSource(time_sources, reference_counter);
-        configurePerExecutorPeriodicTimeSource(time_sources, reference_counter);
+        configureWallclockTimeSource(context, time_sources, reference_counter);
+        configurePerExecutorPeriodicTimeSource(context, time_sources, reference_counter);
 
         switch (wallclock.kernel_start_type) {
             .kernel_start => {
                 init_log.debug(
+                    context,
                     "time initialized {f} after kernel start, spent {f} in firmware and bootloader before kernel start",
                     .{
                         wallclock.elapsed(wallclock.kernel_start, wallclock.read()),
@@ -94,6 +95,7 @@ pub const init = struct {
             },
             .time_system_start => {
                 init_log.debug(
+                    context,
                     "time initialized {f} after system start (includes early kernel init, firmware and bootloader time)",
                     .{
                         wallclock.elapsed(.zero, wallclock.read()),
@@ -109,7 +111,11 @@ pub const init = struct {
             kernel.config.maximum_number_of_time_sources,
         ) = .{},
 
-        pub fn addTimeSource(candidate_time_sources: *CandidateTimeSources, time_source: CandidateTimeSource) void {
+        pub fn addTimeSource(
+            candidate_time_sources: *CandidateTimeSources,
+            context: *kernel.Task.Context,
+            time_source: CandidateTimeSource,
+        ) void {
             if (time_source.reference_counter != null) {
                 if (time_source.initialization == .calibration_required) {
                     std.debug.panic(
@@ -123,9 +129,9 @@ pub const init = struct {
                 @panic("exceeded maximum number of time sources");
             };
 
-            init_log.debug("adding time source: {s}", .{time_source.name});
-            init_log.debug("  priority: {}", .{time_source.priority});
-            init_log.debug("  reference counter: {} - wall clock: {} - per-executor periodic: {}", .{
+            init_log.debug(context, "adding time source: {s}", .{time_source.name});
+            init_log.debug(context, "  priority: {}", .{time_source.priority});
+            init_log.debug(context, "  reference counter: {} - wall clock: {} - per-executor periodic: {}", .{
                 time_source.reference_counter != null,
                 time_source.wallclock != null,
                 time_source.per_executor_periodic != null,
@@ -159,21 +165,22 @@ pub const init = struct {
 
         fn initialize(
             candidate_time_source: *CandidateTimeSource,
+            context: *kernel.Task.Context,
             reference_counter: ReferenceCounter,
         ) void {
             if (candidate_time_source.initialized) return;
             switch (candidate_time_source.initialization) {
                 .none => {},
-                .simple => |simple| simple(),
-                .calibration_required => |calibration_required| calibration_required(reference_counter),
+                .simple => |simple| simple(context),
+                .calibration_required => |calibration_required| calibration_required(context, reference_counter),
             }
             candidate_time_source.initialized = true;
         }
 
         pub const Initialization = union(enum) {
             none,
-            simple: *const fn () void,
-            calibration_required: *const fn (reference_counter: ReferenceCounter) void,
+            simple: *const fn (context: *kernel.Task.Context) void,
+            calibration_required: *const fn (context: *kernel.Task.Context, reference_counter: ReferenceCounter) void,
         };
 
         pub const ReferenceCounterOptions = struct {
@@ -245,13 +252,16 @@ pub const init = struct {
         }
     };
 
-    fn getReferenceCounter(time_sources: []CandidateTimeSource) ReferenceCounter {
-        const time_source = findAndInitializeTimeSource(time_sources, .{
+    fn getReferenceCounter(
+        context: *kernel.Task.Context,
+        time_sources: []CandidateTimeSource,
+    ) ReferenceCounter {
+        const time_source = findAndInitializeTimeSource(context, time_sources, .{
             .pre_calibrated = true,
             .reference_counter = true,
         }, undefined) orelse @panic("no reference counter found");
 
-        init_log.debug("using reference counter: {s}", .{time_source.name});
+        init_log.debug(context, "using reference counter: {s}", .{time_source.name});
 
         const reference_counter_impl = time_source.reference_counter.?;
 
@@ -262,14 +272,15 @@ pub const init = struct {
     }
 
     fn configureWallclockTimeSource(
+        context: *kernel.Task.Context,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) void {
-        const time_source = findAndInitializeTimeSource(time_sources, .{
+        const time_source = findAndInitializeTimeSource(context, time_sources, .{
             .wallclock = true,
         }, reference_counter) orelse @panic("no wallclock found");
 
-        init_log.debug("using wallclock: {s}", .{time_source.name});
+        init_log.debug(context, "using wallclock: {s}", .{time_source.name});
 
         const wallclock_impl = time_source.wallclock.?;
 
@@ -278,6 +289,7 @@ pub const init = struct {
 
         if (!wallclock_impl.standard_wallclock_source) {
             init_log.warn(
+                context,
                 "wallclock is not the standard wallclock source - setting kernel start time to now",
                 .{},
             );
@@ -287,14 +299,15 @@ pub const init = struct {
     }
 
     fn configurePerExecutorPeriodicTimeSource(
+        context: *kernel.Task.Context,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) void {
-        const time_source = findAndInitializeTimeSource(time_sources, .{
+        const time_source = findAndInitializeTimeSource(context, time_sources, .{
             .per_executor_periodic = true,
         }, reference_counter) orelse @panic("no per-executor periodic found");
 
-        init_log.debug("using per-executor periodic: {s}", .{time_source.name});
+        init_log.debug(context, "using per-executor periodic: {s}", .{time_source.name});
 
         const per_executor_periodic_impl = time_source.per_executor_periodic.?;
 
@@ -312,6 +325,7 @@ pub const init = struct {
     };
 
     fn findAndInitializeTimeSource(
+        context: *kernel.Task.Context,
         time_sources: []CandidateTimeSource,
         query: TimeSourceQuery,
         reference_counter: ReferenceCounter,
@@ -334,7 +348,7 @@ pub const init = struct {
             }
         }
 
-        if (opt_best_candidate) |best_candidate| best_candidate.initialize(reference_counter);
+        if (opt_best_candidate) |best_candidate| best_candidate.initialize(context, reference_counter);
 
         return opt_best_candidate;
     }

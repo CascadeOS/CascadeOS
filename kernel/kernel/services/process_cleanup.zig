@@ -2,9 +2,8 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn queueProcessForCleanup(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     process: *kernel.Process,
-    scheduler_locked: core.LockState,
 ) void {
     if (process.queued_for_cleanup.cmpxchgStrong(
         false,
@@ -16,65 +15,58 @@ pub fn queueProcessForCleanup(
         return;
     }
 
-    log.verbose("queueing {f} for cleanup", .{process});
+    log.verbose(context, "queueing {f} for cleanup", .{process});
 
     globals.incoming.prepend(&process.cleanup_node);
-    wake(current_task, scheduler_locked);
+    globals.parker.unpark(context);
 }
 
-/// Wake up the process cleanup service if it is blocked waiting for work.
-pub fn wake(
-    current_task: *kernel.Task,
-    scheduler_locked: core.LockState,
-) void {
-    globals.parker.unpark(current_task, scheduler_locked);
-}
-
-fn execute(current_task: *kernel.Task, _: usize, _: usize) noreturn {
-    std.debug.assert(current_task == globals.process_cleanup_task);
-    std.debug.assert(current_task.interrupt_disable_count == 0);
-    std.debug.assert(current_task.spinlocks_held == 0);
+fn execute(context: *kernel.Task.Context, _: usize, _: usize) noreturn {
+    std.debug.assert(context.task() == globals.process_cleanup_task);
+    std.debug.assert(context.interrupt_disable_count == 0);
+    std.debug.assert(context.spinlocks_held == 0);
+    std.debug.assert(!context.scheduler_locked);
     std.debug.assert(arch.interrupts.areEnabled());
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
             handleProcess(
-                current_task,
+                context,
                 @fieldParentPtr("cleanup_node", node),
             );
         }
 
-        globals.parker.park(current_task);
+        globals.parker.park(context);
     }
 }
 
-fn handleProcess(current_task: *kernel.Task, process: *kernel.Process) void {
+fn handleProcess(context: *kernel.Task.Context, process: *kernel.Process) void {
     std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
     process.queued_for_cleanup.store(false, .release);
 
     {
-        kernel.globals.processes_lock.writeLock(current_task);
-        defer kernel.globals.processes_lock.writeUnlock(current_task);
+        kernel.globals.processes_lock.writeLock(context);
+        defer kernel.globals.processes_lock.writeUnlock(context);
 
         if (process.reference_count.load(.acquire) != 0) {
             @branchHint(.unlikely);
             // someone has acquired a reference to the process after it was queued for cleanup
-            log.verbose("{f} still has references", .{process});
+            log.verbose(context, "{f} still has references", .{process});
             return;
         }
 
         if (process.queued_for_cleanup.swap(true, .acq_rel)) {
             @branchHint(.unlikely);
             // someone has requeued this process for cleanup
-            log.verbose("{f} has been requeued for cleanup", .{process});
+            log.verbose(context, "{f} has been requeued for cleanup", .{process});
             return;
         }
 
         if (!kernel.globals.processes.swapRemove(process)) @panic("process not found in processes");
     }
 
-    kernel.Process.internal.destroy(current_task, process);
+    kernel.Process.internal.destroy(context, process);
 }
 
 const globals = struct {
@@ -90,12 +82,13 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcessCleanupService(current_task: *kernel.Task) !void {
-        globals.process_cleanup_task = try kernel.Task.createKernelTask(current_task, .{
+    pub fn initializeProcessCleanupService(context: *kernel.Task.Context) !void {
+        globals.process_cleanup_task = try kernel.Task.createKernelTask(context, .{
             .name = try .fromSlice("process cleanup"),
             .start_function = execute,
             .arg1 = undefined,
             .arg2 = undefined,
+            .kernel_task_type = .normal,
         });
 
         globals.parker = .withParkedTask(globals.process_cleanup_task);

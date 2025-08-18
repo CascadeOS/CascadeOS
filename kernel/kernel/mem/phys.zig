@@ -53,8 +53,8 @@ pub const FrameAllocator = struct {
 
     pub const AllocateError = error{FramesExhausted};
 
-    pub const Allocate = *const fn () AllocateError!Frame;
-    pub const Deallocate = *const fn (FrameList) void;
+    pub const Allocate = *const fn (context: *kernel.Task.Context) AllocateError!Frame;
+    pub const Deallocate = *const fn (context: *kernel.Task.Context, frame_list: FrameList) void;
 };
 
 pub const FrameList = struct {
@@ -79,7 +79,7 @@ pub const FrameList = struct {
     }
 };
 
-fn allocate() FrameAllocator.AllocateError!Frame {
+fn allocate(_: *kernel.Task.Context) FrameAllocator.AllocateError!Frame {
     const node = globals.free_page_list.popFirst() orelse return error.FramesExhausted;
 
     _ = globals.free_memory.fetchSub(
@@ -101,7 +101,7 @@ fn allocate() FrameAllocator.AllocateError!Frame {
     return page.physical_frame;
 }
 
-fn deallocate(frame_list: FrameList) void {
+fn deallocate(_: *kernel.Task.Context, frame_list: FrameList) void {
     if (frame_list.count == 0) {
         @branchHint(.unlikely);
         return;
@@ -175,12 +175,14 @@ pub const initialization = struct {
     ///
     /// Pulls all memory out of the bootstrap physical frame allocator and uses it to populate the normal allocator.
     pub fn initializePhysicalMemory(
+        context: *kernel.Task.Context,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,
         memory_map: []const init.exports.MemoryMapEntry,
     ) void {
         init_log.debug(
+            context,
             "initializing pages array with {} usable pages ({f}) in {} regions",
             .{
                 number_of_usable_pages,
@@ -248,6 +250,7 @@ pub const initialization = struct {
                 if (init_log.levelEnabled(.debug)) {
                     if (in_use_frames == 0) {
                         init_log.debug(
+                            context,
                             "pulled {} ({f}) free frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
@@ -256,6 +259,7 @@ pub const initialization = struct {
                         );
                     } else if (in_use_frames == bootstrap_region.frame_count) {
                         init_log.debug(
+                            context,
                             "pulled {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 in_use_frames,
@@ -264,6 +268,7 @@ pub const initialization = struct {
                         );
                     } else {
                         init_log.debug(
+                            context,
                             "pulled {} ({f}) free frames and {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
@@ -328,12 +333,12 @@ pub const initialization = struct {
             .subtract(reclaimable_memory)
             .subtract(unavailable_memory);
 
-        init_log.debug("total memory:         {f}", .{total_memory});
-        init_log.debug("  free memory:        {f}", .{free_memory});
-        init_log.debug("  used memory:        {f}", .{used_memory});
-        init_log.debug("  reserved memory:    {f}", .{reserved_memory});
-        init_log.debug("  reclaimable memory: {f}", .{reclaimable_memory});
-        init_log.debug("  unavailable memory: {f}", .{unavailable_memory});
+        init_log.debug(context, "total memory:         {f}", .{total_memory});
+        init_log.debug(context, "  free memory:        {f}", .{free_memory});
+        init_log.debug(context, "  used memory:        {f}", .{used_memory});
+        init_log.debug(context, "  reserved memory:    {f}", .{reserved_memory});
+        init_log.debug(context, "  reclaimable memory: {f}", .{reclaimable_memory});
+        init_log.debug(context, "  unavailable memory: {f}", .{unavailable_memory});
 
         globals.total_memory = total_memory;
         globals.free_memory.store(free_memory.value, .release);
@@ -344,12 +349,12 @@ pub const initialization = struct {
 
     pub const bootstrap_allocator: FrameAllocator = .{
         .allocate = struct {
-            fn allocate() !Frame {
+            fn allocate(context: *kernel.Task.Context) !Frame {
                 const non_empty_region: *Region = region: for (regions.slice()) |*region| {
                     if (region.first_free_frame_index < region.frame_count) break :region region;
                 } else {
                     for (regions.constSlice()) |region| {
-                        init_log.warn("  region: {}", .{region});
+                        init_log.warn(context, "  region: {}", .{region});
                     }
 
                     @panic("no empty region in bootstrap physical frame allocator");
@@ -362,17 +367,20 @@ pub const initialization = struct {
             }
         }.allocate,
         .deallocate = struct {
-            fn deallocate(_: FrameList) void {
+            fn deallocate(_: *kernel.Task.Context, _: FrameList) void {
                 @panic("deallocate not supported");
             }
         }.deallocate,
     };
 
-    pub fn initializeBootstrapFrameAllocator(memory_map: []const init.exports.MemoryMapEntry) void {
-        init_log.debug("bootloader provided memory map:", .{});
+    pub fn initializeBootstrapFrameAllocator(
+        context: *kernel.Task.Context,
+        memory_map: []const init.exports.MemoryMapEntry,
+    ) void {
+        init_log.debug(context, "bootloader provided memory map:", .{});
 
         for (memory_map) |entry| {
-            init_log.debug("\t{f}", .{entry});
+            init_log.debug(context, "\t{f}", .{entry});
             if (entry.type != .free) continue;
 
             regions.append(.{
@@ -395,6 +403,7 @@ pub const initialization = struct {
                 frames_available += region.frame_count;
             }
             init_log.debug(
+                context,
                 "bootstrap physical frame allocator initalized with {} free frames ({f})",
                 .{ frames_available, arch.paging.standard_page_size.multiplyScalar(frames_available) },
             );

@@ -29,8 +29,8 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: support shared anonymous maps
 
-pub fn create(current_task: *kernel.Task, number_of_pages: u32) error{NoMemory}!*AnonymousMap {
-    const anonymous_map = globals.anonymous_map_cache.allocate(current_task) catch
+pub fn create(context: *kernel.Task.Context, number_of_pages: u32) error{NoMemory}!*AnonymousMap {
+    const anonymous_map = globals.anonymous_map_cache.allocate(context) catch
         return error.NoMemory;
     anonymous_map.* = .{
         .number_of_pages = number_of_pages,
@@ -41,9 +41,9 @@ pub fn create(current_task: *kernel.Task, number_of_pages: u32) error{NoMemory}!
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *const kernel.Task) void {
+pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Task.Context) void {
     std.debug.assert(anonymous_map.reference_count != 0);
-    std.debug.assert(anonymous_map.lock.isLockedByCurrent(current_task));
+    std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
 
     anonymous_map.reference_count += 1;
 }
@@ -51,9 +51,9 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *cons
 /// Decrement the reference count.
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *const kernel.Task) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *kernel.Task.Context) void {
     std.debug.assert(anonymous_map.reference_count != 0);
-    std.debug.assert(anonymous_map.lock.isLockedByCurrent(current_task));
+    std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
 
     const reference_count = anonymous_map.reference_count;
     anonymous_map.reference_count = reference_count - 1;
@@ -63,11 +63,11 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *cons
 
         if (true) @panic("NOT IMPLEMENTED"); // TODO
 
-        anonymous_map.lock.unlock(current_task);
+        anonymous_map.lock.unlock(context);
 
-        globals.anonymous_map_cache.deallocate(current_task, anonymous_map);
+        globals.anonymous_map_cache.deallocate(context, anonymous_map);
     } else {
-        anonymous_map.lock.unlock(current_task);
+        anonymous_map.lock.unlock(context);
     }
 }
 
@@ -80,7 +80,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *cons
 ///
 /// Called `amap_copy` in OpenBSD uvm.
 pub fn copy(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     address_space: *AddressSpace,
     entry: *Entry,
     faulting_address: core.VirtualAddress,
@@ -93,7 +93,7 @@ pub fn copy(
         // no anonymous map, create one
 
         // FIXME: rather that `try` wait for memory to be available, page memory out?
-        entry.anonymous_map_reference.anonymous_map = try create(current_task, entry.number_of_pages);
+        entry.anonymous_map_reference.anonymous_map = try create(context, entry.number_of_pages);
         entry.anonymous_map_reference.start_offset = 0;
 
         // clear `needs_copy` flag
@@ -146,6 +146,7 @@ pub const Reference = struct {
     /// Called `amap_add` in OpenBSD uvm.
     pub fn add(
         reference: Reference,
+        context: *kernel.Task.Context,
         entry: *const Entry,
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
@@ -157,7 +158,7 @@ pub const Reference = struct {
         std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
         std.debug.assert(entry.range().containsAddress(faulting_address));
 
-        log.verbose("adding anonymous page for {f} to anonymous map", .{faulting_address});
+        log.verbose(context, "adding anonymous page for {f} to anonymous map", .{faulting_address});
 
         const anonymous_map = reference.anonymous_map.?;
 
@@ -184,7 +185,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         anonymous_map_reference: Reference,
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -198,7 +199,7 @@ pub const Reference = struct {
 
             try writer.splatByteAll(' ', new_indent);
             try anonymous_map.print(
-                current_task,
+                context,
                 writer,
                 new_indent,
             );
@@ -221,14 +222,14 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     anonymous_map: *AnonymousMap,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
     const new_indent = indent + 2;
 
-    anonymous_map.lock.readLock(current_task);
-    defer anonymous_map.lock.readUnlock(current_task);
+    anonymous_map.lock.readLock(context);
+    defer anonymous_map.lock.readUnlock(context);
 
     try writer.writeAll("AnonymousMap{\n");
 
@@ -255,8 +256,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCache() !void {
-        globals.anonymous_map_cache.init(.{
+    pub fn initializeCache(context: *kernel.Task.Context) !void {
+        globals.anonymous_map_cache.init(context, .{
             .name = try .fromSlice("anonymous map"),
         });
     }

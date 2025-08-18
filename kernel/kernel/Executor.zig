@@ -17,7 +17,7 @@ flush_requests: core.containers.AtomicSinglyLinkedList = .{},
 
 // used during `kernel.debug.interruptSourcePanic`
 interrupt_source_panic_buffer: [kernel.config.interrupt_source_panic_buffer_size.value + interrupt_source_panic_truncated.len]u8 = undefined,
-const interrupt_source_panic_truncated = "(msg truncated)";
+const interrupt_source_panic_truncated = " (msg truncated)";
 
 /// Renders the given message using this executor's interrupt source panic buffer.
 ///
@@ -28,7 +28,7 @@ pub fn renderInterruptSourcePanicMessage(
     args: anytype,
 ) []const u8 {
     // TODO: this treatment should be given to all panics
-    std.debug.assert(current_executor == kernel.Task.getCurrent().state.running);
+    std.debug.assert(current_executor == kernel.Task.Context.current().executor.?);
 
     const full_buffer = current_executor.interrupt_source_panic_buffer[0..];
 
@@ -43,10 +43,6 @@ pub fn renderInterruptSourcePanicMessage(
     };
 
     return bw.buffered();
-}
-
-pub inline fn isSchedulerTask(executor: *const Executor, task: *const kernel.Task) bool {
-    return task == &executor.scheduler_task;
 }
 
 pub inline fn format(

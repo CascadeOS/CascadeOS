@@ -30,6 +30,7 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
 
 /// Maps a 4 KiB page.
 pub fn map4KiB(
+    context: *kernel.Task.Context,
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: kernel.mem.phys.Frame,
@@ -39,11 +40,12 @@ pub fn map4KiB(
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-    errdefer physical_frame_allocator.deallocate(deallocate_frame_list);
+    errdefer physical_frame_allocator.deallocate(context, deallocate_frame_list);
 
     const level4_index = PageTable.p4Index(virtual_address);
 
     const level3_table, const created_level3_table = try ensureNextTable(
+        context,
         &level4_table.entries[level4_index],
         physical_frame_allocator,
     );
@@ -59,6 +61,7 @@ pub fn map4KiB(
     const level3_index = PageTable.p3Index(virtual_address);
 
     const level2_table, const created_level2_table = try ensureNextTable(
+        context,
         &level3_table.entries[level3_index],
         physical_frame_allocator,
     );
@@ -74,6 +77,7 @@ pub fn map4KiB(
     const level2_index = PageTable.p2Index(virtual_address);
 
     const level1_table, const created_level1_table = try ensureNextTable(
+        context,
         &level2_table.entries[level2_index],
         physical_frame_allocator,
     );
@@ -94,7 +98,7 @@ pub fn map4KiB(
         .small,
     ) catch |err| switch (err) {
         error.WriteCombiningAndNoCache => {
-            log.err("write combining and no cache not supported", .{});
+            log.err(context, "write combining and no cache not supported", .{});
             return kernel.mem.MapError.MappingNotValid;
         },
         else => |e| return e,
@@ -211,6 +215,7 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
+    context: *kernel.Task.Context,
     raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
@@ -227,7 +232,7 @@ fn ensureNextTable(
         std.debug.assert(entry.isZero());
         created_table = true;
 
-        const physical_frame = try physical_frame_allocator.allocate();
+        const physical_frame = try physical_frame_allocator.allocate(context);
         errdefer comptime unreachable;
 
         const physical_address = physical_frame.baseAddress();
@@ -297,6 +302,7 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn fillTopLevel(
+        context: *kernel.Task.Context,
         page_table: *PageTable,
         range: core.VirtualRange,
         physical_frame_allocator: kernel.mem.phys.FrameAllocator,
@@ -310,7 +316,7 @@ pub const init = struct {
         const entry = raw_entry.load();
         if (entry.present.read()) return error.AlreadyMapped;
 
-        _ = try ensureNextTable(raw_entry, physical_frame_allocator);
+        _ = try ensureNextTable(context, raw_entry, physical_frame_allocator);
     }
 
     /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -326,6 +332,7 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn mapToPhysicalRangeAllPageSizes(
+        context: *kernel.Task.Context,
         level4_table: *PageTable,
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
@@ -339,6 +346,7 @@ pub const init = struct {
         std.debug.assert(virtual_range.size.equal(physical_range.size));
 
         init_log.verbose(
+            context,
             "mapToPhysicalRangeAllPageSizes - virtual_range: {f} - physical_range: {f} - map_type: {f}",
             .{ virtual_range, physical_range, map_type },
         );
@@ -362,6 +370,7 @@ pub const init = struct {
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
             const level3_table, _ = try ensureNextTable(
+                context,
                 &level4_table.entries[level4_index],
                 physical_frame_allocator,
             );
@@ -396,6 +405,7 @@ pub const init = struct {
                 }
 
                 const level2_table, _ = try ensureNextTable(
+                    context,
                     &level3_table.entries[level3_index],
                     physical_frame_allocator,
                 );
@@ -429,6 +439,7 @@ pub const init = struct {
                     }
 
                     const level1_table, _ = try ensureNextTable(
+                        context,
                         &level2_table.entries[level2_index],
                         physical_frame_allocator,
                     );
@@ -459,6 +470,7 @@ pub const init = struct {
         }
 
         init_log.verbose(
+            context,
             "satified using {} large pages, {} medium pages, {} small pages",
             .{ large_pages_mapped, medium_pages_mapped, small_pages_mapped },
         );

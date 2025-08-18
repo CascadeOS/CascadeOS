@@ -19,10 +19,10 @@ wait_queue: kernel.sync.WaitQueue = .{},
 /// Attempts to upgrade the a read lock to a write lock.
 ///
 /// If it fails the lock is left unlocked.
-pub fn tryUpgradeLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
+pub fn tryUpgradeLock(rw_lock: *RwLock, context: *kernel.Task.Context) bool {
     _ = @atomicRmw(usize, &rw_lock.state, .Add, WRITER, .acquire);
 
-    if (rw_lock.mutex.tryLock(current_task)) {
+    if (rw_lock.mutex.tryLock(context)) {
         const state = @atomicRmw(usize, &rw_lock.state, .Sub, READER, .release);
 
         if (state & READER_MASK == READER) {
@@ -32,7 +32,7 @@ pub fn tryUpgradeLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
 
         _ = @atomicRmw(usize, &rw_lock.state, .Sub, WRITER, .release);
 
-        rw_lock.mutex.unlock(current_task);
+        rw_lock.mutex.unlock(context);
     } else {
         _ = @atomicRmw(usize, &rw_lock.state, .Sub, WRITER, .release);
     }
@@ -40,8 +40,8 @@ pub fn tryUpgradeLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
     return false;
 }
 
-pub fn tryWriteLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
-    if (rw_lock.mutex.tryLock(current_task)) {
+pub fn tryWriteLock(rw_lock: *RwLock, context: *kernel.Task.Context) bool {
+    if (rw_lock.mutex.tryLock(context)) {
         const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
         if (state & READER_MASK == 0) {
@@ -49,15 +49,15 @@ pub fn tryWriteLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
             return true;
         }
 
-        rw_lock.mutex.unlock(current_task);
+        rw_lock.mutex.unlock(context);
     }
 
     return false;
 }
 
-pub fn writeLock(rw_lock: *RwLock, current_task: *kernel.Task) void {
+pub fn writeLock(rw_lock: *RwLock, context: *kernel.Task.Context) void {
     _ = @atomicRmw(usize, &rw_lock.state, .Add, WRITER, .acquire);
-    rw_lock.mutex.lock(current_task);
+    rw_lock.mutex.lock(context);
 
     const state = @atomicRmw(
         usize,
@@ -68,14 +68,14 @@ pub fn writeLock(rw_lock: *RwLock, current_task: *kernel.Task) void {
     );
 
     if (state & READER_MASK != 0) {
-        rw_lock.wait_queue_spinlock.lock(current_task);
-        rw_lock.wait_queue.wait(current_task, &rw_lock.wait_queue_spinlock);
+        rw_lock.wait_queue_spinlock.lock(context);
+        rw_lock.wait_queue.wait(context, &rw_lock.wait_queue_spinlock);
     }
 }
 
-pub fn writeUnlock(rw_lock: *RwLock, current_task: *kernel.Task) void {
+pub fn writeUnlock(rw_lock: *RwLock, context: *kernel.Task.Context) void {
     _ = @atomicRmw(usize, &rw_lock.state, .And, ~IS_WRITING, .release);
-    rw_lock.mutex.unlock(current_task);
+    rw_lock.mutex.unlock(context);
 }
 
 /// Returns `true` if the lock is read locked.
@@ -94,7 +94,7 @@ pub fn isWriteLocked(rw_lock: *const RwLock) bool {
     return state & IS_WRITING != 0;
 }
 
-pub fn tryReadLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
+pub fn tryReadLock(rw_lock: *RwLock, context: *kernel.Task.Context) bool {
     const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
     if (state & (IS_WRITING | WRITER_MASK) == 0) {
@@ -108,16 +108,16 @@ pub fn tryReadLock(rw_lock: *RwLock, current_task: *kernel.Task) bool {
         ) orelse return true;
     }
 
-    if (rw_lock.mutex.tryLock(current_task)) {
+    if (rw_lock.mutex.tryLock(context)) {
         _ = @atomicRmw(usize, &rw_lock.state, .Add, READER, .acquire);
-        rw_lock.mutex.unlock(current_task);
+        rw_lock.mutex.unlock(context);
         return true;
     }
 
     return false;
 }
 
-pub fn readLock(rw_lock: *RwLock, current_task: *kernel.Task) void {
+pub fn readLock(rw_lock: *RwLock, context: *kernel.Task.Context) void {
     var state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
     while (state & (IS_WRITING | WRITER_MASK) == 0) {
@@ -131,19 +131,19 @@ pub fn readLock(rw_lock: *RwLock, current_task: *kernel.Task) void {
         ) orelse return;
     }
 
-    rw_lock.mutex.lock(current_task);
+    rw_lock.mutex.lock(context);
     _ = @atomicRmw(usize, &rw_lock.state, .Add, READER, .acquire);
-    rw_lock.mutex.unlock(current_task);
+    rw_lock.mutex.unlock(context);
 }
 
-pub fn readUnlock(rw_lock: *RwLock, current_task: *kernel.Task) void {
+pub fn readUnlock(rw_lock: *RwLock, context: *kernel.Task.Context) void {
     const state = @atomicRmw(usize, &rw_lock.state, .Sub, READER, .release);
 
     if ((state & READER_MASK == READER) and (state & IS_WRITING != 0)) {
-        rw_lock.wait_queue_spinlock.lock(current_task);
-        defer rw_lock.wait_queue_spinlock.unlock(current_task);
+        rw_lock.wait_queue_spinlock.lock(context);
+        defer rw_lock.wait_queue_spinlock.unlock(context);
 
-        rw_lock.wait_queue.wakeOne(current_task, &rw_lock.wait_queue_spinlock, .unlocked);
+        rw_lock.wait_queue.wakeOne(context, &rw_lock.wait_queue_spinlock);
     }
 }
 

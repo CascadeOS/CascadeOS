@@ -17,6 +17,7 @@ pub const Page = @import("Page.zig");
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
+    context: *kernel.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: phys.Frame,
@@ -27,6 +28,7 @@ pub fn mapSinglePage(
     std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
 
     try arch.paging.mapSinglePage(
+        context,
         page_table,
         virtual_address,
         physical_frame,
@@ -44,7 +46,7 @@ pub fn mapSinglePage(
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalFrames(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
@@ -62,7 +64,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     errdefer {
         // Unmap all pages that have been mapped.
         unmapRange(
-            current_task,
+            context,
             page_table,
             .{
                 .address = virtual_range.address,
@@ -76,14 +78,15 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     }
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        const physical_frame = try physical_frame_allocator.allocate();
+        const physical_frame = try physical_frame_allocator.allocate(context);
         errdefer {
             var deallocate_frame_list: phys.FrameList = .{};
             deallocate_frame_list.push(physical_frame);
-            physical_frame_allocator.deallocate(deallocate_frame_list);
+            physical_frame_allocator.deallocate(context, deallocate_frame_list);
         }
 
         try arch.paging.mapSinglePage(
+            context,
             page_table,
             current_virtual_address,
             physical_frame,
@@ -105,7 +108,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 /// - `virtual_range.size` must be equal to `physical_range.size`
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
@@ -127,7 +130,7 @@ pub fn mapRangeToPhysicalRange(
     errdefer {
         // Unmap all pages that have been mapped.
         unmapRange(
-            current_task,
+            context,
             page_table,
             .{
                 .address = virtual_range.address,
@@ -144,6 +147,7 @@ pub fn mapRangeToPhysicalRange(
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         try arch.paging.mapSinglePage(
+            context,
             page_table,
             current_virtual_address,
             .fromAddress(current_physical_address),
@@ -163,7 +167,7 @@ pub fn mapRangeToPhysicalRange(
 /// **REQUIREMENTS**:
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapSinglePage(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     backing_pages: core.CleanupDecision,
@@ -188,7 +192,7 @@ pub fn unmapSinglePage(
         .flush_target = flush_target,
     };
 
-    request.submitAndWait(current_task);
+    request.submitAndWait(context);
 
     physical_frame_allocator.deallocate(deallocate_frame_list);
 }
@@ -199,7 +203,7 @@ pub fn unmapSinglePage(
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapRange(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     flush_target: kernel.Environment,
@@ -231,9 +235,9 @@ pub fn unmapRange(
         .flush_target = flush_target,
     };
 
-    request.submitAndWait(current_task);
+    request.submitAndWait(context);
 
-    physical_frame_allocator.deallocate(deallocate_frame_list);
+    physical_frame_allocator.deallocate(context, deallocate_frame_list);
 }
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
@@ -281,7 +285,7 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
 }
 
 pub fn onKernelPageFault(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
@@ -289,7 +293,7 @@ pub fn onKernelPageFault(
         @branchHint(.cold);
 
         kernel.debug.interruptSourcePanic(
-            current_task,
+            context,
             interrupt_frame,
             "kernel page fault in lower half\n{f}",
             .{page_fault_details},
@@ -300,7 +304,7 @@ pub fn onKernelPageFault(
         @branchHint(.cold);
 
         kernel.debug.interruptSourcePanic(
-            current_task,
+            context,
             interrupt_frame,
             "kernel page fault outside of any kernel region\n{f}",
             .{page_fault_details},
@@ -310,13 +314,13 @@ pub fn onKernelPageFault(
     switch (region_type) {
         .pageable_kernel_address_space => {
             @branchHint(.likely);
-            globals.kernel_pageable_address_space.handlePageFault(current_task, page_fault_details) catch |err| switch (err) {
+            globals.kernel_pageable_address_space.handlePageFault(context, page_fault_details) catch |err| switch (err) {
                 error.NoMemory => std.debug.panic(
                     "no memory available to handle page fault in pageable kernel address space\n{f}",
                     .{page_fault_details},
                 ),
                 else => |e| kernel.debug.interruptSourcePanic(
-                    current_task,
+                    context,
                     interrupt_frame,
                     "failed to handle page fault in pageable kernel address space: {t}\n{f}",
                     .{ e, page_fault_details },
@@ -327,7 +331,7 @@ pub fn onKernelPageFault(
             @branchHint(.cold);
 
             kernel.debug.interruptSourcePanic(
-                current_task,
+                context,
                 interrupt_frame,
                 "kernel page fault in '{t}'\n{f}",
                 .{ region_type, page_fault_details },
@@ -340,6 +344,11 @@ pub const PageFaultDetails = struct {
     faulting_address: core.VirtualAddress,
     access_type: AccessType,
     fault_type: FaultType,
+
+    /// The environment that the fault was triggered from.
+    ///
+    /// This is not necessarily the same as the environment of the task that triggered the fault as a user task may have
+    /// triggered the fault while running in kernel mode.
     environment: kernel.Environment,
 
     pub const AccessType = enum {
@@ -459,44 +468,46 @@ pub const initialization = struct {
         memory_map: []const init.exports.MemoryMapEntry,
     };
 
-    pub fn initializeMemorySystem(current_task: *kernel.Task, inputs: MemorySystemInputs) !void {
-        init_log.debug("initializing bootstrap physical frame allocator", .{});
-        phys.initialization.initializeBootstrapFrameAllocator(inputs.memory_map);
+    pub fn initializeMemorySystem(context: *kernel.Task.Context, inputs: MemorySystemInputs) !void {
+        init_log.debug(context, "initializing bootstrap physical frame allocator", .{});
+        phys.initialization.initializeBootstrapFrameAllocator(context, inputs.memory_map);
 
-        init_log.debug("building kernel memory layout", .{});
+        init_log.debug(context, "building kernel memory layout", .{});
         const result = buildMemoryLayout(
+            context,
             inputs.number_of_usable_pages,
             inputs.number_of_usable_regions,
         );
 
-        init_log.debug("building core page table", .{});
-        buildAndLoadCorePageTable(current_task);
+        init_log.debug(context, "building core page table", .{});
+        buildAndLoadCorePageTable(context);
 
-        init_log.debug("initializing physical memory", .{});
+        init_log.debug(context, "initializing physical memory", .{});
         phys.initialization.initializePhysicalMemory(
+            context,
             inputs.number_of_usable_pages,
             inputs.number_of_usable_regions,
             result.pages_range,
             inputs.memory_map,
         );
 
-        init_log.debug("initializing caches", .{});
-        try resource_arena.global_init.initializeCache();
-        try cache.init.initializeCaches();
-        try AddressSpace.global_init.initializeCaches();
+        init_log.debug(context, "initializing caches", .{});
+        try resource_arena.global_init.initializeCache(context);
+        try cache.init.initializeCaches(context);
+        try AddressSpace.global_init.initializeCaches(context);
 
-        init_log.debug("initializing kernel and special heap", .{});
-        try heap.init.initializeHeaps(current_task, result.heap_range, result.special_heap_range);
+        init_log.debug(context, "initializing kernel and special heap", .{});
+        try heap.init.initializeHeaps(context, result.heap_range, result.special_heap_range);
 
-        init_log.debug("initializing tasks", .{});
-        try kernel.Task.init.initializeTasks(current_task, result.stacks_range);
+        init_log.debug(context, "initializing tasks", .{});
+        try kernel.Task.init.initializeTasks(context, result.stacks_range);
 
-        init_log.debug("initializing processes", .{});
-        try kernel.Process.init.initializeProcesses(current_task);
+        init_log.debug(context, "initializing processes", .{});
+        try kernel.Process.init.initializeProcesses(context);
 
-        init_log.debug("initializing pageable kernel address space", .{});
+        init_log.debug(context, "initializing pageable kernel address space", .{});
         try globals.kernel_pageable_address_space.init(
-            current_task,
+            context,
             .{
                 .name = try .fromSlice("pageable_kernel"),
                 .range = result.pageable_kernel_address_space_range,
@@ -515,7 +526,11 @@ pub const initialization = struct {
         pageable_kernel_address_space_range: core.VirtualRange,
     };
 
-    fn buildMemoryLayout(number_of_usable_pages: usize, number_of_usable_regions: usize) MemoryLayoutResult {
+    fn buildMemoryLayout(
+        context: *kernel.Task.Context,
+        number_of_usable_pages: usize,
+        number_of_usable_regions: usize,
+    ) MemoryLayoutResult {
         registerKernelSections();
         registerDirectMaps();
         const heaps = registerHeaps();
@@ -524,10 +539,10 @@ pub const initialization = struct {
         sortKernelMemoryRegions();
 
         if (init_log.levelEnabled(.debug)) {
-            init_log.debug("kernel memory layout:", .{});
+            init_log.debug(context, "kernel memory layout:", .{});
 
             for (globals.regions.constSlice()) |region| {
-                init_log.debug("\t{f}", .{region});
+                init_log.debug(context, "\t{f}", .{region});
             }
         }
 
@@ -722,18 +737,19 @@ pub const initialization = struct {
         return pages_range;
     }
 
-    fn buildAndLoadCorePageTable(current_task: *kernel.Task) void {
+    fn buildAndLoadCorePageTable(context: *kernel.Task.Context) void {
         globals.core_page_table = arch.paging.PageTable.create(
-            phys.initialization.bootstrap_allocator.allocate() catch unreachable,
+            phys.initialization.bootstrap_allocator.allocate(context) catch unreachable,
         );
 
         for (globals.regions.constSlice()) |region| {
-            init_log.debug("mapping '{t}' into the core page table", .{region.type});
+            init_log.debug(context, "mapping '{t}' into the core page table", .{region.type});
 
             const map_info = region.mapInfo();
 
             switch (map_info) {
                 .top_level => arch.paging.init.fillTopLevel(
+                    context,
                     globals.core_page_table,
                     region.range,
                     phys.initialization.bootstrap_allocator,
@@ -741,6 +757,7 @@ pub const initialization = struct {
                     std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
                 },
                 .full => |full| arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                    context,
                     globals.core_page_table,
                     region.range,
                     full.physical_range,
@@ -751,7 +768,7 @@ pub const initialization = struct {
                 },
                 .back_with_frames => |map_type| {
                     mapRangeAndBackWithPhysicalFrames(
-                        current_task,
+                        context,
                         globals.core_page_table,
                         region.range,
                         map_type,
@@ -765,7 +782,7 @@ pub const initialization = struct {
             }
         }
 
-        init_log.debug("loading core page table", .{});
+        init_log.debug(context, "loading core page table", .{});
         globals.core_page_table.load();
     }
 
@@ -788,14 +805,14 @@ pub const initialization = struct {
         globals.direct_map = early_offsets.direct_map;
     }
 
-    pub fn logEarlyOffsets() void {
+    pub fn logEarlyOffsets(context: *kernel.Task.Context) void {
         if (!init_log.levelEnabled(.debug)) return;
 
-        init_log.debug("kernel memory offsets:", .{});
+        init_log.debug(context, "kernel memory offsets:", .{});
 
-        init_log.debug("  virtual base address:       {f}", .{globals.virtual_base_address});
-        init_log.debug("  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
-        init_log.debug("  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
+        init_log.debug(context, "  virtual base address:       {f}", .{globals.virtual_base_address});
+        init_log.debug(context, "  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
+        init_log.debug(context, "  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
     }
 
     fn sortKernelMemoryRegions() void {

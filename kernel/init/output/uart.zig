@@ -250,7 +250,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                     }
                 }.splatFn,
                 .remapFn = struct {
-                    fn remapFn(state: *anyopaque, _: *kernel.Task) anyerror!void {
+                    fn remapFn(state: *anyopaque, _: *kernel.Task.Context) anyerror!void {
                         switch (mode) {
                             .io_port => {},
                             .memory => {
@@ -551,7 +551,7 @@ pub const PL011 = struct {
                 }
             }.splatFn,
             .remapFn = struct {
-                fn remapFn(state: *anyopaque, _: *kernel.Task) anyerror!void {
+                fn remapFn(state: *anyopaque, _: *kernel.Task.Context) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(state));
                     const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
                         .fromPtr(@volatileCast(uart.write_register)),

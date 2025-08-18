@@ -13,8 +13,8 @@ pub const Name = core.containers.BoundedArray(u8, kernel.config.cache_name_lengt
 
 pub fn Cache(
     comptime T: type,
-    comptime constructor: ?fn (object: *T, current_task: *kernel.Task) ConstructorError!void,
-    comptime destructor: ?fn (object: *T, current_task: *kernel.Task) void,
+    comptime constructor: ?fn (object: *T, context: *kernel.Task.Context) ConstructorError!void,
+    comptime destructor: ?fn (object: *T, context: *kernel.Task.Context) void,
 ) type {
     return struct {
         raw_cache: RawCache,
@@ -38,28 +38,29 @@ pub fn Cache(
         /// Initialize the cache.
         pub fn init(
             cache: *CacheT,
+            context: *kernel.Task.Context,
             options: InitOptions,
         ) void {
             cache.* = .{
                 .raw_cache = undefined,
             };
 
-            cache.raw_cache.init(.{
+            cache.raw_cache.init(context, .{
                 .name = options.name,
                 .size = @sizeOf(T),
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
                     struct {
-                        fn innerConstructor(object: []u8, current_task: *kernel.Task) ConstructorError!void {
-                            try con(@ptrCast(@alignCast(object)), current_task);
+                        fn innerConstructor(object: []u8, inner_context: *kernel.Task.Context) ConstructorError!void {
+                            try con(@ptrCast(@alignCast(object)), inner_context);
                         }
                     }.innerConstructor
                 else
                     null,
                 .destructor = if (destructor) |des|
                     struct {
-                        fn innerDestructor(object: []u8, current_task: *kernel.Task) void {
-                            des(@ptrCast(@alignCast(object)), current_task);
+                        fn innerDestructor(object: []u8, inner_context: *kernel.Task.Context) void {
+                            des(@ptrCast(@alignCast(object)), inner_context);
                         }
                     }.innerDestructor
                 else
@@ -72,8 +73,8 @@ pub fn Cache(
         /// Deinitialize the cache.
         ///
         /// All objects must have been deallocated before calling this.
-        pub fn deinit(cache: *CacheT, current_task: *kernel.Task) void {
-            cache.raw_cache.deinit(current_task);
+        pub fn deinit(cache: *CacheT, context: *kernel.Task.Context) void {
+            cache.raw_cache.deinit(context);
             cache.* = undefined;
         }
 
@@ -82,8 +83,8 @@ pub fn Cache(
         }
 
         /// Allocate an object from the cache.
-        pub fn allocate(cache: *CacheT, current_task: *kernel.Task) RawCache.AllocateError!*T {
-            return @ptrCast(@alignCast(try cache.raw_cache.allocate(current_task)));
+        pub fn allocate(cache: *CacheT, context: *kernel.Task.Context) RawCache.AllocateError!*T {
+            return @ptrCast(@alignCast(try cache.raw_cache.allocate(context)));
         }
 
         /// Allocate multiple objects from the cache.
@@ -91,7 +92,7 @@ pub fn Cache(
         /// The length of `object_buffer` must be less than or equal to `max_count`.
         pub fn allocateMany(
             cache: *CacheT,
-            current_task: *kernel.Task,
+            context: *kernel.Task.Context,
             comptime max_count: usize, // TODO: is there a better way than this?
             objects: []*T,
         ) RawCache.AllocateError!void {
@@ -101,7 +102,7 @@ pub fn Cache(
             var raw_object_buffer: [max_count][]u8 = undefined;
             const raw_objects = raw_object_buffer[0..objects.len];
 
-            try cache.raw_cache.allocateMany(current_task, raw_objects);
+            try cache.raw_cache.allocateMany(context, raw_objects);
 
             for (objects, raw_objects) |*object, raw_object| {
                 object.* = @ptrCast(@alignCast(raw_object));
@@ -109,8 +110,8 @@ pub fn Cache(
         }
 
         /// Deallocate an object back to the cache.
-        pub fn deallocate(cache: *CacheT, current_task: *kernel.Task, object: *T) void {
-            cache.raw_cache.deallocate(current_task, std.mem.asBytes(object));
+        pub fn deallocate(cache: *CacheT, context: *kernel.Task.Context, object: *T) void {
+            cache.raw_cache.deallocate(context, std.mem.asBytes(object));
         }
 
         /// Deallocate multiple objects back to the cache.
@@ -118,7 +119,7 @@ pub fn Cache(
         /// The length of `objects` must be less than or equal to `max_count`.
         pub fn deallocateMany(
             cache: *CacheT,
-            current_task: *kernel.Task,
+            context: *kernel.Task.Context,
             comptime max_count: usize, // TODO: is there a better way than this?
             objects: []const *T,
         ) void {
@@ -132,7 +133,7 @@ pub fn Cache(
                 raw_object.* = std.mem.asBytes(object);
             }
 
-            cache.raw_cache.deallocateMany(current_task, raw_objects);
+            cache.raw_cache.deallocateMany(context, raw_objects);
         }
     };
 }
@@ -163,8 +164,8 @@ pub const RawCache = struct {
     /// `.pmm` is only valid for small object caches.
     slab_source: InitOptions.SlabSource = .heap,
 
-    constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void,
-    destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void,
+    constructor: ?*const fn (object: []u8, context: *kernel.Task.Context) ConstructorError!void,
+    destructor: ?*const fn (object: []u8, context: *kernel.Task.Context) void,
 
     available_slabs: std.DoublyLinkedList,
     full_slabs: std.DoublyLinkedList,
@@ -187,8 +188,8 @@ pub const RawCache = struct {
         size: usize,
         alignment: std.mem.Alignment,
 
-        constructor: ?*const fn (object: []u8, current_task: *kernel.Task) ConstructorError!void = null,
-        destructor: ?*const fn (object: []u8, current_task: *kernel.Task) void = null,
+        constructor: ?*const fn (object: []u8, context: *kernel.Task.Context) ConstructorError!void = null,
+        destructor: ?*const fn (object: []u8, context: *kernel.Task.Context) void = null,
 
         /// What should happen to the last available slab when it is unused?
         last_slab: core.CleanupDecision = .keep,
@@ -209,6 +210,7 @@ pub const RawCache = struct {
     /// Initialize the cache.
     pub fn init(
         raw_cache: *RawCache,
+        context: *kernel.Task.Context,
         options: InitOptions,
     ) void {
         const is_small = isSmallObject(options.size, options.alignment);
@@ -246,6 +248,7 @@ pub const RawCache = struct {
 
         if (is_small) {
             log.debug(
+                context,
                 "{s}: init small object cache with effective size {f} (requested size {f} alignment {}) objects per slab {} ({f})",
                 .{
                     options.name.constSlice(),
@@ -258,6 +261,7 @@ pub const RawCache = struct {
             );
         } else {
             log.debug(
+                context,
                 "{s}: init large object cache with effective size {f} (requested size {f} alignment {}) objects per slab {} ({f})",
                 .{
                     options.name.constSlice(),
@@ -297,8 +301,8 @@ pub const RawCache = struct {
     /// Deinitialize the cache.
     ///
     /// All objects must have been deallocated before calling this.
-    pub fn deinit(raw_cache: *RawCache, current_task: *kernel.Task) void {
-        log.debug("{s}: deinit", .{raw_cache.name()});
+    pub fn deinit(raw_cache: *RawCache, context: *kernel.Task.Context) void {
+        log.debug(context, "{s}: deinit", .{raw_cache.name()});
 
         if (raw_cache.full_slabs.first != null) @panic("full slabs not empty");
 
@@ -313,7 +317,7 @@ pub const RawCache = struct {
             const slab: *Slab = @fieldParentPtr("linkage", node);
             if (slab.allocated_objects != 0) @panic("slab not empty");
 
-            raw_cache.deallocateSlab(current_task, slab);
+            raw_cache.deallocateSlab(context, slab);
         }
 
         raw_cache.* = undefined;
@@ -335,22 +339,22 @@ pub const RawCache = struct {
     };
 
     /// Allocate an object from the cache.
-    pub fn allocate(raw_cache: *RawCache, current_task: *kernel.Task) AllocateError![]u8 {
+    pub fn allocate(raw_cache: *RawCache, context: *kernel.Task.Context) AllocateError![]u8 {
         var object_buffer: [1][]u8 = undefined;
-        try raw_cache.allocateMany(current_task, &object_buffer);
+        try raw_cache.allocateMany(context, &object_buffer);
         return object_buffer[0];
     }
 
     /// Allocate multiple objects from the cache.
-    pub fn allocateMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: [][]u8) AllocateError!void {
+    pub fn allocateMany(raw_cache: *RawCache, context: *kernel.Task.Context, objects: [][]u8) AllocateError!void {
         std.debug.assert(objects.len > 0);
 
-        log.verbose("{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose(context, "{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
 
         var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
-        errdefer raw_cache.deallocateMany(current_task, allocated_objects.items);
+        errdefer raw_cache.deallocateMany(context, allocated_objects.items);
 
-        raw_cache.lock.lock(current_task);
+        raw_cache.lock.lock(context);
 
         var objects_left = objects.len;
 
@@ -359,7 +363,7 @@ pub const RawCache = struct {
                 @fieldParentPtr("linkage", slab_node)
             else blk: {
                 @branchHint(.unlikely);
-                break :blk try raw_cache.allocateSlab(current_task);
+                break :blk try raw_cache.allocateSlab(context);
             };
 
             while (objects_left > 0) {
@@ -384,7 +388,7 @@ pub const RawCache = struct {
                             slab.objects.prepend(object_node);
                             slab.allocated_objects -= 1;
 
-                            log.warn("{s}: failed to add large object to lookup table", .{raw_cache.name()});
+                            log.warn(context, "{s}: failed to add large object to lookup table", .{raw_cache.name()});
 
                             return error.LargeObjectAllocationFailed;
                         };
@@ -403,40 +407,40 @@ pub const RawCache = struct {
             }
         }
 
-        raw_cache.lock.unlock(current_task);
+        raw_cache.lock.unlock(context);
     }
 
     /// Allocates a new slab.
     ///
     /// The cache's lock must be held when this is called, the lock is held on success and unlocked on failure.
-    fn allocateSlab(raw_cache: *RawCache, current_task: *kernel.Task) AllocateError!*Slab {
-        errdefer log.warn("{s}: failed to allocate slab", .{raw_cache.name()});
+    fn allocateSlab(raw_cache: *RawCache, context: *kernel.Task.Context) AllocateError!*Slab {
+        errdefer log.warn(context, "{s}: failed to allocate slab", .{raw_cache.name()});
 
-        raw_cache.lock.unlock(current_task);
+        raw_cache.lock.unlock(context);
 
-        raw_cache.allocate_mutex.lock(current_task);
-        defer raw_cache.allocate_mutex.unlock(current_task);
+        raw_cache.allocate_mutex.lock(context);
+        defer raw_cache.allocate_mutex.unlock(context);
 
         // optimistically check for an available slab without locking, if there is one lock and check again
         if (raw_cache.available_slabs.first != null) {
-            raw_cache.lock.lock(current_task);
+            raw_cache.lock.lock(context);
 
             if (raw_cache.available_slabs.first) |slab_node| {
                 // there is an available slab now, use it without allocating a new one
                 return @fieldParentPtr("linkage", slab_node);
             }
 
-            raw_cache.lock.unlock(current_task);
+            raw_cache.lock.unlock(context);
         }
 
-        log.debug("{s}: allocating slab", .{raw_cache.name()});
+        log.debug(context, "{s}: allocating slab", .{raw_cache.name()});
 
         const slab = switch (raw_cache.size_class) {
             .small => slab: {
                 const slab_base_ptr: [*]u8 = switch (raw_cache.slab_source) {
                     .heap => slab_base_ptr: {
                         const slab_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
-                            current_task,
+                            context,
                             arch.paging.standard_page_size.value,
                             .instant_fit,
                         ) catch return AllocateError.SlabAllocationFailed;
@@ -444,7 +448,7 @@ pub const RawCache = struct {
                         break :slab_base_ptr @ptrFromInt(slab_allocation.base);
                     },
                     .pmm => slab_base_ptr: {
-                        const frame = kernel.mem.phys.allocator.allocate() catch
+                        const frame = kernel.mem.phys.allocator.allocate(context) catch
                             return AllocateError.SlabAllocationFailed;
 
                         const slab_base_ptr = kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
@@ -456,7 +460,7 @@ pub const RawCache = struct {
                 };
 
                 errdefer switch (raw_cache.slab_source) {
-                    .heap => kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
+                    .heap => kernel.mem.heap.globals.heap_page_arena.deallocate(context, .{
                         .base = @intFromPtr(slab_base_ptr),
                         .len = arch.paging.standard_page_size.value,
                     }),
@@ -465,7 +469,7 @@ pub const RawCache = struct {
                         deallocate_frame_list.push(.fromAddress(
                             kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
                         ));
-                        kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                        kernel.mem.phys.allocator.deallocate(context, deallocate_frame_list);
                     },
                 };
 
@@ -481,7 +485,7 @@ pub const RawCache = struct {
                     // call the destructor for any objects that the constructor was called on
                     for (0..i) |y| {
                         const object_ptr = slab_base_ptr + (y * raw_cache.effective_object_size);
-                        destructor(object_ptr[0..raw_cache.object_size], current_task);
+                        destructor(object_ptr[0..raw_cache.object_size], context);
                     }
                 };
 
@@ -489,7 +493,7 @@ pub const RawCache = struct {
                     const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
 
                     if (raw_cache.constructor) |constructor| {
-                        try constructor(object_ptr[0..raw_cache.object_size], current_task);
+                        try constructor(object_ptr[0..raw_cache.object_size], context);
                     }
 
                     const object_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
@@ -503,13 +507,13 @@ pub const RawCache = struct {
             },
             .large => slab: {
                 const large_object_allocation = kernel.mem.heap.globals.heap_page_arena.allocate(
-                    current_task,
+                    context,
                     raw_cache.effective_object_size * raw_cache.objects_per_slab,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
-                errdefer kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, large_object_allocation);
+                errdefer kernel.mem.heap.globals.heap_page_arena.deallocate(context, large_object_allocation);
 
-                const slab = try globals.slab_cache.allocate(current_task);
+                const slab = try globals.slab_cache.allocate(context);
                 slab.* = .{
                     .large_object_allocation = large_object_allocation,
                 };
@@ -527,20 +531,20 @@ pub const RawCache = struct {
                         const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
                         if (raw_cache.destructor) |destructor| {
-                            destructor(large_object.object, current_task);
+                            destructor(large_object.object, context);
                         }
 
-                        globals.large_object_cache.deallocate(current_task, large_object);
+                        globals.large_object_cache.deallocate(context, large_object);
                     }
 
-                    globals.slab_cache.deallocate(current_task, slab);
+                    globals.slab_cache.deallocate(context, slab);
                 }
 
                 const objects_base: [*]u8 = @ptrFromInt(large_object_allocation.base);
 
                 for (0..raw_cache.objects_per_slab) |i| {
-                    const large_object = try globals.large_object_cache.allocate(current_task);
-                    errdefer globals.large_object_cache.deallocate(current_task, large_object);
+                    const large_object = try globals.large_object_cache.allocate(context);
+                    errdefer globals.large_object_cache.deallocate(context, large_object);
 
                     const object: []u8 = (objects_base + (i * raw_cache.effective_object_size))[0..raw_cache.object_size];
 
@@ -551,7 +555,7 @@ pub const RawCache = struct {
                     };
 
                     if (raw_cache.constructor) |constructor| {
-                        try constructor(object, current_task);
+                        try constructor(object, context);
                     }
 
                     slab.objects.prepend(&large_object.node);
@@ -561,7 +565,7 @@ pub const RawCache = struct {
             },
         };
 
-        raw_cache.lock.lock(current_task);
+        raw_cache.lock.lock(context);
 
         raw_cache.available_slabs.append(&slab.linkage);
 
@@ -569,18 +573,18 @@ pub const RawCache = struct {
     }
 
     /// Deallocate an object back to the cache.
-    pub fn deallocate(raw_cache: *RawCache, current_task: *kernel.Task, object: []u8) void {
-        raw_cache.deallocateMany(current_task, &.{object});
+    pub fn deallocate(raw_cache: *RawCache, context: *kernel.Task.Context, object: []u8) void {
+        raw_cache.deallocateMany(context, &.{object});
     }
 
     /// Deallocate many objects back to the cache.
-    pub fn deallocateMany(raw_cache: *RawCache, current_task: *kernel.Task, objects: []const []u8) void {
+    pub fn deallocateMany(raw_cache: *RawCache, context: *kernel.Task.Context, objects: []const []u8) void {
         std.debug.assert(objects.len > 0);
 
-        log.verbose("{s}: deallocating {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose(context, "{s}: deallocating {} objects", .{ raw_cache.name(), objects.len });
 
-        raw_cache.lock.lock(current_task);
-        defer raw_cache.lock.unlock(current_task);
+        raw_cache.lock.lock(context);
+        defer raw_cache.lock.unlock(context);
 
         for (objects) |object| {
             const slab, const object_node = switch (raw_cache.size_class) {
@@ -644,15 +648,15 @@ pub const RawCache = struct {
             // slab is unused remove it from available list and deallocate it
             raw_cache.available_slabs.remove(&slab.linkage);
 
-            raw_cache.deallocateSlab(current_task, slab);
+            raw_cache.deallocateSlab(context, slab);
         }
     }
 
     /// Deallocate a slab.
     ///
     /// The cache's lock must *not* be held when this is called.
-    fn deallocateSlab(raw_cache: *RawCache, current_task: *kernel.Task, slab: *Slab) void {
-        log.debug("{s}: deallocating slab", .{raw_cache.name()});
+    fn deallocateSlab(raw_cache: *RawCache, context: *kernel.Task.Context, slab: *Slab) void {
+        log.debug(context, "{s}: deallocating slab", .{raw_cache.name()});
 
         switch (raw_cache.size_class) {
             .small => {
@@ -662,13 +666,13 @@ pub const RawCache = struct {
                 if (raw_cache.destructor) |destructor| {
                     for (0..raw_cache.objects_per_slab) |i| {
                         const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
-                        destructor(object_ptr[0..raw_cache.object_size], current_task);
+                        destructor(object_ptr[0..raw_cache.object_size], context);
                     }
                 }
 
                 switch (raw_cache.slab_source) {
                     .heap => kernel.mem.heap.globals.heap_page_arena.deallocate(
-                        current_task,
+                        context,
                         .{
                             .base = @intFromPtr(slab_base_ptr),
                             .len = arch.paging.standard_page_size.value,
@@ -679,7 +683,7 @@ pub const RawCache = struct {
                         deallocate_frame_list.push(.fromAddress(
                             kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
                         ));
-                        kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                        kernel.mem.phys.allocator.deallocate(context, deallocate_frame_list);
                     },
                 }
 
@@ -690,15 +694,15 @@ pub const RawCache = struct {
                     const large_object: *LargeObject = @fieldParentPtr("node", object_node);
 
                     if (raw_cache.destructor) |destructor| {
-                        destructor(large_object.object, current_task);
+                        destructor(large_object.object, context);
                     }
 
-                    globals.large_object_cache.deallocate(current_task, large_object);
+                    globals.large_object_cache.deallocate(context, large_object);
                 }
 
-                kernel.mem.heap.globals.heap_page_arena.deallocate(current_task, slab.large_object_allocation);
+                kernel.mem.heap.globals.heap_page_arena.deallocate(context, slab.large_object_allocation);
 
-                globals.slab_cache.deallocate(current_task, slab);
+                globals.slab_cache.deallocate(context, slab);
             },
         }
     }
@@ -747,13 +751,13 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches() !void {
-        globals.slab_cache.init(.{
+    pub fn initializeCaches(context: *kernel.Task.Context) !void {
+        globals.slab_cache.init(context, .{
             .name = try .fromSlice("slab"),
             .slab_source = .pmm,
         });
 
-        globals.large_object_cache.init(.{
+        globals.large_object_cache.init(context, .{
             .name = try .fromSlice("large object"),
             .slab_source = .pmm,
         });

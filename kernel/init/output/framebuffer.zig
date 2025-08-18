@@ -86,7 +86,7 @@ fn newLine() void {
 }
 
 /// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
+fn remapFramebuffer(_: *anyopaque, context: *kernel.Task.Context) !void {
     const framebuffer = boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
@@ -95,7 +95,7 @@ fn remapFramebuffer(_: *anyopaque, current_task: *kernel.Task) !void {
     const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
 
     const virtual_range = try kernel.mem.heap.allocateSpecial(
-        current_task,
+        context,
         framebuffer_size,
         .fromAddr(
             physical_address,

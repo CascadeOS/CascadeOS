@@ -13,12 +13,12 @@ pub const Node = struct {
     node: std.SinglyLinkedList.Node,
 };
 
-pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) void {
+pub fn submitAndWait(flush_request: *FlushRequest, context: *kernel.Task.Context) void {
     {
-        current_task.incrementInterruptDisable();
-        defer current_task.decrementInterruptDisable();
+        context.incrementInterruptDisable();
+        defer context.decrementInterruptDisable();
 
-        const current_executor = current_task.state.running;
+        const current_executor = context.executor.?;
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
@@ -27,7 +27,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) v
             flush_request.requestExecutor(executor);
         }
 
-        flush_request.flush(current_task);
+        flush_request.flush(context);
     }
 
     while (flush_request.count.load(.monotonic) != 0) {
@@ -35,25 +35,25 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *kernel.Task) v
     }
 }
 
-pub fn processFlushRequests(current_task: *kernel.Task) void {
-    std.debug.assert(current_task.interrupt_disable_count != 0);
+pub fn processFlushRequests(context: *kernel.Task.Context) void {
+    std.debug.assert(context.interrupt_disable_count != 0);
 
-    const executor = current_task.state.running;
+    const executor = context.executor.?;
 
     while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.flush(current_task);
+        request_node.request.flush(context);
     }
 }
 
-fn flush(flush_request: *FlushRequest, current_task: *const kernel.Task) void {
-    std.debug.assert(current_task.interrupt_disable_count != 0);
+fn flush(flush_request: *FlushRequest, context: *kernel.Task.Context) void {
+    std.debug.assert(context.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 
     switch (flush_request.flush_target) {
         .kernel => {},
-        .user => |target_process| switch (current_task.environment) {
+        .user => |target_process| switch (context.task().environment) {
             .kernel => return,
             .user => |current_process| if (current_process != target_process) return,
         },

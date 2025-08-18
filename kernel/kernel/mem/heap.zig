@@ -5,9 +5,9 @@
 //!
 //! Each allocation is a multiple of the standard page size.
 
-pub fn allocate(len: usize, current_task: *kernel.Task) !core.VirtualRange {
+pub fn allocate(len: usize, context: *kernel.Task.Context) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
-        current_task,
+        context,
         len,
         .instant_fit,
     );
@@ -22,8 +22,8 @@ pub fn allocate(len: usize, current_task: *kernel.Task) !core.VirtualRange {
     return virtual_range;
 }
 
-pub fn deallocate(range: core.VirtualRange, current_task: *kernel.Task) void {
-    globals.heap_arena.deallocate(current_task, .{
+pub fn deallocate(range: core.VirtualRange, context: *kernel.Task.Context) void {
+    globals.heap_arena.deallocate(context, .{
         .base = range.address.value,
         .len = range.size.value,
     });
@@ -42,34 +42,34 @@ pub const allocator: std.mem.Allocator = .{
 /// This should only be called by uACPI.
 pub fn freeWithNoSize(ptr: [*]u8) void {
     globals.heap_arena.deallocate(
-        kernel.Task.getCurrent(),
+        kernel.Task.Context.current(),
         allocator_impl.getAllocationHeader(ptr).*,
     );
 }
 
 pub fn allocateSpecial(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: kernel.mem.MapType,
 ) !core.VirtualRange {
     const allocation = try globals.special_heap_address_space_arena.allocate(
-        current_task,
+        context,
         size.value,
         .instant_fit,
     );
-    errdefer globals.special_heap_address_space_arena.deallocate(current_task, allocation);
+    errdefer globals.special_heap_address_space_arena.deallocate(context, allocation);
 
     const virtual_range: core.VirtualRange = .{
         .address = .fromInt(allocation.base),
         .size = .from(allocation.len, .byte),
     };
 
-    globals.special_heap_page_table_mutex.lock(current_task);
-    defer globals.special_heap_page_table_mutex.unlock(current_task);
+    globals.special_heap_page_table_mutex.lock(context);
+    defer globals.special_heap_page_table_mutex.unlock(context);
 
     try kernel.mem.mapRangeToPhysicalRange(
-        current_task,
+        context,
         kernel.mem.globals.core_page_table,
         virtual_range,
         physical_range,
@@ -83,15 +83,15 @@ pub fn allocateSpecial(
 }
 
 pub fn deallocateSpecial(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     virtual_range: core.VirtualRange,
 ) void {
     {
-        globals.special_heap_page_table_mutex.lock(current_task);
-        defer globals.special_heap_page_table_mutex.unlock(current_task);
+        globals.special_heap_page_table_mutex.lock(context);
+        defer globals.special_heap_page_table_mutex.unlock(context);
 
         kernel.mem.unmapRange(
-            current_task,
+            context,
             kernel.mem.globals.core_page_table,
             virtual_range,
             .kernel,
@@ -102,7 +102,7 @@ pub fn deallocateSpecial(
     }
 
     globals.special_heap_address_space_arena.deallocate(
-        current_task,
+        context,
         .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
     );
 }
@@ -119,7 +119,7 @@ const allocator_impl = struct {
         const full_len = len + alignment_bytes - 1 + @sizeOf(Allocation);
 
         const allocation = globals.heap_arena.allocate(
-            kernel.Task.getCurrent(),
+            kernel.Task.Context.current(),
             full_len,
             .instant_fit,
         ) catch return null;
@@ -165,7 +165,7 @@ const allocator_impl = struct {
         _: usize,
     ) void {
         globals.heap_arena.deallocate(
-            kernel.Task.getCurrent(),
+            kernel.Task.Context.current(),
             getAllocationHeader(memory.ptr).*,
         );
     }
@@ -177,20 +177,20 @@ const allocator_impl = struct {
 
 fn heapPageArenaImport(
     arena_ptr: *anyopaque,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     len: usize,
     policy: resource_arena.Policy,
 ) resource_arena.AllocateError!resource_arena.Allocation {
     const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
 
     const allocation = try arena.allocate(
-        current_task,
+        context,
         len,
         policy,
     );
-    errdefer arena.deallocate(current_task, allocation);
+    errdefer arena.deallocate(context, allocation);
 
-    log.verbose("mapping {f} into heap", .{allocation});
+    log.verbose(context, "mapping {f} into heap", .{allocation});
 
     const virtual_range: core.VirtualRange = .{
         .address = .fromInt(allocation.base),
@@ -198,11 +198,11 @@ fn heapPageArenaImport(
     };
 
     {
-        globals.heap_page_table_mutex.lock(current_task);
-        defer globals.heap_page_table_mutex.unlock(current_task);
+        globals.heap_page_table_mutex.lock(context);
+        defer globals.heap_page_table_mutex.unlock(context);
 
         kernel.mem.mapRangeAndBackWithPhysicalFrames(
-            current_task,
+            context,
             kernel.mem.globals.core_page_table,
             virtual_range,
             .{ .environment_type = .kernel, .protection = .read_write },
@@ -220,19 +220,19 @@ fn heapPageArenaImport(
 
 fn heapPageArenaRelease(
     arena_ptr: *anyopaque,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     allocation: resource_arena.Allocation,
 ) void {
     const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
 
-    log.verbose("unmapping {f} from heap", .{allocation});
+    log.verbose(context, "unmapping {f} from heap", .{allocation});
 
     {
-        globals.heap_page_table_mutex.lock(current_task);
-        defer globals.heap_page_table_mutex.unlock(current_task);
+        globals.heap_page_table_mutex.lock(context);
+        defer globals.heap_page_table_mutex.unlock(context);
 
         kernel.mem.unmapRange(
-            current_task,
+            context,
             kernel.mem.globals.core_page_table,
             .{
                 .address = .fromInt(allocation.base),
@@ -246,7 +246,7 @@ fn heapPageArenaRelease(
     }
 
     arena.deallocate(
-        current_task,
+        context,
         allocation,
     );
 }
@@ -290,13 +290,14 @@ pub const globals = struct {
 
 pub const init = struct {
     pub fn initializeHeaps(
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         heap_range: core.VirtualRange,
         special_heap_range: core.VirtualRange,
     ) !void {
         // heap
         {
             try globals.heap_address_space_arena.init(
+                context,
                 .{
                     .name = try .fromSlice("heap_address_space"),
                     .quantum = arch.paging.standard_page_size.value,
@@ -304,6 +305,7 @@ pub const init = struct {
             );
 
             try globals.heap_page_arena.init(
+                context,
                 .{
                     .name = try .fromSlice("heap_page"),
                     .quantum = arch.paging.standard_page_size.value,
@@ -315,6 +317,7 @@ pub const init = struct {
             );
 
             try globals.heap_arena.init(
+                context,
                 .{
                     .name = try .fromSlice("heap"),
                     .quantum = heap_arena_quantum,
@@ -323,7 +326,7 @@ pub const init = struct {
             );
 
             globals.heap_address_space_arena.addSpan(
-                current_task,
+                context,
                 heap_range.address.value,
                 heap_range.size.value,
             ) catch |err| {
@@ -334,6 +337,7 @@ pub const init = struct {
         // special heap
         {
             try globals.special_heap_address_space_arena.init(
+                context,
                 .{
                     .name = try .fromSlice("special_heap_address_space"),
                     .quantum = arch.paging.standard_page_size.value,
@@ -341,7 +345,7 @@ pub const init = struct {
             );
 
             globals.special_heap_address_space_arena.addSpan(
-                current_task,
+                context,
                 special_heap_range.address.value,
                 special_heap_range.size.value,
             ) catch |err| {

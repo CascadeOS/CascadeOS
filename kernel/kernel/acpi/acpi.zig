@@ -89,8 +89,8 @@ pub const init = struct {
         globals.early_initialization_complete = true;
     }
 
-    pub fn initialize() !void {
-        init_log.debug("entering ACPI mode", .{});
+    pub fn initialize(context: *kernel.Task.Context) !void {
+        init_log.debug(context, "entering ACPI mode", .{});
         try uacpi.initialize(.{});
 
         try uacpi.FixedEvent.power_button.installHandler(
@@ -99,33 +99,33 @@ pub const init = struct {
             null,
         );
 
-        init_log.debug("loading namespace", .{});
+        init_log.debug(context, "loading namespace", .{});
         try uacpi.namespaceLoad();
 
         if (arch.current_arch == .x64) {
             try uacpi.setInterruptModel(.ioapic);
         }
 
-        init_log.debug("initializing namespace", .{});
+        init_log.debug(context, "initializing namespace", .{});
         try uacpi.namespaceInitialize();
 
         globals.acpi_initialized = true;
     }
 
-    pub fn finializeInitialization() !void {
-        init_log.debug("finializing GPEs", .{});
+    pub fn finializeInitialization(context: *kernel.Task.Context) !void {
+        init_log.debug(context, "finializing GPEs", .{});
         try uacpi.finializeGpeInitialization();
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        init_log.warn("power button pressed", .{});
+        init_log.warn(kernel.Task.Context.current(), "power button pressed", .{});
         tryShutdown() catch |err| {
             std.debug.panic("failed to shutdown: {t}", .{err});
         };
         @panic("shutdown failed");
     }
 
-    pub fn logAcpiTables() !void {
+    pub fn logAcpiTables(context: *kernel.Task.Context) !void {
         // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
 
         if (!init_log.levelEnabled(.debug)) return;
@@ -137,13 +137,13 @@ pub const init = struct {
 
         var iter = tableIterator(sdt_header);
 
-        init_log.debug("ACPI tables:", .{});
+        init_log.debug(context, "ACPI tables:", .{});
 
         while (iter.next()) |table| {
             if (table.isValid()) {
-                init_log.debug("  {s}", .{table.signatureAsString()});
+                init_log.debug(context, "  {s}", .{table.signatureAsString()});
             } else {
-                init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
+                init_log.debug(context, "  {s} - INVALID", .{table.signatureAsString()});
             }
         }
     }

@@ -29,7 +29,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         object_reference: Reference,
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -43,7 +43,7 @@ pub const Reference = struct {
 
             try writer.splatByteAll(' ', new_indent);
             try object.print(
-                current_task,
+                context,
                 writer,
                 new_indent,
             );
@@ -66,14 +66,14 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     object: *Object,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
     const new_indent = indent + 2;
 
-    object.lock.readLock(current_task);
-    defer object.lock.readLock(current_task);
+    object.lock.readLock(context);
+    defer object.lock.readLock(context);
 
     try writer.writeAll("Object{\n");
 

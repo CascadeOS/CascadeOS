@@ -37,16 +37,16 @@ needs_copy: bool,
 
 wired_count: u32 = 0,
 
-pub fn create(current_task: *kernel.Task) !*Entry {
-    return globals.entry_cache.allocate(current_task) catch |err| switch (err) {
+pub fn create(context: *kernel.Task.Context) !*Entry {
+    return globals.entry_cache.allocate(context) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
         error.ObjectConstructionFailed => unreachable, // no constructor is provided
         error.LargeObjectAllocationFailed => unreachable, // `Entry` is not a large object - checked in `global_init.initializeCaches`
     };
 }
 
-pub fn destroy(entry: *Entry, current_task: *kernel.Task) void {
-    globals.entry_cache.deallocate(current_task, entry);
+pub fn destroy(entry: *Entry, context: *kernel.Task.Context) void {
+    globals.entry_cache.deallocate(context, entry);
 }
 
 pub fn range(entry: *const Entry) core.VirtualRange {
@@ -94,7 +94,7 @@ pub const EntryMerge = union(enum) {
 /// Determine if and how an entry should be merged into the list of entries.
 ///
 /// The caller must ensure the entries are locked.
-pub fn determineEntryMerge(entry: *const Entry, current_task: *kernel.Task, entries: []const *Entry) EntryMerge {
+pub fn determineEntryMerge(entry: *const Entry, context: *kernel.Task.Context, entries: []const *Entry) EntryMerge {
     if (entries.len == 0) return .{ .new = 0 };
 
     const insertion_index = entry.insertionIndex(entries);
@@ -103,7 +103,7 @@ pub fn determineEntryMerge(entry: *const Entry, current_task: *kernel.Task, entr
         const before_entry = entries[insertion_index - 1];
         std.debug.assert(!entry.anyOverlap(before_entry)); // entry overlaps with the preceding entry
 
-        break :blk if (entry.canMergeWithProceeding(current_task, before_entry))
+        break :blk if (entry.canMergeWithProceeding(context, before_entry))
             before_entry
         else
             null;
@@ -113,7 +113,7 @@ pub fn determineEntryMerge(entry: *const Entry, current_task: *kernel.Task, entr
         const after_entry = entries[insertion_index];
         std.debug.assert(!entry.anyOverlap(after_entry)); // entry overlaps with the following entry
 
-        break :blk if (entry.canMergeWithFollowing(current_task, after_entry))
+        break :blk if (entry.canMergeWithFollowing(context, after_entry))
             after_entry
         else
             null;
@@ -256,7 +256,7 @@ fn canMergeWithFollowing(entry: *const Entry, curent_task: *kernel.Task, followi
 }
 
 /// Prints the entry.
-pub fn print(entry: *Entry, current_task: *kernel.Task, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(entry: *Entry, context: *kernel.Task.Context, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
@@ -284,7 +284,7 @@ pub fn print(entry: *Entry, current_task: *kernel.Task, writer: *std.Io.Writer, 
     if (entry.anonymous_map_reference.anonymous_map != null) {
         try writer.writeAll("anonymous_map: ");
         try entry.anonymous_map_reference.print(
-            current_task,
+            context,
             writer,
             new_indent,
         );
@@ -297,7 +297,7 @@ pub fn print(entry: *Entry, current_task: *kernel.Task, writer: *std.Io.Writer, 
     if (entry.object_reference.object != null) {
         try writer.writeAll("object: ");
         try entry.object_reference.print(
-            current_task,
+            context,
             writer,
             new_indent,
         );
@@ -320,12 +320,12 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCache() !void {
+    pub fn initializeCache(context: *kernel.Task.Context) !void {
         if (!kernel.mem.cache.isSmallObject(@sizeOf(Entry), .of(Entry))) {
             @panic("`Entry` is a large cache object");
         }
 
-        globals.entry_cache.init(.{
+        globals.entry_cache.init(context, .{
             .name = try .fromSlice("address space entry"),
         });
     }

@@ -352,7 +352,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeECAM() !void {
+    pub fn initializeECAM(context: *kernel.Task.Context) !void {
         const acpi_table = kernel.acpi.getTable(acpi.tables.MCFG, 0) orelse return error.MCFGNotPresent;
         defer acpi_table.deinit();
         const mcfg = acpi_table.table;
@@ -371,7 +371,7 @@ pub const init = struct {
                 .config_space_address = kernel.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
             };
 
-            init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
+            init_log.debug(context, "found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
                 ecam.segment_group,
                 ecam.start_bus,
                 ecam.end_bus,

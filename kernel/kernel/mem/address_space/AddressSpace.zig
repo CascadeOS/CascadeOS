@@ -55,10 +55,10 @@ pub const InitOptions = struct {
 
 pub fn init(
     address_space: *AddressSpace,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     options: InitOptions,
 ) !void {
-    log.debug("{s}: init with {f} environment {t}", .{
+    log.debug(context, "{s}: init with {f} environment {t}", .{
         options.name.constSlice(),
         options.range,
         options.environment,
@@ -74,15 +74,16 @@ pub fn init(
     };
 
     try address_space.address_arena.init(
+        context,
         .{
             .name = resourceArenaName(options.name),
             .quantum = arch.paging.standard_page_size.value,
         },
     );
-    errdefer address_space.address_arena.deinit(current_task);
+    errdefer address_space.address_arena.deinit(context);
 
     try address_space.address_arena.addSpan(
-        current_task,
+        context,
         options.range.address.value,
         options.range.size.value,
     );
@@ -92,13 +93,12 @@ pub fn init(
 ///
 /// The address space must not be in use by any tasks when this function is called as everything is unmapped without
 /// flushing.
-pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, current_task: *kernel.Task) void {
-    log.debug("{s}: reinitializeAndUnmapAll", .{address_space.name()});
+pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *kernel.Task.Context) void {
+    log.debug(context, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
     std.debug.assert(!address_space.page_table_lock.isLocked());
     std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
 
-    _ = current_task;
     @panic("NOT IMPLEMENTED"); // TODO
 }
 
@@ -107,16 +107,16 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, current_task: *kern
 /// `reinitializeAndUnmapAll` is expected to have been called before calling this function.
 ///
 /// The address space must not be in use by any tasks when this function is called.
-pub fn deinit(address_space: *AddressSpace, current_task: *kernel.Task) void {
+pub fn deinit(address_space: *AddressSpace, context: *kernel.Task.Context) void {
     // cannot use the name as it will reference a defunct process that this address space is now unrelated to
-    log.debug("deinit", .{});
+    log.debug(context, "deinit", .{});
 
     std.debug.assert(!address_space.page_table_lock.isLocked());
     std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
     std.debug.assert(address_space.entries.items.len == 0);
     std.debug.assert(address_space.entries.capacity == 0);
 
-    address_space.address_arena.deinit(current_task);
+    address_space.address_arena.deinit(context);
 
     address_space.* = undefined;
 }
@@ -155,14 +155,14 @@ pub const MapError = error{
 /// Map a range of pages into the address space.
 pub fn map(
     address_space: *AddressSpace,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     options: MapOptions,
 ) MapError!core.VirtualRange {
-    errdefer |err| log.debug("{s}: map failed {t}", .{ address_space.name(), err });
+    errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
 
     if (options.number_of_pages == 0) return error.ZeroLength;
 
-    log.verbose("{s}: map {} pages with protection {t} of type {t}", .{
+    log.verbose(context, "{s}: map {} pages with protection {t} of type {t}", .{
         address_space.name(),
         options.number_of_pages,
         options.protection,
@@ -170,14 +170,14 @@ pub fn map(
     });
 
     const allocated_range = address_space.address_arena.allocate(
-        current_task,
+        context,
         options.number_of_pages * arch.paging.standard_page_size.value,
         .instant_fit,
     ) catch |err| switch (err) {
         error.ZeroLength => unreachable, // `options.number_of_pages` is greater than 0
         error.RequestedLengthUnavailable, error.OutOfBoundaryTags => return error.OutOfMemory,
     };
-    errdefer address_space.address_arena.deallocate(current_task, allocated_range);
+    errdefer address_space.address_arena.deallocate(context, allocated_range);
 
     const local_entry: Entry = .{
         .base = .fromInt(allocated_range.base),
@@ -205,18 +205,18 @@ pub fn map(
     };
 
     const entry_merge = blk: {
-        address_space.entries_lock.writeLock(current_task);
-        defer address_space.entries_lock.writeUnlock(current_task);
+        address_space.entries_lock.writeLock(context);
+        defer address_space.entries_lock.writeUnlock(context);
 
         const entry_merge = local_entry.determineEntryMerge(
-            current_task,
+            context,
             address_space.entries.items,
         );
 
         switch (entry_merge) {
             .new => |index| {
-                const new_entry: *Entry = try .create(current_task);
-                errdefer new_entry.destroy(current_task);
+                const new_entry: *Entry = try .create(context);
+                errdefer new_entry.destroy(context);
 
                 new_entry.* = local_entry;
 
@@ -234,8 +234,8 @@ pub fn map(
                     before_entry.number_of_pages = old_number_of_pages + local_entry.number_of_pages;
 
                     if (before_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-                        anonymous_map.lock.writeLock(current_task);
-                        defer anonymous_map.lock.writeUnlock(current_task);
+                        anonymous_map.lock.writeLock(context);
+                        defer anonymous_map.lock.writeUnlock(context);
 
                         std.debug.assert(anonymous_map.reference_count == 1);
                         std.debug.assert(anonymous_map.number_of_pages == old_number_of_pages);
@@ -260,8 +260,8 @@ pub fn map(
                         );
 
                         if (after_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-                            anonymous_map.lock.writeLock(current_task);
-                            defer anonymous_map.lock.writeUnlock(current_task);
+                            anonymous_map.lock.writeLock(context);
+                            defer anonymous_map.lock.writeUnlock(context);
 
                             std.debug.assert(anonymous_map.reference_count == 1);
                             std.debug.assert(anonymous_map.number_of_pages == old_number_of_pages);
@@ -288,22 +288,22 @@ pub fn map(
     const result = local_entry.range();
 
     switch (entry_merge) {
-        .new => log.verbose("{s}: inserted new entry", .{address_space.name()}),
+        .new => log.verbose(context, "{s}: inserted new entry", .{address_space.name()}),
         .extend => |extend| {
             if (extend.before != null) {
                 if (extend.after != null) {
-                    log.verbose("{s}: merged two entries and expanded by {} pages", .{
+                    log.verbose(context, "{s}: merged two entries and expanded by {} pages", .{
                         address_space.name(),
                         local_entry.number_of_pages,
                     });
                 } else {
-                    log.verbose("{s}: extended entry by {} pages", .{
+                    log.verbose(context, "{s}: extended entry by {} pages", .{
                         address_space.name(),
                         local_entry.number_of_pages,
                     });
                 }
             } else if (extend.after != null) {
-                log.verbose("{s}: extended entry by {} pages", .{
+                log.verbose(context, "{s}: extended entry by {} pages", .{
                     address_space.name(),
                     local_entry.number_of_pages,
                 });
@@ -311,7 +311,7 @@ pub fn map(
         },
     }
 
-    log.verbose("{s}: mapped {f}", .{ address_space.name(), result });
+    log.verbose(context, "{s}: mapped {f}", .{ address_space.name(), result });
 
     return result;
 }
@@ -321,15 +321,13 @@ pub const UnmapError = error{};
 /// Unmap a range of pages from the address space.
 ///
 /// The size and address of the range must be aligned to the page size.
-pub fn unmap(address_space: *AddressSpace, current_task: *kernel.Task, range: core.VirtualRange) UnmapError!void {
-    errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
+pub fn unmap(address_space: *AddressSpace, context: *kernel.Task.Context, range: core.VirtualRange) UnmapError!void {
+    errdefer |err| log.debug(context, "{s}: unmap failed {t}", .{ address_space.name(), err });
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
 
-    log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
-
-    _ = current_task;
+    log.verbose(context, "{s}: unmap {f}", .{ address_space.name(), range });
 
     @panic("NOT IMPLEMENTED"); // TODO
 }
@@ -350,12 +348,12 @@ pub const HandlePageFaultError = error{
 /// Called `uvm_fault` in OpenBSD uvm.
 pub fn handlePageFault(
     address_space: *AddressSpace,
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_fault_details: kernel.mem.PageFaultDetails,
 ) HandlePageFaultError!void {
-    errdefer |err| log.debug("{s}: page fault failed {t}", .{ address_space.name(), err });
+    errdefer |err| log.debug(context, "{s}: page fault failed {t}", .{ address_space.name(), err });
 
-    log.verbose("{s}: page fault {f}", .{
+    log.verbose(context, "{s}: page fault {f}", .{
         address_space.name(),
         page_fault_details,
     });
@@ -372,12 +370,12 @@ pub fn handlePageFault(
         var opt_anonymous_page: ?*AnonymousPage = null;
 
         fault_info.faultCheck(
-            current_task,
+            context,
             &opt_anonymous_page,
             page_fault_details.fault_type,
         ) catch |err| switch (err) {
             error.Restart => {
-                log.verbose("restarting fault", .{});
+                log.verbose(context, "restarting fault", .{});
                 continue;
             },
             else => |narrow_err| return @errorCast(narrow_err), // TODO: why is this `@errorCast` needed?
@@ -387,9 +385,9 @@ pub fn handlePageFault(
             _ = anonymous_page;
             @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L685
         } else {
-            fault_info.faultObjectOrZeroFill(current_task) catch |err| switch (err) {
+            fault_info.faultObjectOrZeroFill(context) catch |err| switch (err) {
                 error.Restart => {
-                    log.verbose("restarting fault", .{});
+                    log.verbose(context, "restarting fault", .{});
                     continue;
                 },
                 else => |narrow_err| return @errorCast(narrow_err), // TODO: why is this `@errorCast` needed?
@@ -403,9 +401,9 @@ pub fn handlePageFault(
 /// Prints the address space.
 ///
 /// Locks the entries lock.
-pub fn print(address_space: *AddressSpace, current_task: *kernel.Task, writer: *std.Io.Writer, indent: usize) !void {
-    address_space.entries_lock.readLock(current_task);
-    defer address_space.entries_lock.readUnlock(current_task);
+pub fn print(address_space: *AddressSpace, context: *kernel.Task.Context, writer: *std.Io.Writer, indent: usize) !void {
+    address_space.entries_lock.readLock(context);
+    defer address_space.entries_lock.readUnlock(context);
 
     const new_indent = indent + 2;
 
@@ -423,7 +421,7 @@ pub fn print(address_space: *AddressSpace, current_task: *kernel.Task, writer: *
 
         for (address_space.entries.items) |entry| {
             try writer.splatByteAll(' ', new_indent + 2);
-            try entry.print(current_task, writer, new_indent + 2);
+            try entry.print(context, writer, new_indent + 2);
             try writer.writeAll(",\n");
         }
 
@@ -454,10 +452,10 @@ fn resourceArenaName(address_space_name: Name) kernel.mem.resource_arena.Name {
 }
 
 pub const global_init = struct {
-    pub fn initializeCaches() !void {
-        try AnonymousMap.init.initializeCache();
-        try AnonymousPage.init.initializeCache();
-        try Entry.init.initializeCache();
+    pub fn initializeCaches(context: *kernel.Task.Context) !void {
+        try AnonymousMap.init.initializeCache(context);
+        try AnonymousPage.init.initializeCache(context);
+        try Entry.init.initializeCache(context);
     }
 };
 

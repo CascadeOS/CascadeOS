@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput() ?arch.init.InitOutput {
+pub fn tryGetSerialOutput(context: *kernel.Task.Context) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
-        log.debug("using debug console for serial output", .{});
+        log.debug(context, "using debug console for serial output", .{});
         return .{
             .output = DebugCon.output,
             .preference = .use,
@@ -27,7 +27,7 @@ pub fn tryGetSerialOutput() ?arch.init.InitOutput {
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
         ) catch continue) |serial| {
-            log.debug("using {t} for serial output", .{com_port});
+            log.debug(context, "using {t} for serial output", .{com_port});
 
             static.init_output_serial_port = serial;
             return .{
@@ -42,7 +42,7 @@ pub fn tryGetSerialOutput() ?arch.init.InitOutput {
 
 /// Prepares the provided `Executor` for the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    bootstrap_executor: *kernel.Executor,
+    context: *kernel.Task.Context,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
@@ -50,7 +50,7 @@ pub fn prepareBootstrapExecutor(
         var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
-    prepareExecutorShared(bootstrap_executor, @intCast(architecture_processor_id), .fromRange(
+    prepareExecutorShared(context.executor.?, @intCast(architecture_processor_id), .fromRange(
         .fromSlice(u8, &static.bootstrap_double_fault_stack),
         .fromSlice(u8, &static.bootstrap_double_fault_stack),
     ), .fromRange(
@@ -62,12 +62,12 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u64, current_task: *kernel.Task) void {
+pub fn prepareExecutor(context: *kernel.Task.Context, executor: *kernel.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        kernel.Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate double fault stack"),
-        kernel.Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate NMI stack"),
+        kernel.Task.init.earlyCreateStack(context) catch @panic("failed to allocate double fault stack"),
+        kernel.Task.init.earlyCreateStack(context) catch @panic("failed to allocate NMI stack"),
     );
 }
 
@@ -94,7 +94,9 @@ fn prepareExecutorShared(
 }
 
 /// Load the provided `Executor` as the current executor.
-pub fn loadExecutor(executor: *kernel.Executor) void {
+pub fn loadExecutor(context: *kernel.Task.Context) void {
+    const executor = context.executor.?;
+
     executor.arch_specific.gdt.load();
     executor.arch_specific.gdt.setTss(&executor.arch_specific.tss);
 
@@ -106,8 +108,8 @@ pub fn loadExecutor(executor: *kernel.Executor) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation() void {
-    log.debug("capturing cpuid information", .{});
+pub fn captureEarlySystemInformation(context: *kernel.Task.Context) void {
+    log.debug(context, "capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
     if (!x64.info.cpu_id.mtrr) {
@@ -117,8 +119,8 @@ pub fn captureEarlySystemInformation() void {
     const mtrr_cap = x64.registers.IA32_MTRRCAP.read();
     x64.info.mtrr_number_of_variable_registers = mtrr_cap.number_of_variable_range_registers;
     x64.info.mtrr_write_combining_supported = mtrr_cap.write_combining_supported;
-    log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
-    log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
+    log.debug(context, "mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
+    log.debug(context, "mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
 
     if (!x64.info.cpu_id.pat) {
         @panic("PAT not supported");
@@ -127,13 +129,13 @@ pub fn captureEarlySystemInformation() void {
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
         const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
-        log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
+        log.debug(context, "lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
     }
 
     if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
         const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
-        log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
+        log.debug(context, "tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
 }
 
@@ -145,6 +147,7 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(
+    context: *kernel.Task.Context,
     options: CaptureSystemInformationOptions,
 ) !void {
     const madt_acpi_table = kernel.acpi.getTable(kernel.acpi.tables.MADT, 0) orelse
@@ -157,37 +160,37 @@ pub fn captureSystemInformation(
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
 
-    log.debug("capturing FADT information", .{});
+    log.debug(context, "capturing FADT information", .{});
     {
         const flags = fadt.IA_PC_BOOT_ARCH;
 
         x64.info.have_ps2_controller = flags.@"8042";
-        log.debug("have ps2 controller: {}", .{x64.info.have_ps2_controller});
+        log.debug(context, "have ps2 controller: {}", .{x64.info.have_ps2_controller});
 
         x64.info.msi_supported = !flags.msi_not_supported;
-        log.debug("message signaled interrupts supported: {}", .{x64.info.msi_supported});
+        log.debug(context, "message signaled interrupts supported: {}", .{x64.info.msi_supported});
 
         x64.info.have_cmos_rtc = !flags.cmos_rtc_not_present;
-        log.debug("have cmos rtc: {}", .{x64.info.have_cmos_rtc});
+        log.debug(context, "have cmos rtc: {}", .{x64.info.have_cmos_rtc});
     }
 
-    log.debug("capturing MADT information", .{});
+    log.debug(context, "capturing MADT information", .{});
     {
         x64.info.have_pic = madt.flags.PCAT_COMPAT;
-        log.debug("have pic: {}", .{x64.info.have_pic});
+        log.debug(context, "have pic: {}", .{x64.info.have_pic});
     }
 
-    log.debug("capturing APIC information", .{});
-    x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
+    log.debug(context, "capturing APIC information", .{});
+    x64.apic.init.captureApicInformation(context, fadt, madt, options.x2apic_enabled);
 
-    log.debug("capturing IOAPIC information", .{});
-    try x64.ioapic.init.captureMADTInformation(madt);
+    log.debug(context, "capturing IOAPIC information", .{});
+    try x64.ioapic.init.captureMADTInformation(context, madt);
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures() void {
+pub fn configureGlobalSystemFeatures(context: *kernel.Task.Context) void {
     if (x64.info.have_pic) {
-        log.debug("disabling pic", .{});
+        log.debug(context, "disabling pic", .{});
         disablePic();
     }
 }
@@ -238,11 +241,9 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
-///
-/// **WARNING**: The `executor` provided must be the current executor.
-pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void {
+pub fn configurePerExecutorSystemFeatures(context: *kernel.Task.Context) void {
     if (x64.info.cpu_id.rdtscp) {
-        x64.registers.IA32_TSC_AUX.write(@intFromEnum(executor.id));
+        x64.registers.IA32_TSC_AUX.write(@intFromEnum(context.executor.?.id));
     }
 
     // TODO: be more thorough with setting up these registers
@@ -333,10 +334,13 @@ pub fn configurePerExecutorSystemFeatures(executor: *const kernel.Executor) void
 /// Register any architectural time sources.
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
-pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
-    x64.tsc.init.registerTimeSource(candidate_time_sources);
-    x64.hpet.init.registerTimeSource(candidate_time_sources);
-    x64.apic.init.registerTimeSource(candidate_time_sources);
+pub fn registerArchitecturalTimeSources(
+    context: *kernel.Task.Context,
+    candidate_time_sources: *kernel.time.init.CandidateTimeSources,
+) void {
+    x64.tsc.init.registerTimeSource(context, candidate_time_sources);
+    x64.hpet.init.registerTimeSource(context, candidate_time_sources);
+    x64.apic.init.registerTimeSource(context, candidate_time_sources);
 
     // TODO: PIT, KVMCLOCK
 }
@@ -386,7 +390,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: *kernel.Task) !void {
+            fn remapFn(_: *anyopaque, _: *kernel.Task.Context) !void {
                 return;
             }
         }.remapFn,

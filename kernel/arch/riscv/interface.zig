@@ -37,9 +37,9 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput() ?arch.init.InitOutput {
+            fn tryGetSerialOutput(context: *kernel.Task.Context) ?arch.init.InitOutput {
                 if (riscv.sbi_debug_console.detect()) {
-                    log.debug("using sbi debug console for serial output", .{});
+                    log.debug(context, "using sbi debug console for serial output", .{});
                     return .{
                         .output = riscv.sbi_debug_console.output,
                         .preference = .use,
@@ -54,18 +54,18 @@ pub const functions: arch.Functions = .{
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                bootstrap_executor: *kernel.Executor,
+                context: *kernel.Task.Context,
                 architecture_processor_id: u64,
             ) void {
-                bootstrap_executor.arch_specific = .{
+                context.executor.?.arch_specific = .{
                     .hartid = @intCast(architecture_processor_id),
                 };
             }
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(executor: *kernel.Executor) void {
-                riscv.registers.SupervisorScratch.write(@intFromPtr(executor));
+            fn loadExecutor(context: *kernel.Task.Context) void {
+                riscv.registers.SupervisorScratch.write(@intFromPtr(context.executor.?));
             }
         }.loadExecutor,
     },

@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn allocateInterrupt(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
     arg1: ?*anyopaque,
     arg2: ?*anyopaque,
 ) arch.interrupts.Interrupt.AllocateError!Interrupt {
-    const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
+    const allocation = globals.interrupt_arena.allocate(context, 1, .instant_fit) catch {
         return error.InterruptAllocationFailed;
     };
 
@@ -22,14 +22,14 @@ pub fn allocateInterrupt(
     return @enumFromInt(interrupt_number);
 }
 
-pub fn deallocateInterrupt(interrupt: Interrupt, current_task: *kernel.Task) void {
+pub fn deallocateInterrupt(interrupt: Interrupt, context: *kernel.Task.Context) void {
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
         .interrupt_handler = interrupt_handlers.unhandledInterrupt,
     };
 
-    globals.interrupt_arena.deallocate(current_task, .{
+    globals.interrupt_arena.deallocate(context, .{
         .base = interrupt_number,
         .len = 1,
     });
@@ -40,9 +40,9 @@ pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interr
 }
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const current_task, const restorer = kernel.Task.onInterruptEntry();
-    defer restorer.exit(current_task);
-    globals.handlers[interrupt_frame.vector_number.full].call(current_task, interrupt_frame);
+    const context, const restorer = kernel.Task.Context.onInterruptEntry();
+    defer restorer.exit(context);
+    globals.handlers[interrupt_frame.vector_number.full].call(context, interrupt_frame);
 }
 
 pub const Interrupt = enum(u8) {
@@ -169,10 +169,13 @@ pub const InterruptFrame = extern struct {
     },
 
     /// Returns the environment that the interrupt was triggered from.
-    pub fn environment(interrupt_frame: *const InterruptFrame, current_task: *kernel.Task) kernel.Environment {
+    pub fn environment(
+        interrupt_frame: *const InterruptFrame,
+        context: *kernel.Task.Context,
+    ) kernel.Environment {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .{ .user = current_task.environment.user },
+            .user_code => return .{ .user = context.task().environment.user },
             else => unreachable,
         };
     }
@@ -249,9 +252,9 @@ const Handler = struct {
     arg1: ?*anyopaque = null,
     arg2: ?*anyopaque = null,
 
-    inline fn call(handler: *const Handler, current_task: *kernel.Task, interrupt_frame: *InterruptFrame) void {
+    inline fn call(handler: *const Handler, context: *kernel.Task.Context, interrupt_frame: *InterruptFrame) void {
         handler.interrupt_handler(
-            current_task,
+            context,
             .{ .arch_specific = interrupt_frame },
             handler.arg1,
             handler.arg2,
@@ -304,8 +307,9 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(current_task: *kernel.Task) void {
+    pub fn initializeInterruptRouting(context: *kernel.Task.Context) void {
         globals.interrupt_arena.init(
+            context,
             .{
                 .name = kernel.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
                 .quantum = 1,
@@ -315,7 +319,7 @@ pub const init = struct {
         };
 
         globals.interrupt_arena.addSpan(
-            current_task,
+            context,
             Interrupt.first_available_interrupt,
             Interrupt.last_available_interrupt - Interrupt.first_available_interrupt,
         ) catch |err| {

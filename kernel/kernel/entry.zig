@@ -4,25 +4,25 @@
 /// Executed upon per executor periodic interrupt.
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
-pub fn onPerExecutorPeriodic(current_task: *kernel.Task) void {
-    kernel.scheduler.maybePreempt(current_task);
+pub fn onPerExecutorPeriodic(context: *kernel.Task.Context) void {
+    kernel.scheduler.maybePreempt(context);
 }
 
 /// Executed upon page fault.
 pub fn onPageFault(
-    current_task: *kernel.Task,
+    context: *kernel.Task.Context,
     page_fault_details: kernel.mem.PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
-    current_task.decrementInterruptDisable();
+    context.decrementInterruptDisable();
     switch (page_fault_details.environment) {
         .kernel => kernel.mem.onKernelPageFault(
-            current_task,
+            context,
             page_fault_details,
             interrupt_frame,
         ),
         .user => |process| process.address_space.handlePageFault(
-            current_task,
+            context,
             page_fault_details,
         ) catch |err| {
             std.debug.panic("user page fault failed: {s}\n{f}", .{ @errorName(err), page_fault_details });
@@ -31,8 +31,8 @@ pub fn onPageFault(
 }
 
 /// Executed upon cross-executor flush request.
-pub fn onFlushRequest(current_task: *kernel.Task) void {
-    kernel.mem.FlushRequest.processFlushRequests(current_task);
+pub fn onFlushRequest(context: *kernel.Task.Context) void {
+    kernel.mem.FlushRequest.processFlushRequests(context);
 }
 
 const arch = @import("arch");

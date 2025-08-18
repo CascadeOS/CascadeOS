@@ -36,25 +36,25 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput() ?arch.init.InitOutput {
+            fn tryGetSerialOutput(_: *kernel.Task.Context) ?arch.init.InitOutput {
                 return null;
             }
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                bootstrap_executor: *kernel.Executor,
+                context: *kernel.Task.Context,
                 architecture_processor_id: u64,
             ) void {
-                bootstrap_executor.arch_specific = .{
+                context.executor.?.arch_specific = .{
                     .mpidr = architecture_processor_id,
                 };
             }
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(executor: *kernel.Executor) void {
-                arm.registers.TPIDR_EL1.write(@intFromPtr(executor));
+            fn loadExecutor(context: *kernel.Task.Context) void {
+                arm.registers.TPIDR_EL1.write(@intFromPtr(context.executor.?));
             }
         }.loadExecutor,
     },

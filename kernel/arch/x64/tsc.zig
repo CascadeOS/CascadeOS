@@ -16,22 +16,22 @@ pub const init = struct {
         return @enumFromInt(readTsc());
     }
 
-    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(context: *kernel.Task.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         if (!shouldUseTsc()) return;
 
-        candidate_time_sources.addTimeSource(.{
+        candidate_time_sources.addTimeSource(context, .{
             .name = "tsc",
             .priority = 200,
 
             .initialization = if (x64.info.tsc_tick_duration_fs != null)
                 .{
                     .simple = struct {
-                        fn simple() void {
+                        fn simple(inner_context: *kernel.Task.Context) void {
                             std.debug.assert(shouldUseTsc());
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
                             globals.tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
-                            init_log.debug("tick duration (fs): {}", .{globals.tick_duration_fs});
+                            init_log.debug(inner_context, "tick duration (fs): {}", .{globals.tick_duration_fs});
                         }
                     }.simple,
                 }
@@ -77,6 +77,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
+        context: *kernel.Task.Context,
         reference_counter: kernel.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());
@@ -98,7 +99,7 @@ pub const init = struct {
         const average_ticks = total_ticks / number_of_samples;
 
         globals.tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
-        init_log.debug("tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
+        init_log.debug(context, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
     fn shouldUseTsc() bool {

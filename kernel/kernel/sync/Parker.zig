@@ -26,15 +26,15 @@ pub fn withParkedTask(parked_task: *kernel.Task) Parker {
 /// Park (block) the current task.
 ///
 /// Spurious wakeups are possible.
-pub fn park(parker: *Parker, current_task: *kernel.Task) void {
-    std.debug.assert(current_task.state == .running);
+pub fn park(parker: *Parker, context: *kernel.Task.Context) void {
+    std.debug.assert(context.task().state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         return; // there were some wakeups, they might be spurious
     }
 
-    kernel.scheduler.lockScheduler(current_task);
-    defer kernel.scheduler.unlockScheduler(current_task);
+    kernel.scheduler.lockScheduler(context);
+    defer kernel.scheduler.unlockScheduler(context);
 
     // recheck for unpark attempts that happened while we were locking the scheduler
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -42,24 +42,24 @@ pub fn park(parker: *Parker, current_task: *kernel.Task) void {
         return;
     }
 
-    parker.lock.lock(current_task);
+    parker.lock.lock(context);
     std.debug.assert(parker.parked_task == null);
 
     // recheck for unpark attempts that happened while we were locking the parker lock
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         @branchHint(.unlikely);
-        parker.lock.unlock(current_task);
+        parker.lock.unlock(context);
         return;
     }
 
-    kernel.scheduler.drop(current_task, .{
+    kernel.scheduler.drop(context, .{
         .action = struct {
-            fn action(_: *kernel.Task, old_task: *kernel.Task, arg: usize) void {
+            fn action(_: *kernel.Task.Context, old_task: *kernel.Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
-                old_task.spinlocks_held -= 1;
-                old_task.interrupt_disable_count -= 1;
+                old_task.context.spinlocks_held -= 1;
+                old_task.context.interrupt_disable_count -= 1;
 
                 inner_parker.parked_task = old_task;
                 inner_parker.lock.unsafeUnlock();
@@ -67,13 +67,14 @@ pub fn park(parker: *Parker, current_task: *kernel.Task) void {
         }.action,
         .arg = @intFromPtr(parker),
     });
+
+    parker.unpark_attempts.store(0, .release);
 }
 
 /// Unpark (wake) the parked task if it is currently parked.
 pub fn unpark(
     parker: *Parker,
-    current_task: *kernel.Task,
-    scheduler_locked: core.LockState,
+    context: *kernel.Task.Context,
 ) void {
     if (parker.unpark_attempts.fetchAdd(1, .acq_rel) != 0) {
         // someone else was the first to attempt to unpark the task, so we can leave waking the task to them
@@ -81,8 +82,8 @@ pub fn unpark(
     }
 
     const parked_task = blk: {
-        parker.lock.lock(current_task);
-        defer parker.lock.unlock(current_task);
+        parker.lock.lock(context);
+        defer parker.lock.unlock(context);
 
         const parked_task = parker.parked_task orelse return;
         parker.parked_task = null;
@@ -92,17 +93,18 @@ pub fn unpark(
 
     parked_task.state = .ready;
 
-    switch (scheduler_locked) {
-        .unlocked => kernel.scheduler.lockScheduler(current_task),
-        .locked => std.debug.assert(kernel.scheduler.isLockedByCurrent(current_task)),
+    const scheduler_already_locked = context.scheduler_locked;
+
+    switch (scheduler_already_locked) {
+        true => if (core.is_debug) std.debug.assert(kernel.scheduler.isLockedByCurrent(context)),
+        false => kernel.scheduler.lockScheduler(context),
     }
-    defer switch (scheduler_locked) {
-        .unlocked => kernel.scheduler.unlockScheduler(current_task),
-        .locked => {},
+    defer switch (scheduler_already_locked) {
+        true => {},
+        false => kernel.scheduler.unlockScheduler(context),
     };
 
-    kernel.scheduler.queueTask(current_task, parked_task);
-    parker.unpark_attempts.store(0, .release);
+    kernel.scheduler.queueTask(context, parked_task);
 }
 
 const kernel = @import("kernel");

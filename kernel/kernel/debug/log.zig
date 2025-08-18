@@ -3,29 +3,49 @@
 
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
-        pub fn err(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
+        pub fn err(
+            context: *kernel.Task.Context,
+            comptime format: []const u8,
+            args: anytype,
+        ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.err)) return;
-            logFn(prefix_err, userFmt(format), args);
+            logFn(context, prefix_err, userFmt(format), args);
         }
 
-        pub fn warn(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
+        pub fn warn(
+            context: *kernel.Task.Context,
+            comptime format: []const u8,
+            args: anytype,
+        ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.warn)) return;
-            logFn(prefix_warn, userFmt(format), args);
+            logFn(context, prefix_warn, userFmt(format), args);
         }
 
-        pub fn info(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
+        pub fn info(
+            context: *kernel.Task.Context,
+            comptime format: []const u8,
+            args: anytype,
+        ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.info)) return;
-            logFn(prefix_info, userFmt(format), args);
+            logFn(context, prefix_info, userFmt(format), args);
         }
 
-        pub fn debug(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
+        pub fn debug(
+            context: *kernel.Task.Context,
+            comptime format: []const u8,
+            args: anytype,
+        ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.debug)) return;
-            logFn(prefix_debug, userFmt(format), args);
+            logFn(context, prefix_debug, userFmt(format), args);
         }
 
-        pub fn verbose(comptime format: []const u8, args: anytype) callconv(core.inline_in_non_debug) void {
+        pub fn verbose(
+            context: *kernel.Task.Context,
+            comptime format: []const u8,
+            args: anytype,
+        ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.verbose)) return;
-            logFn(prefix_verbose, userFmt(format), args);
+            logFn(context, prefix_verbose, userFmt(format), args);
         }
 
         pub inline fn levelEnabled(comptime message_level: Level) bool {
@@ -79,6 +99,7 @@ pub const Level = enum {
 };
 
 fn logFn(
+    context: *kernel.Task.Context,
     prefix: []const u8,
     comptime format: []const u8,
     args: anytype,
@@ -87,27 +108,51 @@ fn logFn(
         .single_executor_init_log => {
             @branchHint(.unlikely);
 
+            if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+
             const writer = init.Output.writer;
 
-            writer.writeAll(prefix) catch {};
-            writer.print(format, args) catch {};
+            writer.writeAll(prefix) catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
+            writer.print(format, args) catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
 
-            init.Output.writer.flush() catch {};
+            init.Output.writer.flush() catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
         },
         .init_log => {
             @branchHint(.unlikely);
 
-            const current_task = kernel.Task.getCurrent();
-
-            init.Output.globals.lock.lock(current_task);
-            defer init.Output.globals.lock.unlock(current_task);
+            init.Output.globals.lock.lock(context);
+            defer init.Output.globals.lock.unlock(context);
 
             const writer = init.Output.writer;
 
-            writer.writeAll(prefix) catch {};
-            writer.print(format, args) catch {};
+            writer.writeAll(prefix) catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
+            writer.print(format, args) catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
 
-            init.Output.writer.flush() catch {};
+            init.Output.writer.flush() catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
         },
     }
 }
@@ -204,6 +249,7 @@ const globals = struct {
 
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
+const arch = @import("arch");
 const kernel = @import("kernel");
 const init = @import("init");
 

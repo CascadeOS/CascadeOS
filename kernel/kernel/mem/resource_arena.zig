@@ -57,11 +57,12 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
         pub fn init(
             arena: *@This(),
+            context: *kernel.Task.Context,
             options: InitOptions,
         ) InitError!void {
             if (!std.mem.isValidAlign(options.quantum)) return InitError.InvalidQuantum;
 
-            log.debug("{s}: init with quantum 0x{x}", .{ options.name.constSlice(), options.quantum });
+            log.debug(context, "{s}: init with quantum 0x{x}", .{ options.name.constSlice(), options.quantum });
 
             arena.* = .{
                 ._name = options.name,
@@ -116,7 +117,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     );
 
                     for (0..frames_to_allocate) |_| {
-                        const frame = kernel.mem.phys.allocator.allocate() catch
+                        const frame = kernel.mem.phys.allocator.allocate(context) catch
                             @panic("heap quantum cache allocation failed");
                         frames.push(frame);
 
@@ -126,7 +127,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                         for (frame_caches) |*cache| {
                             caches_created += 1;
 
-                            cache.init(.{
+                            cache.init(context, .{
                                 .name = kernel.mem.cache.Name.initPrint(
                                     "heap qcache {}",
                                     .{caches_created},
@@ -152,12 +153,12 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Assumes that no concurrent access to the resource arena is happening, does not lock.
         ///
         /// Panics if there are any allocations in the resource arena.
-        pub fn deinit(arena: *@This(), current_task: *kernel.Task) void {
-            log.debug("{s}: deinit", .{arena.name()});
+        pub fn deinit(arena: *@This(), context: *kernel.Task.Context) void {
+            log.debug(context, "{s}: deinit", .{arena.name()});
 
             if (quantum_caching.haveQuantumCache()) {
                 for (arena.quantum_caches.caches.constSlice()) |quantum_cache| {
-                    quantum_cache.deinit(current_task);
+                    quantum_cache.deinit(context);
                 }
 
                 switch (quantum_caching) {
@@ -177,7 +178,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                 switch (tag.kind) {
                     .imported_span => arena.source.?.callRelease(
-                        current_task,
+                        context,
                         .{
                             .base = tag.base,
                             .len = tag.len,
@@ -210,7 +211,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     temp_tag_buffer.appendAssumeCapacity(node.toTag());
                 }
 
-                globals.tag_cache.deallocateMany(current_task, capacity, temp_tag_buffer.constSlice());
+                globals.tag_cache.deallocateMany(context, capacity, temp_tag_buffer.constSlice());
             }
 
             if (any_allocations) {
@@ -229,11 +230,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Both `base` and `len` must be aligned to the arena's quantum.
         ///
         /// O(N) runtime.
-        pub fn addSpan(arena: *@This(), current_task: *kernel.Task, base: usize, len: usize) AddSpanError!void {
-            log.debug("{s}: adding span [0x{x}, 0x{x})", .{ arena.name(), base, base + len });
+        pub fn addSpan(arena: *@This(), context: *kernel.Task.Context, base: usize, len: usize) AddSpanError!void {
+            log.debug(context, "{s}: adding span [0x{x}, 0x{x})", .{ arena.name(), base, base + len });
 
-            try arena.ensureBoundaryTags(current_task);
-            defer arena.mutex.unlock(current_task);
+            try arena.ensureBoundaryTags(context);
+            defer arena.mutex.unlock(context);
 
             const span_tag, const free_tag =
                 try arena.getTagsForNewSpan(base, len, .span);
@@ -383,12 +384,12 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         }
 
         /// Allocate a block of length `len` from the arena.
-        pub fn allocate(arena: *@This(), current_task: *kernel.Task, len: usize, policy: Policy) AllocateError!Allocation {
+        pub fn allocate(arena: *@This(), context: *kernel.Task.Context, len: usize, policy: Policy) AllocateError!Allocation {
             if (len == 0) return AllocateError.ZeroLength;
 
             const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
 
-            log.verbose("{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) with policy {t}", .{
+            log.verbose(context, "{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) with policy {t}", .{
                 arena.name(),
                 len,
                 quantum_aligned_len,
@@ -401,7 +402,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     const cache = arena.quantum_caches.caches.constSlice()[cache_index];
                     std.debug.assert(cache.object_size == quantum_aligned_len);
 
-                    const buffer = cache.allocate(current_task) catch
+                    const buffer = cache.allocate(context) catch
                         return AllocateError.RequestedLengthUnavailable; // TODO: is there a better way to handle this?
                     std.debug.assert(buffer.len == quantum_aligned_len);
 
@@ -412,8 +413,8 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 }
             }
 
-            try arena.ensureBoundaryTags(current_task);
-            errdefer arena.mutex.unlock(current_task); // unconditionally unlock mutex on error
+            try arena.ensureBoundaryTags(context);
+            errdefer arena.mutex.unlock(context); // unconditionally unlock mutex on error
 
             const target_tag: *BoundaryTag = while (true) {
                 break switch (policy) {
@@ -423,7 +424,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 } orelse {
                     const source = arena.source orelse return AllocateError.RequestedLengthUnavailable;
 
-                    break arena.importFromSource(current_task, source, quantum_aligned_len) catch
+                    break arena.importFromSource(context, source, quantum_aligned_len) catch
                         return AllocateError.RequestedLengthUnavailable;
                 };
             };
@@ -437,14 +438,14 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
             arena.insertIntoAllocationTable(target_tag);
 
-            arena.mutex.unlock(current_task);
+            arena.mutex.unlock(context);
 
             const allocation: Allocation = .{
                 .base = target_tag.base,
                 .len = quantum_aligned_len,
             };
 
-            log.verbose("{s}: allocated {f}", .{ arena.name(), allocation });
+            log.verbose(context, "{s}: allocated {f}", .{ arena.name(), allocation });
 
             return allocation;
         }
@@ -558,21 +559,21 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// The mutex must be locked upon entry and will be locked upon exit.
         fn importFromSource(
             arena: *@This(),
-            current_task: *kernel.Task,
+            context: *kernel.Task.Context,
             source: Source,
             len: usize,
         ) (AllocateError || AddSpanError)!*BoundaryTag {
-            arena.mutex.unlock(current_task);
+            arena.mutex.unlock(context);
 
-            log.verbose("{s}: importing len 0x{x} from source {s}", .{ arena.name(), len, source.name });
+            log.verbose(context, "{s}: importing len 0x{x} from source {s}", .{ arena.name(), len, source.name });
 
             var need_to_lock_mutex = true;
-            defer if (need_to_lock_mutex) arena.mutex.lock(current_task);
+            defer if (need_to_lock_mutex) arena.mutex.lock(context);
 
-            const allocation = try source.callImport(current_task, len, .instant_fit);
-            errdefer source.callRelease(current_task, allocation);
+            const allocation = try source.callImport(context, len, .instant_fit);
+            errdefer source.callRelease(context, allocation);
 
-            try arena.ensureBoundaryTags(current_task);
+            try arena.ensureBoundaryTags(context);
             need_to_lock_mutex = false;
 
             const span_tag, const free_tag =
@@ -584,7 +585,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
             try arena.addSpanInner(span_tag, free_tag, .nop);
 
-            log.verbose("{s}: imported {f} from source {s}", .{ arena.name(), allocation, source.name });
+            log.verbose(context, "{s}: imported {f} from source {s}", .{ arena.name(), allocation, source.name });
 
             return free_tag;
         }
@@ -618,8 +619,8 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Deallocate the allocation.
         ///
         /// Panics if the allocation does not match a previous call to `allocate`.
-        pub fn deallocate(arena: *@This(), current_task: *kernel.Task, allocation: Allocation) void {
-            log.verbose("{s}: deallocating {f}", .{ arena.name(), allocation });
+        pub fn deallocate(arena: *@This(), context: *kernel.Task.Context, allocation: Allocation) void {
+            log.verbose(context, "{s}: deallocating {f}", .{ arena.name(), allocation });
 
             std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
             std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
@@ -633,16 +634,16 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     const buffer_ptr: [*]u8 = @ptrFromInt(allocation.base);
                     const buffer = buffer_ptr[0..allocation.len];
 
-                    cache.deallocate(current_task, buffer);
+                    cache.deallocate(context, buffer);
 
                     return;
                 }
             }
 
-            arena.mutex.lock(current_task);
+            arena.mutex.lock(context);
 
             var need_to_unlock_mutex = true;
-            defer if (need_to_unlock_mutex) arena.mutex.unlock(current_task);
+            defer if (need_to_unlock_mutex) arena.mutex.unlock(context);
 
             const tag = arena.removeFromAllocationTable(allocation.base) orelse {
                 std.debug.panic(
@@ -714,12 +715,13 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     arena.pushUnusedTag(previous_tag);
                     arena.pushUnusedTag(tag);
 
-                    arena.mutex.unlock(current_task);
+                    arena.mutex.unlock(context);
                     need_to_unlock_mutex = false;
 
-                    source.callRelease(current_task, allocation_to_release);
+                    source.callRelease(context, allocation_to_release);
 
                     log.verbose(
+                        context,
                         "{s}: released {f} to source {s}",
                         .{ arena.name(), allocation_to_release, source.name },
                     );
@@ -734,9 +736,9 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         /// Attempts to ensure that there are at least `min_unused_tags_count` unused tags.
         ///
         /// Upon non-error return, the mutex is locked.
-        fn ensureBoundaryTags(arena: *@This(), current_task: *kernel.Task) EnsureBoundaryTagsError!void {
-            arena.mutex.lock(current_task);
-            errdefer arena.mutex.unlock(current_task);
+        fn ensureBoundaryTags(arena: *@This(), context: *kernel.Task.Context) EnsureBoundaryTagsError!void {
+            arena.mutex.lock(context);
+            errdefer arena.mutex.unlock(context);
 
             if (arena.unused_tags_count >= MAX_TAGS_PER_ALLOCATION) return;
 
@@ -745,7 +747,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 MAX_TAGS_PER_ALLOCATION,
             ).init(MAX_TAGS_PER_ALLOCATION - arena.unused_tags_count) catch unreachable;
 
-            globals.tag_cache.allocateMany(current_task, MAX_TAGS_PER_ALLOCATION, tags.slice()) catch
+            globals.tag_cache.allocateMany(context, MAX_TAGS_PER_ALLOCATION, tags.slice()) catch
                 return EnsureBoundaryTagsError.OutOfBoundaryTags;
 
             for (tags.slice()) |tag| {
@@ -834,14 +836,14 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         pub const CreateSourceOptions = struct {
             custom_import: ?fn (
                 arena_ptr: *anyopaque,
-                current_task: *kernel.Task,
+                context: *kernel.Task.Context,
                 len: usize,
                 policy: Policy,
             ) AllocateError!Allocation = null,
 
             custom_release: ?fn (
                 arena_ptr: *anyopaque,
-                current_task: *kernel.Task,
+                context: *kernel.Task.Context,
                 allocation: Allocation,
             ) void = null,
         };
@@ -857,12 +859,12 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     struct {
                         fn importWrapper(
                             arena_ptr: *anyopaque,
-                            current_task: *kernel.Task,
+                            context: *kernel.Task.Context,
                             len: usize,
                             policy: Policy,
                         ) AllocateError!Allocation {
                             const a: *ArenaT = @ptrCast(@alignCast(arena_ptr));
-                            return a.allocate(current_task, len, policy);
+                            return a.allocate(context, len, policy);
                         }
                     }.importWrapper,
                 .release = if (options.custom_release) |custom_release|
@@ -871,11 +873,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     struct {
                         fn releaseWrapper(
                             arena_ptr: *anyopaque,
-                            current_task: *kernel.Task,
+                            context: *kernel.Task.Context,
                             allocation: Allocation,
                         ) void {
                             const a: *ArenaT = @ptrCast(@alignCast(arena_ptr));
-                            a.deallocate(current_task, allocation);
+                            a.deallocate(context, allocation);
                         }
                     }.releaseWrapper,
             };
@@ -957,32 +959,32 @@ pub const Source = struct {
 
     import: *const fn (
         arena_ptr: *anyopaque,
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         len: usize,
         policy: Policy,
     ) AllocateError!Allocation,
 
     release: *const fn (
         arena_ptr: *anyopaque,
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         allocation: Allocation,
     ) void,
 
     fn callImport(
         source: *const Source,
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         len: usize,
         policy: Policy,
     ) callconv(core.inline_in_non_debug) AllocateError!Allocation {
-        return source.import(source.arena_ptr, current_task, len, policy);
+        return source.import(source.arena_ptr, context, len, policy);
     }
 
     fn callRelease(
         source: *const Source,
-        current_task: *kernel.Task,
+        context: *kernel.Task.Context,
         allocation: Allocation,
     ) callconv(core.inline_in_non_debug) void {
-        source.release(source.arena_ptr, current_task, allocation);
+        source.release(source.arena_ptr, context, allocation);
     }
 };
 
@@ -1317,8 +1319,8 @@ const globals = struct {
 };
 
 pub const global_init = struct {
-    pub fn initializeCache() !void {
-        globals.tag_cache.init(.{
+    pub fn initializeCache(context: *kernel.Task.Context) !void {
+        globals.tag_cache.init(context, .{
             .name = try .fromSlice("boundary tag"),
             .slab_source = .pmm,
         });
