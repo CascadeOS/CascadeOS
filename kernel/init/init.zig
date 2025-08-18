@@ -371,11 +371,11 @@ fn bootNonBootstrapExecutors() !void {
         if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
 
         desc.boot(
-            kernel.globals.executors[i].current_task,
+            &kernel.globals.executors[i].current_task.context,
             struct {
-                fn bootFn(user_data: *anyopaque) noreturn {
+                fn bootFn(inner_context: *anyopaque) noreturn {
                     initStage2(
-                        @ptrCast(@alignCast(user_data)),
+                        @ptrCast(@alignCast(inner_context)),
                         false,
                     ) catch |err| {
                         std.debug.panic("unhandled error: {t}", .{err});
