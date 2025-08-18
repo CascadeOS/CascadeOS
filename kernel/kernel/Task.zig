@@ -107,6 +107,12 @@ pub fn decrementReferenceCount(task: *Task, context: *Task.Context) void {
 }
 
 pub const Context = struct {
+    /// Set to the executor the current task is running on if the state of the context means that the executor cannot
+    /// change underneath us (for example when interrupts are disabled).
+    ///
+    /// Set to null otherwise.
+    ///
+    /// The value is undefined when the task is not running.
     executor: ?*kernel.Executor,
 
     /// Tracks the depth of nested interrupt disables.
@@ -129,14 +135,7 @@ pub const Context = struct {
         if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
         const context: *Context = &current_task.context;
-
-        if (context.interrupt_disable_count == 0) {
-            if (core.is_debug) std.debug.assert(context.executor == null);
-            arch.interrupts.enable();
-        } else {
-            if (core.is_debug) std.debug.assert(context.executor == executor);
-            //context.executor = executor;
-        }
+        if (context.interrupt_disable_count == 0) arch.interrupts.enable();
 
         return context;
     }
@@ -145,11 +144,8 @@ pub const Context = struct {
         previous_interrupt_disable_count: u32,
 
         pub fn exit(interrupt_exit: InterruptExit, context: *Context) void {
-            const previous = interrupt_exit.previous_interrupt_disable_count;
-            context.interrupt_disable_count = previous;
-            if (previous == 0) {
-                context.executor = null;
-            }
+            context.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
+            context.setExecutor();
         }
     };
 
@@ -157,15 +153,14 @@ pub const Context = struct {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
         const executor = arch.getCurrentExecutor();
-
         const current_task = executor.current_task;
         if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
         const context: *Context = &current_task.context;
-        context.executor = executor;
-
         const previous_interrupt_disable_count = context.interrupt_disable_count;
+
         context.interrupt_disable_count = previous_interrupt_disable_count + 1;
+        context.executor = current_task.state.running;
 
         return .{ context, .{ .previous_interrupt_disable_count = previous_interrupt_disable_count } };
     }
@@ -177,35 +172,19 @@ pub const Context = struct {
             if (core.is_debug) std.debug.assert(arch.interrupts.areEnabled());
             arch.interrupts.disable();
             context.executor = context.task().state.running;
-        } else {
-            if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-        }
+        } else if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
         context.interrupt_disable_count = previous + 1;
-
-        if (core.is_debug) {
-            const executor = context.executor.?;
-            std.debug.assert(executor == arch.getCurrentExecutor());
-            std.debug.assert(executor.current_task == context.task());
-        }
     }
 
     pub fn decrementInterruptDisable(context: *Context) void {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
-        const executor = context.executor.?;
-        if (core.is_debug) {
-            std.debug.assert(executor == arch.getCurrentExecutor());
-            std.debug.assert(executor.current_task == context.task());
-        }
-
         const previous = context.interrupt_disable_count;
-        if (core.is_debug) std.debug.assert(previous > 0);
-
         context.interrupt_disable_count = previous - 1;
 
         if (previous == 1) {
-            context.executor = null;
+            context.setExecutor();
             arch.interrupts.enable();
         }
     }
@@ -217,8 +196,7 @@ pub const Context = struct {
     /// The scheduler lock must be held when this function is called.
     pub fn drop(context: *kernel.Task.Context) noreturn {
         if (core.is_debug) {
-            std.debug.assert(context.scheduler_locked);
-            std.debug.assert(kernel.scheduler.isLockedByCurrent(context));
+            kernel.scheduler.assertSchedulerLocked(context);
             std.debug.assert(context.spinlocks_held == 1); // only the scheduler lock is held
         }
 
@@ -232,6 +210,15 @@ pub const Context = struct {
             .arg = undefined,
         });
         @panic("dropped task returned");
+    }
+
+    /// Set the `executor` field of the context based on the state of the context.
+    inline fn setExecutor(context: *kernel.Task.Context) void {
+        if (context.interrupt_disable_count != 0) {
+            context.executor = context.task().state.running;
+        } else {
+            context.executor = null;
+        }
     }
 };
 
