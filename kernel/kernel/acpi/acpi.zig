@@ -118,7 +118,7 @@ pub const init = struct {
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        init_log.warn(kernel.Task.Context.current(), "power button pressed", .{});
+        init_log.warn(.current(), "power button pressed", .{});
         tryShutdown() catch |err| {
             std.debug.panic("failed to shutdown: {t}", .{err});
         };
