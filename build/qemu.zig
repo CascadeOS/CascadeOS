@@ -33,14 +33,6 @@ pub fn registerQemuSteps(
             options,
         );
 
-        // const qemu_step = try QemuStep.create(
-        //     b,
-        //     architecture,
-        //     kernel_log_wrapper_compile,
-        //     image_step.image_file,
-        //     options,
-        // );
-
         const qemu_step_name = try std.fmt.allocPrint(
             b.allocator,
             "run_{t}",
@@ -117,60 +109,60 @@ fn createQemuStep(
     if (options.interrupt_details) {
         if (architecture == .x64) {
             // The "-M smm=off" below disables the SMM generated spam that happens before the kernel starts.
-            run_qemu.addArgs(&[_][]const u8{ "-d", "int", "-M", "smm=off" });
+            run_qemu.addArgs(&.{ "-d", "int", "-M", "smm=off" });
         } else {
-            run_qemu.addArgs(&[_][]const u8{ "-d", "int" });
+            run_qemu.addArgs(&.{ "-d", "int" });
         }
     }
 
     // gdb remote debug
     if (options.qemu_remote_debug) {
-        run_qemu.addArgs(&[_][]const u8{ "-s", "-S" });
+        run_qemu.addArgs(&.{ "-s", "-S" });
     }
 
     if (options.display) {
-        run_qemu.addArgs(&[_][]const u8{ "-monitor", "vc" });
+        run_qemu.addArgs(&.{ "-monitor", "vc" });
 
         switch (architecture) {
             .arm => {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
+                run_qemu.addArgs(&.{ "-serial", "vc" });
 
                 // TODO: once we have virtio-gpu support, uncomment this:
-                // run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-gpu-gl-pci" });
-                run_qemu.addArgs(&[_][]const u8{ "-device", "ramfb" });
+                // run_qemu.addArgs(&.{ "-device", "virtio-gpu-gl-pci" });
+                run_qemu.addArgs(&.{ "-device", "ramfb" });
             },
             .riscv => {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "vc" });
+                run_qemu.addArgs(&.{ "-serial", "vc" });
 
-                run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
+                run_qemu.addArgs(&.{ "-device", "virtio-vga-gl" });
             },
             .x64 => {
-                run_qemu.addArgs(&[_][]const u8{ "-debugcon", "vc" });
+                run_qemu.addArgs(&.{ "-debugcon", "vc" });
 
-                run_qemu.addArgs(&[_][]const u8{ "-device", "virtio-vga-gl" });
+                run_qemu.addArgs(&.{ "-device", "virtio-vga-gl" });
             },
         }
 
-        run_qemu.addArgs(&[_][]const u8{
+        run_qemu.addArgs(&.{
             "-display",
             "gtk,gl=on,show-tabs=on,zoom-to-fit=off",
         });
     } else {
         if (architecture == .x64) {
             if (options.qemu_monitor) {
-                run_qemu.addArgs(&[_][]const u8{ "-debugcon", "mon:stdio" });
+                run_qemu.addArgs(&.{ "-debugcon", "mon:stdio" });
             } else {
-                run_qemu.addArgs(&[_][]const u8{ "-debugcon", "stdio" });
+                run_qemu.addArgs(&.{ "-debugcon", "stdio" });
             }
         } else {
             if (options.qemu_monitor) {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "mon:stdio" });
+                run_qemu.addArgs(&.{ "-serial", "mon:stdio" });
             } else {
-                run_qemu.addArgs(&[_][]const u8{ "-serial", "stdio" });
+                run_qemu.addArgs(&.{ "-serial", "stdio" });
             }
         }
 
-        run_qemu.addArgs(&[_][]const u8{ "-display", "none" });
+        run_qemu.addArgs(&.{ "-display", "none" });
     }
 
     // set the cpu
@@ -183,22 +175,22 @@ fn createQemuStep(
     // set the machine
     switch (architecture) {
         .arm => if (options.no_acpi) {
-            run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
+            run_qemu.addArgs(&.{ "-machine", "virt,acpi=off" });
         } else {
-            run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=on" });
+            run_qemu.addArgs(&.{ "-machine", "virt,acpi=on" });
         },
         .riscv => {
             if (firmware == .uefi) {
                 if (options.no_acpi) {
-                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=off" });
+                    run_qemu.addArgs(&.{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=off" });
                 } else {
-                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=on" });
+                    run_qemu.addArgs(&.{ "-machine", "virt,pflash0=pflash0,pflash1=pflash1,acpi=on" });
                 }
             } else {
                 if (options.no_acpi) {
-                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=off" });
+                    run_qemu.addArgs(&.{ "-machine", "virt,acpi=off" });
                 } else {
-                    run_qemu.addArgs(&[_][]const u8{ "-machine", "virt,acpi=on" });
+                    run_qemu.addArgs(&.{ "-machine", "virt,acpi=on" });
                 }
             }
         },
@@ -208,7 +200,7 @@ fn createQemuStep(
                 std.process.exit(1);
             }
 
-            run_qemu.addArgs(&[_][]const u8{ "-machine", "q35" });
+            run_qemu.addArgs(&.{ "-machine", "q35" });
         },
     }
 
@@ -216,9 +208,9 @@ fn createQemuStep(
     const should_use_acceleration = !options.no_acceleration and architecture.isNative(b);
     if (should_use_acceleration) {
         switch (b.graph.host.result.os.tag) {
-            .linux => run_qemu.addArgs(&[_][]const u8{ "-accel", "kvm" }),
-            .macos => run_qemu.addArgs(&[_][]const u8{ "-accel", "hvf" }),
-            .windows => run_qemu.addArgs(&[_][]const u8{ "-accel", "whpx" }),
+            .linux => run_qemu.addArgs(&.{ "-accel", "kvm" }),
+            .macos => run_qemu.addArgs(&.{ "-accel", "hvf" }),
+            .windows => run_qemu.addArgs(&.{ "-accel", "whpx" }),
             else => std.debug.panic(
                 "unsupported host operating system: {t}",
                 .{b.graph.host.result.os.tag},
@@ -227,7 +219,7 @@ fn createQemuStep(
     }
 
     // always add tcg as the last accelerator
-    run_qemu.addArgs(&[_][]const u8{ "-accel", "tcg" });
+    run_qemu.addArgs(&.{ "-accel", "tcg" });
 
     switch (firmware) {
         .default => {},
