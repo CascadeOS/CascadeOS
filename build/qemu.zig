@@ -259,6 +259,14 @@ fn createQemuStep(
         },
     }
 
+    if (options.tpm_socket) |tpm_socket| {
+        run_qemu.addArgs(&.{
+            "-chardev", try std.fmt.allocPrint(b.allocator, "socket,id=chrtpm,path={s}", .{tpm_socket}),
+            "-tpmdev",  "emulator,id=tpm0,chardev=chrtpm",
+            "-device",  "tpm-tis,tpmdev=tpm0",
+        });
+    }
+
     return run_qemu;
 }
 

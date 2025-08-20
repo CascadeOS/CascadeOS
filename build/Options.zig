@@ -83,6 +83,11 @@ kernel_log_scopes: []const []const u8,
 /// Defaults to false.
 no_kernel_log_wrapper: bool,
 
+/// Path to the TPM emulator (swtpm) socket.
+///
+/// If not given no TPM device will be present in QEMU.
+tpm_socket: ?[]const u8 = null,
+
 /// Module containing kernel options.
 kernel_option_module: *std.Build.Module,
 
@@ -203,6 +208,12 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         "Disable the kernel log wrapper (defaults to false)",
     ) orelse false;
 
+    const tpm_socket = b.option(
+        []const u8,
+        "tpm_socket",
+        "Path to the TPM emulator (swtpm) socket (if not given no TPM device will be present in QEMU)",
+    );
+
     const root_path = std.fmt.allocPrint(
         b.allocator,
         comptime "{s}" ++ std.fs.path.sep_str,
@@ -240,6 +251,8 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         .kernel_log_level = kernel_log_level,
         .kernel_log_scopes = kernel_log_scopes,
         .no_kernel_log_wrapper = no_kernel_log_wrapper,
+        .tpm_socket = tpm_socket,
+
         .kernel_option_module = try buildKernelOptionModule(
             b,
             kernel_log_level,
