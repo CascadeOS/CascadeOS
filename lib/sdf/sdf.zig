@@ -107,13 +107,13 @@ pub const Header = extern struct {
 
     pub fn read(reader: *std.Io.Reader) !Header {
         var header: Header = undefined;
-        try reader.readSliceEndian(Header, (&header)[0..1], .little);
+        try reader.readSliceEndian(Header, @ptrCast(&header), .little);
         if (!std.mem.eql(u8, &header.magic, &magic)) return error.InvalidSdfMagic;
         return header;
     }
 
     pub fn write(header: Header, writer: *std.Io.Writer) !void {
-        try writer.writeSliceEndian(Header, (&header)[0..1], .little);
+        try writer.writeSliceEndian(Header, @ptrCast(&header), .little);
     }
 
     pub fn stringTable(header: Header, memory: []const u8) StringTable {
@@ -217,12 +217,12 @@ pub const FileEntry = extern struct {
 
     pub fn read(reader: *std.Io.Reader) !FileEntry {
         var file_entry: FileEntry = undefined;
-        try reader.readSliceEndian(FileEntry, (&file_entry)[0..1], .little);
+        try reader.readSliceEndian(FileEntry, @ptrCast(&file_entry), .little);
         return file_entry;
     }
 
     pub fn write(file_entry: FileEntry, writer: *std.Io.Writer) !void {
-        try writer.writeSliceEndian(FileEntry, (&file_entry)[0..1], .little);
+        try writer.writeSliceEndian(FileEntry, @ptrCast(&file_entry), .little);
     }
 
     pub fn directory(file_entry: FileEntry, string_table: StringTable) [:0]const u8 {
@@ -330,12 +330,12 @@ pub const LocationProgramState = extern struct {
 
     pub fn read(reader: *std.Io.Reader) !LocationProgramState {
         var location_program_state: LocationProgramState = undefined;
-        try reader.readSliceEndian(LocationProgramState, (&location_program_state)[0..1], .little);
+        try reader.readSliceEndian(LocationProgramState, @ptrCast(&location_program_state), .little);
         return location_program_state;
     }
 
     pub fn write(location_program_state: LocationProgramState, writer: *std.Io.Writer) !void {
-        try writer.writeSliceEndian(LocationProgramState, (&location_program_state)[0..1], .little);
+        try writer.writeSliceEndian(LocationProgramState, @ptrCast(&location_program_state), .little);
     }
 
     test LocationProgramState {

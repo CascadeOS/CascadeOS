@@ -32,7 +32,7 @@ pub fn initStage1() !noreturn {
         );
         arch.init.loadExecutor(context);
 
-        cascade.globals.executors = @as([*]cascade.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
+        cascade.globals.executors = @ptrCast(&static.bootstrap_executor);
 
         break :blk context;
     };
