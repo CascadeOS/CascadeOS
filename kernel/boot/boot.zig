@@ -226,8 +226,6 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
 }
 
 /// Exports bootloader entry points and any other required exported symbols.
-///
-/// Required to be called at comptime from the kernels root file 'kernel/kernel.zig'.
 pub fn exportEntryPoints() void {
     const unknownBootloaderEntryPoint = struct {
         /// The entry point that is exported as `_start` and acts as fallback entry point for unknown bootloaders.
@@ -254,7 +252,7 @@ pub const BootloaderAPI = enum {
 };
 
 const init = @import("init");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const limine = @import("limine.zig");

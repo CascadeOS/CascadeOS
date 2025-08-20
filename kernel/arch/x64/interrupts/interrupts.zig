@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn allocateInterrupt(
-    context: *kernel.Context,
+    context: *cascade.Context,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
     arg1: ?*anyopaque,
     arg2: ?*anyopaque,
@@ -22,7 +22,7 @@ pub fn allocateInterrupt(
     return @enumFromInt(interrupt_number);
 }
 
-pub fn deallocateInterrupt(interrupt: Interrupt, context: *kernel.Context) void {
+pub fn deallocateInterrupt(interrupt: Interrupt, context: *cascade.Context) void {
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
@@ -40,7 +40,7 @@ pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interr
 }
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const context, const restorer = kernel.Context.onInterruptEntry();
+    const context, const restorer = cascade.Context.onInterruptEntry();
     defer restorer.exit(context);
     globals.handlers[interrupt_frame.vector_number.full].call(context, interrupt_frame);
 }
@@ -171,8 +171,8 @@ pub const InterruptFrame = extern struct {
     /// Returns the environment that the interrupt was triggered from.
     pub fn environment(
         interrupt_frame: *const InterruptFrame,
-        context: *kernel.Context,
-    ) kernel.Environment {
+        context: *cascade.Context,
+    ) cascade.Environment {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
             .user_code => return .{ .user = context.task().environment.user },
@@ -252,7 +252,7 @@ const Handler = struct {
     arg1: ?*anyopaque = null,
     arg2: ?*anyopaque = null,
 
-    inline fn call(handler: *const Handler, context: *kernel.Context, interrupt_frame: *InterruptFrame) void {
+    inline fn call(handler: *const Handler, context: *cascade.Context, interrupt_frame: *InterruptFrame) void {
         handler.interrupt_handler(
             context,
             .{ .arch_specific = interrupt_frame },
@@ -283,7 +283,7 @@ const globals = struct {
 
         break :handlers temp_handlers;
     };
-    var interrupt_arena: kernel.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
+    var interrupt_arena: cascade.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
 };
 
 pub const init = struct {
@@ -307,11 +307,11 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(context: *kernel.Context) void {
+    pub fn initializeInterruptRouting(context: *cascade.Context) void {
         globals.interrupt_arena.init(
             context,
             .{
-                .name = kernel.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
+                .name = cascade.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
                 .quantum = 1,
             },
         ) catch |err| {
@@ -369,7 +369,7 @@ pub const init = struct {
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("../x64.zig");
 
 const core = @import("core");

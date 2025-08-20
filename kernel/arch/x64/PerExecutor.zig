@@ -6,10 +6,10 @@ apic_id: u32,
 gdt: x64.Gdt = .{},
 tss: x64.Tss = .{},
 
-double_fault_stack: kernel.Task.Stack,
-non_maskable_interrupt_stack: kernel.Task.Stack,
+double_fault_stack: cascade.Task.Stack,
+non_maskable_interrupt_stack: cascade.Task.Stack,
 
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("x64.zig");
 
 const core = @import("core");

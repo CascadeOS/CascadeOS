@@ -24,7 +24,7 @@ pub fn sendPanicIPI() void {
 }
 
 /// Send a flush IPI to the given executor.
-pub fn sendFlushIPI(executor: *kernel.Executor) void {
+pub fn sendFlushIPI(executor: *cascade.Executor) void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr = .{
@@ -59,16 +59,16 @@ const globals = struct {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        context: *kernel.Context,
-        fadt: *const kernel.acpi.tables.FADT,
-        madt: *const kernel.acpi.tables.MADT,
+        context: *cascade.Context,
+        fadt: *const cascade.acpi.tables.FADT,
+        madt: *const cascade.acpi.tables.MADT,
         x2apic_enabled: bool,
     ) void {
         if (x2apic_enabled) {
             globals.lapic = .x2apic;
         } else {
             globals.lapic = .{
-                .xapic = kernel.mem.nonCachedDirectMapFromPhysical(
+                .xapic = cascade.mem.nonCachedDirectMapFromPhysical(
                     core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address),
                 ).toPtr([*]volatile u8),
             };
@@ -91,7 +91,7 @@ pub const init = struct {
         // TODO: error interrupt
     }
 
-    pub fn registerTimeSource(context: *kernel.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(context: *cascade.Context, candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
         candidate_time_sources.addTimeSource(context, .{
             .name = "lapic",
             .priority = 150,
@@ -107,7 +107,7 @@ pub const init = struct {
 
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer(context: *kernel.Context) void {
+    fn initializeLapicTimer(context: *cascade.Context) void {
         std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
 
         globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
@@ -115,8 +115,8 @@ pub const init = struct {
     }
 
     fn initializeLapicTimerCalibrate(
-        context: *kernel.Context,
-        reference_counter: kernel.time.init.ReferenceCounter,
+        context: *cascade.Context,
+        reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
 
@@ -164,7 +164,7 @@ pub const init = struct {
 
         const average_ticks = total_ticks / number_of_samples;
 
-        globals.tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
+        globals.tick_duration_fs = (sample_duration.value * cascade.time.fs_per_ns) / average_ticks;
         init_log.debug(context, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
@@ -180,13 +180,13 @@ pub const init = struct {
 
         const ticks = std.math.cast(
             u32,
-            (period.value * kernel.time.fs_per_ns) / globals.tick_duration_fs,
+            (period.value * cascade.time.fs_per_ns) / globals.tick_duration_fs,
         ) orelse @panic("period is too long");
 
         globals.lapic.writeInitialCountRegister(ticks);
     }
 
-    const init_log = kernel.debug.log.scoped(.init_apic);
+    const init_log = cascade.debug.log.scoped(.init_apic);
 };
 
 pub const LAPIC = union(enum) {
@@ -993,7 +993,7 @@ pub const LAPIC = union(enum) {
         /// Read Only
         arbitration_priority = 0x9,
 
-        /// kernel.Processor Priority Register (PPR)
+        /// cascade.Processor Priority Register (PPR)
         ///
         /// Read Only
         processor_priority = 0xA,
@@ -1246,7 +1246,7 @@ pub const LAPIC = union(enum) {
     };
 };
 
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("x64.zig");
 
 const core = @import("core");

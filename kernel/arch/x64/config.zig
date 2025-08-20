@@ -3,7 +3,7 @@
 
 pub const maximum_number_of_io_apics = 8;
 
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const std = @import("std");

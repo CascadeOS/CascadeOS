@@ -13,8 +13,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn registerTimeSource(context: *kernel.Context, candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
-        const acpi_table = kernel.acpi.getTable(kernel.acpi.tables.HPET, 0) orelse return;
+    pub fn registerTimeSource(context: *cascade.Context, candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
+        const acpi_table = cascade.acpi.getTable(cascade.acpi.tables.HPET, 0) orelse return;
         acpi_table.deinit();
 
         candidate_time_sources.addTimeSource(context, .{
@@ -28,7 +28,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET(context: *kernel.Context) void {
+    fn initializeHPET(context: *cascade.Context) void {
         globals.hpet = .{ .base = getHpetBase() };
         init_log.debug(context, "using hpet: {}", .{globals.hpet});
 
@@ -63,7 +63,7 @@ pub const init = struct {
     }
 
     fn referenceCounterWaitFor(duration: core.Duration) void {
-        const duration_ticks = ((duration.value * kernel.time.fs_per_ns) / globals.tick_duration_fs);
+        const duration_ticks = ((duration.value * cascade.time.fs_per_ns) / globals.tick_duration_fs);
 
         const current_value = globals.hpet.readCounterRegister();
 
@@ -75,7 +75,7 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        const acpi_table = kernel.acpi.getTable(kernel.acpi.tables.HPET, 0) orelse {
+        const acpi_table = cascade.acpi.getTable(cascade.acpi.tables.HPET, 0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
             @panic("hpet table missing");
         };
@@ -85,12 +85,12 @@ pub const init = struct {
 
         if (hpet_table.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
 
-        return kernel.mem
+        return cascade.mem
             .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet_table.base_address.address))
             .toPtr([*]volatile u64);
     }
 
-    const init_log = kernel.debug.log.scoped(.init_hpet);
+    const init_log = cascade.debug.log.scoped(.init_hpet);
 };
 
 /// High Precision Event Timer (HPET)
@@ -321,9 +321,9 @@ const Hpet = struct {
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("x64.zig");
 
 const core = @import("core");
 const std = @import("std");
-const Tick = kernel.time.wallclock.Tick;
+const Tick = cascade.time.wallclock.Tick;

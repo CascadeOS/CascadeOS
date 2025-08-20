@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 pub fn nonMaskableInterruptHandler(
-    _: *kernel.Context,
+    _: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
-    if (kernel.debug.globals.panicking_executor.load(.acquire) == null) {
+    if (cascade.debug.globals.panicking_executor.load(.acquire) == null) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
     }
 
@@ -16,7 +16,7 @@ pub fn nonMaskableInterruptHandler(
 }
 
 pub fn pageFaultHandler(
-    context: *kernel.Context,
+    context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -26,7 +26,7 @@ pub fn pageFaultHandler(
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
     const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
-    kernel.entry.onPageFault(context, .{
+    cascade.entry.onPageFault(context, .{
         .faulting_address = faulting_address,
 
         .access_type = if (error_code.write)
@@ -49,36 +49,36 @@ pub fn pageFaultHandler(
 }
 
 pub fn flushRequestHandler(
-    context: *kernel.Context,
+    context: *cascade.Context,
     _: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
-    kernel.entry.onFlushRequest(context);
+    cascade.entry.onFlushRequest(context);
     // eoi after all current flush requests have been handled
     x64.apic.eoi();
 }
 
 pub fn perExecutorPeriodicHandler(
-    context: *kernel.Context,
+    context: *cascade.Context,
     _: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
     // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
-    kernel.entry.onPerExecutorPeriodic(context);
+    cascade.entry.onPerExecutorPeriodic(context);
 }
 
 pub fn unhandledException(
-    context: *kernel.Context,
+    context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
     switch (arch_interrupt_frame.environment(context)) {
-        .kernel => kernel.debug.interruptSourcePanic(
+        .kernel => cascade.debug.interruptSourcePanic(
             context,
             interrupt_frame,
             "unhandled kernel exception: {t}",
@@ -92,7 +92,7 @@ pub fn unhandledException(
 ///
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(
-    context: *kernel.Context,
+    context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: ?*anyopaque,
     _: ?*anyopaque,
@@ -102,7 +102,7 @@ pub fn unhandledInterrupt(
 }
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("../x64.zig");
 
 const core = @import("core");

@@ -3,7 +3,7 @@
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *kernel.Executor {
+        inline fn getCurrentExecutor() *cascade.Executor {
             return @ptrFromInt(riscv.registers.SupervisorScratch.read());
         }
     }.getCurrentExecutor,
@@ -31,13 +31,13 @@ pub const functions: arch.Functions = .{
 
     .init = .{
         .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
                 return @enumFromInt(riscv.instructions.readTime());
             }
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(context: *kernel.Context) ?arch.init.InitOutput {
+            fn tryGetSerialOutput(context: *cascade.Context) ?arch.init.InitOutput {
                 if (riscv.sbi_debug_console.detect()) {
                     log.debug(context, "using sbi debug console for serial output", .{});
                     return .{
@@ -49,12 +49,12 @@ pub const functions: arch.Functions = .{
                 return null;
             }
 
-            const log = kernel.debug.log.scoped(.init_riscv);
+            const log = cascade.debug.log.scoped(.init_riscv);
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                context: *kernel.Context,
+                context: *cascade.Context,
                 architecture_processor_id: u64,
             ) void {
                 context.executor.?.arch_specific = .{
@@ -64,7 +64,7 @@ pub const functions: arch.Functions = .{
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(context: *kernel.Context) void {
+            fn loadExecutor(context: *cascade.Context) void {
                 riscv.registers.SupervisorScratch.write(@intFromPtr(context.executor.?));
             }
         }.loadExecutor,
@@ -98,7 +98,7 @@ pub const decls: arch.Decls = .{
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const riscv = @import("riscv.zig");
 

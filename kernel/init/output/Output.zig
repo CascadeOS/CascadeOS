@@ -9,19 +9,19 @@ splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
-remapFn: *const fn (state: *anyopaque, context: *kernel.Context) anyerror!void,
+remapFn: *const fn (state: *anyopaque, context: *cascade.Context) anyerror!void,
 
 state: *anyopaque,
 
 pub const writer = &globals.writer;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
-pub fn remapOutputs(context: *kernel.Context) !void {
+pub fn remapOutputs(context: *cascade.Context) !void {
     if (globals.framebuffer_output) |output| try output.remapFn(output.state, context);
     if (globals.serial_output) |output| try output.remapFn(output.state, context);
 }
 
-pub fn registerOutputs(context: *kernel.Context) void {
+pub fn registerOutputs(context: *cascade.Context) void {
     if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
         globals.framebuffer_output = output;
     }
@@ -40,20 +40,20 @@ pub fn registerOutputs(context: *kernel.Context) void {
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources(context: *kernel.Context) ?init.Output {
+fn tryGetSerialOutputFromGenericSources(context: *cascade.Context) ?init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
 
     blk: {
-        if (kernel.acpi.tables.SPCR.init.tryGetSerialOutput(context)) |output_uart| {
+        if (cascade.acpi.tables.SPCR.init.tryGetSerialOutput(context)) |output_uart| {
             log.debug(context, "got serial output from SPCR", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (kernel.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
+        if (cascade.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
             log.debug(context, "got serial output from DBG2", .{});
 
             static.init_output_uart = output_uart;
@@ -92,7 +92,7 @@ fn splatToOutputs(str: []const u8, splat: usize) void {
 }
 
 pub const globals = struct {
-    pub var lock: kernel.sync.TicketSpinLock = .{};
+    pub var lock: cascade.sync.TicketSpinLock = .{};
 
     var framebuffer_output: ?Output = null;
     var serial_output: ?Output = null;
@@ -136,8 +136,8 @@ pub const uart = @import("uart.zig");
 
 const arch = @import("arch");
 const init = @import("init");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
-const log = kernel.debug.log.scoped(.init_output);
+const log = cascade.debug.log.scoped(.init_output);
 const std = @import("std");

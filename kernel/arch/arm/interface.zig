@@ -3,7 +3,7 @@
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *kernel.Executor {
+        inline fn getCurrentExecutor() *cascade.Executor {
             return @ptrFromInt(arm.registers.TPIDR_EL1.read());
         }
     }.getCurrentExecutor,
@@ -30,20 +30,20 @@ pub const functions: arch.Functions = .{
 
     .init = .{
         .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
                 return @enumFromInt(arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
             }
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(_: *kernel.Context) ?arch.init.InitOutput {
+            fn tryGetSerialOutput(_: *cascade.Context) ?arch.init.InitOutput {
                 return null;
             }
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                context: *kernel.Context,
+                context: *cascade.Context,
                 architecture_processor_id: u64,
             ) void {
                 context.executor.?.arch_specific = .{
@@ -53,7 +53,7 @@ pub const functions: arch.Functions = .{
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(context: *kernel.Context) void {
+            fn loadExecutor(context: *cascade.Context) void {
                 arm.registers.TPIDR_EL1.write(@intFromPtr(context.executor.?));
             }
         }.loadExecutor,
@@ -87,7 +87,7 @@ pub const decls: arch.Decls = .{
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const arm = @import("arm.zig");
 

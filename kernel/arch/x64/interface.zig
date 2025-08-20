@@ -3,7 +3,7 @@
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *kernel.Executor {
+        inline fn getCurrentExecutor() *cascade.Executor {
             return @ptrFromInt(x64.registers.KERNEL_GS_BASE.read());
         }
     }.getCurrentExecutor,
@@ -47,7 +47,7 @@ pub const functions: arch.Functions = .{
         .createPageTable = x64.paging.createPageTable,
 
         .loadPageTable = struct {
-            fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
+            fn loadPageTable(physical_frame: cascade.mem.phys.Frame) void {
                 x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
             }
         }.loadPageTable,
@@ -162,7 +162,7 @@ pub const decls: arch.Decls = .{
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const x64 = @import("x64.zig");
 

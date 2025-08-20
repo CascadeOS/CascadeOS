@@ -5,8 +5,8 @@ pub const PageTable = @import("PageTable.zig").PageTable;
 pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
 
 /// Create a new page table in the given physical frame.
-pub fn createPageTable(physical_frame: kernel.mem.phys.Frame) *PageTable {
-    const page_table = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
+pub fn createPageTable(physical_frame: cascade.mem.phys.Frame) *PageTable {
+    const page_table = cascade.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
     page_table.zero();
     return page_table;
 }
@@ -30,16 +30,16 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
 
 /// Maps a 4 KiB page.
 pub fn map4KiB(
-    context: *kernel.Context,
+    context: *cascade.Context,
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
-    physical_frame: kernel.mem.phys.Frame,
+    physical_frame: cascade.mem.phys.Frame,
     map_type: MapType,
-    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
-) kernel.mem.MapError!void {
+    physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+) cascade.mem.MapError!void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
-    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+    var deallocate_frame_list: cascade.mem.phys.FrameList = .{};
     errdefer physical_frame_allocator.deallocate(context, deallocate_frame_list);
 
     const level4_index = PageTable.p4Index(virtual_address);
@@ -99,7 +99,7 @@ pub fn map4KiB(
     ) catch |err| switch (err) {
         error.WriteCombiningAndNoCache => {
             log.err(context, "write combining and no cache not supported", .{});
-            return kernel.mem.MapError.MappingNotValid;
+            return cascade.mem.MapError.MappingNotValid;
         },
         else => |e| return e,
     };
@@ -113,7 +113,7 @@ pub fn unmap4KiB(
     virtual_address: core.VirtualAddress,
     backing_page_decision: core.CleanupDecision,
     top_level_decision: core.CleanupDecision,
-    deallocate_frame_list: *kernel.mem.phys.FrameList,
+    deallocate_frame_list: *cascade.mem.phys.FrameList,
 ) void {
     std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
@@ -121,7 +121,7 @@ pub fn unmap4KiB(
     const level4_entry = level4_table.entries[level4_index].load();
 
     const level3_table = level4_entry.getNextLevel(
-        kernel.mem.directMapFromPhysical,
+        cascade.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
         error.NotPresent => @panic("page table entry is not present"),
         error.HugePage => @panic("page table entry is huge"),
@@ -136,7 +136,7 @@ pub fn unmap4KiB(
     const level3_entry = level3_table.entries[level3_index].load();
 
     const level2_table = level3_entry.getNextLevel(
-        kernel.mem.directMapFromPhysical,
+        cascade.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
         error.NotPresent => @panic("page table entry is not present"),
         error.HugePage => @panic("page table entry is huge"),
@@ -151,7 +151,7 @@ pub fn unmap4KiB(
     const level2_entry = level2_table.entries[level2_index].load();
 
     const level1_table = level2_entry.getNextLevel(
-        kernel.mem.directMapFromPhysical,
+        cascade.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
         error.NotPresent => @panic("page table entry is not present"),
         error.HugePage => @panic("page table entry is huge"),
@@ -215,9 +215,9 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
-    context: *kernel.Context,
+    context: *cascade.Context,
     raw_entry: *PageTable.Entry.Raw,
-    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    physical_frame_allocator: cascade.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 
@@ -236,7 +236,7 @@ fn ensureNextTable(
         errdefer comptime unreachable;
 
         const physical_address = physical_frame.baseAddress();
-        kernel.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
+        cascade.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
 
         entry.setAddress4kib(physical_address);
         entry.present.write(true);
@@ -252,7 +252,7 @@ fn ensureNextTable(
     };
 
     return .{
-        kernel.mem
+        cascade.mem
             .directMapFromPhysical(next_level_physical_address)
             .toPtr(*PageTable),
         created_table,
@@ -302,10 +302,10 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn fillTopLevel(
-        context: *kernel.Context,
+        context: *cascade.Context,
         page_table: *PageTable,
         range: core.VirtualRange,
-        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        physical_frame_allocator: cascade.mem.phys.FrameAllocator,
     ) !void {
         const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
         std.debug.assert(range.size.equal(size_of_top_level_entry));
@@ -332,12 +332,12 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn mapToPhysicalRangeAllPageSizes(
-        context: *kernel.Context,
+        context: *cascade.Context,
         level4_table: *PageTable,
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,
         map_type: MapType,
-        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        physical_frame_allocator: cascade.mem.phys.FrameAllocator,
     ) !void {
         std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
         std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
@@ -476,14 +476,14 @@ pub const init = struct {
         );
     }
 
-    const init_log = kernel.debug.log.scoped(.init_paging);
+    const init_log = cascade.debug.log.scoped(.init_paging);
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("../x64.zig");
 
 const core = @import("core");
-const log = kernel.debug.log.scoped(.paging);
-const MapType = kernel.mem.MapType;
+const log = cascade.debug.log.scoped(.paging);
+const MapType = cascade.mem.MapType;
 const std = @import("std");

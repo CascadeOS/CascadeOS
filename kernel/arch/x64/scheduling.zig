@@ -3,9 +3,9 @@
 
 /// Prepares the executor for jumping from `old_task` to `new_task`.
 pub fn prepareForJumpToTaskFromTask(
-    executor: *kernel.Executor,
-    old_task: *kernel.Task,
-    new_task: *kernel.Task,
+    executor: *cascade.Executor,
+    old_task: *cascade.Task,
+    new_task: *cascade.Task,
 ) void {
     switch (old_task.environment) {
         .kernel => switch (new_task.environment) {
@@ -19,7 +19,7 @@ pub fn prepareForJumpToTaskFromTask(
             },
         },
         .user => |old_process| switch (new_task.environment) {
-            .kernel => kernel.mem.globals.core_page_table.load(),
+            .kernel => cascade.mem.globals.core_page_table.load(),
             .user => |new_process| if (old_process != new_process) {
                 new_process.address_space.page_table.load();
                 executor.arch_specific.tss.setPrivilegeStack(
@@ -37,7 +37,7 @@ pub fn prepareForJumpToTaskFromTask(
 ///
 /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
 pub fn jumpToTask(
-    task: *kernel.Task,
+    task: *cascade.Task,
 ) noreturn {
     const impls = struct {
         const jumpToTask: *const fn (
@@ -81,8 +81,8 @@ pub fn jumpToTask(
 ///
 /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
 pub fn jumpToTaskFromTask(
-    old_task: *kernel.Task,
-    new_task: *kernel.Task,
+    old_task: *cascade.Task,
+    new_task: *cascade.Task,
 ) void {
     const impls = struct {
         const jumpToTaskFromTask: *const fn (
@@ -136,7 +136,7 @@ pub fn jumpToTaskFromTask(
 /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
 /// the given arguments.
 pub fn prepareNewTaskForScheduling(
-    task: *kernel.Task,
+    task: *cascade.Task,
     target_function: arch.scheduling.NewTaskFunction,
     arg1: usize,
     arg2: usize,
@@ -150,7 +150,7 @@ pub fn prepareNewTaskForScheduling(
                         \\pop %rsi // target_function
                         \\pop %rdx // arg1
                         \\pop %rcx // arg2
-                        \\ret // the return address of `kernel.scheduler.newTaskEntry` should be on the stack
+                        \\ret // the return address of `cascade.scheduler.newTaskEntry` should be on the stack
                     );
                 }
             }.impl;
@@ -159,7 +159,7 @@ pub fn prepareNewTaskForScheduling(
         };
     };
 
-    try task.stack.push(@intFromPtr(&kernel.scheduler.newTaskEntry));
+    try task.stack.push(@intFromPtr(&cascade.scheduler.newTaskEntry));
 
     try task.stack.push(arg2);
     try task.stack.push(arg1);
@@ -174,8 +174,8 @@ pub fn prepareNewTaskForScheduling(
 
 /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
 pub fn callTwoArgs(
-    opt_old_task: ?*kernel.Task,
-    new_stack: kernel.Task.Stack,
+    opt_old_task: ?*cascade.Task,
+    new_stack: cascade.Task.Stack,
     arg1: usize,
     arg2: usize,
     target_function: *const fn (usize, usize) callconv(.c) noreturn,
@@ -253,8 +253,8 @@ pub fn callTwoArgs(
 
 /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
 pub fn callFourArgs(
-    opt_old_task: ?*kernel.Task,
-    new_stack: kernel.Task.Stack,
+    opt_old_task: ?*cascade.Task,
+    new_stack: cascade.Task.Stack,
     arg1: usize,
     arg2: usize,
     arg3: usize,
@@ -343,7 +343,7 @@ pub fn callFourArgs(
 }
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const std = @import("std");

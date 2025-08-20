@@ -4,7 +4,7 @@
 pub const components: []const KernelComponent = &.{
     .{
         .name = "arch",
-        .component_dependencies = &.{"kernel"},
+        .component_dependencies = &.{"cascade"},
         .library_dependencies = &.{ "core", "bitjuggle" },
         .configuration = @import("arch/custom_configuration.zig").customConfiguration,
     },
@@ -14,16 +14,16 @@ pub const components: []const KernelComponent = &.{
         .library_dependencies = &.{ "core", "limine" },
     },
     .{
-        .name = "init",
-        .component_dependencies = &.{ "arch", "boot", "kernel" },
-        .library_dependencies = &.{"core"},
-        .configuration = @import("init/custom_configuration.zig").customConfiguration,
-    },
-    .{
-        .name = "kernel",
+        .name = "cascade",
         .component_dependencies = &.{ "arch", "init" },
         .library_dependencies = &.{ "core", "sdf" },
-        .configuration = @import("kernel/custom_configuration.zig").customConfiguration,
+        .configuration = @import("cascade/custom_configuration.zig").customConfiguration,
+    },
+    .{
+        .name = "init",
+        .component_dependencies = &.{ "arch", "boot", "cascade" },
+        .library_dependencies = &.{"core"},
+        .configuration = @import("init/custom_configuration.zig").customConfiguration,
     },
 };
 

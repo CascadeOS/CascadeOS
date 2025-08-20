@@ -21,7 +21,7 @@ pub const output: arch.init.InitOutput.Output = .{
         }
     }.splatFn,
     .remapFn = struct {
-        fn remapFn(_: *anyopaque, _: *kernel.Context) !void {
+        fn remapFn(_: *anyopaque, _: *cascade.Context) !void {
             return;
         }
     }.remapFn,
@@ -37,6 +37,6 @@ fn writeStr(str: []const u8) void {
 }
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const sbi = @import("sbi");

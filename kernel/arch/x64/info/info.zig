@@ -39,7 +39,7 @@ pub var mtrr_number_of_variable_registers: u8 = 0;
 /// Are write combining memory types supported?
 pub var mtrr_write_combining_supported: bool = false;
 
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const std = @import("std");

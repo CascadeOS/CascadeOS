@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput(context: *kernel.Context) ?arch.init.InitOutput {
+pub fn tryGetSerialOutput(context: *cascade.Context) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
         log.debug(context, "using debug console for serial output", .{});
         return .{
@@ -42,12 +42,12 @@ pub fn tryGetSerialOutput(context: *kernel.Context) ?arch.init.InitOutput {
 
 /// Prepares the provided `Executor` for the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    context: *kernel.Context,
+    context: *cascade.Context,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
-        var bootstrap_double_fault_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
-        var bootstrap_non_maskable_interrupt_stack: [kernel.config.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_double_fault_stack: [cascade.config.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_non_maskable_interrupt_stack: [cascade.config.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
     prepareExecutorShared(context.executor.?, @intCast(architecture_processor_id), .fromRange(
@@ -62,20 +62,20 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(context: *kernel.Context, executor: *kernel.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(context: *cascade.Context, executor: *cascade.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        kernel.Task.init.earlyCreateStack(context) catch @panic("failed to allocate double fault stack"),
-        kernel.Task.init.earlyCreateStack(context) catch @panic("failed to allocate NMI stack"),
+        cascade.Task.init.earlyCreateStack(context) catch @panic("failed to allocate double fault stack"),
+        cascade.Task.init.earlyCreateStack(context) catch @panic("failed to allocate NMI stack"),
     );
 }
 
 fn prepareExecutorShared(
-    executor: *kernel.Executor,
+    executor: *cascade.Executor,
     apic_id: u32,
-    double_fault_stack: kernel.Task.Stack,
-    non_maskable_interrupt_stack: kernel.Task.Stack,
+    double_fault_stack: cascade.Task.Stack,
+    non_maskable_interrupt_stack: cascade.Task.Stack,
 ) void {
     executor.arch_specific = .{
         .apic_id = apic_id,
@@ -94,7 +94,7 @@ fn prepareExecutorShared(
 }
 
 /// Load the provided `Executor` as the current executor.
-pub fn loadExecutor(context: *kernel.Context) void {
+pub fn loadExecutor(context: *cascade.Context) void {
     const executor = context.executor.?;
 
     executor.arch_specific.gdt.load();
@@ -108,7 +108,7 @@ pub fn loadExecutor(context: *kernel.Context) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation(context: *kernel.Context) void {
+pub fn captureEarlySystemInformation(context: *cascade.Context) void {
     log.debug(context, "capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
@@ -127,13 +127,13 @@ pub fn captureEarlySystemInformation(context: *kernel.Context) void {
     }
 
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
-        const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
+        const lapic_base_tick_duration_fs = cascade.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
         log.debug(context, "lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
     }
 
     if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
-        const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
+        const tsc_tick_duration_fs = cascade.time.fs_per_s / tsc_frequency;
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
         log.debug(context, "tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
@@ -147,15 +147,15 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(
-    context: *kernel.Context,
+    context: *cascade.Context,
     options: CaptureSystemInformationOptions,
 ) !void {
-    const madt_acpi_table = kernel.acpi.getTable(kernel.acpi.tables.MADT, 0) orelse
+    const madt_acpi_table = cascade.acpi.getTable(cascade.acpi.tables.MADT, 0) orelse
         return error.NoMADT;
     defer madt_acpi_table.deinit();
     const madt = madt_acpi_table.table;
 
-    const fadt_acpi_table = kernel.acpi.getTable(kernel.acpi.tables.FADT, 0) orelse
+    const fadt_acpi_table = cascade.acpi.getTable(cascade.acpi.tables.FADT, 0) orelse
         return error.NoFADT;
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
@@ -188,7 +188,7 @@ pub fn captureSystemInformation(
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures(context: *kernel.Context) void {
+pub fn configureGlobalSystemFeatures(context: *cascade.Context) void {
     if (x64.info.have_pic) {
         log.debug(context, "disabling pic", .{});
         disablePic();
@@ -241,7 +241,7 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
-pub fn configurePerExecutorSystemFeatures(context: *kernel.Context) void {
+pub fn configurePerExecutorSystemFeatures(context: *cascade.Context) void {
     if (x64.info.cpu_id.rdtscp) {
         x64.registers.IA32_TSC_AUX.write(@intFromEnum(context.executor.?.id));
     }
@@ -335,8 +335,8 @@ pub fn configurePerExecutorSystemFeatures(context: *kernel.Context) void {
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
-    context: *kernel.Context,
-    candidate_time_sources: *kernel.time.init.CandidateTimeSources,
+    context: *cascade.Context,
+    candidate_time_sources: *cascade.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(context, candidate_time_sources);
     x64.hpet.init.registerTimeSource(context, candidate_time_sources);
@@ -390,7 +390,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: *kernel.Context) !void {
+            fn remapFn(_: *anyopaque, _: *cascade.Context) !void {
                 return;
             }
         }.remapFn,
@@ -399,10 +399,10 @@ const DebugCon = struct {
 };
 
 const arch = @import("arch");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 const x64 = @import("x64.zig");
 
 const core = @import("core");
-const log = kernel.debug.log.scoped(.init_x64);
+const log = cascade.debug.log.scoped(.init_x64);
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
 const std = @import("std");

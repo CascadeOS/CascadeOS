@@ -14,7 +14,7 @@ pub const PerExecutor = current_decls.PerExecutor;
 /// Get the current `Executor`.
 ///
 /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
+pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *cascade.Executor {
     return getFunction(
         current_functions,
         "getCurrentExecutor",
@@ -84,7 +84,7 @@ pub const interrupts = struct {
     }
 
     /// Send a flush IPI to the given executor.
-    pub fn sendFlushIPI(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
+    pub fn sendFlushIPI(executor: *cascade.Executor) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.interrupts,
             "sendFlushIPI",
@@ -95,7 +95,7 @@ pub const interrupts = struct {
         arch_specific: current_decls.interrupts.Interrupt,
 
         pub const Handler = *const fn (
-            context: *kernel.Context,
+            context: *cascade.Context,
             frame: InterruptFrame,
             arg1: ?*anyopaque,
             arg2: ?*anyopaque,
@@ -104,7 +104,7 @@ pub const interrupts = struct {
         pub const AllocateError = error{InterruptAllocationFailed};
 
         pub fn allocate(
-            context: *kernel.Context,
+            context: *cascade.Context,
             handler: Handler,
             arg1: ?*anyopaque,
             arg2: ?*anyopaque,
@@ -117,7 +117,7 @@ pub const interrupts = struct {
             };
         }
 
-        pub fn deallocate(interrupt: Interrupt, context: *kernel.Context) callconv(core.inline_in_non_debug) void {
+        pub fn deallocate(interrupt: Interrupt, context: *cascade.Context) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts,
                 "deallocateInterrupt",
@@ -183,7 +183,7 @@ pub const interrupts = struct {
         }
 
         /// Prepare interrupt allocation and routing.
-        pub fn initializeInterruptRouting(context: *kernel.Context) callconv(core.inline_in_non_debug) !void {
+        pub fn initializeInterruptRouting(context: *cascade.Context) callconv(core.inline_in_non_debug) !void {
             return getFunction(
                 current_functions.interrupts.init,
                 "initializeInterruptRouting",
@@ -217,11 +217,11 @@ pub const paging = struct {
     pub const higher_half_start: core.VirtualAddress = current_decls.paging.higher_half_start;
 
     pub const PageTable = struct {
-        physical_frame: kernel.mem.phys.Frame,
+        physical_frame: cascade.mem.phys.Frame,
         arch_specific: *current_decls.paging.PageTable,
 
         /// Create a new page table in the given physical frame.
-        pub fn create(physical_frame: kernel.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
+        pub fn create(physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
             return .{
                 .physical_frame = physical_frame,
                 .arch_specific = getFunction(
@@ -260,13 +260,13 @@ pub const paging = struct {
     ///  - only supports the standard page size for the architecture
     ///  - does not flush the TLB
     pub fn mapSinglePage(
-        context: *kernel.Context,
+        context: *cascade.Context,
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
-        physical_frame: kernel.mem.phys.Frame,
-        map_type: kernel.mem.MapType,
-        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
-    ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
+        physical_frame: cascade.mem.phys.Frame,
+        map_type: cascade.mem.MapType,
+        physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+    ) callconv(core.inline_in_non_debug) cascade.mem.MapError!void {
         return getFunction(
             current_functions.paging,
             "mapSinglePage",
@@ -286,7 +286,7 @@ pub const paging = struct {
         virtual_address: core.VirtualAddress,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
-        deallocate_frame_list: *kernel.mem.phys.FrameList,
+        deallocate_frame_list: *cascade.mem.phys.FrameList,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.paging,
@@ -321,10 +321,10 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn fillTopLevel(
-            context: *kernel.Context,
+            context: *cascade.Context,
             page_table: PageTable,
             range: core.VirtualRange,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
                 current_functions.paging.init,
@@ -345,12 +345,12 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
-            context: *kernel.Context,
+            context: *cascade.Context,
             page_table: PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
-            map_type: kernel.mem.MapType,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            map_type: cascade.mem.MapType,
+            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
                 current_functions.paging.init,
@@ -363,9 +363,9 @@ pub const paging = struct {
 pub const scheduling = struct {
     /// Prepares the executor for jumping from `old_task` to `new_task`.
     pub fn prepareForJumpToTaskFromTask(
-        executor: *kernel.Executor,
-        old_task: *kernel.Task,
-        new_task: *kernel.Task,
+        executor: *cascade.Executor,
+        old_task: *cascade.Task,
+        new_task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
@@ -379,7 +379,7 @@ pub const scheduling = struct {
     ///
     /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
     pub fn jumpToTask(
-        task: *kernel.Task,
+        task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) noreturn {
         getFunction(
             current_functions.scheduling,
@@ -393,8 +393,8 @@ pub const scheduling = struct {
     ///
     /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
     pub fn jumpToTaskFromTask(
-        old_task: *kernel.Task,
-        new_task: *kernel.Task,
+        old_task: *cascade.Task,
+        new_task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
@@ -403,7 +403,7 @@ pub const scheduling = struct {
     }
 
     pub const NewTaskFunction = *const fn (
-        context: *kernel.Context,
+        context: *cascade.Context,
         arg1: usize,
         arg2: usize,
     ) noreturn;
@@ -413,7 +413,7 @@ pub const scheduling = struct {
     /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
     /// the given arguments.
     pub fn prepareNewTaskForScheduling(
-        task: *kernel.Task,
+        task: *cascade.Task,
         target_function: NewTaskFunction,
         arg1: usize,
         arg2: usize,
@@ -428,8 +428,8 @@ pub const scheduling = struct {
 
     /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub fn callTwoArgs(
-        opt_old_task: ?*kernel.Task,
-        new_stack: kernel.Task.Stack,
+        opt_old_task: ?*cascade.Task,
+        new_stack: cascade.Task.Stack,
         arg1: usize,
         arg2: usize,
         target_function: *const fn (usize, usize) callconv(.c) noreturn,
@@ -442,8 +442,8 @@ pub const scheduling = struct {
 
     /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub fn callFourArgs(
-        opt_old_task: ?*kernel.Task,
-        new_stack: kernel.Task.Stack,
+        opt_old_task: ?*cascade.Task,
+        new_stack: cascade.Task.Stack,
         arg1: usize,
         arg2: usize,
         arg3: usize,
@@ -516,7 +516,7 @@ pub const init = struct {
     /// Read current wallclock time from the standard wallclock source of the current architecture.
     ///
     /// For example on x86_64 this is the TSC.
-    pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+    pub fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
         return getFunction(
             current_functions.init,
             "getStandardWallclockStartTime",
@@ -527,7 +527,7 @@ pub const init = struct {
         output: Output,
         preference: Preference,
 
-        pub const Output = kernel.exports.Output;
+        pub const Output = cascade.exports.Output;
 
         pub const Preference = enum {
             /// Use this output.
@@ -539,7 +539,7 @@ pub const init = struct {
     };
 
     /// Attempt to get some form of architecture specific init output if it is available.
-    pub fn tryGetSerialOutput(context: *kernel.Context) callconv(core.inline_in_non_debug) ?InitOutput {
+    pub fn tryGetSerialOutput(context: *cascade.Context) callconv(core.inline_in_non_debug) ?InitOutput {
         return getFunction(
             current_functions.init,
             "tryGetSerialOutput",
@@ -548,7 +548,7 @@ pub const init = struct {
 
     /// Prepares the current executor as the bootstrap executor.
     pub fn prepareBootstrapExecutor(
-        context: *kernel.Context,
+        context: *cascade.Context,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
@@ -561,8 +561,8 @@ pub const init = struct {
     ///
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
     pub fn prepareExecutor(
-        context: *kernel.Context,
-        executor: *kernel.Executor,
+        context: *cascade.Context,
+        executor: *cascade.Executor,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
@@ -572,7 +572,7 @@ pub const init = struct {
     }
 
     /// Load the executor of the provided `Context` as the current executor.
-    pub fn loadExecutor(context: *kernel.Context) callconv(core.inline_in_non_debug) void {
+    pub fn loadExecutor(context: *cascade.Context) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "loadExecutor",
@@ -582,7 +582,7 @@ pub const init = struct {
     /// Capture any system information that can be without using mmio.
     ///
     /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-    pub fn captureEarlySystemInformation(context: *kernel.Context) callconv(core.inline_in_non_debug) void {
+    pub fn captureEarlySystemInformation(context: *cascade.Context) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "captureEarlySystemInformation",
@@ -595,7 +595,7 @@ pub const init = struct {
     ///
     /// For example, on x64 this should capture APIC and ACPI information.
     pub fn captureSystemInformation(
-        context: *kernel.Context,
+        context: *cascade.Context,
         options: CaptureSystemInformationOptions,
     ) callconv(core.inline_in_non_debug) anyerror!void {
         return getFunction(
@@ -605,7 +605,7 @@ pub const init = struct {
     }
 
     /// Configure any global system features.
-    pub fn configureGlobalSystemFeatures(context: *kernel.Context) callconv(core.inline_in_non_debug) void {
+    pub fn configureGlobalSystemFeatures(context: *cascade.Context) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "configureGlobalSystemFeatures",
@@ -613,7 +613,7 @@ pub const init = struct {
     }
 
     /// Configure any per-executor system features.
-    pub fn configurePerExecutorSystemFeatures(context: *kernel.Context) callconv(core.inline_in_non_debug) void {
+    pub fn configurePerExecutorSystemFeatures(context: *cascade.Context) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "configurePerExecutorSystemFeatures",
@@ -624,8 +624,8 @@ pub const init = struct {
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
     pub fn registerArchitecturalTimeSources(
-        context: *kernel.Context,
-        candidate_time_sources: *kernel.time.init.CandidateTimeSources,
+        context: *cascade.Context,
+        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
@@ -651,7 +651,7 @@ pub const Functions = struct {
     /// Get the current `Executor`.
     ///
     /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-    getCurrentExecutor: ?fn () callconv(.@"inline") *kernel.Executor = null,
+    getCurrentExecutor: ?fn () callconv(.@"inline") *cascade.Executor = null,
 
     /// Issues an architecture specific hint to the executor that we are spinning in a loop.
     spinLoopHint: ?fn () callconv(.@"inline") void = null,
@@ -683,10 +683,10 @@ pub const Functions = struct {
         sendPanicIPI: ?fn () void = null,
 
         /// Send a flush IPI to the given executor.
-        sendFlushIPI: ?fn (*kernel.Executor) void = null,
+        sendFlushIPI: ?fn (*cascade.Executor) void = null,
 
         allocateInterrupt: ?fn (
-            context: *kernel.Context,
+            context: *cascade.Context,
             handler: interrupts.Interrupt.Handler,
             arg1: ?*anyopaque,
             arg2: ?*anyopaque,
@@ -694,7 +694,7 @@ pub const Functions = struct {
 
         deallocateInterrupt: ?fn (
             interrupt: current_decls.interrupts.Interrupt,
-            context: *kernel.Context,
+            context: *cascade.Context,
         ) void = null,
 
         routeInterrupt: ?fn (
@@ -717,7 +717,7 @@ pub const Functions = struct {
             initializeEarlyInterrupts: ?fn () void = null,
 
             /// Prepare interrupt allocation and routing.
-            initializeInterruptRouting: ?fn (context: *kernel.Context) void = null,
+            initializeInterruptRouting: ?fn (context: *cascade.Context) void = null,
 
             /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
             /// system interrupt handlers.
@@ -727,9 +727,9 @@ pub const Functions = struct {
 
     paging: struct {
         /// Create a new page table in the given physical frame.
-        createPageTable: ?fn (physical_frame: kernel.mem.phys.Frame) *current_decls.paging.PageTable = null,
+        createPageTable: ?fn (physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
 
-        loadPageTable: ?fn (physical_frame: kernel.mem.phys.Frame) void = null,
+        loadPageTable: ?fn (physical_frame: cascade.mem.phys.Frame) void = null,
 
         /// Copies the top level of `page_table` into `target_page_table`.
         copyTopLevelIntoPageTable: ?fn (
@@ -747,13 +747,13 @@ pub const Functions = struct {
         ///  - only supports the standard page size for the architecture
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
-            context: *kernel.Context,
+            context: *cascade.Context,
             page_table: *current_decls.paging.PageTable,
             virtual_address: core.VirtualAddress,
-            physical_frame: kernel.mem.phys.Frame,
-            map_type: kernel.mem.MapType,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
-        ) kernel.mem.MapError!void = null,
+            physical_frame: cascade.mem.phys.Frame,
+            map_type: cascade.mem.MapType,
+            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+        ) cascade.mem.MapError!void = null,
 
         /// Unmaps `virtual_address`.
         ///
@@ -768,7 +768,7 @@ pub const Functions = struct {
             virtual_address: core.VirtualAddress,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
-            deallocate_frame_list: *kernel.mem.phys.FrameList,
+            deallocate_frame_list: *cascade.mem.phys.FrameList,
         ) void = null,
 
         /// Flushes the cache for the given virtual range on the current executor.
@@ -788,10 +788,10 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             fillTopLevel: ?fn (
-                context: *kernel.Context,
+                context: *cascade.Context,
                 page_table: *current_decls.paging.PageTable,
                 range: core.VirtualRange,
-                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+                physical_frame_allocator: cascade.mem.phys.FrameAllocator,
             ) anyerror!void = null,
 
             /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -807,12 +807,12 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             mapToPhysicalRangeAllPageSizes: ?fn (
-                context: *kernel.Context,
+                context: *cascade.Context,
                 page_table: *current_decls.paging.PageTable,
                 virtual_range: core.VirtualRange,
                 physical_range: core.PhysicalRange,
-                map_type: kernel.mem.MapType,
-                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+                map_type: cascade.mem.MapType,
+                physical_frame_allocator: cascade.mem.phys.FrameAllocator,
             ) anyerror!void = null,
         },
     },
@@ -820,9 +820,9 @@ pub const Functions = struct {
     scheduling: struct {
         /// Prepares the executor for jumping from `old_task` to `new_task`.
         prepareForJumpToTaskFromTask: ?fn (
-            executor: *kernel.Executor,
-            old_task: *kernel.Task,
-            new_task: *kernel.Task,
+            executor: *cascade.Executor,
+            old_task: *cascade.Task,
+            new_task: *cascade.Task,
         ) void = null,
 
         /// Jumps to the given task without saving the old task's state.
@@ -830,21 +830,21 @@ pub const Functions = struct {
         /// If the old task is ever rescheduled undefined behaviour may occur.
         ///
         /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-        jumpToTask: ?fn (task: *kernel.Task) noreturn = null,
+        jumpToTask: ?fn (task: *cascade.Task) noreturn = null,
 
         /// Jumps from `old_task` to `new_task`.
         ///
         /// Saves the old task's state to allow it to be resumed later.
         ///
         /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-        jumpToTaskFromTask: ?fn (old_task: *kernel.Task, new_task: *kernel.Task) void = null,
+        jumpToTaskFromTask: ?fn (old_task: *cascade.Task, new_task: *cascade.Task) void = null,
 
         /// Prepares the given task for being scheduled.
         ///
         /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
         /// the given arguments.
         prepareNewTaskForScheduling: ?fn (
-            task: *kernel.Task,
+            task: *cascade.Task,
             target_function: scheduling.NewTaskFunction,
             arg1: usize,
             arg2: usize,
@@ -852,8 +852,8 @@ pub const Functions = struct {
 
         /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
         callTwoArgs: ?fn (
-            opt_old_task: ?*kernel.Task,
-            new_stack: kernel.Task.Stack,
+            opt_old_task: ?*cascade.Task,
+            new_stack: cascade.Task.Stack,
             arg1: usize,
             arg2: usize,
             target_function: *const fn (usize, usize) callconv(.c) noreturn,
@@ -861,8 +861,8 @@ pub const Functions = struct {
 
         /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
         callFourArgs: ?fn (
-            opt_old_task: ?*kernel.Task,
-            new_stack: kernel.Task.Stack,
+            opt_old_task: ?*cascade.Task,
+            new_stack: cascade.Task.Stack,
             arg1: usize,
             arg2: usize,
             arg3: usize,
@@ -887,57 +887,57 @@ pub const Functions = struct {
         /// For example on x86_64 this is the TSC.
         ///
         /// Non-optional because it is used during early initialization.
-        getStandardWallclockStartTime: fn () kernel.time.wallclock.Tick,
+        getStandardWallclockStartTime: fn () cascade.time.wallclock.Tick,
 
         /// Attempt to get some form of architecture specific init output if it is available.
         ///
         /// Non-optional because it is used during early initialization.
-        tryGetSerialOutput: fn (context: *kernel.Context) ?init.InitOutput,
+        tryGetSerialOutput: fn (context: *cascade.Context) ?init.InitOutput,
 
         /// Prepares the current executor as the bootstrap executor.
-        prepareBootstrapExecutor: ?fn (context: *kernel.Context, u64) void = null,
+        prepareBootstrapExecutor: ?fn (context: *cascade.Context, u64) void = null,
 
         /// Prepares the provided `Executor` for use.
         ///
         /// **WARNING**: This function will panic if the cpu cannot be prepared.
         prepareExecutor: ?fn (
-            context: *kernel.Context,
-            executor: *kernel.Executor,
+            context: *cascade.Context,
+            executor: *cascade.Executor,
             architecture_processor_id: u64,
         ) void = null,
 
         /// Load the executor of the provided `Context` as the current executor.
-        loadExecutor: ?fn (context: *kernel.Context) void = null,
+        loadExecutor: ?fn (context: *cascade.Context) void = null,
 
         /// Capture any system information that can be without using mmio.
         ///
         /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
         captureEarlySystemInformation: ?fn (
-            context: *kernel.Context,
+            context: *cascade.Context,
         ) void = null,
 
         /// Capture any system information that needs mmio.
         ///
         /// For example, on x64 this should capture APIC and ACPI information.
         captureSystemInformation: ?fn (
-            context: *kernel.Context,
+            context: *cascade.Context,
             options: current_decls.init.CaptureSystemInformationOptions,
         ) anyerror!void = null,
 
         /// Configure any global system features.
         configureGlobalSystemFeatures: ?fn (
-            context: *kernel.Context,
+            context: *cascade.Context,
         ) void = null,
 
         /// Configure any per-executor system features.
-        configurePerExecutorSystemFeatures: ?fn (context: *kernel.Context) void = null,
+        configurePerExecutorSystemFeatures: ?fn (context: *cascade.Context) void = null,
 
         /// Register any architectural time sources.
         ///
         /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
         registerArchitecturalTimeSources: ?fn (
-            context: *kernel.Context,
-            candidate_time_sources: *kernel.time.init.CandidateTimeSources,
+            context: *cascade.Context,
+            candidate_time_sources: *cascade.time.init.CandidateTimeSources,
         ) void = null,
 
         /// Initialize the local interrupt controller for the current executor.
@@ -1024,7 +1024,7 @@ fn GetFunctionReturnType(comptime container: anytype, comptime name: []const u8)
     }
 }
 
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const std = @import("std");

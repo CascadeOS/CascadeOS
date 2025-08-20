@@ -197,7 +197,7 @@ fn constructKernelModule(
         is_check,
     );
 
-    const kernel_module = required_components.get("kernel").?.module;
+    const kernel_module = required_components.get("cascade").?.module;
 
     kernel_module.resolved_target = kernelCrossTarget(architecture, b);
     kernel_module.optimize = options.optimize;
@@ -240,7 +240,7 @@ fn getAllRequiredComponents(
     b: *std.Build,
 ) !WipComponent.Collection {
     var todo_components: std.StringArrayHashMapUnmanaged(void) = .empty;
-    try todo_components.putNoClobber(b.allocator, "kernel", {});
+    try todo_components.putNoClobber(b.allocator, "cascade", {});
 
     var required_components: WipComponent.Collection = .{};
 

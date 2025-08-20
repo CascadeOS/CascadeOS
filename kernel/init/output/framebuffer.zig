@@ -86,15 +86,15 @@ fn newLine() void {
 }
 
 /// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(_: *anyopaque, context: *kernel.Context) !void {
+fn remapFramebuffer(_: *anyopaque, context: *cascade.Context) !void {
     const framebuffer = boot.framebuffer().?;
 
-    const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
+    const physical_address: core.PhysicalAddress = try cascade.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
     if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
 
     const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
 
-    const virtual_range = try kernel.mem.heap.allocateSpecial(
+    const virtual_range = try cascade.mem.heap.allocateSpecial(
         context,
         framebuffer_size,
         .fromAddr(
@@ -122,7 +122,7 @@ const c = @cImport({
 const arch = @import("arch");
 const boot = @import("boot");
 const init = @import("init");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const std = @import("std");

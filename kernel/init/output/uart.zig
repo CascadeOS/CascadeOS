@@ -250,15 +250,15 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                     }
                 }.splatFn,
                 .remapFn = struct {
-                    fn remapFn(state: *anyopaque, _: *kernel.Context) anyerror!void {
+                    fn remapFn(state: *anyopaque, _: *cascade.Context) anyerror!void {
                         switch (mode) {
                             .io_port => {},
                             .memory => {
                                 const inner_uart: *UartT = @ptrCast(@alignCast(state));
-                                const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
+                                const write_register_physical_address = try cascade.mem.physicalFromDirectMap(
                                     .fromPtr(@volatileCast(inner_uart.write_register)),
                                 );
-                                inner_uart.write_register = kernel.mem
+                                inner_uart.write_register = cascade.mem
                                     .nonCachedDirectMapFromPhysical(write_register_physical_address)
                                     .toPtr([*]volatile u8);
                                 inner_uart.line_status_register = inner_uart.write_register + @intFromEnum(RegisterOffset.line_status);
@@ -551,12 +551,12 @@ pub const PL011 = struct {
                 }
             }.splatFn,
             .remapFn = struct {
-                fn remapFn(state: *anyopaque, _: *kernel.Context) anyerror!void {
+                fn remapFn(state: *anyopaque, _: *cascade.Context) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(state));
-                    const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
+                    const write_register_physical_address = try cascade.mem.physicalFromDirectMap(
                         .fromPtr(@volatileCast(uart.write_register)),
                     );
-                    uart.write_register = kernel.mem
+                    uart.write_register = cascade.mem
                         .nonCachedDirectMapFromPhysical(write_register_physical_address)
                         .toPtr([*]volatile u32);
                     uart.flag_register = uart.write_register + @intFromEnum(RegisterOffset.Flag);
@@ -713,7 +713,7 @@ pub const Baud = struct {
 
 const arch = @import("arch");
 const init = @import("init");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
 const std = @import("std");

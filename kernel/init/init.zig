@@ -8,15 +8,15 @@ pub const Output = @import("output/Output.zig");
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !noreturn {
-    kernel.time.init.tryCaptureStandardWallclockStartTime();
+    cascade.time.init.tryCaptureStandardWallclockStartTime();
 
     // we need the direct map to be available as early as possible
-    kernel.mem.initialization.setEarlyOffsets(determineEarlyOffsets());
+    cascade.mem.initialization.setEarlyOffsets(determineEarlyOffsets());
 
     var context = blk: {
         const static = struct {
-            var bootstrap_init_task: kernel.Task = undefined;
-            var bootstrap_executor: kernel.Executor = .{
+            var bootstrap_init_task: cascade.Task = undefined;
+            var bootstrap_executor: cascade.Executor = .{
                 .id = @enumFromInt(0),
                 .current_task = &bootstrap_init_task,
                 .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
@@ -24,7 +24,7 @@ pub fn initStage1() !noreturn {
             };
         };
 
-        const context = try kernel.Task.init.initializeBootstrapInitTask(
+        const context = try cascade.Task.init.initializeBootstrapInitTask(
             &static.bootstrap_init_task,
             &static.bootstrap_executor,
         );
@@ -35,7 +35,7 @@ pub fn initStage1() !noreturn {
         );
         arch.init.loadExecutor(context);
 
-        kernel.globals.executors = @as([*]kernel.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
+        cascade.globals.executors = @as([*]cascade.Executor, @ptrCast(&static.bootstrap_executor))[0..1];
 
         break :blk context;
     };
@@ -46,18 +46,18 @@ pub fn initStage1() !noreturn {
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     if (boot.rsdp()) |rsdp_address| {
-        try kernel.acpi.init.earlyInitialize(rsdp_address);
+        try cascade.acpi.init.earlyInitialize(rsdp_address);
     }
 
     Output.registerOutputs(context);
 
-    try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
+    try Output.writer.writeAll(comptime "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    // log the offset determined by `kernel.mem.init.earlyDetermineOffsets`
-    kernel.mem.initialization.logEarlyOffsets(context);
+    // log the offset determined by `cascade.mem.init.earlyDetermineOffsets`
+    cascade.mem.initialization.logEarlyOffsets(context);
 
-    try kernel.acpi.init.logAcpiTables(context);
+    try cascade.acpi.init.logAcpiTables(context);
 
     log.debug(context, "initializing early interrupts", .{});
     arch.interrupts.init.initializeEarlyInterrupts();
@@ -69,7 +69,7 @@ pub fn initStage1() !noreturn {
     arch.init.configurePerExecutorSystemFeatures(context);
 
     log.debug(context, "initializing memory system", .{});
-    try kernel.mem.initialization.initializeMemorySystem(context, try collectMemorySystemInputs());
+    try cascade.mem.initialization.initializeMemorySystem(context, try collectMemorySystemInputs());
 
     log.debug(context, "remapping init outputs", .{});
     try Output.remapOutputs(context);
@@ -84,21 +84,21 @@ pub fn initStage1() !noreturn {
     arch.init.configureGlobalSystemFeatures(context);
 
     log.debug(context, "initializing time", .{});
-    try kernel.time.init.initializeTime(context);
+    try cascade.time.init.initializeTime(context);
 
     log.debug(context, "initializing interrupt routing", .{});
     try arch.interrupts.init.initializeInterruptRouting(context);
 
     log.debug(context, "initializing kernel executors", .{});
     const executors, const new_bootstrap_executor = try createExecutors(context);
-    kernel.globals.executors = executors;
+    cascade.globals.executors = executors;
     context = &new_bootstrap_executor.current_task.context;
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
     arch.init.loadExecutor(context);
 
-    kernel.debug.setPanicMode(.init_panic);
-    kernel.debug.log.setLogMode(.init_log);
+    cascade.debug.setPanicMode(.init_panic);
+    cascade.debug.log.setLogMode(.init_log);
 
     log.debug(context, "booting non-bootstrap executors", .{});
     try bootNonBootstrapExecutors();
@@ -112,10 +112,10 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(context: *kernel.Context, is_bootstrap_executor: bool) !noreturn {
+fn initStage2(context: *cascade.Context, is_bootstrap_executor: bool) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
-    kernel.mem.globals.core_page_table.load();
+    cascade.mem.globals.core_page_table.load();
     const executor = context.executor.?;
     arch.init.loadExecutor(context);
 
@@ -126,7 +126,7 @@ fn initStage2(context: *kernel.Context, is_bootstrap_executor: bool) !noreturn {
     arch.init.initLocalInterruptController();
 
     log.debug(context, "enabling per-executor interrupt on {f}", .{executor.id});
-    kernel.time.per_executor_periodic.enableInterrupt(kernel.config.per_executor_interrupt_period);
+    cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
     try arch.scheduling.callTwoArgs(
         null,
@@ -155,7 +155,7 @@ fn initStage2(context: *kernel.Context, is_bootstrap_executor: bool) !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(context: *kernel.Context, bootstrap_executor: bool) !noreturn {
+fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
     if (bootstrap_executor) {
         Stage3Barrier.waitForAllNonBootstrapExecutors();
 
@@ -164,10 +164,10 @@ fn initStage3(context: *kernel.Context, bootstrap_executor: bool) !noreturn {
 
         log.debug(context, "creating and scheduling init stage 4 task", .{});
         {
-            const init_stage4_task: *kernel.Task = try .createKernelTask(context, .{
+            const init_stage4_task: *cascade.Task = try .createKernelTask(context, .{
                 .name = try .fromSlice("init stage 4"),
                 .start_function = struct {
-                    fn initStage4Wrapper(inner_context: *kernel.Context, _: usize, _: usize) noreturn {
+                    fn initStage4Wrapper(inner_context: *cascade.Context, _: usize, _: usize) noreturn {
                         initStage4(inner_context) catch |err| {
                             std.debug.panic("unhandled error: {t}", .{err});
                         };
@@ -178,10 +178,10 @@ fn initStage3(context: *kernel.Context, bootstrap_executor: bool) !noreturn {
                 .kernel_task_type = .normal,
             });
 
-            kernel.scheduler.lockScheduler(context);
-            defer kernel.scheduler.unlockScheduler(context);
+            cascade.scheduler.lockScheduler(context);
+            defer cascade.scheduler.unlockScheduler(context);
 
-            kernel.scheduler.queueTask(context, init_stage4_task);
+            cascade.scheduler.queueTask(context, init_stage4_task);
         }
 
         Stage3Barrier.stage3Complete();
@@ -190,19 +190,19 @@ fn initStage3(context: *kernel.Context, bootstrap_executor: bool) !noreturn {
         Stage3Barrier.waitForStage3Completion();
     }
 
-    _ = kernel.scheduler.lockScheduler(context);
+    _ = cascade.scheduler.lockScheduler(context);
     context.drop();
     unreachable;
 }
 
-fn initStage4(context: *kernel.Context) !noreturn {
+fn initStage4(context: *cascade.Context) !noreturn {
     log.debug(context, "initializing PCI ECAM", .{});
-    try kernel.pci.init.initializeECAM(context);
+    try cascade.pci.init.initializeECAM(context);
 
     log.debug(context, "initializing ACPI", .{});
-    try kernel.acpi.init.initialize(context);
+    try cascade.acpi.init.initialize(context);
 
-    try kernel.acpi.init.finializeInitialization(context);
+    try cascade.acpi.init.finializeInitialization(context);
 
     {
         Output.globals.lock.lock(context);
@@ -211,30 +211,30 @@ fn initStage4(context: *kernel.Context) !noreturn {
         try Output.writer.print(
             "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
             .{
-                kernel.time.wallclock.elapsed(
-                    kernel.time.wallclock.kernel_start,
-                    kernel.time.wallclock.read(),
+                cascade.time.wallclock.elapsed(
+                    cascade.time.wallclock.kernel_start,
+                    cascade.time.wallclock.read(),
                 ),
-                kernel.time.wallclock.elapsed(
+                cascade.time.wallclock.elapsed(
                     .zero,
-                    kernel.time.wallclock.read(),
+                    cascade.time.wallclock.read(),
                 ),
             },
         );
         try Output.writer.flush();
     }
 
-    _ = kernel.scheduler.lockScheduler(context);
+    _ = cascade.scheduler.lockScheduler(context);
     context.drop();
     unreachable;
 }
 
 /// Determine various offsets used by the kernel early in the boot process.
-pub fn determineEarlyOffsets() kernel.mem.initialization.EarlyOffsets {
+pub fn determineEarlyOffsets() cascade.mem.initialization.EarlyOffsets {
     const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
 
     const virtual_offset = core.Size.from(
-        base_address.virtual.value - kernel.config.kernel_base_address.value,
+        base_address.virtual.value - cascade.config.kernel_base_address.value,
         .byte,
     );
 
@@ -274,11 +274,11 @@ pub fn determineEarlyOffsets() kernel.mem.initialization.EarlyOffsets {
     };
 }
 
-pub fn collectMemorySystemInputs() !kernel.mem.initialization.MemorySystemInputs {
+pub fn collectMemorySystemInputs() !cascade.mem.initialization.MemorySystemInputs {
     const static = struct {
         var memory_map: core.containers.BoundedArray(
             exports.MemoryMapEntry,
-            kernel.config.maximum_number_of_memory_map_entries,
+            cascade.config.maximum_number_of_memory_map_entries,
         ) = .{};
     };
 
@@ -315,22 +315,22 @@ pub fn collectMemorySystemInputs() !kernel.mem.initialization.MemorySystemInputs
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(context: *kernel.Context) !struct { []kernel.Executor, *kernel.Executor } {
+fn createExecutors(context: *cascade.Context) !struct { []cascade.Executor, *cascade.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
-    if (descriptors.count() > kernel.config.maximum_number_of_executors) {
+    if (descriptors.count() > cascade.config.maximum_number_of_executors) {
         std.debug.panic(
             "number of executors '{d}' exceeds maximum '{d}'",
-            .{ descriptors.count(), kernel.config.maximum_number_of_executors },
+            .{ descriptors.count(), cascade.config.maximum_number_of_executors },
         );
     }
 
     log.debug(context, "initializing {} executors", .{descriptors.count()});
 
-    const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
+    const executors = try cascade.mem.heap.allocator.alloc(cascade.Executor, descriptors.count());
 
     const bootstrap_architecture_processor_id = boot.bootstrapArchitectureProcessorId();
-    var opt_bootstrap_executor: ?*kernel.Executor = null;
+    var opt_bootstrap_executor: ?*cascade.Executor = null;
 
     var i: u32 = 0;
 
@@ -344,8 +344,8 @@ fn createExecutors(context: *kernel.Context) !struct { []kernel.Executor, *kerne
             .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
         };
 
-        try kernel.Task.init.createAndAssignInitTask(context, executor);
-        try kernel.Task.init.initializeSchedulerTask(context, &executor.scheduler_task, executor);
+        try cascade.Task.init.createAndAssignInitTask(context, executor);
+        try cascade.Task.init.initializeSchedulerTask(context, &executor.scheduler_task, executor);
 
         arch.init.prepareExecutor(
             context,
@@ -371,7 +371,7 @@ fn bootNonBootstrapExecutors() !void {
         if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
 
         desc.boot(
-            &kernel.globals.executors[i].current_task.context,
+            &cascade.globals.executors[i].current_task.context,
             struct {
                 fn bootFn(inner_context: *anyopaque) noreturn {
                     initStage2(
@@ -413,7 +413,7 @@ const Stage3Barrier = struct {
     ///
     /// Called by the bootstrap executor only.
     fn waitForAllNonBootstrapExecutors() void {
-        while (non_bootstrap_executors_ready.load(.acquire) != (kernel.globals.executors.len - 1)) {
+        while (non_bootstrap_executors_ready.load(.acquire) != (cascade.globals.executors.len - 1)) {
             arch.spinLoopHint();
         }
     }
@@ -435,8 +435,8 @@ comptime {
 
 const arch = @import("arch");
 const boot = @import("boot");
-const kernel = @import("kernel");
+const cascade = @import("cascade");
 
 const core = @import("core");
-const log = kernel.debug.log.scoped(.init);
+const log = cascade.debug.log.scoped(.init);
 const std = @import("std");

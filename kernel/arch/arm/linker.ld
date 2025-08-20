@@ -17,7 +17,7 @@ PHDRS
 
 SECTIONS
 {
-    /* This must be kept in sync with `kernel.config.kernel_base_address` */
+    /* This must be kept in sync with `cascade.config.kernel_base_address` */
     . = 0xffffffff80000000;
 
     . = ALIGN(CONSTANT(MAXPAGESIZE));
