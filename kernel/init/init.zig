@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const devicetree = @import("devicetree.zig");
-pub const Output = @import("output/Output.zig");
-
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !noreturn {
-    cascade.time.init.tryCaptureStandardWallclockStartTime();
+    time.tryCaptureStandardWallclockStartTime();
 
     // we need the direct map to be available as early as possible
     cascade.mem.initialization.setEarlyOffsets(determineEarlyOffsets());
@@ -84,7 +81,7 @@ pub fn initStage1() !noreturn {
     arch.init.configureGlobalSystemFeatures(context);
 
     log.debug(context, "initializing time", .{});
-    try cascade.time.init.initializeTime(context);
+    try time.initializeTime(context);
 
     log.debug(context, "initializing interrupt routing", .{});
     try arch.interrupts.init.initializeInterruptRouting(context);
@@ -207,20 +204,7 @@ fn initStage4(context: *cascade.Context) !noreturn {
     {
         Output.globals.lock.lock(context);
         defer Output.globals.lock.unlock(context);
-
-        try Output.writer.print(
-            "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
-            .{
-                cascade.time.wallclock.elapsed(
-                    cascade.time.wallclock.kernel_start,
-                    cascade.time.wallclock.read(),
-                ),
-                cascade.time.wallclock.elapsed(
-                    .zero,
-                    cascade.time.wallclock.read(),
-                ),
-            },
-        );
+        try time.printInitializationTime(Output.writer);
         try Output.writer.flush();
     }
 
@@ -277,7 +261,7 @@ pub fn determineEarlyOffsets() cascade.mem.initialization.EarlyOffsets {
 pub fn collectMemorySystemInputs() !cascade.mem.initialization.MemorySystemInputs {
     const static = struct {
         var memory_map: core.containers.BoundedArray(
-            exports.MemoryMapEntry,
+            exports.boot.MemoryMapEntry,
             cascade.config.maximum_number_of_memory_map_entries,
         ) = .{};
     };
@@ -419,15 +403,24 @@ const Stage3Barrier = struct {
     }
 };
 
-/// Exports the arch API needed by the boot component.
+/// Exports APIs across components.
 ///
-/// And the boot API needed by the kernel component.
+/// Exports:
+///  - arch API needed by the boot component
+///  - boot API needed by the cascade component
 pub const exports = struct {
-    pub const current_arch = arch.current_arch;
-    pub const disableAndHalt = arch.interrupts.disableAndHalt;
+    pub const arch = struct {
+        pub const current_arch = @import("arch").current_arch;
+        pub const disableAndHalt = @import("arch").interrupts.disableAndHalt;
+    };
 
-    pub const MemoryMapEntry = boot.MemoryMap.Entry;
+    pub const boot = struct {
+        pub const MemoryMapEntry = @import("boot").MemoryMap.Entry;
+    };
 };
+
+pub const time = @import("time.zig");
+pub const Output = @import("output/Output.zig");
 
 comptime {
     @import("boot").exportEntryPoints();

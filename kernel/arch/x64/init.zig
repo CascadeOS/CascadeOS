@@ -336,7 +336,7 @@ pub fn configurePerExecutorSystemFeatures(context: *cascade.Context) void {
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
     context: *cascade.Context,
-    candidate_time_sources: *cascade.time.init.CandidateTimeSources,
+    candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(context, candidate_time_sources);
     x64.hpet.init.registerTimeSource(context, candidate_time_sources);

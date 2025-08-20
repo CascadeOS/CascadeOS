@@ -179,7 +179,7 @@ pub const initialization = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,
-        memory_map: []const init.exports.MemoryMapEntry,
+        memory_map: []const init.exports.boot.MemoryMapEntry,
     ) void {
         init_log.debug(
             context,
@@ -375,7 +375,7 @@ pub const initialization = struct {
 
     pub fn initializeBootstrapFrameAllocator(
         context: *cascade.Context,
-        memory_map: []const init.exports.MemoryMapEntry,
+        memory_map: []const init.exports.boot.MemoryMapEntry,
     ) void {
         init_log.debug(context, "bootloader provided memory map:", .{});
 

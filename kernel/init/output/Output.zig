@@ -60,7 +60,7 @@ fn tryGetSerialOutputFromGenericSources(context: *cascade.Context) ?init.Output 
             break :blk;
         }
 
-        if (init.devicetree.tryGetSerialOutput(context)) |output_uart| {
+        if (devicetree.tryGetSerialOutput(context)) |output_uart| {
             log.debug(context, "got serial output from device tree", .{});
 
             static.init_output_uart = output_uart;
@@ -133,6 +133,7 @@ pub const globals = struct {
 };
 
 pub const uart = @import("uart.zig");
+const devicetree = @import("../devicetree.zig");
 
 const arch = @import("arch");
 const init = @import("init");

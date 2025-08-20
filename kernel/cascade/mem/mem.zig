@@ -465,7 +465,7 @@ pub const initialization = struct {
     pub const MemorySystemInputs = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
-        memory_map: []const init.exports.MemoryMapEntry,
+        memory_map: []const init.exports.boot.MemoryMapEntry,
     };
 
     pub fn initializeMemorySystem(context: *cascade.Context, inputs: MemorySystemInputs) !void {

@@ -45,9 +45,14 @@ pub const std_options: std.Options = .{
     .logFn = debug.log.stdLogImpl,
 };
 
-// Exports the init API needed by the arch component.
+/// Exports APIs across components.
 pub const exports = struct {
     pub const Output = init.Output;
+
+    pub const time = struct {
+        pub const CandidateTimeSources = init.time.CandidateTimeSources;
+        pub const ReferenceCounter = init.time.ReferenceCounter;
+    };
 };
 
 comptime {

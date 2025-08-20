@@ -13,7 +13,10 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn registerTimeSource(context: *cascade.Context, candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(
+        context: *cascade.Context,
+        candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+    ) void {
         const acpi_table = cascade.acpi.getTable(cascade.acpi.tables.HPET, 0) orelse return;
         acpi_table.deinit();
 

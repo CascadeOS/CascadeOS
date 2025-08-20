@@ -87,7 +87,7 @@ pub fn rsdp() ?core.Address {
 }
 
 pub fn x2apicEnabled() bool {
-    std.debug.assert(init.exports.current_arch == .x64);
+    std.debug.assert(init.exports.arch.current_arch == .x64);
 
     const resp: *const limine.MP.x86_64 = requests.smp.response orelse
         return false;
@@ -99,7 +99,7 @@ pub fn bootstrapArchitectureProcessorId() u64 {
     const resp = requests.smp.response orelse
         return 0;
 
-    return switch (init.exports.current_arch) {
+    return switch (init.exports.arch.current_arch) {
         .arm => resp.bsp_mpidr,
         .riscv => resp.bsp_hartid,
         .x64 => resp.bsp_lapic_id,
@@ -198,7 +198,7 @@ pub const CpuDescriptorIterator = struct {
     ) u64 {
         const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
 
-        return switch (init.exports.current_arch) {
+        return switch (init.exports.arch.current_arch) {
             .arm => descriptor.smp_info.mpidr,
             .riscv => descriptor.smp_info.hartid,
             .x64 => descriptor.smp_info.lapic_id,

@@ -16,7 +16,10 @@ pub const init = struct {
         return @enumFromInt(readTsc());
     }
 
-    pub fn registerTimeSource(context: *cascade.Context, candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(
+        context: *cascade.Context,
+        candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+    ) void {
         if (!shouldUseTsc()) return;
 
         candidate_time_sources.addTimeSource(context, .{
@@ -31,7 +34,11 @@ pub const init = struct {
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
                             globals.tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
-                            init_log.debug(inner_context, "tick duration (fs): {}", .{globals.tick_duration_fs});
+                            init_log.debug(
+                                inner_context,
+                                "tick duration (fs): {}",
+                                .{globals.tick_duration_fs},
+                            );
                         }
                     }.simple,
                 }
@@ -78,7 +85,7 @@ pub const init = struct {
 
     fn initializeTscCalibrate(
         context: *cascade.Context,
-        reference_counter: cascade.time.init.ReferenceCounter,
+        reference_counter: cascade.exports.time.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());
 
