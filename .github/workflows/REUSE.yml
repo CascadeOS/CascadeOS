@@ -5,9 +5,9 @@ name: REUSE Compliance Check
 
 on:
   push:
-  pull_request:
     branches:
       - main
+  pull_request:
 
 jobs:
   compliance_check:
