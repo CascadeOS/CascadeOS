@@ -45,6 +45,8 @@ fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.Generate
 
     var writer = output_file.writer(&.{});
     try writer.interface.writeAll(created_debug_info);
+
+    try writer.interface.flush();
 }
 
 fn embed(embed_arguments: Arguments.EmbedArguments) !void {
@@ -112,6 +114,9 @@ fn embed(embed_arguments: Arguments.EmbedArguments) !void {
     try updateElf(elf_mem, sdf_pos, sdf_size);
 
     std.fs.cwd().deleteFile(embed_arguments.binary_output_path) catch {};
+
+    try atomic_output_file.file_writer.interface.flush();
+
     try atomic_output_file.finish();
 }
 
