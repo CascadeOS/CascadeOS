@@ -7,12 +7,12 @@
     .version = "0.0.3",
 
     // Ensure this is kept in sync with `README.md`
-    .minimum_zig_version = "0.15.0-dev.1564+2761cc8be",
+    .minimum_zig_version = "0.15.1",
 
     .dependencies = .{
         .devicetree = .{
-            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#29b4e6f6e127fb361acd1652886469630351d62e",
-            .hash = "devicetree-3.0.0-cZRcrBZfAQCtpfpqy62PYa5QI1XU9mNuBgpTnI0r7MZz",
+            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#26f662ab399a15b06158af16891ea3a1723489a6",
+            .hash = "devicetree-3.0.1-cZRcrHOfAQAmao-6kHxeulFJhgnQFZq9E7vEPanvhZ-g",
         },
 
         .edk2 = .{
@@ -36,8 +36,8 @@
         },
 
         .sbi = .{
-            .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#847ff0e0afa4757d5f29497aa2e86812ece4bb5e",
-            .hash = "sbi-6.0.0-Muvb-rvuAQC95CCzwePSpgQ5cqKE-8RNZCsPBU0kjKmZ",
+            .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#86c454675dc68b9a07db055aa86c9e5c33acd9b3",
+            .hash = "sbi-6.0.1-Muvb-pDuAQCRlEpJaRBRIcIiqAmAj0bDflQgUTOBvzi8",
         },
     },
 
