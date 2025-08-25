@@ -16,21 +16,17 @@
         }
     ],
     "configurations": [
-        { // Requires extension CodeLLDB (vadimcn.vscode-lldb)
+        { // Requires extension LLDB DAP (llvm-vs-code-extensions.lldb-dap)
             "name": "LLDB QEMU remote",
-            "type": "lldb",
-            "request": "launch",
+            "type": "lldb-dap",
+            "request": "attach",
             "program": "${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf",
-            "processCreateCommands": [
-                // "process handle SIGTRAP -p false -s false -n false", // this breaks the extension
-                "settings set target.require-hardware-breakpoint true",
-                "gdb-remote 1234"
-            ],
+            "attachCommands": ["gdb-remote 1234"],
             "presentation": {
                 "hidden": false,
                 "group": "QEMU remote",
                 "order": 1
             }
-        },
+        }
     ]
 }
