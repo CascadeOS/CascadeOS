@@ -150,7 +150,6 @@ fn switchToIdleDeferredAction(
                 std.debug.assert(inner_context.spinlocks_held == 1);
             }
 
-            unlockScheduler(inner_context);
             idle(inner_context);
             @panic("idle returned");
         }
@@ -350,25 +349,26 @@ pub fn newTaskEntry(
 
 fn idle(context: *cascade.Context) callconv(.c) noreturn {
     if (core.is_debug) {
-        std.debug.assert(!context.scheduler_locked);
-        std.debug.assert(context.interrupt_disable_count == 0);
-        std.debug.assert(context.spinlocks_held == 0);
-        std.debug.assert(arch.interrupts.areEnabled());
+        std.debug.assert(context.scheduler_locked);
+        std.debug.assert(context.interrupt_disable_count == 1);
+        std.debug.assert(context.spinlocks_held == 1);
+        std.debug.assert(!arch.interrupts.areEnabled());
     }
 
     log.verbose(context, "entering idle", .{});
 
     while (true) {
-        {
-            lockScheduler(context);
-            defer unlockScheduler(context);
+        // the scheduler is locked here
 
-            if (!globals.ready_to_run.isEmpty()) {
-                yield(context);
-            }
+        if (!globals.ready_to_run.isEmpty()) {
+            yield(context);
         }
 
+        unlockScheduler(context);
+
         arch.halt();
+
+        lockScheduler(context);
     }
 }
 
