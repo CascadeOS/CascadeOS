@@ -187,7 +187,7 @@ fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
         Stage3Barrier.waitForStage3Completion();
     }
 
-    _ = cascade.scheduler.lockScheduler(context);
+    cascade.scheduler.lockScheduler(context);
     context.drop();
     unreachable;
 }
@@ -208,7 +208,7 @@ fn initStage4(context: *cascade.Context) !noreturn {
         try Output.writer.flush();
     }
 
-    _ = cascade.scheduler.lockScheduler(context);
+    cascade.scheduler.lockScheduler(context);
     context.drop();
     unreachable;
 }
