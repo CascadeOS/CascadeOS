@@ -10,6 +10,7 @@ pub const MCFG = @import("MCFG.zig").MCFG;
 pub const RSDP = @import("RSDP.zig").RSDP;
 pub const SharedHeader = @import("SharedHeader.zig").SharedHeader;
 pub const SPCR = @import("SPCR.zig").SPCR;
+pub const TPM2 = @import("TPM2.zig").TPM2;
 
 const core = @import("core");
 const std = @import("std");
