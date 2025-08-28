@@ -192,6 +192,9 @@ fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
     unreachable;
 }
 
+/// Stage 4 of kernel initialization.
+///
+/// This function is executed in a fully scheduled kernel task with interrupts enabled.
 fn initStage4(context: *cascade.Context) !noreturn {
     log.debug(context, "initializing PCI ECAM", .{});
     try cascade.pci.init.initializeECAM(context);
