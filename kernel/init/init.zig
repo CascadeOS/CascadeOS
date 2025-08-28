@@ -10,32 +10,7 @@ pub fn initStage1() !noreturn {
     // we need the direct map to be available as early as possible
     cascade.mem.initialization.setEarlyOffsets(determineEarlyOffsets());
 
-    var context = blk: {
-        const static = struct {
-            var bootstrap_init_task: cascade.Task = undefined;
-            var bootstrap_executor: cascade.Executor = .{
-                .id = @enumFromInt(0),
-                .current_task = &bootstrap_init_task,
-                .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
-                .scheduler_task = undefined, // not used
-            };
-        };
-
-        const context = try cascade.Task.init.initializeBootstrapInitTask(
-            &static.bootstrap_init_task,
-            &static.bootstrap_executor,
-        );
-
-        arch.init.prepareBootstrapExecutor(
-            context,
-            boot.bootstrapArchitectureProcessorId(),
-        );
-        arch.init.loadExecutor(context);
-
-        cascade.globals.executors = @ptrCast(&static.bootstrap_executor);
-
-        break :blk context;
-    };
+    var context = try constructBootstrapContext();
 
     // TODO: initialize the bootstrap frame allocator here then ensure all physical memory regions are mapped in the
     //       bootloader provided memory map, this would allow us to switch to latter limine revisions and also
@@ -216,8 +191,35 @@ fn initStage4(context: *cascade.Context) !noreturn {
     unreachable;
 }
 
+fn constructBootstrapContext() !*cascade.Context {
+    const static = struct {
+        var bootstrap_init_task: cascade.Task = undefined;
+        var bootstrap_executor: cascade.Executor = .{
+            .id = @enumFromInt(0),
+            .current_task = &bootstrap_init_task,
+            .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
+            .scheduler_task = undefined, // not used
+        };
+    };
+
+    const context = try cascade.Task.init.initializeBootstrapInitTask(
+        &static.bootstrap_init_task,
+        &static.bootstrap_executor,
+    );
+
+    arch.init.prepareBootstrapExecutor(
+        context,
+        boot.bootstrapArchitectureProcessorId(),
+    );
+    arch.init.loadExecutor(context);
+
+    cascade.globals.executors = @ptrCast(&static.bootstrap_executor);
+
+    return context;
+}
+
 /// Determine various offsets used by the kernel early in the boot process.
-pub fn determineEarlyOffsets() cascade.mem.initialization.EarlyOffsets {
+fn determineEarlyOffsets() cascade.mem.initialization.EarlyOffsets {
     const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
 
     const virtual_offset = core.Size.from(
