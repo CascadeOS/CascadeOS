@@ -17,7 +17,7 @@ pub const init = struct {
         context: *cascade.Context,
         candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
     ) void {
-        const acpi_table = cascade.acpi.getTable(cascade.acpi.tables.HPET, 0) orelse return;
+        const acpi_table = AcpiTable.get(0) orelse return;
         acpi_table.deinit();
 
         candidate_time_sources.addTimeSource(context, .{
@@ -78,7 +78,7 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        const acpi_table = cascade.acpi.getTable(cascade.acpi.tables.HPET, 0) orelse {
+        const acpi_table = AcpiTable.get(0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
             @panic("hpet table missing");
         };
@@ -93,6 +93,7 @@ pub const init = struct {
             .toPtr([*]volatile u64);
     }
 
+    const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.HPET);
     const init_log = cascade.debug.log.scoped(.init_hpet);
 };
 

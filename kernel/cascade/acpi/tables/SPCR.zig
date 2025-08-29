@@ -392,7 +392,7 @@ pub const SPCR = extern struct {
         }
 
         fn tryGetSerialOutputInner() uart.Baud.DivisorError!?uart.Uart {
-            const spcr = cascade.acpi.getTable(cascade.acpi.tables.SPCR, 0) orelse return null;
+            const spcr = AcpiTable.get(0) orelse return null;
             defer spcr.deinit();
 
             const baud_rate: ?uart.Baud.BaudRate = switch (spcr.table.configured_baud_rate) {
@@ -527,6 +527,7 @@ pub const SPCR = extern struct {
             }
         }
 
+        const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.SPCR);
         const uart = @import("init").Output.uart;
         const log = cascade.debug.log.scoped(.init_output);
     };

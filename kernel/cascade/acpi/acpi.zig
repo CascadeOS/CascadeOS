@@ -2,26 +2,6 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2019-2023 mintsuki and contributors (https://github.com/lowlevelmemes/acpi-shutdown-hack/blob/115c66d097e9d52015907a4ff27cd1ba34aee0d9/LICENSE)
 
-/// Get the `n`th matching ACPI table if present.
-///
-/// Uses the `SIGNATURE_STRING: *const [4]u8` decl on the given `T` to find the table.
-pub fn getTable(comptime T: type, n: usize) ?AcpiTable(T) {
-    if (!globals.early_initialization_complete) return null;
-
-    var table = uacpi.Table.findBySignature(T.SIGNATURE_STRING) catch null orelse return null;
-
-    var i: usize = 0;
-    while (i < n) : (i += 1) {
-        const found_next = table.nextWithSameSignature() catch return null;
-        if (!found_next) return null;
-    }
-
-    return .{
-        .table = @ptrCast(@alignCast(table.table.ptr)),
-        .handle = table,
-    };
-}
-
 pub fn tryShutdown() !void {
     if (globals.acpi_initialized) {
         try uacpi.prepareForSleep(.S5);
@@ -39,54 +19,22 @@ pub fn tryShutdown() !void {
 pub const Address = @import("Address.zig").Address;
 pub const tables = @import("tables/tables.zig");
 
-pub fn AcpiTable(comptime T: type) type {
-    return struct {
-        table: *const T,
-
-        handle: uacpi.Table,
-
-        const AcpiTableT = @This();
-
-        pub fn deinit(acpi_table: AcpiTableT) void {
-            acpi_table.handle.unref() catch unreachable;
-        }
-
-        pub inline fn format(acpi_table: AcpiTableT, writer: *std.Io.Writer) !void {
-            try writer.print(
-                "AcpiTable{{ signature: {s}, revision: {d} }}",
-                .{ acpi_table.table.header.signatureAsString(), acpi_table.table.header.revision },
-            );
-        }
-    };
-}
-
 pub const globals = struct {
     /// Pointer to the RSDP table.
     ///
-    /// Set by `earlyInitialize`, only valid if `early_initialization_complete` is true.
+    /// Set by `setRsdp`, only valid if `acpi_present` is true.
     pub var rsdp: *const tables.RSDP = undefined;
 
-    /// If this is true, the ACPI tables have been initialized and the RSDP pointer is valid.
-    var early_initialization_complete: bool = false;
+    /// If this is true, then ACPI is present and the RSDP pointer is valid.
+    var acpi_present: bool = false;
 
     var acpi_initialized: bool = false;
 };
 
 pub const init = struct {
-    pub fn earlyInitialize(rsdp_address: core.Address) !void {
-        const static = struct {
-            var buffer: [arch.paging.standard_page_size.value]u8 = undefined;
-        };
-
-        globals.rsdp = switch (rsdp_address) {
-            // using `directMapFromPhysical` as the non-cached direct map is not yet initialized
-            .physical => |addr| cascade.mem.directMapFromPhysical(addr).toPtr(*const tables.RSDP),
-            .virtual => |addr| addr.toPtr(*const tables.RSDP),
-        };
-        if (!globals.rsdp.isValid()) return error.InvalidRSDP;
-
-        try uacpi.setupEarlyTableAccess(&static.buffer);
-        globals.early_initialization_complete = true;
+    pub fn setRsdp(rsdp: *const tables.RSDP) void {
+        globals.rsdp = rsdp;
+        globals.acpi_present = true;
     }
 
     pub fn initialize(context: *cascade.Context) !void {
@@ -109,12 +57,10 @@ pub const init = struct {
         init_log.debug(context, "initializing namespace", .{});
         try uacpi.namespaceInitialize();
 
-        globals.acpi_initialized = true;
-    }
-
-    pub fn finializeInitialization(context: *cascade.Context) !void {
         init_log.debug(context, "finializing GPEs", .{});
         try uacpi.finializeGpeInitialization();
+
+        globals.acpi_initialized = true;
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
@@ -125,84 +71,26 @@ pub const init = struct {
         @panic("shutdown failed");
     }
 
-    pub fn logAcpiTables(context: *cascade.Context) !void {
-        // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
-
-        if (!init_log.levelEnabled(.debug)) return;
-
-        const sdt_header = cascade.mem.directMapFromPhysical(globals.rsdp.sdtAddress())
-            .toPtr(*const tables.SharedHeader);
-
-        if (!sdt_header.isValid()) return error.InvalidSDT;
-
-        var iter = tableIterator(sdt_header);
-
-        init_log.debug(context, "ACPI tables:", .{});
-
-        while (iter.next()) |table| {
-            if (table.isValid()) {
-                init_log.debug(context, "  {s}", .{table.signatureAsString()});
-            } else {
-                init_log.debug(context, "  {s} - INVALID", .{table.signatureAsString()});
-            }
-        }
-    }
-
-    fn tableIterator(
-        sdt_header: *const tables.SharedHeader,
-    ) TableIterator {
-        const sdt_ptr: [*]const u8 = @ptrCast(sdt_header);
-
-        const is_xsdt = sdt_header.signatureIs("XSDT");
-        std.debug.assert(is_xsdt or sdt_header.signatureIs("RSDT")); // Invalid SDT signature.
-
-        return .{
-            .ptr = sdt_ptr + @sizeOf(tables.SharedHeader),
-            .end_ptr = sdt_ptr + sdt_header.length,
-            .is_xsdt = is_xsdt,
-        };
-    }
-
-    const TableIterator = struct {
-        ptr: [*]const u8,
-        end_ptr: [*]const u8,
-
-        is_xsdt: bool,
-
-        pub fn next(table_iterator: *TableIterator) ?*const tables.SharedHeader {
-            // this function uses `directMapFromPhysical` as the non-cached direct map is not yet initialized
-
-            const opt_phys_addr = if (table_iterator.is_xsdt)
-                table_iterator.nextTablePhysicalAddressImpl(u64)
-            else
-                table_iterator.nextTablePhysicalAddressImpl(u32);
-
-            return cascade.mem
-                .directMapFromPhysical(opt_phys_addr orelse return null)
-                .toPtr(*const tables.SharedHeader);
-        }
-
-        fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?core.PhysicalAddress {
-            if (@intFromPtr(table_iterator.ptr) + @sizeOf(T) >= @intFromPtr(table_iterator.end_ptr)) return null;
-
-            const physical_address = std.mem.readInt(T, @ptrCast(table_iterator.ptr), .little);
-
-            table_iterator.ptr += @sizeOf(T);
-
-            return core.PhysicalAddress.fromInt(physical_address);
-        }
-    };
-
     const init_log = cascade.debug.log.scoped(.init_acpi);
 };
 
+/// Exports APIs across components.
+///
+/// Exports:
+///  - uacpi API needed by the init component
+pub const exports = struct {
+    pub const uacpi = @import("uacpi.zig");
+};
+
 const hack = struct {
+    const AcpiTable = cascade.exports.acpi.AcpiTable;
+
     fn tryHackyShutdown() !void {
         if (arch.current_arch != .x64) return; // this code uses io ports
 
         // this is ported from https://github.com/lowlevelmemes/acpi-shutdown-hack/blob/trunk/acpi_shutdown_hack.c
 
-        const acpi_table = getTable(tables.FADT, 0) orelse return error.FADTNotPresent;
+        const acpi_table = AcpiTable(tables.FADT).get(0) orelse return error.FADTNotPresent;
         defer acpi_table.deinit();
 
         const fadt: *const tables.FADT = acpi_table.table;

@@ -17,9 +17,7 @@ pub fn initStage1() !noreturn {
     //       allow us to support unusual systems with MMIO above 4GiB
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
-    if (boot.rsdp()) |rsdp_address| {
-        try cascade.acpi.init.earlyInitialize(rsdp_address);
-    }
+    try acpi.earlyInitialize();
 
     Output.registerOutputs(context);
 
@@ -28,7 +26,7 @@ pub fn initStage1() !noreturn {
 
     mem.logEarlyMemoryLayout(context, early_memory_layout);
 
-    try cascade.acpi.init.logAcpiTables(context);
+    try acpi.logAcpiTables(context);
 
     log.debug(context, "initializing early interrupts", .{});
     arch.interrupts.init.initializeEarlyInterrupts();
@@ -174,9 +172,7 @@ fn initStage4(context: *cascade.Context) !noreturn {
     try cascade.pci.init.initializeECAM(context);
 
     log.debug(context, "initializing ACPI", .{});
-    try cascade.acpi.init.initialize(context);
-
-    try cascade.acpi.init.finializeInitialization(context);
+    try acpi.initialize(context);
 
     {
         Output.globals.lock.lock(context);
@@ -378,6 +374,7 @@ pub const exports = struct {
     };
 };
 
+pub const acpi = @import("acpi.zig");
 pub const mem = @import("mem.zig");
 pub const time = @import("time.zig");
 pub const Output = @import("output/Output.zig");

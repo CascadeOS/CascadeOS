@@ -46,7 +46,12 @@ pub const std_options: std.Options = .{
 };
 
 /// Exports APIs across components.
+///
+/// Exports:
+///  - init API needed by the arch component
 pub const exports = struct {
+    pub const acpi = init.acpi;
+
     pub const Output = init.Output;
 
     pub const time = struct {

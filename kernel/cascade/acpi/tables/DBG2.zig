@@ -284,7 +284,7 @@ pub const DBG2 = extern struct {
 
     pub const init = struct {
         pub fn tryGetSerialOutput() ?uart.Uart {
-            const dbg2 = cascade.acpi.getTable(cascade.acpi.tables.DBG2, 0) orelse return null;
+            const dbg2 = AcpiTable.get(0) orelse return null;
             defer dbg2.deinit();
 
             var devices: cascade.acpi.tables.DBG2.DebugDeviceIterator = dbg2.table.debugDevices();
@@ -358,6 +358,7 @@ pub const DBG2 = extern struct {
             return null;
         }
 
+        const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.DBG2);
         const uart = @import("init").Output.uart;
         const log = cascade.debug.log.scoped(.init_output);
     };

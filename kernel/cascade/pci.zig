@@ -353,7 +353,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn initializeECAM(context: *cascade.Context) !void {
-        const acpi_table = cascade.acpi.getTable(acpi.tables.MCFG, 0) orelse return error.MCFGNotPresent;
+        const acpi_table = AcpiTable.get(0) orelse return error.MCFGNotPresent;
         defer acpi_table.deinit();
         const mcfg = acpi_table.table;
 
@@ -382,6 +382,7 @@ pub const init = struct {
         globals.ecams = try ecams.toOwnedSlice(cascade.mem.heap.allocator);
     }
 
+    const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.MCFG);
     const init_log = cascade.debug.log.scoped(.init_pci);
 };
 

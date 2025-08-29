@@ -150,13 +150,11 @@ pub fn captureSystemInformation(
     context: *cascade.Context,
     options: CaptureSystemInformationOptions,
 ) !void {
-    const madt_acpi_table = cascade.acpi.getTable(cascade.acpi.tables.MADT, 0) orelse
-        return error.NoMADT;
+    const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
     defer madt_acpi_table.deinit();
     const madt = madt_acpi_table.table;
 
-    const fadt_acpi_table = cascade.acpi.getTable(cascade.acpi.tables.FADT, 0) orelse
-        return error.NoFADT;
+    const fadt_acpi_table = AcpiTable(cascade.acpi.tables.FADT).get(0) orelse return error.NoFADT;
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
 
@@ -402,6 +400,7 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const x64 = @import("x64.zig");
 
+const AcpiTable = cascade.exports.acpi.AcpiTable;
 const core = @import("core");
 const log = cascade.debug.log.scoped(.init_x64);
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
