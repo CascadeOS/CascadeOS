@@ -466,12 +466,10 @@ pub const initialization = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         memory_map: []const init.exports.boot.MemoryMapEntry,
+        regions: *init.mem.Region.List,
     };
 
     pub fn initializeMemorySystem(context: *cascade.Context, inputs: MemorySystemInputs) !void {
-        init_log.debug(context, "initializing bootstrap physical frame allocator", .{});
-        phys.initialization.initializeBootstrapFrameAllocator(context, inputs.memory_map);
-
         init_log.debug(context, "building kernel memory layout", .{});
         const result = buildMemoryLayout(
             context,
@@ -489,6 +487,7 @@ pub const initialization = struct {
             inputs.number_of_usable_regions,
             result.pages_range,
             inputs.memory_map,
+            inputs.regions,
         );
 
         init_log.debug(context, "initializing caches", .{});
@@ -739,7 +738,7 @@ pub const initialization = struct {
 
     fn buildAndLoadCorePageTable(context: *cascade.Context) void {
         globals.core_page_table = arch.paging.PageTable.create(
-            phys.initialization.bootstrap_allocator.allocate(context) catch unreachable,
+            init.mem.bootstrap_allocator.allocate(context) catch unreachable,
         );
 
         for (globals.regions.constSlice()) |region| {
@@ -752,7 +751,7 @@ pub const initialization = struct {
                     context,
                     globals.core_page_table,
                     region.range,
-                    phys.initialization.bootstrap_allocator,
+                    init.mem.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
                 },
@@ -762,7 +761,7 @@ pub const initialization = struct {
                     region.range,
                     full.physical_range,
                     full.map_type,
-                    phys.initialization.bootstrap_allocator,
+                    init.mem.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to full map {f}: {t}", .{ region, err });
                 },
@@ -774,7 +773,7 @@ pub const initialization = struct {
                         map_type,
                         .kernel,
                         .keep,
-                        phys.initialization.bootstrap_allocator,
+                        init.mem.bootstrap_allocator,
                     ) catch |err| {
                         std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
                     };

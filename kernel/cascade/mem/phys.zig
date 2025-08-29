@@ -168,9 +168,6 @@ const globals = struct {
 };
 
 pub const initialization = struct {
-    var regions: core.containers.BoundedArray(Region, max_regions) = .{};
-    const max_regions: usize = 64;
-
     /// Initializes the normal physical frame allocator and the pages array.
     ///
     /// Pulls all memory out of the bootstrap physical frame allocator and uses it to populate the normal allocator.
@@ -180,6 +177,7 @@ pub const initialization = struct {
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,
         memory_map: []const init.exports.boot.MemoryMapEntry,
+        regions: *init.mem.Region.List,
     ) void {
         init_log.debug(
             context,
@@ -346,80 +344,6 @@ pub const initialization = struct {
         globals.reclaimable_memory = reclaimable_memory;
         globals.unavailable_memory = unavailable_memory;
     }
-
-    pub const bootstrap_allocator: FrameAllocator = .{
-        .allocate = struct {
-            fn allocate(context: *cascade.Context) !Frame {
-                const non_empty_region: *Region = region: for (regions.slice()) |*region| {
-                    if (region.first_free_frame_index < region.frame_count) break :region region;
-                } else {
-                    for (regions.constSlice()) |region| {
-                        init_log.warn(context, "  region: {}", .{region});
-                    }
-
-                    @panic("no empty region in bootstrap physical frame allocator");
-                };
-
-                const first_free_frame_index = non_empty_region.first_free_frame_index;
-                non_empty_region.first_free_frame_index = first_free_frame_index + 1;
-
-                return @enumFromInt(@intFromEnum(non_empty_region.start_physical_frame) + first_free_frame_index);
-            }
-        }.allocate,
-        .deallocate = struct {
-            fn deallocate(_: *cascade.Context, _: FrameList) void {
-                @panic("deallocate not supported");
-            }
-        }.deallocate,
-    };
-
-    pub fn initializeBootstrapFrameAllocator(
-        context: *cascade.Context,
-        memory_map: []const init.exports.boot.MemoryMapEntry,
-    ) void {
-        init_log.debug(context, "bootloader provided memory map:", .{});
-
-        for (memory_map) |entry| {
-            init_log.debug(context, "\t{f}", .{entry});
-            if (entry.type != .free) continue;
-
-            regions.append(.{
-                .start_physical_frame = .fromAddress(entry.range.address),
-                .first_free_frame_index = 0,
-                .frame_count = @intCast(std.math.divExact(
-                    usize,
-                    entry.range.size.value,
-                    arch.paging.standard_page_size.value,
-                ) catch std.debug.panic(
-                    "memory map entry size is not a multiple of page size: {f}",
-                    .{entry},
-                )),
-            }) catch @panic("exceeded max number of regions");
-        }
-
-        if (init_log.levelEnabled(.debug)) {
-            var frames_available: usize = 0;
-            for (regions.slice()) |region| {
-                frames_available += region.frame_count;
-            }
-            init_log.debug(
-                context,
-                "bootstrap physical frame allocator initalized with {} free frames ({f})",
-                .{ frames_available, arch.paging.standard_page_size.multiplyScalar(frames_available) },
-            );
-        }
-    }
-
-    const Region = struct {
-        /// The first frame of the region.
-        start_physical_frame: Frame,
-
-        /// Index of the first free frame in this region.
-        first_free_frame_index: u32,
-
-        /// Total number of frames in the region.
-        frame_count: u32,
-    };
 
     const init_log = cascade.debug.log.scoped(.init_mem_phys);
 };

@@ -12,9 +12,10 @@ pub fn initStage1() !noreturn {
 
     var context = try constructBootstrapContext();
 
-    // TODO: initialize the bootstrap frame allocator here then ensure all physical memory regions are mapped in the
-    //       bootloader provided memory map, this would allow us to switch to latter limine revisions and also
-    //       allow us to support unusual systems with MMIO above 4GiB
+    mem.initializeBootstrapFrameAllocator(context);
+
+    // TODO: ensure all physical memory regions are mapped in the bootloader provided page table here, this would allow
+    // us to switch to latter limine revisions and also allow us to support unusual systems with MMIO above 4GiB
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     try acpi.earlyInitialize();
@@ -38,7 +39,7 @@ pub fn initStage1() !noreturn {
     arch.init.configurePerExecutorSystemFeatures(context);
 
     log.debug(context, "initializing memory system", .{});
-    try cascade.mem.initialization.initializeMemorySystem(context, try collectMemorySystemInputs());
+    try mem.initializeMemorySystem(context);
 
     log.debug(context, "remapping init outputs", .{});
     try Output.remapOutputs(context);
@@ -213,44 +214,6 @@ fn constructBootstrapContext() !*cascade.Context {
     return context;
 }
 
-pub fn collectMemorySystemInputs() !cascade.mem.initialization.MemorySystemInputs {
-    const static = struct {
-        var memory_map: core.containers.BoundedArray(
-            exports.boot.MemoryMapEntry,
-            cascade.config.maximum_number_of_memory_map_entries,
-        ) = .{};
-    };
-
-    var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
-
-    var number_of_usable_pages: usize = 0;
-    var number_of_usable_regions: usize = 0;
-
-    while (memory_iter.next()) |entry| {
-        try static.memory_map.append(entry);
-
-        if (!entry.type.isUsable()) continue;
-        if (entry.range.size.value == 0) continue;
-
-        number_of_usable_regions += 1;
-
-        number_of_usable_pages += std.math.divExact(
-            usize,
-            entry.range.size.value,
-            arch.paging.standard_page_size.value,
-        ) catch std.debug.panic(
-            "memory map entry size is not a multiple of page size: {f}",
-            .{entry},
-        );
-    }
-
-    return .{
-        .number_of_usable_pages = number_of_usable_pages,
-        .number_of_usable_regions = number_of_usable_regions,
-        .memory_map = static.memory_map.constSlice(),
-    };
-}
-
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
@@ -375,7 +338,7 @@ pub const exports = struct {
 };
 
 pub const acpi = @import("acpi.zig");
-pub const mem = @import("mem.zig");
+pub const mem = @import("mem/mem.zig");
 pub const time = @import("time.zig");
 pub const Output = @import("output/Output.zig");
 
