@@ -358,7 +358,7 @@ pub const DBG2 = extern struct {
             return null;
         }
 
-        const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.DBG2);
+        const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.DBG2);
         const uart = @import("init").Output.uart;
         const log = cascade.debug.log.scoped(.init_output);
     };

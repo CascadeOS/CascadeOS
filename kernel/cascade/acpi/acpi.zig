@@ -14,6 +14,7 @@ pub fn tryShutdown(context: *cascade.Context) !void {
 
 pub const Address = @import("Address.zig").Address;
 pub const tables = @import("tables/tables.zig");
+pub const uacpi = @import("uacpi.zig");
 
 pub const globals = struct {
     /// Pointer to the RSDP table.
@@ -71,14 +72,6 @@ pub const init = struct {
     const init_log = cascade.debug.log.scoped(.init_acpi);
 };
 
-/// Exports APIs across components.
-///
-/// Exports:
-///  - uacpi API needed by the init component
-pub const exports = struct {
-    pub const uacpi = @import("uacpi.zig");
-};
-
 comptime {
     _ = @import("uacpi_kernel_api.zig"); // ensure kernel api is exported
 }
@@ -89,4 +82,3 @@ const cascade = @import("cascade");
 const core = @import("core");
 const log = cascade.debug.log.scoped(.acpi);
 const std = @import("std");
-const uacpi = @import("uacpi.zig");

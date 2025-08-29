@@ -382,7 +382,7 @@ pub const init = struct {
         globals.ecams = try ecams.toOwnedSlice(cascade.mem.heap.allocator);
     }
 
-    const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.MCFG);
+    const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.MCFG);
     const init_log = cascade.debug.log.scoped(.init_pci);
 };
 

@@ -527,7 +527,7 @@ pub const SPCR = extern struct {
             }
         }
 
-        const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.SPCR);
+        const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.SPCR);
         const uart = @import("init").Output.uart;
         const log = cascade.debug.log.scoped(.init_output);
     };

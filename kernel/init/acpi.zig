@@ -151,7 +151,7 @@ const boot = @import("boot");
 const cascade = @import("cascade");
 
 const tables = cascade.acpi.tables;
-const uacpi = cascade.acpi.exports.uacpi;
+const uacpi = cascade.acpi.uacpi;
 
 const core = @import("core");
 const log = cascade.debug.log.scoped(.init_acpi);

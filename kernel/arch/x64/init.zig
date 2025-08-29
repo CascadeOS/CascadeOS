@@ -400,7 +400,7 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const x64 = @import("x64.zig");
 
-const AcpiTable = cascade.exports.acpi.AcpiTable;
+const AcpiTable = cascade.exports.AcpiTable;
 const core = @import("core");
 const log = cascade.debug.log.scoped(.init_x64);
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;

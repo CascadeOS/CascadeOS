@@ -50,7 +50,7 @@ pub const std_options: std.Options = .{
 /// Exports:
 ///  - init API needed by the arch component
 pub const exports = struct {
-    pub const acpi = init.acpi;
+    pub const AcpiTable = init.acpi.AcpiTable;
 
     pub const Output = init.Output;
 

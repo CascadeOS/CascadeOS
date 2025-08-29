@@ -93,7 +93,7 @@ pub const init = struct {
             .toPtr([*]volatile u64);
     }
 
-    const AcpiTable = cascade.exports.acpi.AcpiTable(cascade.acpi.tables.HPET);
+    const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.HPET);
     const init_log = cascade.debug.log.scoped(.init_hpet);
 };
 
