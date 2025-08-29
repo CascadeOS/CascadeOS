@@ -8,7 +8,7 @@ pub fn initStage1() !noreturn {
     time.tryCaptureStandardWallclockStartTime();
 
     // we need the direct map to be available as early as possible
-    cascade.mem.initialization.setEarlyOffsets(determineEarlyOffsets());
+    const early_memory_layout = mem.determineEarlyMemoryLayout();
 
     var context = try constructBootstrapContext();
 
@@ -26,8 +26,7 @@ pub fn initStage1() !noreturn {
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    // log the offset determined by `cascade.mem.init.earlyDetermineOffsets`
-    cascade.mem.initialization.logEarlyOffsets(context);
+    mem.logEarlyMemoryLayout(context, early_memory_layout);
 
     try cascade.acpi.init.logAcpiTables(context);
 
@@ -218,51 +217,6 @@ fn constructBootstrapContext() !*cascade.Context {
     return context;
 }
 
-/// Determine various offsets used by the kernel early in the boot process.
-fn determineEarlyOffsets() cascade.mem.initialization.EarlyOffsets {
-    const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
-
-    const virtual_offset = core.Size.from(
-        base_address.virtual.value - cascade.config.kernel_base_address.value,
-        .byte,
-    );
-
-    const physical_to_virtual_offset = core.Size.from(
-        base_address.virtual.value - base_address.physical.value,
-        .byte,
-    );
-
-    const direct_map_size = direct_map_size: {
-        const last_memory_map_entry = last_memory_map_entry: {
-            var memory_map_iterator = boot.memoryMap(.backward) catch @panic("no memory map");
-            break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
-        };
-
-        var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
-
-        // We ensure that the lowest 4GiB are always mapped.
-        const four_gib = core.Size.from(4, .gib);
-        if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
-
-        // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-        direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
-
-        break :direct_map_size direct_map_size;
-    };
-
-    const direct_map = core.VirtualRange.fromAddr(
-        boot.directMapAddress() orelse @panic("direct map address not provided"),
-        direct_map_size,
-    );
-
-    return .{
-        .virtual_base_address = base_address.virtual,
-        .virtual_offset = virtual_offset,
-        .physical_to_virtual_offset = physical_to_virtual_offset,
-        .direct_map = direct_map,
-    };
-}
-
 pub fn collectMemorySystemInputs() !cascade.mem.initialization.MemorySystemInputs {
     const static = struct {
         var memory_map: core.containers.BoundedArray(
@@ -424,6 +378,7 @@ pub const exports = struct {
     };
 };
 
+pub const mem = @import("mem.zig");
 pub const time = @import("time.zig");
 pub const Output = @import("output/Output.zig");
 

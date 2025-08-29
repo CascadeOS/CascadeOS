@@ -786,7 +786,7 @@ pub const initialization = struct {
         globals.core_page_table.load();
     }
 
-    pub const EarlyOffsets = struct {
+    pub const EarlyMemoryLayout = struct {
         /// The virtual base address that the kernel was loaded at.
         virtual_base_address: core.VirtualAddress,
         /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
@@ -797,22 +797,12 @@ pub const initialization = struct {
         direct_map: core.VirtualRange,
     };
 
-    /// Set various offsets used by the kernel early in the boot process.
-    pub fn setEarlyOffsets(early_offsets: EarlyOffsets) void {
-        globals.virtual_base_address = early_offsets.virtual_base_address;
-        globals.virtual_offset = early_offsets.virtual_offset;
-        globals.physical_to_virtual_offset = early_offsets.physical_to_virtual_offset;
-        globals.direct_map = early_offsets.direct_map;
-    }
-
-    pub fn logEarlyOffsets(context: *cascade.Context) void {
-        if (!init_log.levelEnabled(.debug)) return;
-
-        init_log.debug(context, "kernel memory offsets:", .{});
-
-        init_log.debug(context, "  virtual base address:       {f}", .{globals.virtual_base_address});
-        init_log.debug(context, "  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
-        init_log.debug(context, "  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
+    /// Set the kernels various offsets and the direct map early in the boot process.
+    pub fn setEarlyMemoryLayout(early_memory_layout: EarlyMemoryLayout) void {
+        globals.virtual_base_address = early_memory_layout.virtual_base_address;
+        globals.virtual_offset = early_memory_layout.virtual_offset;
+        globals.physical_to_virtual_offset = early_memory_layout.physical_to_virtual_offset;
+        globals.direct_map = early_memory_layout.direct_map;
     }
 
     fn sortKernelMemoryRegions() void {
