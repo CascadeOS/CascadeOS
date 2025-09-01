@@ -1,32 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const bootstrap_allocator: phys.FrameAllocator = .{
-    .allocate = struct {
-        fn allocate(context: *cascade.Context) !phys.Frame {
-            const non_empty_region: *FreePhysicalRegion =
-                region: for (globals.free_physical_regions.slice()) |*region| {
-                    if (region.first_free_frame_index < region.frame_count) break :region region;
-                } else {
-                    for (globals.free_physical_regions.constSlice()) |region| {
-                        log.warn(context, "  region: {}", .{region});
-                    }
-
-                    @panic("no empty region in bootstrap physical frame allocator");
-                };
-
-            const first_free_frame_index = non_empty_region.first_free_frame_index;
-            non_empty_region.first_free_frame_index = first_free_frame_index + 1;
-
-            return @enumFromInt(@intFromEnum(non_empty_region.start_physical_frame) + first_free_frame_index);
-        }
-    }.allocate,
-    .deallocate = struct {
-        fn deallocate(_: *cascade.Context, _: phys.FrameList) void {
-            @panic("deallocate not supported");
-        }
-    }.deallocate,
-};
+pub const phys = @import("phys.zig");
 
 /// Determine the kernels various offsets and the direct map early in the boot process.
 pub fn determineEarlyMemoryLayout() cascade.mem.initialization.EarlyMemoryLayout {
@@ -88,28 +63,6 @@ pub fn logEarlyMemoryLayout(context: *cascade.Context, early_memory_layout: casc
     log.debug(context, "  direct map:                 {f}", .{early_memory_layout.direct_map});
 }
 
-/// Initialize the bootstrap physical frame allocator that is used for allocating physical frames before the full memory
-/// system is initialized.
-pub fn initializeBootstrapFrameAllocator(_: *cascade.Context) void {
-    var memory_map = boot.memoryMap(.forward) catch @panic("no memory map");
-    while (memory_map.next()) |entry| {
-        if (entry.type != .free) continue;
-
-        globals.free_physical_regions.append(.{
-            .start_physical_frame = .fromAddress(entry.range.address),
-            .first_free_frame_index = 0,
-            .frame_count = @intCast(std.math.divExact(
-                usize,
-                entry.range.size.value,
-                arch.paging.standard_page_size.value,
-            ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {f}",
-                .{entry},
-            )),
-        }) catch @panic("exceeded max number of physical regions");
-    }
-}
-
 pub fn initializeMemorySystem(context: *cascade.Context) !void {
     var memory_map: core.containers.BoundedArray(
         boot.MemoryMap.Entry,
@@ -141,7 +94,7 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         .number_of_usable_pages = number_of_usable_pages,
         .number_of_usable_regions = number_of_usable_regions,
 
-        .free_physical_regions = globals.free_physical_regions.constSlice(),
+        .free_physical_regions = phys.globals.free_physical_regions.constSlice(),
         .kernel_regions = &kernel_regions,
         .memory_map = memory_map.constSlice(),
 
@@ -350,17 +303,17 @@ fn registerPages(
     number_of_usable_pages: usize,
     number_of_usable_regions: usize,
 ) void {
-    std.debug.assert(@alignOf(phys.Page.Region) <= arch.paging.standard_page_size.value);
+    std.debug.assert(@alignOf(Page.Region) <= arch.paging.standard_page_size.value);
 
-    const size_of_regions = core.Size.of(phys.Page.Region)
+    const size_of_regions = core.Size.of(Page.Region)
         .multiplyScalar(number_of_usable_regions);
 
-    const size_of_pages = core.Size.of(phys.Page)
+    const size_of_pages = core.Size.of(Page)
         .multiplyScalar(number_of_usable_pages);
 
     const range_size =
         size_of_regions
-            .alignForward(.from(@alignOf(phys.Page), .byte))
+            .alignForward(.from(@alignOf(Page), .byte))
             .add(size_of_pages)
             .alignForward(arch.paging.standard_page_size);
 
@@ -380,7 +333,7 @@ fn buildAndLoadCorePageTable(
     kernel_regions: *cascade.mem.KernelMemoryRegion.List,
 ) arch.paging.PageTable {
     const core_page_table = arch.paging.PageTable.create(
-        bootstrap_allocator.allocate(context) catch unreachable,
+        phys.bootstrap_allocator.allocate(context) catch unreachable,
     );
 
     for (kernel_regions.constSlice()) |region| {
@@ -393,7 +346,7 @@ fn buildAndLoadCorePageTable(
                 context,
                 core_page_table,
                 region.range,
-                bootstrap_allocator,
+                phys.bootstrap_allocator,
             ) catch |err| {
                 std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
             },
@@ -403,7 +356,7 @@ fn buildAndLoadCorePageTable(
                 region.range,
                 full.physical_range,
                 full.map_type,
-                bootstrap_allocator,
+                phys.bootstrap_allocator,
             ) catch |err| {
                 std.debug.panic("failed to full map {f}: {t}", .{ region, err });
             },
@@ -415,7 +368,7 @@ fn buildAndLoadCorePageTable(
                     map_type,
                     .kernel,
                     .keep,
-                    bootstrap_allocator,
+                    phys.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
                 };
@@ -429,28 +382,10 @@ fn buildAndLoadCorePageTable(
     return core_page_table;
 }
 
-pub const FreePhysicalRegion = struct {
-    /// The first frame of the region.
-    start_physical_frame: phys.Frame,
-
-    /// Index of the first free frame in this region.
-    first_free_frame_index: u32,
-
-    /// Total number of frames in the region.
-    frame_count: u32,
-
-    pub const List = core.containers.BoundedArray(FreePhysicalRegion, max_regions);
-    const max_regions: usize = 64;
-};
-
-const globals = struct {
-    var free_physical_regions: FreePhysicalRegion.List = .{};
-};
-
 const arch = @import("arch");
 const boot = @import("boot");
 const cascade = @import("cascade");
-const phys = cascade.mem.phys;
+const Page = cascade.mem.Page;
 
 const core = @import("core");
 const log = cascade.debug.log.scoped(.init_mem);

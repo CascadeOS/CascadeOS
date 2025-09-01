@@ -455,7 +455,7 @@ pub const initialization = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
 
-        free_physical_regions: []const init.mem.FreePhysicalRegion,
+        free_physical_regions: []const init.mem.phys.FreePhysicalRegion,
         kernel_regions: *KernelMemoryRegion.List,
         memory_map: []const init.exports.boot.MemoryMapEntry,
 

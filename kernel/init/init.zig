@@ -12,7 +12,7 @@ pub fn initStage1() !noreturn {
 
     var context = try constructBootstrapContext();
 
-    mem.initializeBootstrapFrameAllocator(context);
+    mem.phys.initializeBootstrapFrameAllocator(context);
 
     // TODO: ensure all physical memory regions are mapped in the bootloader provided page table here, this would allow
     // us to switch to latter limine revisions and also allow us to support unusual systems with MMIO above 4GiB

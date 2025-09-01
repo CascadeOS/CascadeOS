@@ -179,7 +179,7 @@ pub const initialization = struct {
         number_of_usable_regions: usize,
         kernel_regions: *mem.KernelMemoryRegion.List,
         memory_map: []const init.exports.boot.MemoryMapEntry,
-        free_physical_regions: []const init.mem.FreePhysicalRegion,
+        free_physical_regions: []const init.mem.phys.FreePhysicalRegion,
     ) void {
         init_log.debug(
             context,
