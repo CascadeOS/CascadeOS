@@ -90,14 +90,17 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         &kernel_regions,
     );
 
+    log.debug(context, "initializing physical memory", .{});
+    phys.initializePhysicalMemory(
+        context,
+        number_of_usable_pages,
+        number_of_usable_regions,
+        kernel_regions.find(.pages).?.range,
+        memory_map.constSlice(),
+    );
+
     try cascade.mem.initialization.initializeMemorySystem(context, .{
-        .number_of_usable_pages = number_of_usable_pages,
-        .number_of_usable_regions = number_of_usable_regions,
-
-        .free_physical_regions = phys.globals.free_physical_regions.constSlice(),
         .kernel_regions = &kernel_regions,
-        .memory_map = memory_map.constSlice(),
-
         .core_page_table = core_page_table,
     });
 }

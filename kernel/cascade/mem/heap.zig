@@ -287,7 +287,6 @@ pub const init = struct {
         context: *cascade.Context,
         kernel_regions: *cascade.mem.KernelMemoryRegion.List,
     ) !void {
-
         // heap
         {
             try globals.heap_address_space_arena.init(

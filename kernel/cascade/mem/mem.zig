@@ -452,30 +452,14 @@ pub const globals = struct {
 
 pub const initialization = struct {
     const MemorySystemInitializationData = struct {
-        number_of_usable_pages: usize,
-        number_of_usable_regions: usize,
-
-        free_physical_regions: []const init.mem.phys.FreePhysicalRegion,
         kernel_regions: *KernelMemoryRegion.List,
-        memory_map: []const init.exports.boot.MemoryMapEntry,
-
         core_page_table: arch.paging.PageTable,
     };
 
     pub fn initializeMemorySystem(context: *cascade.Context, initialization_data: MemorySystemInitializationData) !void {
-        globals.non_cached_direct_map = initialization_data.kernel_regions.find(.non_cached_direct_map).?.range;
         globals.regions = initialization_data.kernel_regions.*;
+        globals.non_cached_direct_map = globals.regions.find(.non_cached_direct_map).?.range;
         globals.core_page_table = initialization_data.core_page_table;
-
-        init_log.debug(context, "initializing physical memory", .{});
-        phys.initialization.initializePhysicalMemory(
-            context,
-            initialization_data.number_of_usable_pages,
-            initialization_data.number_of_usable_regions,
-            initialization_data.kernel_regions,
-            initialization_data.memory_map,
-            initialization_data.free_physical_regions,
-        );
 
         init_log.debug(context, "initializing caches", .{});
         try resource_arena.global_init.initializeCache(context);
@@ -483,10 +467,10 @@ pub const initialization = struct {
         try AddressSpace.global_init.initializeCaches(context);
 
         init_log.debug(context, "initializing kernel and special heap", .{});
-        try heap.init.initializeHeaps(context, initialization_data.kernel_regions);
+        try heap.init.initializeHeaps(context, &globals.regions);
 
         init_log.debug(context, "initializing tasks", .{});
-        try cascade.Task.init.initializeTasks(context, initialization_data.kernel_regions);
+        try cascade.Task.init.initializeTasks(context, &globals.regions);
 
         init_log.debug(context, "initializing processes", .{});
         try cascade.Process.init.initializeProcesses(context);
@@ -496,7 +480,7 @@ pub const initialization = struct {
             context,
             .{
                 .name = try .fromSlice("pageable_kernel"),
-                .range = initialization_data.kernel_regions.find(.pageable_kernel_address_space).?.range,
+                .range = globals.regions.find(.pageable_kernel_address_space).?.range,
                 .page_table = globals.core_page_table,
                 .environment = .kernel,
             },
