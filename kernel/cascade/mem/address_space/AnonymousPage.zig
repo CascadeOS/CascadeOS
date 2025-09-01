@@ -63,17 +63,9 @@ pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade
     }
 }
 
-const globals = struct {
-    /// Initialized during `init.initializeCache`.
-    var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
-};
-
-pub const init = struct {
-    pub fn initializeCache(context: *cascade.Context) !void {
-        globals.anonymous_page_cache.init(context, .{
-            .name = try .fromSlice("anonymous page"),
-        });
-    }
+pub const globals = struct {
+    /// Initialized during `init.mem.initializeCaches`.
+    pub var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
 };
 
 const Page = cascade.mem.Page; // called a `vm_page` in uvm

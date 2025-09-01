@@ -461,11 +461,6 @@ pub const initialization = struct {
         globals.non_cached_direct_map = globals.regions.find(.non_cached_direct_map).?.range;
         globals.core_page_table = initialization_data.core_page_table;
 
-        init_log.debug(context, "initializing caches", .{});
-        try resource_arena.global_init.initializeCache(context);
-        try cache.init.initializeCaches(context);
-        try AddressSpace.global_init.initializeCaches(context);
-
         init_log.debug(context, "initializing kernel and special heap", .{});
         try heap.init.initializeHeaps(context, &globals.regions);
 

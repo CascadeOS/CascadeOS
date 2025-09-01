@@ -451,17 +451,9 @@ fn resourceArenaName(address_space_name: Name) cascade.mem.resource_arena.Name {
     return resource_arena_name;
 }
 
-pub const global_init = struct {
-    pub fn initializeCaches(context: *cascade.Context) !void {
-        try AnonymousMap.init.initializeCache(context);
-        try AnonymousPage.init.initializeCache(context);
-        try Entry.init.initializeCache(context);
-    }
-};
-
-const AnonymousMap = @import("AnonymousMap.zig");
-const AnonymousPage = @import("AnonymousPage.zig");
-const Entry = @import("Entry.zig");
+pub const AnonymousMap = @import("AnonymousMap.zig");
+pub const AnonymousPage = @import("AnonymousPage.zig");
+pub const Entry = @import("Entry.zig");
 const Page = cascade.mem.Page; // called a `vm_page` in uvm
 const FaultInfo = @import("FaultInfo.zig");
 const Object = @import("Object.zig");

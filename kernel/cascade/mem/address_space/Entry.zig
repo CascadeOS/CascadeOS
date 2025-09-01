@@ -314,22 +314,16 @@ pub inline fn format(_: *const Entry, _: *std.Io.Writer) !void {
     @compileError("use `Entry.print` instead");
 }
 
-const globals = struct {
-    /// Initialized during `init.initializeCache`.
-    var entry_cache: Cache(Entry, null, null) = undefined;
+pub const globals = struct {
+    /// Initialized during `init.mem.initializeCaches`.
+    pub var entry_cache: Cache(Entry, null, null) = undefined;
 };
 
-pub const init = struct {
-    pub fn initializeCache(context: *cascade.Context) !void {
-        if (!cascade.mem.cache.isSmallObject(@sizeOf(Entry), .of(Entry))) {
-            @panic("`Entry` is a large cache object");
-        }
-
-        globals.entry_cache.init(context, .{
-            .name = try .fromSlice("address space entry"),
-        });
+comptime {
+    if (!cascade.mem.cache.isSmallObject(@sizeOf(Entry), .of(Entry))) {
+        @compileError("`Entry` is a large cache object");
     }
-};
+}
 
 const AnonymousMap = @import("AnonymousMap.zig");
 const Object = @import("Object.zig");

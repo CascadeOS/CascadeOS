@@ -99,6 +99,9 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         memory_map.constSlice(),
     );
 
+    log.debug(context, "initializing caches", .{});
+    try initializeCaches(context);
+
     try cascade.mem.initialization.initializeMemorySystem(context, .{
         .kernel_regions = &kernel_regions,
         .core_page_table = core_page_table,
@@ -383,6 +386,36 @@ fn buildAndLoadCorePageTable(
     core_page_table.load();
 
     return core_page_table;
+}
+
+/// Initializes the caches used by the memory subsystem.
+fn initializeCaches(context: *cascade.Context) !void {
+    cascade.mem.resource_arena.globals.tag_cache.init(context, .{
+        .name = try .fromSlice("boundary tag"),
+        .slab_source = .pmm,
+    });
+
+    cascade.mem.cache.globals.slab_cache.init(context, .{
+        .name = try .fromSlice("slab"),
+        .slab_source = .pmm,
+    });
+
+    cascade.mem.cache.globals.large_object_cache.init(context, .{
+        .name = try .fromSlice("large object"),
+        .slab_source = .pmm,
+    });
+
+    cascade.mem.AddressSpace.AnonymousMap.globals.anonymous_map_cache.init(context, .{
+        .name = try .fromSlice("anonymous map"),
+    });
+
+    cascade.mem.AddressSpace.AnonymousPage.globals.anonymous_page_cache.init(context, .{
+        .name = try .fromSlice("anonymous page"),
+    });
+
+    cascade.mem.AddressSpace.Entry.globals.entry_cache.init(context, .{
+        .name = try .fromSlice("address space entry"),
+    });
 }
 
 const arch = @import("arch");

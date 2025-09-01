@@ -250,17 +250,9 @@ pub inline fn format(_: *const *AnonymousMap, _: *std.Io.Writer) !void {
     @compileError("use `AnonymousMap.print` instead");
 }
 
-const globals = struct {
-    /// Initialized during `init.initializeCache`.
-    var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
-};
-
-pub const init = struct {
-    pub fn initializeCache(context: *cascade.Context) !void {
-        globals.anonymous_map_cache.init(context, .{
-            .name = try .fromSlice("anonymous map"),
-        });
-    }
+pub const globals = struct {
+    /// Initialized during `init.mem.initializeCaches`.
+    pub var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
 };
 
 const AddressSpace = @import("AddressSpace.zig");
