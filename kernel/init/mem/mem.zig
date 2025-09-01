@@ -131,6 +131,12 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         &kernel_regions,
     );
 
+    log.debug(context, "building core page table", .{});
+    const core_page_table = buildAndLoadCorePageTable(
+        context,
+        &kernel_regions,
+    );
+
     try cascade.mem.initialization.initializeMemorySystem(context, .{
         .number_of_usable_pages = number_of_usable_pages,
         .number_of_usable_regions = number_of_usable_regions,
@@ -138,6 +144,8 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         .free_physical_regions = globals.free_physical_regions.constSlice(),
         .kernel_regions = &kernel_regions,
         .memory_map = memory_map.constSlice(),
+
+        .core_page_table = core_page_table,
     });
 }
 
@@ -365,6 +373,60 @@ fn registerPages(
         .range = pages_range,
         .type = .pages,
     });
+}
+
+fn buildAndLoadCorePageTable(
+    context: *cascade.Context,
+    kernel_regions: *cascade.mem.KernelMemoryRegion.List,
+) arch.paging.PageTable {
+    const core_page_table = arch.paging.PageTable.create(
+        bootstrap_allocator.allocate(context) catch unreachable,
+    );
+
+    for (kernel_regions.constSlice()) |region| {
+        log.debug(context, "mapping '{t}' into the core page table", .{region.type});
+
+        const map_info = region.mapInfo();
+
+        switch (map_info) {
+            .top_level => arch.paging.init.fillTopLevel(
+                context,
+                core_page_table,
+                region.range,
+                bootstrap_allocator,
+            ) catch |err| {
+                std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
+            },
+            .full => |full| arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                context,
+                core_page_table,
+                region.range,
+                full.physical_range,
+                full.map_type,
+                bootstrap_allocator,
+            ) catch |err| {
+                std.debug.panic("failed to full map {f}: {t}", .{ region, err });
+            },
+            .back_with_frames => |map_type| {
+                cascade.mem.mapRangeAndBackWithPhysicalFrames(
+                    context,
+                    core_page_table,
+                    region.range,
+                    map_type,
+                    .kernel,
+                    .keep,
+                    bootstrap_allocator,
+                ) catch |err| {
+                    std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
+                };
+            },
+        }
+    }
+
+    log.debug(context, "loading core page table", .{});
+    core_page_table.load();
+
+    return core_page_table;
 }
 
 pub const FreePhysicalRegion = struct {

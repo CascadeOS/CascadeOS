@@ -458,17 +458,14 @@ pub const initialization = struct {
         free_physical_regions: []const init.mem.FreePhysicalRegion,
         kernel_regions: *KernelMemoryRegion.List,
         memory_map: []const init.exports.boot.MemoryMapEntry,
+
+        core_page_table: arch.paging.PageTable,
     };
 
     pub fn initializeMemorySystem(context: *cascade.Context, initialization_data: MemorySystemInitializationData) !void {
         globals.non_cached_direct_map = initialization_data.kernel_regions.find(.non_cached_direct_map).?.range;
         globals.regions = initialization_data.kernel_regions.*;
-
-        init_log.debug(context, "building core page table", .{});
-        buildAndLoadCorePageTable(
-            context,
-            initialization_data.kernel_regions,
-        );
+        globals.core_page_table = initialization_data.core_page_table;
 
         init_log.debug(context, "initializing physical memory", .{});
         phys.initialization.initializePhysicalMemory(
@@ -504,58 +501,6 @@ pub const initialization = struct {
                 .environment = .kernel,
             },
         );
-    }
-
-    fn buildAndLoadCorePageTable(
-        context: *cascade.Context,
-        kernel_regions: *KernelMemoryRegion.List,
-    ) void {
-        globals.core_page_table = arch.paging.PageTable.create(
-            init.mem.bootstrap_allocator.allocate(context) catch unreachable,
-        );
-
-        for (kernel_regions.constSlice()) |region| {
-            init_log.debug(context, "mapping '{t}' into the core page table", .{region.type});
-
-            const map_info = region.mapInfo();
-
-            switch (map_info) {
-                .top_level => arch.paging.init.fillTopLevel(
-                    context,
-                    globals.core_page_table,
-                    region.range,
-                    init.mem.bootstrap_allocator,
-                ) catch |err| {
-                    std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
-                },
-                .full => |full| arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                    context,
-                    globals.core_page_table,
-                    region.range,
-                    full.physical_range,
-                    full.map_type,
-                    init.mem.bootstrap_allocator,
-                ) catch |err| {
-                    std.debug.panic("failed to full map {f}: {t}", .{ region, err });
-                },
-                .back_with_frames => |map_type| {
-                    mapRangeAndBackWithPhysicalFrames(
-                        context,
-                        globals.core_page_table,
-                        region.range,
-                        map_type,
-                        .kernel,
-                        .keep,
-                        init.mem.bootstrap_allocator,
-                    ) catch |err| {
-                        std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
-                    };
-                },
-            }
-        }
-
-        init_log.debug(context, "loading core page table", .{});
-        globals.core_page_table.load();
     }
 
     pub const EarlyMemoryLayout = struct {
