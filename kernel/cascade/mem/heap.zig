@@ -285,9 +285,9 @@ pub const globals = struct {
 pub const init = struct {
     pub fn initializeHeaps(
         context: *cascade.Context,
-        heap_range: core.VirtualRange,
-        special_heap_range: core.VirtualRange,
+        kernel_regions: *cascade.mem.KernelMemoryRegion.List,
     ) !void {
+
         // heap
         {
             try globals.heap_address_space_arena.init(
@@ -319,6 +319,8 @@ pub const init = struct {
                 },
             );
 
+            const heap_range = kernel_regions.find(.kernel_heap).?.range;
+
             globals.heap_address_space_arena.addSpan(
                 context,
                 heap_range.address.value,
@@ -337,6 +339,8 @@ pub const init = struct {
                     .quantum = arch.paging.standard_page_size.value,
                 },
             );
+
+            const special_heap_range = kernel_regions.find(.special_heap).?.range;
 
             globals.special_heap_address_space_arena.addSpan(
                 context,

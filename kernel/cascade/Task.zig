@@ -325,7 +325,10 @@ pub const globals = struct {
 pub const init = struct {
     pub const earlyCreateStack = Stack.createStack;
 
-    pub fn initializeTasks(context: *cascade.Context, stacks_range: core.VirtualRange) !void {
+    pub fn initializeTasks(
+        context: *cascade.Context,
+        kernel_regions: *cascade.mem.KernelMemoryRegion.List,
+    ) !void {
         log.debug(context, "initializing task stacks", .{});
         try globals.stack_arena.init(
             context,
@@ -334,6 +337,8 @@ pub const init = struct {
                 .quantum = arch.paging.standard_page_size.value,
             },
         );
+
+        const stacks_range = kernel_regions.find(.kernel_stacks).?.range;
 
         globals.stack_arena.addSpan(
             context,

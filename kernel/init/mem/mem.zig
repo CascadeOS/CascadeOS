@@ -4,11 +4,11 @@
 pub const bootstrap_allocator: phys.FrameAllocator = .{
     .allocate = struct {
         fn allocate(context: *cascade.Context) !phys.Frame {
-            const non_empty_region: *Region =
-                region: for (globals.regions.slice()) |*region| {
+            const non_empty_region: *FreePhysicalRegion =
+                region: for (globals.free_physical_regions.slice()) |*region| {
                     if (region.first_free_frame_index < region.frame_count) break :region region;
                 } else {
-                    for (globals.regions.constSlice()) |region| {
+                    for (globals.free_physical_regions.constSlice()) |region| {
                         log.warn(context, "  region: {}", .{region});
                     }
 
@@ -95,7 +95,7 @@ pub fn initializeBootstrapFrameAllocator(_: *cascade.Context) void {
     while (memory_map.next()) |entry| {
         if (entry.type != .free) continue;
 
-        globals.regions.append(.{
+        globals.free_physical_regions.append(.{
             .start_physical_frame = .fromAddress(entry.range.address),
             .first_free_frame_index = 0,
             .frame_count = @intCast(std.math.divExact(
@@ -106,34 +106,58 @@ pub fn initializeBootstrapFrameAllocator(_: *cascade.Context) void {
                 "memory map entry size is not a multiple of page size: {f}",
                 .{entry},
             )),
-        }) catch @panic("exceeded max number of regions");
+        }) catch @panic("exceeded max number of physical regions");
     }
 }
 
 pub fn initializeMemorySystem(context: *cascade.Context) !void {
-    const static = struct {
-        var memory_map: core.containers.BoundedArray(
-            boot.MemoryMap.Entry,
-            cascade.config.maximum_number_of_memory_map_entries,
-        ) = .{};
-    };
+    var memory_map: core.containers.BoundedArray(
+        boot.MemoryMap.Entry,
+        cascade.config.maximum_number_of_memory_map_entries,
+    ) = .{};
 
-    if (log.levelEnabled(.debug)) {
-        var memory_map = boot.memoryMap(.forward) catch @panic("no memory map");
+    const number_of_usable_pages, const number_of_usable_regions = try fillMemoryMap(
+        context,
+        &memory_map,
+    );
 
-        log.debug(context, "bootloader provided memory map:", .{});
-        while (memory_map.next()) |entry| {
-            log.debug(context, "\t{f}", .{entry});
-        }
-    }
+    var kernel_regions: cascade.mem.KernelMemoryRegion.List = .{};
 
+    log.debug(context, "building kernel memory layout", .{});
+    buildMemoryLayout(
+        context,
+        number_of_usable_pages,
+        number_of_usable_regions,
+        &kernel_regions,
+    );
+
+    try cascade.mem.initialization.initializeMemorySystem(context, .{
+        .number_of_usable_pages = number_of_usable_pages,
+        .number_of_usable_regions = number_of_usable_regions,
+
+        .free_physical_regions = globals.free_physical_regions.constSlice(),
+        .kernel_regions = &kernel_regions,
+        .memory_map = memory_map.constSlice(),
+    });
+}
+
+const MemoryMap = core.containers.BoundedArray(
+    boot.MemoryMap.Entry,
+    cascade.config.maximum_number_of_memory_map_entries,
+);
+
+fn fillMemoryMap(context: *cascade.Context, memory_map: *MemoryMap) !struct { usize, usize } {
     var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
     var number_of_usable_pages: usize = 0;
     var number_of_usable_regions: usize = 0;
 
+    log.debug(context, "bootloader provided memory map:", .{});
+
     while (memory_iter.next()) |entry| {
-        try static.memory_map.append(entry);
+        log.debug(context, "\t{f}", .{entry});
+
+        try memory_map.append(entry);
 
         if (!entry.type.isUsable()) continue;
         if (entry.range.size.value == 0) continue;
@@ -150,15 +174,200 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         );
     }
 
-    try cascade.mem.initialization.initializeMemorySystem(context, .{
-        .number_of_usable_pages = number_of_usable_pages,
-        .number_of_usable_regions = number_of_usable_regions,
-        .memory_map = static.memory_map.constSlice(),
-        .regions = &globals.regions,
+    log.debug(context, "usable pages in memory map: {d}", .{number_of_usable_pages});
+    log.debug(context, "usable regions in memory map: {d}", .{number_of_usable_regions});
+
+    return .{ number_of_usable_pages, number_of_usable_regions };
+}
+
+fn buildMemoryLayout(
+    context: *cascade.Context,
+    number_of_usable_pages: usize,
+    number_of_usable_regions: usize,
+    kernel_regions: *cascade.mem.KernelMemoryRegion.List,
+) void {
+    registerKernelSections(kernel_regions);
+    registerDirectMaps(kernel_regions);
+    registerHeaps(kernel_regions);
+    registerPages(kernel_regions, number_of_usable_pages, number_of_usable_regions);
+
+    kernel_regions.sort();
+
+    if (log.levelEnabled(.debug)) {
+        log.debug(context, "kernel memory layout:", .{});
+
+        for (kernel_regions.constSlice()) |region| {
+            log.debug(context, "\t{f}", .{region});
+        }
+    }
+}
+
+fn registerKernelSections(kernel_regions: *cascade.mem.KernelMemoryRegion.List) void {
+    const linker_symbols = struct {
+        extern const __text_start: u8;
+        extern const __text_end: u8;
+        extern const __rodata_start: u8;
+        extern const __rodata_end: u8;
+        extern const __data_start: u8;
+        extern const __data_end: u8;
+    };
+
+    const sdf_slice = cascade.debug.sdfSlice() catch &.{};
+    const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
+
+    const sections: []const struct {
+        core.VirtualAddress,
+        core.VirtualAddress,
+        cascade.mem.KernelMemoryRegion.Type,
+    } = &.{
+        .{
+            core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
+            core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+            .executable_section,
+        },
+        .{
+            core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
+            core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+            .readonly_section,
+        },
+        .{
+            core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
+            core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+            .writeable_section,
+        },
+        .{
+            sdf_range.address,
+            sdf_range.endBound(),
+            .sdf_section,
+        },
+    };
+
+    for (sections) |section| {
+        const start_address = section[0];
+        const end_address = section[1];
+        const region_type = section[2];
+
+        std.debug.assert(end_address.greaterThan(start_address));
+
+        const virtual_range: core.VirtualRange = .fromAddr(
+            start_address,
+            core.Size.from(end_address.value - start_address.value, .byte)
+                .alignForward(arch.paging.standard_page_size),
+        );
+
+        kernel_regions.append(.{
+            .range = virtual_range,
+            .type = region_type,
+        });
+    }
+}
+
+fn registerDirectMaps(kernel_regions: *cascade.mem.KernelMemoryRegion.List) void {
+    const direct_map = cascade.mem.globals.direct_map;
+
+    // does the direct map range overlap a pre-existing region?
+    for (kernel_regions.constSlice()) |region| {
+        if (region.range.fullyContainsRange(direct_map)) {
+            std.debug.panic("direct map overlaps region: {f}", .{region});
+            return error.DirectMapOverlapsRegion;
+        }
+    }
+
+    kernel_regions.append(.{
+        .range = direct_map,
+        .type = .direct_map,
+    });
+
+    const non_cached_direct_map = kernel_regions.findFreeRange(
+        direct_map.size,
+        arch.paging.largest_page_size,
+    ) orelse @panic("no free range for non-cached direct map");
+
+    kernel_regions.append(.{
+        .range = non_cached_direct_map,
+        .type = .non_cached_direct_map,
     });
 }
 
-pub const Region = struct {
+fn registerHeaps(kernel_regions: *cascade.mem.KernelMemoryRegion.List) void {
+    const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
+
+    const kernel_heap_range = kernel_regions.findFreeRange(
+        size_of_top_level,
+        size_of_top_level,
+    ) orelse
+        @panic("no space in kernel memory layout for the kernel heap");
+
+    kernel_regions.append(.{
+        .range = kernel_heap_range,
+        .type = .kernel_heap,
+    });
+
+    const special_heap_range = kernel_regions.findFreeRange(
+        size_of_top_level,
+        size_of_top_level,
+    ) orelse
+        @panic("no space in kernel memory layout for the special heap");
+
+    kernel_regions.append(.{
+        .range = special_heap_range,
+        .type = .special_heap,
+    });
+
+    const kernel_stacks_range = kernel_regions.findFreeRange(
+        size_of_top_level,
+        size_of_top_level,
+    ) orelse
+        @panic("no space in kernel memory layout for the kernel stacks");
+
+    kernel_regions.append(.{
+        .range = kernel_stacks_range,
+        .type = .kernel_stacks,
+    });
+
+    const pageable_kernel_address_space_range = kernel_regions.findFreeRange(
+        size_of_top_level,
+        size_of_top_level,
+    ) orelse
+        @panic("no space in kernel memory layout for the pageable kernel address space");
+
+    kernel_regions.append(.{
+        .range = pageable_kernel_address_space_range,
+        .type = .pageable_kernel_address_space,
+    });
+}
+
+fn registerPages(
+    kernel_regions: *cascade.mem.KernelMemoryRegion.List,
+    number_of_usable_pages: usize,
+    number_of_usable_regions: usize,
+) void {
+    std.debug.assert(@alignOf(phys.Page.Region) <= arch.paging.standard_page_size.value);
+
+    const size_of_regions = core.Size.of(phys.Page.Region)
+        .multiplyScalar(number_of_usable_regions);
+
+    const size_of_pages = core.Size.of(phys.Page)
+        .multiplyScalar(number_of_usable_pages);
+
+    const range_size =
+        size_of_regions
+            .alignForward(.from(@alignOf(phys.Page), .byte))
+            .add(size_of_pages)
+            .alignForward(arch.paging.standard_page_size);
+
+    const pages_range = kernel_regions.findFreeRange(
+        range_size,
+        arch.paging.standard_page_size,
+    ) orelse @panic("no space in kernel memory layout for the pages array");
+
+    kernel_regions.append(.{
+        .range = pages_range,
+        .type = .pages,
+    });
+}
+
+pub const FreePhysicalRegion = struct {
     /// The first frame of the region.
     start_physical_frame: phys.Frame,
 
@@ -168,12 +377,12 @@ pub const Region = struct {
     /// Total number of frames in the region.
     frame_count: u32,
 
-    pub const List = core.containers.BoundedArray(Region, max_regions);
+    pub const List = core.containers.BoundedArray(FreePhysicalRegion, max_regions);
     const max_regions: usize = 64;
 };
 
 const globals = struct {
-    var regions: Region.List = .{};
+    var free_physical_regions: FreePhysicalRegion.List = .{};
 };
 
 const arch = @import("arch");

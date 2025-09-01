@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+pub const Page = @import("Page.zig");
+
 pub const allocator: FrameAllocator = .{
     .allocate = allocate,
     .deallocate = deallocate,
@@ -175,9 +177,9 @@ pub const initialization = struct {
         context: *cascade.Context,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
-        pages_range: core.VirtualRange,
+        kernel_regions: *mem.KernelMemoryRegion.List,
         memory_map: []const init.exports.boot.MemoryMapEntry,
-        regions: *init.mem.Region.List,
+        free_physical_regions: []const init.mem.FreePhysicalRegion,
     ) void {
         init_log.debug(
             context,
@@ -188,6 +190,8 @@ pub const initialization = struct {
                 number_of_usable_regions,
             },
         );
+
+        const pages_range = kernel_regions.find(.pages).?.range;
 
         // ugly pointer stuff to setup the page and page region arrays
         {
@@ -211,6 +215,8 @@ pub const initialization = struct {
 
         var page_index: u32 = 0;
         var usable_range_index: u32 = 0;
+
+        var free_region_index: usize = 0;
 
         for (memory_map) |entry| {
             total_memory.addInPlace(entry.range.size);
@@ -237,12 +243,15 @@ pub const initialization = struct {
             var in_use_frames_left: u32 = if (entry.type == .free) blk: {
                 // pull the free region out of the bootstrap allocator
 
-                const bootstrap_region = regions.orderedRemove(0);
-                std.debug.assert(bootstrap_region.start_physical_frame.baseAddress().equal(entry.range.address));
+                const free_bootstrap_region = free_physical_regions[free_region_index];
 
-                const in_use_frames = bootstrap_region.first_free_frame_index;
+                free_region_index += 1;
 
-                const free_frames = bootstrap_region.frame_count - in_use_frames;
+                std.debug.assert(free_bootstrap_region.start_physical_frame.baseAddress().equal(entry.range.address));
+
+                const in_use_frames = free_bootstrap_region.first_free_frame_index;
+
+                const free_frames = free_bootstrap_region.frame_count - in_use_frames;
                 free_memory.addInPlace(arch.paging.standard_page_size.multiplyScalar(free_frames));
 
                 if (init_log.levelEnabled(.debug)) {
@@ -255,7 +264,7 @@ pub const initialization = struct {
                                 arch.paging.standard_page_size.multiplyScalar(free_frames),
                             },
                         );
-                    } else if (in_use_frames == bootstrap_region.frame_count) {
+                    } else if (in_use_frames == free_bootstrap_region.frame_count) {
                         init_log.debug(
                             context,
                             "pulled {} ({f}) in use frames out of bootstrap frame allocator region",
@@ -351,8 +360,8 @@ pub const initialization = struct {
 const arch = @import("arch");
 const init = @import("init");
 const cascade = @import("cascade");
+const mem = cascade.mem;
 
 const core = @import("core");
 const log = cascade.debug.log.scoped(.mem_phys);
-const Page = @import("Page.zig");
 const std = @import("std");

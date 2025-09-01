@@ -6,10 +6,11 @@ pub const phys = @import("phys.zig");
 
 pub const AddressSpace = @import("address_space/AddressSpace.zig");
 pub const cache = @import("cache.zig");
-pub const MapType = @import("MapType.zig");
 pub const FlushRequest = @import("FlushRequest.zig");
-pub const resource_arena = @import("resource_arena.zig");
+pub const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
+pub const MapType = @import("MapType.zig");
 pub const Page = @import("Page.zig");
+pub const resource_arena = @import("resource_arena.zig");
 
 /// Maps a single page to a physical frame.
 ///
@@ -300,7 +301,7 @@ pub fn onKernelPageFault(
         );
     }
 
-    const region_type = kernelRegionContainingAddress(page_fault_details.faulting_address) orelse {
+    const region_type = globals.regions.containingAddress(page_fault_details.faulting_address) orelse {
         @branchHint(.cold);
 
         cascade.debug.interruptSourcePanic(
@@ -401,13 +402,6 @@ pub const MapError = error{
     MappingNotValid,
 } || phys.FrameAllocator.AllocateError;
 
-fn kernelRegionContainingAddress(address: core.VirtualAddress) ?KernelMemoryRegion.Type {
-    for (globals.regions.constSlice()) |region| {
-        if (region.range.containsAddress(address)) return region.type;
-    }
-    return null;
-}
-
 pub const globals = struct {
     /// The core page table.
     ///
@@ -441,53 +435,49 @@ pub const globals = struct {
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Initialized during `init.setEarlyOffsets`.
-    var direct_map: core.VirtualRange = undefined;
+    pub var direct_map: core.VirtualRange = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Caching is disabled for this mapping.
     ///
-    /// Initialized during `init.buildMemoryLayout`.
+    /// Initialized during `init.initializeMemorySystem`.
     var non_cached_direct_map: core.VirtualRange = undefined;
 
     /// The layout of the memory regions of the cascade.
     ///
-    /// Initialized during `init.buildMemoryLayout`.
-    var regions: Regions = undefined;
-
-    const Regions = core.containers.BoundedArray(
-        KernelMemoryRegion,
-        std.meta.tags(KernelMemoryRegion.Type).len,
-    );
+    /// Initialized during `init.initializeMemorySystem`.
+    var regions: KernelMemoryRegion.List = undefined;
 };
 
 pub const initialization = struct {
-    pub const MemorySystemInputs = struct {
+    const MemorySystemInitializationData = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
+
+        free_physical_regions: []const init.mem.FreePhysicalRegion,
+        kernel_regions: *KernelMemoryRegion.List,
         memory_map: []const init.exports.boot.MemoryMapEntry,
-        regions: *init.mem.Region.List,
     };
 
-    pub fn initializeMemorySystem(context: *cascade.Context, inputs: MemorySystemInputs) !void {
-        init_log.debug(context, "building kernel memory layout", .{});
-        const result = buildMemoryLayout(
-            context,
-            inputs.number_of_usable_pages,
-            inputs.number_of_usable_regions,
-        );
+    pub fn initializeMemorySystem(context: *cascade.Context, initialization_data: MemorySystemInitializationData) !void {
+        globals.non_cached_direct_map = initialization_data.kernel_regions.find(.non_cached_direct_map).?.range;
+        globals.regions = initialization_data.kernel_regions.*;
 
         init_log.debug(context, "building core page table", .{});
-        buildAndLoadCorePageTable(context);
+        buildAndLoadCorePageTable(
+            context,
+            initialization_data.kernel_regions,
+        );
 
         init_log.debug(context, "initializing physical memory", .{});
         phys.initialization.initializePhysicalMemory(
             context,
-            inputs.number_of_usable_pages,
-            inputs.number_of_usable_regions,
-            result.pages_range,
-            inputs.memory_map,
-            inputs.regions,
+            initialization_data.number_of_usable_pages,
+            initialization_data.number_of_usable_regions,
+            initialization_data.kernel_regions,
+            initialization_data.memory_map,
+            initialization_data.free_physical_regions,
         );
 
         init_log.debug(context, "initializing caches", .{});
@@ -496,10 +486,10 @@ pub const initialization = struct {
         try AddressSpace.global_init.initializeCaches(context);
 
         init_log.debug(context, "initializing kernel and special heap", .{});
-        try heap.init.initializeHeaps(context, result.heap_range, result.special_heap_range);
+        try heap.init.initializeHeaps(context, initialization_data.kernel_regions);
 
         init_log.debug(context, "initializing tasks", .{});
-        try cascade.Task.init.initializeTasks(context, result.stacks_range);
+        try cascade.Task.init.initializeTasks(context, initialization_data.kernel_regions);
 
         init_log.debug(context, "initializing processes", .{});
         try cascade.Process.init.initializeProcesses(context);
@@ -509,239 +499,22 @@ pub const initialization = struct {
             context,
             .{
                 .name = try .fromSlice("pageable_kernel"),
-                .range = result.pageable_kernel_address_space_range,
+                .range = initialization_data.kernel_regions.find(.pageable_kernel_address_space).?.range,
                 .page_table = globals.core_page_table,
                 .environment = .kernel,
             },
         );
     }
 
-    const MemoryLayoutResult = struct {
-        pages_range: core.VirtualRange,
-        heap_range: core.VirtualRange,
-        special_heap_range: core.VirtualRange,
-        stacks_range: core.VirtualRange,
-
-        pageable_kernel_address_space_range: core.VirtualRange,
-    };
-
-    fn buildMemoryLayout(
+    fn buildAndLoadCorePageTable(
         context: *cascade.Context,
-        number_of_usable_pages: usize,
-        number_of_usable_regions: usize,
-    ) MemoryLayoutResult {
-        registerKernelSections();
-        registerDirectMaps();
-        const heaps = registerHeaps();
-        const pages_range = registerPages(number_of_usable_pages, number_of_usable_regions);
-
-        sortKernelMemoryRegions();
-
-        if (init_log.levelEnabled(.debug)) {
-            init_log.debug(context, "kernel memory layout:", .{});
-
-            for (globals.regions.constSlice()) |region| {
-                init_log.debug(context, "\t{f}", .{region});
-            }
-        }
-
-        return .{
-            .pages_range = pages_range,
-            .heap_range = heaps.kernel_heap_range,
-            .special_heap_range = heaps.special_heap_range,
-            .stacks_range = heaps.kernel_stacks_range,
-
-            .pageable_kernel_address_space_range = heaps.pageable_kernel_address_space_range,
-        };
-    }
-
-    fn registerKernelSections() void {
-        const linker_symbols = struct {
-            extern const __text_start: u8;
-            extern const __text_end: u8;
-            extern const __rodata_start: u8;
-            extern const __rodata_end: u8;
-            extern const __data_start: u8;
-            extern const __data_end: u8;
-        };
-
-        const sdf_slice = cascade.debug.sdfSlice() catch &.{};
-        const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
-
-        const sections: []const struct {
-            core.VirtualAddress,
-            core.VirtualAddress,
-            KernelMemoryRegion.Type,
-        } = &.{
-            .{
-                core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
-                core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
-                .executable_section,
-            },
-            .{
-                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
-                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
-                .readonly_section,
-            },
-            .{
-                core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
-                core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
-                .writeable_section,
-            },
-            .{
-                sdf_range.address,
-                sdf_range.endBound(),
-                .sdf_section,
-            },
-        };
-
-        for (sections) |section| {
-            const start_address = section[0];
-            const end_address = section[1];
-            const region_type = section[2];
-
-            std.debug.assert(end_address.greaterThan(start_address));
-
-            const virtual_range: core.VirtualRange = .fromAddr(
-                start_address,
-                core.Size.from(end_address.value - start_address.value, .byte)
-                    .alignForward(arch.paging.standard_page_size),
-            );
-
-            globals.regions.appendAssumeCapacity(.{
-                .range = virtual_range,
-                .type = region_type,
-            });
-        }
-    }
-
-    fn registerDirectMaps() void {
-        const direct_map = globals.direct_map;
-
-        // does the direct map range overlap a pre-existing region?
-        for (globals.regions.constSlice()) |region| {
-            if (region.range.fullyContainsRange(direct_map)) {
-                std.debug.panic("direct map overlaps region: {f}", .{region});
-                return error.DirectMapOverlapsRegion;
-            }
-        }
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = direct_map,
-            .type = .direct_map,
-        });
-
-        const non_cached_direct_map = findFreeRange(
-            direct_map.size,
-            arch.paging.largest_page_size,
-        ) orelse @panic("no free range for non-cached direct map");
-
-        globals.non_cached_direct_map = non_cached_direct_map;
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = non_cached_direct_map,
-            .type = .non_cached_direct_map,
-        });
-    }
-
-    const RegisterHeapsResult = struct {
-        kernel_heap_range: core.VirtualRange,
-        special_heap_range: core.VirtualRange,
-        kernel_stacks_range: core.VirtualRange,
-
-        pageable_kernel_address_space_range: core.VirtualRange,
-    };
-
-    fn registerHeaps() RegisterHeapsResult {
-        const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
-
-        const kernel_heap_range = findFreeRange(
-            size_of_top_level,
-            size_of_top_level,
-        ) orelse
-            @panic("no space in kernel memory layout for the kernel heap");
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = kernel_heap_range,
-            .type = .kernel_heap,
-        });
-
-        const special_heap_range = findFreeRange(
-            size_of_top_level,
-            size_of_top_level,
-        ) orelse
-            @panic("no space in kernel memory layout for the special heap");
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = special_heap_range,
-            .type = .special_heap,
-        });
-
-        const kernel_stacks_range = findFreeRange(
-            size_of_top_level,
-            size_of_top_level,
-        ) orelse
-            @panic("no space in kernel memory layout for the kernel stacks");
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = kernel_stacks_range,
-            .type = .kernel_stacks,
-        });
-
-        const pageable_kernel_address_space_range = findFreeRange(
-            size_of_top_level,
-            size_of_top_level,
-        ) orelse
-            @panic("no space in kernel memory layout for the pageable kernel address space");
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = pageable_kernel_address_space_range,
-            .type = .pageable_kernel_address_space,
-        });
-
-        return .{
-            .kernel_heap_range = kernel_heap_range,
-            .special_heap_range = special_heap_range,
-            .kernel_stacks_range = kernel_stacks_range,
-
-            .pageable_kernel_address_space_range = pageable_kernel_address_space_range,
-        };
-    }
-
-    fn registerPages(number_of_usable_pages: usize, number_of_usable_regions: usize) core.VirtualRange {
-        std.debug.assert(@alignOf(Page.Region) <= arch.paging.standard_page_size.value);
-
-        const size_of_regions = core.Size.of(Page.Region)
-            .multiplyScalar(number_of_usable_regions);
-
-        const size_of_pages = core.Size.of(Page)
-            .multiplyScalar(number_of_usable_pages);
-
-        const range_size =
-            size_of_regions
-                .alignForward(.from(@alignOf(Page), .byte))
-                .add(size_of_pages)
-                .alignForward(arch.paging.standard_page_size);
-
-        const pages_range = findFreeRange(
-            range_size,
-            arch.paging.standard_page_size,
-        ) orelse @panic("no space in kernel memory layout for the pages array");
-
-        globals.regions.appendAssumeCapacity(.{
-            .range = pages_range,
-            .type = .pages,
-        });
-
-        return pages_range;
-    }
-
-    fn buildAndLoadCorePageTable(context: *cascade.Context) void {
+        kernel_regions: *KernelMemoryRegion.List,
+    ) void {
         globals.core_page_table = arch.paging.PageTable.create(
             init.mem.bootstrap_allocator.allocate(context) catch unreachable,
         );
 
-        for (globals.regions.constSlice()) |region| {
+        for (kernel_regions.constSlice()) |region| {
             init_log.debug(context, "mapping '{t}' into the core page table", .{region.type});
 
             const map_info = region.mapInfo();
@@ -804,63 +577,6 @@ pub const initialization = struct {
         globals.direct_map = early_memory_layout.direct_map;
     }
 
-    fn sortKernelMemoryRegions() void {
-        std.mem.sort(KernelMemoryRegion, globals.regions.slice(), {}, struct {
-            fn lessThanFn(context: void, region: KernelMemoryRegion, other_region: KernelMemoryRegion) bool {
-                _ = context;
-                return region.range.address.lessThan(other_region.range.address);
-            }
-        }.lessThanFn);
-    }
-
-    fn findFreeRange(size: core.Size, alignment: core.Size) ?core.VirtualRange {
-        // needs the regions to be sorted
-        sortKernelMemoryRegions();
-
-        const regions = globals.regions.constSlice();
-
-        var current_address = arch.paging.higher_half_start;
-        current_address.alignForwardInPlace(alignment);
-
-        var i: usize = 0;
-
-        while (true) {
-            const region = if (i < regions.len) regions[i] else {
-                const size_of_free_range = core.Size.from(
-                    std.math.maxInt(u64) - current_address.value,
-                    .byte,
-                );
-
-                if (size_of_free_range.lessThan(size)) return null;
-
-                return core.VirtualRange.fromAddr(current_address, size);
-            };
-
-            const region_address = region.range.address;
-
-            if (region_address.lessThanOrEqual(current_address)) {
-                current_address = region.range.endBound();
-                current_address.alignForwardInPlace(alignment);
-                i += 1;
-                continue;
-            }
-
-            const size_of_free_range = core.Size.from(
-                (region_address.value - 1) - current_address.value,
-                .byte,
-            );
-
-            if (size_of_free_range.lessThan(size)) {
-                current_address = region.range.endBound();
-                current_address.alignForwardInPlace(alignment);
-                i += 1;
-                continue;
-            }
-
-            return core.VirtualRange.fromAddr(current_address, size);
-        }
-    }
-
     const init_log = cascade.debug.log.scoped(.init_mem);
 };
 
@@ -869,6 +585,6 @@ const init = @import("init");
 const cascade = @import("cascade");
 
 const core = @import("core");
-const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
+
 const log = cascade.debug.log.scoped(.mem);
 const std = @import("std");
