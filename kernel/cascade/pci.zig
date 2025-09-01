@@ -340,7 +340,7 @@ pub const Function = extern struct {
     }
 };
 
-const ECAM = struct {
+pub const ECAM = struct {
     segment_group: u16,
     start_bus: u8,
     end_bus: u8,
@@ -348,42 +348,16 @@ const ECAM = struct {
 };
 
 const globals = struct {
+    /// All ECAMs in the system.
+    ///
+    /// Set by `init.setECAMs`.
     var ecams: []ECAM = undefined;
 };
 
 pub const init = struct {
-    pub fn initializeECAM(context: *cascade.Context) !void {
-        const acpi_table = AcpiTable.get(0) orelse return error.MCFGNotPresent;
-        defer acpi_table.deinit();
-        const mcfg = acpi_table.table;
-
-        const base_allocations = mcfg.baseAllocations();
-
-        var ecams: std.ArrayList(ECAM) = try .initCapacity(cascade.mem.heap.allocator, base_allocations.len);
-        defer ecams.deinit(cascade.mem.heap.allocator);
-
-        for (mcfg.baseAllocations()) |base_allocation| {
-            const ecam = ecams.addOneAssumeCapacity();
-            ecam.* = .{
-                .start_bus = base_allocation.start_pci_bus,
-                .end_bus = base_allocation.end_pci_bus,
-                .segment_group = base_allocation.segment_group,
-                .config_space_address = cascade.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
-            };
-
-            init_log.debug(context, "found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
-                ecam.segment_group,
-                ecam.start_bus,
-                ecam.end_bus,
-                base_allocation.base_address,
-            });
-        }
-
-        globals.ecams = try ecams.toOwnedSlice(cascade.mem.heap.allocator);
+    pub fn setECAMs(ecams: []ECAM) void {
+        globals.ecams = ecams;
     }
-
-    const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.MCFG);
-    const init_log = cascade.debug.log.scoped(.init_pci);
 };
 
 const DEVICES_PER_BUS = 32;

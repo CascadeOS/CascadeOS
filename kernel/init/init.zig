@@ -170,7 +170,7 @@ fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
 fn initStage4(context: *cascade.Context) !noreturn {
     log.debug(context, "initializing PCI ECAM", .{});
-    try cascade.pci.init.initializeECAM(context);
+    try pci.initializeECAM(context);
 
     log.debug(context, "initializing ACPI", .{});
     try acpi.initialize(context);
@@ -339,6 +339,7 @@ pub const exports = struct {
 
 pub const acpi = @import("acpi.zig");
 pub const mem = @import("mem/mem.zig");
+pub const pci = @import("pci.zig");
 pub const time = @import("time.zig");
 pub const Output = @import("output/Output.zig");
 
