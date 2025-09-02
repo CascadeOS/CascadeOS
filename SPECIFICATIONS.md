@@ -56,5 +56,5 @@ It is possible for these links or the text regarding versions to become out of d
   * [The UVM Virtual Memory System](https://www.usenix.org/legacy/publications/library/proceedings/usenix99/full_papers/cranor/cranor.pdf) by Charles D. Cranor and Gurudatta M. Parulkar
 * VirtIO - [VirtIO Specs](https://docs.oasis-open.org/virtio/virtio/)
 * x64
-  * [AMD](https://www.amd.com/en/search/documentation/hub.html#q=AMD64%20Architecture%20Programmer's%20Manual&f-amd_document_type=Programmer%20References) link is to a search as AMD don't provide an always up to date link to the documents
+  * [AMD](https://docs.amd.com/search/all?query=AMD64+Architecture+Programmer%27s+Manual&content-lang=en-US) link is to a search as AMD don't provide an always up to date link to the documents
   * [Intel](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
