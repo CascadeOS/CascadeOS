@@ -44,8 +44,10 @@ It is possible for these links or the text regarding versions to become out of d
   * [PCI Express® Base Specification Revision 5.0 Version 1.0 22 May 2019](https://picture.iczhiku.com/resource/eetop/SYkDTqhOLhpUTnMx.pdf)
   * PCI Code and ID Assignment Specification Revision 1.14 17 Nov 2021
 * System-V/ELF
-  * [Generic ABI (gABI)](https://www.sco.com/developers/devspecs/) latest at time of writing: Edition 4.1
-  * [Generic ABI (gABI) updates](https://www.sco.com/developers/gabi/) updates to chapter 4 and 5 of the above. Latest at time of writing: DRAFT 10 June 2013 (under the "Latest (in progress) snapshot" link)
+  * [Generic ABI (gABI)](https://gabi.xinuos.com/) verson 4.3
+    * Old
+      * [Generic ABI (gABI)](https://www.sco.com/developers/devspecs/) edition 4.1 draft
+      * [Generic ABI (gABI) updates](https://www.sco.com/developers/gabi/) updates to chapter 4 and 5 of the above. DRAFT 10 June 2013 (under the "Latest (in progress) snapshot" link)
   * [ARM psABI](https://github.com/ARM-software/abi-aa)
   * [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc)
   * [x64 psABI](https://gitlab.com/x86-psABIs/x86-64-ABI)
