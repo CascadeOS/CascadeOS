@@ -72,10 +72,16 @@ kernel_log_level: ?ForceLogLevel,
 
 /// In the kernel, force the provided log scopes to be logged.
 ///
-/// If a scope ends with a `+` it will match any scope that starts with the prefix.
+/// If a scope starts and ends with a `+` it will match any scope that contains the string.
+/// If a scope starts with a `+` it will match any scope that ends with the string.
+/// If a scope ends with a `+` it will match any scope that starts with the string.
 ///
 /// Example:
-/// `virtual,init+,physical` will exact match `virtual` and `physical` and match any scope that starts with `init`.
+/// `virtual,+cache+,+init,ioapic+` will result in the following scopes being logged:
+///   - `virtual`
+///   - containing `cache`
+///   - ends with `init`
+///   - starts with `ioapic`
 kernel_log_scopes: []const []const u8,
 
 /// Disable the kernel log wrapper.
@@ -199,7 +205,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
     const kernel_log_scopes_raw = b.option(
         []const u8,
         "kernel_log_scopes",
-        "In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers, scopes ending with `+` will match any scope that starts with the prefix).",
+        "In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers, use '+' as a prefix or suffix wildcard).",
     ) orelse "";
 
     const no_kernel_log_wrapper = b.option(

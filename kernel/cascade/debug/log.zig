@@ -218,25 +218,27 @@ pub fn stdLogImpl(
 inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: Level) bool {
     comptime {
         if (@intFromEnum(message_level) <= @intFromEnum(log_level)) return true;
-        if (isScopeInForceScopeList(scope, kernel_log_scopes)) return true;
+        if (scopeMatcherMatches(scope)) return true;
         return false;
     }
 }
 
-/// Checks if a scope is in the list of forced scopes.
-inline fn isScopeInForceScopeList(comptime scope: @Type(.enum_literal), comptime force_scope_list: []const []const u8) bool {
+/// Checks if a scope matches one of the scope matchers.
+inline fn scopeMatcherMatches(comptime scope: @Type(.enum_literal)) bool {
     comptime {
-        if (force_scope_list.len == 0) return false;
-
         const tag = @tagName(scope);
 
-        for (force_scope_list) |forced_scope| {
-            if (std.mem.endsWith(u8, forced_scope, "+")) {
-                // if this forced_scope ends with a +, then it is a prefix match
-                if (std.mem.startsWith(u8, tag, forced_scope[0 .. forced_scope.len - 1])) return true;
+        for (kernel_log_scope_matchers) |scope_matcher| {
+            switch (scope_matcher.type) {
+                .exact => if (std.mem.eql(u8, tag, scope_matcher.match_string))
+                    return true,
+                .starts_with => if (std.mem.startsWith(u8, tag, scope_matcher.match_string))
+                    return true,
+                .ends_with => if (std.mem.endsWith(u8, tag, scope_matcher.match_string))
+                    return true,
+                .contains => if (std.mem.indexOf(u8, tag, scope_matcher.match_string)) |_|
+                    return true,
             }
-
-            if (std.mem.eql(u8, tag, forced_scope)) return true;
         }
 
         return false;
@@ -248,6 +250,56 @@ const globals = struct {
 };
 
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
+const kernel_log_scope_matchers: [kernel_log_scopes.len]ScopeMatcher = blk: {
+    var scope_matchers: [kernel_log_scopes.len]ScopeMatcher = undefined;
+
+    for (kernel_log_scopes, 0..) |scope_string, i| {
+        std.debug.assert(scope_string.len != 0);
+
+        const matcher_type: ScopeMatcher.Type = matcher_type: {
+            if (scope_string[0] == '+') {
+                if (scope_string.len == 1) break :matcher_type .exact;
+
+                if (scope_string[scope_string.len - 1] == '+') {
+                    if (scope_string.len == 2) break :matcher_type .exact;
+
+                    break :matcher_type .contains;
+                }
+
+                break :matcher_type .starts_with;
+            }
+
+            if (scope_string[scope_string.len - 1] == '+')
+                break :matcher_type .ends_with;
+
+            break :matcher_type .exact;
+        };
+
+        scope_matchers[i] = .{
+            .match_string = switch (matcher_type) {
+                .exact => scope_string,
+                .starts_with => scope_string[1..],
+                .ends_with => scope_string[0 .. scope_string.len - 1],
+                .contains => scope_string[1 .. scope_string.len - 1],
+            },
+            .type = matcher_type,
+        };
+    }
+
+    break :blk scope_matchers;
+};
+
+const ScopeMatcher = struct {
+    match_string: []const u8,
+    type: Type,
+
+    const Type = enum {
+        exact,
+        starts_with,
+        ends_with,
+        contains,
+    };
+};
 
 const arch = @import("arch");
 const cascade = @import("cascade");
