@@ -17,13 +17,11 @@ pub fn initializeTime(context: *cascade.Context) !void {
     const reference_counter = getReferenceCounter(context, time_sources);
 
     const wallclock = getWallclockTimeSource(context, time_sources, reference_counter);
-    const per_executor_periodic = getPerExecutorPeriodicTimeSource(context, time_sources, reference_counter);
+    cascade.time.wallclock.globals.readFn = wallclock.readFn;
+    cascade.time.wallclock.globals.elapsedFn = wallclock.elapsedFn;
 
-    cascade.time.init.setTimeImplementations(.{
-        .wallclockReadFn = wallclock.readFn,
-        .wallclockElapsedFn = wallclock.elapsedFn,
-        .perExecutorPeriodicEnableInterruptFn = per_executor_periodic.enableInterruptFn,
-    });
+    const per_executor_periodic = getPerExecutorPeriodicTimeSource(context, time_sources, reference_counter);
+    cascade.time.per_executor_periodic.globals.enableInterruptFn = per_executor_periodic.enableInterruptFn;
 
     switch (globals.kernel_start_time) {
         .kernel_start => |tick| {
