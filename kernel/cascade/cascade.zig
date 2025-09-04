@@ -58,12 +58,12 @@ pub const exports = struct {
         pub const CandidateTimeSources = init.time.CandidateTimeSources;
         pub const ReferenceCounter = init.time.ReferenceCounter;
     };
+
+    const init = @import("init");
 };
 
 comptime {
-    _ = &init;
+    _ = &exports.init;
 }
-
-const init = @import("init");
 
 const std = @import("std");

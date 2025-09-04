@@ -28,7 +28,7 @@ pub fn initializeECAM(context: *cascade.Context) !void {
         });
     }
 
-    cascade.pci.init.setECAMs(try ecams.toOwnedSlice(cascade.mem.heap.allocator));
+    cascade.pci.globals.ecams = try ecams.toOwnedSlice(cascade.mem.heap.allocator);
 }
 
 const AcpiTable = init.acpi.AcpiTable(cascade.acpi.tables.MCFG);

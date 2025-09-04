@@ -347,17 +347,11 @@ pub const ECAM = struct {
     config_space_address: core.VirtualAddress,
 };
 
-const globals = struct {
+pub const globals = struct {
     /// All ECAMs in the system.
     ///
-    /// Set by `init.setECAMs`.
-    var ecams: []ECAM = undefined;
-};
-
-pub const init = struct {
-    pub fn setECAMs(ecams: []ECAM) void {
-        globals.ecams = ecams;
-    }
+    /// Set by `init.pci.initializeECAM`.
+    pub var ecams: []ECAM = undefined;
 };
 
 const DEVICES_PER_BUS = 32;
