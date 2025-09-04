@@ -184,7 +184,7 @@ pub fn BoundedArrayAligned(
         pub fn initPrint(comptime fmt: []const u8, args: anytype) error{Overflow}!Self {
             var self: Self = .{};
 
-            var fixed: std.io.Writer = .fixed(&self.buffer);
+            var fixed: std.Io.Writer = .fixed(&self.buffer);
             fixed.print(fmt, args) catch return error.Overflow;
             self.len = fixed.end;
 

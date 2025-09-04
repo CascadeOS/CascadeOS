@@ -50,14 +50,15 @@ fn getArguments(allocator: std.mem.Allocator) !Arguments {
     errdefer allocator.free(output_path);
 
     const image_description_contents = blk: {
-        if (std.mem.eql(u8, args[1], "-")) {
-            break :blk try std.fs.File.stdin().readToEndAlloc(allocator, std.math.maxInt(usize));
-        }
+        const file = if (std.mem.eql(u8, args[1], "-"))
+            std.fs.File.stdin()
+        else
+            try std.fs.cwd().openFile(args[1], .{});
+        defer file.close();
 
-        const image_description_file = try std.fs.cwd().openFile(args[1], .{});
-        defer image_description_file.close();
-
-        break :blk try image_description_file.readToEndAlloc(allocator, std.math.maxInt(usize));
+        var buf: [std.heap.page_size_min]u8 = undefined;
+        var reader = file.reader(&buf);
+        break :blk try reader.interface.allocRemaining(allocator, .unlimited);
     };
     defer allocator.free(image_description_contents);
 

@@ -269,11 +269,10 @@ pub const LocationLookup = struct {
 
     pub fn getStartState(location_lookup: LocationLookup, address: u64) !LocationProgramState {
         const index = blk: {
-            var instruction_addresses = std.Io.fixedBufferStream(location_lookup.instruction_addresses_bytes);
-            const reader = instruction_addresses.reader();
+            var reader: std.Io.Reader = .fixed(location_lookup.instruction_addresses_bytes);
 
             var candidate_index: u64 = 0;
-            while (reader.readInt(u64, .little) catch null) |candidate_address| : (candidate_index += 1) {
+            while (reader.takeInt(u64, .little) catch null) |candidate_address| : (candidate_index += 1) {
                 if (candidate_address > address) break;
             }
             break :blk if (candidate_index != 0) candidate_index - 1 else 0;

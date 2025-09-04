@@ -48,7 +48,7 @@ pub fn initializeTime(context: *cascade.Context) !void {
     }
 }
 
-pub fn printInitializationTime(writer: *std.io.Writer) !void {
+pub fn printInitializationTime(writer: *std.Io.Writer) !void {
     try writer.print(
         "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
         .{
