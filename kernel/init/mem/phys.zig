@@ -105,6 +105,8 @@ pub fn initializePhysicalMemory(
 
         break :blk .{ page_regions, pages };
     };
+    cascade.mem.phys.globals.page_regions = page_regions;
+    cascade.mem.phys.globals.pages = pages;
 
     var free_page_list: std.SinglyLinkedList = .{};
 
@@ -235,6 +237,13 @@ pub fn initializePhysicalMemory(
     std.debug.assert(page_index == number_of_usable_pages);
     std.debug.assert(usable_range_index == number_of_usable_regions);
 
+    cascade.mem.phys.globals.free_page_list.first.store(free_page_list.first, .release);
+    cascade.mem.phys.globals.free_memory.store(free_memory.value, .release);
+    cascade.mem.phys.globals.total_memory = total_memory;
+    cascade.mem.phys.globals.reserved_memory = reserved_memory;
+    cascade.mem.phys.globals.reclaimable_memory = reclaimable_memory;
+    cascade.mem.phys.globals.unavailable_memory = unavailable_memory;
+
     const used_memory = total_memory
         .subtract(free_memory)
         .subtract(reserved_memory)
@@ -247,17 +256,6 @@ pub fn initializePhysicalMemory(
     log.debug(context, "  reserved memory:    {f}", .{reserved_memory});
     log.debug(context, "  reclaimable memory: {f}", .{reclaimable_memory});
     log.debug(context, "  unavailable memory: {f}", .{unavailable_memory});
-
-    cascade.mem.phys.init.setPhysicalMemoryData(.{
-        .page_regions = page_regions,
-        .pages = pages,
-        .free_page_list = free_page_list,
-        .free_memory = free_memory.value,
-        .total_memory = total_memory,
-        .reserved_memory = reserved_memory,
-        .reclaimable_memory = reclaimable_memory,
-        .unavailable_memory = unavailable_memory,
-    });
 }
 
 const arch = @import("arch");

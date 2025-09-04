@@ -117,82 +117,56 @@ fn deallocate(_: *cascade.Context, frame_list: FrameList) void {
     );
 }
 
-const globals = struct {
+pub const globals = struct {
     /// The list of free pages.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var free_page_list: core.containers.AtomicSinglyLinkedList = .{};
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var free_page_list: core.containers.AtomicSinglyLinkedList = .{};
 
     /// The free physical memory.
     ///
     /// Updates to this value are eventually consistent.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var free_memory: std.atomic.Value(u64) = undefined;
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var free_memory: std.atomic.Value(u64) = undefined;
 
     /// The total physical memory.
     ///
     /// Does not change during the lifetime of the system.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var total_memory: core.Size = undefined;
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var total_memory: core.Size = undefined;
 
     /// The reserved physical memory.
     ///
     /// Does not change during the lifetime of the system.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var reserved_memory: core.Size = undefined;
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var reserved_memory: core.Size = undefined;
 
     /// The reclaimable physical memory.
     ///
     /// Will be reduced when the memory is reclaimed. // TODO: reclaim memory
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var reclaimable_memory: core.Size = undefined;
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var reclaimable_memory: core.Size = undefined;
 
     /// The unavailable physical memory.
     ///
     /// Does not change during the lifetime of the system.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var unavailable_memory: core.Size = undefined;
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var unavailable_memory: core.Size = undefined;
 
     /// A `Page` for each usable physical page.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var pages: []Page = undefined;
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var pages: []Page = undefined;
 
     /// A `Page.Region` for each range of usable physical pages in the `pages` array.
     ///
-    /// Initialized during `init.setPhysicalMemoryData`.
-    var page_regions: []Page.Region = undefined;
-};
-
-pub const init = struct {
-    pub const PhysicalMemoryInitializationData = struct {
-        page_regions: []Page.Region,
-        pages: []Page,
-        free_page_list: std.SinglyLinkedList,
-
-        free_memory: u64,
-        total_memory: core.Size,
-        reserved_memory: core.Size,
-        reclaimable_memory: core.Size,
-        unavailable_memory: core.Size,
-    };
-
-    pub fn setPhysicalMemoryData(data: PhysicalMemoryInitializationData) void {
-        globals.page_regions = data.page_regions;
-        globals.pages = data.pages;
-        globals.free_page_list.first.store(data.free_page_list.first, .release);
-
-        globals.free_memory.store(data.free_memory, .release);
-        globals.total_memory = data.total_memory;
-        globals.reserved_memory = data.reserved_memory;
-        globals.reclaimable_memory = data.reclaimable_memory;
-        globals.unavailable_memory = data.unavailable_memory;
-    }
+    /// Initialized during `init.mem.phys.initializePhysicalMemory`.
+    pub var page_regions: []Page.Region = undefined;
 };
 
 const arch = @import("arch");
