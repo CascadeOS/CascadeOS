@@ -461,9 +461,6 @@ pub const initialization = struct {
         globals.non_cached_direct_map = globals.regions.find(.non_cached_direct_map).?.range;
         globals.core_page_table = initialization_data.core_page_table;
 
-        init_log.debug(context, "initializing kernel and special heap", .{});
-        try heap.init.initializeHeaps(context, &globals.regions);
-
         init_log.debug(context, "initializing tasks", .{});
         try cascade.Task.init.initializeTasks(context, &globals.regions);
 

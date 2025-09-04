@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 //! Provides a kernel heap.
-//!
-//! Each allocation is a multiple of the standard page size.
 
 pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
@@ -104,7 +102,7 @@ pub fn deallocateSpecial(
     );
 }
 
-const allocator_impl = struct {
+pub const allocator_impl = struct {
     const Allocation = cascade.mem.resource_arena.Allocation;
     fn alloc(
         _: *anyopaque,
@@ -167,108 +165,108 @@ const allocator_impl = struct {
     inline fn getAllocationHeader(ptr: [*]u8) *align(1) Allocation {
         return @ptrCast(ptr - @sizeOf(Allocation));
     }
-};
 
-fn heapPageArenaImport(
-    arena_ptr: *anyopaque,
-    context: *cascade.Context,
-    len: usize,
-    policy: resource_arena.Policy,
-) resource_arena.AllocateError!resource_arena.Allocation {
-    const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
+    pub fn heapPageArenaImport(
+        arena_ptr: *anyopaque,
+        context: *cascade.Context,
+        len: usize,
+        policy: resource_arena.Policy,
+    ) resource_arena.AllocateError!resource_arena.Allocation {
+        const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
 
-    const allocation = try arena.allocate(
-        context,
-        len,
-        policy,
-    );
-    errdefer arena.deallocate(context, allocation);
-
-    log.verbose(context, "mapping {f} into heap", .{allocation});
-
-    const virtual_range: core.VirtualRange = .{
-        .address = .fromInt(allocation.base),
-        .size = .from(allocation.len, .byte),
-    };
-
-    {
-        globals.heap_page_table_mutex.lock(context);
-        defer globals.heap_page_table_mutex.unlock(context);
-
-        cascade.mem.mapRangeAndBackWithPhysicalFrames(
+        const allocation = try arena.allocate(
             context,
-            cascade.mem.globals.core_page_table,
-            virtual_range,
-            .{ .environment_type = .kernel, .protection = .read_write },
-            .kernel,
-            .keep,
-            cascade.mem.phys.allocator,
-        ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
+            len,
+            policy,
+        );
+        errdefer arena.deallocate(context, allocation);
+
+        log.verbose(context, "mapping {f} into heap", .{allocation});
+
+        const virtual_range: core.VirtualRange = .{
+            .address = .fromInt(allocation.base),
+            .size = .from(allocation.len, .byte),
+        };
+
+        {
+            globals.heap_page_table_mutex.lock(context);
+            defer globals.heap_page_table_mutex.unlock(context);
+
+            cascade.mem.mapRangeAndBackWithPhysicalFrames(
+                context,
+                cascade.mem.globals.core_page_table,
+                virtual_range,
+                .{ .environment_type = .kernel, .protection = .read_write },
+                .kernel,
+                .keep,
+                cascade.mem.phys.allocator,
+            ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
+        }
+        errdefer comptime unreachable;
+
+        if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
+
+        return allocation;
     }
-    errdefer comptime unreachable;
 
-    if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
+    pub fn heapPageArenaRelease(
+        arena_ptr: *anyopaque,
+        context: *cascade.Context,
+        allocation: resource_arena.Allocation,
+    ) void {
+        const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
 
-    return allocation;
-}
+        log.verbose(context, "unmapping {f} from heap", .{allocation});
 
-fn heapPageArenaRelease(
-    arena_ptr: *anyopaque,
-    context: *cascade.Context,
-    allocation: resource_arena.Allocation,
-) void {
-    const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
+        {
+            globals.heap_page_table_mutex.lock(context);
+            defer globals.heap_page_table_mutex.unlock(context);
 
-    log.verbose(context, "unmapping {f} from heap", .{allocation});
+            cascade.mem.unmapRange(
+                context,
+                cascade.mem.globals.core_page_table,
+                .{
+                    .address = .fromInt(allocation.base),
+                    .size = .from(allocation.len, .byte),
+                },
+                .kernel,
+                .free,
+                .keep,
+                cascade.mem.phys.allocator,
+            );
+        }
 
-    {
-        globals.heap_page_table_mutex.lock(context);
-        defer globals.heap_page_table_mutex.unlock(context);
-
-        cascade.mem.unmapRange(
+        arena.deallocate(
             context,
-            cascade.mem.globals.core_page_table,
-            .{
-                .address = .fromInt(allocation.base),
-                .size = .from(allocation.len, .byte),
-            },
-            .kernel,
-            .free,
-            .keep,
-            cascade.mem.phys.allocator,
+            allocation,
         );
     }
 
-    arena.deallocate(
-        context,
-        allocation,
-    );
-}
-
-const heap_arena_quantum: usize = 16;
-const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
+    pub const heap_arena_quantum: usize = 16;
+    pub const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
+};
 
 pub const globals = struct {
     /// An arena managing the heap's virtual address space.
     ///
     /// Has no source arena, provided with a single span representing the entire heap.
     ///
-    /// Initialized during `init.initializeHeaps`.
-    var heap_address_space_arena: Arena = undefined;
+    /// Initialized during `init.mem.initializeHeaps`.
+    pub var heap_address_space_arena: Arena = undefined;
 
     /// The heap page arena, has a quantum of the standard page size.
     ///
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
-    /// Initialized during `init.initializeHeaps`.
+    /// Initialized during `init.mem.initializeHeaps`.
     pub var heap_page_arena: Arena = undefined;
 
     /// The heap arena.
     ///
     /// Has a source arena of `heap_page_arena`.
     ///
-    /// Initialized during `init.initializeHeaps`.
-    var heap_arena: HeapArena = undefined;
+    /// Initialized during `init.mem.initializeHeaps`.
+    pub var heap_arena: HeapArena = undefined;
 
     var heap_page_table_mutex: cascade.sync.Mutex = .{};
 
@@ -276,88 +274,15 @@ pub const globals = struct {
     ///
     /// Has no source arena, provided with a single span representing the entire range.
     ///
-    /// Initialized during `init.initializeHeaps`.
-    var special_heap_address_space_arena: cascade.mem.resource_arena.Arena(.none) = undefined;
+    /// Initialized during `init.mem.initializeHeaps`.
+    pub var special_heap_address_space_arena: cascade.mem.resource_arena.Arena(.none) = undefined;
 
     var special_heap_page_table_mutex: cascade.sync.Mutex = .{};
 };
 
-pub const init = struct {
-    pub fn initializeHeaps(
-        context: *cascade.Context,
-        kernel_regions: *cascade.mem.KernelMemoryRegion.List,
-    ) !void {
-        // heap
-        {
-            try globals.heap_address_space_arena.init(
-                context,
-                .{
-                    .name = try .fromSlice("heap_address_space"),
-                    .quantum = arch.paging.standard_page_size.value,
-                },
-            );
-
-            try globals.heap_page_arena.init(
-                context,
-                .{
-                    .name = try .fromSlice("heap_page"),
-                    .quantum = arch.paging.standard_page_size.value,
-                    .source = globals.heap_address_space_arena.createSource(.{
-                        .custom_import = heapPageArenaImport,
-                        .custom_release = heapPageArenaRelease,
-                    }),
-                },
-            );
-
-            try globals.heap_arena.init(
-                context,
-                .{
-                    .name = try .fromSlice("heap"),
-                    .quantum = heap_arena_quantum,
-                    .source = globals.heap_page_arena.createSource(.{}),
-                },
-            );
-
-            const heap_range = kernel_regions.find(.kernel_heap).?.range;
-
-            globals.heap_address_space_arena.addSpan(
-                context,
-                heap_range.address.value,
-                heap_range.size.value,
-            ) catch |err| {
-                std.debug.panic("failed to add heap range to `heap_address_space_arena`: {t}", .{err});
-            };
-        }
-
-        // special heap
-        {
-            try globals.special_heap_address_space_arena.init(
-                context,
-                .{
-                    .name = try .fromSlice("special_heap_address_space"),
-                    .quantum = arch.paging.standard_page_size.value,
-                },
-            );
-
-            const special_heap_range = kernel_regions.find(.special_heap).?.range;
-
-            globals.special_heap_address_space_arena.addSpan(
-                context,
-                special_heap_range.address.value,
-                special_heap_range.size.value,
-            ) catch |err| {
-                std.debug.panic(
-                    "failed to add special heap range to `special_heap_address_space_arena`: {t}",
-                    .{err},
-                );
-            };
-        }
-    }
-};
-
 const resource_arena = cascade.mem.resource_arena;
 const Arena = resource_arena.Arena(.none);
-const HeapArena = resource_arena.Arena(.{ .heap = heap_arena_quantum_caches });
+const HeapArena = resource_arena.Arena(.{ .heap = allocator_impl.heap_arena_quantum_caches });
 
 const arch = @import("arch");
 const cascade = @import("cascade");

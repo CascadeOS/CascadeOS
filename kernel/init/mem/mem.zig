@@ -102,6 +102,9 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
     log.debug(context, "initializing caches", .{});
     try initializeCaches(context);
 
+    log.debug(context, "initializing kernel and special heap", .{});
+    try initializeHeaps(context, &kernel_regions);
+
     try cascade.mem.initialization.initializeMemorySystem(context, .{
         .kernel_regions = &kernel_regions,
         .core_page_table = core_page_table,
@@ -416,6 +419,77 @@ fn initializeCaches(context: *cascade.Context) !void {
     cascade.mem.AddressSpace.Entry.globals.entry_cache.init(context, .{
         .name = try .fromSlice("address space entry"),
     });
+}
+
+fn initializeHeaps(
+    context: *cascade.Context,
+    kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
+) !void {
+    // heap
+    {
+        try cascade.mem.heap.globals.heap_address_space_arena.init(
+            context,
+            .{
+                .name = try .fromSlice("heap_address_space"),
+                .quantum = arch.paging.standard_page_size.value,
+            },
+        );
+
+        try cascade.mem.heap.globals.heap_page_arena.init(
+            context,
+            .{
+                .name = try .fromSlice("heap_page"),
+                .quantum = arch.paging.standard_page_size.value,
+                .source = cascade.mem.heap.globals.heap_address_space_arena.createSource(.{
+                    .custom_import = cascade.mem.heap.allocator_impl.heapPageArenaImport,
+                    .custom_release = cascade.mem.heap.allocator_impl.heapPageArenaRelease,
+                }),
+            },
+        );
+
+        try cascade.mem.heap.globals.heap_arena.init(
+            context,
+            .{
+                .name = try .fromSlice("heap"),
+                .quantum = cascade.mem.heap.allocator_impl.heap_arena_quantum,
+                .source = cascade.mem.heap.globals.heap_page_arena.createSource(.{}),
+            },
+        );
+
+        const heap_range = kernel_regions.find(.kernel_heap).?.range;
+
+        cascade.mem.heap.globals.heap_address_space_arena.addSpan(
+            context,
+            heap_range.address.value,
+            heap_range.size.value,
+        ) catch |err| {
+            std.debug.panic("failed to add heap range to `heap_address_space_arena`: {t}", .{err});
+        };
+    }
+
+    // special heap
+    {
+        try cascade.mem.heap.globals.special_heap_address_space_arena.init(
+            context,
+            .{
+                .name = try .fromSlice("special_heap_address_space"),
+                .quantum = arch.paging.standard_page_size.value,
+            },
+        );
+
+        const special_heap_range = kernel_regions.find(.special_heap).?.range;
+
+        cascade.mem.heap.globals.special_heap_address_space_arena.addSpan(
+            context,
+            special_heap_range.address.value,
+            special_heap_range.size.value,
+        ) catch |err| {
+            std.debug.panic(
+                "failed to add special heap range to `special_heap_address_space_arena`: {t}",
+                .{err},
+            );
+        };
+    }
 }
 
 const arch = @import("arch");
