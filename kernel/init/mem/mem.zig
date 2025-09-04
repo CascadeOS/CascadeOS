@@ -74,20 +74,22 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         &memory_map,
     );
 
-    var kernel_regions: cascade.mem.KernelMemoryRegion.List = .{};
+    const kernel_regions = &cascade.mem.globals.regions;
 
     log.debug(context, "building kernel memory layout", .{});
     buildMemoryLayout(
         context,
         number_of_usable_pages,
         number_of_usable_regions,
-        &kernel_regions,
+        kernel_regions,
     );
 
+    cascade.mem.globals.non_cached_direct_map = kernel_regions.find(.non_cached_direct_map).?.range;
+
     log.debug(context, "building core page table", .{});
-    const core_page_table = buildAndLoadCorePageTable(
+    cascade.mem.globals.core_page_table = buildAndLoadCorePageTable(
         context,
-        &kernel_regions,
+        kernel_regions,
     );
 
     log.debug(context, "initializing physical memory", .{});
@@ -103,12 +105,12 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
     try initializeCaches(context);
 
     log.debug(context, "initializing kernel and special heap", .{});
-    try initializeHeaps(context, &kernel_regions);
+    try initializeHeaps(context, kernel_regions);
 
-    try cascade.mem.initialization.initializeMemorySystem(context, .{
-        .kernel_regions = &kernel_regions,
-        .core_page_table = core_page_table,
-    });
+    log.debug(context, "initializing tasks", .{});
+    try cascade.Task.init.initializeTasks(context, kernel_regions);
+
+    try cascade.mem.initialization.initializeMemorySystem(context);
 }
 
 const MemoryMap = core.containers.BoundedArray(

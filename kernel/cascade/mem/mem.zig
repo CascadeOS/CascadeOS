@@ -442,28 +442,16 @@ pub const globals = struct {
     /// Caching is disabled for this mapping.
     ///
     /// Initialized during `init.initializeMemorySystem`.
-    var non_cached_direct_map: core.VirtualRange = undefined;
+    pub var non_cached_direct_map: core.VirtualRange = undefined;
 
     /// The layout of the memory regions of the cascade.
     ///
     /// Initialized during `init.initializeMemorySystem`.
-    var regions: KernelMemoryRegion.List = undefined;
+    pub var regions: KernelMemoryRegion.List = .{};
 };
 
 pub const initialization = struct {
-    const MemorySystemInitializationData = struct {
-        kernel_regions: *KernelMemoryRegion.List,
-        core_page_table: arch.paging.PageTable,
-    };
-
-    pub fn initializeMemorySystem(context: *cascade.Context, initialization_data: MemorySystemInitializationData) !void {
-        globals.regions = initialization_data.kernel_regions.*;
-        globals.non_cached_direct_map = globals.regions.find(.non_cached_direct_map).?.range;
-        globals.core_page_table = initialization_data.core_page_table;
-
-        init_log.debug(context, "initializing tasks", .{});
-        try cascade.Task.init.initializeTasks(context, &globals.regions);
-
+    pub fn initializeMemorySystem(context: *cascade.Context) !void {
         init_log.debug(context, "initializing processes", .{});
         try cascade.Process.init.initializeProcesses(context);
 

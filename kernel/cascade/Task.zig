@@ -327,7 +327,7 @@ pub const init = struct {
 
     pub fn initializeTasks(
         context: *cascade.Context,
-        kernel_regions: *cascade.mem.KernelMemoryRegion.List,
+        kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
         log.debug(context, "initializing task stacks", .{});
         try globals.stack_arena.init(
