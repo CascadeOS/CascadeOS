@@ -360,7 +360,7 @@ pub const DBG2 = extern struct {
 
         const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.DBG2);
         const uart = @import("init").Output.uart;
-        const log = cascade.debug.log.scoped(.init_output);
+        const log = cascade.debug.log.scoped(.output_init);
     };
 };
 

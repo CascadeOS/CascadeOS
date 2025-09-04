@@ -94,7 +94,7 @@ pub const init = struct {
     }
 
     const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.HPET);
-    const init_log = cascade.debug.log.scoped(.init_hpet);
+    const init_log = cascade.debug.log.scoped(.hpet_init);
 };
 
 /// High Precision Event Timer (HPET)

@@ -476,7 +476,7 @@ pub const init = struct {
         );
     }
 
-    const init_log = cascade.debug.log.scoped(.init_paging);
+    const init_log = cascade.debug.log.scoped(.paging_init);
 };
 
 const arch = @import("arch");

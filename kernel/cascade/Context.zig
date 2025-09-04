@@ -127,5 +127,4 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.context);
 const std = @import("std");

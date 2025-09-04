@@ -38,5 +38,5 @@ const cascade = @import("cascade");
 const init = @import("init");
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.init_pci);
+const log = cascade.debug.log.scoped(.pci_init);
 const std = @import("std");

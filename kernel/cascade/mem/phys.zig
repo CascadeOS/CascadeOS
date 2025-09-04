@@ -174,5 +174,4 @@ const cascade = @import("cascade");
 const mem = cascade.mem;
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.mem_phys);
 const std = @import("std");

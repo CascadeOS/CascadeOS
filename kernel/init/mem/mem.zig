@@ -502,5 +502,5 @@ const cascade = @import("cascade");
 const Page = cascade.mem.Page;
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.init_mem);
+const log = cascade.debug.log.scoped(.mem_init);
 const std = @import("std");

@@ -402,6 +402,6 @@ const x64 = @import("x64.zig");
 
 const AcpiTable = cascade.exports.AcpiTable;
 const core = @import("core");
-const log = cascade.debug.log.scoped(.init_x64);
+const log = cascade.debug.log.scoped(.x64_init);
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
 const std = @import("std");

@@ -131,7 +131,7 @@ pub const init = struct {
         );
     }
 
-    const init_log = cascade.debug.log.scoped(.init_ioapic);
+    const init_log = cascade.debug.log.scoped(.ioapic_init);
 };
 
 const IOAPIC = struct {

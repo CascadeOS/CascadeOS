@@ -140,5 +140,5 @@ const init = @import("init");
 const cascade = @import("cascade");
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.init_output);
+const log = cascade.debug.log.scoped(.output_init);
 const std = @import("std");

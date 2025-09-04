@@ -329,5 +329,5 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.init_time);
+const log = cascade.debug.log.scoped(.time_init);
 const std = @import("std");

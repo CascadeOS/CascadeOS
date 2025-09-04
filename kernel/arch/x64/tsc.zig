@@ -113,7 +113,7 @@ pub const init = struct {
         return x64.info.cpu_id.invariant_tsc or x64.info.cpu_id.hypervisor == .tcg;
     }
 
-    const init_log = cascade.debug.log.scoped(.init_tsc);
+    const init_log = cascade.debug.log.scoped(.tsc_init);
 };
 
 const readTsc = x64.instructions.readTsc;

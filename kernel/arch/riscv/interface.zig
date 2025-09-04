@@ -49,7 +49,7 @@ pub const functions: arch.Functions = .{
                 return null;
             }
 
-            const log = cascade.debug.log.scoped(.init_riscv);
+            const log = cascade.debug.log.scoped(.riscv_init);
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {

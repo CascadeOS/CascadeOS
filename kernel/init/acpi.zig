@@ -175,5 +175,5 @@ const tables = cascade.acpi.tables;
 const uacpi = cascade.acpi.uacpi;
 
 const core = @import("core");
-const log = cascade.debug.log.scoped(.init_acpi);
+const log = cascade.debug.log.scoped(.acpi_init);
 const std = @import("std");

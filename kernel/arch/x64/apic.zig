@@ -189,7 +189,7 @@ pub const init = struct {
         globals.lapic.writeInitialCountRegister(ticks);
     }
 
-    const init_log = cascade.debug.log.scoped(.init_apic);
+    const init_log = cascade.debug.log.scoped(.apic_init);
 };
 
 pub const LAPIC = union(enum) {
