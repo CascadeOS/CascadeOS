@@ -110,7 +110,19 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
     log.debug(context, "initializing tasks", .{});
     try cascade.Task.init.initializeTasks(context, kernel_regions);
 
-    try cascade.mem.initialization.initializeMemorySystem(context);
+    log.debug(context, "initializing processes", .{});
+    try cascade.Process.init.initializeProcesses(context);
+
+    log.debug(context, "initializing pageable kernel address space", .{});
+    try cascade.mem.globals.kernel_pageable_address_space.init(
+        context,
+        .{
+            .name = try .fromSlice("pageable_kernel"),
+            .range = kernel_regions.find(.pageable_kernel_address_space).?.range,
+            .page_table = cascade.mem.globals.core_page_table,
+            .environment = .kernel,
+        },
+    );
 }
 
 const MemoryMap = core.containers.BoundedArray(

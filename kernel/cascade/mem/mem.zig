@@ -451,22 +451,6 @@ pub const globals = struct {
 };
 
 pub const initialization = struct {
-    pub fn initializeMemorySystem(context: *cascade.Context) !void {
-        init_log.debug(context, "initializing processes", .{});
-        try cascade.Process.init.initializeProcesses(context);
-
-        init_log.debug(context, "initializing pageable kernel address space", .{});
-        try globals.kernel_pageable_address_space.init(
-            context,
-            .{
-                .name = try .fromSlice("pageable_kernel"),
-                .range = globals.regions.find(.pageable_kernel_address_space).?.range,
-                .page_table = globals.core_page_table,
-                .environment = .kernel,
-            },
-        );
-    }
-
     pub const EarlyMemoryLayout = struct {
         /// The virtual base address that the kernel was loaded at.
         virtual_base_address: core.VirtualAddress,
