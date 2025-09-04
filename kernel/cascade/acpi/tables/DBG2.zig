@@ -287,7 +287,7 @@ pub const DBG2 = extern struct {
             const dbg2 = AcpiTable.get(0) orelse return null;
             defer dbg2.deinit();
 
-            var devices: cascade.acpi.tables.DBG2.DebugDeviceIterator = dbg2.table.debugDevices();
+            var devices: DBG2.DebugDeviceIterator = dbg2.table.debugDevices();
 
             while (devices.next()) |device| {
                 const address = blk: {
