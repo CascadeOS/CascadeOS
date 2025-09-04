@@ -19,58 +19,21 @@ pub const uacpi = @import("uacpi.zig");
 pub const globals = struct {
     /// Pointer to the RSDP table.
     ///
-    /// Set by `setRsdp`, only valid if `acpi_present` is true.
+    /// Set by `init.acpi.earlyInitialize`.
     pub var rsdp: *const tables.RSDP = undefined;
 
-    /// If this is true, then ACPI is present and the RSDP pointer is valid.
-    var acpi_present: bool = false;
-
-    var acpi_initialized: bool = false;
+    /// Set by `init.acpi.initialize`.
+    pub var acpi_initialized: bool = false;
 };
 
-pub const init = struct {
-    pub fn setRsdp(rsdp: *const tables.RSDP) void {
-        globals.rsdp = rsdp;
-        globals.acpi_present = true;
-    }
-
-    pub fn initialize(context: *cascade.Context) !void {
-        init_log.debug(context, "entering ACPI mode", .{});
-        try uacpi.initialize(.{});
-
-        try uacpi.FixedEvent.power_button.installHandler(
-            void,
-            earlyPowerButtonHandler,
-            null,
-        );
-
-        init_log.debug(context, "loading namespace", .{});
-        try uacpi.namespaceLoad();
-
-        if (arch.current_arch == .x64) {
-            try uacpi.setInterruptModel(.ioapic);
-        }
-
-        init_log.debug(context, "initializing namespace", .{});
-        try uacpi.namespaceInitialize();
-
-        init_log.debug(context, "finializing GPEs", .{});
-        try uacpi.finializeGpeInitialization();
-
-        globals.acpi_initialized = true;
-    }
-
-    fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        const context: *cascade.Context = .current();
-        init_log.warn(context, "power button pressed", .{});
-        tryShutdown(context) catch |err| {
-            std.debug.panic("failed to shutdown: {t}", .{err});
-        };
-        @panic("shutdown failed");
-    }
-
-    const init_log = cascade.debug.log.scoped(.init_acpi);
-};
+pub fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
+    const context: *cascade.Context = .current();
+    log.warn(context, "power button pressed", .{});
+    tryShutdown(context) catch |err| {
+        std.debug.panic("failed to shutdown: {t}", .{err});
+    };
+    @panic("shutdown failed");
+}
 
 comptime {
     _ = @import("uacpi_kernel_api.zig"); // ensure kernel api is exported

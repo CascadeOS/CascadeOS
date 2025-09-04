@@ -15,8 +15,7 @@ pub fn earlyInitialize() !void {
         .virtual => |addr| addr.toPtr(*const tables.RSDP),
     };
     if (!rsdp.isValid()) return error.InvalidRSDP;
-
-    cascade.acpi.init.setRsdp(rsdp);
+    cascade.acpi.globals.rsdp = rsdp;
 
     try uacpi.setupEarlyTableAccess(&static.buffer);
     globals.acpi_present = true;
@@ -31,7 +30,29 @@ pub fn initialize(context: *cascade.Context) !void {
         return;
     }
 
-    try cascade.acpi.init.initialize(context);
+    log.debug(context, "entering ACPI mode", .{});
+    try uacpi.initialize(.{});
+
+    try uacpi.FixedEvent.power_button.installHandler(
+        void,
+        cascade.acpi.earlyPowerButtonHandler,
+        null,
+    );
+
+    log.debug(context, "loading namespace", .{});
+    try uacpi.namespaceLoad();
+
+    if (arch.current_arch == .x64) {
+        try uacpi.setInterruptModel(.ioapic);
+    }
+
+    log.debug(context, "initializing namespace", .{});
+    try uacpi.namespaceInitialize();
+
+    log.debug(context, "finializing GPEs", .{});
+    try uacpi.finializeGpeInitialization();
+
+    cascade.acpi.globals.acpi_initialized = true;
 }
 
 pub fn AcpiTable(comptime T: type) type {
