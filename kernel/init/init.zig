@@ -8,7 +8,7 @@ pub fn initStage1() !noreturn {
     time.tryCaptureStandardWallclockStartTime();
 
     // we need the direct map to be available as early as possible
-    const early_memory_layout = mem.determineEarlyMemoryLayout();
+    mem.determineEarlyMemoryLayout();
 
     var context = try constructBootstrapContext();
 
@@ -25,7 +25,7 @@ pub fn initStage1() !noreturn {
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    mem.logEarlyMemoryLayout(context, early_memory_layout);
+    mem.logEarlyMemoryLayout(context);
 
     try acpi.logAcpiTables(context);
 

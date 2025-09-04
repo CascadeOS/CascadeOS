@@ -407,74 +407,50 @@ pub const globals = struct {
     ///
     /// All other page tables start as a copy of this one.
     ///
-    /// Initialized during `init.buildCorePageTable`.
+    /// Initialized during `init.mem.buildCorePageTable`.
     pub var core_page_table: arch.paging.PageTable = undefined;
 
     /// The kernel pageable address space.
     ///
     /// Used for pageable kernel memory like file caches and for loaning memory from and to user space.
     ///
-    /// Initialized during `init.initializeMemorySystem`.
+    /// Initialized during `init.mem.initializeMemorySystem`.
     pub var kernel_pageable_address_space: cascade.mem.AddressSpace = undefined;
 
     /// The virtual base address that the kernel was loaded at.
     ///
-    /// Initialized during `init.setEarlyOffsets`.
-    var virtual_base_address: core.VirtualAddress = undefined;
+    /// Initialized during `init.mem.determineEarlyMemoryLayout`.
+    pub var virtual_base_address: core.VirtualAddress = undefined;
 
     /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
     ///
-    /// Initialized during `init.setEarlyOffsets`.
+    /// Initialized during `init.mem.determineEarlyMemoryLayout`.
     pub var virtual_offset: core.Size = undefined;
 
     /// Offset from the virtual address of kernel sections to the physical address of the section.
     ///
-    /// Initialized during `init.setEarlyOffsets`.
+    /// Initialized during `init.mem.determineEarlyMemoryLayout`.
     pub var physical_to_virtual_offset: core.Size = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
-    /// Initialized during `init.setEarlyOffsets`.
+    /// Initialized during `init.mem.determineEarlyMemoryLayout`.
     pub var direct_map: core.VirtualRange = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Caching is disabled for this mapping.
     ///
-    /// Initialized during `init.initializeMemorySystem`.
+    /// Initialized during `init.mem.initializeMemorySystem`.
     pub var non_cached_direct_map: core.VirtualRange = undefined;
 
     /// The layout of the memory regions of the cascade.
     ///
-    /// Initialized during `init.initializeMemorySystem`.
+    /// Initialized during `init.mem.initializeMemorySystem`.
     pub var regions: KernelMemoryRegion.List = .{};
 };
 
-pub const initialization = struct {
-    pub const EarlyMemoryLayout = struct {
-        /// The virtual base address that the kernel was loaded at.
-        virtual_base_address: core.VirtualAddress,
-        /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
-        virtual_offset: core.Size,
-        /// Offset from the virtual address of kernel sections to the physical address of the section.
-        physical_to_virtual_offset: core.Size,
-        /// Provides an identity mapping between virtual and physical addresses.
-        direct_map: core.VirtualRange,
-    };
-
-    /// Set the kernels various offsets and the direct map early in the boot process.
-    pub fn setEarlyMemoryLayout(early_memory_layout: EarlyMemoryLayout) void {
-        globals.virtual_base_address = early_memory_layout.virtual_base_address;
-        globals.virtual_offset = early_memory_layout.virtual_offset;
-        globals.physical_to_virtual_offset = early_memory_layout.physical_to_virtual_offset;
-        globals.direct_map = early_memory_layout.direct_map;
-    }
-
-    const init_log = cascade.debug.log.scoped(.init_mem);
-};
-
 const arch = @import("arch");
-const init = @import("init");
 const cascade = @import("cascade");
 
 const core = @import("core");

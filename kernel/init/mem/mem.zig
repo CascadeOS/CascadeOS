@@ -4,15 +4,17 @@
 pub const phys = @import("phys.zig");
 
 /// Determine the kernels various offsets and the direct map early in the boot process.
-pub fn determineEarlyMemoryLayout() cascade.mem.initialization.EarlyMemoryLayout {
+pub fn determineEarlyMemoryLayout() void {
     const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
+    cascade.mem.globals.virtual_base_address = base_address.virtual;
 
     const virtual_offset = core.Size.from(
         base_address.virtual.value - cascade.config.kernel_base_address.value,
         .byte,
     );
+    cascade.mem.globals.virtual_offset = virtual_offset;
 
-    const physical_to_virtual_offset = core.Size.from(
+    cascade.mem.globals.physical_to_virtual_offset = core.Size.from(
         base_address.virtual.value - base_address.physical.value,
         .byte,
     );
@@ -35,32 +37,21 @@ pub fn determineEarlyMemoryLayout() cascade.mem.initialization.EarlyMemoryLayout
         break :direct_map_size direct_map_size;
     };
 
-    const direct_map = core.VirtualRange.fromAddr(
+    cascade.mem.globals.direct_map = core.VirtualRange.fromAddr(
         boot.directMapAddress() orelse @panic("direct map address not provided"),
         direct_map_size,
     );
-
-    const early_memory_layout: cascade.mem.initialization.EarlyMemoryLayout = .{
-        .virtual_base_address = base_address.virtual,
-        .virtual_offset = virtual_offset,
-        .physical_to_virtual_offset = physical_to_virtual_offset,
-        .direct_map = direct_map,
-    };
-
-    cascade.mem.initialization.setEarlyMemoryLayout(early_memory_layout);
-
-    return early_memory_layout;
 }
 
-pub fn logEarlyMemoryLayout(context: *cascade.Context, early_memory_layout: cascade.mem.initialization.EarlyMemoryLayout) void {
+pub fn logEarlyMemoryLayout(context: *cascade.Context) void {
     if (!log.levelEnabled(.debug)) return;
 
     log.debug(context, "kernel memory offsets:", .{});
 
-    log.debug(context, "  virtual base address:       {f}", .{early_memory_layout.virtual_base_address});
-    log.debug(context, "  virtual offset:             0x{x:0>16}", .{early_memory_layout.virtual_offset.value});
-    log.debug(context, "  physical to virtual offset: 0x{x:0>16}", .{early_memory_layout.physical_to_virtual_offset.value});
-    log.debug(context, "  direct map:                 {f}", .{early_memory_layout.direct_map});
+    log.debug(context, "  virtual base address:       {f}", .{cascade.mem.globals.virtual_base_address});
+    log.debug(context, "  virtual offset:             0x{x:0>16}", .{cascade.mem.globals.virtual_offset.value});
+    log.debug(context, "  physical to virtual offset: 0x{x:0>16}", .{cascade.mem.globals.physical_to_virtual_offset.value});
+    log.debug(context, "  direct map:                 {f}", .{cascade.mem.globals.direct_map});
 }
 
 pub fn initializeMemorySystem(context: *cascade.Context) !void {
@@ -83,7 +74,6 @@ pub fn initializeMemorySystem(context: *cascade.Context) !void {
         number_of_usable_regions,
         kernel_regions,
     );
-
     cascade.mem.globals.non_cached_direct_map = kernel_regions.find(.non_cached_direct_map).?.range;
 
     log.debug(context, "building core page table", .{});
