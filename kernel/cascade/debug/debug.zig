@@ -55,7 +55,7 @@ const PanicType = union(enum) {
 fn panicDispatch(context: *cascade.Context, msg: []const u8, panic_type: PanicType) noreturn {
     @branchHint(.cold);
 
-    arch.interrupts.disable();
+    context.incrementInterruptDisable();
 
     switch (globals.panic_mode) {
         .single_executor_init_panic => singleExecutorInitPanic(context, msg, panic_type),
