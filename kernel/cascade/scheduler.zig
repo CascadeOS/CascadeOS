@@ -351,7 +351,9 @@ pub fn newTaskEntry(
     unlockScheduler(context);
 
     const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
-    func(context, task_arg1, task_arg2);
+    func(context, task_arg1, task_arg2) catch |err| {
+        std.debug.panic("unhandled error: {t}", .{err});
+    };
     @panic("task returned to entry point");
 }
 

@@ -167,11 +167,13 @@ pub const CpuDescriptorIterator = struct {
     pub fn bootFn(
         generic_descriptor: *const boot.CpuDescriptors.Descriptor,
         user_data: *anyopaque,
-        comptime targetFn: fn (user_data: *anyopaque) noreturn,
+        comptime targetFn: fn (user_data: *anyopaque) anyerror!noreturn,
     ) void {
         const trampolineFn = struct {
             fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.c) noreturn {
-                targetFn(@ptrFromInt(smp_info.extra_argument));
+                targetFn(@ptrFromInt(smp_info.extra_argument)) catch |err| {
+                    std.debug.panic("unhandled error: {t}", .{err});
+                };
             }
         }.trampolineFn;
 

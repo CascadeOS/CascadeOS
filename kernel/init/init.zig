@@ -88,7 +88,7 @@ pub fn initStage1() !noreturn {
     log.debug(context, "booting non-bootstrap executors", .{});
     try bootNonBootstrapExecutors();
 
-    try initStage2(context, true);
+    try initStage2(context);
     unreachable;
 }
 
@@ -97,7 +97,7 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(context: *cascade.Context, is_bootstrap_executor: bool) !noreturn {
+fn initStage2(context: *cascade.Context) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     cascade.mem.globals.core_page_table.load();
@@ -113,20 +113,13 @@ fn initStage2(context: *cascade.Context, is_bootstrap_executor: bool) !noreturn 
     log.debug(context, "enabling per-executor interrupt on {f}", .{executor.id});
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
-    try arch.scheduling.callTwoArgs(
+    try arch.scheduling.callOneArg(
         null,
         context.task().stack,
         @intFromPtr(context),
-        @intFromBool(is_bootstrap_executor),
         struct {
-            fn initStage3Wrapper(
-                inner_context_addr: usize,
-                inner_is_bootstrap_executor: usize,
-            ) callconv(.c) noreturn {
-                initStage3(
-                    @ptrFromInt(inner_context_addr),
-                    inner_is_bootstrap_executor != 0,
-                ) catch |err| {
+            fn initStage3Wrapper(inner_context_addr: usize) callconv(.c) noreturn {
+                initStage3(@ptrFromInt(inner_context_addr)) catch |err| {
                     std.debug.panic("unhandled error: {t}", .{err});
                 };
             }
@@ -137,13 +130,11 @@ fn initStage2(context: *cascade.Context, is_bootstrap_executor: bool) !noreturn 
 
 /// Stage 3 of kernel initialization.
 ///
-/// This function is executed by all executors, including the bootstrap executor.
+/// This function is executed by all executors.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
-    if (bootstrap_executor) {
-        Stage3Barrier.waitForAllNonBootstrapExecutors();
-
+fn initStage3(context: *cascade.Context) !noreturn {
+    if (Stage3Barrier.start()) {
         log.debug(context, "loading standard interrupt handlers", .{});
         arch.interrupts.init.loadStandardInterruptHandlers();
 
@@ -151,13 +142,7 @@ fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
         {
             const init_stage4_task: *cascade.Task = try .createKernelTask(context, .{
                 .name = try .fromSlice("init stage 4"),
-                .start_function = struct {
-                    fn initStage4Wrapper(inner_context: *cascade.Context, _: usize, _: usize) noreturn {
-                        initStage4(inner_context) catch |err| {
-                            std.debug.panic("unhandled error: {t}", .{err});
-                        };
-                    }
-                }.initStage4Wrapper,
+                .start_function = initStage4,
                 .arg1 = undefined,
                 .arg2 = undefined,
                 .kernel_task_type = .normal,
@@ -169,10 +154,7 @@ fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
             cascade.scheduler.queueTask(context, init_stage4_task);
         }
 
-        Stage3Barrier.stage3Complete();
-    } else {
-        Stage3Barrier.nonBootstrapExecutorReady();
-        Stage3Barrier.waitForStage3Completion();
+        Stage3Barrier.complete();
     }
 
     cascade.scheduler.lockScheduler(context);
@@ -183,7 +165,7 @@ fn initStage3(context: *cascade.Context, bootstrap_executor: bool) !noreturn {
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(context: *cascade.Context) !noreturn {
+fn initStage4(context: *cascade.Context, _: usize, _: usize) !noreturn {
     log.debug(context, "initializing PCI ECAM", .{});
     try pci.initializeECAM(context);
 
@@ -290,13 +272,8 @@ fn bootNonBootstrapExecutors() !void {
         desc.boot(
             &cascade.globals.executors[i].current_task.context,
             struct {
-                fn bootFn(inner_context: *anyopaque) noreturn {
-                    initStage2(
-                        @ptrCast(@alignCast(inner_context)),
-                        false,
-                    ) catch |err| {
-                        std.debug.panic("unhandled error: {t}", .{err});
-                    };
+                fn bootFn(inner_context: *anyopaque) !noreturn {
+                    try initStage2(@ptrCast(@alignCast(inner_context)));
                 }
             }.bootFn,
         );
@@ -304,35 +281,35 @@ fn bootNonBootstrapExecutors() !void {
 }
 
 const Stage3Barrier = struct {
-    var non_bootstrap_executors_ready = std.atomic.Value(usize).init(0);
+    var number_of_executors_ready: std.atomic.Value(usize) = .init(0);
     var stage3_complete = std.atomic.Value(bool).init(false);
 
-    /// Signal that the current executor has completed initialization.
-    fn nonBootstrapExecutorReady() void {
-        _ = non_bootstrap_executors_ready.fetchAdd(1, .release);
+    /// Returns true is the current executor is selected to run stage 3.
+    ///
+    /// All other executors are blocked until the stage 3 executor signals that it has completed.
+    fn start() bool {
+        const stage3_executor = number_of_executors_ready.fetchAdd(1, .acq_rel) == 0;
+
+        if (stage3_executor) {
+            // wait for all executors to signal that they are ready for stage 3 to occur
+            while (number_of_executors_ready.load(.acquire) != (cascade.globals.executors.len)) {
+                arch.spinLoopHint();
+            }
+        } else {
+            // wait for the stage 3 executor to signal that init stage 3 has completed.
+            while (!stage3_complete.load(.acquire)) {
+                arch.spinLoopHint();
+            }
+        }
+
+        return stage3_executor;
     }
 
     /// Signal that init stage 3 has completed.
     ///
-    /// Called by the bootstrap executor only.
-    fn stage3Complete() void {
+    /// Called by the stage 3 executor only.
+    fn complete() void {
         _ = stage3_complete.store(true, .release);
-    }
-
-    /// Wait for the bootstrap executor to signal that init stage 3 has completed.
-    fn waitForStage3Completion() void {
-        while (!stage3_complete.load(.acquire)) {
-            arch.spinLoopHint();
-        }
-    }
-
-    /// Wait for all other executors to signal that they have completed initialization.
-    ///
-    /// Called by the bootstrap executor only.
-    fn waitForAllNonBootstrapExecutors() void {
-        while (non_bootstrap_executors_ready.load(.acquire) != (cascade.globals.executors.len - 1)) {
-            arch.spinLoopHint();
-        }
     }
 };
 

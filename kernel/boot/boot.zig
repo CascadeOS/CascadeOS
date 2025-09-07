@@ -162,7 +162,7 @@ pub const CpuDescriptors = struct {
         pub fn boot(
             descriptor: *const Descriptor,
             user_data: *anyopaque,
-            target_fn: fn (user_data: *anyopaque) noreturn,
+            target_fn: fn (user_data: *anyopaque) anyerror!noreturn,
         ) void {
             switch (bootloader_api) {
                 .limine => limine.CpuDescriptorIterator.bootFn(descriptor, user_data, target_fn),
