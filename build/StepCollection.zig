@@ -20,6 +20,9 @@ image_build_steps_per_architecture: Steps,
 /// A map from `CascadeTarget.Architecture` to their non-Cascade library test steps.
 non_cascade_library_test_steps_per_architecture: Steps,
 
+/// A map from `CascadeTarget.Architecture` to their non-Cascade application test steps.
+non_cascade_application_test_steps_per_architecture: Steps,
+
 tools_build_step: *Step,
 tools_test_step: *Step,
 
@@ -45,12 +48,12 @@ pub fn registerKernel(
     step_collection.kernel_build_steps_per_architecture.get(architecture).?.dependOn(install_both_kernel_binaries);
 }
 
-/// Registers an image build step for an architecturt.
+/// Registers an image build step for an architecture.
 pub fn registerImage(step_collection: StepCollection, architecture: CascadeTarget.Architecture, step: *Step) void {
     step_collection.image_build_steps_per_architecture.get(architecture).?.dependOn(step);
 }
 
-/// Registers a Cascade library build step for an architecturt.
+/// Registers a Cascade library build step for an architecture.
 pub fn registerCascadeLibrary(step_collection: StepCollection, architecture: CascadeTarget.Architecture, install_step: *Step) void {
     step_collection.cascade_library_build_steps_per_architecture.get(architecture).?.dependOn(install_step);
 }
@@ -58,6 +61,11 @@ pub fn registerCascadeLibrary(step_collection: StepCollection, architecture: Cas
 /// Registers non-Cascade library build and run steps for an architecture.
 pub fn registerNonCascadeLibrary(step_collection: StepCollection, architecture: CascadeTarget.Architecture, run_step: *Step) void {
     step_collection.non_cascade_library_test_steps_per_architecture.get(architecture).?.dependOn(run_step);
+}
+
+/// Registers non-Cascade application build and run steps for an architecture.
+pub fn registerNonCascadeApplication(step_collection: StepCollection, architecture: CascadeTarget.Architecture, run_step: *Step) void {
+    step_collection.non_cascade_application_test_steps_per_architecture.get(architecture).?.dependOn(run_step);
 }
 
 pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architecture) !StepCollection {
@@ -120,6 +128,27 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         "Attempt to run all the library tests for {t} targeting the host os",
     );
 
+    // Applications
+    const all_application_step = b.step(
+        "applications",
+        "Build and run all the application tests",
+    );
+    all_test_step.dependOn(all_application_step);
+
+    const all_application_host_test_step = b.step(
+        "applications_host",
+        "Attempt to run all the application tests targeting the host os",
+    );
+    all_application_step.dependOn(all_application_host_test_step);
+
+    const non_cascade_application_test_steps_per_architecture = try buildPerArchitectureSteps(
+        b,
+        all_architectures,
+        all_application_host_test_step,
+        "applications_host_{t}",
+        "Attempt to run all the application tests for {t} targeting the host os",
+    );
+
     // Tools
     const all_tools_step = b.step(
         "tools",
@@ -147,6 +176,8 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         .image_build_steps_per_architecture = image_build_steps_per_architecture,
 
         .non_cascade_library_test_steps_per_architecture = non_cascade_library_test_steps_per_architecture,
+
+        .non_cascade_application_test_steps_per_architecture = non_cascade_application_test_steps_per_architecture,
 
         .tools_build_step = all_tools_build_step,
         .tools_test_step = all_tools_test_step,

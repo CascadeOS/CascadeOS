@@ -8,6 +8,15 @@ pub const CascadeTarget = struct {
     architecture: Architecture,
     context: Context,
 
+    pub fn getNative(b: *std.Build) ?CascadeTarget {
+        return switch (b.graph.host.result.cpu.arch) {
+            .aarch64 => .{ .architecture = .arm, .context = .non_cascade },
+            .riscv64 => .{ .architecture = .riscv, .context = .non_cascade },
+            .x86_64 => .{ .architecture = .x64, .context = .non_cascade },
+            else => null,
+        };
+    }
+
     pub fn getCrossTarget(self: CascadeTarget, b: *std.Build) std.Build.ResolvedTarget {
         switch (self.context) {
             .cascade => switch (self.architecture) {

@@ -6,6 +6,7 @@ const Step = std.Build.Step;
 
 const build_zig_zon = @import("build.zig.zon");
 
+const Application = @import("build/Application.zig");
 const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
 const ImageStep = @import("build/ImageStep.zig");
 const Kernel = @import("build/Kernel.zig");
@@ -39,6 +40,15 @@ pub fn build(b: *std.Build) !void {
         libraries,
         options.optimize,
     );
+
+    const applications = try Application.getApplications(
+        b,
+        step_collection,
+        libraries,
+        options,
+        all_architectures,
+    );
+    _ = applications;
 
     const kernels = try Kernel.getKernels(
         b,
