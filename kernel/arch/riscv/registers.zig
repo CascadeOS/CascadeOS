@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// Supervisor Scratch Register (sscratch)
 pub const SupervisorScratch = CSR("sscratch");
 
@@ -79,6 +83,3 @@ pub fn CSR(comptime name: []const u8) type {
         }
     };
 }
-
-const std = @import("std");
-const core = @import("core");

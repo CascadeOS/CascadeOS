@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const sdf = @import("sdf");
+
 location_table: std.Io.Writer.Allocating,
 
 pub fn init(allocator: std.mem.Allocator) LocationProgramBuilder {
@@ -33,9 +37,5 @@ pub fn output(
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-
-const sdf = @import("sdf");
 
 const LocationProgramBuilder = @This();

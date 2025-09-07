@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const CascadeTarget = @import("../../build/CascadeTarget.zig").CascadeTarget;
+const Options = @import("../../build/Options.zig");
+
 pub fn customConfiguration(
     b: *std.Build,
     _: CascadeTarget.Architecture,
@@ -65,7 +70,3 @@ pub fn customConfiguration(
     // devicetree
     module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
 }
-
-const std = @import("std");
-const CascadeTarget = @import("../../build/CascadeTarget.zig").CascadeTarget;
-const Options = @import("../../build/Options.zig");

@@ -2,6 +2,10 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 2022 Diego Barria (https://github.com/xyaman/mibu/blob/c2d3719d5dcc1e5a723d3b06459c3b6275d2cef0/LICENSE)
 
+const std = @import("std");
+
+const core = @import("core");
+
 pub const style = struct {
     pub const reset = comptimeCsi("0m", .{});
 
@@ -145,9 +149,6 @@ const csi = esc ++ "[";
 inline fn comptimeCsi(comptime fmt: []const u8, args: anytype) []const u8 {
     return std.fmt.comptimePrint(csi ++ fmt, args);
 }
-
-const std = @import("std");
-const core = @import("core");
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());

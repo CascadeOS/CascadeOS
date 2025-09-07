@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+//! Defines the interface of the architecture specific code.
+
 // TODO: duplication of doc comments is annoying, but having them accessible to each arch as well to the rest of the
 //       kernel is useful
 
-//! Defines the interface of the architecture specific code.
+const std = @import("std");
 
+const cascade = @import("cascade");
+const core = @import("core");
 pub const current_arch = @import("cascade_architecture").arch;
 
 /// Architecture specific per-executor data.
@@ -1023,8 +1027,3 @@ fn GetFunctionReturnType(comptime container: anytype, comptime name: []const u8)
         else => @compileError("field `" ++ name ++ "` has unsupported type " ++ @typeName(T)),
     }
 }
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

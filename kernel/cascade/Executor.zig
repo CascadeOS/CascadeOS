@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
 const Executor = @This();
 
 id: Id,
@@ -63,9 +69,3 @@ pub const Id = enum(u32) {
         try writer.print("Executor({d})", .{@intFromEnum(id)});
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

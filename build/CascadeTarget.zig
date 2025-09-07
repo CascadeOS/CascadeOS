@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
 pub const CascadeTarget = struct {
     architecture: Architecture,
     context: Context,
@@ -41,6 +44,3 @@ pub const CascadeTarget = struct {
         non_cascade, // TODO: better name, `host` does not make sense in every case but it does for most of them?
     };
 };
-
-const std = @import("std");
-const Step = std.Build.Step;

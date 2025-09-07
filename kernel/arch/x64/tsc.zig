@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const Tick = cascade.time.wallclock.Tick;
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+const readTsc = x64.instructions.readTsc;
+
 const globals = struct {
     /// The duration of a tick in femptoseconds.
     ///
@@ -115,12 +124,3 @@ pub const init = struct {
 
     const init_log = cascade.debug.log.scoped(.tsc_init);
 };
-
-const readTsc = x64.instructions.readTsc;
-
-const cascade = @import("cascade");
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");
-const Tick = cascade.time.wallclock.Tick;

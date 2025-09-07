@@ -3,6 +3,15 @@
 
 //! Provides a kernel heap.
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const resource_arena = cascade.mem.resource_arena;
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.heap);
+
 pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         context,
@@ -280,13 +289,5 @@ pub const globals = struct {
     var special_heap_page_table_mutex: cascade.sync.Mutex = .{};
 };
 
-const resource_arena = cascade.mem.resource_arena;
 const Arena = resource_arena.Arena(.none);
 const HeapArena = resource_arena.Arena(.{ .heap = allocator_impl.heap_arena_quantum_caches });
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.heap);
-const std = @import("std");

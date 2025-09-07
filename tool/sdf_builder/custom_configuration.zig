@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const ToolDescription = @import("../../build/ToolDescription.zig");
+
 pub fn customConfiguration(
     b: *std.Build,
     tool_description: ToolDescription,
@@ -96,7 +100,3 @@ pub fn customConfiguration(
         .PACKAGE_VERSION = "0.9.2",
     }));
 }
-
-const std = @import("std");
-
-const ToolDescription = @import("../../build/ToolDescription.zig");

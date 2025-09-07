@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const riscv = @import("riscv.zig");
+
 pub inline fn readTime() u64 {
     return asm ("rdtime %[ret]"
         : [ret] "=r" (-> u64),
@@ -35,8 +41,3 @@ pub inline fn interruptsEnabled() bool {
     const sstatus = riscv.registers.SupervisorStatus.read();
     return sstatus.sie;
 }
-
-const riscv = @import("riscv.zig");
-
-const std = @import("std");
-const core = @import("core");

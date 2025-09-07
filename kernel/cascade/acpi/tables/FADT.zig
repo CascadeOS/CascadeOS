@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// The Fixed ACPI Description Table (FADT) defines various fixed hardware ACPI information vital to an ACPI-compatible
 /// OS, such as the base address for the following hardware registers blocks:
 ///  - PM1a_EVT_BLK
@@ -869,9 +875,3 @@ pub const FADT = extern struct {
         core.testing.expectSize(FADT, 276);
     }
 };
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

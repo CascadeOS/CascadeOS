@@ -5,6 +5,14 @@
 //!
 //! Can be either a kernel or userspace task.
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.task);
+
 const Task = @This();
 
 /// The name of the task.
@@ -423,10 +431,3 @@ pub const init = struct {
         };
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.task);
-const std = @import("std");

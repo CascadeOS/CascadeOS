@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const KernelComponent = @import("../build/KernelComponent.zig");
+
 pub const components: []const KernelComponent = &.{
     .{
         .name = "arch",
@@ -26,5 +28,3 @@ pub const components: []const KernelComponent = &.{
         .configuration = @import("init/custom_configuration.zig").customConfiguration,
     },
 };
-
-const KernelComponent = @import("../build/KernelComponent.zig");

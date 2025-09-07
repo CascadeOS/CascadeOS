@@ -3,6 +3,11 @@
 
 //! A synchronization primitive that allows a single task to block (park) and any other task to wake it (unpark).
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 const Parker = @This();
 
 lock: cascade.sync.TicketSpinLock = .{},
@@ -106,8 +111,3 @@ pub fn unpark(
 
     cascade.scheduler.queueTask(context, parked_task);
 }
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

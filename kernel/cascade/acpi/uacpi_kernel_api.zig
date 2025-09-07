@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const acpi = @import("acpi.zig");
+const uacpi = @import("uacpi.zig");
+
+const log = cascade.debug.log.scoped(.uacpi_kernel_api);
+
 /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
@@ -758,13 +769,3 @@ export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
 
     @panic("uacpi_kernel_wait_for_work_completion()");
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const acpi = @import("acpi.zig");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.uacpi_kernel_api);
-const std = @import("std");
-const uacpi = @import("uacpi.zig");

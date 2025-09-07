@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const x64 = @import("../x64.zig");
+const Idt = @import("Idt.zig");
+const interrupt_handlers = @import("handlers.zig");
+
 pub fn allocateInterrupt(
     context: *cascade.Context,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
@@ -262,8 +272,6 @@ const Handler = struct {
     }
 };
 
-const Idt = @import("Idt.zig");
-
 const globals = struct {
     var idt: Idt = .{};
     var handlers: [Idt.number_of_handlers]Handler = handlers: {
@@ -367,11 +375,3 @@ pub const init = struct {
         break :blk raw_interrupt_handlers_temp;
     };
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const x64 = @import("../x64.zig");
-
-const core = @import("core");
-const interrupt_handlers = @import("handlers.zig");
-const std = @import("std");

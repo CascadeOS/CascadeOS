@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Node = std.SinglyLinkedList.Node;
+
+const core = @import("core");
+
 /// A singly linked FIFO (first in first out).
 ///
 /// Uses the node type `std.SinglyLinkedList.Node` to allow the same node to be used in multiple list implementations.
@@ -426,7 +431,3 @@ pub fn BoundedArrayAligned(
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");
-const Node = std.SinglyLinkedList.Node;

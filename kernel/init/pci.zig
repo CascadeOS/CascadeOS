@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+const init = @import("init");
+
+const log = cascade.debug.log.scoped(.pci_init);
+
 pub fn initializeECAM(context: *cascade.Context) !void {
     const acpi_table = AcpiTable.get(0) orelse return error.MCFGNotPresent;
     defer acpi_table.deinit();
@@ -32,11 +41,3 @@ pub fn initializeECAM(context: *cascade.Context) !void {
 }
 
 const AcpiTable = init.acpi.AcpiTable(cascade.acpi.tables.MCFG);
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const init = @import("init");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.pci_init);
-const std = @import("std");

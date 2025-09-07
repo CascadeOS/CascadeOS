@@ -10,6 +10,13 @@
 //!  - "AMD64 Architecture Programmer's Manual Volume 3: General-Purpose and System Instructions 3.36 March 2024"
 //!
 
+const std = @import("std");
+
+const bitjuggle = @import("bitjuggle");
+const core = @import("core");
+
+const x64 = @import("../x64.zig");
+
 /// Capture the CPUID information.
 pub fn capture() !void {
     if (!isAvailable()) return error.CpuIdNotSupported;
@@ -3554,12 +3561,6 @@ pub const ProcessorType = enum(u2) {
     /// Intel reserved
     reserved = 0b11,
 };
-
-const x64 = @import("../x64.zig");
-
-const std = @import("std");
-const core = @import("core");
-const bitjuggle = @import("bitjuggle");
 
 // TODO: CPUID.02H - TLB/Cache/Prefetch Information (Intel Only)
 // TODO: CPUID.03H - Processor Serial Number (Intel Only)

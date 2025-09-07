@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 pub inline fn interruptsEnabled() bool {
     return x64.registers.RFlags.read().interrupt;
 }
@@ -88,8 +94,3 @@ pub inline fn portWriteU32(port: u16, value: u32) void {
           [port] "N{dx}" (port),
     );
 }
-
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

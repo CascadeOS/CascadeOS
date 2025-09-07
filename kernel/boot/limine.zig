@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const boot = @import("boot");
+const core = @import("core");
+const init = @import("init");
+const limine = @import("limine");
+
 pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     const resp = requests.kernel_address.response orelse
         return null;
@@ -281,10 +288,3 @@ const requests = struct {
     var framebuffer: limine.Framebuffer = .{};
     var device_tree_blob: limine.DeviceTreeBlob = .{};
 };
-
-const boot = @import("boot");
-const init = @import("init");
-
-const core = @import("core");
-const limine = @import("limine");
-const std = @import("std");

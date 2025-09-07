@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const Library = @import("Library.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
+const ToolDescription = @import("ToolDescription.zig");
+
 pub const Collection = std.StringArrayHashMapUnmanaged(Tool);
 
 const Tool = @This();
@@ -263,11 +271,3 @@ fn createModule(
 
     return module;
 }
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const Library = @import("Library.zig");
-const StepCollection = @import("StepCollection.zig");
-const ToolDescription = @import("ToolDescription.zig");
-const Options = @import("Options.zig");

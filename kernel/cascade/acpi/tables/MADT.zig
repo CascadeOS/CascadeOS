@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// The Multiple APIC Description Table (MADT), provides OSPM with information necessary for operation on systems with
 /// APIC, SAPIC, GIC, or LPIC implementations.
 ///
@@ -1234,9 +1240,3 @@ pub const MADT = extern struct {
         );
     }
 };
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

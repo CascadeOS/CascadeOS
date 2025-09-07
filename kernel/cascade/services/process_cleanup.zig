@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.process_cleanup);
+
 pub fn queueProcessForCleanup(
     context: *cascade.Context,
     process: *cascade.Process,
@@ -94,10 +102,3 @@ pub const init = struct {
         globals.parker = .withParkedTask(globals.process_cleanup_task);
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.process_cleanup);
-const std = @import("std");

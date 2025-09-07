@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 const Page = @This();
 
 physical_frame: cascade.mem.phys.Frame,
@@ -29,8 +34,3 @@ pub const Region = struct {
 pub const Index = enum(u32) {
     _,
 };
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

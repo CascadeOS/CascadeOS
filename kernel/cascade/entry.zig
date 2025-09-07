@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.entry);
 /// Executed upon per executor periodic interrupt.
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
@@ -34,10 +41,3 @@ pub fn onPageFault(
 pub fn onFlushRequest(context: *cascade.Context) void {
     cascade.mem.FlushRequest.processFlushRequests(context);
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.entry);
-const std = @import("std");

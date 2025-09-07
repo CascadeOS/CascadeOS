@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
         inline fn getCurrentExecutor() *cascade.Executor {
@@ -160,11 +168,3 @@ pub const decls: arch.Decls = .{
         .CaptureSystemInformationOptions = x64.init.CaptureSystemInformationOptions,
     },
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const x64 = @import("../x64.zig");
+
 pub fn nonMaskableInterruptHandler(
     _: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
@@ -100,10 +108,3 @@ pub fn unhandledInterrupt(
     const executor = context.executor.?;
     std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const x64 = @import("../x64.zig");
-
-const core = @import("core");
-const std = @import("std");

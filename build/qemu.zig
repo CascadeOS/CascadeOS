@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-const Firmware = union(enum) {
-    default,
-    uefi: *std.Build.Dependency, // EDK2 dependency
-};
+const std = @import("std");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const ImageStep = @import("ImageStep.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
+const Tool = @import("Tool.zig");
 
 /// For each architecture, creates a step that runs the image for the architecture using QEMU.
 pub fn registerQemuSteps(
@@ -304,10 +307,7 @@ fn qemuExecutable(architecture: CascadeTarget.Architecture) []const u8 {
     };
 }
 
-const std = @import("std");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const ImageStep = @import("ImageStep.zig");
-const Options = @import("Options.zig");
-const StepCollection = @import("StepCollection.zig");
-const Tool = @import("Tool.zig");
+const Firmware = union(enum) {
+    default,
+    uefi: *std.Build.Dependency, // EDK2 dependency
+};

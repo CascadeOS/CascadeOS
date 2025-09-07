@@ -9,6 +9,12 @@
 //!    root node.
 //!
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// Set up early access to the table subsystem. What this means is:
 /// - uacpi_table_find() and similar API becomes usable before the call to
 ///   uacpi_initialize().
@@ -4052,9 +4058,3 @@ const c_uacpi = @cImport({
     @cInclude("uacpi/uacpi.h");
     @cInclude("uacpi/utilities.h");
 });
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

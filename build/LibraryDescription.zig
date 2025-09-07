@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+
 /// The name of the library:
 ///   - used as the name of the module provided `@import("{name}");` (unless overridden with `LibraryDependency.import_name`)
 ///   - used to build the root file path `libraries/{name}/{name}.zig`
@@ -17,7 +21,3 @@ supported_architectures: ?[]const CascadeTarget.Architecture = null,
 
 /// Whether the library can only be used or tested within Cascade.
 is_cascade_only: bool = false,
-
-const std = @import("std");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const bitjuggle = @import("bitjuggle");
+const core = @import("core");
+
 /// A page table for x64.
 pub const PageTable = extern struct {
     entries: [number_of_entries]Entry.Raw align(small_page_size.value),
@@ -528,7 +533,3 @@ const type_of_1gib: type = std.meta.Int(
     .unsigned,
     maximum_physical_address_bit - level_3_shift,
 );
-
-const core = @import("core");
-const std = @import("std");
-const bitjuggle = @import("bitjuggle");

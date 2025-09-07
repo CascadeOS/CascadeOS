@@ -3,7 +3,16 @@
 
 // FIXME: we assume #address-cells and #size-cells are both two
 
+const std = @import("std");
+
+const boot = @import("boot");
+const cascade = @import("cascade");
+const core = @import("core");
 pub const DeviceTree = @import("DeviceTree");
+const init = @import("init");
+const uart = init.Output.uart;
+
+const log = cascade.debug.log.scoped(.devicetree);
 
 pub fn tryGetSerialOutput(context: *cascade.Context) ?uart.Uart {
     const output_uart = tryGetSerialOutputInner(context) catch |err| switch (err) {
@@ -209,12 +218,3 @@ const GetSerialOutputFn = *const fn (
     dt: DeviceTree,
     node: DeviceTree.Node,
 ) GetSerialOutputError!?uart.Uart;
-
-const boot = @import("boot");
-const init = @import("init");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.devicetree);
-const std = @import("std");
-const uart = init.Output.uart;

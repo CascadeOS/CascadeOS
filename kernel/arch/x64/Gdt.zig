@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 /// The Global Descriptor Table for x64.
 pub const Gdt = extern struct {
     descriptors: [7]u64 = [7]u64{
@@ -91,8 +97,3 @@ pub const Gdt = extern struct {
         base: u64,
     };
 };
-
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

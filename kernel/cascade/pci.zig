@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// Returns the `PCIEConfigurationSpace` of the function at 'address'.
 pub fn getFunction(address: Address) ?*volatile Function {
     for (globals.ecams) |ecam| {
@@ -356,9 +362,3 @@ pub const globals = struct {
 
 const DEVICES_PER_BUS = 32;
 const FUNCTIONS_PER_DEVICE = 8;
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

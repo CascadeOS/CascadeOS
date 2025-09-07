@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Tick = cascade.time.wallclock.Tick;
+const core = @import("core");
+
+const x64 = @import("x64.zig");
 
 const globals = struct {
     var hpet: Hpet = undefined; // Initalized during `initializeHPET`
@@ -323,11 +330,3 @@ const Hpet = struct {
     pub const timer_comparator_register_base_offset: usize = 0x108 / @sizeOf(u64);
     pub const timer_fsb_interrupt_route_register_base_offset: usize = 0x110 / @sizeOf(u64);
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");
-const Tick = cascade.time.wallclock.Tick;

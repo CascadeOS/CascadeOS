@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+const fs = @import("fs");
+const UUID = @import("uuid").UUID;
+
 // TODO: This file is *very* WIP.
 
 pub const signature: u16 = 0xef53;
@@ -1090,8 +1096,3 @@ pub const Creator = enum(u32) {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const core = @import("core");
-const fs = @import("fs");
-const std = @import("std");
-const UUID = @import("uuid").UUID;

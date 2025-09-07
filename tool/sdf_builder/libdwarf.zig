@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 pub fn initPath(path: [:0]const u8) DwarfDebug {
     var dwarf_debug: c.Dwarf_Debug = undefined;
 
@@ -663,9 +667,6 @@ fn toResult(return_value: c_int) !void {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");
 
 const c = @cImport({
     @cInclude("dwarf.h");

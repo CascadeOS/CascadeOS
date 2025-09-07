@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 /// The Task State Segment structure.
 pub const Tss = extern struct {
     _reserved_1: u32 align(1) = 0,
@@ -43,8 +49,3 @@ pub const Tss = extern struct {
         core.testing.expectSize(Tss, 104);
     }
 };
-
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

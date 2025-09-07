@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+const init = @import("init");
+
 pub const Uart = union(enum) {
     io_port_16550: IoPort16550,
     memory_16550: Memory16550,
@@ -710,10 +717,3 @@ pub const Baud = struct {
         return @bitCast(std.math.cast(u22, divisor) orelse return error.DivisorTooLarge);
     }
 };
-
-const arch = @import("arch");
-const init = @import("init");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

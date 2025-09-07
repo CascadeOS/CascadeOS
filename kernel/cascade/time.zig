@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
 pub const wallclock = struct {
     /// This is an opaque timer tick, to acquire an actual time value, use `elapsed`.
     pub const Tick = enum(u64) {
@@ -47,9 +53,3 @@ pub const fs_per_ns = 1000000;
 
 /// Femptoseconds per second.
 pub const fs_per_s = fs_per_ns * std.time.ns_per_s;
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

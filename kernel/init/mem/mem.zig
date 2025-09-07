@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const boot = @import("boot");
+const cascade = @import("cascade");
+const Page = cascade.mem.Page;
+const core = @import("core");
+
 pub const phys = @import("phys.zig");
+
+const log = cascade.debug.log.scoped(.mem_init);
 
 /// Determine the kernels various offsets and the direct map early in the boot process.
 pub fn determineEarlyMemoryLayout() void {
@@ -55,10 +65,7 @@ pub fn logEarlyMemoryLayout(context: *cascade.Context) void {
 }
 
 pub fn initializeMemorySystem(context: *cascade.Context) !void {
-    var memory_map: core.containers.BoundedArray(
-        boot.MemoryMap.Entry,
-        cascade.config.maximum_number_of_memory_map_entries,
-    ) = .{};
+    var memory_map: MemoryMap = .{};
 
     const number_of_usable_pages, const number_of_usable_regions = try fillMemoryMap(
         context,
@@ -495,12 +502,3 @@ fn initializeHeaps(
         };
     }
 }
-
-const arch = @import("arch");
-const boot = @import("boot");
-const cascade = @import("cascade");
-const Page = cascade.mem.Page;
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.mem_init);
-const std = @import("std");

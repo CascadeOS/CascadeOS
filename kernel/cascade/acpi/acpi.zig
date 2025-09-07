@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+pub const Address = @import("Address.zig").Address;
+pub const tables = @import("tables/tables.zig");
+pub const uacpi = @import("uacpi.zig");
+
+const log = cascade.debug.log.scoped(.acpi);
+
 pub fn tryShutdown(context: *cascade.Context) !void {
     if (!globals.acpi_initialized) return;
 
@@ -11,10 +23,6 @@ pub fn tryShutdown(context: *cascade.Context) !void {
 
     try uacpi.sleep(.S5);
 }
-
-pub const Address = @import("Address.zig").Address;
-pub const tables = @import("tables/tables.zig");
-pub const uacpi = @import("uacpi.zig");
 
 pub const globals = struct {
     /// Pointer to the RSDP table.
@@ -38,10 +46,3 @@ pub fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
 comptime {
     _ = @import("uacpi_kernel_api.zig"); // ensure kernel api is exported
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.acpi);
-const std = @import("std");

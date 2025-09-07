@@ -3,6 +3,10 @@
 // SPDX-FileCopyrightText: 2015 Jiri Svoboda (https://github.com/HelenOS/helenos)
 // SPDX-FileCopyrightText: 2021 Dmitri Goutnik (https://github.com/dmgk/zig-uuid)
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// Defines a UUID (Universally Unique IDentifier) as defined by RFC 4122.
 pub const UUID = extern struct {
     bytes: [16]u8,
@@ -145,6 +149,3 @@ test "invalid UUID" {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");

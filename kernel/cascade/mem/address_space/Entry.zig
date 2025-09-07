@@ -14,6 +14,19 @@
 //! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
 //!
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Cache = cascade.mem.cache.Cache;
+const Protection = cascade.mem.MapType.Protection;
+const core = @import("core");
+
+const AnonymousMap = @import("AnonymousMap.zig");
+const Object = @import("Object.zig");
+
+const log = cascade.debug.log.scoped(.address_space);
+
 const Entry = @This();
 
 base: core.VirtualAddress,
@@ -324,16 +337,3 @@ comptime {
         @compileError("`Entry` is a large cache object");
     }
 }
-
-const AnonymousMap = @import("AnonymousMap.zig");
-const Object = @import("Object.zig");
-
-const Protection = cascade.mem.MapType.Protection;
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const Cache = cascade.mem.cache.Cache;
-const core = @import("core");
-const log = cascade.debug.log.scoped(.address_space);
-const std = @import("std");

@@ -5,6 +5,13 @@
 //!
 //! Stored within the `Task` struct to allow fetching the task with `@fieldParentPtr`.
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const core = @import("core");
+
 const Context = @This();
 
 /// Set to the executor the current task is running on if the state of the context means that the executor cannot
@@ -120,11 +127,3 @@ inline fn setExecutor(context: *cascade.Context) void {
         context.executor = null;
     }
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const Task = cascade.Task;
-
-const core = @import("core");
-const std = @import("std");

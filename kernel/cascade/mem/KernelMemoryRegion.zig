@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const MapType = cascade.mem.MapType;
+const core = @import("core");
+
 const KernelMemoryRegion = @This();
 
 range: core.VirtualRange,
@@ -187,10 +194,3 @@ pub const List = struct {
         }
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const MapType = cascade.mem.MapType;
-const std = @import("std");

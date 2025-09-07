@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// Represents a size in bytes.
 pub const Size = extern struct {
     value: u64,
@@ -225,6 +229,3 @@ pub const Size = extern struct {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");

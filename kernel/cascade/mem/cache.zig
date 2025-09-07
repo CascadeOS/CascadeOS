@@ -8,6 +8,14 @@
 
 // TODO: use `core.Size`
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.cache);
+
 pub const ConstructorError = error{ObjectConstructionFailed};
 pub const Name = core.containers.BoundedArray(u8, cascade.config.cache_name_length);
 
@@ -749,10 +757,3 @@ pub const globals = struct {
     /// Initialized during `init.mem.initializeCaches`.
     pub var large_object_cache: Cache(RawCache.LargeObject, null, null) = undefined;
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.cache);
-const std = @import("std");

@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
+const cascade = @import("cascade");
+const AcpiTable = cascade.exports.AcpiTable;
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
+const log = cascade.debug.log.scoped(.x64_init);
+
 /// Attempt to get some form of init output.
 pub fn tryGetSerialOutput(context: *cascade.Context) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
@@ -395,13 +407,3 @@ const DebugCon = struct {
         .state = undefined,
     };
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const x64 = @import("x64.zig");
-
-const AcpiTable = cascade.exports.AcpiTable;
-const core = @import("core");
-const log = cascade.debug.log.scoped(.x64_init);
-const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
-const std = @import("std");

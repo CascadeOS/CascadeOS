@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const mem = cascade.mem;
+const core = @import("core");
+
 pub const Page = @import("Page.zig");
 
 pub const allocator: FrameAllocator = .{
@@ -168,10 +175,3 @@ pub const globals = struct {
     /// Initialized during `init.mem.phys.initializePhysicalMemory`.
     pub var page_regions: []Page.Region = undefined;
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const mem = cascade.mem;
-
-const core = @import("core");
-const std = @import("std");

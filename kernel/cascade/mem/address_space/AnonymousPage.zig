@@ -14,6 +14,15 @@
 //! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
 //!
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const Cache = cascade.mem.cache.Cache;
+const Page = cascade.mem.Page; // called a `vm_page` in uvm
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.address_space);
+
 const AnonymousPage = @This();
 
 lock: cascade.sync.RwLock = .{},
@@ -67,12 +76,3 @@ pub const globals = struct {
     /// Initialized during `init.mem.initializeCaches`.
     pub var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
 };
-
-const Page = cascade.mem.Page; // called a `vm_page` in uvm
-
-const cascade = @import("cascade");
-
-const Cache = cascade.mem.cache.Cache;
-const core = @import("core");
-const log = cascade.debug.log.scoped(.address_space);
-const std = @import("std");

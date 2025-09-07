@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const ansi = @import("ansi.zig");
+
 // TODO: rewrite this whole thing in light of writergate
 
 const StdoutWrapper = @This();
@@ -73,10 +79,6 @@ pub fn next(stdout_wrapper: *StdoutWrapper) !?[]const u8 {
 }
 
 const StdoutEnum = enum { stdout };
-
-const std = @import("std");
-const core = @import("core");
-const ansi = @import("ansi.zig");
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());

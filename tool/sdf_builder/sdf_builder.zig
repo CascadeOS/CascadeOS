@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+const sdf = @import("sdf");
+
+const FileTableBuilder = @import("FileTableBuilder.zig");
+const libdwarf = @import("libdwarf.zig");
+const LocationLookupBuilder = @import("LocationLookupBuilder.zig");
+const LocationProgramBuilder = @import("LocationProgramBuilder.zig");
+const StringTableBuilder = @import("StringTableBuilder.zig");
+
 const default_chunk_size = 8 * 1024;
 
 pub fn main() !void {
@@ -773,15 +784,3 @@ const custom_atomic_file = struct {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");
-
-const libdwarf = @import("libdwarf.zig");
-
-const sdf = @import("sdf");
-
-const FileTableBuilder = @import("FileTableBuilder.zig");
-const LocationLookupBuilder = @import("LocationLookupBuilder.zig");
-const LocationProgramBuilder = @import("LocationProgramBuilder.zig");
-const StringTableBuilder = @import("StringTableBuilder.zig");

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
 const StringTableBuilder = @This();
 
 allocator: std.mem.Allocator,
@@ -40,5 +42,3 @@ pub fn output(
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");

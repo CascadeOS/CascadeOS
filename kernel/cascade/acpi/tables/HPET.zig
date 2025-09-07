@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// The ACPI 2.0 HPET Description Table (HPET)
 ///
 /// [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
@@ -77,9 +83,3 @@ pub const HPET = extern struct {
         core.testing.expectSize(HPET, 56);
     }
 };
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

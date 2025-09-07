@@ -14,6 +14,21 @@
 //! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
 //!
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Page = cascade.mem.Page; // called a `vm_page` in uvm
+const core = @import("core");
+
+const AddressSpace = @import("AddressSpace.zig");
+const AnonymousMap = @import("AnonymousMap.zig");
+const AnonymousPage = @import("AnonymousPage.zig");
+const Entry = @import("Entry.zig");
+const Object = @import("Object.zig");
+
+const log = cascade.debug.log.scoped(.address_space);
+
 const FaultInfo = @This();
 
 address_space: *AddressSpace,
@@ -489,17 +504,3 @@ const ObjectPage = union(enum) {
     zero_fill,
     page: *Page,
 };
-
-const AddressSpace = @import("AddressSpace.zig");
-const AnonymousMap = @import("AnonymousMap.zig");
-const AnonymousPage = @import("AnonymousPage.zig");
-const Entry = @import("Entry.zig");
-const Page = cascade.mem.Page; // called a `vm_page` in uvm
-const Object = @import("Object.zig");
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.address_space);
-const std = @import("std");

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 pub inline fn expectEqual(actual: anytype, expected: @TypeOf(actual)) !void {
     return std.testing.expectEqual(expected, actual);
 }
@@ -24,6 +28,3 @@ pub inline fn expectSize(comptime T: type, comptime bytes: comptime_int) void {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");

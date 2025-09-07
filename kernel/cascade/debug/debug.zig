@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+const init = @import("init");
+
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
@@ -512,10 +519,3 @@ pub const globals = struct {
 
     var panic_mode: PanicMode = .single_executor_init_panic;
 };
-
-const arch = @import("arch");
-const init = @import("init");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

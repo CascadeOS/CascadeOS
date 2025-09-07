@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 const MapType = @This();
 
 /// The environment type of the mapping.
@@ -66,8 +71,3 @@ pub fn format(
 
     try writer.writeAll(" }");
 }
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

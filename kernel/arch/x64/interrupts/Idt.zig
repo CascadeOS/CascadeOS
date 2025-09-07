@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const x64 = @import("../x64.zig");
+
 const Idt = @This();
 
 /// The number of interrupt handlers in the IDT.
@@ -104,8 +110,3 @@ pub fn load(idt: *const Idt) void {
         : [idtr_address] "r" (&idtr),
     );
 }
-
-const x64 = @import("../x64.zig");
-
-const core = @import("core");
-const std = @import("std");

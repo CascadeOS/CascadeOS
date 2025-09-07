@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Kernel = @import("Kernel.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
+const Tool = @import("Tool.zig");
+
 pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *ImageStep);
 
 const ImageStep = @This();
@@ -336,12 +345,3 @@ const ImageDescriptionStep = struct {
         return try image_description.toOwnedSlice();
     }
 };
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Kernel = @import("Kernel.zig");
-const Tool = @import("Tool.zig");
-const StepCollection = @import("StepCollection.zig");
-const Options = @import("Options.zig");

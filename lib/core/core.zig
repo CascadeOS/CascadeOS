@@ -1,13 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const is_debug = builtin.mode == .Debug;
-
-pub const containers = @import("containers.zig");
-
-pub const Duration = @import("duration.zig").Duration;
-
-pub const Size = @import("size.zig").Size;
+const std = @import("std");
+const builtin = @import("builtin");
 
 const address = @import("address.zig");
 pub const Address = address.Address;
@@ -15,8 +10,14 @@ pub const PhysicalAddress = address.PhysicalAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const VirtualAddress = address.VirtualAddress;
 pub const VirtualRange = address.VirtualRange;
-
+pub const containers = @import("containers.zig");
+pub const Duration = @import("duration.zig").Duration;
+pub const Size = @import("size.zig").Size;
 pub const testing = @import("testing.zig");
+
+const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();
+
+pub const is_debug = builtin.mode == .Debug;
 
 pub inline fn require(value: anytype, comptime msg: []const u8) @TypeOf(value catch unreachable) {
     return value catch |err| {
@@ -109,7 +110,3 @@ pub const CleanupDecision = enum {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const builtin = @import("builtin");
-const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();

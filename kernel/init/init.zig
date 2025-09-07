@@ -1,6 +1,21 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const boot = @import("boot");
+const cascade = @import("cascade");
+const core = @import("core");
+
+pub const acpi = @import("acpi.zig");
+pub const mem = @import("mem/mem.zig");
+pub const Output = @import("output/Output.zig");
+pub const pci = @import("pci.zig");
+pub const time = @import("time.zig");
+
+const log = cascade.debug.log.scoped(.init);
+
 /// Stage 1 of kernel initialization, entry point from bootloader specific code.
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
@@ -337,20 +352,6 @@ pub const exports = struct {
     };
 };
 
-pub const acpi = @import("acpi.zig");
-pub const mem = @import("mem/mem.zig");
-pub const pci = @import("pci.zig");
-pub const time = @import("time.zig");
-pub const Output = @import("output/Output.zig");
-
 comptime {
     @import("boot").exportEntryPoints();
 }
-
-const arch = @import("arch");
-const boot = @import("boot");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.init);
-const std = @import("std");

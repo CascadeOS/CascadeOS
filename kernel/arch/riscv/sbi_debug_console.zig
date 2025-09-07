@@ -5,6 +5,10 @@
 //!
 //! Only supports writes.
 
+const arch = @import("arch");
+const cascade = @import("cascade");
+const sbi = @import("sbi");
+
 pub fn detect() bool {
     return sbi.debug_console.available();
 }
@@ -35,8 +39,3 @@ fn writeStr(str: []const u8) void {
         sbi.debug_console.writeByte(b) catch return;
     }
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const sbi = @import("sbi");

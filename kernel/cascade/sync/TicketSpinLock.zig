@@ -5,6 +5,12 @@
 //!
 //! Interrupts are disabled while locked.
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
 const TicketSpinLock = @This();
 
 container: Container = .{ .full = 0 },
@@ -110,9 +116,3 @@ const Container = extern union {
         std.debug.assert(@sizeOf(Container) == @sizeOf(u64));
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

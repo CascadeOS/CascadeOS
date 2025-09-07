@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
 pub const acpi = @import("acpi/acpi.zig");
 pub const config = @import("config.zig");
 pub const Context = @import("Context.zig");
 pub const debug = @import("debug/debug.zig");
+pub const panic = debug.panic_interface;
 pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");
 pub const mem = @import("mem/mem.zig");
@@ -39,7 +42,6 @@ pub const globals = struct {
     pub var processes: std.AutoArrayHashMapUnmanaged(*Process, void) = .{};
 };
 
-pub const panic = debug.panic_interface;
 pub const std_options: std.Options = .{
     .log_level = debug.log.log_level.toStd(),
     .logFn = debug.log.stdLogImpl,
@@ -65,5 +67,3 @@ pub const exports = struct {
 comptime {
     _ = &exports.init;
 }
-
-const std = @import("std");

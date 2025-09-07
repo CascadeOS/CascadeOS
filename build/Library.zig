@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const LibraryDescription = @import("LibraryDescription.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
+
+const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);
 pub const Collection = std.StringArrayHashMapUnmanaged(*Library);
 
 const Library = @This();
@@ -343,12 +352,3 @@ fn createModule(
 
     return module;
 }
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const LibraryDescription = @import("LibraryDescription.zig");
-const Options = @import("Options.zig");
-const StepCollection = @import("StepCollection.zig");
-const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);

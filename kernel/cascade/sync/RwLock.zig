@@ -8,6 +8,11 @@
 //! TODO: replace this with something better, there should be no need for a mutex and we want seperate queues for
 //! readers and writers allowing us to wake all readers when a write lock is released
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 const RwLock = @This();
 
 state: usize = 0,
@@ -153,8 +158,3 @@ const READER: usize = 1 << (1 + @bitSizeOf(Count));
 const WRITER_MASK: usize = std.math.maxInt(Count) << @ctz(WRITER);
 const READER_MASK: usize = std.math.maxInt(Count) << @ctz(READER);
 const Count = std.meta.Int(.unsigned, @divFloor(@bitSizeOf(usize) - 1, 2));
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

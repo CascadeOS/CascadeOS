@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const builtin = @import("builtin");
+
+const core = @import("core");
+
 /// Returns `true` if the the bit at index `bit` is set (equals 1).
 ///
 /// Note: that index 0 is the least significant bit, while index `length() - 1` is the most significant bit.
@@ -484,7 +489,3 @@ comptime {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const builtin = @import("builtin");
-const core = @import("core");

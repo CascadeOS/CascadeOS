@@ -14,6 +14,21 @@
 //! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
 //!
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Page = cascade.mem.Page; // called a `vm_page` in uvm
+const Protection = cascade.mem.MapType.Protection;
+const core = @import("core");
+
+pub const AnonymousMap = @import("AnonymousMap.zig");
+pub const AnonymousPage = @import("AnonymousPage.zig");
+pub const Entry = @import("Entry.zig");
+const FaultInfo = @import("FaultInfo.zig");
+const Object = @import("Object.zig");
+
+const log = cascade.debug.log.scoped(.address_space);
 const AddressSpace = @This();
 
 _name: Name,
@@ -450,19 +465,3 @@ fn resourceArenaName(address_space_name: Name) cascade.mem.resource_arena.Name {
     resource_arena_name.appendSliceAssumeCapacity("_address_arena");
     return resource_arena_name;
 }
-
-pub const AnonymousMap = @import("AnonymousMap.zig");
-pub const AnonymousPage = @import("AnonymousPage.zig");
-pub const Entry = @import("Entry.zig");
-const Page = cascade.mem.Page; // called a `vm_page` in uvm
-const FaultInfo = @import("FaultInfo.zig");
-const Object = @import("Object.zig");
-
-const Protection = cascade.mem.MapType.Protection;
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.address_space);
-const std = @import("std");

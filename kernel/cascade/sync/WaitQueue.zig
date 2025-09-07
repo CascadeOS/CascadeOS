@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 const WaitQueue = @This();
 
 waiting_tasks: core.containers.FIFO = .{},
@@ -87,8 +92,3 @@ pub fn wait(
         .arg = @intFromPtr(spinlock),
     });
 }
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

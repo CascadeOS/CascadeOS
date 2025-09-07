@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const KernelComponent = @import("KernelComponent.zig");
+const Library = @import("Library.zig");
+const Options = @import("Options.zig");
+const StepCollection = @import("StepCollection.zig");
+const Tool = @import("Tool.zig");
+
 pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, Kernel);
 
 const Kernel = @This();
@@ -567,13 +577,3 @@ const kernel_components: std.StaticStringMap(*const KernelComponent) = .initComp
 
     break :blk components;
 });
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const KernelComponent = @import("KernelComponent.zig");
-const Library = @import("Library.zig");
-const Options = @import("Options.zig");
-const Tool = @import("Tool.zig");
-const StepCollection = @import("StepCollection.zig");

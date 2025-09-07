@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+const fs = @import("fs");
+const gpt = fs.gpt;
+const fat = fs.fat;
+const mbr = fs.mbr;
+const UUID = @import("uuid").UUID;
+
+const ImageDescription = @import("ImageDescription.zig");
+
 const disk_block_size: core.Size = .from(512, .byte);
 
 pub fn main() !void {
@@ -951,14 +962,3 @@ const ebpb_boot_code = [_]u8{
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");
-const UUID = @import("uuid").UUID;
-const fs = @import("fs");
-
-const gpt = fs.gpt;
-const fat = fs.fat;
-const mbr = fs.mbr;
-
-const ImageDescription = @import("ImageDescription.zig");

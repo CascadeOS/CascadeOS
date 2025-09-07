@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 /// Signal end of interrupt.
 pub fn eoi() void {
     globals.lapic.eoi();
@@ -1248,9 +1255,3 @@ pub const LAPIC = union(enum) {
         }
     };
 };
-
-const cascade = @import("cascade");
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

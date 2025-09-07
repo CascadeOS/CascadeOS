@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const build_zig_zon = @import("build.zig.zon");
+
+const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
+const ImageStep = @import("build/ImageStep.zig");
+const Kernel = @import("build/Kernel.zig");
+const Library = @import("build/Library.zig");
+const Options = @import("build/Options.zig");
+const qemu = @import("build/qemu.zig");
+const StepCollection = @import("build/StepCollection.zig");
+const Tool = @import("build/Tool.zig");
+
 pub fn build(b: *std.Build) !void {
     try disableUnsupportedSteps(b);
 
@@ -105,6 +119,8 @@ fn disableUnsupportedSteps(b: *std.Build) !void {
     });
 }
 
+const cascade_version = std.SemanticVersion.parse(build_zig_zon.version) catch unreachable;
+
 comptime {
     const current_zig = @import("builtin").zig_version;
     const min_zig = std.SemanticVersion.parse(build_zig_zon.minimum_zig_version) catch unreachable;
@@ -115,18 +131,3 @@ comptime {
         ));
     }
 }
-
-const cascade_version = std.SemanticVersion.parse(build_zig_zon.version) catch unreachable;
-const build_zig_zon = @import("build.zig.zon");
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
-const ImageStep = @import("build/ImageStep.zig");
-const Kernel = @import("build/Kernel.zig");
-const Library = @import("build/Library.zig");
-const Options = @import("build/Options.zig");
-const qemu = @import("build/qemu.zig");
-const StepCollection = @import("build/StepCollection.zig");
-const Tool = @import("build/Tool.zig");

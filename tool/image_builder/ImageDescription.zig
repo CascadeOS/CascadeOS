@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
 // NOTE: This file is imported in build.zig so cannot import any modules.
 
 const ImageDescription = @This();
@@ -200,5 +202,3 @@ pub const PartitionBuilder = struct {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");

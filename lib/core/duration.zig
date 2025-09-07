@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// Represents a duration.
 pub const Duration = extern struct {
     /// The duration in nanoseconds.
@@ -169,6 +173,3 @@ pub const Duration = extern struct {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");
-const core = @import("core");

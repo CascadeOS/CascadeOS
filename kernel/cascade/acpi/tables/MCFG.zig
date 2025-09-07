@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {
     header: acpi.tables.SharedHeader align(1),
@@ -44,9 +50,3 @@ pub const MCFG = extern struct {
         );
     }
 };
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

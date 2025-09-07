@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// The Generic Address Structure (GAS) provides the platform with a robust means to describe register locations.
 ///
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#generic-address-structure)
@@ -126,6 +130,3 @@ pub const Address = extern struct {
         core.testing.expectSize(Address, @sizeOf(u64) + @sizeOf(u8) * 4);
     }
 };
-
-const std = @import("std");
-const core = @import("core");

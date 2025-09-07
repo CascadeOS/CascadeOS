@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const boot = @import("boot");
+const cascade = @import("cascade");
+const core = @import("core");
+const init = @import("init");
+
 // Does not scroll instead wraps to the top of the screen.
 // Due to this is needs to clear the entire line with when a new line is started.
 
@@ -118,11 +126,3 @@ const font: *const c.ssfn_font_t = blk: {
 const c = @cImport({
     @cInclude("ssfn.h");
 });
-
-const arch = @import("arch");
-const boot = @import("boot");
-const init = @import("init");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

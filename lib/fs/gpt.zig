@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
 pub const Crc32 = std.hash.crc.Crc32IsoHdlc;
+
+const core = @import("core");
+const fs = @import("fs");
+const MBR = fs.mbr.MBR;
+const UUID = @import("uuid").UUID;
 
 /// The minimum size that must be reserved for the GPT partition entry array.
 pub const minimum_size_of_partition_entry_array = core.Size.from(16, .kib);
@@ -321,10 +327,3 @@ pub const partition_types = struct {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const core = @import("core");
-const fs = @import("fs");
-const std = @import("std");
-const UUID = @import("uuid").UUID;
-
-const MBR = fs.mbr.MBR;

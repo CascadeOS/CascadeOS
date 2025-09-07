@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: CC0-1.0
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const ToolDescription = @import("../build/ToolDescription.zig");
+
 pub const tools: []const ToolDescription = &.{
     .{ .name = "image_builder", .dependencies = &.{ "core", "fs", "uuid" } },
     .{ .name = "kernel_log_wrapper", .dependencies = &.{"core"} },
@@ -18,5 +20,3 @@ pub const tools: []const ToolDescription = &.{
         },
     },
 };
-
-const ToolDescription = @import("../build/ToolDescription.zig");

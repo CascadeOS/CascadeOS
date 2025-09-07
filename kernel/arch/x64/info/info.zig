@@ -3,6 +3,11 @@
 
 //! Architecture specific runtime discovered/calculated values.
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 pub const cpu_id = @import("cpu_id.zig");
 
 /// The duration of a TSC tick in femptopseconds, if known from CPUID.
@@ -38,8 +43,3 @@ pub var mtrr_number_of_variable_registers: u8 = 0;
 
 /// Are write combining memory types supported?
 pub var mtrr_write_combining_supported: bool = false;
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

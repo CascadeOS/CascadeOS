@@ -19,6 +19,8 @@
 //! In any future versions of this specification added fields or data structures will be clearly marked with the
 //! version they are available from.
 
+const std = @import("std");
+
 pub const version: u8 = 1;
 
 /// Magic bytes to identify the data as SDF.
@@ -812,5 +814,3 @@ pub const LocationProgramInstruction = union(LocationProgramOpcode) {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const std = @import("std");

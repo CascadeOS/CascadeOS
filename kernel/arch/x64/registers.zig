@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 pub const RFlags = packed struct(u64) {
     /// Set by hardware if last arithmetic operation generated a carry out of the most-significant bit of the result.
     carry: bool,
@@ -853,8 +859,3 @@ fn DebugAddressRegister(comptime register: enum { DR0, DR1, DR2, DR3 }) type {
         }
     };
 }
-
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

@@ -5,6 +5,11 @@
 //!
 //! Preemption is disabled while locked.
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+
 const Mutex = @This();
 
 locked_by: std.atomic.Value(?*cascade.Task) = .init(null),
@@ -145,8 +150,3 @@ const UnlockType = enum {
     /// The mutex was unlocked normally.
     unlocked,
 };
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

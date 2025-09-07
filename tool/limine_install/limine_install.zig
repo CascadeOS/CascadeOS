@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 2025 Zig OSDev Community (https://github.com/zig-osdev/zig-limine-install)
 
+const std = @import("std");
+
 pub fn main() u8 {
     const parse_args_result = parseArgs(std.heap.smp_allocator);
 
@@ -80,8 +82,6 @@ fn err(comptime msg: []const u8, args: anytype) noreturn {
 }
 
 extern fn limine_main(argc: c_int, argv: [*]const [*:0]const u8) c_int;
-
-const std = @import("std");
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Options = @import("Options.zig");
+
 const KernelComponent = @This();
 
 /// The name of the kernel component:
@@ -21,8 +26,3 @@ configuration: ?*const fn (
     options: Options,
     is_check: bool,
 ) anyerror!void = null,
-
-const std = @import("std");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Options = @import("Options.zig");

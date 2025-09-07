@@ -3,6 +3,14 @@
 
 //! Represents a userspace process.
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.process);
+
 const Process = @This();
 
 name: Name,
@@ -236,10 +244,3 @@ pub const init = struct {
         try cascade.services.process_cleanup.init.initializeProcessCleanupService(context);
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.process);
-const std = @import("std");

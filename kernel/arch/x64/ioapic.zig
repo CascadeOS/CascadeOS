@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const x64 = @import("x64.zig");
+
 pub fn routeInterrupt(
     interrupt: u8,
     vector: x64.interrupts.Interrupt,
@@ -319,10 +327,3 @@ const IOAPIC = struct {
         ioapic.iowin.* = value;
     }
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const x64 = @import("x64.zig");
-
-const core = @import("core");
-const std = @import("std");

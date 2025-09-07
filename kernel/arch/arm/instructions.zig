@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 pub inline fn readPhysicalCount() u64 {
     return asm ("mrs %[ret], cntpct_el0"
         : [ret] "=r" (-> u64),
@@ -44,6 +48,3 @@ pub inline fn interruptsEnabled() bool {
     const mask: u64 = 0b1111000000;
     return (daif & mask) == 0;
 }
-
-const core = @import("core");
-const std = @import("std");

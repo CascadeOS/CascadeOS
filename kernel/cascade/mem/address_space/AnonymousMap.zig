@@ -14,6 +14,20 @@
 //! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
 //!
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Cache = cascade.mem.cache.Cache;
+const core = @import("core");
+
+const AddressSpace = @import("AddressSpace.zig");
+const AnonymousPage = @import("AnonymousPage.zig");
+const Entry = @import("Entry.zig");
+
+const AnonymousPageChunkMap = @import("chunk_map.zig").ChunkMap(AnonymousPage);
+const log = cascade.debug.log.scoped(.address_space);
+
 const AnonymousMap = @This();
 
 lock: cascade.sync.RwLock = .{},
@@ -254,16 +268,3 @@ pub const globals = struct {
     /// Initialized during `init.mem.initializeCaches`.
     pub var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
 };
-
-const AddressSpace = @import("AddressSpace.zig");
-const AnonymousPage = @import("AnonymousPage.zig");
-const AnonymousPageChunkMap = @import("chunk_map.zig").ChunkMap(AnonymousPage);
-const Entry = @import("Entry.zig");
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const Cache = cascade.mem.cache.Cache;
-const core = @import("core");
-const log = cascade.debug.log.scoped(.address_space);
-const std = @import("std");

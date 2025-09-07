@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const heap = @import("heap.zig");
-pub const phys = @import("phys.zig");
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
 
 pub const AddressSpace = @import("address_space/AddressSpace.zig");
 pub const cache = @import("cache.zig");
 pub const FlushRequest = @import("FlushRequest.zig");
+pub const heap = @import("heap.zig");
 pub const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
 pub const MapType = @import("MapType.zig");
 pub const Page = @import("Page.zig");
+pub const phys = @import("phys.zig");
 pub const resource_arena = @import("resource_arena.zig");
+
+const log = cascade.debug.log.scoped(.mem);
 
 /// Maps a single page to a physical frame.
 ///
@@ -449,11 +456,3 @@ pub const globals = struct {
     /// Initialized during `init.mem.initializeMemorySystem`.
     pub var regions: KernelMemoryRegion.List = .{};
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-
-const log = cascade.debug.log.scoped(.mem);
-const std = @import("std");

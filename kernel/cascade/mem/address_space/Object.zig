@@ -14,6 +14,16 @@
 //! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
 //!
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const Page = cascade.mem.Page; // called a `vm_page` in uvm
+const core = @import("core");
+
+const PageChunkMap = @import("chunk_map.zig").ChunkMap(Page);
+
+const log = cascade.debug.log.scoped(.address_space);
+
 const Object = @This();
 
 lock: cascade.sync.RwLock = .{},
@@ -88,12 +98,3 @@ pub fn print(
 pub inline fn format(_: *const *Object, _: *std.Io.Writer) !void {
     @compileError("use `Object.print` instead");
 }
-
-const PageChunkMap = @import("chunk_map.zig").ChunkMap(Page);
-const Page = cascade.mem.Page; // called a `vm_page` in uvm
-
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.address_space);
-const std = @import("std");

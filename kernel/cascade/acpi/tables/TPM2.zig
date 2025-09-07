@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const acpi = cascade.acpi;
+const core = @import("core");
+
 /// TCG Hardware Interface Description Table Format for TPM 2.0
 ///
 /// [TCG ACPI Specification Version 1.4 Revision 15](https://trustedcomputinggroup.org/wp-content/uploads/TCG-ACPI-Specification-Version-1.4-Revision-15_pub.pdf)
@@ -513,9 +519,3 @@ pub const TPM2 = extern struct {
         core.testing.expectSize(TPM2, 80);
     }
 };
-
-const cascade = @import("cascade");
-
-const acpi = cascade.acpi;
-const core = @import("core");
-const std = @import("std");

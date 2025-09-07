@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+
+const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);
 const Options = @This();
 
 /// The build directory root path
@@ -388,9 +394,3 @@ fn getVersionString(b: *std.Build, base_semantic_version: std.SemanticVersion, r
         },
     }
 }
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);

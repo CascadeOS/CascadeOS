@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
 const ToolDescription = @This();
 
 /// The name of the tool:
@@ -28,5 +30,3 @@ pub const Configuration = union(enum) {
         module: *std.Build.Module,
     ) void;
 };
-
-const std = @import("std");

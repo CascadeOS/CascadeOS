@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 pub const Address = union(enum) {
     physical: core.PhysicalAddress,
     virtual: core.VirtualAddress,
@@ -422,6 +426,3 @@ pub const VirtualRange = extern struct {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const core = @import("core");
-const std = @import("std");

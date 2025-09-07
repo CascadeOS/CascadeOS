@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const boot = @import("boot");
+const cascade = @import("cascade");
+const tables = cascade.acpi.tables;
+const uacpi = cascade.acpi.uacpi;
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.acpi_init);
+
 /// Initializes ACPI table access early.
 ///
 /// NOP if ACPI is not present.
@@ -166,14 +177,3 @@ const globals = struct {
     /// If this is true, the ACPI tables have been initialized and the RSDP pointer is valid.
     var acpi_present: bool = false;
 };
-
-const arch = @import("arch");
-const boot = @import("boot");
-const cascade = @import("cascade");
-
-const tables = cascade.acpi.tables;
-const uacpi = cascade.acpi.uacpi;
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.acpi_init);
-const std = @import("std");

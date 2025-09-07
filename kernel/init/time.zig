@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.time_init);
+
 /// Attempts to capture the wallclock time at the start of the system using the most likely time source.
 ///
 /// For example on x86_64 this is the TSC.
@@ -324,10 +332,3 @@ const globals = struct {
     /// tick is captured from the selected wallclock and is stored as variant `.time_system_start`.
     var kernel_start_time: StartTime = undefined;
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.time_init);
-const std = @import("std");

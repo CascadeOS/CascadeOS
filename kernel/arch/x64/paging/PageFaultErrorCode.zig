@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 pub const PageFaultErrorCode = packed struct(u64) {
     /// When set, the page fault was caused by a page-protection violation.
     ///
@@ -101,6 +105,3 @@ pub const PageFaultErrorCode = packed struct(u64) {
         return page_fault_error_code.print(writer, 0);
     }
 };
-
-const std = @import("std");
-const core = @import("core");

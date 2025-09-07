@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const boot = @import("boot");
+const cascade = @import("cascade");
+const Page = cascade.mem.Page;
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.mem_init);
+
 pub const bootstrap_allocator: cascade.mem.phys.FrameAllocator = .{
     .allocate = struct {
         fn allocate(context: *cascade.Context) !cascade.mem.phys.Frame {
@@ -257,12 +267,3 @@ pub fn initializePhysicalMemory(
     log.debug(context, "  reclaimable memory: {f}", .{reclaimable_memory});
     log.debug(context, "  unavailable memory: {f}", .{unavailable_memory});
 }
-
-const arch = @import("arch");
-const boot = @import("boot");
-const cascade = @import("cascade");
-const Page = cascade.mem.Page;
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.mem_init);
-const std = @import("std");

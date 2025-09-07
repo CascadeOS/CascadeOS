@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT and BSD-2-Clause
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+
 pub fn ChunkMap(comptime T: type) type {
     return struct {
         chunks: std.AutoHashMapUnmanaged(u32, Chunk) = .{},
@@ -42,7 +46,3 @@ const slots_per_chunk = 16;
 comptime {
     std.debug.assert(std.math.isPowerOfTwo(slots_per_chunk));
 }
-
-const cascade = @import("cascade");
-
-const std = @import("std");

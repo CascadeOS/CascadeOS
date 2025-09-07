@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+const Step = std.Build.Step;
+
+const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const Options = @import("Options.zig");
+
+const Steps = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *Step);
+
 const StepCollection = @This();
 
 /// A map from `CascadeTarget.Architecture` to their kernel build steps.
@@ -168,10 +176,3 @@ fn buildPerArchitectureSteps(
 
     return map;
 }
-
-const std = @import("std");
-const Step = std.Build.Step;
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Options = @import("Options.zig");
-const Steps = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *Step);

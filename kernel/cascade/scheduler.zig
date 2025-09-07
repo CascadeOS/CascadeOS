@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.scheduler);
+
 /// Queues a task to be run by the scheduler.
 ///
 /// Must be called with the scheduler lock held.
@@ -383,10 +391,3 @@ const globals = struct {
     var lock: cascade.sync.TicketSpinLock = .{};
     var ready_to_run: core.containers.FIFO = .{};
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.scheduler);
-const std = @import("std");

@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+const init = @import("init");
+const kernel_options = @import("kernel_options");
+const kernel_log_scopes = kernel_options.kernel_log_scopes;
+
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub fn err(
@@ -249,7 +258,6 @@ const globals = struct {
     var log_mode: LogMode = .single_executor_init_log;
 };
 
-const kernel_log_scopes = kernel_options.kernel_log_scopes;
 const kernel_log_scope_matchers: [kernel_log_scopes.len]ScopeMatcher = blk: {
     var scope_matchers: [kernel_log_scopes.len]ScopeMatcher = undefined;
 
@@ -300,11 +308,3 @@ const ScopeMatcher = struct {
         contains,
     };
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const init = @import("init");
-
-const core = @import("core");
-const kernel_options = @import("kernel_options");
-const std = @import("std");

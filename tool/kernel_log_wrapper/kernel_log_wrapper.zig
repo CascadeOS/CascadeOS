@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
+const ansi = @import("ansi.zig");
+const StdoutWrapper = @import("StdoutWrapper.zig");
+
 pub fn main() !void {
     var gpa_impl = if (core.is_debug) std.heap.GeneralPurposeAllocator(.{}){} else {};
     defer {
@@ -194,11 +201,6 @@ fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
 
     std.process.exit(1);
 }
-
-const std = @import("std");
-const core = @import("core");
-const ansi = @import("ansi.zig");
-const StdoutWrapper = @import("StdoutWrapper.zig");
 
 comptime {
     std.testing.refAllDeclsRecursive(@This());

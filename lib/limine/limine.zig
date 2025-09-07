@@ -6,6 +6,11 @@
 //!
 //! [PROTOCOL DOC](https://github.com/limine-bootloader/limine-protocol/blob/fedf97facd1c473ee8720f8dfd5a71d03490d928/PROTOCOL.md)
 
+const std = @import("std");
+
+const core = @import("core");
+const UUID = @import("uuid").UUID;
+
 /// Base protocol revisions change certain behaviours of the Limine boot protocol
 /// outside any specific feature. The specifics are going to be described as
 /// needed throughout this specification.
@@ -1385,7 +1390,3 @@ const arch: Arch = switch (@import("builtin").cpu.arch) {
 comptime {
     std.testing.refAllDeclsRecursive(@This());
 }
-
-const core = @import("core");
-const std = @import("std");
-const UUID = @import("uuid").UUID;

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#root-system-description-pointer-rsdp-structure)
 pub const RSDP = extern struct {
     /// "RSD PTR "
@@ -89,6 +93,3 @@ pub const RSDP = extern struct {
         core.testing.expectSize(RSDP, @sizeOf(u8) * 16 + @sizeOf(u32) * 2 + @sizeOf(u64) + @sizeOf(u8) * 4);
     }
 };
-
-const std = @import("std");
-const core = @import("core");

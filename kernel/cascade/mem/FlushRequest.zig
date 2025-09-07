@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
+
 const FlushRequest = @This();
 
 range: core.VirtualRange,
@@ -74,9 +80,3 @@ fn requestExecutor(flush_request: *FlushRequest, executor: *cascade.Executor) vo
 
     arch.interrupts.sendFlushIPI(executor);
 }
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const std = @import("std");

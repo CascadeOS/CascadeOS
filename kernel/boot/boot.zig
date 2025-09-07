@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const cascade = @import("cascade");
+const core = @import("core");
+const init = @import("init");
+
+const limine = @import("limine.zig");
+
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
 pub fn kernelBaseAddress() ?KernelBaseAddress {
     return switch (bootloader_api) {
@@ -250,10 +258,3 @@ pub const BootloaderAPI = enum {
     unknown,
     limine,
 };
-
-const init = @import("init");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const limine = @import("limine.zig");
-const std = @import("std");

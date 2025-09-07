@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const CascadeTarget = @import("../../build/CascadeTarget.zig").CascadeTarget;
+const Options = @import("../../build/Options.zig");
+
 pub fn customConfiguration(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
@@ -52,7 +57,3 @@ pub fn customConfiguration(
         }
     }
 }
-
-const std = @import("std");
-const CascadeTarget = @import("../../build/CascadeTarget.zig").CascadeTarget;
-const Options = @import("../../build/Options.zig");

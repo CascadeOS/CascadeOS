@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const PageTable = @import("PageTable.zig").PageTable;
-pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
+const std = @import("std");
 
+const arch = @import("arch");
+const cascade = @import("cascade");
+const MapType = cascade.mem.MapType;
+const core = @import("core");
+
+const x64 = @import("../x64.zig");
+pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
+pub const PageTable = @import("PageTable.zig").PageTable;
+
+const log = cascade.debug.log.scoped(.paging);
 /// Create a new page table in the given physical frame.
 pub fn createPageTable(physical_frame: cascade.mem.phys.Frame) *PageTable {
     const page_table = cascade.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
@@ -478,12 +487,3 @@ pub const init = struct {
 
     const init_log = cascade.debug.log.scoped(.paging_init);
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const x64 = @import("../x64.zig");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.paging);
-const MapType = cascade.mem.MapType;
-const std = @import("std");

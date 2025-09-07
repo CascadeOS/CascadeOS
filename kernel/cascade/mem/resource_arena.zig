@@ -5,6 +5,16 @@
 // TODO: stats
 // TODO: next fit
 
+const std = @import("std");
+const Wyhash = std.hash.Wyhash;
+
+const arch = @import("arch");
+const cascade = @import("cascade");
+const RawCache = cascade.mem.cache.RawCache;
+const core = @import("core");
+
+const log = cascade.debug.log.scoped(.resource_arena);
+
 /// A general resource arena providing reasonably low fragmentation with constant time performance.
 ///
 /// Based on [Magazines and Vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources](https://www.usenix.org/legacy/publications/library/proceedings/usenix01/full_papers/bonwick/bonwick.pdf) by Jeff Bonwick and Jonathan Adams.
@@ -1317,12 +1327,3 @@ pub const globals = struct {
     /// Initialized during `init.mem.initializeCaches`.
     pub var tag_cache: cascade.mem.cache.Cache(BoundaryTag, null, null) = undefined;
 };
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-
-const core = @import("core");
-const log = cascade.debug.log.scoped(.resource_arena);
-const RawCache = cascade.mem.cache.RawCache;
-const std = @import("std");
-const Wyhash = std.hash.Wyhash;

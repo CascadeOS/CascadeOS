@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+const std = @import("std");
+
+const core = @import("core");
+
 /// All system description tables begin with this structure.
 ///
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#system-description-table-header)
@@ -76,6 +80,3 @@ pub const SharedHeader = extern struct {
         core.testing.expectSize(SharedHeader, @sizeOf(u8) * 4 + @sizeOf(u32) + @sizeOf(u8) * 16 + @sizeOf(u32) * 3);
     }
 };
-
-const core = @import("core");
-const std = @import("std");

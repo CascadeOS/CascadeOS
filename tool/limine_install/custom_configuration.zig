@@ -2,6 +2,10 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 2025 Zig OSDev Community (https://github.com/zig-osdev/zig-limine-install)
 
+const std = @import("std");
+
+const ToolDescription = @import("../../build/ToolDescription.zig");
+
 pub fn customConfiguration(
     b: *std.Build,
     tool_description: ToolDescription,
@@ -18,7 +22,3 @@ pub fn customConfiguration(
         .flags = &.{ "-std=c99", "-Dmain=limine_main" },
     });
 }
-
-const std = @import("std");
-
-const ToolDescription = @import("../../build/ToolDescription.zig");
