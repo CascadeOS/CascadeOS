@@ -431,6 +431,19 @@ pub const scheduling = struct {
     pub const CallError = error{StackOverflow};
 
     /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+    pub fn callOneArg(
+        opt_old_task: ?*cascade.Task,
+        new_stack: cascade.Task.Stack,
+        arg1: usize,
+        target_function: *const fn (usize) callconv(.c) noreturn,
+    ) callconv(core.inline_in_non_debug) CallError!void {
+        return getFunction(
+            current_functions.scheduling,
+            "callOneArg",
+        )(opt_old_task, new_stack, arg1, target_function);
+    }
+
+    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
     pub fn callTwoArgs(
         opt_old_task: ?*cascade.Task,
         new_stack: cascade.Task.Stack,
@@ -853,6 +866,14 @@ pub const Functions = struct {
             arg1: usize,
             arg2: usize,
         ) error{StackOverflow}!void = null,
+
+        /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+        callOneArg: ?fn (
+            opt_old_task: ?*cascade.Task,
+            new_stack: cascade.Task.Stack,
+            arg1: usize,
+            target_function: *const fn (usize) callconv(.c) noreturn,
+        ) scheduling.CallError!void = null,
 
         /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
         callTwoArgs: ?fn (
