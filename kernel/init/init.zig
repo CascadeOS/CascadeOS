@@ -22,10 +22,13 @@ const log = cascade.debug.log.scoped(.init);
 pub fn initStage1() !noreturn {
     time.tryCaptureStandardWallclockStartTime();
 
-    // we need the direct map to be available as early as possible
+    // we need basic memory layout information to be able to panic
     mem.determineEarlyMemoryLayout();
 
     var context = try constructBootstrapContext();
+
+    // now that we have a context we can panic in a meaningful way
+    cascade.debug.setPanicMode(.single_executor_init_panic);
 
     mem.phys.initializeBootstrapFrameAllocator(context);
 

@@ -119,6 +119,22 @@ pub fn drop(context: *cascade.Context) noreturn {
     @panic("dropped task returned");
 }
 
+/// Called when panicking to fetch the current context.
+///
+/// Interrupts must already be disabled when this function is called.
+pub fn panicked() *Context {
+    std.debug.assert(!arch.interrupts.areEnabled());
+
+    const executor = arch.getCurrentExecutor();
+    const current_task = executor.current_task;
+    const context: *Context = &current_task.context;
+
+    context.interrupt_disable_count += 1;
+    context.executor = executor;
+
+    return context;
+}
+
 /// Set the `executor` field of the context based on the state of the context.
 inline fn setExecutor(context: *cascade.Context) void {
     if (context.interrupt_disable_count != 0) {

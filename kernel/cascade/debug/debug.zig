@@ -22,9 +22,9 @@ pub fn interruptSourcePanic(
     const executor = context.executor.?;
 
     panicDispatch(
-        context,
         executor.renderInterruptSourcePanicMessage(context, format, args),
         .{ .interrupt = interrupt_frame },
+        context,
     );
 }
 
@@ -35,12 +35,12 @@ fn zigPanic(
 ) noreturn {
     @branchHint(.cold);
     panicDispatch(
-        .current(),
         msg,
         .{ .normal = .{
             .return_address = return_address_opt orelse @returnAddress(),
             .error_return_trace = @errorReturnTrace(),
         } },
+        null,
     );
 }
 
@@ -52,21 +52,29 @@ const PanicType = union(enum) {
     interrupt: arch.interrupts.InterruptFrame,
 };
 
-fn panicDispatch(context: *cascade.Context, msg: []const u8, panic_type: PanicType) noreturn {
+fn panicDispatch(
+    msg: []const u8,
+    panic_type: PanicType,
+    opt_context: ?*cascade.Context,
+) noreturn {
     @branchHint(.cold);
 
-    context.incrementInterruptDisable();
+    arch.interrupts.disable();
 
     switch (globals.panic_mode) {
-        .single_executor_init_panic => singleExecutorInitPanic(context, msg, panic_type),
-        .init_panic => initPanic(context, msg, panic_type),
+        .no_op => {},
+        .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
+        .init_panic => initPanic(
+            if (opt_context) |c| c else .panicked(),
+            msg,
+            panic_type,
+        ),
     }
 
     arch.interrupts.disableAndHalt();
 }
 
 fn singleExecutorInitPanic(
-    _: *cascade.Context,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -487,6 +495,11 @@ pub fn sdfSlice() ![]const u8 {
 ///
 /// No modes will be skipped and must be in strict increasing order.
 pub const PanicMode = enum(u8) {
+    /// Panic will disable interrupts and halt the current executor.
+    ///
+    /// The current context is not guaranteed to be valid.
+    no_op,
+
     /// Panic will print using init output with no locking.
     ///
     /// Does not support multiple executors.
@@ -517,5 +530,5 @@ pub const globals = struct {
     /// Public to allow other executors to check after receiving a panic IPI.
     pub var panicking_executor: std.atomic.Value(?*const cascade.Executor) = .init(null);
 
-    var panic_mode: PanicMode = .single_executor_init_panic;
+    var panic_mode: PanicMode = .no_op;
 };
