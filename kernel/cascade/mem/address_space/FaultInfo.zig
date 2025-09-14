@@ -98,6 +98,7 @@ pub fn faultCheck(
         switch (fault_info.entry.protection) {
             .none => return error.Protection,
             .read => if (fault_info.access_type != .read) return error.Protection,
+            .write => if (fault_info.access_type != .write) return error.Protection,
             .read_write => if (fault_info.access_type != .read and fault_info.access_type != .write) return error.Protection,
             .executable => if (fault_info.access_type != .execute) return error.Protection, // TODO: x86 allows read on executable memory
         }
@@ -111,6 +112,7 @@ pub fn faultCheck(
         switch (fault_info.enter_protection) {
             .none => unreachable, // `error.Protection` is returned earlier if protection is `.none`
             .read => fault_info.access_type = .read,
+            .write => fault_info.access_type = .write,
             .read_write => fault_info.access_type = .write,
             .executable => fault_info.access_type = .execute,
         }
@@ -178,10 +180,7 @@ pub fn faultCheck(
 /// Handle a object or zero fill fault.
 ///
 /// Called `uvm_fault_lower` in OpenBSD uvm.
-pub fn faultObjectOrZeroFill(
-    fault_info: *FaultInfo,
-    context: *cascade.Context,
-) error{ Restart, NoMemory }!void {
+pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) error{ Restart, NoMemory }!void {
     log.verbose(context, "handling object or zero fill fault", .{});
 
     const opt_anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map;
@@ -291,12 +290,7 @@ pub fn faultObjectOrZeroFill(
     {
         const map_type: cascade.mem.MapType = .{
             .environment_type = fault_info.address_space.environment,
-            .protection = switch (fault_info.enter_protection) {
-                .none => unreachable, // `error.Protection` is returned by `faultCheck` if protection is `.none`
-                .read => .read,
-                .read_write => .read_write,
-                .executable => .executable,
-            },
+            .protection = fault_info.enter_protection,
         };
 
         log.verbose(context, "mapping {f} with {f}", .{ fault_info.faulting_address, map_type });

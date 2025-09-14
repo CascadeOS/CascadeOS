@@ -28,13 +28,20 @@ pub const Protection = enum {
     /// Read only.
     read,
 
+    /// Write only.
+    ///
+    /// If supported by the architecture reads are not allowed.
+    write,
+
     /// Read and write.
     read_write,
 
     /// Execute only.
     ///
-    /// If supported by the archtecture reads are not allowed.
+    /// If supported by the architecture reads are not allowed.
     executable,
+
+    // TODO: might need a `read_executable` protection
 };
 
 pub const Cache = enum {
@@ -59,6 +66,7 @@ pub fn format(
     try writer.writeAll(switch (region.protection) {
         .none => "NO",
         .read => "RO",
+        .write => "WO",
         .read_write => "RW",
         .executable => "XO",
     });

@@ -198,8 +198,9 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
         }
     }
 
-    if (map_type.protection == .read_write) {
-        entry.writeable.write(true);
+    switch (map_type.protection) {
+        .write, .read_write => entry.writeable.write(true),
+        else => {},
     }
 
     switch (map_type.cache) {
