@@ -460,6 +460,105 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             return allocation;
         }
 
+        pub const AllocateWithBaseError = error{
+            UnalignedBase,
+            AllocationNotPossible,
+        } || AllocateError;
+
+        /// Allocate a block of length `len` at `base` from the arena.
+        ///
+        /// This must perform an O(N) search of a linked list so does not provide the same levels of performance as
+        /// `allocate`.
+        ///
+        /// The entire allocation must fit within one of the spans, if it overlaps two spans the allocation will fail.
+        pub fn allocateWithBase(
+            arena: *@This(),
+            context: *cascade.Context,
+            base: usize,
+            len: usize,
+        ) AllocateWithBaseError!Allocation {
+            if (len == 0) return AllocateError.ZeroLength;
+            if (!std.mem.isAligned(base, arena.quantum)) return error.UnalignedBase;
+
+            const quantum_aligned_len = std.mem.alignForward(usize, len, arena.quantum);
+
+            log.verbose(context, "{s}: allocating len 0x{x} (quantum_aligned_len: 0x{x}) at base 0x{x}", .{
+                arena.name(),
+                len,
+                quantum_aligned_len,
+                base,
+            });
+
+            try arena.ensureBoundaryTags(context);
+            errdefer arena.mutex.unlock(context); // unconditionally unlock mutex on error
+
+            const containing_span = blk: {
+                var opt_span_kind_node: ?*KindNode = arena.spans.first;
+
+                while (opt_span_kind_node) |span_kind_node| : ({
+                    opt_span_kind_node = span_kind_node.next;
+                }) {
+                    const span = span_kind_node.toTag();
+                    std.debug.assert(span.kind == .span or span.kind == .imported_span);
+
+                    if (span.base > base) {
+                        // we have already checked all possible spans, so don't bother to check the rest
+                        break;
+                    }
+
+                    if (span.base + span.len >= base + len) {
+                        break :blk span;
+                    }
+                }
+
+                return error.AllocationNotPossible;
+            };
+
+            const target_tag = blk: {
+                var opt_node: ?*AllTagNode = containing_span.all_tag_node.next;
+
+                while (opt_node) |node| : (opt_node = node.next) {
+                    const tag = node.toTag();
+
+                    if (tag.base > base) {
+                        // we have already checked all _possible_ free tags in this span, so don't bother to check the rest
+                        break;
+                    }
+
+                    switch (tag.kind) {
+                        .span, .imported_span => break, // we have reached the end of the containing span
+                        .allocated => continue,
+                        .free => {},
+                    }
+
+                    if (tag.base + tag.len >= base + len) break :blk tag;
+                }
+
+                return error.AllocationNotPossible;
+            };
+            std.debug.assert(target_tag.kind == .free);
+            errdefer comptime unreachable;
+
+            arena.removeFromFreelist(target_tag);
+            arena.splitFreeTagAtBase(target_tag, base, len);
+
+            target_tag.kind = .allocated;
+            std.debug.assert(target_tag.len == quantum_aligned_len);
+
+            arena.insertIntoAllocationTable(target_tag);
+
+            arena.mutex.unlock(context);
+
+            const allocation: Allocation = .{
+                .base = target_tag.base,
+                .len = quantum_aligned_len,
+            };
+
+            log.verbose(context, "{s}: allocated {f}", .{ arena.name(), allocation });
+
+            return allocation;
+        }
+
         fn findInstantFit(arena: *@This(), quantum_aligned_len: usize) ?*BoundaryTag {
             if (arena.performStrictInstantFit(quantum_aligned_len)) |tag| {
                 @branchHint(.likely);
@@ -624,6 +723,60 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             );
 
             arena.pushToFreelist(new_tag);
+        }
+
+        fn splitFreeTagAtBase(
+            arena: *@This(),
+            tag: *BoundaryTag,
+            base: usize,
+            allocation_len: usize,
+        ) void {
+            std.debug.assert(tag.kind == .free);
+
+            const start_offset = base - tag.base;
+
+            if (start_offset != 0) {
+                const new_tag = arena.popUnusedTag();
+
+                new_tag.* = .{
+                    .base = tag.base,
+                    .len = start_offset,
+                    .all_tag_node = .empty,
+                    .kind_node = .empty,
+                    .kind = .free,
+                };
+
+                arena.all_tags.insertBefore(
+                    &new_tag.all_tag_node,
+                    &tag.all_tag_node,
+                );
+
+                arena.pushToFreelist(new_tag);
+            }
+
+            const end_offset = start_offset + allocation_len;
+
+            if (end_offset != tag.len) {
+                const new_tag = arena.popUnusedTag();
+
+                new_tag.* = .{
+                    .base = tag.base + end_offset,
+                    .len = tag.len - end_offset,
+                    .all_tag_node = .empty,
+                    .kind_node = .empty,
+                    .kind = .free,
+                };
+
+                arena.all_tags.insertAfter(
+                    &new_tag.all_tag_node,
+                    &tag.all_tag_node,
+                );
+
+                arena.pushToFreelist(new_tag);
+            }
+
+            tag.base += start_offset;
+            tag.len = allocation_len;
         }
 
         /// Deallocate the allocation.
@@ -1289,6 +1442,21 @@ fn DoublyLinkedList(comptime Node: type) type {
 
                 doubly_linked_list.first = node;
             }
+        }
+
+        pub fn insertBefore(doubly_linked_list: *DoublyLinkedListT, node: *Node, next: *Node) void {
+            std.debug.assert(node.previous == null and node.next == null);
+
+            node.next = next;
+
+            if (next.previous) |previous| {
+                node.previous = previous;
+                previous.next = node;
+            } else {
+                doubly_linked_list.first = node;
+            }
+
+            next.previous = node;
         }
 
         inline fn isEmpty(doubly_linked_list: *const DoublyLinkedListT) bool {
