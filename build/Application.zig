@@ -281,11 +281,12 @@ fn createModule(
         .root_source_file = root_source_file,
         .target = cascade_target.getCrossTarget(b),
         .optimize = options.optimize,
-        .sanitize_c = switch (options.optimize) {
-            .ReleaseFast => .off,
-            .ReleaseSmall => .trap,
-            else => .full,
-        },
+        .sanitize_c = .off, // TODO: this should depend on if we are linking c code
+        // .sanitize_c = switch (options.optimize) {
+        //     .ReleaseFast => .off,
+        //     .ReleaseSmall => .trap,
+        //     else => .full,
+        // },
     });
 
     // self reference
