@@ -168,7 +168,7 @@ fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
 /// It is the caller's responsibility to ensure that `proceeding_entry` immediately precedes `entry`.
 ///
 /// Asserts that `entry` does not have an anonymous map.
-fn canMergeWithProceeding(entry: *const Entry, curent_task: *cascade.Task, proceeding_entry: *const Entry) bool {
+fn canMergeWithProceeding(entry: *const Entry, context: *cascade.Context, proceeding_entry: *const Entry) bool {
     std.debug.assert(proceeding_entry.range().endBound().equal(entry.range().address));
     std.debug.assert(entry.anonymous_map_reference.anonymous_map == null);
 
@@ -200,8 +200,8 @@ fn canMergeWithProceeding(entry: *const Entry, curent_task: *cascade.Task, proce
     }
 
     if (proceeding_entry.anonymous_map_reference.anonymous_map) |proceeding_anonymous_map| {
-        proceeding_anonymous_map.lock.readLock(curent_task);
-        defer proceeding_anonymous_map.lock.readUnlock(curent_task);
+        proceeding_anonymous_map.lock.readLock(context);
+        defer proceeding_anonymous_map.lock.readUnlock(context);
 
         if (proceeding_anonymous_map.reference_count != 1) {
             // TODO: is this the right thing to do?
@@ -218,7 +218,7 @@ fn canMergeWithProceeding(entry: *const Entry, curent_task: *cascade.Task, proce
 /// It is the caller's responsibility to ensure that `following_entry` immediately follows `entry`.
 ///
 /// Asserts that `entry` does not have an anonymous map.
-fn canMergeWithFollowing(entry: *const Entry, curent_task: *cascade.Task, following_entry: *const Entry) bool {
+fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, following_entry: *const Entry) bool {
     std.debug.assert(entry.range().endBound().equal(following_entry.range().address));
     std.debug.assert(entry.anonymous_map_reference.anonymous_map == null);
 
@@ -250,8 +250,8 @@ fn canMergeWithFollowing(entry: *const Entry, curent_task: *cascade.Task, follow
     }
 
     if (following_entry.anonymous_map_reference.anonymous_map) |following_anonymous_map| {
-        following_anonymous_map.lock.readLock(curent_task);
-        defer following_anonymous_map.lock.readUnlock(curent_task);
+        following_anonymous_map.lock.readLock(context);
+        defer following_anonymous_map.lock.readUnlock(context);
 
         if (following_entry.anonymous_map_reference.start_offset < entry.number_of_pages) {
             // we can't move the start offset back far enough to cover the new entry
