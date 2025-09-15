@@ -156,6 +156,11 @@ pub const MapOptions = struct {
 
     type: Type,
 
+    /// The base address of the mapping.
+    ///
+    /// If `null` the base address is determined by the address arena.
+    base: ?core.VirtualAddress = null,
+
     pub const Type = union(enum) {
         zero_fill,
         object: Object.Reference,
@@ -164,6 +169,9 @@ pub const MapOptions = struct {
 
 pub const MapError = error{
     ZeroLength,
+    UnalignedBase,
+    /// It is not possible to map the requested length at the requested base address.
+    BaseMappingNotPossible,
     OutOfMemory,
 };
 
@@ -176,22 +184,48 @@ pub fn map(
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
 
     if (options.number_of_pages == 0) return error.ZeroLength;
+    if (options.base) |base| if (!std.mem.isAligned(
+        base.value,
+        arch.paging.standard_page_size.value,
+    )) return error.UnalignedBase;
 
-    log.verbose(context, "{s}: map {} pages with protection {t} of type {t}", .{
-        address_space.name(),
-        options.number_of_pages,
-        options.protection,
-        options.type,
-    });
+    if (options.base) |base| {
+        log.verbose(context, "{s}: map {} pages with protection {t} of type {t} at {f}", .{
+            address_space.name(),
+            options.number_of_pages,
+            options.protection,
+            options.type,
+            base,
+        });
+    } else {
+        log.verbose(context, "{s}: map {} pages with protection {t} of type {t}", .{
+            address_space.name(),
+            options.number_of_pages,
+            options.protection,
+            options.type,
+        });
+    }
 
-    const allocated_range = address_space.address_arena.allocate(
-        context,
-        options.number_of_pages * arch.paging.standard_page_size.value,
-        .instant_fit,
-    ) catch |err| switch (err) {
-        error.ZeroLength => unreachable, // `options.number_of_pages` is greater than 0
-        error.RequestedLengthUnavailable, error.OutOfBoundaryTags => return error.OutOfMemory,
-    };
+    const allocated_range = if (options.base) |base|
+        address_space.address_arena.allocateWithBase(
+            context,
+            base.value,
+            options.number_of_pages * arch.paging.standard_page_size.value,
+        ) catch |err| switch (err) {
+            error.UnalignedBase => unreachable, // `base` alignment is checked above
+            error.ZeroLength => unreachable, // `options.number_of_pages` is greater than 0
+            error.RequestedLengthUnavailable, error.OutOfBoundaryTags => return error.OutOfMemory,
+            error.AllocationNotPossible => return error.BaseMappingNotPossible,
+        }
+    else
+        address_space.address_arena.allocate(
+            context,
+            options.number_of_pages * arch.paging.standard_page_size.value,
+            .instant_fit,
+        ) catch |err| switch (err) {
+            error.ZeroLength => unreachable, // `options.number_of_pages` is greater than 0
+            error.RequestedLengthUnavailable, error.OutOfBoundaryTags => return error.OutOfMemory,
+        };
     errdefer address_space.address_arena.deallocate(context, allocated_range);
 
     const local_entry: Entry = .{
