@@ -11,7 +11,7 @@
 //!   * [Zero-Copy Data Movement Mechanisms for UVM](https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=8961abccddf8ff24f7b494cd64d5cf62604b0018) by Charles D. Cranor and Gurudatta M. Parulkar
 //!   * [The UVM Virtual Memory System](https://www.usenix.org/legacy/publications/library/proceedings/usenix99/full_papers/cranor/cranor.pdf) by Charles D. Cranor and Gurudatta M. Parulkar
 //!
-//! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/master/sys/uvm)
+//! Made with reference to [OpenBSD implementation of UVM](https://github.com/openbsd/src/tree/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm)
 //!
 
 const std = @import("std");
@@ -193,7 +193,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
 
     const object_page: ObjectPage = if (opt_object) |object| blk: {
         const object_page: ObjectPage = if (true) {
-            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1370
+            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1370
         } else .need_io;
 
         std.debug.assert(switch (fault_info.object_lock_type) {
@@ -219,11 +219,11 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
 
     switch (object_page) {
         .page => {
-            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1414-L1416
+            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1414-L1416
         },
         .zero_fill => {},
         .need_io => {
-            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1419-L1421
+            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1419-L1421
         },
     }
 
@@ -263,7 +263,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
 
         switch (object_page) {
             .zero_fill => {},
-            .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1473
+            .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1473
             .need_io => unreachable,
         }
 
@@ -273,9 +273,9 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
             fault_info.faulting_address,
             anonymous_page,
             .add,
-        ); // TODO: on error maybe we need https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1508-L1523
+        ); // TODO: on error maybe we need https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1508-L1523
     } else {
-        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1430
+        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1430
     }
 
     std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
@@ -307,15 +307,15 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
             map_type,
             cascade.mem.phys.allocator,
         ) catch {
-            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1545-L1568
+            @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1545-L1568
         };
     }
 
     if (fault_info.wired) {
-        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1573-L1589
+        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1573-L1589
     }
 
-    // TODO: might need https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L1571-L1604
+    // TODO: might need https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1571-L1604
 
     fault_info.unlockAll(context, opt_anonymous_map, opt_object);
 }
@@ -379,12 +379,12 @@ fn promote(
     std.debug.assert(opt_object == null or (opt_object.?.lock.isReadLocked() or opt_object.?.lock.isWriteLocked()));
 
     const allocated_frame = cascade.mem.phys.allocator.allocate(context) catch {
-        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L520
+        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
     };
     page.* = allocated_frame.page().?;
 
     anonymous_page.* = AnonymousPage.create(context, page.*) catch {
-        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L520
+        @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
         // MUST clean up `page` as well
     };
 
@@ -402,7 +402,7 @@ fn promote(
                 .toPtr(*[arch.paging.standard_page_size.value]u8);
             @memset(mapped_frame, 0);
         },
-        .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/master/sys/uvm/uvm_fault.c#L545
+        .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L545
         .need_io => unreachable,
     }
 }
