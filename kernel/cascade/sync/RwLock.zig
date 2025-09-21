@@ -39,7 +39,7 @@ pub fn tryUpgradeLock(rw_lock: *RwLock, context: *cascade.Context) bool {
 
         rw_lock.mutex.unlock(context);
     } else {
-        _ = @atomicRmw(usize, &rw_lock.state, .Sub, WRITER, .release);
+        _ = @atomicRmw(usize, &rw_lock.state, .Sub, READER + WRITER, .release);
     }
 
     return false;
