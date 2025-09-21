@@ -111,6 +111,10 @@ pub const Size = extern struct {
         return size.value == other.value;
     }
 
+    pub inline fn notEqual(size: Size, other: Size) bool {
+        return size.value != other.value;
+    }
+
     pub inline fn lessThan(size: Size, other: Size) bool {
         return size.value < other.value;
     }
