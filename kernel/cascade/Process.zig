@@ -183,7 +183,7 @@ fn cacheConstructor(process: *Process, context: *cascade.Context) cascade.mem.ca
     };
 
     const frame = cascade.mem.phys.allocator.allocate(context) catch |err| {
-        log.warn(context, "process constructor failed during frame allocation: {s}", .{@errorName(err)});
+        log.warn(context, "process constructor failed during frame allocation: {t}", .{err});
         return error.ObjectConstructionFailed;
     };
     errdefer {
@@ -205,8 +205,8 @@ fn cacheConstructor(process: *Process, context: *cascade.Context) cascade.mem.ca
     }) catch |err| {
         log.warn(
             context,
-            "process constructor failed during address space initialization: {s}",
-            .{@errorName(err)},
+            "process constructor failed during address space initialization: {t}",
+            .{err},
         );
         return error.ObjectConstructionFailed;
     };

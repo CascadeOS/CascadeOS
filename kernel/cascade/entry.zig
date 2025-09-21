@@ -32,7 +32,7 @@ pub fn onPageFault(
             context,
             page_fault_details,
         ) catch |err| {
-            std.debug.panic("user page fault failed: {s}\n{f}", .{ @errorName(err), page_fault_details });
+            std.debug.panic("user page fault failed: {t}\n{f}", .{ err, page_fault_details });
         },
     }
 }
