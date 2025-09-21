@@ -88,7 +88,7 @@ pub fn faultCheck(
     }
 
     log.verbose(context, "fault_lookup found entry with range {f} and protection {t}", .{
-        fault_info.entry.range(),
+        fault_info.entry.range,
         fault_info.entry.protection,
     });
 

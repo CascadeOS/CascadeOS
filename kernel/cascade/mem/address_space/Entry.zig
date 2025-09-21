@@ -29,8 +29,7 @@ const log = cascade.debug.log.scoped(.address_space);
 
 const Entry = @This();
 
-base: core.VirtualAddress,
-number_of_pages: u32,
+range: core.VirtualRange,
 
 protection: Protection, // TODO: eventually we will want a max protection, which is the maximum allowed protection
 
@@ -62,13 +61,6 @@ pub fn destroy(entry: *Entry, context: *cascade.Context) void {
     globals.entry_cache.deallocate(context, entry);
 }
 
-pub fn range(entry: *const Entry) core.VirtualRange {
-    return .fromAddr(
-        entry.base,
-        arch.paging.standard_page_size.multiplyScalar(entry.number_of_pages),
-    );
-}
-
 pub fn entryIndexByAddress(address: core.VirtualAddress, entries: []const *Entry) ?usize {
     return std.sort.binarySearch(
         *const Entry,
@@ -76,22 +68,10 @@ pub fn entryIndexByAddress(address: core.VirtualAddress, entries: []const *Entry
         address,
         struct {
             fn addressCompareOrder(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
-                return entry.range().compareAddressOrder(addr);
+                return entry.range.compareAddressOrder(addr);
             }
         }.addressCompareOrder,
     );
-}
-
-/// Returns the page offset of the given address in the given entry.
-///
-/// Asserts that the address is within the entry's range.
-pub fn offsetOfAddressInEntry(entry: *const Entry, address: core.VirtualAddress) u32 {
-    std.debug.assert(entry.range().containsAddress(address));
-
-    return @intCast(address
-        .subtract(entry.base)
-        .divide(arch.paging.standard_page_size)
-        .value);
 }
 
 pub const EntryMerge = union(enum) {
@@ -153,14 +133,14 @@ fn insertionIndex(entry: *const Entry, entries: []const *Entry) usize {
         entry,
         struct {
             fn compareOrder(compare_entry: *const Entry, e: *const Entry) std.math.Order {
-                return e.range().compareAddressOrder(compare_entry.base);
+                return e.range.compareAddressOrder(compare_entry.range.address);
             }
         }.compareOrder,
     );
 }
 
 fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
-    return entry.range().anyOverlap(other.range());
+    return entry.range.anyOverlap(other.range);
 }
 
 /// Returns true if `entry` can be merged with `proceeding_entry`.
@@ -169,7 +149,7 @@ fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
 ///
 /// Asserts that `entry` does not have an anonymous map.
 fn canMergeWithProceeding(entry: *const Entry, context: *cascade.Context, proceeding_entry: *const Entry) bool {
-    std.debug.assert(proceeding_entry.range().endBound().equal(entry.range().address));
+    std.debug.assert(proceeding_entry.range.endBound().equal(entry.range.address));
     std.debug.assert(entry.anonymous_map_reference.anonymous_map == null);
 
     if (entry.protection != proceeding_entry.protection) return false;
@@ -188,8 +168,9 @@ fn canMergeWithProceeding(entry: *const Entry, context: *cascade.Context, procee
             return false;
         }
 
-        if (proceeding_entry.object_reference.start_offset + proceeding_entry.number_of_pages !=
-            entry.object_reference.start_offset)
+        if (proceeding_entry.object_reference.start_offset
+            .add(proceeding_entry.range.size)
+            .notEqual(entry.object_reference.start_offset))
         {
             // entry's object reference does not immediately follow proceeding_entry's object reference
             return false;
@@ -219,7 +200,7 @@ fn canMergeWithProceeding(entry: *const Entry, context: *cascade.Context, procee
 ///
 /// Asserts that `entry` does not have an anonymous map.
 fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, following_entry: *const Entry) bool {
-    std.debug.assert(entry.range().endBound().equal(following_entry.range().address));
+    std.debug.assert(entry.range.endBound().equal(following_entry.range.address));
     std.debug.assert(entry.anonymous_map_reference.anonymous_map == null);
 
     if (entry.protection != following_entry.protection) return false;
@@ -238,9 +219,7 @@ fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, followi
             return false;
         }
 
-        if (entry.object_reference.start_offset + entry.number_of_pages !=
-            following_entry.object_reference.start_offset)
-        {
+        if (entry.object_reference.start_offset.add(entry.range.size).notEqual(following_entry.object_reference.start_offset)) {
             // following_entry's object reference does not immediately follow entry's object reference
             return false;
         }
@@ -253,7 +232,7 @@ fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, followi
         following_anonymous_map.lock.readLock(context);
         defer following_anonymous_map.lock.readUnlock(context);
 
-        if (following_entry.anonymous_map_reference.start_offset < entry.number_of_pages) {
+        if (following_entry.anonymous_map_reference.start_offset.lessThan(entry.range.size)) {
             // we can't move the start offset back far enough to cover the new entry
             return false;
         }
@@ -275,11 +254,7 @@ pub fn print(entry: *Entry, context: *cascade.Context, writer: *std.Io.Writer, i
     try writer.writeAll("Entry{\n");
 
     try writer.splatByteAll(' ', new_indent);
-    if (entry.number_of_pages == 1) {
-        try writer.print("range: {f} (1 page),\n", .{entry.range()});
-    } else {
-        try writer.print("range: {f} ({} pages),\n", .{ entry.range(), entry.number_of_pages });
-    }
+    try writer.print("range: {f},\n", .{entry.range});
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("protection: {t},\n", .{entry.protection});

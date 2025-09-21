@@ -34,21 +34,22 @@ lock: cascade.sync.RwLock = .{},
 
 reference_count: u32 = 1,
 
-number_of_pages: u32,
+number_of_pages: PageCount,
 
-pages_in_use: u32 = 0,
+pages_in_use: PageCount = .zero,
 
 anonymous_page_chunks: AnonymousPageChunkMap = .{},
 
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: support shared anonymous maps
 
-pub fn create(context: *cascade.Context, number_of_pages: u32) error{NoMemory}!*AnonymousMap {
-    const anonymous_map = globals.anonymous_map_cache.allocate(context) catch
-        return error.NoMemory;
-    anonymous_map.* = .{
-        .number_of_pages = number_of_pages,
-    };
+pub fn create(context: *cascade.Context, size: core.Size) error{NoMemory}!*AnonymousMap {
+    std.debug.assert(size.isAligned(arch.paging.standard_page_size));
+
+    const anonymous_map = globals.anonymous_map_cache.allocate(context) catch return error.NoMemory;
+
+    anonymous_map.* = .{ .number_of_pages = .fromSize(size) };
+
     return anonymous_map;
 }
 
@@ -102,15 +103,13 @@ pub fn copy(
     _ = address_space;
     _ = faulting_address;
 
-    // is there an anonymous map?
     if (entry.anonymous_map_reference.anonymous_map == null) {
         // no anonymous map, create one
 
-        // FIXME: rather that `try` wait for memory to be available, page memory out?
-        entry.anonymous_map_reference.anonymous_map = try create(context, entry.number_of_pages);
-        entry.anonymous_map_reference.start_offset = 0;
+        // FIXME: rather than `try` - wait for memory to be available and trigger memory reclaimation
+        entry.anonymous_map_reference.anonymous_map = try create(context, entry.range.size);
+        entry.anonymous_map_reference.start_offset = .zero;
 
-        // clear `needs_copy` flag
         entry.needs_copy = false;
 
         return;
@@ -121,7 +120,7 @@ pub fn copy(
 
 pub const Reference = struct {
     anonymous_map: ?*AnonymousMap,
-    start_offset: u32,
+    start_offset: core.Size,
 
     /// Lookup up a page in the referenced anonymous map for the given entry and faulting address.
     ///
@@ -133,17 +132,16 @@ pub const Reference = struct {
     /// Called `amap_lookups` in OpenBSD uvm, but this implementation only returns a single page.
     pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: core.VirtualAddress) ?*AnonymousPage {
         std.debug.assert(reference.anonymous_map != null);
+        std.debug.assert(reference.start_offset.isAligned(arch.paging.standard_page_size));
         std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
-        std.debug.assert(entry.anonymous_map_reference.start_offset == reference.start_offset);
+        std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
         std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(entry.range().containsAddress(faulting_address));
+        std.debug.assert(entry.range.containsAddress(faulting_address));
 
         const anonymous_map = reference.anonymous_map.?;
 
-        const entry_page_index = entry.offsetOfAddressInEntry(faulting_address);
-
-        const target_index = entry_page_index + reference.start_offset;
-        std.debug.assert(target_index < anonymous_map.number_of_pages);
+        const target_index = targetIndex(entry, reference, faulting_address);
+        std.debug.assert(target_index < anonymous_map.number_of_pages.count);
 
         return anonymous_map.anonymous_page_chunks.get(target_index);
     }
@@ -168,18 +166,16 @@ pub const Reference = struct {
     ) error{NoMemory}!void {
         std.debug.assert(reference.anonymous_map != null);
         std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
-        std.debug.assert(entry.anonymous_map_reference.start_offset == reference.start_offset);
+        std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
         std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(entry.range().containsAddress(faulting_address));
+        std.debug.assert(entry.range.containsAddress(faulting_address));
 
         log.verbose(context, "adding anonymous page for {f} to anonymous map", .{faulting_address});
 
         const anonymous_map = reference.anonymous_map.?;
 
-        const entry_page_index = entry.offsetOfAddressInEntry(faulting_address);
-
-        const target_index = entry_page_index + reference.start_offset;
-        std.debug.assert(target_index < anonymous_map.number_of_pages);
+        const target_index = targetIndex(entry, reference, faulting_address);
+        std.debug.assert(target_index < anonymous_map.number_of_pages.count);
 
         const chunk = anonymous_map.anonymous_page_chunks.ensureChunk(target_index) catch
             return error.NoMemory;
@@ -189,11 +185,28 @@ pub const Reference = struct {
         switch (operation) {
             .add => {
                 std.debug.assert(chunk[chunk_offset] == null);
-                anonymous_map.pages_in_use += 1;
+                anonymous_map.pages_in_use.increment();
             },
             .replace => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_amap.c#L1223
         }
         chunk[chunk_offset] = anonymous_page;
+    }
+
+    /// Returns the page offset of the given address in the given entry.
+    ///
+    /// Asserts that the address is within the entry's range.
+    fn targetIndex(entry: *const Entry, reference: Reference, faulting_address: core.VirtualAddress) u32 {
+        std.debug.assert(entry.range.containsAddress(faulting_address));
+
+        return @intCast(
+            faulting_address
+                .subtract(entry.range.address)
+                .divide(arch.paging.standard_page_size)
+                .add(
+                    reference.start_offset
+                        .divide(arch.paging.standard_page_size),
+                ).value,
+        );
     }
 
     /// Prints the anonymous map reference.
@@ -209,7 +222,7 @@ pub const Reference = struct {
             try writer.writeAll("AnonymousMap.Reference{\n");
 
             try writer.splatByteAll(' ', new_indent);
-            try writer.print("start_offset: {d}\n", .{anonymous_map_reference.start_offset});
+            try writer.print("start_offset: {f}\n", .{anonymous_map_reference.start_offset});
 
             try writer.splatByteAll(' ', new_indent);
             try anonymous_map.print(
@@ -228,6 +241,26 @@ pub const Reference = struct {
 
     pub inline fn format(_: Reference, _: *std.Io.Writer) !void {
         @compileError("use `Reference.print` instead");
+    }
+};
+
+pub const PageCount = extern struct {
+    count: u32,
+
+    pub const zero: PageCount = .{ .count = 0 };
+
+    pub inline fn increment(page_count: *PageCount) void {
+        page_count.count += 1;
+    }
+
+    pub fn equal(page_count: PageCount, other: PageCount) bool {
+        return page_count.count == other.count;
+    }
+
+    pub fn fromSize(size: core.Size) PageCount {
+        return .{
+            .count = @intCast(size.divide(arch.paging.standard_page_size).value),
+        };
     }
 };
 
@@ -251,10 +284,10 @@ pub fn print(
     try writer.print("reference_count: {d}\n", .{anonymous_map.reference_count});
 
     try writer.splatByteAll(' ', new_indent);
-    try writer.print("number_of_pages: {d}\n", .{anonymous_map.number_of_pages});
+    try writer.print("number_of_pages: {d}\n", .{anonymous_map.number_of_pages.count});
 
     try writer.splatByteAll(' ', new_indent);
-    try writer.print("pages_in_use: {d}\n", .{anonymous_map.pages_in_use});
+    try writer.print("pages_in_use: {d}\n", .{anonymous_map.pages_in_use.count});
 
     try writer.splatByteAll(' ', indent);
     try writer.writeAll("}");

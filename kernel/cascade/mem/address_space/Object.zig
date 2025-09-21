@@ -34,7 +34,7 @@ page_chunks: PageChunkMap = .{},
 
 pub const Reference = struct {
     object: ?*Object,
-    start_offset: u32,
+    start_offset: core.Size,
 
     /// Prints the anonymous map reference.
     pub fn print(
@@ -49,7 +49,7 @@ pub const Reference = struct {
             try writer.writeAll("Object.Reference{\n");
 
             try writer.splatByteAll(' ', new_indent);
-            try writer.print("start_offset: {d}\n", .{object_reference.start_offset});
+            try writer.print("start_offset: {f}\n", .{object_reference.start_offset});
 
             try writer.splatByteAll(' ', new_indent);
             try object.print(

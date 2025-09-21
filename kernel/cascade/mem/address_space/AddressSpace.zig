@@ -82,8 +82,8 @@ pub fn init(
     address_space.* = .{
         .address_arena = undefined, // initialized below
         ._name = options.name,
-        .page_table = options.page_table,
         .environment = options.environment,
+        .page_table = options.page_table,
         .entries = .empty,
         .entries_version = 0,
     };
@@ -139,7 +139,6 @@ pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
 /// Rename the address space.
 pub fn rename(address_space: *AddressSpace, new_name: Name) void {
     address_space._name = new_name;
-    address_space.address_arena._name = resourceArenaName(new_name);
 }
 
 pub fn name(address_space: *const AddressSpace) []const u8 {
@@ -147,10 +146,12 @@ pub fn name(address_space: *const AddressSpace) []const u8 {
 }
 
 pub const MapOptions = struct {
-    /// The number of pages to map.
+    /// The size of the range to map.
     ///
-    /// Must be greater than 0.
-    number_of_pages: u32,
+    /// This will be rounded up to the nearest page size.
+    ///
+    /// Must not be `.zero`.
+    size: core.Size,
 
     protection: Protection,
 
@@ -163,7 +164,7 @@ pub const MapOptions = struct {
 };
 
 pub const MapError = error{
-    ZeroLength,
+    ZeroSize,
     OutOfMemory,
 };
 
@@ -175,28 +176,30 @@ pub fn map(
 ) MapError!core.VirtualRange {
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
 
-    if (options.number_of_pages == 0) return error.ZeroLength;
+    if (options.size.equal(.zero)) return error.ZeroSize;
+    const size = options.size.alignForward(arch.paging.standard_page_size);
 
-    log.verbose(context, "{s}: map {} pages with protection {t} of type {t}", .{
+    log.verbose(context, "{s}: map {f} with protection {t} of type {t}", .{
         address_space.name(),
-        options.number_of_pages,
+        size,
         options.protection,
         options.type,
     });
+    // 0x{x} (quantum_aligned_len: 0x{x})
 
     const allocated_range = address_space.address_arena.allocate(
         context,
-        options.number_of_pages * arch.paging.standard_page_size.value,
+        size.value,
         .instant_fit,
     ) catch |err| switch (err) {
-        error.ZeroLength => unreachable, // `options.number_of_pages` is greater than 0
+        error.ZeroLength => unreachable, // `options.size` is not `.zero`
         error.RequestedLengthUnavailable, error.OutOfBoundaryTags => return error.OutOfMemory,
     };
     errdefer address_space.address_arena.deallocate(context, allocated_range);
+    std.debug.assert(allocated_range.len == size.value);
 
     const local_entry: Entry = .{
-        .base = .fromInt(allocated_range.base),
-        .number_of_pages = options.number_of_pages,
+        .range = .fromAddr(.fromInt(allocated_range.base), size),
         .protection = options.protection,
         .anonymous_map_reference = .{
             .anonymous_map = null,
@@ -245,17 +248,17 @@ pub fn map(
                 if (extend.before) |before_entry| {
                     // merge the local entry into the before entry
 
-                    const old_number_of_pages = before_entry.number_of_pages;
-                    before_entry.number_of_pages = old_number_of_pages + local_entry.number_of_pages;
+                    const old_size = before_entry.range.size;
+                    before_entry.range.size.addInPlace(local_entry.range.size);
 
                     if (before_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
                         anonymous_map.lock.writeLock(context);
                         defer anonymous_map.lock.writeUnlock(context);
 
                         std.debug.assert(anonymous_map.reference_count == 1);
-                        std.debug.assert(anonymous_map.number_of_pages == old_number_of_pages);
+                        std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
 
-                        anonymous_map.number_of_pages = before_entry.number_of_pages;
+                        anonymous_map.number_of_pages = .fromSize(before_entry.range.size);
                     }
                 }
 
@@ -266,24 +269,24 @@ pub fn map(
 
                         @panic("NOT IMPLEMENTED"); // TODO: implement merging the entry with both the before and after entry
                     } else {
-                        // merge the locak entry into the after entry
+                        // merge the local entry into the after entry
 
-                        const old_number_of_pages = after_entry.number_of_pages;
-                        after_entry.number_of_pages = old_number_of_pages + local_entry.number_of_pages;
-                        after_entry.base.moveBackwardInPlace(
-                            arch.paging.standard_page_size.multiplyScalar(local_entry.number_of_pages),
-                        );
+                        const old_size = after_entry.range.size;
+                        after_entry.range.size.addInPlace(local_entry.range.size);
+                        after_entry.range.address.moveBackwardInPlace(local_entry.range.size);
 
                         if (after_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
                             anonymous_map.lock.writeLock(context);
                             defer anonymous_map.lock.writeUnlock(context);
 
                             std.debug.assert(anonymous_map.reference_count == 1);
-                            std.debug.assert(anonymous_map.number_of_pages == old_number_of_pages);
-                            std.debug.assert(after_entry.anonymous_map_reference.start_offset >= local_entry.number_of_pages);
+                            std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
+                            std.debug.assert(
+                                after_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(local_entry.range.size),
+                            );
 
-                            anonymous_map.number_of_pages = after_entry.number_of_pages;
-                            after_entry.anonymous_map_reference.start_offset -= local_entry.number_of_pages;
+                            anonymous_map.number_of_pages = .fromSize(after_entry.range.size);
+                            after_entry.anonymous_map_reference.start_offset.subtractInPlace(local_entry.range.size);
                         }
                     }
                 }
@@ -300,35 +303,33 @@ pub fn map(
         break :blk entry_merge;
     };
 
-    const result = local_entry.range();
-
     switch (entry_merge) {
         .new => log.verbose(context, "{s}: inserted new entry", .{address_space.name()}),
         .extend => |extend| {
             if (extend.before != null) {
                 if (extend.after != null) {
-                    log.verbose(context, "{s}: merged two entries and expanded by {} pages", .{
+                    log.verbose(context, "{s}: merged two entries and expanded by {f}", .{
                         address_space.name(),
-                        local_entry.number_of_pages,
+                        local_entry.range.size,
                     });
                 } else {
-                    log.verbose(context, "{s}: extended entry by {} pages", .{
+                    log.verbose(context, "{s}: extended entry by {f}", .{
                         address_space.name(),
-                        local_entry.number_of_pages,
+                        local_entry.range.size,
                     });
                 }
             } else if (extend.after != null) {
-                log.verbose(context, "{s}: extended entry by {} pages", .{
+                log.verbose(context, "{s}: extended entry by {f}", .{
                     address_space.name(),
-                    local_entry.number_of_pages,
+                    local_entry.range.size,
                 });
             } else unreachable;
         },
     }
 
-    log.verbose(context, "{s}: mapped {f}", .{ address_space.name(), result });
+    log.verbose(context, "{s}: mapped {f}", .{ address_space.name(), local_entry.range });
 
-    return result;
+    return local_entry.range;
 }
 
 pub const UnmapError = error{};
@@ -425,7 +426,7 @@ pub fn print(address_space: *AddressSpace, context: *cascade.Context, writer: *s
     try writer.writeAll("AddressSpace{\n");
 
     try writer.splatByteAll(' ', new_indent);
-    try writer.print("mode: {t},\n", .{address_space.mode});
+    try writer.print("environment: {t},\n", .{address_space.environment});
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("entries_version: {d},\n", .{address_space.entries_version});
