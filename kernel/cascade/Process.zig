@@ -163,8 +163,8 @@ pub const internal = struct {
                 .environment = .{ .user = process },
             }) catch @panic("janky leaking process destroy failed to init address space");
         } else {
-            // TODO: not called as `reinitialize` is not implemented
-            process.address_space.reinitialize(context);
+            // TODO: not called as `reinitializeAndUnmapAll` is not implemented
+            process.address_space.reinitializeAndUnmapAll(context);
         }
 
         globals.cache.deallocate(context, process);
