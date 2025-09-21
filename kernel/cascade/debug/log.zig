@@ -274,11 +274,11 @@ const kernel_log_scope_matchers: [kernel_log_scopes.len]ScopeMatcher = blk: {
                     break :matcher_type .contains;
                 }
 
-                break :matcher_type .starts_with;
+                break :matcher_type .ends_with;
             }
 
             if (scope_string[scope_string.len - 1] == '+')
-                break :matcher_type .ends_with;
+                break :matcher_type .starts_with;
 
             break :matcher_type .exact;
         };
@@ -286,8 +286,8 @@ const kernel_log_scope_matchers: [kernel_log_scopes.len]ScopeMatcher = blk: {
         scope_matchers[i] = .{
             .match_string = switch (matcher_type) {
                 .exact => scope_string,
-                .starts_with => scope_string[1..],
-                .ends_with => scope_string[0 .. scope_string.len - 1],
+                .starts_with => scope_string[0 .. scope_string.len - 1],
+                .ends_with => scope_string[1..],
                 .contains => scope_string[1 .. scope_string.len - 1],
             },
             .type = matcher_type,
