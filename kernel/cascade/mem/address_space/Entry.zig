@@ -87,10 +87,15 @@ pub const EntryMerge = union(enum) {
 /// Determine if and how an entry should be merged into the list of entries.
 ///
 /// The caller must ensure the entries are locked.
-pub fn determineEntryMerge(entry: *const Entry, context: *cascade.Context, entries: []const *Entry) EntryMerge {
-    if (entries.len == 0) return .{ .new = 0 };
+pub fn determineEntryMerge(
+    entry: *const Entry,
+    context: *cascade.Context,
+    insertion_index: usize,
+    entries: []const *Entry,
+) EntryMerge {
+    std.debug.assert(insertion_index <= entries.len);
 
-    const insertion_index = entry.insertionIndex(entries);
+    if (entries.len == 0) return .{ .new = 0 };
 
     const opt_before_entry: ?*Entry = if (insertion_index != 0) blk: {
         const before_entry = entries[insertion_index - 1];
@@ -124,19 +129,6 @@ pub fn determineEntryMerge(entry: *const Entry, context: *cascade.Context, entri
     } else {
         return .{ .new = insertion_index };
     }
-}
-
-fn insertionIndex(entry: *const Entry, entries: []const *Entry) usize {
-    return std.sort.lowerBound(
-        *const Entry,
-        entries,
-        entry,
-        struct {
-            fn compareOrder(compare_entry: *const Entry, e: *const Entry) std.math.Order {
-                return e.range.compareAddressOrder(compare_entry.range.address);
-            }
-        }.compareOrder,
-    );
 }
 
 fn anyOverlap(entry: *const Entry, other: *const Entry) bool {

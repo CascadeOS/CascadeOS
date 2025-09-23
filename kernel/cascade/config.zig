@@ -23,11 +23,12 @@ pub const maximum_number_of_memory_map_entries = 128;
 pub const maximum_number_of_executors = 64;
 
 pub const task_name_length = 64;
+
+pub const process_name_length = 64;
 // the process name is also used as the name of its address space
-pub const process_name_length = address_space_name_length;
+pub const address_space_name_length = process_name_length;
+
 pub const resource_arena_name_length = 64;
-// the address spaces resource arena has the same name as the address space but with `_address_arena` appended
-pub const address_space_name_length = resource_arena_name_length - "_address_arena".len;
 pub const cache_name_length = 64;
 
 pub const per_executor_interrupt_period = core.Duration.from(5, .millisecond);

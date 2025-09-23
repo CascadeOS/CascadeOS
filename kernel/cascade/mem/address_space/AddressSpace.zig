@@ -33,8 +33,7 @@ const AddressSpace = @This();
 
 _name: Name,
 
-/// Used as the source of addresses in this address space.
-address_arena: cascade.mem.resource_arena.Arena(.none),
+range: core.VirtualRange,
 
 environment: cascade.Environment,
 
@@ -80,28 +79,13 @@ pub fn init(
     });
 
     address_space.* = .{
-        .address_arena = undefined, // initialized below
+        .range = options.range,
         ._name = options.name,
         .environment = options.environment,
         .page_table = options.page_table,
         .entries = .empty,
         .entries_version = 0,
     };
-
-    try address_space.address_arena.init(
-        context,
-        .{
-            .name = resourceArenaName(options.name),
-            .quantum = arch.paging.standard_page_size.value,
-        },
-    );
-    errdefer address_space.address_arena.deinit(context);
-
-    try address_space.address_arena.addSpan(
-        context,
-        options.range.address.value,
-        options.range.size.value,
-    );
 }
 
 /// Reinitialize the address space back to its initial state including unmapping everything.
@@ -131,8 +115,6 @@ pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
     std.debug.assert(address_space.entries.items.len == 0);
     std.debug.assert(address_space.entries.capacity == 0);
 
-    address_space.address_arena.deinit(context);
-
     address_space.* = undefined;
 }
 
@@ -148,9 +130,7 @@ pub fn name(address_space: *const AddressSpace) []const u8 {
 pub const MapOptions = struct {
     /// The size of the range to map.
     ///
-    /// This will be rounded up to the nearest page size.
-    ///
-    /// Must not be `.zero`.
+    /// Must not be `.zero` and must be aligned to the standard page size.
     size: core.Size,
 
     protection: Protection,
@@ -166,6 +146,7 @@ pub const MapOptions = struct {
 pub const MapError = error{
     ZeroSize,
     OutOfMemory,
+    RequestedSizeUnavailable,
 };
 
 /// Map a range of pages into the address space.
@@ -176,58 +157,51 @@ pub fn map(
 ) MapError!core.VirtualRange {
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
 
-    if (options.size.equal(.zero)) return error.ZeroSize;
-    const size = options.size.alignForward(arch.paging.standard_page_size);
+    std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
 
-    log.verbose(context, "{s}: map {f} with protection {t} of type {t}", .{
+    if (options.size.equal(.zero)) return error.ZeroSize;
+
+    log.verbose(context, "{s}: map {f} - {t} - {t}", .{
         address_space.name(),
-        size,
+        options.size,
         options.protection,
         options.type,
     });
-    // 0x{x} (quantum_aligned_len: 0x{x})
 
-    const allocated_range = address_space.address_arena.allocate(
-        context,
-        size.value,
-        .instant_fit,
-    ) catch |err| switch (err) {
-        error.ZeroLength => unreachable, // `options.size` is not `.zero`
-        error.RequestedLengthUnavailable, error.OutOfBoundaryTags => return error.OutOfMemory,
-    };
-    errdefer address_space.address_arena.deallocate(context, allocated_range);
-    std.debug.assert(allocated_range.len == size.value);
-
-    const local_entry: Entry = .{
-        .range = .fromAddr(.fromInt(allocated_range.base), size),
-        .protection = options.protection,
-        .anonymous_map_reference = .{
-            .anonymous_map = null,
-            .start_offset = undefined,
-        },
-        .object_reference = switch (options.type) {
-            .object => |object_reference| object_reference,
-            .zero_fill => .{
-                .object = null,
-                .start_offset = undefined,
-            },
-        },
-        .copy_on_write = switch (options.type) {
-            .zero_fill => true,
-            .object => @panic("NOT IMPLEMENTED"), // TODO
-        },
-        .needs_copy = switch (options.type) {
-            .zero_fill => true,
-            .object => @panic("NOT IMPLEMENTED"), // TODO
-        },
-    };
-
-    const entry_merge = blk: {
+    const local_entry, const entry_merge = blk: {
         address_space.entries_lock.writeLock(context);
         defer address_space.entries_lock.writeUnlock(context);
 
+        const free_range = address_space.findFreeRange(options.size) orelse
+            return error.RequestedSizeUnavailable;
+
+        const local_entry: Entry = .{
+            .range = free_range.range,
+            .protection = options.protection,
+            .anonymous_map_reference = .{
+                .anonymous_map = null,
+                .start_offset = undefined,
+            },
+            .object_reference = switch (options.type) {
+                .object => |object_reference| object_reference,
+                .zero_fill => .{
+                    .object = null,
+                    .start_offset = undefined,
+                },
+            },
+            .copy_on_write = switch (options.type) {
+                .zero_fill => true,
+                .object => @panic("NOT IMPLEMENTED"), // TODO
+            },
+            .needs_copy = switch (options.type) {
+                .zero_fill => true,
+                .object => @panic("NOT IMPLEMENTED"), // TODO
+            },
+        };
+
         const entry_merge = local_entry.determineEntryMerge(
             context,
+            free_range.insertion_index,
             address_space.entries.items,
         );
 
@@ -300,7 +274,7 @@ pub fn map(
 
         address_space.entries_version +%= 1;
 
-        break :blk entry_merge;
+        break :blk .{ local_entry, entry_merge };
     };
 
     switch (entry_merge) {
@@ -330,6 +304,43 @@ pub fn map(
     log.verbose(context, "{s}: mapped {f}", .{ address_space.name(), local_entry.range });
 
     return local_entry.range;
+}
+
+const FreeRange = struct {
+    range: core.VirtualRange,
+    insertion_index: usize,
+};
+
+/// Find a free range in the address space of the given size.
+fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
+    // TODO: we could seperately track the free ranges in the address space
+
+    var candidate_insertion_index: usize = 0;
+    var candidate_range: core.VirtualRange = .fromAddr(address_space.range.address, size);
+    var candidate_range_last_address = candidate_range.last();
+
+    for (address_space.entries.items) |entry| {
+        if (candidate_range_last_address.lessThan(entry.range.address)) {
+            @branchHint(.unlikely);
+            // the candidate range is entirely before the entry
+            break;
+        }
+
+        candidate_range.address = entry.range.endBound();
+        candidate_range_last_address = candidate_range.last();
+        candidate_insertion_index += 1;
+    }
+
+    if (candidate_range_last_address.lessThanOrEqual(address_space.range.last())) {
+        // the candidate range does not extend past the end of the address space
+        @branchHint(.likely);
+        return .{
+            .range = candidate_range,
+            .insertion_index = candidate_insertion_index,
+        };
+    }
+
+    return null;
 }
 
 pub const UnmapError = error{};
@@ -429,6 +440,9 @@ pub fn print(address_space: *AddressSpace, context: *cascade.Context, writer: *s
     try writer.print("environment: {t},\n", .{address_space.environment});
 
     try writer.splatByteAll(' ', new_indent);
+    try writer.print("range: {f},\n", .{address_space.range});
+
+    try writer.splatByteAll(' ', new_indent);
     try writer.print("entries_version: {d},\n", .{address_space.entries_version});
 
     if (address_space.entries.items.len != 0) {
@@ -452,17 +466,8 @@ pub fn print(address_space: *AddressSpace, context: *cascade.Context, writer: *s
     try writer.writeAll("}");
 }
 
-pub inline fn format(_: *const AddressSpace, _: *std.Io.Writer) !void {
-    @compileError("use `AddressSpace.print` instead");
+pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void {
+    return address_space.print(.current(), writer, 0);
 }
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_name_length);
-
-fn resourceArenaName(address_space_name: Name) cascade.mem.resource_arena.Name {
-    var resource_arena_name: cascade.mem.resource_arena.Name = .{};
-    // these assume capacity calls are safe as the size of an `cascade.mem.resource_arena.Name` is ensured in
-    // `cascade.config` to have enough capacity for a `cascade.mem.AddressSpace.Name` along with the `_address_arena` suffix
-    resource_arena_name.appendSliceAssumeCapacity(address_space_name.constSlice());
-    resource_arena_name.appendSliceAssumeCapacity("_address_arena");
-    return resource_arena_name;
-}
