@@ -180,7 +180,7 @@ pub fn faultCheck(
 /// Handle a object or zero fill fault.
 ///
 /// Called `uvm_fault_lower` in OpenBSD uvm.
-pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) error{ Restart, NoMemory }!void {
+pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) error{ Restart, OutOfMemory }!void {
     log.verbose(context, "handling object or zero fill fault", .{});
 
     const opt_anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map;
@@ -365,7 +365,7 @@ fn promote(
     object_page: ObjectPage,
     anonymous_page: **AnonymousPage,
     page: **Page,
-) error{ Restart, NoMemory }!void {
+) error{ Restart, OutOfMemory }!void {
     log.verbose(context, "promoting to an anonymous page", .{});
 
     const anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map.?;
@@ -414,7 +414,7 @@ fn promote(
 /// The `entries_lock` must be unlocked.
 ///
 /// Called `uvmfault_amapcopy` in OpenBSD uvm.
-fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Context) error{ NotMapped, NoMemory }!void {
+fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Context) error{ NotMapped, OutOfMemory }!void {
     // lookup entry and lock `entries_lock` for writing
     if (!fault_info.faultLookup(context, .write)) return error.NotMapped;
     defer fault_info.address_space.entries_lock.writeUnlock(context);

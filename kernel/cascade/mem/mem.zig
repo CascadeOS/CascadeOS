@@ -323,7 +323,7 @@ pub fn onKernelPageFault(
         .pageable_kernel_address_space => {
             @branchHint(.likely);
             globals.kernel_pageable_address_space.handlePageFault(context, page_fault_details) catch |err| switch (err) {
-                error.NoMemory => std.debug.panic(
+                error.OutOfMemory => std.debug.panic(
                     "no memory available to handle page fault in pageable kernel address space\n{f}",
                     .{page_fault_details},
                 ),

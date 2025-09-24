@@ -43,10 +43,10 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: support shared anonymous maps
 
-pub fn create(context: *cascade.Context, size: core.Size) error{NoMemory}!*AnonymousMap {
+pub fn create(context: *cascade.Context, size: core.Size) error{OutOfMemory}!*AnonymousMap {
     std.debug.assert(size.isAligned(arch.paging.standard_page_size));
 
-    const anonymous_map = globals.anonymous_map_cache.allocate(context) catch return error.NoMemory;
+    const anonymous_map = globals.anonymous_map_cache.allocate(context) catch return error.OutOfMemory;
 
     anonymous_map.* = .{ .number_of_pages = .fromSize(size) };
 
@@ -99,7 +99,7 @@ pub fn copy(
     address_space: *AddressSpace,
     entry: *Entry,
     faulting_address: core.VirtualAddress,
-) error{NoMemory}!void {
+) error{OutOfMemory}!void {
     _ = address_space;
     _ = faulting_address;
 
@@ -163,7 +163,7 @@ pub const Reference = struct {
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
         operation: AddOperation,
-    ) error{NoMemory}!void {
+    ) error{OutOfMemory}!void {
         std.debug.assert(reference.anonymous_map != null);
         std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
         std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
@@ -178,7 +178,7 @@ pub const Reference = struct {
         std.debug.assert(target_index < anonymous_map.number_of_pages.count);
 
         const chunk = anonymous_map.anonymous_page_chunks.ensureChunk(target_index) catch
-            return error.NoMemory;
+            return error.OutOfMemory;
 
         const chunk_offset = AnonymousPageChunkMap.chunkOffset(target_index);
 

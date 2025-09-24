@@ -144,9 +144,14 @@ pub const MapOptions = struct {
 };
 
 pub const MapError = error{
+    /// The requested size is zero.
     ZeroSize,
-    OutOfMemory,
+
+    /// The requested size is not available.
     RequestedSizeUnavailable,
+
+    /// No memory available.
+    OutOfMemory,
 };
 
 /// Map a range of pages into the address space.
@@ -347,7 +352,11 @@ pub const UnmapError = error{};
 
 /// Unmap a range of pages from the address space.
 ///
+/// The range may cover multiple entries or none at all.
+///
 /// The size and address of the range must be aligned to the page size.
+///
+/// The range must be entirely within the address space.
 pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: core.VirtualRange) UnmapError!void {
     errdefer |err| log.debug(context, "{s}: unmap failed {t}", .{ address_space.name(), err });
 
@@ -355,6 +364,9 @@ pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: cor
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(address_space.range.fullyContainsRange(range));
+
+    if (range.size.equal(.zero)) return;
 
     @panic("NOT IMPLEMENTED"); // TODO
 }
@@ -367,7 +379,7 @@ pub const HandlePageFaultError = error{
     Protection,
 
     /// No memory available.
-    NoMemory,
+    OutOfMemory,
 };
 
 /// Handle a page fault.
