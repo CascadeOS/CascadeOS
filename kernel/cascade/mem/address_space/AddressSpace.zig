@@ -157,16 +157,16 @@ pub fn map(
 ) MapError!core.VirtualRange {
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
 
-    std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
-
-    if (options.size.equal(.zero)) return error.ZeroSize;
-
     log.verbose(context, "{s}: map {f} - {t} - {t}", .{
         address_space.name(),
         options.size,
         options.protection,
         options.type,
     });
+
+    std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
+
+    if (options.size.equal(.zero)) return error.ZeroSize;
 
     const local_entry, const entry_merge = blk: {
         address_space.entries_lock.writeLock(context);
@@ -351,10 +351,10 @@ pub const UnmapError = error{};
 pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: core.VirtualRange) UnmapError!void {
     errdefer |err| log.debug(context, "{s}: unmap failed {t}", .{ address_space.name(), err });
 
+    log.verbose(context, "{s}: unmap {f}", .{ address_space.name(), range });
+
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
-
-    log.verbose(context, "{s}: unmap {f}", .{ address_space.name(), range });
 
     @panic("NOT IMPLEMENTED"); // TODO
 }
