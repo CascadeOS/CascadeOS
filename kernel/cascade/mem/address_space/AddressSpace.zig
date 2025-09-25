@@ -105,15 +105,16 @@ pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) voi
 
 /// Reinitialize the address space back to its initial state including unmapping everything.
 ///
-/// The address space must not be in use by any tasks when this function is called as everything is unmapped without
-/// flushing.
+/// The address space must not be in use by any tasks when this function is called.
 pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.Context) void {
     log.debug(context, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
     std.debug.assert(!address_space.page_table_lock.isLocked());
     std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
 
-    @panic("NOT IMPLEMENTED"); // TODO
+    try address_space.unmap(context, address_space.range);
+
+    address_space.entries_version = 0;
 }
 
 /// This leaves the address space in an invalid state, if it will be reused see `reinitializeAndUnmapAll`.
@@ -129,6 +130,7 @@ pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
     std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
     std.debug.assert(address_space.entries.items.len == 0);
     std.debug.assert(address_space.entries.capacity == 0);
+    std.debug.assert(address_space.entries_version == 0);
 
     address_space.* = undefined;
 }
