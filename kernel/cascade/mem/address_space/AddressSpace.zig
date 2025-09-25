@@ -88,6 +88,21 @@ pub fn init(
     };
 }
 
+/// Retarget the address space to a new process.
+pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) void {
+    std.debug.assert(address_space.environment == .user);
+    std.debug.assert(!address_space.page_table_lock.isLocked());
+    std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
+    std.debug.assert(address_space.entries.items.len == 0);
+    std.debug.assert(address_space.entries.capacity == 0);
+    std.debug.assert(address_space.entries_version == 0);
+
+    address_space._name = cascade.mem.AddressSpace.Name.fromSlice(
+        new_process.name.constSlice(),
+    ) catch unreachable; // ensured in `cascade.config`
+    address_space.environment = .{ .user = new_process };
+}
+
 /// Reinitialize the address space back to its initial state including unmapping everything.
 ///
 /// The address space must not be in use by any tasks when this function is called as everything is unmapped without
@@ -116,11 +131,6 @@ pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
     std.debug.assert(address_space.entries.capacity == 0);
 
     address_space.* = undefined;
-}
-
-/// Rename the address space.
-pub fn rename(address_space: *AddressSpace, new_name: Name) void {
-    address_space._name = new_name;
 }
 
 pub fn name(address_space: *const AddressSpace) []const u8 {

@@ -47,11 +47,7 @@ pub fn create(context: *cascade.Context, options: CreateOptions) !struct { *Proc
         errdefer globals.cache.deallocate(context, process);
 
         process.name = options.name;
-        process.address_space.rename(
-            cascade.mem.AddressSpace.Name.fromSlice(
-                options.name.constSlice(),
-            ) catch unreachable, // ensured in `cascade.config`
-        );
+        process.address_space.retarget(process);
 
         break :blk process;
     };
