@@ -101,7 +101,7 @@ pub fn determineEntryMerge(
         const before_entry = entries[insertion_index - 1];
         std.debug.assert(!entry.anyOverlap(before_entry)); // entry overlaps with the preceding entry
 
-        break :blk if (entry.canMergeWithProceeding(context, before_entry))
+        break :blk if (entry.canMergeWith(context, before_entry, .before))
             before_entry
         else
             null;
@@ -111,7 +111,7 @@ pub fn determineEntryMerge(
         const after_entry = entries[insertion_index];
         std.debug.assert(!entry.anyOverlap(after_entry)); // entry overlaps with the following entry
 
-        break :blk if (entry.canMergeWithFollowing(context, after_entry))
+        break :blk if (entry.canMergeWith(context, after_entry, .after))
             after_entry
         else
             null;
@@ -135,142 +135,82 @@ fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
     return entry.range.anyOverlap(other.range);
 }
 
-/// Returns true if `entry` can be merged with `proceeding_entry`.
-fn canMergeWithProceeding(entry: *const Entry, context: *cascade.Context, proceeding_entry: *const Entry) bool {
-    if (entry.protection != proceeding_entry.protection) return false;
-    if (entry.copy_on_write != proceeding_entry.copy_on_write) return false;
-    if (entry.wired_count != proceeding_entry.wired_count) return false;
+/// Returns true if `entry` can be merged with `other`.
+///
+/// `order` is the relative location of `other` relative to `entry`.
+fn canMergeWith(
+    entry: *const Entry,
+    context: *cascade.Context,
+    other_entry: *const Entry,
+    comptime order: enum { before, after },
+) bool {
+    if (entry.protection != other_entry.protection) return false;
+    if (entry.copy_on_write != other_entry.copy_on_write) return false;
+    if (entry.wired_count != other_entry.wired_count) return false;
 
-    if (!proceeding_entry.range.endBound().equal(entry.range.address)) {
-        // entry does not immediately follow proceeding_entry
-        return false;
+    switch (order) {
+        .before => if (!other_entry.range.endBound().equal(entry.range.address)) {
+            // entry does not immediately follow other_entry
+            return false;
+        },
+        .after => if (!entry.range.endBound().equal(other_entry.range.address)) {
+            // entry does not immediately proceed other_entry
+            return false;
+        },
     }
 
     if (entry.object_reference.object) |entry_object| {
-        const proceeding_entry_object = proceeding_entry.object_reference.object orelse {
-            // entry has an object reference, proceeding_entry has no object reference
+        const other_entry_object = other_entry.object_reference.object orelse {
+            // entry has an object reference, other_entry has no object reference
             return false;
         };
 
-        if (entry_object != proceeding_entry_object) {
+        if (entry_object != other_entry_object) {
             // objects dont match
             return false;
         }
 
-        if (proceeding_entry.object_reference.start_offset
-            .add(proceeding_entry.range.size)
-            .notEqual(entry.object_reference.start_offset))
-        {
-            // entry's object reference does not immediately follow proceeding_entry's object reference
-            return false;
-        }
-    } else if (proceeding_entry.object_reference.object != null) {
-        // entry has no object reference, proceeding_entry has an object reference
-        return false;
-    }
-
-    if (entry.anonymous_map_reference.anonymous_map) |entry_anonymous_map| blk: {
-        if (proceeding_entry.anonymous_map_reference.anonymous_map) |proceeding_anonymous_map| {
-            if (entry_anonymous_map != proceeding_anonymous_map) return false;
-            if (entry.needs_copy != proceeding_entry.needs_copy) return false;
-
-            if (proceeding_entry.anonymous_map_reference.start_offset
-                .add(proceeding_entry.range.size)
-                .notEqual(entry.anonymous_map_reference.start_offset))
+        switch (order) {
+            .before => if (other_entry.object_reference.start_offset
+                .add(other_entry.range.size)
+                .notEqual(entry.object_reference.start_offset))
             {
-                // entry's anonymous map reference does not immediately follow proceeding_entry's anonymous map reference
+                // entry's object reference does not immediately follow other_entry's object reference
                 return false;
-            }
-
-            break :blk;
-        }
-
-        if (entry.needs_copy) {
-            // the entries anonymous map needs to be copied as it is shared
-            return false;
-        }
-        std.debug.assert(proceeding_entry.needs_copy);
-
-        if (entry.anonymous_map_reference.start_offset.lessThan(proceeding_entry.range.size)) {
-            // we can't move the start offset back far enough to cover the proceeding entry
-            return false;
-        }
-
-        entry_anonymous_map.lock.readLock(context);
-        defer entry_anonymous_map.lock.readUnlock(context);
-
-        if (entry_anonymous_map.reference_count != 1) {
-            // TODO: is this the right thing to do?
-            // anonymous map is shared
-            return false;
-        }
-    } else blk: {
-        const proceeding_anonymous_map = proceeding_entry.anonymous_map_reference.anonymous_map orelse {
-            std.debug.assert(entry.needs_copy and proceeding_entry.needs_copy);
-            // neither entry has an anonymous map
-            break :blk;
-        };
-
-        if (proceeding_entry.needs_copy) {
-            // the proceeding entries anonymous map needs to be copied as it is shared
-            return false;
-        }
-
-        proceeding_anonymous_map.lock.readLock(context);
-        defer proceeding_anonymous_map.lock.readUnlock(context);
-
-        if (proceeding_anonymous_map.reference_count != 1) {
-            // TODO: is this the right thing to do?
-            // anonymous map is shared
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/// Returns true if `entry` can be merged with `following_entry`.
-fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, following_entry: *const Entry) bool {
-    if (entry.protection != following_entry.protection) return false;
-    if (entry.copy_on_write != following_entry.copy_on_write) return false;
-    if (entry.wired_count != following_entry.wired_count) return false;
-
-    if (!entry.range.endBound().equal(following_entry.range.address)) {
-        // entry does not immediately proceed following_entry
-        return false;
-    }
-
-    if (entry.object_reference.object) |entry_object| {
-        const proceeding_entry_object = following_entry.object_reference.object orelse {
-            // entry has an object reference, following_entry has no object reference
-            return false;
-        };
-
-        if (entry_object != proceeding_entry_object) {
-            // objects dont match
-            return false;
-        }
-
-        if (entry.object_reference.start_offset.add(entry.range.size).notEqual(following_entry.object_reference.start_offset)) {
-            // following_entry's object reference does not immediately follow entry's object reference
-            return false;
-        }
-    } else if (following_entry.object_reference.object != null) {
-        // entry has no object reference, following_entry has an object reference
-        return false;
-    }
-
-    if (entry.anonymous_map_reference.anonymous_map) |entry_anonymous_map| blk: {
-        if (following_entry.anonymous_map_reference.anonymous_map) |following_anonymous_map| {
-            if (entry_anonymous_map != following_anonymous_map) return false;
-            if (entry.needs_copy != following_entry.needs_copy) return false;
-
-            if (entry.anonymous_map_reference.start_offset
+            },
+            .after => if (entry.object_reference.start_offset
                 .add(entry.range.size)
-                .notEqual(following_entry.anonymous_map_reference.start_offset))
+                .notEqual(other_entry.object_reference.start_offset))
             {
-                // entry's anonymous map reference does not immediately proceed following_entry's anonymous map reference
+                // other_entry's object reference does not immediately follow entry's object reference
                 return false;
+            },
+        }
+    } else if (other_entry.object_reference.object != null) {
+        // entry has no object reference, other_entry has an object reference
+        return false;
+    }
+
+    if (entry.anonymous_map_reference.anonymous_map) |entry_anonymous_map| blk: {
+        if (other_entry.anonymous_map_reference.anonymous_map) |other_entry_anonymous_map| {
+            if (entry_anonymous_map != other_entry_anonymous_map) return false;
+            if (entry.needs_copy != other_entry.needs_copy) return false;
+
+            switch (order) {
+                .before => if (other_entry.anonymous_map_reference.start_offset
+                    .add(other_entry.range.size)
+                    .notEqual(entry.anonymous_map_reference.start_offset))
+                {
+                    // entry's anonymous map reference does not immediately follow other_entry's anonymous map reference
+                    return false;
+                },
+                .after => if (entry.anonymous_map_reference.start_offset
+                    .add(entry.range.size)
+                    .notEqual(other_entry.anonymous_map_reference.start_offset))
+                {
+                    // entry's anonymous map reference does not immediately proceed other_entry's anonymous map reference
+                    return false;
+                },
             }
 
             break :blk;
@@ -280,7 +220,15 @@ fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, followi
             // the entries anonymous map needs to be copied as it is shared
             return false;
         }
-        std.debug.assert(following_entry.needs_copy);
+        std.debug.assert(other_entry.needs_copy);
+
+        switch (order) {
+            .before => if (entry.anonymous_map_reference.start_offset.lessThan(other_entry.range.size)) {
+                // we can't move the start offset back far enough to cover other_entry
+                return false;
+            },
+            .after => {},
+        }
 
         entry_anonymous_map.lock.readLock(context);
         defer entry_anonymous_map.lock.readUnlock(context);
@@ -291,27 +239,30 @@ fn canMergeWithFollowing(entry: *const Entry, context: *cascade.Context, followi
             return false;
         }
     } else blk: {
-        const following_anonymous_map = following_entry.anonymous_map_reference.anonymous_map orelse {
-            std.debug.assert(entry.needs_copy and following_entry.needs_copy);
+        const other_entry_anonymous_map = other_entry.anonymous_map_reference.anonymous_map orelse {
+            std.debug.assert(entry.needs_copy and other_entry.needs_copy);
             // neither entry has an anonymous map
             break :blk;
         };
 
-        if (following_entry.needs_copy) {
-            // the following entries anonymous map needs to be copied as it is shared
+        if (other_entry.needs_copy) {
+            // the other_entry's anonymous map needs to be copied as it is shared
             return false;
         }
         std.debug.assert(entry.needs_copy);
 
-        if (following_entry.anonymous_map_reference.start_offset.lessThan(entry.range.size)) {
-            // we can't move the following entry's start offset back far enough to cover the entry
-            return false;
+        switch (order) {
+            .before => {},
+            .after => if (other_entry.anonymous_map_reference.start_offset.lessThan(entry.range.size)) {
+                // we can't move the other_entry's start offset back far enough to cover the entry
+                return false;
+            },
         }
 
-        following_anonymous_map.lock.readLock(context);
-        defer following_anonymous_map.lock.readUnlock(context);
+        other_entry_anonymous_map.lock.readLock(context);
+        defer other_entry_anonymous_map.lock.readUnlock(context);
 
-        if (following_anonymous_map.reference_count != 1) {
+        if (other_entry_anonymous_map.reference_count != 1) {
             // TODO: is this the right thing to do?
             // anonymous map is shared
             return false;
