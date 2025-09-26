@@ -101,7 +101,7 @@ pub fn determineEntryMerge(
         const before_entry = entries[insertion_index - 1];
         std.debug.assert(!entry.anyOverlap(before_entry)); // entry overlaps with the preceding entry
 
-        break :blk if (entry.canMergeWith(context, before_entry, .before))
+        break :blk if (entry.canMergeInto(context, before_entry, .before))
             before_entry
         else
             null;
@@ -111,7 +111,7 @@ pub fn determineEntryMerge(
         const after_entry = entries[insertion_index];
         std.debug.assert(!entry.anyOverlap(after_entry)); // entry overlaps with the following entry
 
-        break :blk if (entry.canMergeWith(context, after_entry, .after))
+        break :blk if (entry.canMergeInto(context, after_entry, .after))
             after_entry
         else
             null;
@@ -135,10 +135,10 @@ fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
     return entry.range.anyOverlap(other.range);
 }
 
-/// Returns true if `entry` can be merged with `other`.
+/// Returns true if `entry` can be merged into `other`.
 ///
 /// `order` is the relative location of `other` relative to `entry`.
-fn canMergeWith(
+fn canMergeInto(
     entry: *const Entry,
     context: *cascade.Context,
     other_entry: *const Entry,
