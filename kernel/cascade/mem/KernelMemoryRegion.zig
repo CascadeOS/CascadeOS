@@ -71,7 +71,7 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
             );
 
             const map_type: MapType = switch (kernel_memory_region.type) {
-                .executable_section => .{ .environment_type = .kernel, .protection = .executable },
+                .executable_section => .{ .environment_type = .kernel, .protection = .execute },
                 .readonly_section, .sdf_section => .{ .environment_type = .kernel, .protection = .read },
                 .writeable_section => .{ .environment_type = .kernel, .protection = .read_write },
                 else => unreachable,

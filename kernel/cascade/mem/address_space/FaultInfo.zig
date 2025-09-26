@@ -98,9 +98,8 @@ pub fn faultCheck(
         switch (fault_info.entry.protection) {
             .none => return error.Protection,
             .read => if (fault_info.access_type != .read) return error.Protection,
-            .write => if (fault_info.access_type != .write) return error.Protection,
             .read_write => if (fault_info.access_type != .read and fault_info.access_type != .write) return error.Protection,
-            .executable => if (fault_info.access_type != .execute) return error.Protection, // TODO: x86 allows read on executable memory
+            .execute => if (fault_info.access_type != .execute) return error.Protection, // TODO: x86 allows read on executable memory
         }
     }
 
@@ -112,9 +111,8 @@ pub fn faultCheck(
         switch (fault_info.enter_protection) {
             .none => unreachable, // `error.Protection` is returned earlier if protection is `.none`
             .read => fault_info.access_type = .read,
-            .write => fault_info.access_type = .write,
             .read_write => fault_info.access_type = .write,
-            .executable => fault_info.access_type = .execute,
+            .execute => fault_info.access_type = .execute,
         }
         // wiring needs write lock
         fault_info.anonymous_map_lock_type = .write;

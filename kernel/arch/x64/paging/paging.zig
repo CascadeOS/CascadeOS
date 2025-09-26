@@ -191,7 +191,7 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
         .kernel => entry.global.write(true),
     }
 
-    if (map_type.protection != .executable) {
+    if (map_type.protection != .execute) {
         if (x64.info.cpu_id.execute_disable) {
             @branchHint(.likely); // modern CPUs support NX
             entry.no_execute.write(true);
@@ -199,8 +199,9 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
     }
 
     switch (map_type.protection) {
-        .write, .read_write => entry.writeable.write(true),
-        else => {},
+        .none => entry.present.write(false),
+        .read_write => entry.writeable.write(true),
+        .read, .execute => {},
     }
 
     switch (map_type.cache) {

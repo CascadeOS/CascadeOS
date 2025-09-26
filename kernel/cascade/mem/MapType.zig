@@ -21,27 +21,22 @@ protection: Protection,
 
 cache: Cache = .write_back,
 
-pub const Protection = enum {
+pub const Protection = enum(u8) {
     /// Disallow any access.
-    none,
+    none = 0,
 
     /// Read only.
-    read,
-
-    /// Write only.
-    ///
-    /// If supported by the architecture reads are not allowed.
-    write,
-
-    /// Read and write.
-    read_write,
+    read = 1,
 
     /// Execute only.
     ///
-    /// If supported by the architecture reads are not allowed.
-    executable,
+    /// Reads may still be possible if the architecture does not support execute only.
+    execute = 2,
 
-    // TODO: might need a `read_executable` protection
+    /// Read and write.
+    read_write = 3,
+
+    // TODO: is there a way to support write only without it being the same as read_write when combined with mprotect?
 };
 
 pub const Cache = enum {
@@ -66,9 +61,8 @@ pub fn format(
     try writer.writeAll(switch (region.protection) {
         .none => "NO",
         .read => "RO",
-        .write => "WO",
+        .execute => "XO",
         .read_write => "RW",
-        .executable => "XO",
     });
 
     try writer.writeAll(switch (region.cache) {
