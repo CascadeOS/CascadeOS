@@ -31,7 +31,8 @@ const Entry = @This();
 
 range: core.VirtualRange,
 
-protection: Protection, // TODO: eventually we will want a max protection, which is the maximum allowed protection
+protection: Protection,
+max_protection: Protection,
 
 anonymous_map_reference: AnonymousMap.Reference,
 object_reference: Object.Reference,
@@ -145,6 +146,7 @@ fn canMergeInto(
     comptime order: enum { before, after },
 ) bool {
     if (entry.protection != other_entry.protection) return false;
+    if (entry.max_protection != other_entry.max_protection) return false;
     if (entry.copy_on_write != other_entry.copy_on_write) return false;
     if (entry.wired_count != other_entry.wired_count) return false;
 
@@ -283,6 +285,9 @@ pub fn print(entry: *Entry, context: *cascade.Context, writer: *std.Io.Writer, i
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("protection: {t},\n", .{entry.protection});
+
+    try writer.splatByteAll(' ', new_indent);
+    try writer.print("max_protection: {t},\n", .{entry.max_protection});
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("copy_on_write: {},\n", .{entry.copy_on_write});

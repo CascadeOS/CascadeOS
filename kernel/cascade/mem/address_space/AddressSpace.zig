@@ -147,6 +147,11 @@ pub const MapOptions = struct {
 
     protection: Protection,
 
+    /// The maximum allowed protection of the range.
+    ///
+    /// If `null` then the maximum protection is the same as the `protection`.
+    max_protection: ?Protection = null,
+
     type: Type,
 
     pub const Type = union(enum) {
@@ -195,6 +200,7 @@ pub fn map(
         const local_entry: Entry = .{
             .range = free_range.range,
             .protection = options.protection,
+            .max_protection = options.max_protection orelse options.protection,
             .anonymous_map_reference = .{
                 .anonymous_map = null,
                 .start_offset = undefined,
@@ -360,28 +366,60 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     return null;
 }
 
-pub const ChangeProtectionError = error{};
+pub const ChangeProtectionOptions = struct {
+    range: core.VirtualRange,
 
-/// Change the protection of a range of pages in the address space.
+    /// If `null` then the protection is left unchanged.
+    new_protection: ?Protection = null,
+
+    /// If `null` then the maximum protection is left unchanged.
+    new_max_protection: ?Protection = null,
+};
+
+pub const ChangeProtectionError = error{
+    BothProtectionAndMaxProtectionUnset,
+};
+
+/// Change the protection and/or maximum protection of a range of pages in the address space.
 ///
 /// The range may cover multiple entries or none at all.
 ///
 /// The size and address of the range must be aligned to the page size.
 ///
 /// The range must be entirely within the address space.
+///
+/// One of either `new_protection` or `new_max_protection` must be specified.
 pub fn changeProtection(
     address_space: *AddressSpace,
     context: *cascade.Context,
-    range: core.VirtualRange,
-    new_protection: Protection,
+    options: ChangeProtectionOptions,
 ) ChangeProtectionError!void {
     errdefer |err| log.debug(context, "{s}: change protection failed {t}", .{ address_space.name(), err });
 
-    log.verbose(context, "{s}: change protection of {f} to {t}", .{
-        address_space.name(),
-        range,
-        new_protection,
-    });
+    const range = options.range;
+
+    if (options.new_max_protection) |new_max_protection|
+        if (options.new_protection) |new_protection|
+            log.verbose(context, "{s}: change protection and max protection of {f} to {t} / {t}", .{
+                address_space.name(),
+                range,
+                new_protection,
+                new_max_protection,
+            })
+        else
+            log.verbose(context, "{s}: change max protection of {f} to {t}", .{
+                address_space.name(),
+                range,
+                new_max_protection,
+            })
+    else if (options.new_protection) |new_protection|
+        log.verbose(context, "{s}: change protection of {f} to {t}", .{
+            address_space.name(),
+            range,
+            new_protection,
+        })
+    else
+        return error.BothProtectionAndMaxProtectionUnset;
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
