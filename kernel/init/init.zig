@@ -88,8 +88,10 @@ pub fn initStage1() !noreturn {
     cascade.debug.setPanicMode(.init_panic);
     cascade.debug.log.setLogMode(.init_log);
 
-    log.debug(context, "booting non-bootstrap executors", .{});
-    try bootNonBootstrapExecutors();
+    if (executors.len > 1) {
+        log.debug(context, "booting non-bootstrap executors", .{});
+        try bootNonBootstrapExecutors();
+    }
 
     try initStage2(context);
     unreachable;
