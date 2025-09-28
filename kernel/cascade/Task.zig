@@ -255,12 +255,9 @@ pub const Stack = struct {
         ) catch return error.ObjectConstructionFailed;
         errdefer globals.stack_arena.deallocate(context, stack_range);
 
-        const range: core.VirtualRange = .{
-            .address = .fromInt(stack_range.base),
-            .size = stack_size_including_guard_page,
-        };
+        const range = stack_range.toVirtualRange();
         const usable_range: core.VirtualRange = .{
-            .address = .fromInt(stack_range.base),
+            .address = range.address,
             .size = cascade.config.kernel_stack_size,
         };
 
@@ -298,10 +295,7 @@ pub const Stack = struct {
             );
         }
 
-        globals.stack_arena.deallocate(context, .{
-            .base = stack.range.address.value,
-            .len = stack.range.size.value,
-        });
+        globals.stack_arena.deallocate(context, .fromVirtualRange(stack.range));
     }
 
     const stack_size_including_guard_page = cascade.config.kernel_stack_size.add(arch.paging.standard_page_size);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
+// TODO: use `core.Size`
 // TODO: return unused tags to the cache when they exceed a threshold
 // TODO: stats
 // TODO: next fit
@@ -953,6 +954,20 @@ pub const Policy = enum {
 pub const Allocation = struct {
     base: usize,
     len: usize,
+
+    pub fn toVirtualRange(self: Allocation) core.VirtualRange {
+        return .{
+            .address = .fromInt(self.base),
+            .size = .from(self.len, .byte),
+        };
+    }
+
+    pub fn fromVirtualRange(range: core.VirtualRange) Allocation {
+        return .{
+            .base = range.address.value,
+            .len = range.size.value,
+        };
+    }
 
     pub inline fn format(
         allocation: Allocation,

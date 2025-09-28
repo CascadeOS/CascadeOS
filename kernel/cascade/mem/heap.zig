@@ -19,10 +19,7 @@ pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
         .instant_fit,
     );
 
-    const virtual_range: core.VirtualRange = .{
-        .address = .fromInt(allocation.base),
-        .size = .from(allocation.len, .byte),
-    };
+    const virtual_range = allocation.toVirtualRange();
 
     if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
 
@@ -30,10 +27,7 @@ pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
 }
 
 pub inline fn deallocate(range: core.VirtualRange, context: *cascade.Context) void {
-    globals.heap_arena.deallocate(context, .{
-        .base = range.address.value,
-        .len = range.size.value,
-    });
+    globals.heap_arena.deallocate(context, .fromVirtualRange(range));
 }
 
 pub const allocator: std.mem.Allocator = .{
@@ -64,10 +58,7 @@ pub fn allocateSpecial(
     );
     errdefer globals.special_heap_address_space_arena.deallocate(context, allocation);
 
-    const virtual_range: core.VirtualRange = .{
-        .address = .fromInt(allocation.base),
-        .size = .from(allocation.len, .byte),
-    };
+    const virtual_range = allocation.toVirtualRange();
 
     globals.special_heap_page_table_mutex.lock(context);
     defer globals.special_heap_page_table_mutex.unlock(context);
@@ -105,10 +96,7 @@ pub fn deallocateSpecial(
         );
     }
 
-    globals.special_heap_address_space_arena.deallocate(
-        context,
-        .{ .base = virtual_range.address.value, .len = virtual_range.size.value },
-    );
+    globals.special_heap_address_space_arena.deallocate(context, .fromVirtualRange(virtual_range));
 }
 
 pub const allocator_impl = struct {
@@ -192,10 +180,7 @@ pub const allocator_impl = struct {
 
         log.verbose(context, "mapping {f} into heap", .{allocation});
 
-        const virtual_range: core.VirtualRange = .{
-            .address = .fromInt(allocation.base),
-            .size = .from(allocation.len, .byte),
-        };
+        const virtual_range = allocation.toVirtualRange();
 
         {
             globals.heap_page_table_mutex.lock(context);
@@ -234,10 +219,7 @@ pub const allocator_impl = struct {
             cascade.mem.unmapRange(
                 context,
                 cascade.mem.globals.core_page_table,
-                .{
-                    .address = .fromInt(allocation.base),
-                    .size = .from(allocation.len, .byte),
-                },
+                allocation.toVirtualRange(),
                 .kernel,
                 .free,
                 .keep,
