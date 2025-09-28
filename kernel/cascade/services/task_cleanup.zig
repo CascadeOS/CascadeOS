@@ -24,8 +24,7 @@ pub fn queueTaskForCleanup(
         .acq_rel,
         .acquire,
     ) != null) {
-        // someone else already queued this task for cleanup
-        return;
+        @panic("already queued for cleanup");
     }
 
     log.verbose(context, "queueing {f} for cleanup", .{task});

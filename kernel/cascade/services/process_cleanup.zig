@@ -19,8 +19,7 @@ pub fn queueProcessForCleanup(
         .acq_rel,
         .acquire,
     ) != null) {
-        // someone else already queued this process for cleanup
-        return;
+        @panic("already queued for cleanup");
     }
 
     log.verbose(context, "queueing {f} for cleanup", .{process});
