@@ -354,7 +354,10 @@ pub fn newTaskEntry(
     func(context, task_arg1, task_arg2) catch |err| {
         std.debug.panic("unhandled error: {t}", .{err});
     };
-    @panic("task returned to entry point");
+
+    cascade.scheduler.lockScheduler(context);
+    context.drop();
+    unreachable;
 }
 
 fn idle(context: *cascade.Context) callconv(.c) noreturn {

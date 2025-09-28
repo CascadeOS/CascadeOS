@@ -170,23 +170,17 @@ fn initStage3(context: *cascade.Context) !noreturn {
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(context: *cascade.Context, _: usize, _: usize) !noreturn {
+fn initStage4(context: *cascade.Context, _: usize, _: usize) !void {
     log.debug(context, "initializing PCI ECAM", .{});
     try pci.initializeECAM(context);
 
     log.debug(context, "initializing ACPI", .{});
     try acpi.initialize(context);
 
-    {
-        Output.globals.lock.lock(context);
-        defer Output.globals.lock.unlock(context);
-        try time.printInitializationTime(Output.writer);
-        try Output.writer.flush();
-    }
-
-    cascade.scheduler.lockScheduler(context);
-    context.drop();
-    unreachable;
+    Output.globals.lock.lock(context);
+    defer Output.globals.lock.unlock(context);
+    try time.printInitializationTime(Output.writer);
+    try Output.writer.flush();
 }
 
 fn constructBootstrapContext() !*cascade.Context {

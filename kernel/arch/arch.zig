@@ -410,7 +410,7 @@ pub const scheduling = struct {
         context: *cascade.Context,
         arg1: usize,
         arg2: usize,
-    ) anyerror!noreturn;
+    ) anyerror!void;
 
     /// Prepares the given task for being scheduled.
     ///
