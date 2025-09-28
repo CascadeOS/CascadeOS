@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-//! A slab based cache.
-//!
-//! Based on [The slab allocator: an object-caching kernel memory allocator](https://dl.acm.org/doi/10.5555/1267257.1267263) by Jeff Bonwick.
-//!
-
 // TODO: use `core.Size`
 
 const std = @import("std");
@@ -19,6 +14,9 @@ const log = cascade.debug.log.scoped(.cache);
 pub const ConstructorError = error{ObjectConstructionFailed};
 pub const Name = core.containers.BoundedArray(u8, cascade.config.cache_name_length);
 
+/// A slab based cache of T.
+///
+/// Wrapper around `RawCache` that provides a `T`-specifc API.
 pub fn Cache(
     comptime T: type,
     comptime constructor: ?fn (object: *T, context: *cascade.Context) ConstructorError!void,
@@ -146,6 +144,9 @@ pub fn Cache(
     };
 }
 
+/// A slab based cache.
+///
+/// Based on [The slab allocator: an object-caching kernel memory allocator](https://dl.acm.org/doi/10.5555/1267257.1267263) by Jeff Bonwick.
 pub const RawCache = struct {
     _name: Name,
 
