@@ -69,8 +69,8 @@ pub const CreateKernelTaskOptions = struct {
     name: Name,
 
     start_function: arch.scheduling.NewTaskFunction,
-    arg1: u64,
-    arg2: u64,
+    arg1: u64 = 0,
+    arg2: u64 = 0,
 
     kernel_task_type: Environment.KernelTaskType,
 };
@@ -394,8 +394,6 @@ pub const init = struct {
         const task = try createKernelTask(context, .{
             .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
             .start_function = undefined,
-            .arg1 = undefined,
-            .arg2 = undefined,
             .kernel_task_type = .init,
         });
         errdefer comptime unreachable;

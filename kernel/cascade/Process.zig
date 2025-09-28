@@ -72,8 +72,8 @@ pub const CreateTaskOptions = struct {
     name: ?cascade.Task.Name = null,
 
     start_function: arch.scheduling.NewTaskFunction,
-    arg1: u64,
-    arg2: u64,
+    arg1: u64 = 0,
+    arg2: u64 = 0,
 };
 
 /// Creates a task in the given process.

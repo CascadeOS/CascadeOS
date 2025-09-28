@@ -94,8 +94,6 @@ pub const init = struct {
         globals.process_cleanup_task = try cascade.Task.createKernelTask(context, .{
             .name = try .fromSlice("process cleanup"),
             .start_function = execute,
-            .arg1 = undefined,
-            .arg2 = undefined,
             .kernel_task_type = .normal,
         });
 
