@@ -758,7 +758,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 MAX_TAGS_PER_ALLOCATION,
             ).init(MAX_TAGS_PER_ALLOCATION - arena.unused_tags_count) catch unreachable;
 
-            globals.tag_cache.allocateMany(context, MAX_TAGS_PER_ALLOCATION, tags.slice()) catch
+            globals.tag_cache.allocateMany(context, tags.slice()) catch
                 return EnsureBoundaryTagsError.OutOfBoundaryTags;
 
             for (tags.slice()) |tag| {

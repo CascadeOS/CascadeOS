@@ -94,24 +94,20 @@ pub fn Cache(
         }
 
         /// Allocate multiple items from the cache.
-        ///
-        /// The length of `item_buffer` must be less than or equal to `max_count`.
-        pub fn allocateMany(
-            cache: *CacheT,
-            context: *cascade.Context,
-            comptime max_count: usize, // TODO: is there a better way than this?
-            items: []*T,
-        ) RawCache.AllocateError!void {
-            std.debug.assert(items.len > 0);
-            std.debug.assert(items.len <= max_count);
+        pub fn allocateMany(cache: *CacheT, context: *cascade.Context, items: []*T) RawCache.AllocateError!void {
+            var raw_item_buffer: [16][]u8 = undefined;
 
-            var raw_item_buffer: [max_count][]u8 = undefined;
-            const raw_items = raw_item_buffer[0..items.len];
+            var item_index: usize = 0;
+            while (item_index < items.len) {
+                const raw_items = raw_item_buffer[0..@min(raw_item_buffer.len, items.len - item_index)];
 
-            try cache.raw_cache.allocateMany(context, raw_items);
+                try cache.raw_cache.allocateMany(context, raw_items);
 
-            for (items, raw_items) |*item, raw_item| {
-                item.* = @ptrCast(@alignCast(raw_item));
+                for (items[item_index..][0..raw_items.len], raw_items) |*item, raw_item| {
+                    item.* = @ptrCast(@alignCast(raw_item));
+                }
+
+                item_index += raw_items.len;
             }
         }
 
@@ -121,25 +117,21 @@ pub fn Cache(
         }
 
         /// Deallocate multiple items back to the cache.
-        ///
-        /// The length of `items` must be less than or equal to `max_count`.
-        pub fn deallocateMany(
-            cache: *CacheT,
-            context: *cascade.Context,
-            comptime max_count: usize, // TODO: is there a better way than this?
-            items: []const *T,
-        ) void {
-            std.debug.assert(items.len > 0);
-            std.debug.assert(items.len <= max_count);
+        pub fn deallocateMany(cache: *CacheT, context: *cascade.Context, items: []const *T) void {
+            var raw_item_buffer: [16][]u8 = undefined;
 
-            var raw_item_buffer: [max_count][]u8 = undefined;
-            const raw_items = raw_item_buffer[0..items.len];
+            var item_index: usize = 0;
+            while (item_index < items.len) {
+                const raw_items = raw_item_buffer[0..@min(raw_item_buffer.len, items.len - item_index)];
 
-            for (raw_items, items) |*raw_item, item| {
-                raw_item.* = std.mem.asBytes(item);
+                for (raw_items, items[item_index..][0..raw_items.len]) |*raw_item, item| {
+                    raw_item.* = @ptrCast(@alignCast(item));
+                }
+
+                cache.raw_cache.deallocateMany(context, raw_items);
+
+                item_index += raw_items.len;
             }
-
-            cache.raw_cache.deallocateMany(context, raw_items);
         }
     };
 }
