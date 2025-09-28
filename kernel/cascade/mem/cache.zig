@@ -490,18 +490,23 @@ pub const RawCache = struct {
                     }
                 };
 
-                while (i < raw_cache.items_per_slab) : (i += 1) {
-                    const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
+                if (raw_cache.constructor) |constructor| {
+                    while (i < raw_cache.items_per_slab) : (i += 1) {
+                        const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
 
-                    if (raw_cache.constructor) |constructor| {
                         try constructor(item_ptr[0..raw_cache.item_size], context);
+
+                        slab.items.prepend(@ptrCast(@alignCast(
+                            item_ptr + single_node_alignment.forward(raw_cache.item_size),
+                        )));
                     }
-
-                    const item_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
-                        item_ptr + single_node_alignment.forward(raw_cache.item_size),
-                    ));
-
-                    slab.items.prepend(item_node);
+                } else {
+                    while (i < raw_cache.items_per_slab) : (i += 1) {
+                        const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
+                        slab.items.prepend(@ptrCast(@alignCast(
+                            item_ptr + single_node_alignment.forward(raw_cache.item_size),
+                        )));
+                    }
                 }
 
                 break :slab slab;
@@ -543,23 +548,38 @@ pub const RawCache = struct {
 
                 const items_base: [*]u8 = @ptrFromInt(large_item_allocation.base);
 
-                for (0..raw_cache.items_per_slab) |i| {
-                    const large_item = try globals.large_item_cache.allocate(context);
-                    errdefer globals.large_item_cache.deallocate(context, large_item);
+                if (raw_cache.constructor) |constructor| {
+                    for (0..raw_cache.items_per_slab) |i| {
+                        const large_item = try globals.large_item_cache.allocate(context);
+                        errdefer globals.large_item_cache.deallocate(context, large_item);
 
-                    const item: []u8 = (items_base + (i * raw_cache.effective_item_size))[0..raw_cache.item_size];
+                        const item: []u8 = (items_base + (i * raw_cache.effective_item_size))[0..raw_cache.item_size];
 
-                    large_item.* = .{
-                        .item = item,
-                        .slab = slab,
-                        .node = .{},
-                    };
+                        large_item.* = .{
+                            .item = item,
+                            .slab = slab,
+                            .node = .{},
+                        };
 
-                    if (raw_cache.constructor) |constructor| {
                         try constructor(item, context);
-                    }
 
-                    slab.items.prepend(&large_item.node);
+                        slab.items.prepend(&large_item.node);
+                    }
+                } else {
+                    for (0..raw_cache.items_per_slab) |i| {
+                        const large_item = try globals.large_item_cache.allocate(context);
+                        errdefer globals.large_item_cache.deallocate(context, large_item);
+
+                        const item: []u8 = (items_base + (i * raw_cache.effective_item_size))[0..raw_cache.item_size];
+
+                        large_item.* = .{
+                            .item = item,
+                            .slab = slab,
+                            .node = .{},
+                        };
+
+                        slab.items.prepend(&large_item.node);
+                    }
                 }
 
                 break :slab slab;
@@ -691,14 +711,18 @@ pub const RawCache = struct {
                 return;
             },
             .large => {
-                while (slab.items.popFirst()) |item_node| {
-                    const large_item: *LargeItem = @fieldParentPtr("node", item_node);
+                if (raw_cache.destructor) |destructor| {
+                    while (slab.items.popFirst()) |item_node| {
+                        const large_item: *LargeItem = @fieldParentPtr("node", item_node);
 
-                    if (raw_cache.destructor) |destructor| {
                         destructor(large_item.item, context);
-                    }
 
-                    globals.large_item_cache.deallocate(context, large_item);
+                        globals.large_item_cache.deallocate(context, large_item);
+                    }
+                } else {
+                    while (slab.items.popFirst()) |item_node| {
+                        globals.large_item_cache.deallocate(context, @fieldParentPtr("node", item_node));
+                    }
                 }
 
                 cascade.mem.heap.globals.heap_page_arena.deallocate(context, slab.large_item_allocation);
