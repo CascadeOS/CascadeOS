@@ -228,6 +228,8 @@ pub const RawCache = struct {
         const items_per_slab = if (is_small)
             (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_item_size
         else blk: {
+            // TODO: why search when we can calculate?
+
             var candidate_large_items_per_slab: usize = default_large_items_per_slab;
 
             const initial_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
@@ -445,7 +447,6 @@ pub const RawCache = struct {
                             arch.paging.standard_page_size.value,
                             .instant_fit,
                         ) catch return AllocateError.SlabAllocationFailed;
-                        std.debug.assert(slab_allocation.len == arch.paging.standard_page_size.value);
                         break :slab_base_ptr @ptrFromInt(slab_allocation.base);
                     },
                     .pmm => slab_base_ptr: {
