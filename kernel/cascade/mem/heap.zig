@@ -29,7 +29,7 @@ pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
     return virtual_range;
 }
 
-pub fn deallocate(range: core.VirtualRange, context: *cascade.Context) void {
+pub inline fn deallocate(range: core.VirtualRange, context: *cascade.Context) void {
     globals.heap_arena.deallocate(context, .{
         .base = range.address.value,
         .len = range.size.value,

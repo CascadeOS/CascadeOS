@@ -743,7 +743,7 @@ pub const RawCache = struct {
 const maximum_small_object_size = arch.paging.standard_page_size.subtract(.of(RawCache.Slab)).divideScalar(8);
 const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
 
-pub fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
+pub inline fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
     return sizeOfObjectWithNodeAppended(size, alignment) <= maximum_small_object_size.value;
 }
 
