@@ -740,7 +740,10 @@ pub const RawCache = struct {
     const default_large_objects_per_slab = 16;
 };
 
-const maximum_small_object_size = arch.paging.standard_page_size.subtract(.of(RawCache.Slab)).divideScalar(8);
+const minimum_small_objects_per_slab = 8;
+const maximum_small_object_size = arch.paging.standard_page_size
+    .subtract(.of(RawCache.Slab))
+    .divideScalar(minimum_small_objects_per_slab);
 const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
 
 pub inline fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
