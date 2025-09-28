@@ -53,8 +53,8 @@ wired_count: u32 = 0,
 pub fn create(context: *cascade.Context) !*Entry {
     return globals.entry_cache.allocate(context) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
-        error.ObjectConstructionFailed => unreachable, // no constructor is provided
-        error.LargeObjectAllocationFailed => unreachable, // `Entry` is not a large object - checked in `global_init.initializeCaches`
+        error.ItemConstructionFailed => unreachable, // no constructor is provided
+        error.LargeItemAllocationFailed => unreachable, // `Entry` is not a large entry - checked in `global_init.initializeCaches`
     };
 }
 
@@ -338,7 +338,7 @@ pub const globals = struct {
 };
 
 comptime {
-    if (!cascade.mem.cache.isSmallObject(@sizeOf(Entry), .of(Entry))) {
-        @compileError("`Entry` is a large cache object");
+    if (!cascade.mem.cache.isSmallItem(@sizeOf(Entry), .of(Entry))) {
+        @compileError("`Entry` is a large cache item");
     }
 }

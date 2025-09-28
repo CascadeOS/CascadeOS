@@ -252,7 +252,7 @@ pub const Stack = struct {
             context,
             stack_size_including_guard_page.value,
             .instant_fit,
-        ) catch return error.ObjectConstructionFailed;
+        ) catch return error.ItemConstructionFailed;
         errdefer globals.stack_arena.deallocate(context, stack_range);
 
         const range = stack_range.toVirtualRange();
@@ -273,7 +273,7 @@ pub const Stack = struct {
                 .kernel,
                 .keep,
                 cascade.mem.phys.allocator,
-            ) catch return error.ObjectConstructionFailed;
+            ) catch return error.ItemConstructionFailed;
         }
 
         return .fromRange(range, usable_range);

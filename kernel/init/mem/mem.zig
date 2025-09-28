@@ -414,8 +414,8 @@ fn initializeCaches(context: *cascade.Context) !void {
         .slab_source = .pmm,
     });
 
-    cascade.mem.cache.globals.large_object_cache.init(context, .{
-        .name = try .fromSlice("large object"),
+    cascade.mem.cache.globals.large_item_cache.init(context, .{
+        .name = try .fromSlice("large item"),
         .slab_source = .pmm,
     });
 

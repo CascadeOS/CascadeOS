@@ -180,7 +180,7 @@ fn cacheConstructor(process: *Process, context: *cascade.Context) cascade.mem.ca
 
     const frame = cascade.mem.phys.allocator.allocate(context) catch |err| {
         log.warn(context, "process constructor failed during frame allocation: {t}", .{err});
-        return error.ObjectConstructionFailed;
+        return error.ItemConstructionFailed;
     };
     errdefer {
         var frame_list: cascade.mem.phys.FrameList = .{};

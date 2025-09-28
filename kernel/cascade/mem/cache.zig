@@ -11,7 +11,7 @@ const core = @import("core");
 
 const log = cascade.debug.log.scoped(.cache);
 
-pub const ConstructorError = error{ObjectConstructionFailed};
+pub const ConstructorError = error{ItemConstructionFailed};
 pub const Name = core.containers.BoundedArray(u8, cascade.config.cache_name_length);
 
 /// A slab based cache of T.
@@ -19,8 +19,8 @@ pub const Name = core.containers.BoundedArray(u8, cascade.config.cache_name_leng
 /// Wrapper around `RawCache` that provides a `T`-specifc API.
 pub fn Cache(
     comptime T: type,
-    comptime constructor: ?fn (object: *T, context: *cascade.Context) ConstructorError!void,
-    comptime destructor: ?fn (object: *T, context: *cascade.Context) void,
+    comptime constructor: ?fn (item: *T, context: *cascade.Context) ConstructorError!void,
+    comptime destructor: ?fn (item: *T, context: *cascade.Context) void,
 ) type {
     return struct {
         raw_cache: RawCache,
@@ -37,7 +37,7 @@ pub fn Cache(
             ///
             /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
             ///
-            /// `.pmm` is only valid for small object caches.
+            /// `.pmm` is only valid for small item caches.
             slab_source: RawCache.InitOptions.SlabSource = .heap,
         };
 
@@ -57,16 +57,16 @@ pub fn Cache(
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
                     struct {
-                        fn innerConstructor(object: []u8, inner_context: *cascade.Context) ConstructorError!void {
-                            try con(@ptrCast(@alignCast(object)), inner_context);
+                        fn innerConstructor(item: []u8, inner_context: *cascade.Context) ConstructorError!void {
+                            try con(@ptrCast(@alignCast(item)), inner_context);
                         }
                     }.innerConstructor
                 else
                     null,
                 .destructor = if (destructor) |des|
                     struct {
-                        fn innerDestructor(object: []u8, inner_context: *cascade.Context) void {
-                            des(@ptrCast(@alignCast(object)), inner_context);
+                        fn innerDestructor(item: []u8, inner_context: *cascade.Context) void {
+                            des(@ptrCast(@alignCast(item)), inner_context);
                         }
                     }.innerDestructor
                 else
@@ -78,7 +78,7 @@ pub fn Cache(
 
         /// Deinitialize the cache.
         ///
-        /// All objects must have been deallocated before calling this.
+        /// All items must have been deallocated before calling this.
         pub fn deinit(cache: *CacheT, context: *cascade.Context) void {
             cache.raw_cache.deinit(context);
             cache.* = undefined;
@@ -88,58 +88,58 @@ pub fn Cache(
             return cache.raw_cache.name();
         }
 
-        /// Allocate an object from the cache.
+        /// Allocate an item from the cache.
         pub fn allocate(cache: *CacheT, context: *cascade.Context) RawCache.AllocateError!*T {
             return @ptrCast(@alignCast(try cache.raw_cache.allocate(context)));
         }
 
-        /// Allocate multiple objects from the cache.
+        /// Allocate multiple items from the cache.
         ///
-        /// The length of `object_buffer` must be less than or equal to `max_count`.
+        /// The length of `item_buffer` must be less than or equal to `max_count`.
         pub fn allocateMany(
             cache: *CacheT,
             context: *cascade.Context,
             comptime max_count: usize, // TODO: is there a better way than this?
-            objects: []*T,
+            items: []*T,
         ) RawCache.AllocateError!void {
-            std.debug.assert(objects.len > 0);
-            std.debug.assert(objects.len <= max_count);
+            std.debug.assert(items.len > 0);
+            std.debug.assert(items.len <= max_count);
 
-            var raw_object_buffer: [max_count][]u8 = undefined;
-            const raw_objects = raw_object_buffer[0..objects.len];
+            var raw_item_buffer: [max_count][]u8 = undefined;
+            const raw_items = raw_item_buffer[0..items.len];
 
-            try cache.raw_cache.allocateMany(context, raw_objects);
+            try cache.raw_cache.allocateMany(context, raw_items);
 
-            for (objects, raw_objects) |*object, raw_object| {
-                object.* = @ptrCast(@alignCast(raw_object));
+            for (items, raw_items) |*item, raw_item| {
+                item.* = @ptrCast(@alignCast(raw_item));
             }
         }
 
-        /// Deallocate an object back to the cache.
-        pub fn deallocate(cache: *CacheT, context: *cascade.Context, object: *T) void {
-            cache.raw_cache.deallocate(context, std.mem.asBytes(object));
+        /// Deallocate an item back to the cache.
+        pub fn deallocate(cache: *CacheT, context: *cascade.Context, item: *T) void {
+            cache.raw_cache.deallocate(context, std.mem.asBytes(item));
         }
 
-        /// Deallocate multiple objects back to the cache.
+        /// Deallocate multiple items back to the cache.
         ///
-        /// The length of `objects` must be less than or equal to `max_count`.
+        /// The length of `items` must be less than or equal to `max_count`.
         pub fn deallocateMany(
             cache: *CacheT,
             context: *cascade.Context,
             comptime max_count: usize, // TODO: is there a better way than this?
-            objects: []const *T,
+            items: []const *T,
         ) void {
-            std.debug.assert(objects.len > 0);
-            std.debug.assert(objects.len <= max_count);
+            std.debug.assert(items.len > 0);
+            std.debug.assert(items.len <= max_count);
 
-            var raw_object_buffer: [max_count][]u8 = undefined;
-            const raw_objects = raw_object_buffer[0..objects.len];
+            var raw_item_buffer: [max_count][]u8 = undefined;
+            const raw_items = raw_item_buffer[0..items.len];
 
-            for (raw_objects, objects) |*raw_object, object| {
-                raw_object.* = std.mem.asBytes(object);
+            for (raw_items, items) |*raw_item, item| {
+                raw_item.* = std.mem.asBytes(item);
             }
 
-            cache.raw_cache.deallocateMany(context, raw_objects);
+            cache.raw_cache.deallocateMany(context, raw_items);
         }
     };
 }
@@ -154,14 +154,14 @@ pub const RawCache = struct {
 
     size_class: Size,
 
-    object_size: usize,
+    item_size: usize,
 
-    /// The size of the object with sufficient padding to ensure alignment.
+    /// The size of the item with sufficient padding to ensure alignment.
     ///
-    /// If the object is small additional space for the free list node is added.
-    effective_object_size: usize,
+    /// If the item is small additional space for the free list node is added.
+    effective_item_size: usize,
 
-    objects_per_slab: usize,
+    items_per_slab: usize,
 
     /// What should happen to the last available slab when it is unused?
     last_slab: core.CleanupDecision = .keep,
@@ -170,11 +170,11 @@ pub const RawCache = struct {
     ///
     /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
     ///
-    /// `.pmm` is only valid for small object caches.
+    /// `.pmm` is only valid for small item caches.
     slab_source: InitOptions.SlabSource = .heap,
 
-    constructor: ?*const fn (object: []u8, context: *cascade.Context) ConstructorError!void,
-    destructor: ?*const fn (object: []u8, context: *cascade.Context) void,
+    constructor: ?*const fn (item: []u8, context: *cascade.Context) ConstructorError!void,
+    destructor: ?*const fn (item: []u8, context: *cascade.Context) void,
 
     available_slabs: std.DoublyLinkedList,
     full_slabs: std.DoublyLinkedList,
@@ -187,7 +187,7 @@ pub const RawCache = struct {
         large: Large,
 
         const Large = struct {
-            object_lookup: std.AutoHashMap(usize, *LargeObject),
+            item_lookup: std.AutoHashMap(usize, *LargeItem),
         };
     };
 
@@ -197,8 +197,8 @@ pub const RawCache = struct {
         size: usize,
         alignment: std.mem.Alignment,
 
-        constructor: ?*const fn (object: []u8, context: *cascade.Context) ConstructorError!void = null,
-        destructor: ?*const fn (object: []u8, context: *cascade.Context) void = null,
+        constructor: ?*const fn (item: []u8, context: *cascade.Context) ConstructorError!void = null,
+        destructor: ?*const fn (item: []u8, context: *cascade.Context) void = null,
 
         /// What should happen to the last available slab when it is unused?
         last_slab: core.CleanupDecision = .keep,
@@ -207,7 +207,7 @@ pub const RawCache = struct {
         ///
         /// This should only be `.pmm` for caches used as part of `ResourceArena`/`RawCache` implementation.
         ///
-        /// `.pmm` is only valid for small object caches.
+        /// `.pmm` is only valid for small item caches.
         slab_source: SlabSource = .heap,
 
         pub const SlabSource = enum {
@@ -222,63 +222,63 @@ pub const RawCache = struct {
         context: *cascade.Context,
         options: InitOptions,
     ) void {
-        const is_small = isSmallObject(options.size, options.alignment);
+        const is_small = isSmallItem(options.size, options.alignment);
 
         if (!is_small and options.slab_source == .pmm) {
-            @panic("only small object caches can have `slab_source` set to `.pmm`");
+            @panic("only small item caches can have `slab_source` set to `.pmm`");
         }
 
-        const effective_object_size = if (is_small)
-            sizeOfObjectWithNodeAppended(options.size, options.alignment)
+        const effective_item_size = if (is_small)
+            sizeOfItemWithNodeAppended(options.size, options.alignment)
         else
             options.alignment.forward(options.size);
 
-        const objects_per_slab = if (is_small)
-            (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_object_size
+        const items_per_slab = if (is_small)
+            (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_item_size
         else blk: {
-            var candidate_large_objects_per_slab: usize = default_large_objects_per_slab;
+            var candidate_large_items_per_slab: usize = default_large_items_per_slab;
 
             const initial_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
-                .from(candidate_large_objects_per_slab * effective_object_size, .byte),
+                .from(candidate_large_items_per_slab * effective_item_size, .byte),
             );
 
             while (true) {
                 const next_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
-                    .from((candidate_large_objects_per_slab + 1) * effective_object_size, .byte),
+                    .from((candidate_large_items_per_slab + 1) * effective_item_size, .byte),
                 );
 
                 if (next_pages_for_allocation != initial_pages_for_allocation) break;
 
-                candidate_large_objects_per_slab += 1;
+                candidate_large_items_per_slab += 1;
             }
 
-            break :blk candidate_large_objects_per_slab;
+            break :blk candidate_large_items_per_slab;
         };
 
         if (is_small) {
             log.debug(
                 context,
-                "{s}: init small object cache with effective size {f} (requested size {f} alignment {}) objects per slab {} ({f})",
+                "{s}: init small item cache with effective size {f} (requested size {f} alignment {}) items per slab {} ({f})",
                 .{
                     options.name.constSlice(),
-                    core.Size.from(effective_object_size, .byte),
+                    core.Size.from(effective_item_size, .byte),
                     core.Size.from(options.size, .byte),
                     options.alignment.toByteUnits(),
-                    objects_per_slab,
-                    core.Size.from(effective_object_size * objects_per_slab, .byte),
+                    items_per_slab,
+                    core.Size.from(effective_item_size * items_per_slab, .byte),
                 },
             );
         } else {
             log.debug(
                 context,
-                "{s}: init large object cache with effective size {f} (requested size {f} alignment {}) objects per slab {} ({f})",
+                "{s}: init large item cache with effective size {f} (requested size {f} alignment {}) items per slab {} ({f})",
                 .{
                     options.name.constSlice(),
-                    core.Size.from(effective_object_size, .byte),
+                    core.Size.from(effective_item_size, .byte),
                     core.Size.from(options.size, .byte),
                     options.alignment.toByteUnits(),
-                    objects_per_slab,
-                    core.Size.from(effective_object_size * objects_per_slab, .byte),
+                    items_per_slab,
+                    core.Size.from(effective_item_size * items_per_slab, .byte),
                 },
             );
         }
@@ -287,13 +287,13 @@ pub const RawCache = struct {
             ._name = options.name,
             .allocate_mutex = .{},
             .lock = .{},
-            .object_size = options.size,
-            .effective_object_size = effective_object_size,
+            .item_size = options.size,
+            .effective_item_size = effective_item_size,
             .constructor = options.constructor,
             .destructor = options.destructor,
             .available_slabs = .{},
             .full_slabs = .{},
-            .objects_per_slab = objects_per_slab,
+            .items_per_slab = items_per_slab,
             .last_slab = options.last_slab,
             .slab_source = options.slab_source,
             .size_class = if (is_small)
@@ -301,7 +301,7 @@ pub const RawCache = struct {
             else
                 .{
                     .large = .{
-                        .object_lookup = .init(cascade.mem.heap.allocator),
+                        .item_lookup = .init(cascade.mem.heap.allocator),
                     },
                 },
         };
@@ -309,7 +309,7 @@ pub const RawCache = struct {
 
     /// Deinitialize the cache.
     ///
-    /// All objects must have been deallocated before calling this.
+    /// All items must have been deallocated before calling this.
     pub fn deinit(raw_cache: *RawCache, context: *cascade.Context) void {
         log.debug(context, "{s}: deinit", .{raw_cache.name()});
 
@@ -318,13 +318,13 @@ pub const RawCache = struct {
         switch (raw_cache.size_class) {
             .small => {},
             .large => |large| {
-                if (large.object_lookup.count() != 0) @panic("large object lookup not empty");
+                if (large.item_lookup.count() != 0) @panic("large item lookup not empty");
             },
         }
 
         while (raw_cache.available_slabs.pop()) |node| {
             const slab: *Slab = @fieldParentPtr("linkage", node);
-            if (slab.allocated_objects != 0) @panic("slab not empty");
+            if (slab.allocated_items != 0) @panic("slab not empty");
 
             raw_cache.deallocateSlab(context, slab);
         }
@@ -337,37 +337,37 @@ pub const RawCache = struct {
     }
 
     pub const AllocateError = error{
-        ObjectConstructionFailed,
+        ItemConstructionFailed,
 
         SlabAllocationFailed,
 
-        /// Failed to allocate a large object.
+        /// Failed to allocate a large item.
         ///
-        /// Only possible if adding the object to the large object lookup failed.
-        LargeObjectAllocationFailed,
+        /// Only possible if adding the item to the large item lookup failed.
+        LargeItemAllocationFailed,
     };
 
-    /// Allocate an object from the cache.
+    /// Allocate an item from the cache.
     pub fn allocate(raw_cache: *RawCache, context: *cascade.Context) AllocateError![]u8 {
-        var object_buffer: [1][]u8 = undefined;
-        try raw_cache.allocateMany(context, &object_buffer);
-        return object_buffer[0];
+        var item_buffer: [1][]u8 = undefined;
+        try raw_cache.allocateMany(context, &item_buffer);
+        return item_buffer[0];
     }
 
-    /// Allocate multiple objects from the cache.
-    pub fn allocateMany(raw_cache: *RawCache, context: *cascade.Context, objects: [][]u8) AllocateError!void {
-        std.debug.assert(objects.len > 0);
+    /// Allocate multiple items from the cache.
+    pub fn allocateMany(raw_cache: *RawCache, context: *cascade.Context, items: [][]u8) AllocateError!void {
+        std.debug.assert(items.len > 0);
 
-        log.verbose(context, "{s}: allocating {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose(context, "{s}: allocating {} items", .{ raw_cache.name(), items.len });
 
-        var allocated_objects: std.ArrayListUnmanaged([]u8) = .initBuffer(objects);
-        errdefer raw_cache.deallocateMany(context, allocated_objects.items);
+        var allocated_items: std.ArrayListUnmanaged([]u8) = .initBuffer(items);
+        errdefer raw_cache.deallocateMany(context, allocated_items.items);
 
         raw_cache.lock.lock(context);
 
-        var objects_left = objects.len;
+        var items_left = items.len;
 
-        while (objects_left > 0) {
+        while (items_left > 0) {
             const slab: *Slab = if (raw_cache.available_slabs.first) |slab_node|
                 @fieldParentPtr("linkage", slab_node)
             else blk: {
@@ -375,38 +375,38 @@ pub const RawCache = struct {
                 break :blk try raw_cache.allocateSlab(context);
             };
 
-            while (objects_left > 0) {
-                defer objects_left -= 1;
+            while (items_left > 0) {
+                defer items_left -= 1;
 
-                const object_node = slab.objects.popFirst() orelse
+                const item_node = slab.items.popFirst() orelse
                     @panic("empty slab on available list");
-                slab.allocated_objects += 1;
+                slab.allocated_items += 1;
 
                 switch (raw_cache.size_class) {
                     .small => {
-                        const object_node_ptr: [*]u8 = @ptrCast(object_node);
-                        const object_ptr = object_node_ptr - single_node_alignment.forward(raw_cache.object_size);
-                        allocated_objects.appendAssumeCapacity(object_ptr[0..raw_cache.object_size]);
+                        const item_node_ptr: [*]u8 = @ptrCast(item_node);
+                        const item_ptr = item_node_ptr - single_node_alignment.forward(raw_cache.item_size);
+                        allocated_items.appendAssumeCapacity(item_ptr[0..raw_cache.item_size]);
                     },
                     .large => |*large| {
-                        const large_object: *LargeObject = @fieldParentPtr("node", object_node);
+                        const large_item: *LargeItem = @fieldParentPtr("node", item_node);
 
-                        large.object_lookup.putNoClobber(@intFromPtr(large_object.object.ptr), large_object) catch {
+                        large.item_lookup.putNoClobber(@intFromPtr(large_item.item.ptr), large_item) catch {
                             @branchHint(.cold);
 
-                            slab.objects.prepend(object_node);
-                            slab.allocated_objects -= 1;
+                            slab.items.prepend(item_node);
+                            slab.allocated_items -= 1;
 
-                            log.warn(context, "{s}: failed to add large object to lookup table", .{raw_cache.name()});
+                            log.warn(context, "{s}: failed to add large item to lookup table", .{raw_cache.name()});
 
-                            return error.LargeObjectAllocationFailed;
+                            return error.LargeItemAllocationFailed;
                         };
 
-                        allocated_objects.appendAssumeCapacity(large_object.object);
+                        allocated_items.appendAssumeCapacity(large_item.item);
                     },
                 }
 
-                if (slab.allocated_objects == raw_cache.objects_per_slab) {
+                if (slab.allocated_items == raw_cache.items_per_slab) {
                     @branchHint(.unlikely);
                     raw_cache.available_slabs.remove(&slab.linkage);
                     raw_cache.full_slabs.append(&slab.linkage);
@@ -486,88 +486,88 @@ pub const RawCache = struct {
                     slab_base_ptr + arch.paging.standard_page_size.value - @sizeOf(Slab),
                 ));
                 slab.* = .{
-                    .large_object_allocation = undefined,
+                    .large_item_allocation = undefined,
                 };
 
                 var i: usize = 0;
                 errdefer if (raw_cache.destructor) |destructor| {
-                    // call the destructor for any objects that the constructor was called on
+                    // call the destructor for any items that the constructor was called on
                     for (0..i) |y| {
-                        const object_ptr = slab_base_ptr + (y * raw_cache.effective_object_size);
-                        destructor(object_ptr[0..raw_cache.object_size], context);
+                        const item_ptr = slab_base_ptr + (y * raw_cache.effective_item_size);
+                        destructor(item_ptr[0..raw_cache.item_size], context);
                     }
                 };
 
-                while (i < raw_cache.objects_per_slab) : (i += 1) {
-                    const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
+                while (i < raw_cache.items_per_slab) : (i += 1) {
+                    const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
 
                     if (raw_cache.constructor) |constructor| {
-                        try constructor(object_ptr[0..raw_cache.object_size], context);
+                        try constructor(item_ptr[0..raw_cache.item_size], context);
                     }
 
-                    const object_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
-                        object_ptr + single_node_alignment.forward(raw_cache.object_size),
+                    const item_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
+                        item_ptr + single_node_alignment.forward(raw_cache.item_size),
                     ));
 
-                    slab.objects.prepend(object_node);
+                    slab.items.prepend(item_node);
                 }
 
                 break :slab slab;
             },
             .large => slab: {
-                const large_object_allocation = cascade.mem.heap.globals.heap_page_arena.allocate(
+                const large_item_allocation = cascade.mem.heap.globals.heap_page_arena.allocate(
                     context,
-                    raw_cache.effective_object_size * raw_cache.objects_per_slab,
+                    raw_cache.effective_item_size * raw_cache.items_per_slab,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
-                errdefer cascade.mem.heap.globals.heap_page_arena.deallocate(context, large_object_allocation);
+                errdefer cascade.mem.heap.globals.heap_page_arena.deallocate(context, large_item_allocation);
 
                 const slab = try globals.slab_cache.allocate(context);
                 slab.* = .{
-                    .large_object_allocation = large_object_allocation,
+                    .large_item_allocation = large_item_allocation,
                 };
 
                 if (core.is_debug) {
                     const virtual_range: core.VirtualRange = .{
-                        .address = .fromInt(slab.large_object_allocation.base),
-                        .size = .from(slab.large_object_allocation.len, .byte),
+                        .address = .fromInt(slab.large_item_allocation.base),
+                        .size = .from(slab.large_item_allocation.len, .byte),
                     };
                     @memset(virtual_range.toByteSlice(), undefined);
                 }
 
                 errdefer {
-                    while (slab.objects.popFirst()) |object_node| {
-                        const large_object: *LargeObject = @fieldParentPtr("node", object_node);
+                    while (slab.items.popFirst()) |item_node| {
+                        const large_item: *LargeItem = @fieldParentPtr("node", item_node);
 
                         if (raw_cache.destructor) |destructor| {
-                            destructor(large_object.object, context);
+                            destructor(large_item.item, context);
                         }
 
-                        globals.large_object_cache.deallocate(context, large_object);
+                        globals.large_item_cache.deallocate(context, large_item);
                     }
 
                     globals.slab_cache.deallocate(context, slab);
                 }
 
-                const objects_base: [*]u8 = @ptrFromInt(large_object_allocation.base);
+                const items_base: [*]u8 = @ptrFromInt(large_item_allocation.base);
 
-                for (0..raw_cache.objects_per_slab) |i| {
-                    const large_object = try globals.large_object_cache.allocate(context);
-                    errdefer globals.large_object_cache.deallocate(context, large_object);
+                for (0..raw_cache.items_per_slab) |i| {
+                    const large_item = try globals.large_item_cache.allocate(context);
+                    errdefer globals.large_item_cache.deallocate(context, large_item);
 
-                    const object: []u8 = (objects_base + (i * raw_cache.effective_object_size))[0..raw_cache.object_size];
+                    const item: []u8 = (items_base + (i * raw_cache.effective_item_size))[0..raw_cache.item_size];
 
-                    large_object.* = .{
-                        .object = object,
+                    large_item.* = .{
+                        .item = item,
                         .slab = slab,
                         .node = .{},
                     };
 
                     if (raw_cache.constructor) |constructor| {
-                        try constructor(object, context);
+                        try constructor(item, context);
                     }
 
-                    slab.objects.prepend(&large_object.node);
+                    slab.items.prepend(&large_item.node);
                 }
 
                 break :slab slab;
@@ -581,59 +581,59 @@ pub const RawCache = struct {
         return slab;
     }
 
-    /// Deallocate an object back to the cache.
-    pub fn deallocate(raw_cache: *RawCache, context: *cascade.Context, object: []u8) void {
-        raw_cache.deallocateMany(context, &.{object});
+    /// Deallocate an item back to the cache.
+    pub fn deallocate(raw_cache: *RawCache, context: *cascade.Context, item: []u8) void {
+        raw_cache.deallocateMany(context, &.{item});
     }
 
-    /// Deallocate many objects back to the cache.
-    pub fn deallocateMany(raw_cache: *RawCache, context: *cascade.Context, objects: []const []u8) void {
-        std.debug.assert(objects.len > 0);
+    /// Deallocate many items back to the cache.
+    pub fn deallocateMany(raw_cache: *RawCache, context: *cascade.Context, items: []const []u8) void {
+        std.debug.assert(items.len > 0);
 
-        log.verbose(context, "{s}: deallocating {} objects", .{ raw_cache.name(), objects.len });
+        log.verbose(context, "{s}: deallocating {} items", .{ raw_cache.name(), items.len });
 
         raw_cache.lock.lock(context);
         defer raw_cache.lock.unlock(context);
 
-        for (objects) |object| {
-            const slab, const object_node = switch (raw_cache.size_class) {
+        for (items) |item| {
+            const slab, const item_node = switch (raw_cache.size_class) {
                 .small => blk: {
                     const page_start = std.mem.alignBackward(
                         usize,
-                        @intFromPtr(object.ptr),
+                        @intFromPtr(item.ptr),
                         arch.paging.standard_page_size.value,
                     );
 
                     const slab: *Slab = @ptrFromInt(page_start + arch.paging.standard_page_size.value - @sizeOf(Slab));
 
-                    const object_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
-                        object.ptr + single_node_alignment.forward(raw_cache.object_size),
+                    const item_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
+                        item.ptr + single_node_alignment.forward(raw_cache.item_size),
                     ));
 
-                    break :blk .{ slab, object_node };
+                    break :blk .{ slab, item_node };
                 },
                 .large => |*large| blk: {
-                    const large_object = large.object_lookup.get(@intFromPtr(object.ptr)) orelse {
-                        @panic("large object not found in object lookup");
+                    const large_item = large.item_lookup.get(@intFromPtr(item.ptr)) orelse {
+                        @panic("large item not found in item lookup");
                     };
 
-                    _ = large.object_lookup.remove(@intFromPtr(object.ptr));
+                    _ = large.item_lookup.remove(@intFromPtr(item.ptr));
 
-                    break :blk .{ large_object.slab, &large_object.node };
+                    break :blk .{ large_item.slab, &large_item.node };
                 },
             };
 
-            if (slab.allocated_objects == raw_cache.objects_per_slab) {
+            if (slab.allocated_items == raw_cache.items_per_slab) {
                 // slab was previously full, move it to available list
                 @branchHint(.unlikely);
                 raw_cache.full_slabs.remove(&slab.linkage);
                 raw_cache.available_slabs.append(&slab.linkage);
             }
 
-            slab.objects.prepend(object_node);
-            slab.allocated_objects -= 1;
+            slab.items.prepend(item_node);
+            slab.allocated_items -= 1;
 
-            if (slab.allocated_objects != 0) {
+            if (slab.allocated_items != 0) {
                 // slab is still in use
                 @branchHint(.likely);
                 continue;
@@ -673,9 +673,9 @@ pub const RawCache = struct {
                 const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - arch.paging.standard_page_size.value;
 
                 if (raw_cache.destructor) |destructor| {
-                    for (0..raw_cache.objects_per_slab) |i| {
-                        const object_ptr = slab_base_ptr + (i * raw_cache.effective_object_size);
-                        destructor(object_ptr[0..raw_cache.object_size], context);
+                    for (0..raw_cache.items_per_slab) |i| {
+                        const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
+                        destructor(item_ptr[0..raw_cache.item_size], context);
                     }
                 }
 
@@ -699,17 +699,17 @@ pub const RawCache = struct {
                 return;
             },
             .large => {
-                while (slab.objects.popFirst()) |object_node| {
-                    const large_object: *LargeObject = @fieldParentPtr("node", object_node);
+                while (slab.items.popFirst()) |item_node| {
+                    const large_item: *LargeItem = @fieldParentPtr("node", item_node);
 
                     if (raw_cache.destructor) |destructor| {
-                        destructor(large_object.object, context);
+                        destructor(large_item.item, context);
                     }
 
-                    globals.large_object_cache.deallocate(context, large_object);
+                    globals.large_item_cache.deallocate(context, large_item);
                 }
 
-                cascade.mem.heap.globals.heap_page_arena.deallocate(context, slab.large_object_allocation);
+                cascade.mem.heap.globals.heap_page_arena.deallocate(context, slab.large_item_allocation);
 
                 globals.slab_cache.deallocate(context, slab);
             },
@@ -718,39 +718,39 @@ pub const RawCache = struct {
 
     const Slab = struct {
         linkage: std.DoublyLinkedList.Node = .{},
-        objects: std.SinglyLinkedList = .{},
-        allocated_objects: usize = 0,
+        items: std.SinglyLinkedList = .{},
+        allocated_items: usize = 0,
 
-        /// The allocation containing this slabs objects.
+        /// The allocation containing this slabs items.
         ///
-        /// Only set for large object slabs.
-        large_object_allocation: cascade.mem.resource_arena.Allocation,
+        /// Only set for large item slabs.
+        large_item_allocation: cascade.mem.resource_arena.Allocation,
 
         fn constructor(slab: *Slab) void {
             slab.* = .{};
         }
     };
 
-    const LargeObject = struct {
-        object: []u8,
+    const LargeItem = struct {
+        item: []u8,
         slab: *Slab,
         node: std.SinglyLinkedList.Node = .{},
     };
 
-    const default_large_objects_per_slab = 16;
+    const default_large_items_per_slab = 16;
 };
 
-const minimum_small_objects_per_slab = 8;
-const maximum_small_object_size = arch.paging.standard_page_size
+const minimum_small_items_per_slab = 8;
+const maximum_small_item_size = arch.paging.standard_page_size
     .subtract(.of(RawCache.Slab))
-    .divideScalar(minimum_small_objects_per_slab);
+    .divideScalar(minimum_small_items_per_slab);
 const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
 
-pub inline fn isSmallObject(size: usize, alignment: std.mem.Alignment) bool {
-    return sizeOfObjectWithNodeAppended(size, alignment) <= maximum_small_object_size.value;
+pub inline fn isSmallItem(size: usize, alignment: std.mem.Alignment) bool {
+    return sizeOfItemWithNodeAppended(size, alignment) <= maximum_small_item_size.value;
 }
 
-fn sizeOfObjectWithNodeAppended(size: usize, alignment: std.mem.Alignment) usize {
+fn sizeOfItemWithNodeAppended(size: usize, alignment: std.mem.Alignment) usize {
     return alignment.forward(single_node_alignment.forward(size) + @sizeOf(std.SinglyLinkedList.Node));
 }
 
@@ -759,5 +759,5 @@ pub const globals = struct {
     pub var slab_cache: Cache(RawCache.Slab, null, null) = undefined;
 
     /// Initialized during `init.mem.initializeCaches`.
-    pub var large_object_cache: Cache(RawCache.LargeObject, null, null) = undefined;
+    pub var large_item_cache: Cache(RawCache.LargeItem, null, null) = undefined;
 };
