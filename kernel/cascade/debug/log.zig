@@ -126,6 +126,13 @@ fn logFn(
                 _ = writer.consumeAll();
                 return;
             };
+
+            writer.print("{f} | ", .{context.task()}) catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
+
             writer.print(format, args) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
@@ -151,6 +158,13 @@ fn logFn(
                 _ = writer.consumeAll();
                 return;
             };
+
+            writer.print("{f} | ", .{context.task()}) catch {
+                @branchHint(.cold);
+                _ = writer.consumeAll();
+                return;
+            };
+
             writer.print(format, args) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();

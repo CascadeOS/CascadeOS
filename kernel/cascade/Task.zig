@@ -120,11 +120,11 @@ pub fn format(
 ) !void {
     switch (task.environment) {
         .kernel => try writer.print(
-            "Kernel('{s}')",
+            "Kernel<{s}>",
             .{task.name.constSlice()},
         ),
         .user => |process| try writer.print(
-            "User('{s}'-'{s}')",
+            "User<{s} - {s}>",
             .{ process.name.constSlice(), task.name.constSlice() },
         ),
     }
