@@ -69,4 +69,14 @@ pub fn customConfiguration(
 
     // devicetree
     module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
+
+    // ssfn
+    {
+        module.addCSourceFile(.{
+            .file = b.path("kernel/cascade/init/output/ssfn.h"),
+            .flags = &.{"-DSSFN_CONSOLEBITMAP_TRUECOLOR=1"},
+            .language = .c,
+        });
+        module.addIncludePath(b.path(("kernel/cascade/init/output")));
+    }
 }

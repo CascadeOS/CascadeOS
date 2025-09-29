@@ -47,11 +47,6 @@ fn getIOAPIC(gsi: u32) !IOAPIC {
     return error.NoIOAPICForGSI;
 }
 
-const globals = struct {
-    var io_apics: core.containers.BoundedArray(IOAPIC, x64.config.maximum_number_of_io_apics) = .{};
-    var source_overrides: [x64.paging.PageTable.number_of_entries]?SourceOverride = @splat(null);
-};
-
 const SourceOverride = struct {
     gsi: u32,
     polarity: IOAPIC.Polarity,
@@ -95,6 +90,11 @@ const SourceOverride = struct {
             id.trigger_mode,
         });
     }
+};
+
+const globals = struct {
+    var io_apics: core.containers.BoundedArray(IOAPIC, x64.config.maximum_number_of_io_apics) = .{};
+    var source_overrides: [x64.paging.PageTable.number_of_entries]?SourceOverride = @splat(null);
 };
 
 pub const init = struct {

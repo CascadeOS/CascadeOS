@@ -8,11 +8,7 @@ const boot = @import("boot");
 const cascade = @import("cascade");
 const core = @import("core");
 
-pub const acpi = @import("acpi.zig");
-pub const mem = @import("mem/mem.zig");
 pub const Output = @import("output/Output.zig");
-pub const pci = @import("pci.zig");
-pub const time = @import("time.zig");
 
 const log = cascade.debug.log.scoped(.init);
 
@@ -20,32 +16,32 @@ const log = cascade.debug.log.scoped(.init);
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !noreturn {
-    time.tryCaptureStandardWallclockStartTime();
+    cascade.time.init.tryCaptureStandardWallclockStartTime();
 
     // we need basic memory layout information to be able to panic
-    mem.determineEarlyMemoryLayout();
+    cascade.mem.init.determineEarlyMemoryLayout();
 
     var context = try constructBootstrapContext();
 
     // now that we have a context we can panic in a meaningful way
     cascade.debug.setPanicMode(.single_executor_init_panic);
 
-    mem.phys.initializeBootstrapFrameAllocator(context);
+    cascade.mem.phys.init.initializeBootstrapFrameAllocator(context);
 
     // TODO: ensure all physical memory regions are mapped in the bootloader provided page table here, this would allow
     // us to switch to latter limine revisions and also allow us to support unusual systems with MMIO above 4GiB
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
-    try acpi.earlyInitialize();
+    try cascade.acpi.init.earlyInitialize();
 
     Output.registerOutputs(context);
 
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    mem.logEarlyMemoryLayout(context);
+    cascade.mem.init.logEarlyMemoryLayout(context);
 
-    try acpi.logAcpiTables(context);
+    try cascade.acpi.init.logAcpiTables(context);
 
     log.debug(context, "initializing early interrupts", .{});
     arch.interrupts.init.initializeEarlyInterrupts();
@@ -57,7 +53,7 @@ pub fn initStage1() !noreturn {
     arch.init.configurePerExecutorSystemFeatures(context);
 
     log.debug(context, "initializing memory system", .{});
-    try mem.initializeMemorySystem(context);
+    try cascade.mem.init.initializeMemorySystem(context);
 
     log.debug(context, "remapping init outputs", .{});
     try Output.remapOutputs(context);
@@ -72,7 +68,7 @@ pub fn initStage1() !noreturn {
     arch.init.configureGlobalSystemFeatures(context);
 
     log.debug(context, "initializing time", .{});
-    try time.initializeTime(context);
+    try cascade.time.init.initializeTime(context);
 
     log.debug(context, "initializing interrupt routing", .{});
     try arch.interrupts.init.initializeInterruptRouting(context);
@@ -170,14 +166,14 @@ fn initStage3(context: *cascade.Context) !noreturn {
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
 fn initStage4(context: *cascade.Context, _: usize, _: usize) !void {
     log.debug(context, "initializing PCI ECAM", .{});
-    try pci.initializeECAM(context);
+    try cascade.pci.init.initializeECAM(context);
 
     log.debug(context, "initializing ACPI", .{});
-    try acpi.initialize(context);
+    try cascade.acpi.init.initialize(context);
 
     Output.globals.lock.lock(context);
     defer Output.globals.lock.unlock(context);
-    try time.printInitializationTime(Output.writer);
+    try cascade.time.init.printInitializationTime(Output.writer);
     try Output.writer.flush();
 }
 
@@ -309,23 +305,3 @@ const Stage3Barrier = struct {
         _ = stage3_complete.store(true, .release);
     }
 };
-
-/// Exports APIs across components.
-///
-/// Exports:
-///  - arch API needed by the boot component
-///  - boot API needed by the cascade component
-pub const exports = struct {
-    pub const arch = struct {
-        pub const current_arch = @import("arch").current_arch;
-        pub const disableAndHalt = @import("arch").interrupts.disableAndHalt;
-    };
-
-    pub const boot = struct {
-        pub const MemoryMapEntry = @import("boot").MemoryMap.Entry;
-    };
-};
-
-comptime {
-    @import("boot").exportEntryPoints();
-}

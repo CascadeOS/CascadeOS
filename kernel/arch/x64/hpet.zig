@@ -22,7 +22,7 @@ const globals = struct {
 pub const init = struct {
     pub fn registerTimeSource(
         context: *cascade.Context,
-        candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         const acpi_table = AcpiTable.get(0) orelse return;
         acpi_table.deinit();
@@ -100,7 +100,7 @@ pub const init = struct {
             .toPtr([*]volatile u64);
     }
 
-    const AcpiTable = cascade.exports.AcpiTable(cascade.acpi.tables.HPET);
+    const AcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.HPET);
     const init_log = cascade.debug.log.scoped(.hpet_init);
 };
 

@@ -332,9 +332,17 @@ pub inline fn format(_: *const Entry, _: *std.Io.Writer) !void {
     @compileError("use `Entry.print` instead");
 }
 
-pub const globals = struct {
-    /// Initialized during `init.mem.initializeCaches`.
-    pub var entry_cache: Cache(Entry, null, null) = undefined;
+const globals = struct {
+    /// Initialized during `init.initializeCaches`.
+    var entry_cache: Cache(Entry, null, null) = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeCaches(context: *cascade.Context) !void {
+        globals.entry_cache.init(context, .{
+            .name = try .fromSlice("address space entry"),
+        });
+    }
 };
 
 comptime {

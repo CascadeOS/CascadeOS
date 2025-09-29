@@ -6,7 +6,6 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
-const init = @import("init");
 const kernel_options = @import("kernel_options");
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
@@ -119,7 +118,7 @@ fn logFn(
 
             if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
-            const writer = init.Output.writer;
+            const writer = cascade.init.Output.writer;
 
             writer.writeAll(prefix) catch {
                 @branchHint(.cold);
@@ -139,7 +138,7 @@ fn logFn(
                 return;
             };
 
-            init.Output.writer.flush() catch {
+            cascade.init.Output.writer.flush() catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;
@@ -148,10 +147,10 @@ fn logFn(
         .init_log => {
             @branchHint(.unlikely);
 
-            init.Output.globals.lock.lock(context);
-            defer init.Output.globals.lock.unlock(context);
+            cascade.init.Output.globals.lock.lock(context);
+            defer cascade.init.Output.globals.lock.unlock(context);
 
-            const writer = init.Output.writer;
+            const writer = cascade.init.Output.writer;
 
             writer.writeAll(prefix) catch {
                 @branchHint(.cold);
@@ -171,7 +170,7 @@ fn logFn(
                 return;
             };
 
-            init.Output.writer.flush() catch {
+            cascade.init.Output.writer.flush() catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;

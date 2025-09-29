@@ -27,7 +27,7 @@ pub const init = struct {
 
     pub fn registerTimeSource(
         context: *cascade.Context,
-        candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         if (!shouldUseTsc()) return;
 
@@ -94,7 +94,7 @@ pub const init = struct {
 
     fn initializeTscCalibrate(
         context: *cascade.Context,
-        reference_counter: cascade.exports.time.ReferenceCounter,
+        reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());
 

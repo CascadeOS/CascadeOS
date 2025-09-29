@@ -6,7 +6,6 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
-const init = @import("init");
 
 pub const log = @import("log.zig");
 
@@ -82,21 +81,21 @@ fn singleExecutorInitPanic(
         var nested_panic_count: usize = 0;
     };
 
-    init.Output.globals.lock.poison();
+    cascade.init.Output.globals.lock.poison();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(init.Output.writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(cascade.init.Output.writer, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => cascade.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
         else => return,
     }
 
-    init.Output.writer.flush() catch {};
+    cascade.init.Output.writer.flush() catch {};
 }
 
 fn initPanic(
@@ -119,7 +118,7 @@ fn initPanic(
         if (panicking_executor != executor) return; // another executor is panicking
     }
 
-    init.Output.globals.lock.poison();
+    cascade.init.Output.globals.lock.poison();
     arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;
@@ -127,14 +126,14 @@ fn initPanic(
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(init.Output.writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(cascade.init.Output.writer, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => cascade.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
         else => return,
     }
 
-    init.Output.writer.flush() catch {};
+    cascade.init.Output.writer.flush() catch {};
 }
 
 const formatting = struct {

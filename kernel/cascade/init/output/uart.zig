@@ -6,7 +6,6 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
-const init = @import("init");
 
 pub const Uart = union(enum) {
     io_port_16550: IoPort16550,
@@ -16,7 +15,7 @@ pub const Uart = union(enum) {
 
     pl011: PL011,
 
-    pub fn output(uart: *Uart) init.Output {
+    pub fn output(uart: *Uart) cascade.init.Output {
         switch (uart.*) {
             inline else => |*u| return u.output(),
         }
@@ -242,7 +241,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
             }
         }
 
-        pub fn output(uart: *UartT) init.Output {
+        pub fn output(uart: *UartT) cascade.init.Output {
             return .{
                 .writeFn = struct {
                     fn writeFn(state: *anyopaque, str: []const u8) void {
@@ -543,7 +542,7 @@ pub const PL011 = struct {
         }
     }
 
-    pub fn output(pl011: *PL011) init.Output {
+    pub fn output(pl011: *PL011) cascade.init.Output {
         return .{
             .writeFn = struct {
                 fn writeFn(state: *anyopaque, str: []const u8) void {

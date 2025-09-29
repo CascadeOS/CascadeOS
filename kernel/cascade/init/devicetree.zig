@@ -9,8 +9,7 @@ const boot = @import("boot");
 const cascade = @import("cascade");
 const core = @import("core");
 pub const DeviceTree = @import("DeviceTree");
-const init = @import("init");
-const uart = init.Output.uart;
+const uart = cascade.init.Output.uart;
 
 const log = cascade.debug.log.scoped(.devicetree);
 

@@ -544,7 +544,7 @@ pub const init = struct {
         output: Output,
         preference: Preference,
 
-        pub const Output = cascade.exports.Output;
+        pub const Output = cascade.init.Output;
 
         pub const Preference = enum {
             /// Use this output.
@@ -642,7 +642,7 @@ pub const init = struct {
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
     pub fn registerArchitecturalTimeSources(
         context: *cascade.Context,
-        candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
@@ -962,7 +962,7 @@ pub const Functions = struct {
         /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
         registerArchitecturalTimeSources: ?fn (
             context: *cascade.Context,
-            candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+            candidate_time_sources: *cascade.time.init.CandidateTimeSources,
         ) void = null,
 
         /// Initialize the local interrupt controller for the current executor.

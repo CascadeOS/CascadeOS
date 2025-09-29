@@ -242,22 +242,22 @@ pub const globals = struct {
     ///
     /// Has no source arena, provided with a single span representing the entire heap.
     ///
-    /// Initialized during `init.mem.initializeHeaps`.
-    pub var heap_address_space_arena: Arena = undefined;
+    /// Initialized during `init.initializeHeaps`.
+    var heap_address_space_arena: Arena = undefined;
 
     /// The heap page arena, has a quantum of the standard page size.
     ///
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
-    /// Initialized during `init.mem.initializeHeaps`.
+    /// Initialized during `init.initializeHeaps`.
     pub var heap_page_arena: Arena = undefined;
 
     /// The heap arena.
     ///
     /// Has a source arena of `heap_page_arena`.
     ///
-    /// Initialized during `init.mem.initializeHeaps`.
-    pub var heap_arena: HeapArena = undefined;
+    /// Initialized during `init.initializeHeaps`.
+    var heap_arena: HeapArena = undefined;
 
     var heap_page_table_mutex: cascade.sync.Mutex = .{};
 
@@ -265,10 +265,83 @@ pub const globals = struct {
     ///
     /// Has no source arena, provided with a single span representing the entire range.
     ///
-    /// Initialized during `init.mem.initializeHeaps`.
-    pub var special_heap_address_space_arena: cascade.mem.resource_arena.Arena(.none) = undefined;
+    /// Initialized during `init.initializeHeaps`.
+    var special_heap_address_space_arena: cascade.mem.resource_arena.Arena(.none) = undefined;
 
     var special_heap_page_table_mutex: cascade.sync.Mutex = .{};
+};
+
+pub const init = struct {
+    pub fn initializeHeaps(
+        context: *cascade.Context,
+        kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
+    ) !void {
+        // heap
+        {
+            try globals.heap_address_space_arena.init(
+                context,
+                .{
+                    .name = try .fromSlice("heap_address_space"),
+                    .quantum = arch.paging.standard_page_size.value,
+                },
+            );
+
+            try globals.heap_page_arena.init(
+                context,
+                .{
+                    .name = try .fromSlice("heap_page"),
+                    .quantum = arch.paging.standard_page_size.value,
+                    .source = globals.heap_address_space_arena.createSource(.{
+                        .custom_import = allocator_impl.heapPageArenaImport,
+                        .custom_release = allocator_impl.heapPageArenaRelease,
+                    }),
+                },
+            );
+
+            try globals.heap_arena.init(
+                context,
+                .{
+                    .name = try .fromSlice("heap"),
+                    .quantum = allocator_impl.heap_arena_quantum,
+                    .source = globals.heap_page_arena.createSource(.{}),
+                },
+            );
+
+            const heap_range = kernel_regions.find(.kernel_heap).?.range;
+
+            globals.heap_address_space_arena.addSpan(
+                context,
+                heap_range.address.value,
+                heap_range.size.value,
+            ) catch |err| {
+                std.debug.panic("failed to add heap range to `heap_address_space_arena`: {t}", .{err});
+            };
+        }
+
+        // special heap
+        {
+            try globals.special_heap_address_space_arena.init(
+                context,
+                .{
+                    .name = try .fromSlice("special_heap_address_space"),
+                    .quantum = arch.paging.standard_page_size.value,
+                },
+            );
+
+            const special_heap_range = kernel_regions.find(.special_heap).?.range;
+
+            globals.special_heap_address_space_arena.addSpan(
+                context,
+                special_heap_range.address.value,
+                special_heap_range.size.value,
+            ) catch |err| {
+                std.debug.panic(
+                    "failed to add special heap range to `special_heap_address_space_arena`: {t}",
+                    .{err},
+                );
+            };
+        }
+    }
 };
 
 const Arena = resource_arena.Arena(.none);

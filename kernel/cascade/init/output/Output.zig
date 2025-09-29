@@ -6,7 +6,6 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
-const init = @import("init");
 
 const devicetree = @import("../devicetree.zig");
 pub const uart = @import("uart.zig");
@@ -52,7 +51,7 @@ pub fn registerOutputs(context: *cascade.Context) void {
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources(context: *cascade.Context) ?init.Output {
+fn tryGetSerialOutputFromGenericSources(context: *cascade.Context) ?cascade.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };

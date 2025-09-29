@@ -7,12 +7,11 @@ const arch = @import("arch");
 const boot = @import("boot");
 const cascade = @import("cascade");
 const core = @import("core");
-const init = @import("init");
 
 // Does not scroll instead wraps to the top of the screen.
 // Due to this is needs to clear the entire line with when a new line is started.
 
-pub fn tryGetFramebufferOutput() ?init.Output {
+pub fn tryGetFramebufferOutput() ?cascade.init.Output {
     const framebuffer = boot.framebuffer() orelse return null;
 
     c.ssfn_src = @constCast(font);

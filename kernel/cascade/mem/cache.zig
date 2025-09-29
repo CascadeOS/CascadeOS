@@ -771,10 +771,24 @@ fn sizeOfItemWithNodeAppended(size: usize, alignment: std.mem.Alignment) usize {
     return alignment.forward(single_node_alignment.forward(size) + @sizeOf(std.SinglyLinkedList.Node));
 }
 
-pub const globals = struct {
-    /// Initialized during `init.mem.initializeCaches`.
-    pub var slab_cache: Cache(RawCache.Slab, null, null) = undefined;
+const globals = struct {
+    /// Initialized during `init.initializeCaches`.
+    var slab_cache: Cache(RawCache.Slab, null, null) = undefined;
 
-    /// Initialized during `init.mem.initializeCaches`.
-    pub var large_item_cache: Cache(RawCache.LargeItem, null, null) = undefined;
+    /// Initialized during `init.initializeCaches`.
+    var large_item_cache: Cache(RawCache.LargeItem, null, null) = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeCaches(context: *cascade.Context) !void {
+        globals.slab_cache.init(context, .{
+            .name = try .fromSlice("slab"),
+            .slab_source = .pmm,
+        });
+
+        globals.large_item_cache.init(context, .{
+            .name = try .fromSlice("large item"),
+            .slab_source = .pmm,
+        });
+    }
 };

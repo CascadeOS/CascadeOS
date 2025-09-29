@@ -301,7 +301,7 @@ pub const Stack = struct {
     const stack_size_including_guard_page = cascade.config.kernel_stack_size.add(arch.paging.standard_page_size);
 };
 
-pub const globals = struct {
+const globals = struct {
     /// The source of task objects.
     ///
     /// Initialized during `init.initializeTasks`.

@@ -12,19 +12,13 @@ pub const components: []const KernelComponent = &.{
     },
     .{
         .name = "boot",
-        .component_dependencies = &.{"init"},
+        .component_dependencies = &.{ "arch", "cascade" },
         .library_dependencies = &.{ "core", "limine" },
     },
     .{
         .name = "cascade",
-        .component_dependencies = &.{ "arch", "init" },
+        .component_dependencies = &.{ "arch", "boot" },
         .library_dependencies = &.{ "core", "sdf" },
         .configuration = @import("cascade/custom_configuration.zig").customConfiguration,
-    },
-    .{
-        .name = "init",
-        .component_dependencies = &.{ "arch", "boot", "cascade" },
-        .library_dependencies = &.{"core"},
-        .configuration = @import("init/custom_configuration.zig").customConfiguration,
     },
 };

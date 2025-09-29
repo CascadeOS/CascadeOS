@@ -100,7 +100,7 @@ pub const init = struct {
 
     pub fn registerTimeSource(
         context: *cascade.Context,
-        candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         candidate_time_sources.addTimeSource(context, .{
             .name = "lapic",
@@ -126,7 +126,7 @@ pub const init = struct {
 
     fn initializeLapicTimerCalibrate(
         context: *cascade.Context,
-        reference_counter: cascade.exports.time.ReferenceCounter,
+        reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
 

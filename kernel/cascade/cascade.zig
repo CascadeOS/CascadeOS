@@ -47,23 +47,8 @@ pub const std_options: std.Options = .{
     .logFn = debug.log.stdLogImpl,
 };
 
-/// Exports APIs across components.
-///
-/// Exports:
-///  - init API needed by the arch component
-pub const exports = struct {
-    pub const AcpiTable = init.acpi.AcpiTable;
-
-    pub const Output = init.Output;
-
-    pub const time = struct {
-        pub const CandidateTimeSources = init.time.CandidateTimeSources;
-        pub const ReferenceCounter = init.time.ReferenceCounter;
-    };
-
-    const init = @import("init");
-};
+pub const init = @import("init/init.zig");
 
 comptime {
-    _ = &exports.init;
+    @import("boot").exportEntryPoints();
 }

@@ -3,9 +3,10 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const boot = @import("boot");
+const cascade = @import("cascade");
 const core = @import("core");
-const init = @import("init");
 const limine = @import("limine");
 
 pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
@@ -94,7 +95,7 @@ pub fn rsdp() ?core.Address {
 }
 
 pub fn x2apicEnabled() bool {
-    std.debug.assert(init.exports.arch.current_arch == .x64);
+    std.debug.assert(arch.current_arch == .x64);
 
     const resp: *const limine.MP.x86_64 = requests.smp.response orelse
         return false;
@@ -106,7 +107,7 @@ pub fn bootstrapArchitectureProcessorId() u64 {
     const resp = requests.smp.response orelse
         return 0;
 
-    return switch (init.exports.arch.current_arch) {
+    return switch (arch.current_arch) {
         .arm => resp.bsp_mpidr,
         .riscv => resp.bsp_hartid,
         .x64 => resp.bsp_lapic_id,
@@ -207,7 +208,7 @@ pub const CpuDescriptorIterator = struct {
     ) u64 {
         const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
 
-        return switch (init.exports.arch.current_arch) {
+        return switch (arch.current_arch) {
             .arm => descriptor.smp_info.mpidr,
             .riscv => descriptor.smp_info.hartid,
             .x64 => descriptor.smp_info.lapic_id,
@@ -257,7 +258,7 @@ fn limineEntryPoint() callconv(.c) noreturn {
         limine_revison = target_limine_revison;
     }
 
-    @call(.never_inline, init.initStage1, .{}) catch |err| {
+    @call(.never_inline, cascade.init.initStage1, .{}) catch |err| {
         std.debug.panic("unhandled error: {t}", .{err});
     };
     @panic("`initStage1` returned");

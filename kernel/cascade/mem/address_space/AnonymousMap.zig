@@ -297,7 +297,15 @@ pub inline fn format(_: *const *AnonymousMap, _: *std.Io.Writer) !void {
     @compileError("use `AnonymousMap.print` instead");
 }
 
-pub const globals = struct {
-    /// Initialized during `init.mem.initializeCaches`.
-    pub var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
+const globals = struct {
+    /// Initialized during `init.initializeCaches`.
+    var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeCaches(context: *cascade.Context) !void {
+        globals.anonymous_map_cache.init(context, .{
+            .name = try .fromSlice("anonymous map"),
+        });
+    }
 };

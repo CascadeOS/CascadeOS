@@ -218,7 +218,7 @@ fn cacheDestructor(process: *Process, context: *cascade.Context) void {
     cascade.mem.phys.allocator.deallocate(context, frame_list);
 }
 
-pub const globals = struct {
+const globals = struct {
     /// The source of process objects.
     ///
     /// Initialized during `init.initializeCache`.

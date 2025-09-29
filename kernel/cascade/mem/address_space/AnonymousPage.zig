@@ -72,7 +72,15 @@ pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade
     }
 }
 
-pub const globals = struct {
-    /// Initialized during `init.mem.initializeCaches`.
-    pub var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
+const globals = struct {
+    /// Initialized during `init.initializeCaches`.
+    var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeCaches(context: *cascade.Context) !void {
+        globals.anonymous_page_cache.init(context, .{
+            .name = try .fromSlice("anonymous page"),
+        });
+    }
 };

@@ -4,10 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
+const AcpiTable = cascade.acpi.init.AcpiTable;
 const cascade = @import("cascade");
-const AcpiTable = cascade.exports.AcpiTable;
 const core = @import("core");
+const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
 
 const x64 = @import("x64.zig");
 
@@ -346,7 +346,7 @@ pub fn configurePerExecutorSystemFeatures(context: *cascade.Context) void {
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
     context: *cascade.Context,
-    candidate_time_sources: *cascade.exports.time.CandidateTimeSources,
+    candidate_time_sources: *cascade.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(context, candidate_time_sources);
     x64.hpet.init.registerTimeSource(context, candidate_time_sources);

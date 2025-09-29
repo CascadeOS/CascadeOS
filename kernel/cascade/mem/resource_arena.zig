@@ -1338,7 +1338,16 @@ const MAX_TAGS_PER_ALLOCATION = TAGS_PER_SPAN_CREATE + TAGS_PER_PARTIAL_ALLOCATI
 
 const TAGS_PER_PAGE = arch.paging.standard_page_size.value / @sizeOf(BoundaryTag);
 
-pub const globals = struct {
-    /// Initialized during `init.mem.initializeCaches`.
-    pub var tag_cache: cascade.mem.cache.Cache(BoundaryTag, null, null) = undefined;
+const globals = struct {
+    /// Initialized during `init.initializeCaches`.
+    var tag_cache: cascade.mem.cache.Cache(BoundaryTag, null, null) = undefined;
+};
+
+pub const init = struct {
+    pub fn initializeCaches(context: *cascade.Context) !void {
+        globals.tag_cache.init(context, .{
+            .name = try .fromSlice("boundary tag"),
+            .slab_source = .pmm,
+        });
+    }
 };
