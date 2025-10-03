@@ -102,6 +102,11 @@ pub const LockState = enum {
     unlocked,
 };
 
+pub const LockType = enum {
+    read,
+    write,
+};
+
 pub const CleanupDecision = enum {
     keep,
     free,

@@ -51,13 +51,8 @@ wired: bool = false,
 
 promote_to_anonymous_map: bool = false,
 
-anonymous_map_lock_type: LockType = .read,
-object_lock_type: LockType = .read,
-
-const LockType = enum {
-    read,
-    write,
-};
+anonymous_map_lock_type: core.LockType = .read,
+object_lock_type: core.LockType = .read,
 
 const FaultCheckError =
     AddressSpace.HandlePageFaultError ||
@@ -325,7 +320,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
 /// If `write_lock` is `true` the `entries_lock` is acquired in write mode.
 ///
 /// Called `uvmfault_lookup` in OpenBSD uvm.
-fn faultLookup(fault_info: *FaultInfo, context: *cascade.Context, lock_type: LockType) bool {
+fn faultLookup(fault_info: *FaultInfo, context: *cascade.Context, lock_type: core.LockType) bool {
     switch (lock_type) {
         .read => fault_info.address_space.entries_lock.readLock(context),
         .write => fault_info.address_space.entries_lock.writeLock(context),
