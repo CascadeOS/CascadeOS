@@ -21,7 +21,9 @@ mutex: cascade.sync.Mutex = .{},
 wait_queue_spinlock: cascade.sync.TicketSpinLock = .{},
 wait_queue: cascade.sync.WaitQueue = .{},
 
-/// Attempts to upgrade the a read lock to a write lock.
+/// Attempt to upgrade a read lock to a write lock.
+///
+/// Returns `true` if the upgrade was successful.
 ///
 /// If it fails the lock is left unlocked.
 pub fn tryUpgradeLock(rw_lock: *RwLock, context: *cascade.Context) bool {
