@@ -188,39 +188,53 @@ pub fn map(
 
     std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
 
-    if (options.size.equal(.zero)) return error.ZeroSize;
+    if (options.size.equal(.zero)) {
+        @branchHint(.cold);
+        return error.ZeroSize;
+    }
 
-    const local_entry, const entry_merge = blk: {
-        address_space.entries_lock.writeLock(context);
-        defer address_space.entries_lock.writeUnlock(context);
-
-        const free_range = address_space.findFreeRange(options.size) orelse
-            return error.RequestedSizeUnavailable;
-
-        const local_entry: Entry = .{
-            .range = free_range.range,
-            .protection = options.protection,
-            .max_protection = options.max_protection orelse options.protection,
-            .anonymous_map_reference = .{
-                .anonymous_map = null,
+    var local_entry: Entry = .{
+        .range = undefined, // set below
+        .protection = options.protection,
+        .max_protection = options.max_protection orelse options.protection,
+        .anonymous_map_reference = .{
+            .anonymous_map = null,
+            .start_offset = undefined,
+        },
+        .object_reference = switch (options.type) {
+            .object => |object_reference| object_reference,
+            .zero_fill => .{
+                .object = null,
                 .start_offset = undefined,
             },
-            .object_reference = switch (options.type) {
-                .object => |object_reference| object_reference,
-                .zero_fill => .{
-                    .object = null,
-                    .start_offset = undefined,
-                },
-            },
-            .copy_on_write = switch (options.type) {
-                .zero_fill => true,
-                .object => @panic("NOT IMPLEMENTED"), // TODO
-            },
-            .needs_copy = switch (options.type) {
-                .zero_fill => true,
-                .object => @panic("NOT IMPLEMENTED"), // TODO
-            },
+        },
+        .copy_on_write = switch (options.type) {
+            .zero_fill => true,
+            .object => @panic("NOT IMPLEMENTED"), // TODO
+        },
+        .needs_copy = switch (options.type) {
+            .zero_fill => true,
+            .object => @panic("NOT IMPLEMENTED"), // TODO
+        },
+    };
+
+    var entries_lock_type: core.LockType = .read;
+    const entry_merge = while (true) {
+        switch (entries_lock_type) {
+            .read => address_space.entries_lock.readLock(context),
+            .write => address_space.entries_lock.writeLock(context),
+        }
+        errdefer switch (entries_lock_type) {
+            .read => address_space.entries_lock.readUnlock(context),
+            .write => address_space.entries_lock.writeUnlock(context),
         };
+
+        const free_range = address_space.findFreeRange(options.size) orelse {
+            @branchHint(.cold);
+            return error.RequestedSizeUnavailable;
+        };
+
+        local_entry.range = free_range.range;
 
         const entry_merge = local_entry.determineEntryMerge(
             context,
@@ -228,67 +242,27 @@ pub fn map(
             address_space.entries.items,
         );
 
-        switch (entry_merge) {
-            .new => |index| {
-                const new_entry: *Entry = try .create(context);
-                errdefer new_entry.destroy(context);
+        // now we need a write lock
+        if (entries_lock_type == .read) {
+            const entries_version = address_space.entries_version;
+            entries_lock_type = .write;
 
-                new_entry.* = local_entry;
+            if (!address_space.entries_lock.tryUpgradeLock(context)) {
+                // we failed to upgrade the read lock to a write lock so we need to try again with a write lock
+                address_space.entries_lock.writeLock(context);
 
-                address_space.entries.insert(
-                    cascade.mem.heap.allocator,
-                    index,
-                    new_entry,
-                ) catch return error.OutOfMemory;
-            },
-            .extend => |extend| {
-                if (extend.before) |before_entry| {
-                    // merge the local entry into the before entry
-
-                    const old_size = before_entry.range.size;
-                    before_entry.range.size.addInPlace(local_entry.range.size);
-
-                    if (before_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-                        anonymous_map.lock.writeLock(context);
-                        defer anonymous_map.lock.writeUnlock(context);
-
-                        std.debug.assert(anonymous_map.reference_count == 1);
-                        std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
-
-                        anonymous_map.number_of_pages = .fromSize(before_entry.range.size);
-                    }
+                if (address_space.entries_version != entries_version) {
+                    // someone else changed the entries list while we were waiting for the write lock so we need to
+                    // start again with a write lock from the beginning
+                    continue;
                 }
+            }
 
-                if (extend.after) |after_entry| {
-                    if (extend.before) |before_entry| {
-                        _ = before_entry;
-                        // merge the after entry into the before entry, then remove and free the after entry
-
-                        @panic("NOT IMPLEMENTED"); // TODO: implement merging the entry with both the before and after entry
-                    } else {
-                        // merge the local entry into the after entry
-
-                        const old_size = after_entry.range.size;
-                        after_entry.range.size.addInPlace(local_entry.range.size);
-                        after_entry.range.address.moveBackwardInPlace(local_entry.range.size);
-
-                        if (after_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-                            anonymous_map.lock.writeLock(context);
-                            defer anonymous_map.lock.writeUnlock(context);
-
-                            std.debug.assert(anonymous_map.reference_count == 1);
-                            std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
-                            std.debug.assert(
-                                after_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(local_entry.range.size),
-                            );
-
-                            anonymous_map.number_of_pages = .fromSize(after_entry.range.size);
-                            after_entry.anonymous_map_reference.start_offset.subtractInPlace(local_entry.range.size);
-                        }
-                    }
-                }
-            },
+            std.debug.assert(address_space.entries_version == entries_version);
         }
+
+        try address_space.performMapEntryMerge(context, local_entry, entry_merge);
+        errdefer comptime unreachable;
 
         switch (options.type) {
             .zero_fill => {},
@@ -296,10 +270,13 @@ pub fn map(
         }
 
         address_space.entries_version +%= 1;
+        address_space.entries_lock.writeUnlock(context);
 
-        break :blk .{ local_entry, entry_merge };
+        break entry_merge;
     };
+    errdefer comptime unreachable;
 
+    // log the merge that was performed
     switch (entry_merge) {
         .new => log.verbose(context, "{s}: inserted new entry", .{address_space.name()}),
         .extend => |extend| {
@@ -337,6 +314,7 @@ const FreeRange = struct {
 /// Find a free range in the address space of the given size.
 fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     // TODO: we could seperately track the free ranges in the address space
+    // TODO: use `std.sort.lowerBound`
 
     var candidate_insertion_index: usize = 0;
     var candidate_range: core.VirtualRange = .fromAddr(address_space.range.address, size);
@@ -364,6 +342,78 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     }
 
     return null;
+}
+
+fn performMapEntryMerge(
+    address_space: *AddressSpace,
+    context: *cascade.Context,
+    local_entry: Entry,
+    entry_merge: Entry.EntryMerge,
+) !void {
+    switch (entry_merge) {
+        .new => |index| {
+            const new_entry: *Entry = try .create(context);
+            errdefer new_entry.destroy(context);
+
+            new_entry.* = local_entry;
+
+            address_space.entries.insert(
+                cascade.mem.heap.allocator,
+                index,
+                new_entry,
+            ) catch {
+                @branchHint(.cold);
+                return error.OutOfMemory;
+            };
+        },
+        .extend => |extend| {
+            if (extend.before) |before_entry| {
+                // merge the local entry into the before entry
+
+                const old_size = before_entry.range.size;
+                before_entry.range.size.addInPlace(local_entry.range.size);
+
+                if (before_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
+                    anonymous_map.lock.writeLock(context);
+                    defer anonymous_map.lock.writeUnlock(context);
+
+                    std.debug.assert(anonymous_map.reference_count == 1);
+                    std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
+
+                    anonymous_map.number_of_pages = .fromSize(before_entry.range.size);
+                }
+            }
+
+            if (extend.after) |after_entry| {
+                if (extend.before) |before_entry| {
+                    _ = before_entry;
+                    // merge the after entry into the before entry, then remove and free the after entry
+
+                    @panic("NOT IMPLEMENTED"); // TODO: implement merging the entry with both the before and after entry
+                } else {
+                    // merge the local entry into the after entry
+
+                    const old_size = after_entry.range.size;
+                    after_entry.range.size.addInPlace(local_entry.range.size);
+                    after_entry.range.address.moveBackwardInPlace(local_entry.range.size);
+
+                    if (after_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
+                        anonymous_map.lock.writeLock(context);
+                        defer anonymous_map.lock.writeUnlock(context);
+
+                        std.debug.assert(anonymous_map.reference_count == 1);
+                        std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
+                        std.debug.assert(
+                            after_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(local_entry.range.size),
+                        );
+
+                        anonymous_map.number_of_pages = .fromSize(after_entry.range.size);
+                        after_entry.anonymous_map_reference.start_offset.subtractInPlace(local_entry.range.size);
+                    }
+                }
+            }
+        },
+    }
 }
 
 pub const ChangeProtection = union(enum) {
@@ -395,29 +445,44 @@ pub fn changeProtection(
     errdefer |err| log.debug(context, "{s}: change protection failed {t}", .{ address_space.name(), err });
 
     switch (change) {
-        .protection => |new_protection| log.verbose(context, "{s}: change protection of {f} to {t}", .{
-            address_space.name(),
-            range,
-            new_protection,
-        }),
-        .max_protection => |new_max_protection| log.verbose(context, "{s}: change max protection of {f} to {t}", .{
-            address_space.name(),
-            range,
-            new_max_protection,
-        }),
-        .both => |both| log.verbose(context, "{s}: change protection and max protection of {f} to {t} / {t}", .{
-            address_space.name(),
-            range,
-            both.protection,
-            both.max_protection,
-        }),
+        .protection => |new_protection| log.verbose(
+            context,
+            "{s}: change protection of {f} to {t}",
+            .{
+                address_space.name(),
+                range,
+                new_protection,
+            },
+        ),
+        .max_protection => |new_max_protection| log.verbose(
+            context,
+            "{s}: change max protection of {f} to {t}",
+            .{
+                address_space.name(),
+                range,
+                new_max_protection,
+            },
+        ),
+        .both => |both| log.verbose(
+            context,
+            "{s}: change protection and max protection of {f} to {t} / {t}",
+            .{
+                address_space.name(),
+                range,
+                both.protection,
+                both.max_protection,
+            },
+        ),
     }
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
     std.debug.assert(address_space.range.fullyContainsRange(range));
 
-    if (range.size.equal(.zero)) return;
+    if (range.size.equal(.zero)) {
+        @branchHint(.cold);
+        return;
+    }
 
     @panic("NOT IMPLEMENTED"); // TODO
 }
@@ -440,7 +505,10 @@ pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: cor
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
     std.debug.assert(address_space.range.fullyContainsRange(range));
 
-    if (range.size.equal(.zero)) return;
+    if (range.size.equal(.zero)) {
+        @branchHint(.cold);
+        return;
+    }
 
     @panic("NOT IMPLEMENTED"); // TODO
 }
