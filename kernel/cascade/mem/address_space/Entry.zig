@@ -67,12 +67,12 @@ pub fn entryIndexByAddress(address: core.VirtualAddress, entries: []const *Entry
         *const Entry,
         entries,
         address,
-        struct {
-            fn addressCompareOrder(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
-                return entry.range.compareAddressOrder(addr);
-            }
-        }.addressCompareOrder,
+        entryAddressCompare,
     );
+}
+
+pub fn entryAddressCompare(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
+    return entry.range.compareAddressOrder(addr);
 }
 
 pub const EntryMerge = union(enum) {
