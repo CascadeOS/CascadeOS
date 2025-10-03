@@ -275,7 +275,7 @@ fn canMergeInto(
 }
 
 /// Prints the entry.
-pub fn print(entry: *Entry, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(entry: *const Entry, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
@@ -328,8 +328,8 @@ pub fn print(entry: *Entry, context: *cascade.Context, writer: *std.Io.Writer, i
     try writer.writeAll("}");
 }
 
-pub inline fn format(_: *const Entry, _: *std.Io.Writer) !void {
-    @compileError("use `Entry.print` instead");
+pub inline fn format(entry: *const Entry, writer: *std.Io.Writer) !void {
+    return entry.print(.current(), writer, 0);
 }
 
 const globals = struct {
