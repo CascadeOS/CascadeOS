@@ -21,6 +21,7 @@ protection: Protection,
 
 cache: Cache = .write_back,
 
+// The ordering/values of these fields is important.
 pub const Protection = enum(u8) {
     /// Disallow any access.
     none = 0,
