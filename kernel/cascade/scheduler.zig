@@ -341,21 +341,21 @@ pub inline fn assertSchedulerNotLocked(context: *cascade.Context) void {
     std.debug.assert(!globals.lock.isLockedByCurrent(context));
 }
 
-pub fn newTaskEntry(
+pub fn taskEntry(
     context: *cascade.Context,
-    /// must be a function compatible with `arch.scheduling.NewTaskFunction`
+    /// must be a function compatible with `arch.scheduling.TaskFunction`
     target_function_addr: *const anyopaque,
     task_arg1: usize,
     task_arg2: usize,
 ) callconv(.c) noreturn {
     unlockScheduler(context);
 
-    const func: arch.scheduling.NewTaskFunction = @ptrCast(target_function_addr);
+    const func: arch.scheduling.TaskFunction = @ptrCast(target_function_addr);
     func(context, task_arg1, task_arg2) catch |err| {
         std.debug.panic("unhandled error: {t}", .{err});
     };
 
-    cascade.scheduler.lockScheduler(context);
+    lockScheduler(context);
     context.drop();
     unreachable;
 }

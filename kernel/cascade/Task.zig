@@ -67,8 +67,7 @@ pub const Environment = union(cascade.Environment.Type) {
 
 pub const CreateKernelTaskOptions = struct {
     name: Name,
-
-    start_function: arch.scheduling.NewTaskFunction,
+    function: arch.scheduling.TaskFunction,
     arg1: u64 = 0,
     arg2: u64 = 0,
 
@@ -78,7 +77,7 @@ pub const CreateKernelTaskOptions = struct {
 pub fn createKernelTask(context: *cascade.Context, options: CreateKernelTaskOptions) !*Task {
     const task = try internal.create(context, .{
         .name = options.name,
-        .start_function = options.start_function,
+        .function = options.function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
         .environment = .{ .kernel = options.kernel_task_type },
@@ -137,8 +136,7 @@ pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {
 pub const internal = struct {
     pub const CreateOptions = struct {
         name: Name,
-
-        start_function: arch.scheduling.NewTaskFunction,
+        function: arch.scheduling.TaskFunction,
         arg1: u64,
         arg2: u64,
 
@@ -165,9 +163,9 @@ pub const internal = struct {
 
         task.stack.reset();
 
-        try arch.scheduling.prepareNewTaskForScheduling(
+        try arch.scheduling.prepareTaskForScheduling(
             task,
-            options.start_function,
+            options.function,
             options.arg1,
             options.arg2,
         );
@@ -387,7 +385,7 @@ pub const init = struct {
     ) !void {
         const task = try createKernelTask(context, .{
             .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
-            .start_function = undefined,
+            .function = undefined,
             .kernel_task_type = .init,
         });
         errdefer comptime unreachable;
@@ -399,7 +397,7 @@ pub const init = struct {
             .scheduler_locked = false, // init tasks don't start with the scheduler locked
         };
 
-        task.stack.reset(); // we don't care about the `start_function` and arguments
+        task.stack.reset(); // we don't care about the `function` and arguments
 
         executor.current_task = task;
     }

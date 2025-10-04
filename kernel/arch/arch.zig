@@ -224,7 +224,7 @@ pub const paging = struct {
         physical_frame: cascade.mem.phys.Frame,
         arch_specific: *current_decls.paging.PageTable,
 
-        /// Create a new page table in the given physical frame.
+        /// Create a page table in the given physical frame.
         pub fn create(physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
             return .{
                 .physical_frame = physical_frame,
@@ -406,7 +406,7 @@ pub const scheduling = struct {
         )(old_task, new_task);
     }
 
-    pub const NewTaskFunction = *const fn (
+    pub const TaskFunction = *const fn (
         context: *cascade.Context,
         arg1: usize,
         arg2: usize,
@@ -416,15 +416,15 @@ pub const scheduling = struct {
     ///
     /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
     /// the given arguments.
-    pub fn prepareNewTaskForScheduling(
+    pub fn prepareTaskForScheduling(
         task: *cascade.Task,
-        target_function: NewTaskFunction,
+        target_function: TaskFunction,
         arg1: usize,
         arg2: usize,
     ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
         return getFunction(
             current_functions.scheduling,
-            "prepareNewTaskForScheduling",
+            "prepareTaskForScheduling",
         )(task, target_function, arg1, arg2);
     }
 
@@ -743,7 +743,7 @@ pub const Functions = struct {
     },
 
     paging: struct {
-        /// Create a new page table in the given physical frame.
+        /// Create a page table in the given physical frame.
         createPageTable: ?fn (physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
 
         loadPageTable: ?fn (physical_frame: cascade.mem.phys.Frame) void = null,
@@ -860,9 +860,9 @@ pub const Functions = struct {
         ///
         /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
         /// the given arguments.
-        prepareNewTaskForScheduling: ?fn (
+        prepareTaskForScheduling: ?fn (
             task: *cascade.Task,
-            target_function: scheduling.NewTaskFunction,
+            target_function: scheduling.TaskFunction,
             arg1: usize,
             arg2: usize,
         ) error{StackOverflow}!void = null,

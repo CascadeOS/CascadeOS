@@ -143,7 +143,7 @@ fn initStage3(context: *cascade.Context) !noreturn {
         {
             const init_stage4_task: *cascade.Task = try .createKernelTask(context, .{
                 .name = try .fromSlice("init stage 4"),
-                .start_function = initStage4,
+                .function = initStage4,
                 .kernel_task_type = .normal,
             });
 

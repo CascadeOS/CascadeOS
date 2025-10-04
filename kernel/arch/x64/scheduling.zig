@@ -141,14 +141,14 @@ pub fn jumpToTaskFromTask(
 ///
 /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
 /// the given arguments.
-pub fn prepareNewTaskForScheduling(
+pub fn prepareTaskForScheduling(
     task: *cascade.Task,
-    target_function: arch.scheduling.NewTaskFunction,
+    target_function: arch.scheduling.TaskFunction,
     arg1: usize,
     arg2: usize,
 ) error{StackOverflow}!void {
     const impls = struct {
-        const startNewTaskStage1: *const fn () callconv(.c) void = blk: {
+        const startTaskStage1: *const fn () callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
@@ -156,7 +156,7 @@ pub fn prepareNewTaskForScheduling(
                         \\pop %rsi // target_function
                         \\pop %rdx // arg1
                         \\pop %rcx // arg2
-                        \\ret // the return address of `cascade.scheduler.newTaskEntry` should be on the stack
+                        \\ret // the return address of `cascade.scheduler.taskEntry` should be on the stack
                     );
                 }
             }.impl;
@@ -165,14 +165,14 @@ pub fn prepareNewTaskForScheduling(
         };
     };
 
-    try task.stack.push(@intFromPtr(&cascade.scheduler.newTaskEntry));
+    try task.stack.push(@intFromPtr(&cascade.scheduler.taskEntry));
 
     try task.stack.push(arg2);
     try task.stack.push(arg1);
     try task.stack.push(@intFromPtr(target_function));
     try task.stack.push(@intFromPtr(&task.context));
 
-    try task.stack.push(@intFromPtr(impls.startNewTaskStage1));
+    try task.stack.push(@intFromPtr(impls.startTaskStage1));
 
     // general purpose registers
     for (0..6) |_| try task.stack.push(0);

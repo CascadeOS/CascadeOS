@@ -115,7 +115,7 @@ pub const init = struct {
     pub fn initializeTaskCleanupService(context: *cascade.Context) !void {
         globals.task_cleanup_task = try Task.createKernelTask(context, .{
             .name = try .fromSlice("task cleanup"),
-            .start_function = execute,
+            .function = execute,
             .kernel_task_type = .normal,
         });
 

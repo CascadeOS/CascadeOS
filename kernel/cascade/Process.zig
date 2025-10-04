@@ -70,8 +70,7 @@ pub fn create(context: *cascade.Context, options: CreateOptions) !struct { *Proc
 
 pub const CreateTaskOptions = struct {
     name: ?cascade.Task.Name = null,
-
-    start_function: arch.scheduling.NewTaskFunction,
+    function: arch.scheduling.TaskFunction,
     arg1: u64 = 0,
     arg2: u64 = 0,
 };
@@ -92,7 +91,7 @@ pub fn createUserTask(
                 "{d}",
                 .{process.next_task_id.fetchAdd(1, .monotonic)},
             ),
-        .start_function = options.start_function,
+        .function = options.function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
         .environment = .{ .user = process },

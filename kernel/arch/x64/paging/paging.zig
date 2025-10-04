@@ -13,7 +13,8 @@ pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorC
 pub const PageTable = @import("PageTable.zig").PageTable;
 
 const log = cascade.debug.log.scoped(.paging);
-/// Create a new page table in the given physical frame.
+
+/// Create a page table in the given physical frame.
 pub fn createPageTable(physical_frame: cascade.mem.phys.Frame) *PageTable {
     const page_table = cascade.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
     page_table.zero();
