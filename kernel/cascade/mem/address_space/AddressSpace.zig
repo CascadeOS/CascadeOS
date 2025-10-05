@@ -89,6 +89,10 @@ pub fn init(
 }
 
 /// Retarget the address space to a new process.
+///
+/// Caller must ensure:
+///  - the address space is not in use by any tasks
+///  - the address space is empty
 pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) void {
     std.debug.assert(address_space.environment == .user);
     std.debug.assert(!address_space.page_table_lock.isLocked());
@@ -105,7 +109,8 @@ pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) voi
 
 /// Reinitialize the address space back to its initial state including unmapping everything.
 ///
-/// The address space must not be in use by any tasks when this function is called.
+/// Caller must ensure:
+///  - the address space is not in use by any tasks
 pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.Context) void {
     log.debug(context, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
@@ -119,9 +124,9 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.C
 
 /// This leaves the address space in an invalid state, if it will be reused see `reinitializeAndUnmapAll`.
 ///
-/// `reinitializeAndUnmapAll` is expected to have been called before calling this function.
-///
-/// The address space must not be in use by any tasks when this function is called.
+/// Caller must ensure:
+///  - the address space is not in use by any tasks
+///  - the address space is empty
 pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
     // cannot use the name as it will reference a defunct process that this address space is now unrelated to
     log.debug(context, "deinit", .{});
@@ -142,14 +147,25 @@ pub fn name(address_space: *const AddressSpace) []const u8 {
 pub const MapOptions = struct {
     /// The size of the range to map.
     ///
-    /// Must not be `.zero` and must be aligned to the standard page size.
+    /// Caller must ensure:
+    ///  - the size is not `.zero`
+    ///  - the size is aligned to the standard page size
     size: core.Size,
 
+    /// The protection of the range.
+    ///
+    /// Caller must ensure:
+    ///  - this value does not exceed `max_protection` if it is provided
     protection: Protection,
 
     /// The maximum allowed protection of the range.
     ///
+    /// The protection of the range cannot exceed this value.
+    ///
     /// If `null` then the maximum protection is the same as the `protection`.
+    ///
+    /// Caller must ensure:
+    ///  - the maximum protection is not `.none`
     max_protection: ?Protection = null,
 
     type: Type,
@@ -174,7 +190,12 @@ pub const MapError = error{
     MaxProtectionExceeded,
 };
 
-/// Map a range of pages into the address space.
+/// Map a range into the address space.
+///
+/// Caller must ensure:
+///  - the size is aligned to the standard page size
+///  - the size is not `.zero`
+///  - the `max_protection` if provided is not `.none`
 pub fn map(
     address_space: *AddressSpace,
     context: *cascade.Context,
@@ -298,7 +319,6 @@ const FreeRange = struct {
 /// Find a free range in the address space of the given size.
 fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     // TODO: we could seperately track the free ranges in the address space
-    // TODO: use `std.sort.lowerBound`
 
     var candidate_insertion_index: usize = 0;
     var candidate_range: core.VirtualRange = .fromAddr(address_space.range.address, size);
@@ -401,25 +421,43 @@ fn performMapEntryMerge(
 }
 
 pub const ChangeProtection = union(enum) {
+    /// The protection to change the range to.
     protection: Protection,
+
+    /// The maximum protection to change the range to.
+    ///
+    /// The maximum protection of entries in the range cannot be increased only decreased or unchanged.
+    ///
+    /// Caller must ensure:
+    ///  - the maximum protection is not `.none`
     max_protection: Protection,
+
+    /// Modify both the protection and the maximum protection.
+    ///
+    /// This is more efficient than modifying each separately.
     both: Both,
 
     const Both = struct {
+        /// The protection to change the range to.
         protection: Protection,
+
+        /// The maximum protection to change the range to.
+        ///
+        /// The maximum protection of entries in the range cannot be increased only decreased or unchanged.
+        ///
+        /// Caller must ensure:
+        ///  - the maximum protection is not `.none`
         max_protection: Protection,
     };
 };
 
 pub const ChangeProtectionError = error{};
 
-/// Change the protection and/or maximum protection of a range of pages in the address space.
+/// Change the protection and/or maximum protection of a range in the address space.
 ///
-/// The range may cover multiple entries or none at all.
-///
-/// The size and address of the range must be aligned to the page size.
-///
-/// The range must be entirely within the address space.
+/// Caller must ensure:
+///  - the size and address of the range are aligned to the standard page size
+///  - the `max_protection` if provided is not `.none`
 pub fn changeProtection(
     address_space: *AddressSpace,
     context: *cascade.Context,
@@ -438,30 +476,37 @@ pub fn changeProtection(
                 new_protection,
             },
         ),
-        .max_protection => |new_max_protection| log.verbose(
-            context,
-            "{s}: change max protection of {f} to {t}",
-            .{
-                address_space.name(),
-                range,
-                new_max_protection,
-            },
-        ),
-        .both => |both| log.verbose(
-            context,
-            "{s}: change protection and max protection of {f} to {t} / {t}",
-            .{
-                address_space.name(),
-                range,
-                both.protection,
-                both.max_protection,
-            },
-        ),
+        .max_protection => |new_max_protection| {
+            log.verbose(
+                context,
+                "{s}: change max protection of {f} to {t}",
+                .{
+                    address_space.name(),
+                    range,
+                    new_max_protection,
+                },
+            );
+
+            std.debug.assert(new_max_protection != .none);
+        },
+        .both => |both| {
+            log.verbose(
+                context,
+                "{s}: change protection and max protection of {f} to {t} / {t}",
+                .{
+                    address_space.name(),
+                    range,
+                    both.protection,
+                    both.max_protection,
+                },
+            );
+
+            std.debug.assert(both.max_protection != .none);
+        },
     }
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(address_space.range.fullyContainsRange(range));
 
     if (range.size.equal(.zero)) {
         @branchHint(.cold);
@@ -473,13 +518,10 @@ pub fn changeProtection(
 
 pub const UnmapError = error{};
 
-/// Unmap a range of pages from the address space.
+/// Unmap a range from the address space.
 ///
-/// The range may cover multiple entries or none at all.
-///
-/// The size and address of the range must be aligned to the page size.
-///
-/// The range must be entirely within the address space.
+/// Caller must ensure:
+///  - the size and address of the range are aligned to the standard page size
 pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: core.VirtualRange) UnmapError!void {
     errdefer |err| log.debug(context, "{s}: unmap failed {t}", .{ address_space.name(), err });
 
@@ -487,7 +529,6 @@ pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: cor
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(address_space.range.fullyContainsRange(range));
 
     if (range.size.equal(.zero)) {
         @branchHint(.cold);
