@@ -218,16 +218,9 @@ pub fn map(
         },
     };
 
-    var entries_lock_type: core.LockType = .read;
-    const entry_merge = while (true) {
-        switch (entries_lock_type) {
-            .read => address_space.entries_lock.readLock(context),
-            .write => address_space.entries_lock.writeLock(context),
-        }
-        errdefer switch (entries_lock_type) {
-            .read => address_space.entries_lock.readUnlock(context),
-            .write => address_space.entries_lock.writeUnlock(context),
-        };
+    const entry_merge = entry_merge: {
+        address_space.entries_lock.writeLock(context);
+        defer address_space.entries_lock.writeUnlock(context);
 
         const free_range = address_space.findFreeRange(options.size) orelse {
             @branchHint(.cold);
@@ -242,25 +235,6 @@ pub fn map(
             address_space.entries.items,
         );
 
-        // now we need a write lock
-        if (entries_lock_type == .read) {
-            const entries_version = address_space.entries_version;
-            entries_lock_type = .write;
-
-            if (!address_space.entries_lock.tryUpgradeLock(context)) {
-                // we failed to upgrade the read lock to a write lock so we need to try again with a write lock
-                address_space.entries_lock.writeLock(context);
-
-                if (address_space.entries_version != entries_version) {
-                    // someone else changed the entries list while we were waiting for the write lock so we need to
-                    // start again with a write lock from the beginning
-                    continue;
-                }
-            }
-
-            std.debug.assert(address_space.entries_version == entries_version);
-        }
-
         try address_space.performMapEntryMerge(context, local_entry, entry_merge);
         errdefer comptime unreachable;
 
@@ -270,9 +244,8 @@ pub fn map(
         }
 
         address_space.entries_version +%= 1;
-        address_space.entries_lock.writeUnlock(context);
 
-        break entry_merge;
+        break :entry_merge entry_merge;
     };
     errdefer comptime unreachable;
 
