@@ -169,6 +169,9 @@ pub const MapError = error{
 
     /// No memory available.
     OutOfMemory,
+
+    /// The requested map would result in the protection of an entry in the range exceeding its maximum protection.
+    MaxProtectionExceeded,
 };
 
 /// Map a range of pages into the address space.
@@ -191,6 +194,14 @@ pub fn map(
     if (options.size.equal(.zero)) {
         @branchHint(.cold);
         return error.ZeroSize;
+    }
+
+    if (options.max_protection) |max_protection| {
+        std.debug.assert(max_protection != .none);
+        if (@intFromEnum(options.protection) > @intFromEnum(max_protection)) {
+            @branchHint(.cold);
+            return error.MaxProtectionExceeded;
+        }
     }
 
     var local_entry: Entry = .{
