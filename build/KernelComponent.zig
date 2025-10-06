@@ -26,3 +26,8 @@ configuration: ?*const fn (
     options: Options,
     is_check: bool,
 ) anyerror!void = null,
+
+/// Provide the source file modules used for printing source code in stacktraces to this component.
+///
+/// This is intended to be used by the `cascade` component.
+provide_source_file_modules: bool = false,

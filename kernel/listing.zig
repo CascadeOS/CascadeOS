@@ -20,5 +20,6 @@ pub const components: []const KernelComponent = &.{
         .component_dependencies = &.{ "arch", "boot" },
         .library_dependencies = &.{ "core", "sdf" },
         .configuration = @import("cascade/custom_configuration.zig").customConfiguration,
+        .provide_source_file_modules = true,
     },
 };

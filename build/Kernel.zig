@@ -207,19 +207,26 @@ fn constructKernelModule(
         is_check,
     );
 
-    const kernel_module = required_components.get("cascade").?.module;
+    const kernel_module = b.createModule(.{
+        .root_source_file = b.path("kernel/kernel.zig"),
 
-    kernel_module.resolved_target = kernelCrossTarget(architecture, b);
-    kernel_module.optimize = options.optimize;
-    kernel_module.sanitize_c = switch (options.optimize) {
-        .ReleaseFast => .off,
-        .ReleaseSmall => .trap,
-        else => .full,
-    };
+        .target = kernelCrossTarget(architecture, b),
+        .optimize = options.optimize,
 
-    // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
-    kernel_module.strip = false;
-    kernel_module.omit_frame_pointer = false;
+        // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
+        .strip = false,
+
+        .sanitize_c = switch (options.optimize) {
+            .Debug => .full,
+            .ReleaseSafe, .ReleaseSmall => .trap,
+            .ReleaseFast => .off,
+        },
+
+        .omit_frame_pointer = false,
+    });
+    kernel_module.addImport("arch", required_components.get("arch").?.module);
+    kernel_module.addImport("boot", required_components.get("boot").?.module);
+    kernel_module.addImport("cascade", required_components.get("cascade").?.module);
 
     // apply architecture-specific configuration to the kernel
     switch (architecture) {
@@ -229,15 +236,6 @@ fn constructKernelModule(
             kernel_module.code_model = .kernel;
             kernel_module.red_zone = false;
         },
-    }
-
-    const source_file_modules = try getSourceFileModules(
-        b,
-        required_components,
-        required_libraries,
-    );
-    for (source_file_modules) |module| {
-        kernel_module.addImport(module.name, module.module);
     }
 
     return kernel_module;
@@ -372,6 +370,16 @@ fn configureComponents(
         // self reference
         module.addImport(kernel_component.name, module);
 
+        if (kernel_component.provide_source_file_modules) {
+            const source_file_modules = try getSourceFileModules(
+                b,
+                libraries,
+            );
+            for (source_file_modules) |source_file_module| {
+                module.addImport(source_file_module.name, source_file_module.module);
+            }
+        }
+
         // custom configuration
         if (kernel_component.configuration) |configuration| {
             try configuration(
@@ -394,7 +402,6 @@ fn configureComponents(
 /// source files by file path key, which is exactly what is needed for printing source code in stacktraces.
 fn getSourceFileModules(
     b: *std.Build,
-    required_components: WipComponent.Collection,
     required_libraries: Library.Collection,
 ) ![]const SourceFileModule {
     var modules = std.array_list.Managed(SourceFileModule).init(b.allocator);
@@ -403,15 +410,12 @@ fn getSourceFileModules(
     var file_paths = std.array_list.Managed([]const u8).init(b.allocator);
     defer file_paths.deinit();
 
-    // add each component's files
-    for (required_components.values()) |component| {
-        try addFilesRecursive(
-            b,
-            &modules,
-            &file_paths,
-            component.directory_path,
-        );
-    }
+    try addFilesRecursive(
+        b,
+        &modules,
+        &file_paths,
+        "kernel",
+    );
 
     // add each libraries files
     var processed_libraries = std.AutoHashMap(*const Library, void).init(b.allocator);
