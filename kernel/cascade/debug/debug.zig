@@ -241,7 +241,7 @@ const formatting = struct {
 
         if (address < arch.paging.higher_half_start.value) {
             try writer.print(
-                comptime indent ++ "0x{x:0>16} - address is not in the higher half so must be userspace\n",
+                comptime indent ++ "0x{x:0>16} - address in the lower half\n",
                 .{address},
             );
             return;
@@ -338,7 +338,7 @@ const formatting = struct {
         try writer.writeAll(comptime indent ** 2);
 
         //     @panic("some message");
-        //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        //           ^
         try writer.writeAll(line[blank_spaces..]);
 
         try writer.writeAll(comptime "\n" ++ (indent ** 2));
