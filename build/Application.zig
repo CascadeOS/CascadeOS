@@ -283,10 +283,10 @@ fn createModule(
         .optimize = options.optimize,
         .sanitize_c = .off, // TODO: this should depend on if we are linking c code
         // .sanitize_c = switch (options.optimize) {
+        //     .Debug => .full,
+        //     .ReleaseSafe, .ReleaseSmall => .trap,
         //     .ReleaseFast => .off,
-        //     .ReleaseSmall => .trap,
-        //     else => .full,
-        // },
+        // }
     });
 
     // self reference

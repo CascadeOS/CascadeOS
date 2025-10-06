@@ -244,9 +244,9 @@ fn createModule(
         .target = b.graph.host,
         .optimize = optimize_mode,
         .sanitize_c = switch (optimize_mode) {
+            .Debug => .full,
+            .ReleaseSafe, .ReleaseSmall => .trap,
             .ReleaseFast => .off,
-            .ReleaseSmall => .trap,
-            else => .full,
         },
     });
 

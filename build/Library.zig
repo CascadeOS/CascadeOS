@@ -320,14 +320,7 @@ fn createModule(
     purpose: enum { exe_root, dependency },
     dependencies: []const *const Library,
 ) !*std.Build.Module {
-    const module = b.createModule(.{
-        .root_source_file = lazy_path,
-        .sanitize_c = switch (options.optimize) {
-            .ReleaseFast => .off,
-            .ReleaseSmall => .trap,
-            else => .full,
-        },
-    });
+    const module = b.createModule(.{ .root_source_file = lazy_path });
 
     if (purpose == .exe_root) {
         module.resolved_target = cascade_target.getCrossTarget(b);
