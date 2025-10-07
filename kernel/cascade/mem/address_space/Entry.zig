@@ -62,19 +62,6 @@ pub fn destroy(entry: *Entry, context: *cascade.Context) void {
     globals.entry_cache.deallocate(context, entry);
 }
 
-pub fn entryIndexByAddress(address: core.VirtualAddress, entries: []const *Entry) ?usize {
-    return std.sort.binarySearch(
-        *const Entry,
-        entries,
-        address,
-        entryAddressCompare,
-    );
-}
-
-pub fn entryAddressCompare(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
-    return entry.range.compareAddressOrder(addr);
-}
-
 pub const EntryMerge = union(enum) {
     new: usize,
     extend: Extend,

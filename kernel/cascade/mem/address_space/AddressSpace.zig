@@ -650,3 +650,24 @@ pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void
 }
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_name_length);
+
+/// Returns the index of the entry that contains the given address.
+///
+/// Returns `null` if the address is not mapped.
+///
+/// Caller must ensure:
+///  - the address space entries are atleast read locked
+pub fn entryIndexByAddress(address_space: *const AddressSpace, address: core.VirtualAddress) ?usize {
+    std.debug.assert(address_space.entries_lock.isReadLocked() or address_space.entries_lock.isWriteLocked());
+
+    return std.sort.binarySearch(
+        *const Entry,
+        address_space.entries.items,
+        address,
+        entryAddressCompare,
+    );
+}
+
+fn entryAddressCompare(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
+    return entry.range.compareAddressOrder(addr);
+}

@@ -326,10 +326,7 @@ fn faultLookup(fault_info: *FaultInfo, context: *cascade.Context, lock_type: cor
         .write => fault_info.address_space.entries_lock.writeLock(context),
     }
 
-    const entry_index = Entry.entryIndexByAddress(
-        fault_info.faulting_address,
-        fault_info.address_space.entries.items,
-    ) orelse {
+    const entry_index = fault_info.address_space.entryIndexByAddress(fault_info.faulting_address) orelse {
         switch (lock_type) {
             .read => fault_info.address_space.entries_lock.readUnlock(context),
             .write => fault_info.address_space.entries_lock.writeUnlock(context),
