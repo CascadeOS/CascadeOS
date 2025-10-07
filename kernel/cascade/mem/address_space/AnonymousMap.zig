@@ -100,8 +100,9 @@ pub fn copy(
     entry: *Entry,
     faulting_address: core.VirtualAddress,
 ) error{OutOfMemory}!void {
-    _ = address_space;
     _ = faulting_address;
+
+    std.debug.assert(address_space.entries_lock.isWriteLocked());
 
     if (entry.anonymous_map_reference.anonymous_map == null) {
         // no anonymous map, create one
