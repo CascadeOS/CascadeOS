@@ -451,35 +451,35 @@ pub const IA32_MTRRCAP = packed struct(u64) {
 pub const PAT = packed struct(u64) {
     entry0: MemoryType,
 
-    _reserved3_7: u5 = 0,
+    _reserved3_7: u5,
 
     entry1: MemoryType,
 
-    _reserved11_15: u5 = 0,
+    _reserved11_15: u5,
 
     entry2: MemoryType,
 
-    _reserved19_23: u5 = 0,
+    _reserved19_23: u5,
 
     entry3: MemoryType,
 
-    _reserved27_31: u5 = 0,
+    _reserved27_31: u5,
 
     entry4: MemoryType,
 
-    _reserved35_39: u5 = 0,
+    _reserved35_39: u5,
 
     entry5: MemoryType,
 
-    _reserved43_47: u5 = 0,
+    _reserved43_47: u5,
 
     entry6: MemoryType,
 
-    _reserved51_55: u5 = 0,
+    _reserved51_55: u5,
 
     entry7: MemoryType,
 
-    _reserved59_63: u5 = 0,
+    _reserved59_63: u5,
 
     pub const MemoryType = enum(u3) {
         unchacheable = 0x0,
@@ -558,14 +558,14 @@ pub const DR6 = packed struct(u64) {
     breakpoint_2: bool,
     breakpoint_3: bool,
 
-    _reserved4_10: u7 = std.math.maxInt(u7),
+    _reserved4_10: u7,
 
     /// The processor set this to `false` if #DB was generated due to a bus lock.
     ///
     /// Other sources of #DB do not modify this bit.
-    bus_lock_detected: bool = true,
+    bus_lock_detected: bool,
 
-    _reserved_12: u1 = 0,
+    _reserved_12: u1,
 
     /// The processor sets this bit to 1 if software accesses any debug register (DR0–DR7) while the general-detect
     /// condition is enabled (`DR7.general_detect = true`).
@@ -583,9 +583,9 @@ pub const DR6 = packed struct(u64) {
     /// TSS T-bit set to 1.
     task_switch: bool,
 
-    _reserved16_31: u16 = std.math.maxInt(u16),
+    _reserved16_31: u16,
 
-    _reserved32_63: u32 = 0,
+    _reserved32_63: u32,
 
     pub fn read() DR6 {
         return @bitCast(asm ("mov %%dr6, %[value]"
@@ -662,9 +662,9 @@ pub const DR7 = packed struct(u64) {
     /// This bit is ignored by implementations of the AMD64 architecture.
     global_exact_breakpoint: bool,
 
-    _reserved10: u1 = 1,
+    _reserved10: u1,
 
-    _reserved11_12: u2 = 0,
+    _reserved11_12: u2,
 
     /// Software sets this to `true` to cause a debug exception to occur when an attempt is made to execute a MOV DRn
     /// instruction to any debug register (DR0–DR7).
@@ -679,7 +679,7 @@ pub const DR7 = packed struct(u64) {
     /// operation.
     general_detect: bool,
 
-    _reserved14_15: u2 = 0,
+    _reserved14_15: u2,
 
     /// Control the breakpoint conditions used by the DR0 register.
     type_breakpoint_0: BreakpointType,
@@ -697,7 +697,7 @@ pub const DR7 = packed struct(u64) {
     type_breakpoint_3: BreakpointType,
     length_breakpoint_3: Length,
 
-    _reserved_32_63: u32 = 0,
+    _reserved_32_63: u32,
 
     pub const BreakpointType = enum(u2) {
         /// Only on instruction execution.

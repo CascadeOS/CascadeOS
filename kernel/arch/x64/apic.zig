@@ -17,15 +17,13 @@ pub fn eoi() void {
 pub fn sendPanicIPI() void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
-    icr = .{
-        .vector = .non_maskable_interrupt,
-        .delivery_mode = .nmi,
-        .destination_mode = .physical,
-        .level = .assert,
-        .trigger_mode = .edge,
-        .destination_shorthand = .all_excluding_self,
-        .destination_field = .{ .x2apic = 0 },
-    };
+    icr.vector = .non_maskable_interrupt;
+    icr.delivery_mode = .nmi;
+    icr.destination_mode = .physical;
+    icr.level = .assert;
+    icr.trigger_mode = .edge;
+    icr.destination_shorthand = .all_excluding_self;
+    icr.destination_field = .{ .x2apic = 0 };
 
     globals.lapic.writeInterruptCommandRegister(icr);
 }
@@ -34,21 +32,16 @@ pub fn sendPanicIPI() void {
 pub fn sendFlushIPI(executor: *cascade.Executor) void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
-    icr = .{
-        .vector = .flush_request,
-        .delivery_mode = .fixed,
-        .destination_mode = .physical,
-        .level = .assert,
-        .trigger_mode = .edge,
-        .destination_shorthand = .no_shorthand,
-        .destination_field = undefined, // set below
-    };
+    icr.vector = .flush_request;
+    icr.delivery_mode = .fixed;
+    icr.destination_mode = .physical;
+    icr.level = .assert;
+    icr.trigger_mode = .edge;
+    icr.destination_shorthand = .no_shorthand;
 
     switch (globals.lapic) {
-        .xapic => icr.destination_field = .{ .xapic = .{
-            .destination = @intCast(executor.arch_specific.apic_id),
-        } },
-        .x2apic => icr.destination_field = .{ .x2apic = executor.arch_specific.apic_id },
+        .xapic => icr.destination_field.xapic.destination = @intCast(executor.arch_specific.apic_id),
+        .x2apic => icr.destination_field.x2apic = executor.arch_specific.apic_id,
     }
 
     globals.lapic.writeInterruptCommandRegister(icr);
@@ -89,10 +82,12 @@ pub const init = struct {
     }
 
     pub fn initApicOnCurrentExecutor() void {
-        globals.lapic.writeSupriousInterruptRegister(.{
-            .apic_enable = true,
-            .spurious_vector = .spurious_interrupt,
-        });
+        var spurious_interrupt_register = globals.lapic.readSupriousInterruptRegister();
+
+        spurious_interrupt_register.apic_enable = true;
+        spurious_interrupt_register.spurious_vector = .spurious_interrupt;
+
+        globals.lapic.writeSupriousInterruptRegister(spurious_interrupt_register);
 
         // TODO: task priority
         // TODO: error interrupt
@@ -130,11 +125,15 @@ pub const init = struct {
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
 
-        globals.lapic.writeLVTTimerRegister(.{
-            .vector = .debug, // interrupt is masked so it doesnt matter what the vector is set to
-            .timer_mode = .oneshot,
-            .masked = true,
-        });
+        {
+            var lvt_timer_register = globals.lapic.readLVTTimerRegister();
+
+            lvt_timer_register.vector = .debug; // interrupt is masked so it doesnt matter what the vector is set to
+            lvt_timer_register.timer_mode = .oneshot;
+            lvt_timer_register.masked = true;
+
+            globals.lapic.writeLVTTimerRegister(lvt_timer_register);
+        }
 
         // warmup
         {
@@ -182,11 +181,15 @@ pub const init = struct {
         globals.lapic.writeInitialCountRegister(0);
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
 
-        globals.lapic.writeLVTTimerRegister(.{
-            .vector = .per_executor_periodic,
-            .timer_mode = .periodic,
-            .masked = false,
-        });
+        {
+            var lvt_timer_register = globals.lapic.readLVTTimerRegister();
+
+            lvt_timer_register.vector = .per_executor_periodic;
+            lvt_timer_register.timer_mode = .periodic;
+            lvt_timer_register.masked = false;
+
+            globals.lapic.writeLVTTimerRegister(lvt_timer_register);
+        }
 
         const ticks = std.math.cast(
             u32,
@@ -251,9 +254,9 @@ pub const LAPIC = union(enum) {
         /// Is focus processor checking enabled when using lowest-priority delivery mode.
         ///
         /// In Pentium 4 and Intel Xeon processors, this bit is reserved and should be set to `false`.
-        focus_processor_checking: bool = false,
+        focus_processor_checking: bool,
 
-        _reserved1: u2 = 0,
+        _reserved1: u2,
 
         /// Determines whether an EOI for a level-triggered interrupt causes EOI messages to be broadcast to the I/O
         /// APICs or not.
@@ -261,9 +264,9 @@ pub const LAPIC = union(enum) {
         /// The default value is `false`, indicating that EOI broadcasts are performed.
         ///
         /// This is reserved to `false` if the processor does not support EOI-broadcast suppression.
-        eoi_broadcast_suppression: bool = false,
+        eoi_broadcast_suppression: bool,
 
-        _reserved2: u19 = 0,
+        _reserved2: u19,
     };
 
     pub fn readSupriousInterruptRegister(lapic: LAPIC) SupriousInterruptRegister {
@@ -292,14 +295,14 @@ pub const LAPIC = union(enum) {
         /// Interrupt vector number.
         vector: x64.interrupts.Interrupt,
 
-        _reserved1: u4 = 0,
+        _reserved1: u4,
 
         /// Indicates the interrupt delivery status.
         ///
         /// Read Only
         status: DeliveryStatus = .idle,
 
-        _reserved2: u3 = 0,
+        _reserved2: u3,
 
         /// Interrupt mask: `false` enables reception of the interrupt and `true` inhibits reception of the interrupt.
         ///
@@ -314,7 +317,7 @@ pub const LAPIC = union(enum) {
         /// The timer mode.
         timer_mode: TimerMode,
 
-        _reserved3: u13 = 0,
+        _reserved3: u13,
 
         pub const TimerMode = enum(u2) {
             /// One-shot mode using a count-down value.
@@ -386,7 +389,7 @@ pub const LAPIC = union(enum) {
         /// Read Only
         status: DeliveryStatus = .idle,
 
-        _reserved2: u3 = 0,
+        _reserved2: u3,
 
         /// Interrupt mask: `false` enables reception of the interrupt and `true` inhibits reception of the interrupt.
         ///
@@ -398,7 +401,7 @@ pub const LAPIC = union(enum) {
         /// It can be cleared only by software.
         masked: bool,
 
-        _reserved3: u16 = 0,
+        _reserved3: u16,
     };
 
     pub fn readLVTErrorRegister(lapic: LAPIC) LVTErrorRegister {
@@ -464,7 +467,7 @@ pub const LAPIC = union(enum) {
     /// In x2APIC mode, the Logical Destination Register (LDR) is increased to 32 bits wide and is read-only.
     pub const LogicalDestinationRegister = packed union {
         xapic: packed struct(u32) {
-            _reserved: u24 = 0,
+            _reserved: u24,
 
             /// The 8-bit logical APIC ID used to create an identifier that can be compared with the MDA.
             logical_apic_id: u8,
@@ -584,7 +587,7 @@ pub const LAPIC = union(enum) {
 
         priority_class: u4,
 
-        _reserved: u24 = 0,
+        _reserved: u24,
     };
 
     pub fn readTaskPriorityRegister(lapic: LAPIC) TaskPriorityRegister {
@@ -649,7 +652,7 @@ pub const LAPIC = union(enum) {
         /// Reserved in x2APIC mode.
         delivery_status: DeliveryStatus = .idle,
 
-        _reserved1: u1 = 0,
+        _reserved1: u1,
 
         /// For the INIT level de-assert delivery mode this flag must be set to `.deassert`; for all other delivery modes it must be
         /// set to `.assert`.
@@ -665,7 +668,7 @@ pub const LAPIC = union(enum) {
         /// This flag has no meaning in Pentium 4 and Intel Xeon processors, and will always be issued as `edge`.
         trigger_mode: TriggerMode,
 
-        _reserved2: u2 = 0,
+        _reserved2: u2,
 
         /// Indicates whether a shorthand notation is used to specify the destination of the interrupt and, if so, which
         /// shorthand is used.
@@ -674,7 +677,7 @@ pub const LAPIC = union(enum) {
         /// single write to the low doubleword of the ICR.
         destination_shorthand: DestinationShorthand,
 
-        _reserved3: u12 = 0,
+        _reserved3: u12,
 
         /// Specifies the target processor or processors.
         ///
@@ -695,7 +698,7 @@ pub const LAPIC = union(enum) {
 
         pub const Destination = packed union {
             xapic: packed struct(u32) {
-                _reserved: u24 = 0,
+                _reserved: u24,
                 destination: u8,
             },
             x2apic: u32,
