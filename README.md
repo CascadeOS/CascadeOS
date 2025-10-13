@@ -16,7 +16,7 @@ Cascade is a general purpose operating system targeting standard desktops and la
 
 ## Build, testing, running
 ### Prerequisites:
-- zig 0.15.1
+- zig 0.15.2
 - qemu (optional; used for running and host testing)
 
 Run the x64 kernel in QEMU:
