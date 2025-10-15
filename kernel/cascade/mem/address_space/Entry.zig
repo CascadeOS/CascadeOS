@@ -51,7 +51,13 @@ needs_copy: bool,
 wired_count: u32 = 0,
 
 pub fn create(context: *cascade.Context) !*Entry {
-    return globals.entry_cache.allocate(context) catch |err| switch (err) {
+    var entry: [1]*Entry = undefined;
+    try createMany(context, &entry);
+    return entry[0];
+}
+
+pub fn createMany(context: *cascade.Context, items: []*Entry) !void {
+    return globals.entry_cache.allocateMany(context, items) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
         error.ItemConstructionFailed => unreachable, // no constructor is provided
         error.LargeItemAllocationFailed => unreachable, // `Entry` is not a large entry - checked in `global_init.initializeCaches`
