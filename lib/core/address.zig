@@ -80,6 +80,10 @@ pub const PhysicalAddress = extern struct {
         return physical_address.value == other.value;
     }
 
+    pub inline fn notEqual(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
+        return physical_address.value != other.value;
+    }
+
     pub inline fn lessThan(physical_address: PhysicalAddress, other: PhysicalAddress) bool {
         return physical_address.value < other.value;
     }
@@ -193,6 +197,10 @@ pub const VirtualAddress = extern struct {
 
     pub inline fn equal(virtual_address: VirtualAddress, other: VirtualAddress) bool {
         return virtual_address.value == other.value;
+    }
+
+    pub inline fn notEqual(virtual_address: VirtualAddress, other: VirtualAddress) bool {
+        return virtual_address.value != other.value;
     }
 
     pub inline fn lessThan(virtual_address: VirtualAddress, other: VirtualAddress) bool {
