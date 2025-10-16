@@ -254,6 +254,10 @@ pub const PageCount = extern struct {
         page_count.count += 1;
     }
 
+    pub fn increaseBySize(page_count: *PageCount, size: core.Size) void {
+        page_count.count += @intCast(size.divide(arch.paging.standard_page_size).value);
+    }
+
     pub fn equal(page_count: PageCount, other: PageCount) bool {
         return page_count.count == other.count;
     }
@@ -262,6 +266,10 @@ pub const PageCount = extern struct {
         return .{
             .count = @intCast(size.divide(arch.paging.standard_page_size).value),
         };
+    }
+
+    pub fn toSize(page_count: PageCount) core.Size {
+        return arch.paging.standard_page_size.multiplyScalar(page_count.count);
     }
 };
 
