@@ -48,7 +48,7 @@ copy_on_write: bool,
 /// write.
 needs_copy: bool,
 
-wired_count: u32 = 0,
+wired_count: u32,
 
 pub fn create(context: *cascade.Context) !*Entry {
     var entry: [1]*Entry = undefined;

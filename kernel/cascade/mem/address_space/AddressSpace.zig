@@ -248,6 +248,7 @@ pub fn map(
             .zero_fill => true,
             .object => @panic("NOT IMPLEMENTED"), // TODO
         },
+        .wired_count = 0,
     };
 
     var merges: usize = 0;
