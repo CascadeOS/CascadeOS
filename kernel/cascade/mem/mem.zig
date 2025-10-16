@@ -36,6 +36,8 @@ pub fn mapSinglePage(
     std.debug.assert(map_type.protection != .none);
     std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
 
+    // TODO: replace with `mapRangeToPhysicalRange`
+
     try arch.paging.mapSinglePage(
         context,
         page_table,
@@ -86,6 +88,10 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             physical_frame_allocator,
         );
     }
+
+    // TODO: this can be optimized by implementing `arch.paging.mapRangeAndBackWithPhysicalFrames`
+    //       this one is not as obviously good as the other TODO optimizations in this file as every arch will have to do
+    //       the same physical frame allocation and errdefer deallocation
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         const physical_frame = try physical_frame_allocator.allocate(context);
@@ -154,6 +160,8 @@ pub fn mapRangeToPhysicalRange(
         );
     }
 
+    // TODO: this can be optimized by implementing `arch.paging.mapRange`
+
     var current_physical_address = physical_range.address;
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
@@ -169,45 +177,6 @@ pub fn mapRangeToPhysicalRange(
         current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
         current_physical_address.moveForwardInPlace(arch.paging.standard_page_size);
     }
-}
-
-/// Unmaps a single page.
-///
-/// Performs TLB shootdown.
-///
-/// Prefer to use `unmapRange` instead.
-///
-/// **REQUIREMENTS**:
-/// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
-pub fn unmapSinglePage(
-    context: *cascade.Context,
-    page_table: arch.paging.PageTable,
-    virtual_address: core.VirtualAddress,
-    backing_pages: core.CleanupDecision,
-    flush_target: cascade.Environment,
-    top_level_decision: core.CleanupDecision,
-    physical_frame_allocator: phys.FrameAllocator,
-) void {
-    std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
-
-    var deallocate_frame_list: phys.FrameList = .{};
-
-    arch.paging.unmapSinglePage(
-        page_table,
-        virtual_address,
-        backing_pages,
-        top_level_decision,
-        &deallocate_frame_list,
-    );
-
-    var request: FlushRequest = .{
-        .range = .fromAddr(virtual_address, arch.paging.standard_page_size),
-        .flush_target = flush_target,
-    };
-
-    request.submitAndWait(context);
-
-    physical_frame_allocator.deallocate(deallocate_frame_list);
 }
 
 /// Unmaps a virtual range.
@@ -231,6 +200,8 @@ pub fn unmapRange(
 
     var deallocate_frame_list: phys.FrameList = .{};
 
+    // TODO: this can be optimized by implementing `arch.paging.unmapRange`
+
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
 
@@ -245,6 +216,9 @@ pub fn unmapRange(
         current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
     }
 
+    // TODO: once `arch.paging.unmapRange` is implemented it can return the actual range unmapped and we can use that
+    //       for the flush instead of the entire virtual range
+
     var request: FlushRequest = .{
         .range = virtual_range,
         .flush_target = flush_target,
@@ -253,6 +227,50 @@ pub fn unmapRange(
     request.submitAndWait(context);
 
     physical_frame_allocator.deallocate(context, deallocate_frame_list);
+}
+
+/// Changes the protection of the given virtual range.
+///
+/// Only modifies the pages in the range that are actually mapped.
+///
+/// Performs TLB shootdown if required.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+pub fn changeProtection(
+    context: *cascade.Context,
+    page_table: arch.paging.PageTable,
+    virtual_range: core.VirtualRange,
+    flush_target: cascade.Environment,
+    map_type: cascade.mem.MapType,
+) void {
+    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+
+    // TODO: this can be optimized by implementing `arch.paging.changeProtection`
+
+    const last_virtual_address = virtual_range.last();
+    var current_virtual_address = virtual_range.address;
+
+    while (current_virtual_address.lessThan(last_virtual_address)) {
+        arch.paging.changeSinglePageProtection(
+            page_table,
+            current_virtual_address,
+            map_type,
+        );
+        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+    }
+
+    // TODO: once `arch.paging.changeProtection` is implemented it can return the actual range modified and we can use
+    //       that for the flush instead of the entire virtual range
+
+    var request: FlushRequest = .{
+        .range = virtual_range,
+        .flush_target = flush_target,
+    };
+
+    request.submitAndWait(context);
 }
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
