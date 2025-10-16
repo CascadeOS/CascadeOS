@@ -528,11 +528,22 @@ pub fn changeProtection(
         );
 
         if (result.need_remap) {
+            const map_type: cascade.mem.MapType = .{
+                .environment_type = address_space.environment,
+                .protection = request.protection.?, // `need_remap` is only true if `protection` is not null
+            };
+
             // TODO: as we have a write lock to the entries do we need to lock the page table?
             address_space.page_table_lock.lock(context);
             defer address_space.page_table_lock.unlock(context);
 
-            @panic("NOT IMPLEMENTED"); // TODO: support remapping the page table
+            cascade.mem.changeProtection(
+                context,
+                address_space.page_table,
+                range,
+                address_space.environment,
+                map_type,
+            );
         }
 
         address_space.entries_version +%= 1;
