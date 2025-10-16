@@ -399,9 +399,60 @@ pub const ChangeProtection = union(enum) {
         ///  - the maximum protection is not `.none`
         max_protection: Protection,
     };
+
+    fn toRequest(change: ChangeProtection) Request {
+        return switch (change) {
+            .protection => |new_protection| .{
+                .protection = new_protection,
+                .max_protection = null,
+            },
+            .max_protection => |new_max_protection| .{
+                .protection = null,
+                .max_protection = new_max_protection,
+            },
+            .both => |both| .{
+                .protection = both.protection,
+                .max_protection = both.max_protection,
+            },
+        };
+    }
+
+    const Request = struct {
+        protection: ?Protection,
+        max_protection: ?Protection,
+
+        fn toInts(request: Request) struct { ?u8, ?u8 } {
+            return .{
+                if (request.protection) |protection| @intFromEnum(protection) else null,
+                if (request.max_protection) |max_protection| @intFromEnum(max_protection) else null,
+            };
+        }
+
+        pub fn format(
+            request: Request,
+            writer: *std.Io.Writer,
+        ) !void {
+            try writer.print(
+                "protection: {?t} - max_protection: {?t}",
+                .{
+                    request.protection,
+                    request.max_protection,
+                },
+            );
+        }
+    };
 };
 
-pub const ChangeProtectionError = error{};
+pub const ChangeProtectionError = error{
+    /// The requested change would result in the maximum protection of an entry in the range being increased.
+    MaxProtectionIncreased,
+
+    /// The requested change would result in the protection of an entry in the range exceeding its maximum protection.
+    MaxProtectionExceeded,
+
+    /// No memory available.
+    OutOfMemory,
+};
 
 /// Change the protection and/or maximum protection of a range in the address space.
 ///
@@ -416,54 +467,283 @@ pub fn changeProtection(
 ) ChangeProtectionError!void {
     errdefer |err| log.debug(context, "{s}: change protection failed {t}", .{ address_space.name(), err });
 
-    switch (change) {
-        .protection => |new_protection| log.verbose(
-            context,
-            "{s}: change protection of {f} to {t}",
-            .{
-                address_space.name(),
-                range,
-                new_protection,
-            },
-        ),
-        .max_protection => |new_max_protection| {
-            log.verbose(
-                context,
-                "{s}: change max protection of {f} to {t}",
-                .{
-                    address_space.name(),
-                    range,
-                    new_max_protection,
-                },
-            );
+    const request = change.toRequest();
 
-            std.debug.assert(new_max_protection != .none);
-        },
-        .both => |both| {
-            log.verbose(
-                context,
-                "{s}: change protection and max protection of {f} to {t} / {t}",
-                .{
-                    address_space.name(),
-                    range,
-                    both.protection,
-                    both.max_protection,
-                },
-            );
-
-            std.debug.assert(both.max_protection != .none);
-        },
-    }
+    log.verbose(context, "{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
 
     std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
     std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+    if (request.max_protection) |max_protection| std.debug.assert(max_protection != .none);
 
-    if (range.size.equal(.zero)) {
-        @branchHint(.cold);
-        return;
+    const result: ChangeProtectionResult = blk: {
+        if (range.size.equal(.zero)) {
+            @branchHint(.cold);
+            break :blk .none;
+        }
+
+        address_space.entries_lock.writeLock(context);
+        defer address_space.entries_lock.writeUnlock(context);
+
+        const entry_range = address_space.entryRange(range) orelse {
+            // no entries overlap the range
+            break :blk .none;
+        };
+        std.debug.assert(entry_range.length != 0);
+
+        if (!try address_space.validateChangeProtection(entry_range, request)) {
+            // there is no work to do
+            break :blk .none;
+        }
+
+        // preallocate the worse-case number of entries we might need and ensure sufficent capacity in the entries array
+        // only entries that straddle the start or end of the range might require a new entry, so we will need at most 2
+        var new_entries: NewEntries = .{};
+        defer for (new_entries.constSlice()) |entry| {
+            entry.destroy(context); // free any preallocated entries that we didn't use
+        };
+
+        worse_case_new_entries: {
+            var worse_case_new_entries: usize = 0;
+
+            if (entry_range.first_straddles) worse_case_new_entries += 1;
+            if (entry_range.last_straddles) worse_case_new_entries += 1;
+            if (worse_case_new_entries == 0) break :worse_case_new_entries;
+
+            try Entry.createMany(context, new_entries.unusedCapacitySlice()[0..worse_case_new_entries]);
+            new_entries.resize(worse_case_new_entries) catch unreachable;
+
+            try address_space.entries.ensureUnusedCapacity(
+                cascade.mem.heap.allocator,
+                worse_case_new_entries,
+            );
+        }
+        errdefer comptime unreachable;
+
+        const result = address_space.performChangeProtection(
+            context,
+            entry_range,
+            range,
+            request,
+            &new_entries,
+        );
+
+        if (result.need_remap) {
+            // TODO: as we have a write lock to the entries do we need to lock the page table?
+            address_space.page_table_lock.lock(context);
+            defer address_space.page_table_lock.unlock(context);
+
+            @panic("NOT IMPLEMENTED"); // TODO: support remapping the page table
+        }
+
+        address_space.entries_version +%= 1;
+
+        break :blk result;
+    };
+
+    log.verbose(
+        context,
+        "{s}: change protection of {f} resulted in {} split, {} modified and {} merged entries",
+        .{
+            address_space.name(),
+            range,
+            result.entries_split,
+            result.entries_modified,
+            result.entries_merged,
+        },
+    );
+}
+
+/// Validates the change protection request.
+///
+/// Returns false if the change protection request is a no-op.
+fn validateChangeProtection(
+    address_space: *AddressSpace,
+    entry_range: EntryRange,
+    request: ChangeProtection.Request,
+) !bool {
+    const opt_new_protection, const opt_new_max_protection = request.toInts();
+
+    var any_changes = false;
+
+    for (address_space.entries.items[entry_range.start..][0..entry_range.length]) |entry| {
+        const planned_max_protection = if (opt_new_max_protection) |new_max_protection| blk: {
+            const old_max_protection = @intFromEnum(entry.max_protection);
+
+            if (new_max_protection > old_max_protection) {
+                @branchHint(.cold);
+                return error.MaxProtectionIncreased;
+            }
+
+            if (new_max_protection != old_max_protection) any_changes = true;
+
+            break :blk new_max_protection;
+        } else @intFromEnum(entry.max_protection);
+
+        const old_protection = @intFromEnum(entry.protection);
+
+        if (opt_new_protection) |new_protection| {
+            if (new_protection > planned_max_protection) {
+                @branchHint(.cold);
+                return error.MaxProtectionExceeded;
+            }
+
+            if (new_protection != old_protection) any_changes = true;
+        } else {
+            if (old_protection > planned_max_protection) {
+                @branchHint(.cold);
+                return error.MaxProtectionExceeded;
+            }
+        }
     }
 
-    @panic("NOT IMPLEMENTED"); // TODO
+    return any_changes;
+}
+
+const ChangeProtectionResult = struct {
+    entries_split: usize,
+    entries_modified: usize,
+    entries_merged: usize,
+
+    /// `true` is the page tables need to be remapped due to changes in the protection of the entries.
+    need_remap: bool,
+
+    pub const none: ChangeProtectionResult = .{
+        .entries_modified = 0,
+        .entries_split = 0,
+        .entries_merged = 0,
+        .need_remap = false,
+    };
+};
+
+fn performChangeProtection(
+    address_space: *AddressSpace,
+    context: *cascade.Context,
+    entry_range: EntryRange,
+    range: core.VirtualRange,
+    request: ChangeProtection.Request,
+    new_entries: *NewEntries,
+) ChangeProtectionResult {
+    var result: ChangeProtectionResult = .none;
+
+    var first_entry_index = entry_range.start;
+
+    // split first entry if necessary
+    if (entry_range.first_straddles) no_split_first_entry: {
+        const first_entry = address_space.entries.items[first_entry_index];
+
+        split_first_entry: {
+            if (request.protection) |new_protection| {
+                if (first_entry.protection != new_protection) break :split_first_entry;
+            }
+            if (request.max_protection) |new_max_protection| {
+                if (first_entry.max_protection != new_max_protection) break :split_first_entry;
+            }
+
+            // the first entry is already the correct protection so no need to split it
+            break :no_split_first_entry;
+        }
+
+        const split_offset = range.address.subtract(first_entry.range.address);
+        log.verbose(context, "{s}: split first entry {f} at offset {f}", .{
+            address_space.name(),
+            first_entry.range,
+            split_offset,
+        });
+
+        // the new entry will be after the first entry, and will become the new first entry in the range
+        //
+        // | first entry | -> | first entry | new entry |
+        const new_entry = new_entries.pop() orelse unreachable;
+        first_entry.split(context, new_entry, split_offset);
+
+        // move first entry index forward to as the new entry is now the first entry of the entry range
+        first_entry_index += 1;
+        address_space.entries.insertAssumeCapacity(first_entry_index, new_entry);
+
+        result.entries_split += 1;
+    }
+
+    // split last entry if necessary
+    if (entry_range.last_straddles) no_split_last_entry: {
+        const last_entry_index = first_entry_index + entry_range.length - 1;
+        const last_entry = address_space.entries.items[last_entry_index];
+
+        split_last_entry: {
+            if (request.protection) |new_protection| {
+                if (last_entry.protection != new_protection) break :split_last_entry;
+            }
+            if (request.max_protection) |new_max_protection| {
+                if (last_entry.max_protection != new_max_protection) break :split_last_entry;
+            }
+
+            // the last entry is already the correct protection so no need to split it
+            break :no_split_last_entry;
+        }
+
+        const split_offset = range.endBound().subtract(last_entry.range.address);
+        log.verbose(context, "{s}: split last entry {f} at offset {f}", .{
+            address_space.name(),
+            last_entry.range,
+            split_offset,
+        });
+
+        // the new entry will be after last entry, last entry will remain the last entry in the range
+        //
+        // | last entry | -> | last entry | new entry |
+        const new_entry = new_entries.pop() orelse unreachable;
+        last_entry.split(context, new_entry, split_offset);
+
+        // `last_entry_index + 1` as the new entry is after the last entry of the entry range
+        address_space.entries.insertAssumeCapacity(last_entry_index + 1, new_entry);
+
+        result.entries_split += 1;
+    }
+
+    // iterate over entries in range in reverse order, modify and merge them
+    var index = first_entry_index + entry_range.length;
+    while (index > first_entry_index) {
+        index -= 1;
+
+        var modified = false;
+
+        const entry = address_space.entries.items[index];
+        if (request.protection) |new_protection| {
+            if (entry.protection != new_protection) {
+                entry.protection = new_protection;
+                result.need_remap = true;
+                modified = true;
+            }
+        }
+        if (request.max_protection) |new_max_protection| {
+            if (entry.max_protection != new_max_protection) {
+                entry.max_protection = new_max_protection;
+                modified = true;
+            }
+        }
+
+        if (modified) result.entries_modified += 1;
+
+        no_following_entry: {
+            const following_index = index + 1;
+
+            if (following_index >= address_space.entries.items.len) {
+                @branchHint(.unlikely);
+                break :no_following_entry;
+            }
+            const following_entry = address_space.entries.items[following_index];
+
+            if (entry.canMerge(context, following_entry)) {
+                entry.merge(context, following_entry);
+
+                _ = address_space.entries.orderedRemove(following_index);
+                following_entry.destroy(context);
+
+                result.entries_merged += 1;
+            }
+        }
+    }
+
+    return result;
 }
 
 pub const UnmapError = error{};
@@ -600,6 +880,7 @@ pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void
 }
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_name_length);
+const NewEntries = core.containers.BoundedArray(*Entry, 2);
 
 /// Returns the index of the entry that contains the given address.
 ///
@@ -609,10 +890,14 @@ pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_n
 ///  - the address space entries are atleast read locked
 pub fn entryIndexByAddress(address_space: *const AddressSpace, address: core.VirtualAddress) ?usize {
     std.debug.assert(address_space.entries_lock.isReadLocked() or address_space.entries_lock.isWriteLocked());
+    return innerEntryIndexByAddress(address_space.entries.items, address);
+}
 
+// Exists so that a subslice of entries can be searched unlike with `entryIndexByAddress` which searches the entire slice.
+inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: core.VirtualAddress) ?usize {
     return std.sort.binarySearch(
         *const Entry,
-        address_space.entries.items,
+        entries,
         address,
         entryAddressCompare,
     );
@@ -620,4 +905,55 @@ pub fn entryIndexByAddress(address_space: *const AddressSpace, address: core.Vir
 
 fn entryAddressCompare(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
     return entry.range.compareAddressOrder(addr);
+}
+
+const EntryRange = struct {
+    start: usize,
+    length: usize,
+
+    first_straddles: bool = false,
+    last_straddles: bool = false,
+};
+
+/// Return the start index and length of the entries that overlap the given range.
+///
+/// Also determines if the first and last entries straddle the start and end of the range.
+fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?EntryRange {
+    const entries = address_space.entries.items;
+
+    var entry_range: EntryRange = blk: {
+        const start_index = std.sort.lowerBound(
+            *const Entry,
+            entries,
+            range.address,
+            entryAddressCompare,
+        );
+        if (start_index == entries.len) return null;
+
+        var index = start_index;
+
+        while (index < entries.len) : (index += 1) {
+            if (!entries[index].range.anyOverlap(range)) break;
+        }
+        std.debug.assert(index != start_index);
+
+        break :blk .{
+            .start = start_index,
+            .length = index - start_index,
+        };
+    };
+
+    const first_entry = address_space.entries.items[entry_range.start];
+    if (first_entry.range.address.lessThan(range.address)) {
+        std.debug.assert(first_entry.range.last().greaterThan(range.address));
+        entry_range.first_straddles = true;
+    }
+
+    const last_entry = address_space.entries.items[entry_range.start + entry_range.length - 1];
+    if (last_entry.range.last().greaterThan(range.last())) {
+        std.debug.assert(last_entry.range.address.lessThan(range.last()));
+        entry_range.last_straddles = true;
+    }
+
+    return entry_range;
 }
