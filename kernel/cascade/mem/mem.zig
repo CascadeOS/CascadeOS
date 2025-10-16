@@ -23,6 +23,7 @@ const log = cascade.debug.log.scoped(.mem);
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_address` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
     context: *cascade.Context,
@@ -52,6 +53,7 @@ pub fn mapSinglePage(
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalFrames(
     context: *cascade.Context,
@@ -114,6 +116,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 /// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `physical_range.size` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be equal to `physical_range.size`
+/// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
     context: *cascade.Context,
@@ -170,7 +173,9 @@ pub fn mapRangeToPhysicalRange(
 
 /// Unmaps a single page.
 ///
-/// Performs TLB shootdown, prefer to use `unmapRange` instead.
+/// Performs TLB shootdown.
+///
+/// Prefer to use `unmapRange` instead.
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
@@ -206,6 +211,8 @@ pub fn unmapSinglePage(
 }
 
 /// Unmaps a virtual range.
+///
+/// Performs TLB shootdown.
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
