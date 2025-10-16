@@ -250,7 +250,9 @@ pub fn map(
         },
     };
 
-    const entry_merge = entry_merge: {
+    var merges: usize = 0;
+
+    {
         address_space.entries_lock.writeLock(context);
         defer address_space.entries_lock.writeUnlock(context);
 
@@ -259,15 +261,54 @@ pub fn map(
             return error.RequestedSizeUnavailable;
         };
 
+        const insertion_index = free_range.insertion_index;
         local_entry.range = free_range.range;
 
-        const entry_merge = local_entry.determineEntryMerge(
-            context,
-            free_range.insertion_index,
-            address_space.entries.items,
-        );
+        // following entry
+        if (insertion_index != address_space.entries.items.len) {
+            const following_entry = address_space.entries.items[insertion_index];
+            std.debug.assert(!local_entry.anyOverlap(following_entry)); // entry overlaps with the following entry
 
-        try address_space.performMapEntryMerge(context, local_entry, entry_merge);
+            if (local_entry.canMerge(context, following_entry)) {
+                local_entry.merge(context, following_entry);
+                following_entry.* = local_entry;
+                merges += 1;
+            }
+        }
+
+        // preceding entry
+        if (insertion_index != 0) {
+            const preceding_entry = address_space.entries.items[insertion_index - 1];
+            std.debug.assert(!local_entry.anyOverlap(preceding_entry)); // entry overlaps with the preceding entry
+
+            if (preceding_entry.canMerge(context, &local_entry)) {
+                preceding_entry.merge(context, &local_entry);
+
+                if (merges != 0) {
+                    // the local entry was merged into the following entry above, so we need to remove it
+                    const following_entry = address_space.entries.orderedRemove(insertion_index);
+                    following_entry.destroy(context);
+                }
+
+                merges += 1;
+            }
+        }
+
+        if (merges == 0) {
+            const new_entry: *Entry = try .create(context);
+            errdefer new_entry.destroy(context);
+
+            new_entry.* = local_entry;
+
+            address_space.entries.insert(
+                cascade.mem.heap.allocator,
+                insertion_index,
+                new_entry,
+            ) catch {
+                @branchHint(.cold);
+                return error.OutOfMemory;
+            };
+        }
         errdefer comptime unreachable;
 
         switch (options.type) {
@@ -276,34 +317,14 @@ pub fn map(
         }
 
         address_space.entries_version +%= 1;
-
-        break :entry_merge entry_merge;
-    };
+    }
     errdefer comptime unreachable;
 
-    // log the merge that was performed
-    switch (entry_merge) {
-        .new => log.verbose(context, "{s}: inserted new entry", .{address_space.name()}),
-        .extend => |extend| {
-            if (extend.before != null) {
-                if (extend.after != null) {
-                    log.verbose(context, "{s}: merged two entries and expanded by {f}", .{
-                        address_space.name(),
-                        local_entry.range.size,
-                    });
-                } else {
-                    log.verbose(context, "{s}: extended entry by {f}", .{
-                        address_space.name(),
-                        local_entry.range.size,
-                    });
-                }
-            } else if (extend.after != null) {
-                log.verbose(context, "{s}: extended entry by {f}", .{
-                    address_space.name(),
-                    local_entry.range.size,
-                });
-            } else unreachable;
-        },
+    switch (merges) {
+        0 => log.verbose(context, "{s}: inserted new entry", .{address_space.name()}),
+        1 => log.verbose(context, "{s}: merged with pre-existing entry", .{address_space.name()}),
+        2 => log.verbose(context, "{s}: merged with 2 pre-existing entries", .{address_space.name()}),
+        else => unreachable,
     }
 
     log.verbose(context, "{s}: mapped {f}", .{ address_space.name(), local_entry.range });
@@ -346,78 +367,6 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     }
 
     return null;
-}
-
-fn performMapEntryMerge(
-    address_space: *AddressSpace,
-    context: *cascade.Context,
-    local_entry: Entry,
-    entry_merge: Entry.EntryMerge,
-) !void {
-    switch (entry_merge) {
-        .new => |index| {
-            const new_entry: *Entry = try .create(context);
-            errdefer new_entry.destroy(context);
-
-            new_entry.* = local_entry;
-
-            address_space.entries.insert(
-                cascade.mem.heap.allocator,
-                index,
-                new_entry,
-            ) catch {
-                @branchHint(.cold);
-                return error.OutOfMemory;
-            };
-        },
-        .extend => |extend| {
-            if (extend.before) |before_entry| {
-                // merge the local entry into the before entry
-
-                const old_size = before_entry.range.size;
-                before_entry.range.size.addInPlace(local_entry.range.size);
-
-                if (before_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-                    anonymous_map.lock.writeLock(context);
-                    defer anonymous_map.lock.writeUnlock(context);
-
-                    std.debug.assert(anonymous_map.reference_count == 1);
-                    std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
-
-                    anonymous_map.number_of_pages = .fromSize(before_entry.range.size);
-                }
-            }
-
-            if (extend.after) |after_entry| {
-                if (extend.before) |before_entry| {
-                    _ = before_entry;
-                    // merge the after entry into the before entry, then remove and free the after entry
-
-                    @panic("NOT IMPLEMENTED"); // TODO: implement merging the entry with both the before and after entry
-                } else {
-                    // merge the local entry into the after entry
-
-                    const old_size = after_entry.range.size;
-                    after_entry.range.size.addInPlace(local_entry.range.size);
-                    after_entry.range.address.moveBackwardInPlace(local_entry.range.size);
-
-                    if (after_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-                        anonymous_map.lock.writeLock(context);
-                        defer anonymous_map.lock.writeUnlock(context);
-
-                        std.debug.assert(anonymous_map.reference_count == 1);
-                        std.debug.assert(anonymous_map.number_of_pages.equal(.fromSize(old_size)));
-                        std.debug.assert(
-                            after_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(local_entry.range.size),
-                        );
-
-                        anonymous_map.number_of_pages = .fromSize(after_entry.range.size);
-                        after_entry.anonymous_map_reference.start_offset.subtractInPlace(local_entry.range.size);
-                    }
-                }
-            }
-        },
-    }
 }
 
 pub const ChangeProtection = union(enum) {
