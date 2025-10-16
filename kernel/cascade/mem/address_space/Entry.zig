@@ -226,6 +226,57 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
     first_entry.range.size = new_size;
 }
 
+/// Split `first_entry` at `split_offset` into its range.
+///
+/// `first_entry` is modified to cover the range before `split_offset` and `new_second_entry` is filled in to cover the
+/// range after `split_offset`.
+///
+/// Caller must ensure:
+///  - `first_entry` and `new_second_entry` are not the same entry
+///  - `split_offset` is not `.zero`
+///  - `split_offset` is less than or equal to `first_entry.range.size`
+pub fn split(first_entry: *Entry, context: *cascade.Context, new_second_entry: *Entry, split_offset: core.Size) void {
+    std.debug.assert(first_entry != new_second_entry);
+    std.debug.assert(first_entry.range.size.notEqual(.zero));
+    std.debug.assert(split_offset.lessThanOrEqual(first_entry.range.size));
+
+    new_second_entry.* = .{
+        .range = .fromAddr(
+            first_entry.range.address.moveForward(split_offset),
+            first_entry.range.size.subtract(split_offset),
+        ),
+        .protection = first_entry.protection,
+        .max_protection = first_entry.max_protection,
+
+        .copy_on_write = first_entry.copy_on_write,
+        .needs_copy = first_entry.needs_copy,
+        .wired_count = first_entry.wired_count,
+
+        .anonymous_map_reference = first_entry.anonymous_map_reference,
+        .object_reference = first_entry.object_reference,
+    };
+
+    if (first_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
+        new_second_entry.anonymous_map_reference.start_offset.addInPlace(split_offset);
+
+        anonymous_map.lock.writeLock(context);
+        defer anonymous_map.lock.writeUnlock(context);
+
+        anonymous_map.reference_count += 1;
+    }
+
+    if (first_entry.object_reference.object) |object| {
+        new_second_entry.object_reference.start_offset.addInPlace(split_offset);
+
+        object.lock.writeLock(context);
+        defer object.lock.writeUnlock(context);
+
+        object.reference_count += 1;
+    }
+
+    first_entry.range.size = split_offset;
+}
+
 /// Prints the entry.
 pub fn print(entry: *const Entry, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
