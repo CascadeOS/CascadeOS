@@ -72,6 +72,7 @@ pub const functions: arch.Functions = .{
 
         .mapSinglePage = x64.paging.map4KiB,
         .unmapSinglePage = x64.paging.unmap4KiB,
+        .changeSinglePageProtection = x64.paging.change4KiBProtection,
         .flushCache = x64.paging.flushCache,
 
         .init = .{

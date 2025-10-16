@@ -180,6 +180,56 @@ pub fn unmap4KiB(
     }
 }
 
+/// Changes the protection of a 4 KiB page.
+///
+/// NOP if the page is not mapped.
+///
+/// Panics if the page is a huge page.
+pub fn change4KiBProtection(
+    level4_table: *PageTable,
+    virtual_address: core.VirtualAddress,
+    map_type: MapType,
+) void {
+    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+
+    const level4_index = PageTable.p4Index(virtual_address);
+    const level4_entry = level4_table.entries[level4_index].load();
+
+    const level3_table = level4_entry.getNextLevel(
+        cascade.mem.directMapFromPhysical,
+    ) catch |err| switch (err) {
+        error.NotPresent => return,
+        error.HugePage => @panic("page table entry is huge"),
+    };
+
+    const level3_index = PageTable.p3Index(virtual_address);
+    const level3_entry = level3_table.entries[level3_index].load();
+
+    const level2_table = level3_entry.getNextLevel(
+        cascade.mem.directMapFromPhysical,
+    ) catch |err| switch (err) {
+        error.NotPresent => return,
+        error.HugePage => @panic("page table entry is huge"),
+    };
+
+    const level2_index = PageTable.p2Index(virtual_address);
+    const level2_entry = level2_table.entries[level2_index].load();
+
+    const level1_table = level2_entry.getNextLevel(
+        cascade.mem.directMapFromPhysical,
+    ) catch |err| switch (err) {
+        error.NotPresent => return,
+        error.HugePage => @panic("page table entry is huge"),
+    };
+
+    const level1_index = PageTable.p1Index(virtual_address);
+    var level1_entry = level1_table.entries[level1_index].load();
+
+    applyMapType(map_type, .small, &level1_entry);
+
+    level1_table.entries[level1_index].store(level1_entry);
+}
+
 fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) void {
     switch (map_type.protection) {
         .none => {

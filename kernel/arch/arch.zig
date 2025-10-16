@@ -298,9 +298,31 @@ pub const paging = struct {
         )(page_table.arch_specific, virtual_address, backing_page_decision, top_level_decision, deallocate_frame_list);
     }
 
+    /// Changes the protection of the given virtual address.
+    ///
+    /// NOP if the page is not mapped.
+    ///
+    /// Caller must ensure:
+    ///   - the virtual address is aligned to the standard page size
+    ///
+    /// This function:
+    ///   - only supports the standard page size for the architecture
+    ///   - does not flush the TLB
+    pub fn changeSinglePageProtection(
+        page_table: PageTable,
+        virtual_address: core.VirtualAddress,
+        map_type: cascade.mem.MapType,
+    ) callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.paging,
+            "changeSinglePageProtection",
+        )(page_table.arch_specific, virtual_address, map_type);
+    }
+
     /// Flushes the cache for the given virtual range on the current executor.
     ///
-    /// The `virtual_range` address and size must be aligned to the standard page size.
+    /// Caller must ensure:
+    ///   - the `virtual_range` address and size must be aligned to the standard page size
     pub fn flushCache(virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.paging,
@@ -788,9 +810,26 @@ pub const Functions = struct {
             deallocate_frame_list: *cascade.mem.phys.FrameList,
         ) void = null,
 
+        /// Changes the protection of the given virtual address.
+        ///
+        /// NOP if the page is not mapped.
+        ///
+        /// Caller must ensure:
+        ///   - the virtual address is aligned to the standard page size
+        ///
+        /// This function:
+        ///   - only supports the standard page size for the architecture
+        ///   - does not flush the TLB
+        changeSinglePageProtection: ?fn (
+            page_table: *current_decls.paging.PageTable,
+            virtual_address: core.VirtualAddress,
+            map_type: cascade.mem.MapType,
+        ) void = null,
+
         /// Flushes the cache for the given virtual range on the current executor.
         ///
-        /// The `virtual_range` address and size must be aligned to the standard page size.
+        /// Caller must ensure:
+        ///   - the `virtual_range` address and size must be aligned to the standard page size
         flushCache: ?fn (virtual_range: core.VirtualRange) void = null,
 
         init: struct {
