@@ -100,19 +100,13 @@ pub fn map4KiB(
         }
     }
 
-    setEntry(
+    try setEntry(
         level1_table,
         PageTable.p1Index(virtual_address),
         physical_frame.baseAddress(),
         map_type,
         .small,
-    ) catch |err| switch (err) {
-        error.WriteCombiningAndNoCache => {
-            log.err(context, "write combining and no cache not supported", .{});
-            return cascade.mem.MapError.MappingNotValid;
-        },
-        else => |e| return e,
-    };
+    );
 }
 
 /// Unmaps a 4 KiB page.
@@ -186,28 +180,51 @@ pub fn unmap4KiB(
     }
 }
 
-fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) error{WriteCombiningAndNoCache}!void {
-    switch (map_type.environment_type) {
-        .user => entry.user_accessible.write(true),
-        .kernel => entry.global.write(true),
-    }
-
-    if (map_type.protection != .execute) {
-        if (x64.info.cpu_id.execute_disable) {
-            @branchHint(.likely); // modern CPUs support NX
-            entry.no_execute.write(true);
-        }
-    }
-
+fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry) void {
     switch (map_type.protection) {
-        .none => entry.present.write(false),
-        .read_write => entry.writeable.write(true),
-        .read, .execute => {},
+        .none => {
+            entry.present.write(false);
+            return; // entry is not present so no need to set other fields
+        },
+        .read, .execute => {
+            entry.present.write(true);
+            entry.writeable.write(false);
+        },
+        .read_write => {
+            entry.present.write(true);
+            entry.writeable.write(true);
+        },
+    }
+
+    if (x64.info.cpu_id.execute_disable) {
+        @branchHint(.likely); // modern CPUs support NX
+        entry.no_execute.write(map_type.protection != .execute);
+    }
+
+    switch (map_type.environment_type) {
+        .user => {
+            entry.user_accessible.write(true);
+            entry.global.write(false);
+        },
+        .kernel => {
+            entry.user_accessible.write(false);
+            entry.global.write(true);
+        },
     }
 
     switch (map_type.cache) {
-        .write_back => {},
+        .write_back => {
+            entry.write_through.write(false);
+            entry.no_cache.write(false);
+
+            switch (page_type) {
+                .small => entry.pat.write(false),
+                .medium, .large => entry.pat_huge.write(false),
+            }
+        },
         .write_combining => {
+            entry.no_cache.write(true);
+
             // PAT entry 6 is the one set to write combining
             // to select entry 6 `pat[_huge]` and `no_cache` (pcd) must be set to `true`
 
@@ -215,10 +232,14 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
                 .small => entry.pat.write(true),
                 .medium, .large => entry.pat_huge.write(true),
             }
-            entry.no_cache.write(true);
         },
         .uncached => {
             entry.no_cache.write(true);
+
+            switch (page_type) {
+                .small => entry.pat.write(false),
+                .medium, .large => entry.pat_huge.write(false),
+            }
         },
     }
 }
@@ -279,7 +300,7 @@ fn setEntry(
     physical_address: core.PhysicalAddress,
     map_type: MapType,
     page_type: PageType,
-) error{ AlreadyMapped, WriteCombiningAndNoCache }!void {
+) error{AlreadyMapped}!void {
     var entry = page_table.entries[index].load();
 
     if (entry.present.read()) return error.AlreadyMapped;
@@ -298,9 +319,7 @@ fn setEntry(
         },
     }
 
-    try applyMapType(map_type, page_type, &entry);
-
-    entry.present.write(true);
+    applyMapType(map_type, page_type, &entry);
 
     page_table.entries[index].store(entry);
 }
