@@ -38,3 +38,7 @@ pub const user_address_space_range: core.VirtualRange = .{
     .address = .fromInt(arch.paging.standard_page_size.value),
     .size = arch.paging.lower_half_size.subtract(arch.paging.standard_page_size),
 };
+comptime {
+    // No special handing of the undefined address is required as it does not overlap with the user address space range.
+    std.debug.assert(!user_address_space_range.containsAddress(.undefined_address));
+}

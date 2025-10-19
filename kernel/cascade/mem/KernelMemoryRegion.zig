@@ -153,6 +153,11 @@ pub const List = struct {
         const regions = list.constSlice();
 
         var current_address = arch.paging.higher_half_start;
+        comptime {
+            // this means any range returned by this function cannot overlap with the undefined address
+            std.debug.assert(arch.paging.higher_half_start.greaterThan(.undefined_address));
+        }
+
         current_address.alignForwardInPlace(alignment);
 
         var i: usize = 0;

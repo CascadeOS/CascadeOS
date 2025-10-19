@@ -119,6 +119,7 @@ pub const VirtualAddress = extern struct {
     value: u64,
 
     pub const zero: VirtualAddress = .{ .value = 0 };
+    pub const undefined_address: core.VirtualAddress = .fromInt(0xAAAAAAAAAAAAAAAA);
 
     pub inline fn fromInt(value: u64) VirtualAddress {
         return .{ .value = value };

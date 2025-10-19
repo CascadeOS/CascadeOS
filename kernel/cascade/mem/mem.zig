@@ -718,6 +718,10 @@ pub const init = struct {
                     .alignForward(arch.paging.standard_page_size),
             );
 
+            if (virtual_range.containsAddress(.undefined_address)) {
+                std.debug.panic("kernel section {t} overlaps with the undefined address", .{region_type});
+            }
+
             kernel_regions.append(.{
                 .range = virtual_range,
                 .type = region_type,
@@ -730,10 +734,13 @@ pub const init = struct {
 
         // does the direct map range overlap a pre-existing region?
         for (kernel_regions.constSlice()) |region| {
-            if (region.range.fullyContainsRange(direct_map)) {
+            if (region.range.anyOverlap(direct_map)) {
                 std.debug.panic("direct map overlaps region: {f}", .{region});
-                return error.DirectMapOverlapsRegion;
             }
+        }
+
+        if (direct_map.containsAddress(.undefined_address)) {
+            std.debug.panic("direct map overlaps with the undefined address", .{});
         }
 
         kernel_regions.append(.{
