@@ -65,7 +65,7 @@ pub const functions: arch.Functions = .{
                 page_table: *x64.paging.PageTable,
                 target_page_table: *x64.paging.PageTable,
             ) void {
-                std.debug.assert(page_table != target_page_table);
+                if (core.is_debug) std.debug.assert(page_table != target_page_table);
                 @memcpy(&target_page_table.entries, &page_table.entries);
             }
         }.copyTopLevelIntoPageTable,

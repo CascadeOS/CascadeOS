@@ -41,10 +41,10 @@ pages_in_use: PageCount = .zero,
 anonymous_page_chunks: AnonymousPageChunkMap = .{},
 
 // /// If `true` this anonymous map is shared between multiple entries.
-// shared: bool, // TODO: support shared anonymous maps
+// shared: bool, // TODO: properly support shared anonymous maps
 
 pub fn create(context: *cascade.Context, size: core.Size) error{OutOfMemory}!*AnonymousMap {
-    std.debug.assert(size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) std.debug.assert(size.isAligned(arch.paging.standard_page_size));
 
     const anonymous_map = globals.anonymous_map_cache.allocate(context) catch return error.OutOfMemory;
 
@@ -57,8 +57,10 @@ pub fn create(context: *cascade.Context, size: core.Size) error{OutOfMemory}!*An
 ///
 /// When called the lock must be held.
 pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.Context) void {
-    std.debug.assert(anonymous_map.reference_count != 0);
-    std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(anonymous_map.reference_count != 0);
+        std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
+    }
 
     anonymous_map.reference_count += 1;
 }
@@ -67,8 +69,10 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.C
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
 pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.Context) void {
-    std.debug.assert(anonymous_map.reference_count != 0);
-    std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(anonymous_map.reference_count != 0);
+        std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
+    }
 
     const reference_count = anonymous_map.reference_count;
     anonymous_map.reference_count = reference_count - 1;
@@ -102,7 +106,7 @@ pub fn copy(
 ) error{OutOfMemory}!void {
     _ = faulting_address;
 
-    std.debug.assert(address_space.entries_lock.isWriteLocked());
+    if (core.is_debug) std.debug.assert(address_space.entries_lock.isWriteLocked());
 
     if (entry.anonymous_map_reference.anonymous_map == null) {
         // no anonymous map, create one
@@ -132,17 +136,19 @@ pub const Reference = struct {
     ///
     /// Called `amap_lookups` in OpenBSD uvm, but this implementation only returns a single page.
     pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: core.VirtualAddress) ?*AnonymousPage {
-        std.debug.assert(reference.anonymous_map != null);
-        std.debug.assert(reference.start_offset.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
-        std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
-        std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(entry.range.containsAddress(faulting_address));
+        if (core.is_debug) {
+            std.debug.assert(reference.anonymous_map != null);
+            std.debug.assert(reference.start_offset.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
+            std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
+            std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(entry.range.containsAddress(faulting_address));
+        }
 
         const anonymous_map = reference.anonymous_map.?;
 
         const target_index = targetIndex(entry, reference, faulting_address);
-        std.debug.assert(target_index < anonymous_map.number_of_pages.count);
+        if (core.is_debug) std.debug.assert(target_index < anonymous_map.number_of_pages.count);
 
         return anonymous_map.anonymous_page_chunks.get(target_index);
     }
@@ -165,18 +171,20 @@ pub const Reference = struct {
         anonymous_page: *AnonymousPage,
         operation: AddOperation,
     ) error{OutOfMemory}!void {
-        std.debug.assert(reference.anonymous_map != null);
-        std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
-        std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
-        std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(entry.range.containsAddress(faulting_address));
+        if (core.is_debug) {
+            std.debug.assert(reference.anonymous_map != null);
+            std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
+            std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
+            std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(entry.range.containsAddress(faulting_address));
+        }
 
         log.verbose(context, "adding anonymous page for {f} to anonymous map", .{faulting_address});
 
         const anonymous_map = reference.anonymous_map.?;
 
         const target_index = targetIndex(entry, reference, faulting_address);
-        std.debug.assert(target_index < anonymous_map.number_of_pages.count);
+        if (core.is_debug) std.debug.assert(target_index < anonymous_map.number_of_pages.count);
 
         const chunk = anonymous_map.anonymous_page_chunks.ensureChunk(target_index) catch
             return error.OutOfMemory;
@@ -185,7 +193,7 @@ pub const Reference = struct {
 
         switch (operation) {
             .add => {
-                std.debug.assert(chunk[chunk_offset] == null);
+                if (core.is_debug) std.debug.assert(chunk[chunk_offset] == null);
                 anonymous_map.pages_in_use.increment();
             },
             .replace => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_amap.c#L1223
@@ -197,7 +205,7 @@ pub const Reference = struct {
     ///
     /// Asserts that the address is within the entry's range.
     fn targetIndex(entry: *const Entry, reference: Reference, faulting_address: core.VirtualAddress) u32 {
-        std.debug.assert(entry.range.containsAddress(faulting_address));
+        if (core.is_debug) std.debug.assert(entry.range.containsAddress(faulting_address));
 
         return @intCast(
             faulting_address

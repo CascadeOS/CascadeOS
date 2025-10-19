@@ -343,8 +343,10 @@ pub const DBG2 = extern struct {
                             }
                         },
                         .ArmPL011 => {
-                            std.debug.assert(address.address_space == .memory);
-                            std.debug.assert(address.access_size == .dword);
+                            if (core.is_debug) {
+                                std.debug.assert(address.address_space == .memory);
+                                std.debug.assert(address.access_size == .dword);
+                            }
 
                             return .{
                                 .pl011 = (uart.PL011.create(

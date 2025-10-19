@@ -47,10 +47,10 @@ pub const Frame = enum(u32) {
         const region = globals.page_regions[region_index];
 
         const offset_into_region = @intFromEnum(frame) - @intFromEnum(region.start_frame);
-        std.debug.assert(offset_into_region < region.number_of_frames);
+        if (core.is_debug) std.debug.assert(offset_into_region < region.number_of_frames);
 
         const index = region.start_index + offset_into_region;
-        std.debug.assert(index < globals.pages.len);
+        if (core.is_debug) std.debug.assert(index < globals.pages.len);
 
         return @enumFromInt(index);
     }
@@ -301,8 +301,10 @@ pub const init = struct {
                 },
             }
 
-            std.debug.assert(entry.range.address.isAligned(arch.paging.standard_page_size));
-            std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
+            if (core.is_debug) {
+                std.debug.assert(entry.range.address.isAligned(arch.paging.standard_page_size));
+                std.debug.assert(entry.range.size.isAligned(arch.paging.standard_page_size));
+            }
 
             var in_use_frames_left: u32 = if (entry.type == .free) blk: {
                 // pull the free region out of the bootstrap allocator
@@ -311,7 +313,7 @@ pub const init = struct {
 
                 free_region_index += 1;
 
-                std.debug.assert(free_bootstrap_region.start_physical_frame.baseAddress().equal(entry.range.address));
+                if (core.is_debug) std.debug.assert(free_bootstrap_region.start_physical_frame.baseAddress().equal(entry.range.address));
 
                 const in_use_frames = free_bootstrap_region.first_free_frame_index;
 
@@ -395,8 +397,10 @@ pub const init = struct {
                 page_index += 1;
             }
         }
-        std.debug.assert(page_index == number_of_usable_pages);
-        std.debug.assert(usable_range_index == number_of_usable_regions);
+        if (core.is_debug) {
+            std.debug.assert(page_index == number_of_usable_pages);
+            std.debug.assert(usable_range_index == number_of_usable_regions);
+        }
 
         globals.free_page_list.first.store(free_page_list.first, .release);
         globals.free_memory.store(free_memory.value, .release);

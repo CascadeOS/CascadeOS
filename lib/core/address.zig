@@ -147,7 +147,7 @@ pub const VirtualAddress = extern struct {
     ///
     /// `virtual_address` must be greater than or equal to `other`.
     pub fn subtract(virtual_address: VirtualAddress, other: VirtualAddress) core.Size {
-        std.debug.assert(virtual_address.greaterThanOrEqual(other));
+        if (core.is_debug) std.debug.assert(virtual_address.greaterThanOrEqual(other));
         return .from(virtual_address.value - other.value, .byte);
     }
 
@@ -345,7 +345,7 @@ pub const VirtualRange = extern struct {
 
     /// Returns a virtual range between the given addresses exclusive of the end address.
     pub fn between(start: VirtualAddress, end: VirtualAddress) VirtualRange {
-        std.debug.assert(start.lessThan(end));
+        if (core.is_debug) std.debug.assert(start.lessThan(end));
 
         return .{
             .address = start,

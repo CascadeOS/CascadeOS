@@ -517,8 +517,10 @@ pub const SPCR = extern struct {
                         .baud_rate = br,
                     } else null;
 
-                    std.debug.assert(spcr.table.base_address.address_space == .memory);
-                    std.debug.assert(spcr.table.base_address.access_size == .dword);
+                    if (core.is_debug) {
+                        std.debug.assert(spcr.table.base_address.address_space == .memory);
+                        std.debug.assert(spcr.table.base_address.access_size == .dword);
+                    }
 
                     return .{
                         .pl011 = try uart.PL011.create(

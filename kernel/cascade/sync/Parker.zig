@@ -23,7 +23,7 @@ pub const empty: Parker = .{ .parked_task = null };
 /// It is the caller's responsibility to ensure that the task is not currently running, queued for scheduling,
 /// or blocked.
 pub fn withParkedTask(parked_task: *cascade.Task) Parker {
-    std.debug.assert(parked_task.state == .ready);
+    if (core.is_debug) std.debug.assert(parked_task.state == .ready);
     parked_task.state = .blocked;
     return .{ .parked_task = parked_task };
 }
@@ -32,7 +32,7 @@ pub fn withParkedTask(parked_task: *cascade.Task) Parker {
 ///
 /// Spurious wakeups are possible.
 pub fn park(parker: *Parker, context: *cascade.Context) void {
-    std.debug.assert(context.task().state == .running);
+    if (core.is_debug) std.debug.assert(context.task().state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         return; // there were some wakeups, they might be spurious
@@ -48,7 +48,7 @@ pub fn park(parker: *Parker, context: *cascade.Context) void {
     }
 
     parker.lock.lock(context);
-    std.debug.assert(parker.parked_task == null);
+    if (core.is_debug) std.debug.assert(parker.parked_task == null);
 
     // recheck for unpark attempts that happened while we were locking the parker lock
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -94,7 +94,7 @@ pub fn unpark(
         parker.parked_task = null;
         break :blk parked_task;
     };
-    std.debug.assert(parked_task.state == .blocked);
+    if (core.is_debug) std.debug.assert(parked_task.state == .blocked);
 
     parked_task.state = .ready;
 

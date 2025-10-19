@@ -704,8 +704,10 @@ pub const Baud = struct {
         const baud_rate = @intFromEnum(baud.baud_rate);
         const clock_frequency = @intFromEnum(baud.clock_frequency);
 
-        std.debug.assert(baud_rate != 0);
-        std.debug.assert(clock_frequency != 0);
+        if (core.is_debug) {
+            std.debug.assert(baud_rate != 0);
+            std.debug.assert(clock_frequency != 0);
+        }
 
         const divisor = clock_frequency / (baud_rate * 16);
         return std.math.cast(u16, divisor) orelse return error.DivisorTooLarge;
@@ -720,8 +722,10 @@ pub const Baud = struct {
         const baud_rate = @intFromEnum(baud.baud_rate);
         const clock_frequency = @intFromEnum(baud.clock_frequency);
 
-        std.debug.assert(baud_rate != 0);
-        std.debug.assert(clock_frequency != 0);
+        if (core.is_debug) {
+            std.debug.assert(baud_rate != 0);
+            std.debug.assert(clock_frequency != 0);
+        }
 
         const divisor = (64 * clock_frequency) / (baud_rate * 16);
         return @bitCast(std.math.cast(u22, divisor) orelse return error.DivisorTooLarge);

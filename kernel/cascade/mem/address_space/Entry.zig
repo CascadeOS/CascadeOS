@@ -128,7 +128,7 @@ pub fn canMerge(first_entry: *const Entry, context: *cascade.Context, second_ent
                 return false;
             }
         } else {
-            std.debug.assert(second_entry.needs_copy);
+            if (core.is_debug) std.debug.assert(second_entry.needs_copy);
 
             if (first_entry.needs_copy) {
                 first_entry_anonymous_map.lock.readLock(context);
@@ -141,7 +141,7 @@ pub fn canMerge(first_entry: *const Entry, context: *cascade.Context, second_ent
             }
         }
     } else if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
-        std.debug.assert(first_entry.needs_copy);
+        if (core.is_debug) std.debug.assert(first_entry.needs_copy);
 
         if (second_entry.anonymous_map_reference.start_offset.lessThan(first_entry.range.size)) {
             // we can't move the second entry's start offset back far enough to cover the first entry
@@ -159,7 +159,7 @@ pub fn canMerge(first_entry: *const Entry, context: *cascade.Context, second_ent
         }
     } else {
         // neither entry has an anonymous map
-        std.debug.assert(first_entry.needs_copy and second_entry.needs_copy);
+        if (core.is_debug) std.debug.assert(first_entry.needs_copy and second_entry.needs_copy);
     }
 
     return true;
@@ -179,8 +179,10 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
         defer anonymous_map.lock.writeUnlock(context);
 
         if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
-            std.debug.assert(anonymous_map == second_entry_anonymous_map); // checked by `canMerge`
-            std.debug.assert(anonymous_map.reference_count >= 2);
+            if (core.is_debug) {
+                std.debug.assert(anonymous_map == second_entry_anonymous_map); // checked by `canMerge`
+                std.debug.assert(anonymous_map.reference_count >= 2);
+            }
 
             anonymous_map.reference_count -= 1;
         } else {
@@ -188,7 +190,7 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
             const size_after_offset = size_of_anonymous_map.subtract(
                 first_entry.anonymous_map_reference.start_offset,
             );
-            std.debug.assert(size_after_offset.greaterThanOrEqual(first_entry.range.size));
+            if (core.is_debug) std.debug.assert(size_after_offset.greaterThanOrEqual(first_entry.range.size));
 
             if (size_after_offset.lessThan(new_size)) {
                 // we must extend the anonymous map to cover the second entries range
@@ -196,7 +198,7 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
             }
         }
     } else if (second_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-        std.debug.assert(second_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(first_entry.range.size));
+        if (core.is_debug) std.debug.assert(second_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(first_entry.range.size));
 
         // we take over the anonymous map reference from the second entry and move the start offset back to cover the
         // first entries range
@@ -209,16 +211,16 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
 
     object: {
         const object = first_entry.object_reference.object orelse {
-            std.debug.assert(second_entry.object_reference.object == null);
+            if (core.is_debug) std.debug.assert(second_entry.object_reference.object == null);
             break :object;
         };
 
         const second_entry_object = second_entry.object_reference.object.?;
-        std.debug.assert(object == second_entry_object);
+        if (core.is_debug) std.debug.assert(object == second_entry_object);
 
         object.lock.writeLock(context);
         defer object.lock.writeUnlock(context);
-        std.debug.assert(object.reference_count >= 2);
+        if (core.is_debug) std.debug.assert(object.reference_count >= 2);
 
         object.reference_count -= 1;
     }
@@ -236,9 +238,11 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
 ///  - `split_offset` is not `.zero`
 ///  - `split_offset` is less than or equal to `first_entry.range.size`
 pub fn split(first_entry: *Entry, context: *cascade.Context, new_second_entry: *Entry, split_offset: core.Size) void {
-    std.debug.assert(first_entry != new_second_entry);
-    std.debug.assert(first_entry.range.size.notEqual(.zero));
-    std.debug.assert(split_offset.lessThanOrEqual(first_entry.range.size));
+    if (core.is_debug) {
+        std.debug.assert(first_entry != new_second_entry);
+        std.debug.assert(first_entry.range.size.notEqual(.zero));
+        std.debug.assert(split_offset.lessThanOrEqual(first_entry.range.size));
+    }
 
     new_second_entry.* = .{
         .range = .fromAddr(

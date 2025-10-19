@@ -41,7 +41,7 @@ pub const Tss = extern struct {
         privilege_level: x64.PrivilegeLevel,
         stack_pointer: core.VirtualAddress,
     ) void {
-        std.debug.assert(privilege_level != .ring3);
+        if (core.is_debug) std.debug.assert(privilege_level != .ring3);
         tss.privilege_stack_table[@intFromEnum(privilege_level)] = stack_pointer;
     }
 

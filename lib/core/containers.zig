@@ -23,10 +23,10 @@ pub const FIFO = struct {
     /// Removes the first node from and returns it.
     pub fn pop(fifo: *FIFO) ?*Node {
         const node = fifo.first_node orelse return null;
-        std.debug.assert(fifo.last_node != null);
+        if (core.is_debug) std.debug.assert(fifo.last_node != null);
 
         if (node == fifo.last_node) {
-            std.debug.assert(node.next == null);
+            if (core.is_debug) std.debug.assert(node.next == null);
             fifo.first_node = null;
             fifo.last_node = null;
         } else {
@@ -39,10 +39,10 @@ pub const FIFO = struct {
 
     /// Append a node to the end.
     pub fn append(fifo: *FIFO, node: *Node) void {
-        std.debug.assert(node.next == null);
+        if (core.is_debug) std.debug.assert(node.next == null);
 
         if (fifo.last_node) |last| {
-            std.debug.assert(fifo.first_node != null);
+            if (core.is_debug) std.debug.assert(fifo.first_node != null);
             last.next = node;
         } else {
             fifo.first_node = node;
@@ -267,7 +267,7 @@ pub fn BoundedArrayAligned(
         /// Increase length by 1, returning pointer to the new item.
         /// Asserts that there is space for the new item.
         pub fn addOneAssumeCapacity(self: *Self) *T {
-            std.debug.assert(self.len < buffer_capacity);
+            if (core.is_debug) std.debug.assert(self.len < buffer_capacity);
             self.len += 1;
             return &self.slice()[self.len - 1];
         }
@@ -422,7 +422,7 @@ pub fn BoundedArrayAligned(
         pub fn appendNTimesAssumeCapacity(self: *Self, value: T, n: usize) void {
             const old_len = self.len;
             self.len += n;
-            std.debug.assert(self.len <= buffer_capacity);
+            if (core.is_debug) std.debug.assert(self.len <= buffer_capacity);
             @memset(self.slice()[old_len..self.len], value);
         }
     };

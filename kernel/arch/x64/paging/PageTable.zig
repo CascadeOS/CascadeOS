@@ -217,7 +217,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress4kib(entry: *Entry, address: core.PhysicalAddress) void {
-            std.debug.assert(address.isAligned(small_page_size));
+            if (core.is_debug) std.debug.assert(address.isAligned(small_page_size));
             entry._address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -226,7 +226,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress2mib(entry: *Entry, address: core.PhysicalAddress) void {
-            std.debug.assert(address.isAligned(medium_page_size));
+            if (core.is_debug) std.debug.assert(address.isAligned(medium_page_size));
             entry._address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -235,7 +235,7 @@ pub const PageTable = extern struct {
         }
 
         pub fn setAddress1gib(entry: *Entry, address: core.PhysicalAddress) void {
-            std.debug.assert(address.isAligned(large_page_size));
+            if (core.is_debug) std.debug.assert(address.isAligned(large_page_size));
             entry._address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 

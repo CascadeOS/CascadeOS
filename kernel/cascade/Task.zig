@@ -83,7 +83,7 @@ pub fn createKernelTask(context: *cascade.Context, options: CreateKernelTaskOpti
         .environment = .{ .kernel = options.kernel_task_type },
     });
     errdefer {
-        std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
+        if (core.is_debug) std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
         internal.destroy(context, task);
     }
 
@@ -108,8 +108,11 @@ pub fn incrementReferenceCount(task: *Task) void {
 ///
 /// This must not be called when the task is the current task, see `Context.drop` instead.
 pub fn decrementReferenceCount(task: *Task, context: *cascade.Context) void {
-    std.debug.assert(task != context.task());
-    if (task.reference_count.fetchSub(1, .acq_rel) != 1) return;
+    if (core.is_debug) std.debug.assert(task != context.task());
+    if (task.reference_count.fetchSub(1, .acq_rel) != 1) {
+        @branchHint(.likely);
+        return;
+    }
     cascade.services.task_cleanup.queueTaskForCleanup(context, task);
 }
 
@@ -176,8 +179,10 @@ pub const internal = struct {
     pub fn destroy(context: *cascade.Context, task: *Task) void {
         // for user tasks the process reference stored in `environment` has been set to `undefined` before this function
         // is called
-        std.debug.assert(task.state == .dropped);
-        std.debug.assert(task.reference_count.load(.monotonic) == 0);
+        if (core.is_debug) {
+            std.debug.assert(task.state == .dropped);
+            std.debug.assert(task.reference_count.load(.monotonic) == 0);
+        }
         globals.cache.deallocate(context, task);
     }
 };
@@ -206,12 +211,14 @@ pub const Stack = struct {
     /// - `range` and `usable_range` must be aligned to 16 bytes.
     /// - `range` must fully contain `usable_range`.
     pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
-        std.debug.assert(usable_range.size.greaterThanOrEqual(core.Size.of(usize)));
-        std.debug.assert(range.fullyContainsRange(usable_range));
+        if (core.is_debug) {
+            std.debug.assert(usable_range.size.greaterThanOrEqual(core.Size.of(usize)));
+            std.debug.assert(range.fullyContainsRange(usable_range));
 
-        // TODO: are these two checks needed needed as we don't use SIMD? non-x64?
-        std.debug.assert(range.address.isAligned(.from(16, .byte)));
-        std.debug.assert(usable_range.address.isAligned(.from(16, .byte)));
+            // TODO: are these two checks needed needed as we don't use SIMD? non-x64?
+            std.debug.assert(range.address.isAligned(.from(16, .byte)));
+            std.debug.assert(usable_range.address.isAligned(.from(16, .byte)));
+        }
 
         var stack: Stack = .{
             .range = range,

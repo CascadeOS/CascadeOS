@@ -94,12 +94,14 @@ pub fn init(
 ///  - the address space is not in use by any tasks
 ///  - the address space is empty
 pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) void {
-    std.debug.assert(address_space.environment == .user);
-    std.debug.assert(!address_space.page_table_lock.isLocked());
-    std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
-    std.debug.assert(address_space.entries.items.len == 0);
-    std.debug.assert(address_space.entries.capacity == 0);
-    std.debug.assert(address_space.entries_version == 0);
+    if (core.is_debug) {
+        std.debug.assert(address_space.environment == .user);
+        std.debug.assert(!address_space.page_table_lock.isLocked());
+        std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
+        std.debug.assert(address_space.entries.items.len == 0);
+        std.debug.assert(address_space.entries.capacity == 0);
+        std.debug.assert(address_space.entries_version == 0);
+    }
 
     address_space._name = cascade.mem.AddressSpace.Name.fromSlice(
         new_process.name.constSlice(),
@@ -114,8 +116,10 @@ pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) voi
 pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.Context) void {
     log.debug(context, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
-    std.debug.assert(!address_space.page_table_lock.isLocked());
-    std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
+    if (core.is_debug) {
+        std.debug.assert(!address_space.page_table_lock.isLocked());
+        std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
+    }
 
     try address_space.unmap(context, address_space.range);
 
@@ -131,11 +135,13 @@ pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
     // cannot use the name as it will reference a defunct process that this address space is now unrelated to
     log.debug(context, "deinit", .{});
 
-    std.debug.assert(!address_space.page_table_lock.isLocked());
-    std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
-    std.debug.assert(address_space.entries.items.len == 0);
-    std.debug.assert(address_space.entries.capacity == 0);
-    std.debug.assert(address_space.entries_version == 0);
+    if (core.is_debug) {
+        std.debug.assert(!address_space.page_table_lock.isLocked());
+        std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
+        std.debug.assert(address_space.entries.items.len == 0);
+        std.debug.assert(address_space.entries.capacity == 0);
+        std.debug.assert(address_space.entries_version == 0);
+    }
 
     address_space.* = undefined;
 }
@@ -210,7 +216,7 @@ pub fn map(
         options.type,
     });
 
-    std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
 
     if (options.size.equal(.zero)) {
         @branchHint(.cold);
@@ -218,7 +224,7 @@ pub fn map(
     }
 
     if (options.max_protection) |max_protection| {
-        std.debug.assert(max_protection != .none);
+        if (core.is_debug) std.debug.assert(max_protection != .none);
         if (@intFromEnum(options.protection) > @intFromEnum(max_protection)) {
             @branchHint(.cold);
             return error.MaxProtectionExceeded;
@@ -268,7 +274,7 @@ pub fn map(
         // following entry
         if (insertion_index != address_space.entries.items.len) {
             const following_entry = address_space.entries.items[insertion_index];
-            std.debug.assert(!local_entry.anyOverlap(following_entry)); // entry overlaps with the following entry
+            if (core.is_debug) std.debug.assert(!local_entry.anyOverlap(following_entry)); // entry overlaps with the following entry
 
             if (local_entry.canMerge(context, following_entry)) {
                 local_entry.merge(context, following_entry);
@@ -280,7 +286,7 @@ pub fn map(
         // preceding entry
         if (insertion_index != 0) {
             const preceding_entry = address_space.entries.items[insertion_index - 1];
-            std.debug.assert(!local_entry.anyOverlap(preceding_entry)); // entry overlaps with the preceding entry
+            if (core.is_debug) std.debug.assert(!local_entry.anyOverlap(preceding_entry)); // entry overlaps with the preceding entry
 
             if (preceding_entry.canMerge(context, &local_entry)) {
                 preceding_entry.merge(context, &local_entry);
@@ -471,9 +477,12 @@ pub fn changeProtection(
 
     log.verbose(context, "{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
 
-    std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
-    if (request.max_protection) |max_protection| std.debug.assert(max_protection != .none);
+    if (core.is_debug) {
+        std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+
+        if (request.max_protection) |max_protection| std.debug.assert(max_protection != .none);
+    }
 
     const result: ChangeProtectionResult = blk: {
         if (range.size.equal(.zero)) {
@@ -488,7 +497,7 @@ pub fn changeProtection(
             // no entries overlap the range
             break :blk .none;
         };
-        std.debug.assert(entry_range.length != 0);
+        if (core.is_debug) std.debug.assert(entry_range.length != 0);
 
         if (!try address_space.validateChangeProtection(entry_range, request)) {
             // there is no work to do
@@ -768,8 +777,10 @@ pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: cor
 
     log.verbose(context, "{s}: unmap {f}", .{ address_space.name(), range });
 
-    std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) {
+        std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+    }
 
     if (range.size.equal(.zero)) {
         @branchHint(.cold);
@@ -900,7 +911,7 @@ const NewEntries = core.containers.BoundedArray(*Entry, 2);
 /// Caller must ensure:
 ///  - the address space entries are atleast read locked
 pub fn entryIndexByAddress(address_space: *const AddressSpace, address: core.VirtualAddress) ?usize {
-    std.debug.assert(address_space.entries_lock.isReadLocked() or address_space.entries_lock.isWriteLocked());
+    if (core.is_debug) std.debug.assert(address_space.entries_lock.isReadLocked() or address_space.entries_lock.isWriteLocked());
     return innerEntryIndexByAddress(address_space.entries.items, address);
 }
 
@@ -946,7 +957,7 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
         while (index < entries.len) : (index += 1) {
             if (!entries[index].range.anyOverlap(range)) break;
         }
-        std.debug.assert(index != start_index);
+        if (core.is_debug) std.debug.assert(index != start_index);
 
         break :blk .{
             .start = start_index,
@@ -956,13 +967,13 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
 
     const first_entry = address_space.entries.items[entry_range.start];
     if (first_entry.range.address.lessThan(range.address)) {
-        std.debug.assert(first_entry.range.last().greaterThan(range.address));
+        if (core.is_debug) std.debug.assert(first_entry.range.last().greaterThan(range.address));
         entry_range.first_straddles = true;
     }
 
     const last_entry = address_space.entries.items[entry_range.start + entry_range.length - 1];
     if (last_entry.range.last().greaterThan(range.last())) {
-        std.debug.assert(last_entry.range.address.lessThan(range.last()));
+        if (core.is_debug) std.debug.assert(last_entry.range.address.lessThan(range.last()));
         entry_range.last_straddles = true;
     }
 

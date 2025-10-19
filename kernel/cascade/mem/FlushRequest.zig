@@ -42,7 +42,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, context: *cascade.Context) vo
 }
 
 pub fn processFlushRequests(context: *cascade.Context) void {
-    std.debug.assert(context.interrupt_disable_count != 0);
+    if (core.is_debug) std.debug.assert(context.interrupt_disable_count != 0);
 
     const executor = context.executor.?;
 
@@ -53,7 +53,7 @@ pub fn processFlushRequests(context: *cascade.Context) void {
 }
 
 fn flush(flush_request: *FlushRequest, context: *cascade.Context) void {
-    std.debug.assert(context.interrupt_disable_count != 0);
+    if (core.is_debug) std.debug.assert(context.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 

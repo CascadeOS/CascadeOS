@@ -143,8 +143,10 @@ fn updateElfSpecific(
     const Offset = if (is_64) std.elf.Elf64_Off else std.elf.Elf32_Off;
 
     const elf_header: *const HeaderT = std.mem.bytesAsValue(HeaderT, elf_mem);
-    std.debug.assert(elf_header.e_shentsize == @as(u16, @sizeOf(SectionHeaderT)));
-    std.debug.assert(elf_header.e_phentsize == @as(u16, @sizeOf(ProgramHeaderT)));
+    if (core.is_debug) {
+        std.debug.assert(elf_header.e_shentsize == @as(u16, @sizeOf(SectionHeaderT)));
+        std.debug.assert(elf_header.e_phentsize == @as(u16, @sizeOf(ProgramHeaderT)));
+    }
 
     const section_table: []align(1) SectionHeaderT = std.mem.bytesAsSlice(
         SectionHeaderT,
@@ -522,7 +524,7 @@ fn fillInBuilders(
     );
 
     for (line_debug_info) |line_info| {
-        std.debug.assert(line_info.address >= previous_address);
+        if (core.is_debug) std.debug.assert(line_info.address >= previous_address);
 
         const new_address = line_info.address;
         const new_line: i64 = @intCast(line_info.line);

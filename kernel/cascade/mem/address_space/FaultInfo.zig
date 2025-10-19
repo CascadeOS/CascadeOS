@@ -135,7 +135,7 @@ pub fn faultCheck(
     const anonymous_map_reference = fault_info.entry.anonymous_map_reference;
     const object_reference = fault_info.entry.object_reference;
 
-    std.debug.assert(anonymous_map_reference.anonymous_map != null or object_reference.object != null);
+    if (core.is_debug) std.debug.assert(anonymous_map_reference.anonymous_map != null or object_reference.object != null);
 
     if (anonymous_map_reference.anonymous_map) |anonymous_map| {
         // we have an anonymous map so lock it and try to extract the page
@@ -179,20 +179,24 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
     const opt_anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map;
     const opt_object = fault_info.entry.object_reference.object;
 
-    std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
-        .read => opt_anonymous_map.?.lock.isReadLocked(),
-        .write => opt_anonymous_map.?.lock.isWriteLocked(),
-    });
+    if (core.is_debug) {
+        std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
+            .read => opt_anonymous_map.?.lock.isReadLocked(),
+            .write => opt_anonymous_map.?.lock.isWriteLocked(),
+        });
+    }
 
     const object_page: ObjectPage = if (opt_object) |object| blk: {
         const object_page: ObjectPage = if (true) {
             @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1370
         } else .need_io;
 
-        std.debug.assert(switch (fault_info.object_lock_type) {
-            .read => object.lock.isReadLocked(),
-            .write => object.lock.isWriteLocked(),
-        });
+        if (core.is_debug) {
+            std.debug.assert(switch (fault_info.object_lock_type) {
+                .read => object.lock.isReadLocked(),
+                .write => object.lock.isWriteLocked(),
+            });
+        }
 
         // we have a backing object are we going to promote to an anonymous page?
         fault_info.promote_to_anonymous_map = fault_info.access_type == .write and fault_info.entry.copy_on_write;
@@ -220,7 +224,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
         },
     }
 
-    std.debug.assert(object_page != .need_io);
+    if (core.is_debug) std.debug.assert(object_page != .need_io);
 
     var anonymous_page: *AnonymousPage = undefined;
     var page: *Page = undefined;
@@ -241,11 +245,13 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
             );
             return error.Restart;
         }
-        std.debug.assert(anonymous_map.lock.isWriteLocked());
-        std.debug.assert(opt_object == null or switch (fault_info.object_lock_type) {
-            .read => opt_object.?.lock.isReadLocked(),
-            .write => opt_object.?.lock.isWriteLocked(),
-        });
+        if (core.is_debug) {
+            std.debug.assert(anonymous_map.lock.isWriteLocked());
+            std.debug.assert(opt_object == null or switch (fault_info.object_lock_type) {
+                .read => opt_object.?.lock.isReadLocked(),
+                .write => opt_object.?.lock.isWriteLocked(),
+            });
+        }
 
         try fault_info.promote(
             context,
@@ -271,14 +277,16 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1430
     }
 
-    std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
-        .read => opt_anonymous_map.?.lock.isReadLocked(),
-        .write => opt_anonymous_map.?.lock.isWriteLocked(),
-    });
-    std.debug.assert(opt_object == null or switch (fault_info.object_lock_type) {
-        .read => opt_object.?.lock.isReadLocked(),
-        .write => opt_object.?.lock.isWriteLocked(),
-    });
+    if (core.is_debug) {
+        std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
+            .read => opt_anonymous_map.?.lock.isReadLocked(),
+            .write => opt_anonymous_map.?.lock.isWriteLocked(),
+        });
+        std.debug.assert(opt_object == null or switch (fault_info.object_lock_type) {
+            .read => opt_object.?.lock.isReadLocked(),
+            .write => opt_object.?.lock.isWriteLocked(),
+        });
+    }
 
     {
         const map_type: cascade.mem.MapType = .{
@@ -359,14 +367,14 @@ fn promote(
     log.verbose(context, "promoting to an anonymous page", .{});
 
     const anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map.?;
-    std.debug.assert(anonymous_map.lock.isWriteLocked());
+    if (core.is_debug) std.debug.assert(anonymous_map.lock.isWriteLocked());
 
     const opt_object = switch (object_page) {
         .zero_fill => null,
         .page => fault_info.entry.object_reference.object,
         .need_io => unreachable,
     };
-    std.debug.assert(opt_object == null or (opt_object.?.lock.isReadLocked() or opt_object.?.lock.isWriteLocked()));
+    if (core.is_debug) std.debug.assert(opt_object == null or (opt_object.?.lock.isReadLocked() or opt_object.?.lock.isWriteLocked()));
 
     const allocated_frame = cascade.mem.phys.allocator.allocate(context) catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
@@ -431,10 +439,12 @@ fn faultAnonymousMapLockUpgrade(
     context: *cascade.Context,
     anonymous_map: *AnonymousMap,
 ) bool {
-    std.debug.assert(switch (fault_info.anonymous_map_lock_type) {
-        .read => anonymous_map.lock.isReadLocked(),
-        .write => anonymous_map.lock.isWriteLocked(),
-    });
+    if (core.is_debug) {
+        std.debug.assert(switch (fault_info.anonymous_map_lock_type) {
+            .read => anonymous_map.lock.isReadLocked(),
+            .write => anonymous_map.lock.isWriteLocked(),
+        });
+    }
 
     // fast path
     if (fault_info.anonymous_map_lock_type == .write) {
@@ -449,10 +459,12 @@ fn faultAnonymousMapLockUpgrade(
         return false;
     }
 
-    std.debug.assert(switch (fault_info.anonymous_map_lock_type) {
-        .read => anonymous_map.lock.isReadLocked(),
-        .write => anonymous_map.lock.isWriteLocked(),
-    });
+    if (core.is_debug) {
+        std.debug.assert(switch (fault_info.anonymous_map_lock_type) {
+            .read => anonymous_map.lock.isReadLocked(),
+            .write => anonymous_map.lock.isWriteLocked(),
+        });
+    }
 
     return true;
 }

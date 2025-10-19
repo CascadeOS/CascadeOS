@@ -20,7 +20,7 @@ holding_executor: ?*const cascade.Executor = null,
 pub fn lock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) void {
     context.incrementInterruptDisable();
 
-    std.debug.assert(!ticket_spin_lock.isLockedByCurrent(context)); // recursive locks are not supported
+    if (core.is_debug) std.debug.assert(!ticket_spin_lock.isLockedByCurrent(context)); // recursive locks are not supported
 
     const ticket = @atomicRmw(u32, &ticket_spin_lock.container.contents.ticket, .Add, 1, .monotonic);
 
@@ -78,8 +78,10 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) boo
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
 pub fn unlock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) void {
-    std.debug.assert(context.spinlocks_held != 0);
-    std.debug.assert(ticket_spin_lock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(context.spinlocks_held != 0);
+        std.debug.assert(ticket_spin_lock.isLockedByCurrent(context));
+    }
 
     ticket_spin_lock.unsafeUnlock();
 

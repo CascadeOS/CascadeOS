@@ -957,7 +957,7 @@ pub const LAPIC = union(enum) {
                 return ptr.*;
             },
             .x2apic => {
-                std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
+                if (core.is_debug) std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) @panic("this is a 64-bit register");
 
                 return x64.registers.readMSR(u32, register.x2apicRegister());
@@ -977,7 +977,7 @@ pub const LAPIC = union(enum) {
                 ptr.* = value;
             },
             .x2apic => {
-                std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
+                if (core.is_debug) std.debug.assert(register != .interrupt_command_32_63); // not supported in x2apic mode
                 if (register == .interrupt_command_0_31) @panic("this is a 64-bit register");
 
                 x64.registers.writeMSR(u32, register.x2apicRegister(), value);
@@ -1236,7 +1236,7 @@ pub const LAPIC = union(enum) {
         ///
         /// Does not support the `self_ipi` register as it is not supported in xAPIC mode.
         pub fn xapicOffset(register: Register) usize {
-            std.debug.assert(register != .lapic_ipi); // not supported in xAPIC mode
+            if (core.is_debug) std.debug.assert(register != .lapic_ipi); // not supported in xAPIC mode
 
             return @intFromEnum(register) * 0x10;
         }
@@ -1249,10 +1249,12 @@ pub const LAPIC = union(enum) {
         ///  - `remote_read`
         ///  - `interrupt_command_32_63`
         pub fn x2apicRegister(register: Register) u32 {
-            std.debug.assert(register != .destination_format); // not supported in x2APIC mode
-            std.debug.assert(register != .arbitration_priority); // not supported in x2APIC mode
-            std.debug.assert(register != .remote_read); // not supported in x2APIC mode
-            std.debug.assert(register != .interrupt_command_32_63); // not supported in x2APIC mode
+            if (core.is_debug) {
+                std.debug.assert(register != .destination_format); // not supported in x2APIC mode
+                std.debug.assert(register != .arbitration_priority); // not supported in x2APIC mode
+                std.debug.assert(register != .remote_read); // not supported in x2APIC mode
+                std.debug.assert(register != .interrupt_command_32_63); // not supported in x2APIC mode
+            }
 
             return 0x800 + @intFromEnum(register);
         }

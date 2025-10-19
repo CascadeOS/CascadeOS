@@ -36,13 +36,15 @@ pub fn wakeOne(
     context: *cascade.Context,
     spinlock: *const cascade.sync.TicketSpinLock,
 ) void {
-    std.debug.assert(context.interrupt_disable_count != 0);
-    std.debug.assert(spinlock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(context.interrupt_disable_count != 0);
+        std.debug.assert(spinlock.isLockedByCurrent(context));
+    }
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
     const task_to_wake = cascade.Task.fromNode(task_to_wake_node);
 
-    std.debug.assert(task_to_wake.state == .blocked);
+    if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
     const scheduler_already_locked = context.scheduler_locked;
@@ -69,8 +71,10 @@ pub fn wait(
     context: *cascade.Context,
     spinlock: *cascade.sync.TicketSpinLock,
 ) void {
-    std.debug.assert(context.interrupt_disable_count != 0);
-    std.debug.assert(spinlock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(context.interrupt_disable_count != 0);
+        std.debug.assert(spinlock.isLockedByCurrent(context));
+    }
 
     wait_queue.waiting_tasks.append(&context.task().next_task_node);
 

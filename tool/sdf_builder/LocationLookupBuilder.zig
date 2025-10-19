@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const core = @import("core");
 const sdf = @import("sdf");
 
 const LocationLookupBuilder = @This();
@@ -36,7 +37,7 @@ pub fn output(
     location_lookup_builder: *const LocationLookupBuilder,
     output_buffer: *std.Io.Writer.Allocating,
 ) !struct { u64, u64, u64 } {
-    std.debug.assert(location_lookup_builder.location_lookup.items.len == location_lookup_builder.location_program_states.items.len);
+    if (core.is_debug) std.debug.assert(location_lookup_builder.location_lookup.items.len == location_lookup_builder.location_program_states.items.len);
 
     const location_lookup_offset = output_buffer.writer.end;
 

@@ -350,7 +350,7 @@ pub const RawCache = struct {
 
     /// Allocate multiple items from the cache.
     pub fn allocateMany(raw_cache: *RawCache, context: *cascade.Context, items: [][]u8) AllocateError!void {
-        std.debug.assert(items.len > 0);
+        if (items.len == 0) return;
 
         log.verbose(context, "{s}: allocating {} items", .{ raw_cache.name(), items.len });
 
@@ -601,7 +601,7 @@ pub const RawCache = struct {
 
     /// Deallocate many items back to the cache.
     pub fn deallocateMany(raw_cache: *RawCache, context: *cascade.Context, items: []const []u8) void {
-        std.debug.assert(items.len > 0);
+        if (items.len == 0) return;
 
         log.verbose(context, "{s}: deallocating {} items", .{ raw_cache.name(), items.len });
 
@@ -658,7 +658,7 @@ pub const RawCache = struct {
                 .keep => if (raw_cache.available_slabs.first == raw_cache.available_slabs.last) {
                     @branchHint(.unlikely);
 
-                    std.debug.assert(raw_cache.available_slabs.first == &slab.linkage);
+                    if (core.is_debug) std.debug.assert(raw_cache.available_slabs.first == &slab.linkage);
 
                     // this is the last available slab so we leave it in the available list and don't deallocate it
 

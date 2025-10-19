@@ -181,7 +181,7 @@ const Hpet = struct {
     }
 
     pub fn writeCounterRegister(hpet: Hpet, value: u64) void {
-        std.debug.assert(!hpet.readGeneralConfigurationRegister().enable); // counter must be disabled
+        if (core.is_debug) std.debug.assert(!hpet.readGeneralConfigurationRegister().enable); // counter must be disabled
         hpet.base[counter_register_offset] = value;
     }
 

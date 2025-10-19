@@ -15,8 +15,10 @@ pub fn queueTaskForCleanup(
     context: *cascade.Context,
     task: *Task,
 ) void {
-    std.debug.assert(context.task() != task);
-    std.debug.assert(task.state == .dropped);
+    if (core.is_debug) {
+        std.debug.assert(context.task() != task);
+        std.debug.assert(task.state == .dropped);
+    }
 
     if (task.state.dropped.queued_for_cleanup.cmpxchgStrong(
         false,
@@ -34,11 +36,13 @@ pub fn queueTaskForCleanup(
 }
 
 fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
-    std.debug.assert(context.task() == globals.task_cleanup_task);
-    std.debug.assert(context.interrupt_disable_count == 0);
-    std.debug.assert(context.spinlocks_held == 0);
-    std.debug.assert(!context.scheduler_locked);
-    std.debug.assert(arch.interrupts.areEnabled());
+    if (core.is_debug) {
+        std.debug.assert(context.task() == globals.task_cleanup_task);
+        std.debug.assert(context.interrupt_disable_count == 0);
+        std.debug.assert(context.spinlocks_held == 0);
+        std.debug.assert(!context.scheduler_locked);
+        std.debug.assert(arch.interrupts.areEnabled());
+    }
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
@@ -53,8 +57,10 @@ fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
 }
 
 fn handleTask(context: *cascade.Context, task: *Task) void {
-    std.debug.assert(task.state == .dropped);
-    std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
+    if (core.is_debug) {
+        std.debug.assert(task.state == .dropped);
+        std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
+    }
 
     const tasks_lock, const tasks = switch (task.environment) {
         .kernel => .{ &cascade.globals.kernel_tasks_lock, &cascade.globals.kernel_tasks },

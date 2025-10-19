@@ -133,7 +133,7 @@ pub const allocator_impl = struct {
         new_len: usize,
         _: usize,
     ) bool {
-        std.debug.assert(new_len != 0);
+        if (core.is_debug) std.debug.assert(new_len != 0);
         const allocation = getAllocationHeader(memory.ptr);
         return new_len <= allocation.len;
     }

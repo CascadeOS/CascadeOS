@@ -54,7 +54,7 @@ pub fn create(context: *cascade.Context, options: CreateOptions) !struct { *Proc
 
     const entry_task = try process.createUserTask(context, options.initial_task_options);
     errdefer entry_task.decrementReferenceCount(context);
-    std.debug.assert(process.reference_count.load(.monotonic) == 1);
+    if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 1);
 
     {
         cascade.globals.processes_lock.writeLock(context);
@@ -131,13 +131,16 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
 
 pub const internal = struct {
     pub fn destroy(context: *cascade.Context, process: *Process) void {
-        std.debug.assert(process.reference_count.load(.monotonic) == 0);
-
-        std.debug.assert(process.queued_for_cleanup.load(.monotonic));
+        if (core.is_debug) {
+            std.debug.assert(process.reference_count.load(.monotonic) == 0);
+            std.debug.assert(process.queued_for_cleanup.load(.monotonic));
+        }
         process.queued_for_cleanup.store(false, .monotonic);
 
-        std.debug.assert(!process.tasks_lock.isReadLocked() and !process.tasks_lock.isWriteLocked());
-        std.debug.assert(process.tasks.count() == 0);
+        if (core.is_debug) {
+            std.debug.assert(!process.tasks_lock.isReadLocked() and !process.tasks_lock.isWriteLocked());
+            std.debug.assert(process.tasks.count() == 0);
+        }
         process.tasks.clearAndFree(cascade.mem.heap.allocator);
 
         if (true) { // TODO: actually implement cleanup of the address space

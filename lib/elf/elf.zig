@@ -10,6 +10,7 @@
 //! [ELF Object File Format Version 4.3 DRAFT](https://gabi.xinuos.com/)
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const Header = struct {
     is_64: bool,
@@ -62,7 +63,7 @@ pub const Header = struct {
     ///
     /// The slice must be atleast 64 bytes long.
     pub fn parse(elf_header_slice: []const u8) ParseError!Header {
-        std.debug.assert(elf_header_slice.len >= 64);
+        if (builtin.mode == .Debug) std.debug.assert(elf_header_slice.len >= 64);
 
         const ident: HeaderIdent = .from(elf_header_slice);
         if (!std.mem.eql(u8, ident.magic(), HeaderIdent.MAGIC)) return error.InvalidMagic;
@@ -123,7 +124,7 @@ pub const Header = struct {
     ///
     /// The provided slice must match the location and size given by `programHeaderTableLocation`.
     pub fn iterateProgramHeaders(header: *const Header, program_header_table_slice: []const u8) ProgramHeader.Iterator {
-        std.debug.assert(
+        if (builtin.mode == .Debug) std.debug.assert(
             program_header_table_slice.len >= header.program_header_entry_count * header.program_header_entry_size,
         );
 

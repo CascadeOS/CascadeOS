@@ -25,8 +25,10 @@ pub fn createPageTable(physical_frame: cascade.mem.phys.Frame) *PageTable {
 ///
 /// The `virtual_range` address and size must be aligned to the standard page size.
 pub fn flushCache(virtual_range: core.VirtualRange) void {
-    std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
-    std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
+    if (core.is_debug) {
+        std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
+        std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
+    }
 
     var current_virtual_address = virtual_range.address;
     const last_virtual_address = virtual_range.last();
@@ -47,7 +49,7 @@ pub fn map4KiB(
     map_type: MapType,
     physical_frame_allocator: cascade.mem.phys.FrameAllocator,
 ) cascade.mem.MapError!void {
-    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+    if (core.is_debug) std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     var deallocate_frame_list: cascade.mem.phys.FrameList = .{};
     errdefer physical_frame_allocator.deallocate(context, deallocate_frame_list);
@@ -119,7 +121,7 @@ pub fn unmap4KiB(
     top_level_decision: core.CleanupDecision,
     deallocate_frame_list: *cascade.mem.phys.FrameList,
 ) void {
-    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+    if (core.is_debug) std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     const level4_index = PageTable.p4Index(virtual_address);
     const level4_entry = level4_table.entries[level4_index].load();
@@ -190,7 +192,7 @@ pub fn change4KiBProtection(
     virtual_address: core.VirtualAddress,
     map_type: MapType,
 ) void {
-    std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
+    if (core.is_debug) std.debug.assert(virtual_address.isAligned(PageTable.small_page_size));
 
     const level4_index = PageTable.p4Index(virtual_address);
     const level4_entry = level4_table.entries[level4_index].load();
@@ -312,7 +314,7 @@ fn ensureNextTable(
 
             break :blk entry.getAddress4kib();
         }
-        std.debug.assert(entry.isZero());
+        if (core.is_debug) std.debug.assert(entry.isZero());
         created_table = true;
 
         const physical_frame = try physical_frame_allocator.allocate(context);
@@ -389,8 +391,10 @@ pub const init = struct {
         physical_frame_allocator: cascade.mem.phys.FrameAllocator,
     ) !void {
         const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
-        std.debug.assert(range.size.equal(size_of_top_level_entry));
-        std.debug.assert(range.address.isAligned(size_of_top_level_entry));
+        if (core.is_debug) {
+            std.debug.assert(range.size.equal(size_of_top_level_entry));
+            std.debug.assert(range.address.isAligned(size_of_top_level_entry));
+        }
 
         const raw_entry = &page_table.entries[PageTable.p4Index(range.address)];
 
@@ -420,11 +424,13 @@ pub const init = struct {
         map_type: MapType,
         physical_frame_allocator: cascade.mem.phys.FrameAllocator,
     ) !void {
-        std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
-        std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
-        std.debug.assert(physical_range.address.isAligned(PageTable.small_page_size));
-        std.debug.assert(physical_range.size.isAligned(PageTable.small_page_size));
-        std.debug.assert(virtual_range.size.equal(physical_range.size));
+        if (core.is_debug) {
+            std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
+            std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
+            std.debug.assert(physical_range.address.isAligned(PageTable.small_page_size));
+            std.debug.assert(physical_range.size.isAligned(PageTable.small_page_size));
+            std.debug.assert(virtual_range.size.equal(physical_range.size));
+        }
 
         init_log.verbose(
             context,

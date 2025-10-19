@@ -43,8 +43,10 @@ pub fn create(context: *cascade.Context, page: *Page) !*AnonymousPage {
 ///
 /// When called the lock must be held.
 pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade.Context) void {
-    std.debug.assert(anonymous_page.reference_count != 0);
-    std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(anonymous_page.reference_count != 0);
+        std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
+    }
 
     anonymous_page.reference_count += 1;
 }
@@ -53,8 +55,10 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
 pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade.Context) void {
-    std.debug.assert(anonymous_page.reference_count != 0);
-    std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
+    if (core.is_debug) {
+        std.debug.assert(anonymous_page.reference_count != 0);
+        std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
+    }
 
     const reference_count = anonymous_page.reference_count;
     anonymous_page.reference_count = reference_count - 1;

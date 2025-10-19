@@ -33,8 +33,10 @@ pub fn mapSinglePage(
     map_type: MapType,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
-    std.debug.assert(map_type.protection != .none);
-    std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) {
+        std.debug.assert(map_type.protection != .none);
+        std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
+    }
 
     // TODO: replace with `mapRangeToPhysicalRange`
 
@@ -66,9 +68,11 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
-    std.debug.assert(map_type.protection != .none);
-    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) {
+        std.debug.assert(map_type.protection != .none);
+        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    }
 
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
@@ -134,12 +138,14 @@ pub fn mapRangeToPhysicalRange(
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
-    std.debug.assert(map_type.protection != .none);
-    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.equal(physical_range.size));
+    if (core.is_debug) {
+        std.debug.assert(map_type.protection != .none);
+        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.equal(physical_range.size));
+    }
 
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
@@ -195,8 +201,10 @@ pub fn unmapRange(
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
-    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) {
+        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    }
 
     var deallocate_frame_list: phys.FrameList = .{};
 
@@ -245,8 +253,10 @@ pub fn changeProtection(
     flush_target: cascade.Environment,
     map_type: cascade.mem.MapType,
 ) void {
-    std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-    std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) {
+        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+    }
 
     // TODO: this can be optimized by implementing `arch.paging.changeProtection`
 
@@ -700,7 +710,7 @@ pub const init = struct {
             const end_address = section[1];
             const region_type = section[2];
 
-            std.debug.assert(end_address.greaterThan(start_address));
+            if (core.is_debug) std.debug.assert(end_address.greaterThan(start_address));
 
             const virtual_range: core.VirtualRange = .fromAddr(
                 start_address,
@@ -795,7 +805,7 @@ pub const init = struct {
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
     ) void {
-        std.debug.assert(@alignOf(Page.Region) <= arch.paging.standard_page_size.value);
+        if (core.is_debug) std.debug.assert(@alignOf(Page.Region) <= arch.paging.standard_page_size.value);
 
         const size_of_regions = core.Size.of(Page.Region)
             .multiplyScalar(number_of_usable_regions);

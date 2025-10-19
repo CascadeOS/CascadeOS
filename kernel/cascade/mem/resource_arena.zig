@@ -96,7 +96,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             switch (quantum_caching) {
                 .none => {},
                 .normal => |count| {
-                    std.debug.assert(count > 0);
+                    if (core.is_debug) std.debug.assert(count > 0);
 
                     const quantum_caches = cascade.mem.heap.allocator.alloc(RawCache, count) catch
                         @panic("quantum cache allocation failed"); // TODO: return this error
@@ -117,7 +117,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     arena.quantum_caches.max_cached_size = count * options.quantum;
                 },
                 .heap => |count| {
-                    std.debug.assert(count > 0);
+                    if (core.is_debug) std.debug.assert(count > 0);
 
                     var frames: cascade.mem.phys.FrameList = .{};
 
@@ -304,8 +304,10 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             free_tag: *BoundaryTag,
             comptime freelist_decision: enum { add, nop },
         ) error{Overlap}!void {
-            std.debug.assert(span_tag.kind == .span or span_tag.kind == .imported_span);
-            std.debug.assert(free_tag.kind == .free);
+            if (core.is_debug) {
+                std.debug.assert(span_tag.kind == .span or span_tag.kind == .imported_span);
+                std.debug.assert(free_tag.kind == .free);
+            }
 
             const opt_previous_span = try arena.findSpanListPreviousSpan(span_tag.base, span_tag.len);
 
@@ -353,7 +355,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 opt_next_span_kind_node = next_span_kind_node.next;
             }) {
                 const next_span = next_span_kind_node.toTag();
-                std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
+                if (core.is_debug) std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
 
                 if (next_span.base > end) break;
 
@@ -371,11 +373,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             opt_previous_span: ?*BoundaryTag,
         ) ?*AllTagNode {
             if (opt_previous_span) |previous_span| {
-                std.debug.assert(previous_span.kind == .span or previous_span.kind == .imported_span);
+                if (core.is_debug) std.debug.assert(previous_span.kind == .span or previous_span.kind == .imported_span);
 
                 if (previous_span.kind_node.next) |next_span_kind_node| {
                     const next_span = next_span_kind_node.toTag();
-                    std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
+                    if (core.is_debug) std.debug.assert(next_span.kind == .span or next_span.kind == .imported_span);
 
                     return next_span.all_tag_node.previous;
                 }
@@ -411,11 +413,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 if (quantum_aligned_len <= arena.quantum_caches.max_cached_size) {
                     const cache_index: usize = (quantum_aligned_len / arena.quantum) - 1;
                     const cache = arena.quantum_caches.caches.constSlice()[cache_index];
-                    std.debug.assert(cache.item_size == quantum_aligned_len);
+                    if (core.is_debug) std.debug.assert(cache.item_size == quantum_aligned_len);
 
                     const buffer = cache.allocate(context) catch
                         return AllocateError.RequestedLengthUnavailable; // TODO: is there a better way to handle this?
-                    std.debug.assert(buffer.len == quantum_aligned_len);
+                    if (core.is_debug) std.debug.assert(buffer.len == quantum_aligned_len);
 
                     return .{
                         .base = @intFromPtr(buffer.ptr),
@@ -439,13 +441,13 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                         return AllocateError.RequestedLengthUnavailable;
                 };
             };
-            std.debug.assert(target_tag.kind == .free);
+            if (core.is_debug) std.debug.assert(target_tag.kind == .free);
             errdefer comptime unreachable;
 
             arena.splitFreeTag(target_tag, quantum_aligned_len);
 
             target_tag.kind = .allocated;
-            std.debug.assert(target_tag.len == quantum_aligned_len);
+            if (core.is_debug) std.debug.assert(target_tag.len == quantum_aligned_len);
 
             arena.insertIntoAllocationTable(target_tag);
 
@@ -478,7 +480,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                 while (opt_node) |node| : (opt_node = node.next) {
                     const tag = node.toTag();
-                    std.debug.assert(tag.kind == .free);
+                    if (core.is_debug) std.debug.assert(tag.kind == .free);
 
                     if (tag.len == quantum_aligned_len) {
                         arena.removeFromFreelist(tag);
@@ -509,7 +511,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                 while (opt_node) |node| : (opt_node = node.next) {
                     const tag = node.toTag();
-                    std.debug.assert(tag.kind == .free);
+                    if (core.is_debug) std.debug.assert(tag.kind == .free);
 
                     // if this tag is the smallest possible len in this freelist we can never do better
                     if (tag.len == smallest_possible_len) {
@@ -545,7 +547,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 return null;
             };
             const tag = arena.popFromFreelist(index) orelse unreachable;
-            std.debug.assert(tag.kind == .free);
+            if (core.is_debug) std.debug.assert(tag.kind == .free);
             return tag;
         }
 
@@ -555,7 +557,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
             while (opt_node) |node| : (opt_node = node.next) {
                 const tag = node.toTag();
-                std.debug.assert(tag.kind == .free);
+                if (core.is_debug) std.debug.assert(tag.kind == .free);
                 if (tag.len >= quantum_aligned_len) {
                     arena.removeFromFreelist(tag);
                     return tag;
@@ -602,8 +604,10 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         }
 
         fn splitFreeTag(arena: *@This(), tag: *BoundaryTag, allocation_len: usize) void {
-            std.debug.assert(tag.kind == .free);
-            std.debug.assert(tag.len >= allocation_len);
+            if (core.is_debug) {
+                std.debug.assert(tag.kind == .free);
+                std.debug.assert(tag.len >= allocation_len);
+            }
 
             if (tag.len == allocation_len) return;
 
@@ -633,14 +637,16 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         pub fn deallocate(arena: *@This(), context: *cascade.Context, allocation: Allocation) void {
             log.verbose(context, "{s}: deallocating {f}", .{ arena.name(), allocation });
 
-            std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
-            std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
+            if (core.is_debug) {
+                std.debug.assert(std.mem.isAligned(allocation.base, arena.quantum));
+                std.debug.assert(std.mem.isAligned(allocation.len, arena.quantum));
+            }
 
             if (quantum_caching.haveQuantumCache()) {
                 if (allocation.len <= arena.quantum_caches.max_cached_size) {
                     const cache_index: usize = (allocation.len / arena.quantum) - 1;
                     const cache = arena.quantum_caches.caches.constSlice()[cache_index];
-                    std.debug.assert(cache.item_size == allocation.len);
+                    if (core.is_debug) std.debug.assert(cache.item_size == allocation.len);
 
                     const buffer_ptr: [*]u8 = @ptrFromInt(allocation.base);
                     const buffer = buffer_ptr[0..allocation.len];
@@ -662,7 +668,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     .{allocation.base},
                 );
             };
-            std.debug.assert(tag.kind == .allocated);
+            if (core.is_debug) std.debug.assert(tag.kind == .allocated);
 
             if (allocation.len != tag.len) {
                 std.debug.panic(
@@ -680,7 +686,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 const previous_tag = previous_node.toTag();
 
                 if (previous_tag.kind != .free) break :coalesce_previous_tag;
-                std.debug.assert(previous_tag.base + previous_tag.len == tag.base);
+                if (core.is_debug) std.debug.assert(previous_tag.base + previous_tag.len == tag.base);
 
                 arena.removeFromFreelist(previous_tag);
                 arena.all_tags.remove(&previous_tag.all_tag_node);
@@ -696,7 +702,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 const next_tag = next_node.toTag();
 
                 if (next_tag.kind != .free) break :coalesce_next_tag;
-                std.debug.assert(tag.base + tag.len == next_tag.base);
+                if (core.is_debug) std.debug.assert(tag.base + tag.len == next_tag.base);
 
                 arena.removeFromFreelist(next_tag);
                 arena.all_tags.remove(&next_tag.all_tag_node);
@@ -713,7 +719,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 const previous_tag = previous_node.toTag();
 
                 if (previous_tag.kind == .imported_span and previous_tag.len == tag.len) {
-                    std.debug.assert(previous_tag.base == tag.base);
+                    if (core.is_debug) std.debug.assert(previous_tag.base == tag.base);
 
                     arena.spans.remove(&previous_tag.kind_node);
                     arena.all_tags.remove(&previous_tag.all_tag_node);
@@ -769,7 +775,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         }
 
         fn insertIntoAllocationTable(arena: *@This(), tag: *BoundaryTag) void {
-            std.debug.assert(tag.kind == .allocated);
+            if (core.is_debug) std.debug.assert(tag.kind == .allocated);
 
             const index: HashIndex = @truncate(Wyhash.hash(0, std.mem.asBytes(&tag.base)));
             arena.allocation_table[index].push(&tag.kind_node);
@@ -782,7 +788,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             var opt_node = bucket.first;
             while (opt_node) |node| : (opt_node = node.next) {
                 const tag = node.toTag();
-                std.debug.assert(tag.kind == .allocated);
+                if (core.is_debug) std.debug.assert(tag.kind == .allocated);
 
                 if (tag.base != base) continue;
 
@@ -794,7 +800,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         }
 
         fn pushToFreelist(arena: *@This(), tag: *BoundaryTag) void {
-            std.debug.assert(tag.kind == .free);
+            if (core.is_debug) std.debug.assert(tag.kind == .free);
 
             const index = indexOfFreelistContainingLen(tag.len);
 
@@ -810,12 +816,12 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             if (freelist.isEmpty()) arena.freelist_bitmap.unset(index);
 
             const tag = node.toTag();
-            std.debug.assert(tag.kind == .free);
+            if (core.is_debug) std.debug.assert(tag.kind == .free);
             return tag;
         }
 
         fn removeFromFreelist(arena: *@This(), tag: *BoundaryTag) void {
-            std.debug.assert(tag.kind == .free);
+            if (core.is_debug) std.debug.assert(tag.kind == .free);
 
             const index = indexOfFreelistContainingLen(tag.len);
             const freelist = &arena.freelists[index];
@@ -825,15 +831,15 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         }
 
         fn popUnusedTag(arena: *@This()) *BoundaryTag {
-            std.debug.assert(arena.unused_tags_count > 0);
+            if (core.is_debug) std.debug.assert(arena.unused_tags_count > 0);
             arena.unused_tags_count -= 1;
             const tag = arena.unused_tags.pop().?.toTag();
-            std.debug.assert(tag.kind == .free);
+            if (core.is_debug) std.debug.assert(tag.kind == .free);
             return tag;
         }
 
         fn pushUnusedTag(arena: *@This(), tag: *BoundaryTag) void {
-            std.debug.assert(tag.kind == .free);
+            if (core.is_debug) std.debug.assert(tag.kind == .free);
             arena.unused_tags.push(&tag.all_tag_node);
             arena.unused_tags_count += 1;
         }
@@ -920,6 +926,8 @@ pub const QuantumCaching = union(enum) {
     /// The number of multiples of the quantum to cache.
     ///
     /// Uses the heap resource arena to allocate the caches.
+    ///
+    /// Must be non-zero.
     normal: u8,
 
     /// The number of multiples of the quantum to cache.
@@ -927,6 +935,8 @@ pub const QuantumCaching = union(enum) {
     /// This should only be used by the heap resource arena itself.
     ///
     /// Uses the physical memory allocator and the hhdm to allocate the caches.
+    ///
+    /// Must be non-zero.
     heap: u8,
 
     inline fn haveQuantumCache(comptime quantum_caching: QuantumCaching) bool {
@@ -1202,7 +1212,7 @@ const SinglyLinkedList = struct {
     const empty: SinglyLinkedList = .{ .first = null };
 
     fn push(singly_linked_list: *SinglyLinkedList, node: *AllTagNode) void {
-        std.debug.assert(node.previous == null and node.next == null);
+        if (core.is_debug) std.debug.assert(node.previous == null and node.next == null);
 
         node.* = .{ .next = singly_linked_list.first, .previous = null };
 
@@ -1211,7 +1221,7 @@ const SinglyLinkedList = struct {
 
     fn pop(singly_linked_list: *SinglyLinkedList) ?*AllTagNode {
         const node = singly_linked_list.first orelse return null;
-        std.debug.assert(node.previous == null);
+        if (core.is_debug) std.debug.assert(node.previous == null);
 
         singly_linked_list.first = node.next;
 
@@ -1232,14 +1242,14 @@ fn DoublyLinkedList(comptime Node: type) type {
 
         /// Push a node to the front of the list.
         fn push(doubly_linked_list: *DoublyLinkedListT, node: *Node) void {
-            std.debug.assert(node.previous == null and node.next == null);
+            if (core.is_debug) std.debug.assert(node.previous == null and node.next == null);
 
             const opt_first = doubly_linked_list.first;
 
             node.next = opt_first;
 
             if (opt_first) |first| {
-                std.debug.assert(first.previous == null);
+                if (core.is_debug) std.debug.assert(first.previous == null);
                 first.previous = node;
             }
 
@@ -1250,12 +1260,12 @@ fn DoublyLinkedList(comptime Node: type) type {
         /// Pop a node from the front of the list.
         fn pop(doubly_linked_list: *DoublyLinkedListT) ?*Node {
             const first = doubly_linked_list.first orelse return null;
-            std.debug.assert(first.previous == null);
+            if (core.is_debug) std.debug.assert(first.previous == null);
 
             const opt_next = first.next;
 
             if (opt_next) |next| {
-                std.debug.assert(next.previous == first);
+                if (core.is_debug) std.debug.assert(next.previous == first);
                 next.previous = null;
             }
 
@@ -1269,14 +1279,14 @@ fn DoublyLinkedList(comptime Node: type) type {
         /// Removes a node from the list.
         fn remove(doubly_linked_list: *DoublyLinkedListT, node: *Node) void {
             if (node.previous) |previous| {
-                std.debug.assert(previous.next == node);
+                if (core.is_debug) std.debug.assert(previous.next == node);
                 previous.next = node.next;
             } else {
                 doubly_linked_list.first = node.next;
             }
 
             if (node.next) |next| {
-                std.debug.assert(next.previous == node);
+                if (core.is_debug) std.debug.assert(next.previous == node);
                 next.previous = node.previous;
             }
 
@@ -1284,11 +1294,11 @@ fn DoublyLinkedList(comptime Node: type) type {
         }
 
         pub fn insertAfter(doubly_linked_list: *DoublyLinkedListT, node: *Node, opt_previous: ?*Node) void {
-            std.debug.assert(node.previous == null and node.next == null);
+            if (core.is_debug) std.debug.assert(node.previous == null and node.next == null);
 
             if (opt_previous) |previous| {
                 if (previous.next) |next| {
-                    std.debug.assert(next.previous == previous);
+                    if (core.is_debug) std.debug.assert(next.previous == previous);
                     next.previous = node;
                     node.next = next;
                 }
@@ -1297,7 +1307,7 @@ fn DoublyLinkedList(comptime Node: type) type {
                 node.previous = previous;
             } else {
                 if (doubly_linked_list.first) |first| {
-                    std.debug.assert(first.previous == null);
+                    if (core.is_debug) std.debug.assert(first.previous == null);
                     first.previous = node;
                     node.next = first;
                 }

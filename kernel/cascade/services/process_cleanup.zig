@@ -29,11 +29,13 @@ pub fn queueProcessForCleanup(
 }
 
 fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
-    std.debug.assert(context.task() == globals.process_cleanup_task);
-    std.debug.assert(context.interrupt_disable_count == 0);
-    std.debug.assert(context.spinlocks_held == 0);
-    std.debug.assert(!context.scheduler_locked);
-    std.debug.assert(arch.interrupts.areEnabled());
+    if (core.is_debug) {
+        std.debug.assert(context.task() == globals.process_cleanup_task);
+        std.debug.assert(context.interrupt_disable_count == 0);
+        std.debug.assert(context.spinlocks_held == 0);
+        std.debug.assert(!context.scheduler_locked);
+        std.debug.assert(arch.interrupts.areEnabled());
+    }
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
@@ -48,7 +50,7 @@ fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
 }
 
 fn handleProcess(context: *cascade.Context, process: *cascade.Process) void {
-    std.debug.assert(process.queued_for_cleanup.load(.monotonic));
+    if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
     process.queued_for_cleanup.store(false, .release);
 
