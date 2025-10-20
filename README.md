@@ -2,7 +2,7 @@
 
 [![justforfunnoreally.dev badge](https://img.shields.io/badge/justforfunnoreally-dev-9ff)](https://justforfunnoreally.dev)
 
-Cascade is a general purpose operating system targeting standard desktops and laptops.
+CascadeOS is a general purpose operating system targeting standard desktops and laptops.
 
 ## Short Term Goals
 - Good enough x64 support for QEMU (virtio drivers)

@@ -125,6 +125,38 @@ fn resolveApp(
             });
             try exes.putNoClobber(b.allocator, host_target, host_exe);
 
+            // install host exe
+            {
+                const host_exe_install_step = b.addInstallArtifact(
+                    host_exe,
+                    .{
+                        .dest_dir = .{
+                            .override = .{
+                                .custom = b.pathJoin(&.{
+                                    @tagName(architecture),
+                                    "application",
+                                    "non_cascade",
+                                }),
+                            },
+                        },
+                    },
+                );
+
+                const build_step = b.step(
+                    try std.fmt.allocPrint(
+                        b.allocator,
+                        "{s}_build_host_{t}",
+                        .{ application_description.name, architecture },
+                    ),
+                    try std.fmt.allocPrint(
+                        b.allocator,
+                        "Build the {s} application for {t} targeting the host os",
+                        .{ application_description.name, architecture },
+                    ),
+                );
+                build_step.dependOn(&host_exe_install_step.step);
+            }
+
             // host check exe
             {
                 const host_check_exe = b.addExecutable(.{
@@ -157,6 +189,7 @@ fn resolveApp(
                             .override = .{
                                 .custom = b.pathJoin(&.{
                                     @tagName(architecture),
+                                    "application",
                                     "tests",
                                     "non_cascade",
                                 }),
@@ -171,20 +204,18 @@ fn resolveApp(
 
                 host_test_run_step.step.dependOn(&host_test_install_step.step); // ensure the test exe is installed
 
-                const host_test_step_name = try std.fmt.allocPrint(
-                    b.allocator,
-                    "{s}_host_{t}",
-                    .{ application_description.name, architecture },
-                );
-
-                const host_test_step_description =
+                const host_test_step = b.step(
                     try std.fmt.allocPrint(
                         b.allocator,
-                        "Build and attempt to run the tests for {s} on {t} targeting the host os",
+                        "{s}_test_host_{t}",
                         .{ application_description.name, architecture },
-                    );
-
-                const host_test_step = b.step(host_test_step_name, host_test_step_description);
+                    ),
+                    try std.fmt.allocPrint(
+                        b.allocator,
+                        "Run the tests for {s} on {t} targeting the host os",
+                        .{ application_description.name, architecture },
+                    ),
+                );
                 host_test_step.dependOn(&host_test_run_step.step);
 
                 all_build_and_test_step.dependOn(host_test_step);
@@ -214,6 +245,39 @@ fn resolveApp(
             });
             try exes.putNoClobber(b.allocator, cascade_target, cascade_exe);
 
+            // install host exe
+            {
+                const exe_install_step = b.addInstallArtifact(
+                    cascade_exe,
+                    .{
+                        .dest_dir = .{
+                            .override = .{
+                                .custom = b.pathJoin(&.{
+                                    @tagName(architecture),
+                                    "application",
+                                }),
+                            },
+                        },
+                    },
+                );
+
+                const build_step = b.step(
+                    try std.fmt.allocPrint(
+                        b.allocator,
+                        "{s}_build_{t}",
+                        .{ application_description.name, architecture },
+                    ),
+                    try std.fmt.allocPrint(
+                        b.allocator,
+                        "Build the {s} application for {t} targeting CascadeOS",
+                        .{ application_description.name, architecture },
+                    ),
+                );
+                build_step.dependOn(&exe_install_step.step);
+
+                step_collection.registerCascadeApplication(architecture, build_step);
+            }
+
             // cascade check exe
             {
                 const cascade_check_exe = b.addExecutable(.{
@@ -240,7 +304,7 @@ fn resolveApp(
                     .override = .{
                         .custom = b.pathJoin(&.{
                             @tagName(native_cascade_target.architecture),
-                            "applications",
+                            "application",
                             "non_cascade",
                         }),
                     },

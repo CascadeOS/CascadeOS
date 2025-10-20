@@ -20,6 +20,9 @@ image_build_steps_per_architecture: Steps,
 /// A map from `CascadeTarget.Architecture` to their non-Cascade library test steps.
 non_cascade_library_test_steps_per_architecture: Steps,
 
+/// A map from `CascadeTarget.Architecture` to their Cascade application build steps.
+cascade_application_build_steps_per_architecture: Steps,
+
 /// A map from `CascadeTarget.Architecture` to their non-Cascade application test steps.
 non_cascade_application_test_steps_per_architecture: Steps,
 
@@ -61,6 +64,11 @@ pub fn registerCascadeLibrary(step_collection: StepCollection, architecture: Cas
 /// Registers non-Cascade library build and run steps for an architecture.
 pub fn registerNonCascadeLibrary(step_collection: StepCollection, architecture: CascadeTarget.Architecture, run_step: *Step) void {
     step_collection.non_cascade_library_test_steps_per_architecture.get(architecture).?.dependOn(run_step);
+}
+
+/// Registers Cascade application build steps for an architecture.
+pub fn registerCascadeApplication(step_collection: StepCollection, architecture: CascadeTarget.Architecture, build_step: *Step) void {
+    step_collection.cascade_application_build_steps_per_architecture.get(architecture).?.dependOn(build_step);
 }
 
 /// Registers non-Cascade application build and run steps for an architecture.
@@ -129,17 +137,17 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
     );
 
     // Applications
-    const all_application_step = b.step(
+    const all_application_test_step = b.step(
         "applications",
         "Build and run all the application tests",
     );
-    all_test_step.dependOn(all_application_step);
+    all_test_step.dependOn(all_application_test_step);
 
     const all_application_host_test_step = b.step(
         "applications_host",
         "Attempt to run all the application tests targeting the host os",
     );
-    all_application_step.dependOn(all_application_host_test_step);
+    all_application_test_step.dependOn(all_application_host_test_step);
 
     const non_cascade_application_test_steps_per_architecture = try buildPerArchitectureSteps(
         b,
@@ -147,6 +155,20 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         all_application_host_test_step,
         "applications_host_{t}",
         "Attempt to run all the application tests for {t} targeting the host os",
+    );
+
+    const all_application_cascade_build_step = b.step(
+        "applications_build_cascade",
+        "Build all the applications for CascadeOS",
+    );
+    all_test_step.dependOn(all_application_cascade_build_step);
+
+    const cascade_application_build_steps_per_architecture = try buildPerArchitectureSteps(
+        b,
+        all_architectures,
+        all_application_cascade_build_step,
+        "applications_build_cascade_{t}",
+        "Build all the applications for {t} targeting CascadeOS",
     );
 
     // Tools
@@ -177,6 +199,7 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
 
         .non_cascade_library_test_steps_per_architecture = non_cascade_library_test_steps_per_architecture,
 
+        .cascade_application_build_steps_per_architecture = cascade_application_build_steps_per_architecture,
         .non_cascade_application_test_steps_per_architecture = non_cascade_application_test_steps_per_architecture,
 
         .tools_build_step = all_tools_build_step,

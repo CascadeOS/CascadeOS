@@ -261,6 +261,7 @@ fn resolveLibrary(
                         .override = .{
                             .custom = b.pathJoin(&.{
                                 @tagName(architecture),
+                                "library",
                                 "tests",
                                 "non_cascade",
                             }),
