@@ -16,12 +16,17 @@
         }
     ],
     "configurations": [
-        { // Requires extension LLDB DAP (llvm-vs-code-extensions.lldb-dap)
+        { // Requires extension CodeLLDB (vadimcn.vscode-lldb)
             "name": "LLDB QEMU remote",
-            "type": "lldb-dap",
+            "type": "lldb",
             "request": "attach",
             "program": "${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf",
-            "attachCommands": ["gdb-remote 1234"],
+            "processCreateCommands": [
+                "gdb-remote 1234"
+            ],
+            "postRunCommands": [
+                "continue" // prevent pausing in the bootloader/firmware
+            ],
             "presentation": {
                 "hidden": false,
                 "group": "QEMU remote",
