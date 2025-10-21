@@ -151,6 +151,12 @@ pub fn name(address_space: *const AddressSpace) []const u8 {
 }
 
 pub const MapOptions = struct {
+    /// The base address of the range to map.
+    ///
+    /// Caller must ensure:
+    ///  - the size is aligned to the standard page size
+    base: ?core.VirtualAddress = null,
+
     /// The size of the range to map.
     ///
     /// Caller must ensure:
@@ -186,22 +192,17 @@ pub const MapError = error{
     /// The requested size is zero.
     ZeroSize,
 
-    /// The requested size is not available.
-    RequestedSizeUnavailable,
+    /// Either the requested size or [base .. base + size) is not available.
+    RequestedRangeUnavailable,
 
     /// No memory available.
     OutOfMemory,
 
-    /// The requested map would result in the protection of an entry in the range exceeding its maximum protection.
+    /// The request would result in the protection of an entry in the range exceeding its maximum protection.
     MaxProtectionExceeded,
 };
 
 /// Map a range into the address space.
-///
-/// Caller must ensure:
-///  - the size is aligned to the standard page size
-///  - the size is not `.zero`
-///  - the `max_protection` if provided is not `.none`
 pub fn map(
     address_space: *AddressSpace,
     context: *cascade.Context,
@@ -209,14 +210,25 @@ pub fn map(
 ) MapError!core.VirtualRange {
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
 
-    log.verbose(context, "{s}: map {f} - {t} - {t}", .{
-        address_space.name(),
-        options.size,
-        options.protection,
-        options.type,
-    });
+    if (log.levelEnabled(.verbose)) {
+        if (options.base) |base| log.verbose(context, "{s}: map {f} @ {f} - {t} - {t}", .{
+            address_space.name(),
+            options.size,
+            base,
+            options.protection,
+            options.type,
+        }) else log.verbose(context, "{s}: map {f} - {t} - {t}", .{
+            address_space.name(),
+            options.size,
+            options.protection,
+            options.type,
+        });
+    }
 
-    if (core.is_debug) std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) {
+        std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
+        if (options.base) |base| std.debug.assert(base.isAligned(arch.paging.standard_page_size));
+    }
 
     if (options.size.equal(.zero)) {
         @branchHint(.cold);
@@ -263,10 +275,17 @@ pub fn map(
         address_space.entries_lock.writeLock(context);
         defer address_space.entries_lock.writeUnlock(context);
 
-        const free_range = address_space.findFreeRange(options.size) orelse {
+        // zig fmt: off
+        const free_range: FreeRange = (
+            if (options.base) |base|
+                address_space.findExactFreeRange(.fromAddr(base, options.size))
+            else
+                address_space.findFreeRange(options.size)
+        ) orelse {
             @branchHint(.cold);
-            return error.RequestedSizeUnavailable;
+            return error.RequestedRangeUnavailable;
         };
+        // zig fmt: on
 
         const insertion_index = free_range.insertion_index;
         local_entry.range = free_range.range;
@@ -343,6 +362,43 @@ const FreeRange = struct {
     range: core.VirtualRange,
     insertion_index: usize,
 };
+
+/// If the given range is free, return the range.
+fn findExactFreeRange(address_space: *AddressSpace, range: core.VirtualRange) ?FreeRange {
+    const entries = address_space.entries.items;
+
+    const index = std.sort.lowerBound(
+        *const Entry,
+        entries,
+        range.address,
+        entryAddressCompare,
+    );
+    if (index == entries.len) {
+        @branchHint(.unlikely);
+
+        if (range.last().lessThanOrEqual(address_space.range.last())) {
+            // the range does not extend past the end of the address space
+            @branchHint(.likely);
+            return .{
+                .range = range,
+                .insertion_index = index,
+            };
+        }
+
+        return null;
+    }
+
+    if (entries[index].range.anyOverlap(range)) {
+        @branchHint(.unlikely);
+        return null;
+    }
+    if (core.is_debug) std.debug.assert(entries[index].range.address.greaterThanOrEqual(range.endBound()));
+
+    return .{
+        .range = range,
+        .insertion_index = index,
+    };
+}
 
 /// Find a free range in the address space of the given size.
 fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
@@ -856,51 +912,6 @@ pub fn handlePageFault(
     }
 }
 
-/// Prints the address space.
-///
-/// Locks the entries lock.
-pub fn print(address_space: *AddressSpace, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
-    address_space.entries_lock.readLock(context);
-    defer address_space.entries_lock.readUnlock(context);
-
-    const new_indent = indent + 2;
-
-    try writer.writeAll("AddressSpace{\n");
-
-    try writer.splatByteAll(' ', new_indent);
-    try writer.print("environment: {t},\n", .{address_space.environment});
-
-    try writer.splatByteAll(' ', new_indent);
-    try writer.print("range: {f},\n", .{address_space.range});
-
-    try writer.splatByteAll(' ', new_indent);
-    try writer.print("entries_version: {d},\n", .{address_space.entries_version});
-
-    if (address_space.entries.items.len != 0) {
-        try writer.splatByteAll(' ', new_indent);
-        try writer.writeAll("entries: {\n");
-
-        for (address_space.entries.items) |entry| {
-            try writer.splatByteAll(' ', new_indent + 2);
-            try entry.print(context, writer, new_indent + 2);
-            try writer.writeAll(",\n");
-        }
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.writeAll("},\n");
-    } else {
-        try writer.splatByteAll(' ', new_indent);
-        try writer.writeAll("entries: {},\n");
-    }
-
-    try writer.splatByteAll(' ', indent);
-    try writer.writeAll("}");
-}
-
-pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void {
-    return address_space.print(.current(), writer, 0);
-}
-
 pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_name_length);
 const NewEntries = core.containers.BoundedArray(*Entry, 2);
 
@@ -950,7 +961,10 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
             range.address,
             entryAddressCompare,
         );
-        if (start_index == entries.len) return null;
+        if (start_index == entries.len) {
+            @branchHint(.unlikely);
+            return null;
+        }
 
         var index = start_index;
 
@@ -978,4 +992,49 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
     }
 
     return entry_range;
+}
+
+/// Prints the address space.
+///
+/// Locks the entries lock.
+pub fn print(address_space: *AddressSpace, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
+    address_space.entries_lock.readLock(context);
+    defer address_space.entries_lock.readUnlock(context);
+
+    const new_indent = indent + 2;
+
+    try writer.writeAll("AddressSpace{\n");
+
+    try writer.splatByteAll(' ', new_indent);
+    try writer.print("environment: {t},\n", .{address_space.environment});
+
+    try writer.splatByteAll(' ', new_indent);
+    try writer.print("range: {f},\n", .{address_space.range});
+
+    try writer.splatByteAll(' ', new_indent);
+    try writer.print("entries_version: {d},\n", .{address_space.entries_version});
+
+    if (address_space.entries.items.len != 0) {
+        try writer.splatByteAll(' ', new_indent);
+        try writer.writeAll("entries: {\n");
+
+        for (address_space.entries.items) |entry| {
+            try writer.splatByteAll(' ', new_indent + 2);
+            try entry.print(context, writer, new_indent + 2);
+            try writer.writeAll(",\n");
+        }
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.writeAll("},\n");
+    } else {
+        try writer.splatByteAll(' ', new_indent);
+        try writer.writeAll("entries: {},\n");
+    }
+
+    try writer.splatByteAll(' ', indent);
+    try writer.writeAll("}");
+}
+
+pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void {
+    return address_space.print(.current(), writer, 0);
 }
