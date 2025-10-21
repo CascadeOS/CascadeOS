@@ -663,7 +663,7 @@ fn performChangeProtection(
             break :no_split_first_entry;
         }
 
-        const split_offset = range.address.subtract(first_entry.range.address);
+        const split_offset = range.address.difference(first_entry.range.address);
         log.verbose(context, "{s}: split first entry {f} at offset {f}", .{
             address_space.name(),
             first_entry.range,
@@ -700,7 +700,7 @@ fn performChangeProtection(
             break :no_split_last_entry;
         }
 
-        const split_offset = range.endBound().subtract(last_entry.range.address);
+        const split_offset = range.endBound().difference(last_entry.range.address);
         log.verbose(context, "{s}: split last entry {f} at offset {f}", .{
             address_space.name(),
             last_entry.range,
@@ -926,7 +926,7 @@ inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: core.
 }
 
 fn entryAddressCompare(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
-    return entry.range.compareAddressOrder(addr);
+    return entry.range.containsAddressOrder(addr);
 }
 
 const EntryRange = struct {

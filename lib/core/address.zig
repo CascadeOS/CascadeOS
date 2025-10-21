@@ -147,7 +147,7 @@ pub const VirtualAddress = extern struct {
     /// Returns the difference between two addresses.
     ///
     /// `virtual_address` must be greater than or equal to `other`.
-    pub fn subtract(virtual_address: VirtualAddress, other: VirtualAddress) core.Size {
+    pub fn difference(virtual_address: VirtualAddress, other: VirtualAddress) core.Size {
         if (core.is_debug) std.debug.assert(virtual_address.greaterThanOrEqual(other));
         return .from(virtual_address.value - other.value, .byte);
     }
@@ -410,14 +410,14 @@ pub const VirtualRange = extern struct {
         return true;
     }
 
-    pub fn compareAddressOrder(virtual_range: VirtualRange, address: VirtualAddress) std.math.Order {
+    pub fn containsAddressOrder(virtual_range: VirtualRange, address: VirtualAddress) std.math.Order {
         if (virtual_range.address.greaterThan(address)) return .lt;
         if (virtual_range.endBound().lessThanOrEqual(address)) return .gt;
         return .eq;
     }
 
     pub fn containsAddress(virtual_range: VirtualRange, address: VirtualAddress) bool {
-        return virtual_range.compareAddressOrder(address) == .eq;
+        return virtual_range.containsAddressOrder(address) == .eq;
     }
 
     pub inline fn format(

@@ -209,7 +209,7 @@ pub const Reference = struct {
 
         return @intCast(
             faulting_address
-                .subtract(entry.range.address)
+                .difference(entry.range.address)
                 .divide(arch.paging.standard_page_size)
                 .add(
                     reference.start_offset
