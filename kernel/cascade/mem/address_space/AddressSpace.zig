@@ -616,6 +616,11 @@ pub fn changeProtection(
         break :blk result;
     };
 
+    if (core.is_debug) {
+        // `validateChangeProtection` should have caused an early return if the change protection request is a no-op
+        std.debug.assert(result.entries_split != 0 or result.entries_modified != 0 or result.entries_merged != 0);
+    }
+
     log.verbose(
         context,
         "{s}: change protection of {f} resulted in {} split, {} modified and {} merged entries",
@@ -797,15 +802,15 @@ fn performChangeProtection(
             }
         }
 
-        if (modified) result.entries_modified += 1;
+        // TODO: this can be more efficient by checking if the following and preceeding entries can both be merged with
+        // the current entry, and if so then merging them together and performing a more efficent `orderedRemoveMany`
 
-        no_following_entry: {
-            const following_index = index + 1;
+        var merged: bool = false;
 
-            if (following_index >= address_space.entries.items.len) {
-                @branchHint(.unlikely);
-                break :no_following_entry;
-            }
+        const following_index = index + 1;
+        if (following_index < address_space.entries.items.len) {
+            @branchHint(.likely);
+
             const following_entry = address_space.entries.items[following_index];
 
             if (entry.canMerge(context, following_entry)) {
@@ -814,8 +819,34 @@ fn performChangeProtection(
                 _ = address_space.entries.orderedRemove(following_index);
                 following_entry.destroy(context);
 
-                result.entries_merged += 1;
+                merged = true;
             }
+        }
+
+        if (merged)
+            result.entries_merged += 1
+        else if (modified)
+            result.entries_modified += 1;
+    }
+
+    // handle merging with an entry preceeding the range, if we spilt the first entry (`entry_range.first_straddles == true`)
+    // then if cannot be merged with the preceeding entry
+    if (!entry_range.first_straddles and index != 0) {
+        const first_entry = address_space.entries.items[index];
+        const preceeding_entry = address_space.entries.items[index - 1];
+
+        if (preceeding_entry.canMerge(context, first_entry)) {
+            preceeding_entry.merge(context, first_entry);
+
+            _ = address_space.entries.orderedRemove(index);
+            first_entry.destroy(context);
+
+            // the first entry must have be modified in the above loop, as otherwise it would already be merged with the
+            // preceeding entry
+            // TODO: this assumption will not be true if we ever decide to place limits on merging entries, i.e. not
+            // exceeding a certain anonymous map size
+            result.entries_modified -= 1;
+            result.entries_merged += 1;
         }
     }
 
