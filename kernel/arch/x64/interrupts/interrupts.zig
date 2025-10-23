@@ -14,8 +14,8 @@ const interrupt_handlers = @import("handlers.zig");
 pub fn allocateInterrupt(
     context: *cascade.Context,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
-    arg1: ?*anyopaque,
-    arg2: ?*anyopaque,
+    arg1: usize,
+    arg2: usize,
 ) arch.interrupts.Interrupt.AllocateError!Interrupt {
     const allocation = globals.interrupt_arena.allocate(context, 1, .instant_fit) catch {
         return error.InterruptAllocationFailed;
@@ -259,8 +259,8 @@ pub const InterruptStackSelector = enum(u3) {
 
 const Handler = struct {
     interrupt_handler: arch.interrupts.Interrupt.Handler,
-    arg1: ?*anyopaque = null,
-    arg2: ?*anyopaque = null,
+    arg1: usize = 0,
+    arg2: usize = 0,
 
     inline fn call(handler: *const Handler, context: *cascade.Context, interrupt_frame: *InterruptFrame) void {
         handler.interrupt_handler(

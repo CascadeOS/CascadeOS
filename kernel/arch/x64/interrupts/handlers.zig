@@ -12,8 +12,8 @@ const x64 = @import("../x64.zig");
 pub fn nonMaskableInterruptHandler(
     _: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: ?*anyopaque,
-    _: ?*anyopaque,
+    _: usize,
+    _: usize,
 ) void {
     if (cascade.debug.globals.panicking_executor.load(.acquire) == null) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
@@ -26,8 +26,8 @@ pub fn nonMaskableInterruptHandler(
 pub fn pageFaultHandler(
     context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: ?*anyopaque,
-    _: ?*anyopaque,
+    _: usize,
+    _: usize,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -59,8 +59,8 @@ pub fn pageFaultHandler(
 pub fn flushRequestHandler(
     context: *cascade.Context,
     _: arch.interrupts.InterruptFrame,
-    _: ?*anyopaque,
-    _: ?*anyopaque,
+    _: usize,
+    _: usize,
 ) void {
     cascade.entry.onFlushRequest(context);
     // eoi after all current flush requests have been handled
@@ -70,8 +70,8 @@ pub fn flushRequestHandler(
 pub fn perExecutorPeriodicHandler(
     context: *cascade.Context,
     _: arch.interrupts.InterruptFrame,
-    _: ?*anyopaque,
-    _: ?*anyopaque,
+    _: usize,
+    _: usize,
 ) void {
     // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
@@ -81,8 +81,8 @@ pub fn perExecutorPeriodicHandler(
 pub fn unhandledException(
     context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: ?*anyopaque,
-    _: ?*anyopaque,
+    _: usize,
+    _: usize,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
     switch (arch_interrupt_frame.environment(context)) {
@@ -102,8 +102,8 @@ pub fn unhandledException(
 pub fn unhandledInterrupt(
     context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: ?*anyopaque,
-    _: ?*anyopaque,
+    _: usize,
+    _: usize,
 ) void {
     const executor = context.executor.?;
     std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });

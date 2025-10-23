@@ -101,8 +101,8 @@ pub const interrupts = struct {
         pub const Handler = *const fn (
             context: *cascade.Context,
             frame: InterruptFrame,
-            arg1: ?*anyopaque,
-            arg2: ?*anyopaque,
+            arg1: usize,
+            arg2: usize,
         ) void;
 
         pub const AllocateError = error{InterruptAllocationFailed};
@@ -110,8 +110,8 @@ pub const interrupts = struct {
         pub fn allocate(
             context: *cascade.Context,
             handler: Handler,
-            arg1: ?*anyopaque,
-            arg2: ?*anyopaque,
+            arg1: usize,
+            arg2: usize,
         ) callconv(core.inline_in_non_debug) AllocateError!Interrupt {
             return .{
                 .arch_specific = try getFunction(
@@ -727,8 +727,8 @@ pub const Functions = struct {
         allocateInterrupt: ?fn (
             context: *cascade.Context,
             handler: interrupts.Interrupt.Handler,
-            arg1: ?*anyopaque,
-            arg2: ?*anyopaque,
+            arg1: usize,
+            arg2: usize,
         ) interrupts.Interrupt.AllocateError!current_decls.interrupts.Interrupt = null,
 
         deallocateInterrupt: ?fn (

@@ -632,11 +632,11 @@ export fn uacpi_kernel_install_interrupt_handler(
         fn HandlerWrapper(
             _: *cascade.Context,
             _: arch.interrupts.InterruptFrame,
-            _handler: ?*anyopaque,
-            _ctx: ?*anyopaque,
+            _handler: usize,
+            _ctx: usize,
         ) void {
-            const inner_handler: uacpi.RawInterruptHandler = @ptrCast(@alignCast(_handler));
-            _ = inner_handler(@ptrCast(_ctx)); // FIXME: should we do something with the return value?
+            const inner_handler: uacpi.RawInterruptHandler = @ptrFromInt(_handler);
+            _ = inner_handler(@ptrFromInt(_ctx)); // FIXME: should we do something with the return value?
         }
     }.HandlerWrapper;
 
@@ -647,8 +647,8 @@ export fn uacpi_kernel_install_interrupt_handler(
     const interrupt = arch.interrupts.Interrupt.allocate(
         context,
         HandlerWrapper,
-        @constCast(handler),
-        ctx,
+        @intFromPtr(handler),
+        @intFromPtr(ctx),
     ) catch |err| {
         log.err(context, "failed to allocate interrupt: {}", .{err});
         return .internal_error;
