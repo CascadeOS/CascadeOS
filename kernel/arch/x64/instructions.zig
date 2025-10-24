@@ -94,3 +94,19 @@ pub inline fn portWriteU32(port: u16, value: u32) void {
           [port] "N{dx}" (port),
     );
 }
+
+pub fn enableAccessToUserMemory() void {
+    if (!x64.info.cpu_id.smap) {
+        @branchHint(.unlikely); // modern CPUs support SMAP
+        return;
+    }
+    asm volatile ("stac");
+}
+
+pub fn disableAccessToUserMemory() void {
+    if (!x64.info.cpu_id.smap) {
+        @branchHint(.unlikely); // modern CPUs support SMAP
+        return;
+    }
+    asm volatile ("clac");
+}

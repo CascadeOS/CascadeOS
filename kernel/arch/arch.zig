@@ -330,6 +330,28 @@ pub const paging = struct {
         )(virtual_range);
     }
 
+    /// Enable the kernel to access user memory.
+    ///
+    /// This is allowed to be a no-op if the architecture does not support stopping the kernel from accessing user
+    /// memory.
+    pub fn enableAccessToUserMemory() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.paging,
+            "enableAccessToUserMemory",
+        )();
+    }
+
+    /// Disable the kernel from accessing user memory.
+    ///
+    /// This is allowed to be a no-op if the architecture does not support stopping the kernel from accessing user
+    /// memory.
+    pub fn disableAccessToUserMemory() callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.paging,
+            "disableAccessToUserMemory",
+        )();
+    }
+
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
@@ -831,6 +853,18 @@ pub const Functions = struct {
         /// Caller must ensure:
         ///   - the `virtual_range` address and size must be aligned to the standard page size
         flushCache: ?fn (virtual_range: core.VirtualRange) void = null,
+
+        /// Enable the kernel to access user memory.
+        ///
+        /// This is allowed to be a no-op if the architecture does not support stopping the kernel from accessing user
+        /// memory.
+        enableAccessToUserMemory: ?fn () void = null,
+
+        /// Disable the kernel from accessing user memory.
+        ///
+        /// This is allowed to be a no-op if the architecture does not support stopping the kernel from accessing user
+        /// memory.
+        disableAccessToUserMemory: ?fn () void = null,
 
         init: struct {
             /// The total size of the virtual address space that one entry in the top level of the page table covers.

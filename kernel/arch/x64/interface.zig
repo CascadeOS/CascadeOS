@@ -74,6 +74,8 @@ pub const functions: arch.Functions = .{
         .unmapSinglePage = x64.paging.unmap4KiB,
         .changeSinglePageProtection = x64.paging.change4KiBProtection,
         .flushCache = x64.paging.flushCache,
+        .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
+        .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,
 
         .init = .{
             .sizeOfTopLevelEntry = struct {
