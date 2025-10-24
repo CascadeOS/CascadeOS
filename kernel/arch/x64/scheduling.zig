@@ -7,12 +7,16 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
 
+const x64 = @import("x64.zig");
+
 /// Prepares the executor for jumping from `old_task` to `new_task`.
 pub fn prepareForJumpToTaskFromTask(
     executor: *cascade.Executor,
     old_task: *cascade.Task,
     new_task: *cascade.Task,
 ) void {
+    // TODO: most of this function should be lifted out into the arch independent code
+
     switch (old_task.environment) {
         .kernel => switch (new_task.environment) {
             .kernel => {},
@@ -34,6 +38,16 @@ pub fn prepareForJumpToTaskFromTask(
                 );
             },
         },
+    }
+
+    if (old_task.context.enable_access_to_user_memory_count != new_task.context.enable_access_to_user_memory_count) {
+        @branchHint(.unlikely); // we expect both to be 0 most of the time
+        if (new_task.context.enable_access_to_user_memory_count == 0) {
+            @branchHint(.likely);
+            x64.instructions.disableAccessToUserMemory();
+        } else {
+            x64.instructions.enableAccessToUserMemory();
+        }
     }
 }
 

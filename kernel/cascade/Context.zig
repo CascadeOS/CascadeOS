@@ -25,6 +25,9 @@ executor: ?*cascade.Executor,
 /// Tracks the depth of nested interrupt disables.
 interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
 
+/// Tracks nested enables of access to user memory.
+enable_access_to_user_memory_count: u32 = 0,
+
 spinlocks_held: u32,
 scheduler_locked: bool,
 
@@ -49,9 +52,19 @@ pub fn current() *Context {
 
 pub const InterruptExit = struct {
     previous_interrupt_disable_count: u32,
+    previous_enable_access_to_user_memory_count: u32,
 
     pub fn exit(interrupt_exit: InterruptExit, context: *Context) void {
         context.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
+
+        context.enable_access_to_user_memory_count = interrupt_exit.previous_enable_access_to_user_memory_count;
+        if (context.enable_access_to_user_memory_count == 0) {
+            @branchHint(.likely);
+            arch.paging.disableAccessToUserMemory();
+        } else {
+            arch.paging.enableAccessToUserMemory();
+        }
+
         context.setExecutor();
     }
 };
@@ -64,12 +77,24 @@ pub fn onInterruptEntry() struct { *Context, InterruptExit } {
     if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
     const context: *Context = &current_task.context;
-    const previous_interrupt_disable_count = context.interrupt_disable_count;
 
+    const previous_interrupt_disable_count = context.interrupt_disable_count;
     context.interrupt_disable_count = previous_interrupt_disable_count + 1;
     context.executor = current_task.state.running;
 
-    return .{ context, .{ .previous_interrupt_disable_count = previous_interrupt_disable_count } };
+    const previous_enable_access_to_user_memory_count = context.enable_access_to_user_memory_count;
+    context.enable_access_to_user_memory_count = 0;
+    if (previous_enable_access_to_user_memory_count != 0) {
+        @branchHint(.unlikely);
+        arch.paging.disableAccessToUserMemory();
+    }
+
+    return .{
+        context, .{
+            .previous_interrupt_disable_count = previous_interrupt_disable_count,
+            .previous_enable_access_to_user_memory_count = previous_enable_access_to_user_memory_count,
+        },
+    };
 }
 
 pub fn incrementInterruptDisable(context: *Context) void {
@@ -93,6 +118,28 @@ pub fn decrementInterruptDisable(context: *Context) void {
     if (previous == 1) {
         context.setExecutor();
         arch.interrupts.enable();
+    }
+}
+
+pub fn incrementEnableAccessToUserMemory(context: *Context) void {
+    if (core.is_debug) std.debug.assert(context.task().environment == .user);
+
+    const previous = context.enable_access_to_user_memory_count;
+    context.enable_access_to_user_memory_count = previous + 1;
+
+    if (previous == 0) {
+        arch.paging.enableAccessToUserMemory();
+    }
+}
+
+pub fn decrementEnableAccessToUserMemory(context: *Context) void {
+    if (core.is_debug) std.debug.assert(context.task().environment == .user);
+
+    const previous = context.enable_access_to_user_memory_count;
+    context.enable_access_to_user_memory_count = previous - 1;
+
+    if (previous == 1) {
+        arch.paging.disableAccessToUserMemory();
     }
 }
 
