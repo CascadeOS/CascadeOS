@@ -263,6 +263,10 @@ pub const ProgramHeader = struct {
         index: usize = 0,
         program_header_table_slice: []const u8,
 
+        pub fn reset(it: *Iterator) void {
+            it.index = 0;
+        }
+
         pub fn next(it: *Iterator) ?ProgramHeader {
             const index = it.index;
             const header = it.header;
