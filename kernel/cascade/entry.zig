@@ -22,7 +22,7 @@ pub fn onPageFault(
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
     context.decrementInterruptDisable();
-    switch (page_fault_details.environment) {
+    switch (page_fault_details.faulting_environment) {
         .kernel => cascade.mem.onKernelPageFault(
             context,
             page_fault_details,

@@ -26,8 +26,7 @@ pub fn nonMaskableInterruptHandler(
 pub fn pageFaultHandler(
     context: *cascade.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
+    interrupt_exit: cascade.Context.InterruptExit,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -49,10 +48,16 @@ pub fn pageFaultHandler(
         else
             .invalid,
 
-        .environment = if (error_code.user)
-            .{ .user = context.task().environment.user }
+        .faulting_environment = if (error_code.user)
+            .{
+                .user = context.task().environment.user,
+            }
         else
-            .kernel,
+            .{
+                .kernel = .{
+                    .access_to_user_memory_enabled = interrupt_exit.previous_enable_access_to_user_memory_count != 0,
+                },
+            },
     }, interrupt_frame);
 }
 

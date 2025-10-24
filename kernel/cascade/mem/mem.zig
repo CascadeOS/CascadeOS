@@ -335,12 +335,42 @@ pub fn onKernelPageFault(
     if (page_fault_details.faulting_address.lessThan(arch.paging.higher_half_start)) {
         @branchHint(.cold);
 
-        cascade.debug.interruptSourcePanic(
+        const process = switch (context.task().environment) {
+            .kernel => {
+                @branchHint(.cold);
+                cascade.debug.interruptSourcePanic(
+                    context,
+                    interrupt_frame,
+                    "kernel page fault in lower half\n{f}",
+                    .{page_fault_details},
+                );
+            },
+            .user => |proccess| proccess,
+        };
+
+        if (!page_fault_details.faulting_environment.kernel.access_to_user_memory_enabled) {
+            @branchHint(.cold);
+
+            cascade.debug.interruptSourcePanic(
+                context,
+                interrupt_frame,
+                "kernel accessed user memory\n{f}",
+                .{page_fault_details},
+            );
+        }
+
+        process.address_space.handlePageFault(
             context,
-            interrupt_frame,
-            "kernel page fault in lower half\n{f}",
-            .{page_fault_details},
-        );
+            page_fault_details,
+        ) catch |err|
+            cascade.debug.interruptSourcePanic(
+                context,
+                interrupt_frame,
+                "kernel page fault in user memory failed: {t}\n{f}",
+                .{ err, page_fault_details },
+            );
+
+        return;
     }
 
     const region_type = globals.regions.containingAddress(page_fault_details.faulting_address) orelse {
@@ -392,7 +422,14 @@ pub const PageFaultDetails = struct {
     ///
     /// This is not necessarily the same as the environment of the task that triggered the fault as a user task may have
     /// triggered the fault while running in kernel mode.
-    environment: cascade.Environment,
+    faulting_environment: FaultingEnvironment,
+
+    pub const FaultingEnvironment = union(cascade.Environment.Type) {
+        kernel: struct {
+            access_to_user_memory_enabled: bool,
+        },
+        user: *cascade.Process,
+    };
 
     pub const AccessType = enum {
         read,
@@ -423,7 +460,7 @@ pub const PageFaultDetails = struct {
         try writer.print("fault_type: {t},\n", .{details.fault_type});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("environment: {t},\n", .{details.environment});
+        try writer.print("faulting_environment: {t},\n", .{details.faulting_environment});
 
         try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
