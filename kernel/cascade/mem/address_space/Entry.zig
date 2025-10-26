@@ -237,11 +237,13 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
 ///  - `first_entry` and `new_second_entry` are not the same entry
 ///  - `split_offset` is not `.zero`
 ///  - `split_offset` is less than or equal to `first_entry.range.size`
+///  - `split_offset` is a multiple of the standard page size
 pub fn split(first_entry: *Entry, context: *cascade.Context, new_second_entry: *Entry, split_offset: core.Size) void {
     if (core.is_debug) {
         std.debug.assert(first_entry != new_second_entry);
         std.debug.assert(first_entry.range.size.notEqual(.zero));
         std.debug.assert(split_offset.lessThanOrEqual(first_entry.range.size));
+        std.debug.assert(split_offset.isAligned(arch.paging.standard_page_size));
     }
 
     new_second_entry.* = .{
@@ -279,6 +281,51 @@ pub fn split(first_entry: *Entry, context: *cascade.Context, new_second_entry: *
     }
 
     first_entry.range.size = split_offset;
+}
+
+const ShrinkDirection = enum {
+    beginning,
+    end,
+};
+
+/// Shrink the entry.
+///
+/// If `direction` is `.beginning` the entry is shrunk from the beginning.
+/// If `direction` is `.end` the entry is shrunk from the end.
+///
+/// Caller must ensure:
+///  - `new_size` is not `.zero`
+///  - `new_size` is less than the entry's size
+///  - `new_size` is a multiple of the standard page size
+pub fn shrink(
+    entry: *Entry,
+    direction: ShrinkDirection,
+    new_size: core.Size,
+) void {
+    if (core.is_debug) {
+        std.debug.assert(new_size.notEqual(.zero));
+        std.debug.assert(new_size.lessThan(entry.range.size));
+        std.debug.assert(new_size.isAligned(arch.paging.standard_page_size));
+    }
+
+    const size_change = entry.range.size.subtract(new_size);
+
+    switch (direction) {
+        .beginning => {
+            entry.range.address.moveForwardInPlace(size_change);
+            entry.range.size = new_size;
+
+            if (entry.anonymous_map_reference.anonymous_map) |_| {
+                entry.anonymous_map_reference.start_offset.addInPlace(size_change);
+            }
+            if (entry.object_reference.object) |_| {
+                entry.object_reference.start_offset.addInPlace(size_change);
+            }
+        },
+        .end => {},
+    }
+
+    entry.range.size = new_size;
 }
 
 /// Prints the entry.
