@@ -551,37 +551,20 @@ pub fn changeProtection(
 
         const entry_range = address_space.entryRange(range) orelse {
             // no entries overlap the range
+            @branchHint(.cold);
             break :blk .none;
         };
         if (core.is_debug) std.debug.assert(entry_range.length != 0);
 
         if (!try address_space.validateChangeProtection(entry_range, request)) {
             // there is no work to do
+            @branchHint(.cold);
             break :blk .none;
         }
 
-        // preallocate the worse-case number of entries we might need and ensure sufficent capacity in the entries array
-        // only entries that straddle the start or end of the range might require a new entry, so we will need at most 2
-        var new_entries: NewEntries = .{};
-        defer for (new_entries.constSlice()) |entry| {
-            entry.destroy(context); // free any preallocated entries that we didn't use
-        };
-
-        worse_case_new_entries: {
-            var worse_case_new_entries: usize = 0;
-
-            if (entry_range.first_straddles) worse_case_new_entries += 1;
-            if (entry_range.last_straddles) worse_case_new_entries += 1;
-            if (worse_case_new_entries == 0) break :worse_case_new_entries;
-
-            try Entry.createMany(context, new_entries.unusedCapacitySlice()[0..worse_case_new_entries]);
-            new_entries.resize(worse_case_new_entries) catch unreachable;
-
-            try address_space.entries.ensureUnusedCapacity(
-                cascade.mem.heap.allocator,
-                worse_case_new_entries,
-            );
-        }
+        var preallocated_entries: PreallocatedEntries = .empty;
+        defer preallocated_entries.deinit(context);
+        try preallocated_entries.preallocateChangeProtection(context, address_space, entry_range);
         errdefer comptime unreachable;
 
         const result = address_space.performChangeProtection(
@@ -589,10 +572,12 @@ pub fn changeProtection(
             entry_range,
             range,
             request,
-            &new_entries,
+            &preallocated_entries,
         );
 
         if (result.need_remap) {
+            // TODO: use `entry_range` to only modify ranges covered by the entry range
+
             const map_type: cascade.mem.MapType = .{
                 .environment_type = address_space.environment,
                 .protection = request.protection.?, // `need_remap` is only true if `protection` is not null
@@ -615,11 +600,6 @@ pub fn changeProtection(
 
         break :blk result;
     };
-
-    if (core.is_debug) {
-        // `validateChangeProtection` should have caused an early return if the change protection request is a no-op
-        std.debug.assert(result.entries_split != 0 or result.entries_modified != 0 or result.entries_merged != 0);
-    }
 
     log.verbose(
         context,
@@ -702,7 +682,7 @@ fn performChangeProtection(
     entry_range: EntryRange,
     range: core.VirtualRange,
     request: ChangeProtection.Request,
-    new_entries: *NewEntries,
+    preallocated_entries: *PreallocatedEntries,
 ) ChangeProtectionResult {
     var result: ChangeProtectionResult = .none;
 
@@ -734,7 +714,7 @@ fn performChangeProtection(
         // the new entry will be after the first entry, and will become the new first entry in the range
         //
         // | first entry | -> | first entry | new entry |
-        const new_entry = new_entries.pop() orelse unreachable;
+        const new_entry = preallocated_entries.entries.pop() orelse unreachable;
         first_entry.split(context, new_entry, split_offset);
 
         // move first entry index forward to as the new entry is now the first entry of the entry range
@@ -771,7 +751,7 @@ fn performChangeProtection(
         // the new entry will be after last entry, last entry will remain the last entry in the range
         //
         // | last entry | -> | last entry | new entry |
-        const new_entry = new_entries.pop() orelse unreachable;
+        const new_entry = preallocated_entries.entries.pop() orelse unreachable;
         last_entry.split(context, new_entry, split_offset);
 
         // `last_entry_index + 1` as the new entry is after the last entry of the entry range
@@ -943,8 +923,66 @@ pub fn handlePageFault(
     }
 }
 
+const PreallocatedEntries = struct {
+    entries: core.containers.BoundedArray(*Entry, 2),
+
+    pub const empty: PreallocatedEntries = .{
+        .entries = .{},
+    };
+
+    /// Preallocate the worse-case number of entries we might need to perform a change protection operation.
+    ///
+    /// Also ensures sufficent capacity in the entries array.
+    ///
+    /// Only entries that straddle the start or end of the range might require a new entry, so we will need at most 2.
+    pub fn preallocateChangeProtection(
+        preallocated_entries: *PreallocatedEntries,
+        context: *cascade.Context,
+        address_space: *AddressSpace,
+        entry_range: EntryRange,
+    ) !void {
+        var worse_case_new_entries: usize = 0;
+
+        if (entry_range.first_straddles) worse_case_new_entries += 1;
+        if (entry_range.last_straddles) worse_case_new_entries += 1;
+        if (worse_case_new_entries == 0) return;
+
+        try Entry.createMany(context, preallocated_entries.entries.unusedCapacitySlice()[0..worse_case_new_entries]);
+        preallocated_entries.entries.resize(worse_case_new_entries) catch unreachable;
+
+        try address_space.entries.ensureUnusedCapacity(
+            cascade.mem.heap.allocator,
+            worse_case_new_entries,
+        );
+    }
+
+    /// Preallocate the worse-case number of entries we might need to perform an unmap operation.
+    ///
+    /// Also ensures sufficent capacity in the entries array.
+    ///
+    /// Only an entry that completely contains the range requires a new entry after spliting, so we will need at most 1.
+    pub fn preallocateUnmap(
+        preallocated_entries: *PreallocatedEntries,
+        context: *cascade.Context,
+        address_space: *AddressSpace,
+        entry_range: EntryRange,
+    ) !void {
+        if (entry_range.length != 1) return;
+        if (!entry_range.first_straddles) return;
+        if (!entry_range.last_straddles) return;
+
+        preallocated_entries.entries.append(try Entry.create(context)) catch unreachable;
+        try address_space.entries.ensureUnusedCapacity(cascade.mem.heap.allocator, 1);
+    }
+
+    fn deinit(preallocated_entries: *PreallocatedEntries, context: *cascade.Context) void {
+        for (preallocated_entries.entries.constSlice()) |entry| {
+            entry.destroy(context); // free any preallocated entries that we didn't use
+        }
+    }
+};
+
 pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_name_length);
-const NewEntries = core.containers.BoundedArray(*Entry, 2);
 
 /// Returns the index of the entry that contains the given address.
 ///
