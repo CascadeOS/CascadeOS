@@ -113,6 +113,8 @@ pub fn map4KiB(
 
 /// Unmaps a 4 KiB page.
 ///
+/// NOP if the page is not mapped.
+///
 /// Panics if the page is not present or is a huge page.
 pub fn unmap4KiB(
     level4_table: *PageTable,
@@ -129,7 +131,7 @@ pub fn unmap4KiB(
     const level3_table = level4_entry.getNextLevel(
         cascade.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
-        error.NotPresent => @panic("page table entry is not present"),
+        error.NotPresent => return,
         error.HugePage => @panic("page table entry is huge"),
     };
 
@@ -144,7 +146,7 @@ pub fn unmap4KiB(
     const level2_table = level3_entry.getNextLevel(
         cascade.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
-        error.NotPresent => @panic("page table entry is not present"),
+        error.NotPresent => return,
         error.HugePage => @panic("page table entry is huge"),
     };
 
@@ -159,7 +161,7 @@ pub fn unmap4KiB(
     const level1_table = level2_entry.getNextLevel(
         cascade.mem.directMapFromPhysical,
     ) catch |err| switch (err) {
-        error.NotPresent => @panic("page table entry is not present"),
+        error.NotPresent => return,
         error.HugePage => @panic("page table entry is huge"),
     };
 
@@ -171,9 +173,7 @@ pub fn unmap4KiB(
     const level1_index = PageTable.p1Index(virtual_address);
     const level1_entry = level1_table.entries[level1_index].load();
 
-    if (!level1_entry.present.read()) {
-        @panic("page table entry is not present");
-    }
+    if (!level1_entry.present.read()) return;
 
     level1_table.entries[level1_index].zero();
 

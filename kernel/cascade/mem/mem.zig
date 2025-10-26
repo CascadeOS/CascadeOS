@@ -187,6 +187,8 @@ pub fn mapRangeToPhysicalRange(
 
 /// Unmaps a virtual range.
 ///
+/// Only unmaps the pages in the range that are actually mapped.
+///
 /// Performs TLB shootdown.
 ///
 /// **REQUIREMENTS**:

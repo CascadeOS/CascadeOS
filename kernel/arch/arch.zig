@@ -279,6 +279,8 @@ pub const paging = struct {
 
     /// Unmaps `virtual_address`.
     ///
+    /// NOP if the page is not mapped.
+    ///
     /// Caller must ensure:
     ///  - the virtual address is aligned to the standard page size
     ///
@@ -805,6 +807,8 @@ pub const Functions = struct {
         ) cascade.mem.MapError!void = null,
 
         /// Unmaps `virtual_address`.
+        ///
+        /// NOP if the page is not mapped.
         ///
         /// Caller must ensure:
         ///  - the virtual address is aligned to the standard page size
