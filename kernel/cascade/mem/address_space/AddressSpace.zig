@@ -695,7 +695,7 @@ fn performChangeProtection(
     var first_entry_index = entry_range.start;
 
     // split first entry if necessary
-    if (entry_range.first_straddles) no_split_first_entry: {
+    if (entry_range.start_overlap) no_split_first_entry: {
         const first_entry = address_space.entries.items[first_entry_index];
 
         split_first_entry: {
@@ -731,7 +731,7 @@ fn performChangeProtection(
     }
 
     // split last entry if necessary
-    if (entry_range.last_straddles) no_split_last_entry: {
+    if (entry_range.end_overlap) no_split_last_entry: {
         const last_entry_index = first_entry_index + entry_range.length - 1;
         const last_entry = address_space.entries.items[last_entry_index];
 
@@ -814,9 +814,9 @@ fn performChangeProtection(
             result.entries_modified += 1;
     }
 
-    // handle merging with an entry preceeding the range, if we spilt the first entry (`entry_range.first_straddles == true`)
+    // handle merging with an entry preceeding the range, if we spilt the first entry (`entry_range.start_overlap == true`)
     // then if cannot be merged with the preceeding entry
-    if (!entry_range.first_straddles and index != 0) {
+    if (!entry_range.start_overlap and index != 0) {
         const first_entry = address_space.entries.items[index];
         const preceeding_entry = address_space.entries.items[index - 1];
 
@@ -948,8 +948,8 @@ const PreallocatedEntries = struct {
     ) !void {
         var worse_case_new_entries: usize = 0;
 
-        if (entry_range.first_straddles) worse_case_new_entries += 1;
-        if (entry_range.last_straddles) worse_case_new_entries += 1;
+        if (entry_range.start_overlap) worse_case_new_entries += 1;
+        if (entry_range.end_overlap) worse_case_new_entries += 1;
         if (worse_case_new_entries == 0) return;
 
         try Entry.createMany(context, preallocated_entries.entries.unusedCapacitySlice()[0..worse_case_new_entries]);
@@ -972,9 +972,7 @@ const PreallocatedEntries = struct {
         address_space: *AddressSpace,
         entry_range: EntryRange,
     ) !void {
-        if (entry_range.length != 1) return;
-        if (!entry_range.first_straddles) return;
-        if (!entry_range.last_straddles) return;
+        if (!entry_range.isWithinSingleEntry()) return;
 
         preallocated_entries.entries.append(try Entry.create(context)) catch unreachable;
         try address_space.entries.ensureUnusedCapacity(cascade.mem.heap.allocator, 1);
@@ -1018,13 +1016,22 @@ const EntryRange = struct {
     start: usize,
     length: usize,
 
-    first_straddles: bool = false,
-    last_straddles: bool = false,
+    /// If `true` the first entry in the range overlaps the start of the range.
+    start_overlap: bool = false,
+
+    /// If `true` the last entry in the range overlaps the end of the range.
+    end_overlap: bool = false,
+
+    pub fn isWithinSingleEntry(entry_range: EntryRange) bool {
+        return entry_range.length == 1 and
+            entry_range.start_overlap and
+            entry_range.end_overlap;
+    }
 };
 
 /// Return the start index and length of the entries that overlap the given range.
 ///
-/// Also determines if the first and last entries straddle the start and end of the range.
+/// Also determines if the first and last entries overlap the start and end of the range.
 fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?EntryRange {
     const entries = address_space.entries.items;
 
@@ -1056,13 +1063,13 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
     const first_entry = address_space.entries.items[entry_range.start];
     if (first_entry.range.address.lessThan(range.address)) {
         if (core.is_debug) std.debug.assert(first_entry.range.last().greaterThan(range.address));
-        entry_range.first_straddles = true;
+        entry_range.start_overlap = true;
     }
 
     const last_entry = address_space.entries.items[entry_range.start + entry_range.length - 1];
     if (last_entry.range.last().greaterThan(range.last())) {
         if (core.is_debug) std.debug.assert(last_entry.range.address.lessThan(range.last()));
-        entry_range.last_straddles = true;
+        entry_range.end_overlap = true;
     }
 
     return entry_range;
