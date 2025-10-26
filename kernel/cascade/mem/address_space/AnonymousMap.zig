@@ -55,11 +55,11 @@ pub fn create(context: *cascade.Context, size: core.Size) error{OutOfMemory}!*An
 
 /// Increment the reference count.
 ///
-/// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.Context) void {
+/// When called a write lock must be held.
+pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
-        std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
+        std.debug.assert(anonymous_map.lock.isWriteLocked());
     }
 
     anonymous_map.reference_count += 1;
@@ -67,26 +67,23 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.C
 
 /// Decrement the reference count.
 ///
-/// When called the lock must be held, upon return the lock is unlocked.
+/// When called a write lock must be held, upon return the lock is unlocked.
 pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.Context) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
-        std.debug.assert(anonymous_map.lock.isLockedByCurrent(context));
+        std.debug.assert(anonymous_map.lock.isWriteLocked());
     }
 
     const reference_count = anonymous_map.reference_count;
     anonymous_map.reference_count = reference_count - 1;
+    anonymous_map.lock.writeUnlock(context);
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous map
 
         if (true) @panic("NOT IMPLEMENTED"); // TODO
 
-        anonymous_map.lock.unlock(context);
-
         globals.anonymous_map_cache.deallocate(context, anonymous_map);
-    } else {
-        anonymous_map.lock.unlock(context);
     }
 }
 

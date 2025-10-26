@@ -838,7 +838,12 @@ fn performChangeProtection(
     return result;
 }
 
-pub const UnmapError = error{};
+pub const UnmapError = error{
+    /// No memory available.
+    ///
+    /// This is only possible if the given range results in splitting an entry
+    OutOfMemory,
+};
 
 /// Unmap a range from the address space.
 ///
@@ -854,12 +859,166 @@ pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: cor
         std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
     }
 
-    if (range.size.equal(.zero)) {
-        @branchHint(.cold);
-        return;
+    const result: UnmapResult = blk: {
+        if (range.size.equal(.zero)) {
+            @branchHint(.cold);
+            break :blk .none;
+        }
+
+        address_space.entries_lock.writeLock(context);
+        defer address_space.entries_lock.writeUnlock(context);
+
+        const entry_range = address_space.entryRange(range) orelse {
+            @branchHint(.cold);
+            // no entries overlap the range
+            break :blk .none;
+        };
+        if (core.is_debug) std.debug.assert(entry_range.length != 0);
+
+        var preallocated_entries: PreallocatedEntries = .empty;
+        defer preallocated_entries.deinit(context);
+        try preallocated_entries.preallocateUnmap(context, address_space, entry_range);
+        errdefer comptime unreachable;
+
+        {
+            // TODO: as we have a write lock to the entries do we need to lock the page table?
+            address_space.page_table_lock.lock(context);
+            defer address_space.page_table_lock.unlock(context);
+
+            // TODO: use `entry_range` to only unmap ranges covered by the entry range
+            cascade.mem.unmapRange(
+                context,
+                address_space.page_table,
+                range,
+                address_space.environment,
+                .keep, // backing pages are managed by anonymous maps
+                switch (address_space.environment) {
+                    .kernel => .keep,
+                    .user => .free,
+                },
+                cascade.mem.phys.allocator,
+            );
+        }
+
+        address_space.entries_version +%= 1;
+
+        break :blk address_space.performUnmap(
+            context,
+            entry_range,
+            range,
+            &preallocated_entries,
+        );
+    };
+
+    log.verbose(
+        context,
+        "{s}: unmap of {f} resulted in {} split, {} shrunk and {} removed entries",
+        .{
+            address_space.name(),
+            range,
+            result.entries_split,
+            result.entries_shrunk,
+            result.entries_removed,
+        },
+    );
+}
+
+const UnmapResult = struct {
+    entries_split: usize,
+    entries_shrunk: usize,
+    entries_removed: usize,
+
+    pub const none: UnmapResult = .{
+        .entries_split = 0,
+        .entries_shrunk = 0,
+        .entries_removed = 0,
+    };
+};
+
+fn performUnmap(
+    address_space: *AddressSpace,
+    context: *cascade.Context,
+    entry_range: EntryRange,
+    range: core.VirtualRange,
+    preallocated_entries: *PreallocatedEntries,
+) UnmapResult {
+    var result: UnmapResult = .none;
+
+    var first_entry_index = entry_range.start;
+
+    if (entry_range.isWithinSingleEntry()) {
+        const first = address_space.entries.items[first_entry_index];
+        const split_offset = range.address.difference(first.range.address);
+
+        // split the first entry, the two entries together still cover the entire range of the first entry
+        // | first entry | -> | first entry | second entry |
+        const second_entry = preallocated_entries.entries.pop() orelse unreachable;
+        first.split(context, second_entry, split_offset);
+
+        // now shrink the second entry to leave a hole in between the first and second entry
+        // | entry | -> | first entry | UNMAPPED | second entry |
+        second_entry.shrink(
+            .beginning,
+            second_entry.range.endBound().difference(range.endBound()),
+        );
+
+        address_space.entries.insertAssumeCapacity(first_entry_index + 1, second_entry);
+
+        result.entries_split += 1;
+        return result;
     }
 
-    @panic("NOT IMPLEMENTED"); // TODO
+    var length = entry_range.length;
+
+    // shrink the first entry if needed
+    if (entry_range.start_overlap) {
+        const first_entry = address_space.entries.items[first_entry_index];
+
+        first_entry.shrink(
+            .end,
+            range.address.difference(first_entry.range.address),
+        );
+
+        result.entries_shrunk += 1;
+        first_entry_index += 1;
+        length -= 1;
+    }
+
+    // shrink the last entry if needed
+    if (entry_range.end_overlap) {
+        const last_entry = address_space.entries.items[first_entry_index + length - 1];
+
+        last_entry.shrink(
+            .beginning,
+            last_entry.range.endBound().difference(range.endBound()),
+        );
+
+        result.entries_shrunk += 1;
+        length -= 1;
+    }
+
+    // iterate over entries in range in reverse order and remove them
+    var index = first_entry_index + length;
+    while (index > first_entry_index) {
+        index -= 1;
+
+        const entry = address_space.entries.orderedRemove(index);
+
+        if (entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
+            anonymous_map.lock.writeLock(context);
+            anonymous_map.decrementReferenceCount(context);
+        }
+
+        if (entry.object_reference.object) |object| {
+            object.lock.writeLock(context);
+            object.decrementReferenceCount(context);
+        }
+
+        entry.destroy(context);
+        result.entries_removed += 1;
+    }
+
+    return result;
 }
 
 pub const HandlePageFaultError = error{
