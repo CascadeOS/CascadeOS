@@ -165,15 +165,15 @@ fn switchToIdleDeferredAction(
 
     const old_task = context.task();
 
-    const current_executor = context.executor.?;
-    const scheduler_task = &current_executor.scheduler_task;
+    const executor = context.executor.?;
+    const scheduler_task = &executor.scheduler_task;
     if (core.is_debug) std.debug.assert(scheduler_task.state == .ready);
 
-    arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, scheduler_task);
+    beforeSwitchTask(executor, old_task, scheduler_task);
 
-    scheduler_task.state = .{ .running = current_executor };
-    scheduler_task.context.executor = current_executor;
-    current_executor.current_task = scheduler_task;
+    scheduler_task.state = .{ .running = executor };
+    scheduler_task.context.executor = executor;
+    executor.current_task = scheduler_task;
 
     arch.scheduling.callFourArgs(
         old_task,
@@ -200,7 +200,7 @@ fn switchToTaskFromIdleYield(context: *cascade.Context, new_task: *cascade.Task)
     const scheduler_task = context.task();
     if (core.is_debug) std.debug.assert(&executor.scheduler_task == scheduler_task);
 
-    arch.scheduling.prepareForJumpToTaskFromTask(executor, scheduler_task, new_task);
+    beforeSwitchTask(executor, scheduler_task, new_task);
 
     new_task.state = .{ .running = executor };
     new_task.context.executor = executor;
@@ -220,7 +220,7 @@ fn switchToTaskFromIdleYield(context: *cascade.Context, new_task: *cascade.Task)
     // which is the value is is expected to have upon entry to idle
     scheduler_task.context.interrupt_disable_count = 1;
 
-    arch.scheduling.jumpToTask(new_task);
+    arch.scheduling.switchTask(null, new_task);
     @panic("task returned");
 }
 
@@ -228,18 +228,18 @@ fn switchToTaskFromTaskYield(
     context: *cascade.Context,
     new_task: *cascade.Task,
 ) void {
-    const current_executor = context.executor.?;
+    const executor = context.executor.?;
     const old_task = context.task();
 
-    arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
+    beforeSwitchTask(executor, old_task, new_task);
 
-    new_task.state = .{ .running = current_executor };
-    new_task.context.executor = current_executor;
-    current_executor.current_task = new_task;
+    new_task.state = .{ .running = executor };
+    new_task.context.executor = executor;
+    executor.current_task = new_task;
 
     old_task.state = .ready;
 
-    arch.scheduling.jumpToTaskFromTask(old_task, new_task);
+    arch.scheduling.switchTask(old_task, new_task);
 
     // returning to the old task
     if (core.is_debug) std.debug.assert(old_task.context.executor == old_task.state.running);
@@ -260,9 +260,9 @@ fn switchToTaskFromTaskDeferredAction(
             const inner_old_task: *cascade.Task = @ptrFromInt(old_task_addr);
             const inner_new_task: *cascade.Task = @ptrFromInt(new_task_addr);
 
-            const current_executor = inner_old_task.context.executor.?;
+            const executor = inner_old_task.context.executor.?;
 
-            const scheduler_task = &current_executor.scheduler_task;
+            const scheduler_task = &executor.scheduler_task;
             const scheduler_task_context = &scheduler_task.context;
 
             const action: DeferredAction.Action = @ptrFromInt(action_addr);
@@ -277,27 +277,27 @@ fn switchToTaskFromTaskDeferredAction(
                 std.debug.assert(scheduler_task_context.spinlocks_held == 1);
             }
 
-            inner_new_task.state = .{ .running = current_executor };
-            inner_new_task.context.executor = current_executor;
-            current_executor.current_task = inner_new_task;
+            inner_new_task.state = .{ .running = executor };
+            inner_new_task.context.executor = executor;
+            executor.current_task = inner_new_task;
 
             scheduler_task.state = .ready;
 
-            arch.scheduling.jumpToTask(inner_new_task);
+            arch.scheduling.switchTask(null, inner_new_task);
             @panic("task returned");
         }
     };
 
-    const current_executor = context.executor.?;
+    const executor = context.executor.?;
     const old_task = context.task();
 
-    arch.scheduling.prepareForJumpToTaskFromTask(current_executor, old_task, new_task);
+    beforeSwitchTask(executor, old_task, new_task);
 
-    const scheduler_task = &current_executor.scheduler_task;
+    const scheduler_task = &executor.scheduler_task;
 
-    scheduler_task.state = .{ .running = current_executor };
-    scheduler_task.context.executor = current_executor;
-    current_executor.current_task = scheduler_task;
+    scheduler_task.state = .{ .running = executor };
+    scheduler_task.context.executor = executor;
+    executor.current_task = scheduler_task;
 
     arch.scheduling.callFourArgs(
         old_task,
@@ -339,6 +339,35 @@ pub inline fn assertSchedulerLocked(context: *cascade.Context) void {
 pub inline fn assertSchedulerNotLocked(context: *cascade.Context) void {
     std.debug.assert(!context.scheduler_locked);
     std.debug.assert(!globals.lock.isLockedByCurrent(context));
+}
+
+fn beforeSwitchTask(
+    executor: *cascade.Executor,
+    old_task: *cascade.Task,
+    new_task: *cascade.Task,
+) void {
+    arch.scheduling.beforeSwitchTask(executor, old_task, new_task);
+
+    if (old_task.context.enable_access_to_user_memory_count != new_task.context.enable_access_to_user_memory_count) {
+        @branchHint(.unlikely); // we expect both to be 0 most of the time
+        if (new_task.context.enable_access_to_user_memory_count == 0) {
+            @branchHint(.likely);
+            arch.paging.disableAccessToUserMemory();
+        } else {
+            arch.paging.enableAccessToUserMemory();
+        }
+    }
+
+    switch (old_task.environment) {
+        .kernel => switch (new_task.environment) {
+            .kernel => {},
+            .user => |process| process.address_space.page_table.load(),
+        },
+        .user => |old_process| switch (new_task.environment) {
+            .kernel => cascade.mem.globals.core_page_table.load(),
+            .user => |new_process| if (old_process != new_process) new_process.address_space.page_table.load(),
+        },
+    }
 }
 
 pub fn taskEntry(

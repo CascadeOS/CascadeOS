@@ -9,58 +9,28 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
-/// Prepares the executor for jumping from `old_task` to `new_task`.
-pub fn prepareForJumpToTaskFromTask(
+pub fn beforeSwitchTask(
     executor: *cascade.Executor,
     old_task: *cascade.Task,
     new_task: *cascade.Task,
 ) void {
-    // TODO: most of this function should be lifted out into the arch independent code
+    _ = old_task;
 
-    switch (old_task.environment) {
-        .kernel => switch (new_task.environment) {
-            .kernel => {},
-            .user => |process| {
-                process.address_space.page_table.load();
-                executor.arch_specific.tss.setPrivilegeStack(
-                    .ring0,
-                    new_task.stack.top_stack_pointer,
-                );
-            },
-        },
-        .user => |old_process| switch (new_task.environment) {
-            .kernel => cascade.mem.globals.core_page_table.load(),
-            .user => |new_process| if (old_process != new_process) {
-                new_process.address_space.page_table.load();
-                executor.arch_specific.tss.setPrivilegeStack(
-                    .ring0,
-                    new_task.stack.top_stack_pointer,
-                );
-            },
-        },
-    }
-
-    if (old_task.context.enable_access_to_user_memory_count != new_task.context.enable_access_to_user_memory_count) {
-        @branchHint(.unlikely); // we expect both to be 0 most of the time
-        if (new_task.context.enable_access_to_user_memory_count == 0) {
-            @branchHint(.likely);
-            x64.instructions.disableAccessToUserMemory();
-        } else {
-            x64.instructions.enableAccessToUserMemory();
-        }
-    }
+    executor.arch_specific.tss.setPrivilegeStack(
+        .ring0,
+        new_task.stack.top_stack_pointer,
+    );
 }
 
-/// Jumps to the given task without saving the old task's state.
+/// Switches to `new_task`.
 ///
-/// If the old task is ever rescheduled undefined behaviour may occur.
-///
-/// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-pub fn jumpToTask(
-    task: *cascade.Task,
-) noreturn {
+/// If `old_task` is not null its state is saved to allow it to be resumed later.
+pub fn switchTask(
+    old_task: ?*cascade.Task,
+    new_task: *cascade.Task,
+) void {
     const impls = struct {
-        const jumpToTask: *const fn (
+        const switchToTaskWithoutOld: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
         ) callconv(.c) void = blk: {
             const impl = struct {
@@ -89,23 +59,8 @@ pub fn jumpToTask(
 
             break :blk @ptrCast(&impl);
         };
-    };
 
-    impls.jumpToTask(task.stack.stack_pointer);
-    @panic("task returned");
-}
-
-/// Jumps from `old_task` to `new_task`.
-///
-/// Saves the old task's state to allow it to be resumed later.
-///
-/// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-pub fn jumpToTaskFromTask(
-    old_task: *cascade.Task,
-    new_task: *cascade.Task,
-) void {
-    const impls = struct {
-        const jumpToTaskFromTask: *const fn (
+        const switchToTaskWithOld: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
         ) callconv(.c) void = blk: {
@@ -145,9 +100,14 @@ pub fn jumpToTaskFromTask(
         };
     };
 
-    impls.jumpToTaskFromTask(
+    const old = old_task orelse {
+        impls.switchToTaskWithoutOld(new_task.stack.stack_pointer);
+        @panic("task returned");
+    };
+
+    impls.switchToTaskWithOld(
         new_task.stack.stack_pointer,
-        &old_task.stack.stack_pointer,
+        &old.stack.stack_pointer,
     );
 }
 

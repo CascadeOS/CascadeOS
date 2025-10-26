@@ -91,9 +91,8 @@ pub const functions: arch.Functions = .{
     },
 
     .scheduling = .{
-        .prepareForJumpToTaskFromTask = x64.scheduling.prepareForJumpToTaskFromTask,
-        .jumpToTask = x64.scheduling.jumpToTask,
-        .jumpToTaskFromTask = x64.scheduling.jumpToTaskFromTask,
+        .beforeSwitchTask = x64.scheduling.beforeSwitchTask,
+        .switchTask = x64.scheduling.switchTask,
         .prepareTaskForScheduling = x64.scheduling.prepareTaskForScheduling,
         .callOneArg = x64.scheduling.callOneArg,
         .callTwoArgs = x64.scheduling.callTwoArgs,

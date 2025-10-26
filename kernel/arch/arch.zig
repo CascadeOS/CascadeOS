@@ -409,44 +409,32 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
-    /// Prepares the executor for jumping from `old_task` to `new_task`.
-    pub fn prepareForJumpToTaskFromTask(
+    /// Called before `old_task` is switched to `new_task`.
+    ///
+    /// This function does not perform page table switching or managing ability to access user memory.
+    pub fn beforeSwitchTask(
         executor: *cascade.Executor,
         old_task: *cascade.Task,
         new_task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
-            "prepareForJumpToTaskFromTask",
+            "beforeSwitchTask",
         )(executor, old_task, new_task);
     }
 
-    /// Jumps to the given task without saving the old task's state.
+    /// Switches to `new_task`.
     ///
-    /// If the old task is ever rescheduled undefined behaviour may occur.
+    /// If `old_task` is not null its state is saved to allow it to be resumed later.
     ///
-    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-    pub fn jumpToTask(
-        task: *cascade.Task,
-    ) callconv(core.inline_in_non_debug) noreturn {
-        getFunction(
-            current_functions.scheduling,
-            "jumpToTask",
-        )(task);
-    }
-
-    /// Jumps from `old_task` to `new_task`.
-    ///
-    /// Saves the old task's state to allow it to be resumed later.
-    ///
-    /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-    pub fn jumpToTaskFromTask(
-        old_task: *cascade.Task,
+    /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
+    pub fn switchTask(
+        old_task: ?*cascade.Task,
         new_task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
-            "jumpToTaskFromTask",
+            "switchTask",
         )(old_task, new_task);
     }
 
@@ -908,26 +896,21 @@ pub const Functions = struct {
     },
 
     scheduling: struct {
-        /// Prepares the executor for jumping from `old_task` to `new_task`.
-        prepareForJumpToTaskFromTask: ?fn (
+        /// Called before `old_task` is switched to `new_task`.
+        ///
+        /// This function does not perform page table switching or managing ability to access user memory.
+        beforeSwitchTask: ?fn (
             executor: *cascade.Executor,
             old_task: *cascade.Task,
             new_task: *cascade.Task,
         ) void = null,
 
-        /// Jumps to the given task without saving the old task's state.
+        /// Switches to `new_task`.
         ///
-        /// If the old task is ever rescheduled undefined behaviour may occur.
+        /// If `old_task` is not null its state is saved to allow it to be resumed later.
         ///
-        /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-        jumpToTask: ?fn (task: *cascade.Task) noreturn = null,
-
-        /// Jumps from `old_task` to `new_task`.
-        ///
-        /// Saves the old task's state to allow it to be resumed later.
-        ///
-        /// **Note**: It is the caller's responsibility to call `prepareForJumpToTaskFromTask` before calling this function.
-        jumpToTaskFromTask: ?fn (old_task: *cascade.Task, new_task: *cascade.Task) void = null,
+        /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
+        switchTask: ?fn (old_task: ?*cascade.Task, new_task: *cascade.Task) void = null,
 
         /// Prepares the given task for being scheduled.
         ///
