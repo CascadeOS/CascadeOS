@@ -556,7 +556,8 @@ pub fn changeProtection(
         };
         if (core.is_debug) std.debug.assert(entry_range.length != 0);
 
-        if (!try address_space.validateChangeProtection(entry_range, request)) {
+        const validate_change_protection = try address_space.validateChangeProtection(entry_range, request);
+        if (validate_change_protection.no_op) {
             // there is no work to do
             @branchHint(.cold);
             break :blk .none;
@@ -567,26 +568,18 @@ pub fn changeProtection(
         try preallocated_entries.preallocateChangeProtection(context, address_space, entry_range);
         errdefer comptime unreachable;
 
-        const result = address_space.performChangeProtection(
-            context,
-            entry_range,
-            range,
-            request,
-            &preallocated_entries,
-        );
-
-        if (result.need_remap) {
-            // TODO: use `entry_range` to only modify ranges covered by the entry range
-
+        if (validate_change_protection.update_page_table) {
             const map_type: cascade.mem.MapType = .{
                 .environment_type = address_space.environment,
-                .protection = request.protection.?, // `need_remap` is only true if `protection` is not null
+                // `update_page_table` is only true if `protection` is not null
+                .protection = request.protection.?,
             };
 
             // TODO: as we have a write lock to the entries do we need to lock the page table?
             address_space.page_table_lock.lock(context);
             defer address_space.page_table_lock.unlock(context);
 
+            // TODO: use `entry_range` to only modify ranges covered by the entry range
             cascade.mem.changeProtection(
                 context,
                 address_space.page_table,
@@ -598,7 +591,13 @@ pub fn changeProtection(
 
         address_space.entries_version +%= 1;
 
-        break :blk result;
+        break :blk address_space.performChangeProtection(
+            context,
+            entry_range,
+            range,
+            request,
+            &preallocated_entries,
+        );
     };
 
     log.verbose(
@@ -614,6 +613,14 @@ pub fn changeProtection(
     );
 }
 
+const ValidateChangeProtection = struct {
+    /// No work to do.
+    no_op: bool,
+
+    /// The protection has changed so the page table needs to be updated.
+    update_page_table: bool,
+};
+
 /// Validates the change protection request.
 ///
 /// Returns false if the change protection request is a no-op.
@@ -621,10 +628,10 @@ fn validateChangeProtection(
     address_space: *AddressSpace,
     entry_range: EntryRange,
     request: ChangeProtection.Request,
-) !bool {
+) !ValidateChangeProtection {
     const opt_new_protection, const opt_new_max_protection = request.toInts();
 
-    var any_changes = false;
+    var result: ValidateChangeProtection = .{ .no_op = true, .update_page_table = false };
 
     for (address_space.entries.items[entry_range.start..][0..entry_range.length]) |entry| {
         const planned_max_protection = if (opt_new_max_protection) |new_max_protection| blk: {
@@ -635,7 +642,7 @@ fn validateChangeProtection(
                 return error.MaxProtectionIncreased;
             }
 
-            if (new_max_protection != old_max_protection) any_changes = true;
+            if (new_max_protection != old_max_protection) result.no_op = false;
 
             break :blk new_max_protection;
         } else @intFromEnum(entry.max_protection);
@@ -648,7 +655,10 @@ fn validateChangeProtection(
                 return error.MaxProtectionExceeded;
             }
 
-            if (new_protection != old_protection) any_changes = true;
+            if (new_protection != old_protection) {
+                result.no_op = false;
+                result.update_page_table = true;
+            }
         } else {
             if (old_protection > planned_max_protection) {
                 @branchHint(.cold);
@@ -657,7 +667,7 @@ fn validateChangeProtection(
         }
     }
 
-    return any_changes;
+    return result;
 }
 
 const ChangeProtectionResult = struct {
@@ -665,14 +675,10 @@ const ChangeProtectionResult = struct {
     entries_modified: usize,
     entries_merged: usize,
 
-    /// `true` is the page tables need to be remapped due to changes in the protection of the entries.
-    need_remap: bool,
-
     pub const none: ChangeProtectionResult = .{
         .entries_modified = 0,
         .entries_split = 0,
         .entries_merged = 0,
-        .need_remap = false,
     };
 };
 
@@ -771,7 +777,6 @@ fn performChangeProtection(
         if (request.protection) |new_protection| {
             if (entry.protection != new_protection) {
                 entry.protection = new_protection;
-                result.need_remap = true;
                 modified = true;
             }
         }
