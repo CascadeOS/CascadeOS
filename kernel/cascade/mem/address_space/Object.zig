@@ -32,6 +32,38 @@ reference_count: u32 = 1,
 
 page_chunks: PageChunkMap = .{},
 
+/// Increment the reference count.
+///
+/// When called a write lock must be held.
+pub fn incrementReferenceCount(object: *Object) void {
+    if (core.is_debug) {
+        std.debug.assert(object.reference_count != 0);
+        std.debug.assert(object.lock.isWriteLocked());
+    }
+
+    object.reference_count += 1;
+}
+
+/// Decrement the reference count.
+///
+/// When called a write lock must be held, upon return the lock is unlocked.
+pub fn decrementReferenceCount(object: *Object, context: *cascade.Context) void {
+    if (core.is_debug) {
+        std.debug.assert(object.reference_count != 0);
+        std.debug.assert(object.lock.isWriteLocked());
+    }
+
+    const reference_count = object.reference_count;
+    object.reference_count = reference_count - 1;
+    object.lock.writeUnlock(context);
+
+    if (reference_count == 1) {
+        // reference count is now zero, destroy the object
+
+        if (true) @panic("NOT IMPLEMENTED"); // TODO
+    }
+}
+
 pub const Reference = struct {
     object: ?*Object,
     start_offset: core.Size,
