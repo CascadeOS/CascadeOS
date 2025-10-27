@@ -42,6 +42,8 @@ next_task_node: std.SinglyLinkedList.Node = .{},
 
 context: cascade.Context,
 
+is_scheduler_task: bool = false,
+
 pub const State = union(enum) {
     ready,
     /// Do not access the executor directly, use the `context` instead.
@@ -55,12 +57,8 @@ pub const State = union(enum) {
 };
 
 pub const Environment = union(cascade.Environment.Type) {
-    kernel: Kernel,
+    kernel: void,
     user: *cascade.Process,
-
-    pub const Kernel = struct {
-        is_scheduler_task: bool = false,
-    };
 };
 
 pub const CreateKernelTaskOptions = struct {
@@ -76,7 +74,7 @@ pub fn createKernelTask(context: *cascade.Context, options: CreateKernelTaskOpti
         .function = options.function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
-        .environment = .{ .kernel = .{} },
+        .environment = .kernel,
     });
     errdefer {
         if (core.is_debug) std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
@@ -371,7 +369,7 @@ pub const init = struct {
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
 
-            .environment = .{ .kernel = .{} },
+            .environment = .kernel,
 
             .context = .{
                 .executor = bootstrap_executor,
@@ -414,12 +412,13 @@ pub const init = struct {
 
             .state = .ready,
             .stack = try .createStack(context),
-            .environment = .{ .kernel = .{ .is_scheduler_task = true } },
+            .environment = .kernel,
             .context = .{
                 .executor = null,
                 .spinlocks_held = 1, // fresh tasks start with the scheduler locked
                 .scheduler_locked = true, // fresh tasks start with the scheduler locked
             },
+            .is_scheduler_task = true,
         };
     }
 };

@@ -14,7 +14,7 @@ const log = cascade.debug.log.scoped(.scheduler);
 /// Must be called with the scheduler lock held.
 pub fn queueTask(context: *cascade.Context, task: *cascade.Task) void {
     if (core.is_debug) {
-        std.debug.assert(!isSchedulerTask(task)); // cannot queue a scheduler task
+        std.debug.assert(!task.is_scheduler_task); // cannot queue a scheduler task
         assertSchedulerLocked(context);
         std.debug.assert(task.state == .ready);
     }
@@ -57,14 +57,14 @@ pub fn yield(context: *cascade.Context) void {
     const new_task_node = globals.ready_to_run.pop() orelse return; // no tasks to run
     const new_task = cascade.Task.fromNode(new_task_node);
     if (core.is_debug) {
-        std.debug.assert(!isSchedulerTask(new_task));
+        std.debug.assert(!new_task.is_scheduler_task);
         std.debug.assert(new_task.state == .ready);
     }
 
     const current_task = context.task();
     if (core.is_debug) std.debug.assert(current_task.state == .running);
 
-    if (isSchedulerTask(current_task)) {
+    if (current_task.is_scheduler_task) {
         log.verbose(context, "switching from idle to {f}", .{new_task});
         switchToTaskFromIdleYield(context, new_task);
         unreachable;
@@ -107,7 +107,7 @@ pub const DeferredAction = struct {
 pub fn drop(context: *cascade.Context, deferred_action: DeferredAction) void {
     const current_task = context.task();
     if (core.is_debug) {
-        std.debug.assert(!isSchedulerTask(current_task)); // scheduler task cannot be dropped
+        std.debug.assert(!current_task.is_scheduler_task); // scheduler task cannot be dropped
         assertSchedulerLocked(context);
         std.debug.assert(current_task.state == .running);
     }
@@ -120,7 +120,7 @@ pub fn drop(context: *cascade.Context, deferred_action: DeferredAction) void {
 
     const new_task = cascade.Task.fromNode(new_task_node);
     if (core.is_debug) {
-        std.debug.assert(!isSchedulerTask(new_task));
+        std.debug.assert(!new_task.is_scheduler_task);
         std.debug.assert(current_task != new_task);
         std.debug.assert(new_task.context.scheduler_locked);
         std.debug.assert(new_task.context.spinlocks_held == 1); // only the scheduler lock is held
@@ -412,13 +412,6 @@ fn idle(context: *cascade.Context) callconv(.c) noreturn {
 
         lockScheduler(context);
     }
-}
-
-fn isSchedulerTask(task: *cascade.Task) bool {
-    return switch (task.environment) {
-        .kernel => |kernel| kernel.is_scheduler_task,
-        .user => false,
-    };
 }
 
 const globals = struct {
