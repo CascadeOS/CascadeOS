@@ -416,7 +416,7 @@ fn idle(context: *cascade.Context) callconv(.c) noreturn {
 
 fn isSchedulerTask(task: *cascade.Task) bool {
     return switch (task.environment) {
-        .kernel => |kernel_task_type| kernel_task_type == .scheduler,
+        .kernel => |kernel| kernel.is_scheduler_task,
         .user => false,
     };
 }

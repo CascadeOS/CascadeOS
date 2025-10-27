@@ -55,13 +55,11 @@ pub const State = union(enum) {
 };
 
 pub const Environment = union(cascade.Environment.Type) {
-    kernel: KernelTaskType,
+    kernel: Kernel,
     user: *cascade.Process,
 
-    pub const KernelTaskType = union(enum) {
-        init,
-        scheduler,
-        normal,
+    pub const Kernel = struct {
+        is_scheduler_task: bool = false,
     };
 };
 
@@ -70,8 +68,6 @@ pub const CreateKernelTaskOptions = struct {
     function: arch.scheduling.TaskFunction,
     arg1: u64 = 0,
     arg2: u64 = 0,
-
-    kernel_task_type: Environment.KernelTaskType,
 };
 
 pub fn createKernelTask(context: *cascade.Context, options: CreateKernelTaskOptions) !*Task {
@@ -80,7 +76,7 @@ pub fn createKernelTask(context: *cascade.Context, options: CreateKernelTaskOpti
         .function = options.function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
-        .environment = .{ .kernel = options.kernel_task_type },
+        .environment = .{ .kernel = .{} },
     });
     errdefer {
         if (core.is_debug) std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
@@ -375,7 +371,7 @@ pub const init = struct {
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
 
-            .environment = .{ .kernel = .init },
+            .environment = .{ .kernel = .{} },
 
             .context = .{
                 .executor = bootstrap_executor,
@@ -393,7 +389,6 @@ pub const init = struct {
         const task = try createKernelTask(context, .{
             .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
             .function = undefined,
-            .kernel_task_type = .init,
         });
         errdefer comptime unreachable;
 
@@ -419,7 +414,7 @@ pub const init = struct {
 
             .state = .ready,
             .stack = try .createStack(context),
-            .environment = .{ .kernel = .scheduler },
+            .environment = .{ .kernel = .{ .is_scheduler_task = true } },
             .context = .{
                 .executor = null,
                 .spinlocks_held = 1, // fresh tasks start with the scheduler locked

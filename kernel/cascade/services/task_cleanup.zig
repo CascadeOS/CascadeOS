@@ -122,7 +122,6 @@ pub const init = struct {
         globals.task_cleanup_task = try Task.createKernelTask(context, .{
             .name = try .fromSlice("task cleanup"),
             .function = execute,
-            .kernel_task_type = .normal,
         });
 
         globals.parker = .withParkedTask(globals.task_cleanup_task);
