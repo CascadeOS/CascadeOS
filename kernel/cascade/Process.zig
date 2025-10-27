@@ -44,7 +44,7 @@ pub const CreateOptions = struct {
 pub fn create(context: *cascade.Context, options: CreateOptions) !struct { *Process, *cascade.Task } {
     const process = blk: {
         const process = try globals.cache.allocate(context);
-        errdefer globals.cache.deallocate(context, process);
+        errdefer comptime unreachable;
 
         process.name = options.name;
         process.address_space.retarget(process);
@@ -52,7 +52,10 @@ pub fn create(context: *cascade.Context, options: CreateOptions) !struct { *Proc
         break :blk process;
     };
 
-    const entry_task = try process.createUserTask(context, options.initial_task_options);
+    const entry_task = process.createUserTask(context, options.initial_task_options) catch |err| {
+        globals.cache.deallocate(context, process);
+        return err;
+    };
     errdefer entry_task.decrementReferenceCount(context);
     if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 1);
 
