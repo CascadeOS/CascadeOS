@@ -15,7 +15,7 @@ const log = cascade.debug.log.scoped(.uacpi_kernel_api);
 /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_get_rsdp called",
         .{},
     );
@@ -35,7 +35,7 @@ export fn uacpi_kernel_pci_device_open(
     out_handle: **volatile cascade.pci.Function,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_device_open called with address {f}",
         .{address},
     );
@@ -46,7 +46,7 @@ export fn uacpi_kernel_pci_device_open(
 
 export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_device_close called",
         .{},
     );
@@ -61,7 +61,7 @@ export fn uacpi_kernel_pci_read8(
     value: *u8,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_read8 called",
         .{},
     );
@@ -78,7 +78,7 @@ export fn uacpi_kernel_pci_read16(
     value: *u16,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_read16 called",
         .{},
     );
@@ -95,7 +95,7 @@ export fn uacpi_kernel_pci_read32(
     value: *u32,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_read32 called",
         .{},
     );
@@ -112,7 +112,7 @@ export fn uacpi_kernel_pci_write8(
     value: u8,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_write8 called",
         .{},
     );
@@ -129,7 +129,7 @@ export fn uacpi_kernel_pci_write16(
     value: u16,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_write16 called",
         .{},
     );
@@ -146,7 +146,7 @@ export fn uacpi_kernel_pci_write32(
     value: u32,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_pci_write32 called",
         .{},
     );
@@ -162,7 +162,7 @@ export fn uacpi_kernel_pci_write32(
 /// NOTE: The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_map called",
         .{},
     );
@@ -175,7 +175,7 @@ export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) ua
 
 export fn uacpi_kernel_io_unmap(handle: *anyopaque) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_unmap called",
         .{},
     );
@@ -192,7 +192,7 @@ export fn uacpi_kernel_io_read8(
     value: *u8,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_read8 called",
         .{},
     );
@@ -214,7 +214,7 @@ export fn uacpi_kernel_io_read16(
     value: *u16,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_read16 called",
         .{},
     );
@@ -236,7 +236,7 @@ export fn uacpi_kernel_io_read32(
     value: *u32,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_read32 called",
         .{},
     );
@@ -258,7 +258,7 @@ export fn uacpi_kernel_io_write8(
     value: u8,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_write8 called",
         .{},
     );
@@ -280,7 +280,7 @@ export fn uacpi_kernel_io_write16(
     value: u16,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_write16 called",
         .{},
     );
@@ -302,7 +302,7 @@ export fn uacpi_kernel_io_write32(
     value: u32,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_io_write32 called",
         .{},
     );
@@ -337,7 +337,7 @@ export fn uacpi_kernel_io_write32(
 ///              0xF000 + 0xABC => 0xFABC. Return it to uACPI.
 export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_map called",
         .{},
     );
@@ -354,7 +354,7 @@ export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
 ///       for this mapping as well as its true length.
 export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_unmap called",
         .{},
     );
@@ -367,7 +367,7 @@ export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
 /// The contents of the allocated memory are unspecified.
 export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_alloc called",
         .{},
     );
@@ -381,7 +381,7 @@ export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
 /// 'mem' might be a NULL pointer. In this case, the call is assumed to be a no-op.
 export fn uacpi_kernel_free(opt_mem: ?[*]u8) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_free called",
         .{},
     );
@@ -403,7 +403,7 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 
             if (!uacpi_log.levelEnabled(kernel_log_level)) return;
 
-            const context: *cascade.Task.Context = .current();
+            const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
             const full_msg = std.mem.sliceTo(c_msg, 0);
 
@@ -413,11 +413,11 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
                 full_msg;
 
             switch (comptime kernel_log_level) {
-                .verbose => uacpi_log.verbose(context, "{s}", .{msg}),
-                .debug => uacpi_log.debug(context, "{s}", .{msg}),
+                .verbose => uacpi_log.verbose(current_task, "{s}", .{msg}),
+                .debug => uacpi_log.debug(current_task, "{s}", .{msg}),
                 .info => @compileError("NO INFO LOGS"),
-                .warn => uacpi_log.warn(context, "{s}", .{msg}),
-                .err => uacpi_log.err(context, "{s}", .{msg}),
+                .warn => uacpi_log.warn(current_task, "{s}", .{msg}),
+                .err => uacpi_log.err(current_task, "{s}", .{msg}),
             }
         },
     }
@@ -426,7 +426,7 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 /// Returns the number of nanosecond ticks elapsed since boot, strictly monotonic.
 export fn uacpi_kernel_get_nanoseconds_since_boot() u64 {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_get_nanoseconds_since_boot called",
         .{},
     );
@@ -437,7 +437,7 @@ export fn uacpi_kernel_get_nanoseconds_since_boot() u64 {
 /// Spin for N microseconds.
 export fn uacpi_kernel_stall(usec: u8) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_stall called",
         .{},
     );
@@ -454,7 +454,7 @@ export fn uacpi_kernel_stall(usec: u8) void {
 /// Sleep for N milliseconds.
 export fn uacpi_kernel_sleep(msec: u64) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_sleep called",
         .{},
     );
@@ -465,7 +465,7 @@ export fn uacpi_kernel_sleep(msec: u64) void {
 /// Create an opaque non-recursive kernel mutex object.
 export fn uacpi_kernel_create_mutex() *cascade.sync.Mutex {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_create_mutex called",
         .{},
     );
@@ -478,7 +478,7 @@ export fn uacpi_kernel_create_mutex() *cascade.sync.Mutex {
 /// Free a opaque non-recursive kernel mutex object.
 export fn uacpi_kernel_free_mutex(mutex: *cascade.sync.Mutex) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_free_mutex called",
         .{},
     );
@@ -488,15 +488,15 @@ export fn uacpi_kernel_free_mutex(mutex: *cascade.sync.Mutex) void {
 
 /// Create/free an opaque kernel (semaphore-like) event object.
 export fn uacpi_kernel_create_event() *anyopaque {
-    const context: *cascade.Task.Context = .current(); // TODO: once this is implemented move this in to the if
+    const current_task: *cascade.Task = cascade.Task.Context.current().task(); // TODO: once this is implemented move this in to the if
 
     if (log.levelEnabled(.verbose)) log.verbose(
-        context,
+        current_task,
         "uacpi_kernel_create_event called",
         .{},
     );
 
-    log.warn(context, "uacpi_kernel_create_event called with dummy implementation", .{});
+    log.warn(current_task, "uacpi_kernel_create_event called with dummy implementation", .{});
 
     const static = struct {
         var value: std.atomic.Value(usize) = .init(1);
@@ -508,7 +508,7 @@ export fn uacpi_kernel_create_event() *anyopaque {
 /// Free a previously allocated kernel (semaphore-like) event object.
 export fn uacpi_kernel_free_event(handle: *anyopaque) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_free_event called",
         .{},
     );
@@ -520,11 +520,11 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 ///
 /// The returned thread id cannot be UACPI_THREAD_ID_NONE.
 export fn uacpi_kernel_get_thread_id() usize {
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_get_thread_id called", .{});
+    log.verbose(current_task, "uacpi_kernel_get_thread_id called", .{});
 
-    return @intFromPtr(context.task());
+    return @intFromPtr(current_task);
 }
 
 /// Try to acquire the mutex with a millisecond timeout.
@@ -540,13 +540,13 @@ export fn uacpi_kernel_get_thread_id() usize {
 ///                           successful for calls with timeout=.none)
 /// 3. Any other value - signifies a host internal error and is treated as such
 export fn uacpi_kernel_acquire_mutex(mutex: *cascade.sync.Mutex, timeout: uacpi.Timeout) uacpi.Status {
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_acquire_mutex called", .{});
+    log.verbose(current_task, "uacpi_kernel_acquire_mutex called", .{});
 
     switch (timeout) {
-        .none => if (!mutex.tryLock(context)) return .timeout,
-        .infinite => mutex.lock(context),
+        .none => if (!mutex.tryLock(current_task)) return .timeout,
+        .infinite => mutex.lock(current_task),
         else => @panic("mutex timeout lock not implemented"),
     }
 
@@ -554,11 +554,11 @@ export fn uacpi_kernel_acquire_mutex(mutex: *cascade.sync.Mutex, timeout: uacpi.
 }
 
 export fn uacpi_kernel_release_mutex(mutex: *cascade.sync.Mutex) void {
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_release_mutex called", .{});
+    log.verbose(current_task, "uacpi_kernel_release_mutex called", .{});
 
-    mutex.unlock(context);
+    mutex.unlock(current_task);
 }
 
 /// Try to wait for an event (counter > 0) with a millisecond timeout.
@@ -568,7 +568,7 @@ export fn uacpi_kernel_release_mutex(mutex: *cascade.sync.Mutex) void {
 /// A successful wait is indicated by returning UACPI_TRUE.
 export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: uacpi.Timeout) bool {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_wait_for_event called",
         .{},
     );
@@ -584,7 +584,7 @@ export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: uacpi.Timeout
 /// This function may be used in interrupt contexts.
 export fn uacpi_kernel_signal_event(handle: *anyopaque) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_signal_event called",
         .{},
     );
@@ -595,7 +595,7 @@ export fn uacpi_kernel_signal_event(handle: *anyopaque) void {
 /// Reset the event counter to 0.
 export fn uacpi_kernel_reset_event(handle: *anyopaque) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_reset_event called",
         .{},
     );
@@ -608,7 +608,7 @@ export fn uacpi_kernel_reset_event(handle: *anyopaque) void {
 /// Currently either a Breakpoint or Fatal operators.
 export fn uacpi_kernel_handle_firmware_request(request: *const uacpi.FirmwareRequest) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_handle_firmware_request called",
         .{},
     );
@@ -630,7 +630,7 @@ export fn uacpi_kernel_install_interrupt_handler(
 ) uacpi.Status {
     const HandlerWrapper = struct {
         fn HandlerWrapper(
-            _: *cascade.Task.Context,
+            _: *cascade.Task,
             _: arch.interrupts.InterruptFrame,
             _handler: usize,
             _ctx: usize,
@@ -640,24 +640,24 @@ export fn uacpi_kernel_install_interrupt_handler(
         }
     }.HandlerWrapper;
 
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_install_interrupt_handler called", .{});
+    log.verbose(current_task, "uacpi_kernel_install_interrupt_handler called", .{});
 
     const interrupt = arch.interrupts.Interrupt.allocate(
-        context,
+        current_task,
         HandlerWrapper,
         @intFromPtr(handler),
         @intFromPtr(ctx),
     ) catch |err| {
-        log.err(context, "failed to allocate interrupt: {}", .{err});
+        log.err(current_task, "failed to allocate interrupt: {}", .{err});
         return .internal_error;
     };
 
     interrupt.route(irq) catch |err| {
-        interrupt.deallocate(context);
+        interrupt.deallocate(current_task);
 
-        log.err(context, "failed to route interrupt: {}", .{err});
+        log.err(current_task, "failed to route interrupt: {}", .{err});
         return .internal_error;
     };
 
@@ -673,12 +673,12 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
     _: uacpi.RawInterruptHandler,
     irq_handle: *anyopaque,
 ) uacpi.Status {
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_uninstall_interrupt_handler called", .{});
+    log.verbose(current_task, "uacpi_kernel_uninstall_interrupt_handler called", .{});
 
     const interrupt: arch.interrupts.Interrupt = .fromUsize(@intFromPtr(irq_handle));
-    interrupt.deallocate(context);
+    interrupt.deallocate(current_task);
 
     return .ok;
 }
@@ -688,7 +688,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
 /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
 export fn uacpi_kernel_create_spinlock() *cascade.sync.TicketSpinLock {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_create_spinlock called",
         .{},
     );
@@ -703,7 +703,7 @@ export fn uacpi_kernel_create_spinlock() *cascade.sync.TicketSpinLock {
 /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
 export fn uacpi_kernel_free_spinlock(spinlock: *cascade.sync.TicketSpinLock) void {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_free_spinlock called",
         .{},
     );
@@ -718,21 +718,21 @@ export fn uacpi_kernel_free_spinlock(spinlock: *cascade.sync.TicketSpinLock) voi
 ///
 /// Note that lock is infalliable.
 export fn uacpi_kernel_lock_spinlock(spinlock: *cascade.sync.TicketSpinLock) uacpi.CpuFlags {
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_lock_spinlock called", .{});
+    log.verbose(current_task, "uacpi_kernel_lock_spinlock called", .{});
 
-    spinlock.lock(context);
+    spinlock.lock(current_task);
     return 0;
 }
 
 export fn uacpi_kernel_unlock_spinlock(spinlock: *cascade.sync.TicketSpinLock, cpu_flags: uacpi.CpuFlags) void {
-    const context: *cascade.Task.Context = .current();
+    const current_task: *cascade.Task = cascade.Task.Context.current().task();
 
-    log.verbose(context, "uacpi_kernel_unlock_spinlock called", .{});
+    log.verbose(current_task, "uacpi_kernel_unlock_spinlock called", .{});
 
     _ = cpu_flags;
-    spinlock.unlock(context);
+    spinlock.unlock(current_task);
 }
 
 /// Schedules deferred work for execution.
@@ -744,7 +744,7 @@ export fn uacpi_kernel_schedule_work(
     ctx: *anyopaque,
 ) uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_schedule_work called",
         .{},
     );
@@ -762,7 +762,7 @@ export fn uacpi_kernel_schedule_work(
 /// Note that the waits must be done in this order specifically.
 export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
     if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
+        cascade.Task.Context.current().task(),
         "uacpi_kernel_wait_for_work_completion called",
         .{},
     );

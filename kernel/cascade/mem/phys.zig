@@ -62,8 +62,8 @@ pub const FrameAllocator = struct {
 
     pub const AllocateError = error{FramesExhausted};
 
-    pub const Allocate = *const fn (context: *cascade.Task.Context) AllocateError!Frame;
-    pub const Deallocate = *const fn (context: *cascade.Task.Context, frame_list: FrameList) void;
+    pub const Allocate = *const fn (current_task: *cascade.Task) AllocateError!Frame;
+    pub const Deallocate = *const fn (current_task: *cascade.Task, frame_list: FrameList) void;
 };
 
 pub const FrameList = struct {
@@ -88,7 +88,7 @@ pub const FrameList = struct {
     }
 };
 
-fn allocate(_: *cascade.Task.Context) FrameAllocator.AllocateError!Frame {
+fn allocate(_: *cascade.Task) FrameAllocator.AllocateError!Frame {
     const node = globals.free_page_list.popFirst() orelse return error.FramesExhausted;
 
     _ = globals.free_memory.fetchSub(
@@ -110,7 +110,7 @@ fn allocate(_: *cascade.Task.Context) FrameAllocator.AllocateError!Frame {
     return page.physical_frame;
 }
 
-fn deallocate(_: *cascade.Task.Context, frame_list: FrameList) void {
+fn deallocate(_: *cascade.Task, frame_list: FrameList) void {
     if (frame_list.count == 0) {
         @branchHint(.unlikely);
         return;
@@ -182,13 +182,13 @@ pub const init = struct {
 
     pub const bootstrap_allocator: FrameAllocator = .{
         .allocate = struct {
-            fn allocate(context: *cascade.Task.Context) !Frame {
+            fn allocate(current_task: *cascade.Task) !Frame {
                 const non_empty_region: *FreePhysicalRegion =
                     region: for (init_globals.free_physical_regions.slice()) |*region| {
                         if (region.first_free_frame_index < region.frame_count) break :region region;
                     } else {
                         for (init_globals.free_physical_regions.constSlice()) |region| {
-                            init_log.warn(context, "  region: {}", .{region});
+                            init_log.warn(current_task, "  region: {}", .{region});
                         }
 
                         @panic("no empty region in bootstrap physical frame allocator");
@@ -201,7 +201,7 @@ pub const init = struct {
             }
         }.allocate,
         .deallocate = struct {
-            fn deallocate(_: *cascade.Task.Context, _: FrameList) void {
+            fn deallocate(_: *cascade.Task, _: FrameList) void {
                 @panic("deallocate not supported");
             }
         }.deallocate,
@@ -209,7 +209,7 @@ pub const init = struct {
 
     /// Initialize the bootstrap physical frame allocator that is used for allocating physical frames before the full memory
     /// system is initialized.
-    pub fn initializeBootstrapFrameAllocator(_: *cascade.Task.Context) void {
+    pub fn initializeBootstrapFrameAllocator(_: *cascade.Task) void {
         var memory_map = boot.memoryMap(.forward) catch @panic("no memory map");
         while (memory_map.next()) |entry| {
             if (entry.type != .free) continue;
@@ -233,14 +233,14 @@ pub const init = struct {
     ///
     /// Pulls all memory out of the bootstrap physical frame allocator and uses it to populate the normal allocator.
     pub fn initializePhysicalMemory(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,
         memory_map: []const boot.MemoryMap.Entry,
     ) void {
         init_log.debug(
-            context,
+            current_task,
             "initializing pages array with {} usable pages ({f}) in {} regions",
             .{
                 number_of_usable_pages,
@@ -323,7 +323,7 @@ pub const init = struct {
                 if (init_log.levelEnabled(.debug)) {
                     if (in_use_frames == 0) {
                         init_log.debug(
-                            context,
+                            current_task,
                             "pulled {} ({f}) free frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
@@ -332,7 +332,7 @@ pub const init = struct {
                         );
                     } else if (in_use_frames == free_bootstrap_region.frame_count) {
                         init_log.debug(
-                            context,
+                            current_task,
                             "pulled {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 in_use_frames,
@@ -341,7 +341,7 @@ pub const init = struct {
                         );
                     } else {
                         init_log.debug(
-                            context,
+                            current_task,
                             "pulled {} ({f}) free frames and {} ({f}) in use frames out of bootstrap frame allocator region",
                             .{
                                 free_frames,
@@ -415,12 +415,12 @@ pub const init = struct {
             .subtract(reclaimable_memory)
             .subtract(unavailable_memory);
 
-        init_log.debug(context, "total memory:         {f}", .{total_memory});
-        init_log.debug(context, "  free memory:        {f}", .{free_memory});
-        init_log.debug(context, "  used memory:        {f}", .{used_memory});
-        init_log.debug(context, "  reserved memory:    {f}", .{reserved_memory});
-        init_log.debug(context, "  reclaimable memory: {f}", .{reclaimable_memory});
-        init_log.debug(context, "  unavailable memory: {f}", .{unavailable_memory});
+        init_log.debug(current_task, "total memory:         {f}", .{total_memory});
+        init_log.debug(current_task, "  free memory:        {f}", .{free_memory});
+        init_log.debug(current_task, "  used memory:        {f}", .{used_memory});
+        init_log.debug(current_task, "  reserved memory:    {f}", .{reserved_memory});
+        init_log.debug(current_task, "  reclaimable memory: {f}", .{reclaimable_memory});
+        init_log.debug(current_task, "  unavailable memory: {f}", .{unavailable_memory});
     }
 
     const FreePhysicalRegion = struct {

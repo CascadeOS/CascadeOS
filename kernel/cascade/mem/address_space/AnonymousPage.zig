@@ -31,8 +31,8 @@ reference_count: u32 = 1,
 
 page: *Page,
 
-pub fn create(context: *cascade.Task.Context, page: *Page) !*AnonymousPage {
-    const anonymous_page = try globals.anonymous_page_cache.allocate(context);
+pub fn create(current_task: *cascade.Task, page: *Page) !*AnonymousPage {
+    const anonymous_page = try globals.anonymous_page_cache.allocate(current_task);
     anonymous_page.* = .{
         .page = page,
     };
@@ -42,10 +42,10 @@ pub fn create(context: *cascade.Task.Context, page: *Page) !*AnonymousPage {
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade.Task.Context) void {
+pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *cascade.Task) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
-        std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
+        std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
     }
 
     anonymous_page.reference_count += 1;
@@ -54,10 +54,10 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade
 /// Decrement the reference count.
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade.Task.Context) void {
+pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *cascade.Task) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
-        std.debug.assert(anonymous_page.lock.isLockedByCurrent(context));
+        std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
     }
 
     const reference_count = anonymous_page.reference_count;
@@ -68,11 +68,11 @@ pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, context: *cascade
 
         if (true) @panic("NOT IMPLEMENTED"); // TODO
 
-        anonymous_page.lock.unlock(context);
+        anonymous_page.lock.unlock(current_task);
 
-        globals.anonymous_page_cache.deallocate(context, anonymous_page);
+        globals.anonymous_page_cache.deallocate(current_task, anonymous_page);
     } else {
-        anonymous_page.lock.unlock(context);
+        anonymous_page.lock.unlock(current_task);
     }
 }
 
@@ -82,8 +82,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(context: *cascade.Task.Context) !void {
-        globals.anonymous_page_cache.init(context, .{
+    pub fn initializeCaches(current_task: *cascade.Task) !void {
+        globals.anonymous_page_cache.init(current_task, .{
             .name = try .fromSlice("anonymous page"),
         });
     }

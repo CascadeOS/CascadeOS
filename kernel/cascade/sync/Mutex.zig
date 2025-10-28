@@ -19,9 +19,7 @@ unlock_type: UnlockType = .unlocked,
 spinlock: cascade.sync.TicketSpinLock = .{},
 wait_queue: cascade.sync.WaitQueue = .{},
 
-pub fn lock(mutex: *Mutex, context: *cascade.Task.Context) void {
-    const current_task = context.task();
-
+pub fn lock(mutex: *Mutex, current_task: *cascade.Task) void {
     while (true) {
         var locked_by = mutex.locked_by.cmpxchgWeak(
             null,
@@ -47,7 +45,7 @@ pub fn lock(mutex: *Mutex, context: *cascade.Task.Context) void {
             }
         }
 
-        mutex.spinlock.lock(context);
+        mutex.spinlock.lock(current_task);
 
         locked_by = mutex.locked_by.cmpxchgStrong(
             null,
@@ -56,7 +54,7 @@ pub fn lock(mutex: *Mutex, context: *cascade.Task.Context) void {
             .monotonic,
         ) orelse {
             // we have the mutex
-            mutex.spinlock.unlock(context);
+            mutex.spinlock.unlock(current_task);
             return;
         };
 
@@ -65,7 +63,7 @@ pub fn lock(mutex: *Mutex, context: *cascade.Task.Context) void {
                 .passed_to_waiter => {
                     @branchHint(.likely);
                     // the mutex was passed directly to us
-                    mutex.spinlock.unlock(context);
+                    mutex.spinlock.unlock(current_task);
                     return;
                 },
                 .unlocked => {
@@ -75,14 +73,12 @@ pub fn lock(mutex: *Mutex, context: *cascade.Task.Context) void {
             }
         }
 
-        mutex.wait_queue.wait(context, &mutex.spinlock);
+        mutex.wait_queue.wait(current_task, &mutex.spinlock);
     }
 }
 
 /// Try to lock the mutex.
-pub fn tryLock(mutex: *Mutex, context: *cascade.Task.Context) bool {
-    const current_task = context.task();
-
+pub fn tryLock(mutex: *Mutex, current_task: *cascade.Task) bool {
     const locked_by = mutex.locked_by.cmpxchgStrong(
         null,
         current_task,
@@ -102,12 +98,10 @@ pub fn tryLock(mutex: *Mutex, context: *cascade.Task.Context) bool {
     return false;
 }
 
-pub fn unlock(mutex: *Mutex, context: *cascade.Task.Context) void {
-    const current_task = context.task();
-
+pub fn unlock(mutex: *Mutex, current_task: *cascade.Task) void {
     {
-        mutex.spinlock.lock(context);
-        defer mutex.spinlock.unlock(context);
+        mutex.spinlock.lock(current_task);
+        defer mutex.spinlock.unlock(current_task);
 
         const waiting_task = mutex.wait_queue.firstTask() orelse {
             mutex.unlock_type = .unlocked;
@@ -139,7 +133,7 @@ pub fn unlock(mutex: *Mutex, context: *cascade.Task.Context) void {
         }
     }
 
-    mutex.wait_queue.wakeOne(context, &mutex.spinlock);
+    mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
 }
 
 /// Returns `true` if the mutex is locked.

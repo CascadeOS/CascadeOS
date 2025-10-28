@@ -85,22 +85,22 @@ pub const Context = struct {
         previous_interrupt_disable_count: u32,
         previous_enable_access_to_user_memory_count: u32,
 
-        pub fn exit(interrupt_exit: InterruptExit, context: *Context) void {
-            context.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
+        pub fn exit(interrupt_exit: InterruptExit, current_task: *Task) void {
+            current_task.context.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
 
-            context.enable_access_to_user_memory_count = interrupt_exit.previous_enable_access_to_user_memory_count;
-            if (context.enable_access_to_user_memory_count == 0) {
+            current_task.context.enable_access_to_user_memory_count = interrupt_exit.previous_enable_access_to_user_memory_count;
+            if (current_task.context.enable_access_to_user_memory_count == 0) {
                 @branchHint(.likely);
                 arch.paging.disableAccessToUserMemory();
             } else {
                 arch.paging.enableAccessToUserMemory();
             }
 
-            context.setExecutor();
+            current_task.context.setExecutor();
         }
     };
 
-    pub fn onInterruptEntry() struct { *Context, InterruptExit } {
+    pub fn onInterruptEntry() struct { *Task, InterruptExit } {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
         const executor = arch.getCurrentExecutor();
@@ -121,7 +121,7 @@ pub const Context = struct {
         }
 
         return .{
-            context, .{
+            current_task, .{
                 .previous_interrupt_disable_count = previous_interrupt_disable_count,
                 .previous_enable_access_to_user_memory_count = previous_enable_access_to_user_memory_count,
             },
@@ -181,15 +181,15 @@ pub const Context = struct {
     /// The scheduler lock must be held when this function is called.
     pub fn drop(context: *Context) noreturn {
         if (core.is_debug) {
-            cascade.scheduler.assertSchedulerLocked(context);
+            cascade.scheduler.assertSchedulerLocked(context.task());
             std.debug.assert(context.spinlocks_held == 1); // only the scheduler lock is held
         }
 
-        cascade.scheduler.drop(context, .{
+        cascade.scheduler.drop(context.task(), .{
             .action = struct {
-                fn action(new_context: *Context, old_task: *cascade.Task, _: usize) void {
+                fn action(scheduler_task: *Task, old_task: *cascade.Task, _: usize) void {
                     old_task.state = .{ .dropped = .{} };
-                    old_task.decrementReferenceCount(new_context);
+                    old_task.decrementReferenceCount(scheduler_task);
                 }
             }.action,
             .arg = undefined,
@@ -200,7 +200,7 @@ pub const Context = struct {
     /// Called when panicking to fetch the current context.
     ///
     /// Interrupts must already be disabled when this function is called.
-    pub fn panicked() *Context {
+    pub fn panicked() *Task {
         std.debug.assert(!arch.interrupts.areEnabled());
 
         const executor = arch.getCurrentExecutor();
@@ -210,7 +210,7 @@ pub const Context = struct {
         context.interrupt_disable_count += 1;
         context.executor = executor;
 
-        return context;
+        return current_task;
     }
 
     /// Set the `executor` field of the context based on the state of the context.
@@ -247,8 +247,8 @@ pub const CreateKernelTaskOptions = struct {
     arg2: u64 = 0,
 };
 
-pub fn createKernelTask(context: *Context, options: CreateKernelTaskOptions) !*Task {
-    const task = try internal.create(context, .{
+pub fn createKernelTask(current_task: *Task, options: CreateKernelTaskOptions) !*Task {
+    const task = try internal.create(current_task, .{
         .name = options.name,
         .function = options.function,
         .arg1 = options.arg1,
@@ -257,12 +257,12 @@ pub fn createKernelTask(context: *Context, options: CreateKernelTaskOptions) !*T
     });
     errdefer {
         if (core.is_debug) std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
-        internal.destroy(context, task);
+        internal.destroy(current_task, task);
     }
 
     {
-        cascade.globals.kernel_tasks_lock.writeLock(context);
-        defer cascade.globals.kernel_tasks_lock.writeUnlock(context);
+        cascade.globals.kernel_tasks_lock.writeLock(current_task);
+        defer cascade.globals.kernel_tasks_lock.writeUnlock(current_task);
 
         const gop = try cascade.globals.kernel_tasks.getOrPut(cascade.mem.heap.allocator, task);
         if (gop.found_existing) std.debug.panic("task already in kernel_tasks list", .{});
@@ -280,13 +280,13 @@ pub fn incrementReferenceCount(task: *Task) void {
 /// If it reaches zero the task is submitted to the task cleanup service.
 ///
 /// This must not be called when the task is the current task, see `Context.drop` instead.
-pub fn decrementReferenceCount(task: *Task, context: *Context) void {
-    if (core.is_debug) std.debug.assert(task != context.task());
+pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
+    if (core.is_debug) std.debug.assert(task != current_task);
     if (task.reference_count.fetchSub(1, .acq_rel) != 1) {
         @branchHint(.likely);
         return;
     }
-    cascade.services.task_cleanup.queueTaskForCleanup(context, task);
+    cascade.services.task_cleanup.queueTaskForCleanup(current_task, task);
 }
 
 pub fn format(
@@ -319,9 +319,9 @@ pub const internal = struct {
         environment: Environment,
     };
 
-    pub fn create(context: *Context, options: CreateOptions) !*Task {
-        const task = try globals.cache.allocate(context);
-        errdefer globals.cache.deallocate(context, task);
+    pub fn create(current_task: *Task, options: CreateOptions) !*Task {
+        const task = try globals.cache.allocate(current_task);
+        errdefer globals.cache.deallocate(current_task, task);
 
         const preconstructed_stack = task.stack;
 
@@ -349,14 +349,14 @@ pub const internal = struct {
         return task;
     }
 
-    pub fn destroy(context: *Context, task: *Task) void {
+    pub fn destroy(current_task: *Task, task: *Task) void {
         // for user tasks the process reference stored in `environment` has been set to `undefined` before this function
         // is called
         if (core.is_debug) {
             std.debug.assert(task.state == .dropped);
             std.debug.assert(task.reference_count.load(.monotonic) == 0);
         }
-        globals.cache.deallocate(context, task);
+        globals.cache.deallocate(current_task, task);
     }
 };
 
@@ -425,13 +425,13 @@ pub const Stack = struct {
         stack.top_stack_pointer = stack.stack_pointer;
     }
 
-    fn createStack(context: *Context) !Stack {
+    fn createStack(current_task: *Task) !Stack {
         const stack_range = globals.stack_arena.allocate(
-            context,
+            current_task,
             stack_size_including_guard_page.value,
             .instant_fit,
         ) catch return error.ItemConstructionFailed;
-        errdefer globals.stack_arena.deallocate(context, stack_range);
+        errdefer globals.stack_arena.deallocate(current_task, stack_range);
 
         const range = stack_range.toVirtualRange();
         const usable_range: core.VirtualRange = .{
@@ -440,11 +440,11 @@ pub const Stack = struct {
         };
 
         {
-            globals.stack_page_table_mutex.lock(context);
-            defer globals.stack_page_table_mutex.unlock(context);
+            globals.stack_page_table_mutex.lock(current_task);
+            defer globals.stack_page_table_mutex.unlock(current_task);
 
             cascade.mem.mapRangeAndBackWithPhysicalFrames(
-                context,
+                current_task,
                 cascade.mem.globals.core_page_table,
                 usable_range,
                 .{ .environment_type = .kernel, .protection = .read_write },
@@ -457,13 +457,13 @@ pub const Stack = struct {
         return .fromRange(range, usable_range);
     }
 
-    fn destroyStack(stack: Stack, context: *Context) void {
+    fn destroyStack(stack: Stack, current_task: *Task) void {
         {
-            globals.stack_page_table_mutex.lock(context);
-            defer globals.stack_page_table_mutex.unlock(context);
+            globals.stack_page_table_mutex.lock(current_task);
+            defer globals.stack_page_table_mutex.unlock(current_task);
 
             cascade.mem.unmapRange(
-                context,
+                current_task,
                 cascade.mem.globals.core_page_table,
                 stack.usable_range,
                 .kernel,
@@ -473,7 +473,7 @@ pub const Stack = struct {
             );
         }
 
-        globals.stack_arena.deallocate(context, .fromVirtualRange(stack.range));
+        globals.stack_arena.deallocate(current_task, .fromVirtualRange(stack.range));
     }
 
     const stack_size_including_guard_page = cascade.config.kernel_stack_size.add(arch.paging.standard_page_size);
@@ -486,14 +486,14 @@ const globals = struct {
     var cache: cascade.mem.cache.Cache(
         Task,
         struct {
-            fn constructor(task: *Task, context: *Context) cascade.mem.cache.ConstructorError!void {
+            fn constructor(task: *Task, current_task: *Task) cascade.mem.cache.ConstructorError!void {
                 task.* = undefined;
-                task.stack = try .createStack(context);
+                task.stack = try .createStack(current_task);
             }
         }.constructor,
         struct {
-            fn destructor(task: *Task, context: *Context) void {
-                task.stack.destroyStack(context);
+            fn destructor(task: *Task, current_task: *Task) void {
+                task.stack.destroyStack(current_task);
             }
         }.destructor,
     ) = undefined;
@@ -506,12 +506,12 @@ pub const init = struct {
     pub const earlyCreateStack = Stack.createStack;
 
     pub fn initializeTasks(
-        context: *Context,
+        current_task: *Task,
         kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
-        log.debug(context, "initializing task stacks", .{});
+        log.debug(current_task, "initializing task stacks", .{});
         try globals.stack_arena.init(
-            context,
+            current_task,
             .{
                 .name = try .fromSlice("stacks"),
                 .quantum = arch.paging.standard_page_size.value,
@@ -521,27 +521,27 @@ pub const init = struct {
         const stacks_range = kernel_regions.find(.kernel_stacks).?.range;
 
         globals.stack_arena.addSpan(
-            context,
+            current_task,
             stacks_range.address.value,
             stacks_range.size.value,
         ) catch |err| {
             std.debug.panic("failed to add stack range to `stack_arena`: {t}", .{err});
         };
 
-        log.debug(context, "initializing task cache", .{});
+        log.debug(current_task, "initializing task cache", .{});
         globals.cache.init(
-            context,
+            current_task,
             .{ .name = try .fromSlice("task") },
         );
 
-        log.debug(context, "initializing task cleanup service", .{});
-        try cascade.services.task_cleanup.init.initializeTaskCleanupService(context);
+        log.debug(current_task, "initializing task cleanup service", .{});
+        try cascade.services.task_cleanup.init.initializeTaskCleanupService(current_task);
     }
 
     pub fn initializeBootstrapInitTask(
         bootstrap_init_task: *cascade.Task,
         bootstrap_executor: *cascade.Executor,
-    ) !*Context {
+    ) !*Task {
         bootstrap_init_task.* = .{
             .name = try .fromSlice("bootstrap init"),
 
@@ -556,14 +556,14 @@ pub const init = struct {
                 .scheduler_locked = false, // init tasks don't start with the scheduler locked
             },
         };
-        return &bootstrap_init_task.context;
+        return bootstrap_init_task;
     }
 
     pub fn createAndAssignInitTask(
-        context: *Context,
+        current_task: *Task,
         executor: *cascade.Executor,
     ) !void {
-        const task = try createKernelTask(context, .{
+        const task = try createKernelTask(current_task, .{
             .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
             .function = undefined,
         });
@@ -582,7 +582,7 @@ pub const init = struct {
     }
 
     pub fn initializeSchedulerTask(
-        context: *Context,
+        current_task: *Task,
         scheduler_task: *cascade.Task,
         executor: *cascade.Executor,
     ) !void {
@@ -590,7 +590,7 @@ pub const init = struct {
             .name = try .initPrint("scheduler {}", .{@intFromEnum(executor.id)}),
 
             .state = .ready,
-            .stack = try .createStack(context),
+            .stack = try .createStack(current_task),
             .environment = .kernel,
             .context = .{
                 .executor = null,

@@ -126,7 +126,7 @@ pub fn prepareTaskForScheduling(
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
-                        \\pop %rdi // context
+                        \\pop %rdi // current_task
                         \\pop %rsi // target_function
                         \\pop %rdx // arg1
                         \\pop %rcx // arg2
@@ -144,7 +144,7 @@ pub fn prepareTaskForScheduling(
     try task.stack.push(arg2);
     try task.stack.push(arg1);
     try task.stack.push(@intFromPtr(target_function));
-    try task.stack.push(@intFromPtr(&task.context));
+    try task.stack.push(@intFromPtr(task));
 
     try task.stack.push(@intFromPtr(impls.startTaskStage1));
 

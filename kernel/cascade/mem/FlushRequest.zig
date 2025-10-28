@@ -19,12 +19,12 @@ pub const Node = struct {
     node: std.SinglyLinkedList.Node,
 };
 
-pub fn submitAndWait(flush_request: *FlushRequest, context: *cascade.Task.Context) void {
+pub fn submitAndWait(flush_request: *FlushRequest, current_task: *cascade.Task) void {
     {
-        context.incrementInterruptDisable();
-        defer context.decrementInterruptDisable();
+        current_task.context.incrementInterruptDisable();
+        defer current_task.context.decrementInterruptDisable();
 
-        const current_executor = context.executor.?;
+        const current_executor = current_task.context.executor.?;
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
@@ -33,7 +33,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, context: *cascade.Task.Contex
             flush_request.requestExecutor(executor);
         }
 
-        flush_request.flush(context);
+        flush_request.flush(current_task);
     }
 
     while (flush_request.count.load(.monotonic) != 0) {
@@ -41,25 +41,25 @@ pub fn submitAndWait(flush_request: *FlushRequest, context: *cascade.Task.Contex
     }
 }
 
-pub fn processFlushRequests(context: *cascade.Task.Context) void {
-    if (core.is_debug) std.debug.assert(context.interrupt_disable_count != 0);
+pub fn processFlushRequests(current_task: *cascade.Task) void {
+    if (core.is_debug) std.debug.assert(current_task.context.interrupt_disable_count != 0);
 
-    const executor = context.executor.?;
+    const executor = current_task.context.executor.?;
 
     while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const cascade.mem.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.flush(context);
+        request_node.request.flush(current_task);
     }
 }
 
-fn flush(flush_request: *FlushRequest, context: *cascade.Task.Context) void {
-    if (core.is_debug) std.debug.assert(context.interrupt_disable_count != 0);
+fn flush(flush_request: *FlushRequest, current_task: *cascade.Task) void {
+    if (core.is_debug) std.debug.assert(current_task.context.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 
     switch (flush_request.flush_target) {
         .kernel => {},
-        .user => |target_process| switch (context.task().environment) {
+        .user => |target_process| switch (current_task.environment) {
             .kernel => return,
             .user => |current_process| if (current_process != target_process) return,
         },

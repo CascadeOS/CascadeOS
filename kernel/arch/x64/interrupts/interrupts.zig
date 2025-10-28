@@ -12,12 +12,12 @@ const Idt = @import("Idt.zig");
 const interrupt_handlers = @import("handlers.zig");
 
 pub fn allocateInterrupt(
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
     arg1: usize,
     arg2: usize,
 ) arch.interrupts.Interrupt.AllocateError!Interrupt {
-    const allocation = globals.interrupt_arena.allocate(context, 1, .instant_fit) catch {
+    const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
         return error.InterruptAllocationFailed;
     };
 
@@ -32,14 +32,14 @@ pub fn allocateInterrupt(
     return @enumFromInt(interrupt_number);
 }
 
-pub fn deallocateInterrupt(interrupt: Interrupt, context: *cascade.Task.Context) void {
+pub fn deallocateInterrupt(interrupt: Interrupt, current_task: *cascade.Task) void {
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
         .func = .{ .normal = interrupt_handlers.unhandledInterrupt },
     };
 
-    globals.interrupt_arena.deallocate(context, .{
+    globals.interrupt_arena.deallocate(current_task, .{
         .base = interrupt_number,
         .len = 1,
     });
@@ -50,10 +50,10 @@ pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interr
 }
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const context, const interrupt_exit = cascade.Task.Context.onInterruptEntry();
-    defer interrupt_exit.exit(context);
+    const current_task, const interrupt_exit = cascade.Task.Context.onInterruptEntry();
+    defer interrupt_exit.exit(current_task);
     globals.handlers[interrupt_frame.vector_number.full].call(
-        context,
+        current_task,
         interrupt_frame,
         interrupt_exit,
     );
@@ -185,11 +185,11 @@ pub const InterruptFrame = extern struct {
     /// Returns the environment that the interrupt was triggered from.
     pub fn environment(
         interrupt_frame: *const InterruptFrame,
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
     ) cascade.Environment {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .{ .user = context.task().environment.user },
+            .user_code => return .{ .user = current_task.environment.user },
             else => unreachable,
         };
     }
@@ -269,7 +269,7 @@ const Handler = struct {
     const Func = union(enum) {
         normal: arch.interrupts.Interrupt.Handler,
         page_fault: *const fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             frame: arch.interrupts.InterruptFrame,
             interrupt_exit: cascade.Task.Context.InterruptExit,
         ) void,
@@ -277,19 +277,19 @@ const Handler = struct {
 
     inline fn call(
         handler: *const Handler,
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         interrupt_frame: *InterruptFrame,
         interrupt_exit: cascade.Task.Context.InterruptExit,
     ) void {
         switch (handler.func) {
             .normal => |func| func(
-                context,
+                current_task,
                 .{ .arch_specific = interrupt_frame },
                 handler.arg1,
                 handler.arg2,
             ),
             .page_fault => |func| func(
-                context,
+                current_task,
                 .{ .arch_specific = interrupt_frame },
                 interrupt_exit,
             ),
@@ -340,9 +340,9 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(context: *cascade.Task.Context) void {
+    pub fn initializeInterruptRouting(current_task: *cascade.Task) void {
         globals.interrupt_arena.init(
-            context,
+            current_task,
             .{
                 .name = cascade.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
                 .quantum = 1,
@@ -352,7 +352,7 @@ pub const init = struct {
         };
 
         globals.interrupt_arena.addSpan(
-            context,
+            current_task,
             Interrupt.first_available_interrupt,
             Interrupt.last_available_interrupt - Interrupt.first_available_interrupt,
         ) catch |err| {

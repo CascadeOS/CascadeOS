@@ -368,7 +368,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.pci_init);
 
-    pub fn initializeECAM(context: *cascade.Task.Context) !void {
+    pub fn initializeECAM(current_task: *cascade.Task) !void {
         const acpi_table = cascade.acpi.init.AcpiTable(cascade.acpi.tables.MCFG).get(0) orelse
             return error.MCFGNotPresent;
         defer acpi_table.deinit();
@@ -388,7 +388,7 @@ pub const init = struct {
                 .config_space_address = cascade.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
             };
 
-            init_log.debug(context, "found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
+            init_log.debug(current_task, "found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
                 ecam.segment_group,
                 ecam.start_bus,
                 ecam.end_bus,

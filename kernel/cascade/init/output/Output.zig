@@ -20,59 +20,59 @@ splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
-remapFn: *const fn (state: *anyopaque, context: *cascade.Task.Context) anyerror!void,
+remapFn: *const fn (state: *anyopaque, current_task: *cascade.Task) anyerror!void,
 
 state: *anyopaque,
 
 pub const writer = &globals.writer;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
-pub fn remapOutputs(context: *cascade.Task.Context) !void {
-    if (globals.framebuffer_output) |output| try output.remapFn(output.state, context);
-    if (globals.serial_output) |output| try output.remapFn(output.state, context);
+pub fn remapOutputs(current_task: *cascade.Task) !void {
+    if (globals.framebuffer_output) |output| try output.remapFn(output.state, current_task);
+    if (globals.serial_output) |output| try output.remapFn(output.state, current_task);
 }
 
-pub fn registerOutputs(context: *cascade.Task.Context) void {
+pub fn registerOutputs(current_task: *cascade.Task) void {
     if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
         globals.framebuffer_output = output;
     }
 
-    if (arch.init.tryGetSerialOutput(context)) |output| {
+    if (arch.init.tryGetSerialOutput(current_task)) |output| {
         switch (output.preference) {
             .use => globals.serial_output = output.output,
             .prefer_generic => {
-                if (tryGetSerialOutputFromGenericSources(context)) |generic_output|
+                if (tryGetSerialOutputFromGenericSources(current_task)) |generic_output|
                     globals.serial_output = generic_output
                 else
                     globals.serial_output = output.output;
             },
         }
-    } else globals.serial_output = tryGetSerialOutputFromGenericSources(context);
+    } else globals.serial_output = tryGetSerialOutputFromGenericSources(current_task);
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources(context: *cascade.Task.Context) ?cascade.init.Output {
+fn tryGetSerialOutputFromGenericSources(current_task: *cascade.Task) ?cascade.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
 
     blk: {
-        if (cascade.acpi.tables.SPCR.init.tryGetSerialOutput(context)) |output_uart| {
-            log.debug(context, "got serial output from SPCR", .{});
+        if (cascade.acpi.tables.SPCR.init.tryGetSerialOutput(current_task)) |output_uart| {
+            log.debug(current_task, "got serial output from SPCR", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
         if (cascade.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
-            log.debug(context, "got serial output from DBG2", .{});
+            log.debug(current_task, "got serial output from DBG2", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (devicetree.tryGetSerialOutput(context)) |output_uart| {
-            log.debug(context, "got serial output from device tree", .{});
+        if (devicetree.tryGetSerialOutput(current_task)) |output_uart| {
+            log.debug(current_task, "got serial output from device tree", .{});
 
             static.init_output_uart = output_uart;
             break :blk;

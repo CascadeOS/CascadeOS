@@ -99,7 +99,7 @@ pub const interrupts = struct {
         arch_specific: current_decls.interrupts.Interrupt,
 
         pub const Handler = *const fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             frame: InterruptFrame,
             arg1: usize,
             arg2: usize,
@@ -108,7 +108,7 @@ pub const interrupts = struct {
         pub const AllocateError = error{InterruptAllocationFailed};
 
         pub fn allocate(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             handler: Handler,
             arg1: usize,
             arg2: usize,
@@ -117,15 +117,15 @@ pub const interrupts = struct {
                 .arch_specific = try getFunction(
                     current_functions.interrupts,
                     "allocateInterrupt",
-                )(context, handler, arg1, arg2),
+                )(current_task, handler, arg1, arg2),
             };
         }
 
-        pub fn deallocate(interrupt: Interrupt, context: *cascade.Task.Context) callconv(core.inline_in_non_debug) void {
+        pub fn deallocate(interrupt: Interrupt, current_task: *cascade.Task) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts,
                 "deallocateInterrupt",
-            )(interrupt.arch_specific, context);
+            )(interrupt.arch_specific, current_task);
         }
 
         pub const RouteError = error{UnableToRouteExternalInterrupt};
@@ -187,11 +187,11 @@ pub const interrupts = struct {
         }
 
         /// Prepare interrupt allocation and routing.
-        pub fn initializeInterruptRouting(context: *cascade.Task.Context) callconv(core.inline_in_non_debug) !void {
+        pub fn initializeInterruptRouting(current_task: *cascade.Task) callconv(core.inline_in_non_debug) !void {
             return getFunction(
                 current_functions.interrupts.init,
                 "initializeInterruptRouting",
-            )(context);
+            )(current_task);
         }
 
         /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
@@ -264,7 +264,7 @@ pub const paging = struct {
     ///  - only supports the standard page size for the architecture
     ///  - does not flush the TLB
     pub fn mapSinglePage(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         page_table: PageTable,
         virtual_address: core.VirtualAddress,
         physical_frame: cascade.mem.phys.Frame,
@@ -274,7 +274,7 @@ pub const paging = struct {
         return getFunction(
             current_functions.paging,
             "mapSinglePage",
-        )(context, page_table.arch_specific, virtual_address, physical_frame, map_type, physical_frame_allocator);
+        )(current_task, page_table.arch_specific, virtual_address, physical_frame, map_type, physical_frame_allocator);
     }
 
     /// Unmaps `virtual_address`.
@@ -371,7 +371,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn fillTopLevel(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             page_table: PageTable,
             range: core.VirtualRange,
             physical_frame_allocator: cascade.mem.phys.FrameAllocator,
@@ -379,7 +379,7 @@ pub const paging = struct {
             return getFunction(
                 current_functions.paging.init,
                 "fillTopLevel",
-            )(context, page_table.arch_specific, range, physical_frame_allocator);
+            )(current_task, page_table.arch_specific, range, physical_frame_allocator);
         }
 
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -395,7 +395,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             page_table: PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
@@ -405,7 +405,7 @@ pub const paging = struct {
             return getFunction(
                 current_functions.paging.init,
                 "mapToPhysicalRangeAllPageSizes",
-            )(context, page_table.arch_specific, virtual_range, physical_range, map_type, physical_frame_allocator);
+            )(current_task, page_table.arch_specific, virtual_range, physical_range, map_type, physical_frame_allocator);
         }
     };
 };
@@ -441,7 +441,7 @@ pub const scheduling = struct {
     }
 
     pub const TaskFunction = *const fn (
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         arg1: usize,
         arg2: usize,
     ) anyerror!void;
@@ -590,54 +590,54 @@ pub const init = struct {
     };
 
     /// Attempt to get some form of architecture specific init output if it is available.
-    pub fn tryGetSerialOutput(context: *cascade.Task.Context) callconv(core.inline_in_non_debug) ?InitOutput {
+    pub fn tryGetSerialOutput(current_task: *cascade.Task) callconv(core.inline_in_non_debug) ?InitOutput {
         return getFunction(
             current_functions.init,
             "tryGetSerialOutput",
-        )(context);
+        )(current_task);
     }
 
     /// Prepares the current executor as the bootstrap executor.
     pub fn prepareBootstrapExecutor(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "prepareBootstrapExecutor",
-        )(context, architecture_processor_id);
+        )(current_task, architecture_processor_id);
     }
 
     /// Prepares the provided `Executor` for use.
     ///
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
     pub fn prepareExecutor(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         executor: *cascade.Executor,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "prepareExecutor",
-        )(context, executor, architecture_processor_id);
+        )(current_task, executor, architecture_processor_id);
     }
 
     /// Load the executor of the provided `Context` as the current executor.
-    pub fn loadExecutor(context: *cascade.Task.Context) callconv(core.inline_in_non_debug) void {
+    pub fn loadExecutor(current_task: *cascade.Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "loadExecutor",
-        )(context);
+        )(current_task);
     }
 
     /// Capture any system information that can be without using mmio.
     ///
     /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-    pub fn captureEarlySystemInformation(context: *cascade.Task.Context) callconv(core.inline_in_non_debug) void {
+    pub fn captureEarlySystemInformation(current_task: *cascade.Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "captureEarlySystemInformation",
-        )(context);
+        )(current_task);
     }
 
     pub const CaptureSystemInformationOptions = current_decls.init.CaptureSystemInformationOptions;
@@ -646,42 +646,42 @@ pub const init = struct {
     ///
     /// For example, on x64 this should capture APIC and ACPI information.
     pub fn captureSystemInformation(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         options: CaptureSystemInformationOptions,
     ) callconv(core.inline_in_non_debug) anyerror!void {
         return getFunction(
             current_functions.init,
             "captureSystemInformation",
-        )(context, options);
+        )(current_task, options);
     }
 
     /// Configure any global system features.
-    pub fn configureGlobalSystemFeatures(context: *cascade.Task.Context) callconv(core.inline_in_non_debug) void {
+    pub fn configureGlobalSystemFeatures(current_task: *cascade.Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "configureGlobalSystemFeatures",
-        )(context);
+        )(current_task);
     }
 
     /// Configure any per-executor system features.
-    pub fn configurePerExecutorSystemFeatures(context: *cascade.Task.Context) callconv(core.inline_in_non_debug) void {
+    pub fn configurePerExecutorSystemFeatures(current_task: *cascade.Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "configurePerExecutorSystemFeatures",
-        )(context);
+        )(current_task);
     }
 
     /// Register any architectural time sources.
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
     pub fn registerArchitecturalTimeSources(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "registerArchitecturalTimeSources",
-        )(context, candidate_time_sources);
+        )(current_task, candidate_time_sources);
     }
 
     /// Initialize the local interrupt controller for the current executor.
@@ -737,7 +737,7 @@ pub const Functions = struct {
         sendFlushIPI: ?fn (*cascade.Executor) void = null,
 
         allocateInterrupt: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             handler: interrupts.Interrupt.Handler,
             arg1: usize,
             arg2: usize,
@@ -745,7 +745,7 @@ pub const Functions = struct {
 
         deallocateInterrupt: ?fn (
             interrupt: current_decls.interrupts.Interrupt,
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
         ) void = null,
 
         routeInterrupt: ?fn (
@@ -768,7 +768,7 @@ pub const Functions = struct {
             initializeEarlyInterrupts: ?fn () void = null,
 
             /// Prepare interrupt allocation and routing.
-            initializeInterruptRouting: ?fn (context: *cascade.Task.Context) void = null,
+            initializeInterruptRouting: ?fn (current_task: *cascade.Task) void = null,
 
             /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
             /// system interrupt handlers.
@@ -798,7 +798,7 @@ pub const Functions = struct {
         ///  - only supports the standard page size for the architecture
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             page_table: *current_decls.paging.PageTable,
             virtual_address: core.VirtualAddress,
             physical_frame: cascade.mem.phys.Frame,
@@ -870,7 +870,7 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             fillTopLevel: ?fn (
-                context: *cascade.Task.Context,
+                current_task: *cascade.Task,
                 page_table: *current_decls.paging.PageTable,
                 range: core.VirtualRange,
                 physical_frame_allocator: cascade.mem.phys.FrameAllocator,
@@ -889,7 +889,7 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             mapToPhysicalRangeAllPageSizes: ?fn (
-                context: *cascade.Task.Context,
+                current_task: *cascade.Task,
                 page_table: *current_decls.paging.PageTable,
                 virtual_range: core.VirtualRange,
                 physical_range: core.PhysicalRange,
@@ -977,51 +977,51 @@ pub const Functions = struct {
         /// Attempt to get some form of architecture specific init output if it is available.
         ///
         /// Non-optional because it is used during early initialization.
-        tryGetSerialOutput: fn (context: *cascade.Task.Context) ?init.InitOutput,
+        tryGetSerialOutput: fn (current_task: *cascade.Task) ?init.InitOutput,
 
         /// Prepares the current executor as the bootstrap executor.
-        prepareBootstrapExecutor: ?fn (context: *cascade.Task.Context, u64) void = null,
+        prepareBootstrapExecutor: ?fn (current_task: *cascade.Task, u64) void = null,
 
         /// Prepares the provided `Executor` for use.
         ///
         /// **WARNING**: This function will panic if the cpu cannot be prepared.
         prepareExecutor: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             executor: *cascade.Executor,
             architecture_processor_id: u64,
         ) void = null,
 
         /// Load the executor of the provided `Context` as the current executor.
-        loadExecutor: ?fn (context: *cascade.Task.Context) void = null,
+        loadExecutor: ?fn (current_task: *cascade.Task) void = null,
 
         /// Capture any system information that can be without using mmio.
         ///
         /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
         captureEarlySystemInformation: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
         ) void = null,
 
         /// Capture any system information that needs mmio.
         ///
         /// For example, on x64 this should capture APIC and ACPI information.
         captureSystemInformation: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             options: current_decls.init.CaptureSystemInformationOptions,
         ) anyerror!void = null,
 
         /// Configure any global system features.
         configureGlobalSystemFeatures: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
         ) void = null,
 
         /// Configure any per-executor system features.
-        configurePerExecutorSystemFeatures: ?fn (context: *cascade.Task.Context) void = null,
+        configurePerExecutorSystemFeatures: ?fn (current_task: *cascade.Task) void = null,
 
         /// Register any architectural time sources.
         ///
         /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
         registerArchitecturalTimeSources: ?fn (
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             candidate_time_sources: *cascade.time.init.CandidateTimeSources,
         ) void = null,
 

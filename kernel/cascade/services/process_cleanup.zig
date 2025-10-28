@@ -10,7 +10,7 @@ const core = @import("core");
 const log = cascade.debug.log.scoped(.process_cleanup);
 
 pub fn queueProcessForCleanup(
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     process: *cascade.Process,
 ) void {
     if (process.queued_for_cleanup.cmpxchgStrong(
@@ -22,60 +22,60 @@ pub fn queueProcessForCleanup(
         @panic("already queued for cleanup");
     }
 
-    log.verbose(context, "queueing {f} for cleanup", .{process});
+    log.verbose(current_task, "queueing {f} for cleanup", .{process});
 
     globals.incoming.prepend(&process.cleanup_node);
-    globals.parker.unpark(context);
+    globals.parker.unpark(current_task);
 }
 
-fn execute(context: *cascade.Task.Context, _: usize, _: usize) noreturn {
+fn execute(current_task: *cascade.Task, _: usize, _: usize) noreturn {
     if (core.is_debug) {
-        std.debug.assert(context.task() == globals.process_cleanup_task);
-        std.debug.assert(context.interrupt_disable_count == 0);
-        std.debug.assert(context.spinlocks_held == 0);
-        std.debug.assert(!context.scheduler_locked);
+        std.debug.assert(current_task == globals.process_cleanup_task);
+        std.debug.assert(current_task.context.interrupt_disable_count == 0);
+        std.debug.assert(current_task.context.spinlocks_held == 0);
+        std.debug.assert(!current_task.context.scheduler_locked);
         std.debug.assert(arch.interrupts.areEnabled());
     }
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
             handleProcess(
-                context,
+                current_task,
                 @fieldParentPtr("cleanup_node", node),
             );
         }
 
-        globals.parker.park(context);
+        globals.parker.park(current_task);
     }
 }
 
-fn handleProcess(context: *cascade.Task.Context, process: *cascade.Process) void {
+fn handleProcess(current_task: *cascade.Task, process: *cascade.Process) void {
     if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
     process.queued_for_cleanup.store(false, .release);
 
     {
-        cascade.globals.processes_lock.writeLock(context);
-        defer cascade.globals.processes_lock.writeUnlock(context);
+        cascade.globals.processes_lock.writeLock(current_task);
+        defer cascade.globals.processes_lock.writeUnlock(current_task);
 
         if (process.reference_count.load(.acquire) != 0) {
             @branchHint(.unlikely);
             // someone has acquired a reference to the process after it was queued for cleanup
-            log.verbose(context, "{f} still has references", .{process});
+            log.verbose(current_task, "{f} still has references", .{process});
             return;
         }
 
         if (process.queued_for_cleanup.swap(true, .acq_rel)) {
             @branchHint(.unlikely);
             // someone has requeued this process for cleanup
-            log.verbose(context, "{f} has been requeued for cleanup", .{process});
+            log.verbose(current_task, "{f} has been requeued for cleanup", .{process});
             return;
         }
 
         if (!cascade.globals.processes.swapRemove(process)) @panic("process not found in processes");
     }
 
-    cascade.Process.internal.destroy(context, process);
+    cascade.Process.internal.destroy(current_task, process);
 }
 
 const globals = struct {
@@ -91,8 +91,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcessCleanupService(context: *cascade.Task.Context) !void {
-        globals.process_cleanup_task = try cascade.Task.createKernelTask(context, .{
+    pub fn initializeProcessCleanupService(current_task: *cascade.Task) !void {
+        globals.process_cleanup_task = try cascade.Task.createKernelTask(current_task, .{
             .name = try .fromSlice("process cleanup"),
             .function = execute,
         });

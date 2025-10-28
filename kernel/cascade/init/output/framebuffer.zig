@@ -93,7 +93,7 @@ fn newLine() void {
 }
 
 /// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(_: *anyopaque, context: *cascade.Task.Context) !void {
+fn remapFramebuffer(_: *anyopaque, current_task: *cascade.Task) !void {
     const framebuffer = boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try cascade.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
@@ -102,7 +102,7 @@ fn remapFramebuffer(_: *anyopaque, context: *cascade.Task.Context) !void {
     const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
 
     const virtual_range = try cascade.mem.heap.allocateSpecial(
-        context,
+        current_task,
         framebuffer_size,
         .fromAddr(
             physical_address,

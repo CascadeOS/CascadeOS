@@ -47,7 +47,7 @@ pub fn incrementReferenceCount(object: *Object) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(object: *Object, context: *cascade.Task.Context) void {
+pub fn decrementReferenceCount(object: *Object, current_task: *cascade.Task) void {
     if (core.is_debug) {
         std.debug.assert(object.reference_count != 0);
         std.debug.assert(object.lock.isWriteLocked());
@@ -55,7 +55,7 @@ pub fn decrementReferenceCount(object: *Object, context: *cascade.Task.Context) 
 
     const reference_count = object.reference_count;
     object.reference_count = reference_count - 1;
-    object.lock.writeUnlock(context);
+    object.lock.writeUnlock(current_task);
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the object
@@ -71,7 +71,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         object_reference: Reference,
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -85,7 +85,7 @@ pub const Reference = struct {
 
             try writer.splatByteAll(' ', new_indent);
             try object.print(
-                context,
+                current_task,
                 writer,
                 new_indent,
             );
@@ -108,14 +108,14 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     object: *Object,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
     const new_indent = indent + 2;
 
-    object.lock.readLock(context);
-    defer object.lock.readLock(context);
+    object.lock.readLock(current_task);
+    defer object.lock.readLock(current_task);
 
     try writer.writeAll("Object{\n");
 

@@ -12,11 +12,11 @@ const log = cascade.debug.log.scoped(.task_cleanup);
 
 /// Queues a task to be cleaned up by the task cleanup service.
 pub fn queueTaskForCleanup(
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     task: *Task,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(context.task() != task);
+        std.debug.assert(current_task != task);
         std.debug.assert(task.state == .dropped);
     }
 
@@ -29,34 +29,34 @@ pub fn queueTaskForCleanup(
         @panic("already queued for cleanup");
     }
 
-    log.verbose(context, "queueing {f} for cleanup", .{task});
+    log.verbose(current_task, "queueing {f} for cleanup", .{task});
 
     globals.incoming.prepend(&task.next_task_node);
-    globals.parker.unpark(context);
+    globals.parker.unpark(current_task);
 }
 
-fn execute(context: *cascade.Task.Context, _: usize, _: usize) noreturn {
+fn execute(current_task: *cascade.Task, _: usize, _: usize) noreturn {
     if (core.is_debug) {
-        std.debug.assert(context.task() == globals.task_cleanup_task);
-        std.debug.assert(context.interrupt_disable_count == 0);
-        std.debug.assert(context.spinlocks_held == 0);
-        std.debug.assert(!context.scheduler_locked);
+        std.debug.assert(current_task == globals.task_cleanup_task);
+        std.debug.assert(current_task.context.interrupt_disable_count == 0);
+        std.debug.assert(current_task.context.spinlocks_held == 0);
+        std.debug.assert(!current_task.context.scheduler_locked);
         std.debug.assert(arch.interrupts.areEnabled());
     }
 
     while (true) {
         while (globals.incoming.popFirst()) |node| {
             handleTask(
-                context,
+                current_task,
                 .fromNode(node),
             );
         }
 
-        globals.parker.park(context);
+        globals.parker.park(current_task);
     }
 }
 
-fn handleTask(context: *cascade.Task.Context, task: *Task) void {
+fn handleTask(current_task: *cascade.Task, task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(task.state == .dropped);
         std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
@@ -70,20 +70,20 @@ fn handleTask(context: *cascade.Task.Context, task: *Task) void {
     task.state.dropped.queued_for_cleanup.store(false, .release);
 
     {
-        tasks_lock.writeLock(context);
-        defer tasks_lock.writeUnlock(context);
+        tasks_lock.writeLock(current_task);
+        defer tasks_lock.writeUnlock(current_task);
 
         if (task.reference_count.load(.acquire) != 0) {
             @branchHint(.unlikely);
             // someone has acquired a reference to the task after it was queued for cleanup
-            log.verbose(context, "{f} still has references", .{task});
+            log.verbose(current_task, "{f} still has references", .{task});
             return;
         }
 
         if (task.state.dropped.queued_for_cleanup.swap(true, .acq_rel)) {
             @branchHint(.unlikely);
             // someone has requeued this task for cleanup
-            log.verbose(context, "{f} has been requeued for cleanup", .{task});
+            log.verbose(current_task, "{f} has been requeued for cleanup", .{task});
             return;
         }
 
@@ -92,17 +92,17 @@ fn handleTask(context: *cascade.Task.Context, task: *Task) void {
     }
 
     // this log must happen before the process reference count is decremented
-    log.debug(context, "destroying {f}", .{task});
+    log.debug(current_task, "destroying {f}", .{task});
 
     switch (task.environment) {
         .kernel => {},
         .user => |process| {
             task.environment = .{ .user = undefined };
-            process.decrementReferenceCount(context);
+            process.decrementReferenceCount(current_task);
         },
     }
 
-    Task.internal.destroy(context, task);
+    Task.internal.destroy(current_task, task);
 }
 
 const globals = struct {
@@ -118,8 +118,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeTaskCleanupService(context: *cascade.Task.Context) !void {
-        globals.task_cleanup_task = try Task.createKernelTask(context, .{
+    pub fn initializeTaskCleanupService(current_task: *cascade.Task) !void {
+        globals.task_cleanup_task = try Task.createKernelTask(current_task, .{
             .name = try .fromSlice("task cleanup"),
             .function = execute,
         });

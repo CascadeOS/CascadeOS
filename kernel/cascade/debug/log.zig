@@ -12,48 +12,48 @@ const kernel_log_scopes = kernel_options.kernel_log_scopes;
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub fn err(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.err)) return;
-            logFn(context, prefix_err, userFmt(format), args);
+            logFn(current_task, prefix_err, userFmt(format), args);
         }
 
         pub fn warn(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.warn)) return;
-            logFn(context, prefix_warn, userFmt(format), args);
+            logFn(current_task, prefix_warn, userFmt(format), args);
         }
 
         pub fn info(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.info)) return;
-            logFn(context, prefix_info, userFmt(format), args);
+            logFn(current_task, prefix_info, userFmt(format), args);
         }
 
         pub fn debug(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.debug)) return;
-            logFn(context, prefix_debug, userFmt(format), args);
+            logFn(current_task, prefix_debug, userFmt(format), args);
         }
 
         pub fn verbose(
-            context: *cascade.Task.Context,
+            current_task: *cascade.Task,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.verbose)) return;
-            logFn(context, prefix_verbose, userFmt(format), args);
+            logFn(current_task, prefix_verbose, userFmt(format), args);
         }
 
         pub inline fn levelEnabled(comptime message_level: Level) bool {
@@ -107,7 +107,7 @@ pub const Level = enum {
 };
 
 fn logFn(
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     prefix: []const u8,
     comptime format: []const u8,
     args: anytype,
@@ -126,7 +126,7 @@ fn logFn(
                 return;
             };
 
-            writer.print("{f} | ", .{context.task()}) catch {
+            writer.print("{f} | ", .{current_task}) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;
@@ -147,8 +147,8 @@ fn logFn(
         .init_log => {
             @branchHint(.unlikely);
 
-            cascade.init.Output.globals.lock.lock(context);
-            defer cascade.init.Output.globals.lock.unlock(context);
+            cascade.init.Output.globals.lock.lock(current_task);
+            defer cascade.init.Output.globals.lock.unlock(current_task);
 
             const writer = cascade.init.Output.writer;
 
@@ -158,7 +158,7 @@ fn logFn(
                 return;
             };
 
-            writer.print("{f} | ", .{context.task()}) catch {
+            writer.print("{f} | ", .{current_task}) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;

@@ -386,10 +386,10 @@ pub const SPCR = extern struct {
     }
 
     pub const init = struct {
-        pub fn tryGetSerialOutput(context: *cascade.Task.Context) ?uart.Uart {
+        pub fn tryGetSerialOutput(current_task: *cascade.Task) ?uart.Uart {
             const output_uart = tryGetSerialOutputInner() catch |err| switch (err) {
                 error.DivisorTooLarge => {
-                    log.warn(context, "baud divisor from SPCR too large", .{});
+                    log.warn(current_task, "baud divisor from SPCR too large", .{});
                     return null;
                 },
             } orelse return null;

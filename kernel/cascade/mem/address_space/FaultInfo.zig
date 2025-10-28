@@ -71,25 +71,25 @@ const FaultCheckError =
 /// Called `uvm_faultcheck` in OpenBSD uvm.
 pub fn faultCheck(
     fault_info: *FaultInfo,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     anonymous_page: *?*AnonymousPage,
     fault_type: cascade.mem.PageFaultDetails.FaultType,
 ) FaultCheckError!void {
     _ = fault_type;
 
     // lookup entry and lock `entries_lock` for reading
-    if (!fault_info.faultLookup(context, .read)) {
+    if (!fault_info.faultLookup(current_task, .read)) {
         return error.NotMapped;
     }
 
-    log.verbose(context, "fault_lookup found entry with range {f} and protection {t}", .{
+    log.verbose(current_task, "fault_lookup found entry with range {f} and protection {t}", .{
         fault_info.entry.range,
         fault_info.entry.protection,
     });
 
     // check protection
     {
-        errdefer fault_info.address_space.entries_lock.readUnlock(context);
+        errdefer fault_info.address_space.entries_lock.readUnlock(current_task);
         switch (fault_info.entry.protection) {
             .none => return error.Protection,
             .read => if (fault_info.access_type != .read) return error.Protection,
@@ -117,11 +117,11 @@ pub fn faultCheck(
     // handle `needs_copy`
     if (fault_info.entry.needs_copy) {
         if (fault_info.access_type == .write or fault_info.entry.object_reference.object == null) {
-            fault_info.address_space.entries_lock.readUnlock(context);
+            fault_info.address_space.entries_lock.readUnlock(current_task);
 
-            log.verbose(context, "clearing needs_copy by copying anonymous map", .{});
+            log.verbose(current_task, "clearing needs_copy by copying anonymous map", .{});
 
-            try fault_info.anonymousMapCopy(context);
+            try fault_info.anonymousMapCopy(current_task);
 
             return error.Restart;
         } else if (fault_info.enter_protection == .read_write and fault_info.access_type == .read) {
@@ -130,7 +130,7 @@ pub fn faultCheck(
         }
     }
 
-    log.verbose(context, "page enter protection: {t}", .{fault_info.enter_protection});
+    log.verbose(current_task, "page enter protection: {t}", .{fault_info.enter_protection});
 
     const anonymous_map_reference = fault_info.entry.anonymous_map_reference;
     const object_reference = fault_info.entry.object_reference;
@@ -145,8 +145,8 @@ pub fn faultCheck(
             fault_info.anonymous_map_lock_type = .write;
         }
         switch (fault_info.anonymous_map_lock_type) {
-            .read => anonymous_map.lock.readLock(context),
-            .write => anonymous_map.lock.writeLock(context),
+            .read => anonymous_map.lock.readLock(current_task),
+            .write => anonymous_map.lock.writeLock(current_task),
         }
 
         anonymous_page.* = anonymous_map_reference.lookup(
@@ -155,12 +155,12 @@ pub fn faultCheck(
         );
 
         if (anonymous_page.* == null) {
-            log.verbose(context, "anonymous page not found in anonymous map", .{});
+            log.verbose(current_task, "anonymous page not found in anonymous map", .{});
         } else {
-            log.verbose(context, "anonymous page found in anonymous map", .{});
+            log.verbose(current_task, "anonymous page found in anonymous map", .{});
         }
     } else {
-        log.verbose(context, "anonymous page not found in anonymous map", .{});
+        log.verbose(current_task, "anonymous page not found in anonymous map", .{});
         anonymous_page.* = null;
     }
 
@@ -173,8 +173,8 @@ pub fn faultCheck(
 /// Handle a object or zero fill fault.
 ///
 /// Called `uvm_fault_lower` in OpenBSD uvm.
-pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Context) error{ Restart, OutOfMemory }!void {
-    log.verbose(context, "handling object or zero fill fault", .{});
+pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, current_task: *cascade.Task) error{ Restart, OutOfMemory }!void {
+    log.verbose(current_task, "handling object or zero fill fault", .{});
 
     const opt_anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map;
     const opt_object = fault_info.entry.object_reference.object;
@@ -209,7 +209,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
     };
 
     log.verbose(
-        context,
+        current_task,
         "determined object page {t} with promote_to_anonymous_map {}",
         .{ object_page, fault_info.promote_to_anonymous_map },
     );
@@ -233,13 +233,13 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
         const anonymous_map = opt_anonymous_map.?;
 
         // promoting requires a write lock
-        if (!fault_info.faultAnonymousMapLockUpgrade(context, anonymous_map)) {
-            log.verbose(context, "anonymous map lock upgrade failed", .{});
+        if (!fault_info.faultAnonymousMapLockUpgrade(current_task, anonymous_map)) {
+            log.verbose(current_task, "anonymous map lock upgrade failed", .{});
 
             // lock upgrade failed, `faultAnonymousMapLockUpgrade` left the anonymous_map lock unlocked
             // unlock everything else and restart the fault
             fault_info.unlockAll(
-                context,
+                current_task,
                 null, // left unlocked by `faultAnonymousMapLockUpgrade`
                 opt_object,
             );
@@ -254,7 +254,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
         }
 
         try fault_info.promote(
-            context,
+            current_task,
             object_page,
             &anonymous_page,
             &page,
@@ -267,7 +267,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
         }
 
         try fault_info.entry.anonymous_map_reference.add(
-            context,
+            current_task,
             fault_info.entry,
             fault_info.faulting_address,
             anonymous_page,
@@ -294,14 +294,14 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
             .protection = fault_info.enter_protection,
         };
 
-        log.verbose(context, "mapping {f} with {f}", .{ fault_info.faulting_address, map_type });
+        log.verbose(current_task, "mapping {f} with {f}", .{ fault_info.faulting_address, map_type });
 
-        fault_info.address_space.page_table_lock.lock(context);
-        defer fault_info.address_space.page_table_lock.unlock(context);
+        fault_info.address_space.page_table_lock.lock(current_task);
+        defer fault_info.address_space.page_table_lock.unlock(current_task);
 
         // all resources are present time to actually map them in
         cascade.mem.mapSinglePage(
-            context,
+            current_task,
             fault_info.address_space.page_table,
             fault_info.faulting_address,
             page.physical_frame,
@@ -318,7 +318,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
 
     // TODO: might need https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1571-L1604
 
-    fault_info.unlockAll(context, opt_anonymous_map, opt_object);
+    fault_info.unlockAll(current_task, opt_anonymous_map, opt_object);
 }
 
 /// Look up the entry that contains the faulting address.
@@ -328,16 +328,16 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Cont
 /// If `write_lock` is `true` the `entries_lock` is acquired in write mode.
 ///
 /// Called `uvmfault_lookup` in OpenBSD uvm.
-fn faultLookup(fault_info: *FaultInfo, context: *cascade.Task.Context, lock_type: core.LockType) bool {
+fn faultLookup(fault_info: *FaultInfo, current_task: *cascade.Task, lock_type: core.LockType) bool {
     switch (lock_type) {
-        .read => fault_info.address_space.entries_lock.readLock(context),
-        .write => fault_info.address_space.entries_lock.writeLock(context),
+        .read => fault_info.address_space.entries_lock.readLock(current_task),
+        .write => fault_info.address_space.entries_lock.writeLock(current_task),
     }
 
     const entry_index = fault_info.address_space.entryIndexByAddress(fault_info.faulting_address) orelse {
         switch (lock_type) {
-            .read => fault_info.address_space.entries_lock.readUnlock(context),
-            .write => fault_info.address_space.entries_lock.writeUnlock(context),
+            .read => fault_info.address_space.entries_lock.readUnlock(current_task),
+            .write => fault_info.address_space.entries_lock.writeUnlock(current_task),
         }
 
         return false;
@@ -359,12 +359,12 @@ fn faultLookup(fault_info: *FaultInfo, context: *cascade.Task.Context, lock_type
 /// Called `uvmfault_promote` in OpenBSD uvm.
 fn promote(
     fault_info: *FaultInfo,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     object_page: ObjectPage,
     anonymous_page: **AnonymousPage,
     page: **Page,
 ) error{ Restart, OutOfMemory }!void {
-    log.verbose(context, "promoting to an anonymous page", .{});
+    log.verbose(current_task, "promoting to an anonymous page", .{});
 
     const anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map.?;
     if (core.is_debug) std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -376,25 +376,25 @@ fn promote(
     };
     if (core.is_debug) std.debug.assert(opt_object == null or (opt_object.?.lock.isReadLocked() or opt_object.?.lock.isWriteLocked()));
 
-    const allocated_frame = cascade.mem.phys.allocator.allocate(context) catch {
+    const allocated_frame = cascade.mem.phys.allocator.allocate(current_task) catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
     };
     page.* = allocated_frame.page().?;
 
-    anonymous_page.* = AnonymousPage.create(context, page.*) catch {
+    anonymous_page.* = AnonymousPage.create(current_task, page.*) catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
         // MUST clean up `page` as well
     };
 
     log.verbose(
-        context,
+        current_task,
         "allocated anonymous page for {f} at {f}",
         .{ fault_info.faulting_address, allocated_frame.baseAddress() },
     );
 
     switch (object_page) {
         .zero_fill => {
-            log.verbose(context, "zero filling anonymous page", .{});
+            log.verbose(current_task, "zero filling anonymous page", .{});
             const mapped_frame = cascade.mem
                 .directMapFromPhysical(allocated_frame.baseAddress())
                 .toPtr(*[arch.paging.standard_page_size.value]u8);
@@ -412,15 +412,15 @@ fn promote(
 /// The `entries_lock` must be unlocked.
 ///
 /// Called `uvmfault_amapcopy` in OpenBSD uvm.
-fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Task.Context) error{ NotMapped, OutOfMemory }!void {
+fn anonymousMapCopy(fault_info: *FaultInfo, current_task: *cascade.Task) error{ NotMapped, OutOfMemory }!void {
     // lookup entry and lock `entries_lock` for writing
-    if (!fault_info.faultLookup(context, .write)) return error.NotMapped;
-    defer fault_info.address_space.entries_lock.writeUnlock(context);
+    if (!fault_info.faultLookup(current_task, .write)) return error.NotMapped;
+    defer fault_info.address_space.entries_lock.writeUnlock(current_task);
 
     if (!fault_info.entry.needs_copy) return; // someone else already copied the anonymous map
 
     try AnonymousMap.copy(
-        context,
+        current_task,
         fault_info.address_space,
         fault_info.entry,
         fault_info.faulting_address,
@@ -436,7 +436,7 @@ fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Task.Context) erro
 /// Called `uvm_fault_upper_upgrade` in OpenBSD uvm.
 fn faultAnonymousMapLockUpgrade(
     fault_info: *FaultInfo,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     anonymous_map: *AnonymousMap,
 ) bool {
     if (core.is_debug) {
@@ -454,7 +454,7 @@ fn faultAnonymousMapLockUpgrade(
     // try for upgrade
     // if we don't succeed unlock everything and restart the fault and next time get a write lock
     fault_info.anonymous_map_lock_type = .write;
-    if (!anonymous_map.lock.tryUpgradeLock(context)) {
+    if (!anonymous_map.lock.tryUpgradeLock(current_task)) {
         // `tryUpgradeLock` leaves the lock unlocked if it fails
         return false;
     }
@@ -474,25 +474,25 @@ fn faultAnonymousMapLockUpgrade(
 /// Called `uvmfault_unlockall` in OpenBSD uvm.
 fn unlockAll(
     fault_info: *FaultInfo,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     opt_anonymous_map: ?*AnonymousMap,
     opt_object: ?*Object,
 ) void {
     if (opt_object) |object| {
         switch (fault_info.object_lock_type) {
-            .read => object.lock.readUnlock(context),
-            .write => object.lock.writeUnlock(context),
+            .read => object.lock.readUnlock(current_task),
+            .write => object.lock.writeUnlock(current_task),
         }
     }
 
     if (opt_anonymous_map) |anonymous_map| {
         switch (fault_info.anonymous_map_lock_type) {
-            .read => anonymous_map.lock.readUnlock(context),
-            .write => anonymous_map.lock.writeUnlock(context),
+            .read => anonymous_map.lock.readUnlock(current_task),
+            .write => anonymous_map.lock.writeUnlock(current_task),
         }
     }
 
-    fault_info.address_space.entries_lock.readUnlock(context);
+    fault_info.address_space.entries_lock.readUnlock(current_task);
 }
 
 const ObjectPage = union(enum) {

@@ -26,25 +26,25 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         if (!shouldUseTsc()) return;
 
-        candidate_time_sources.addTimeSource(context, .{
+        candidate_time_sources.addTimeSource(current_task, .{
             .name = "tsc",
             .priority = 200,
 
             .initialization = if (x64.info.tsc_tick_duration_fs != null)
                 .{
                     .simple = struct {
-                        fn simple(inner_context: *cascade.Task.Context) void {
+                        fn simple(inner_current_task: *cascade.Task) void {
                             std.debug.assert(shouldUseTsc());
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
                             globals.tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
                             init_log.debug(
-                                inner_context,
+                                inner_current_task,
                                 "tick duration (fs): {}",
                                 .{globals.tick_duration_fs},
                             );
@@ -93,7 +93,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());
@@ -115,7 +115,7 @@ pub const init = struct {
         const average_ticks = total_ticks / number_of_samples;
 
         globals.tick_duration_fs = (sample_duration.value * cascade.time.fs_per_ns) / average_ticks;
-        init_log.debug(context, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
+        init_log.debug(current_task, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
     fn shouldUseTsc() bool {

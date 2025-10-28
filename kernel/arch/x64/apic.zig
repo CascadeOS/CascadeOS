@@ -59,7 +59,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         fadt: *const cascade.acpi.tables.FADT,
         madt: *const cascade.acpi.tables.MADT,
         x2apic_enabled: bool,
@@ -74,7 +74,7 @@ pub const init = struct {
             };
         }
 
-        init_log.debug(context, "lapic in mode: {t}", .{globals.lapic});
+        init_log.debug(current_task, "lapic in mode: {t}", .{globals.lapic});
 
         if (fadt.fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) {
             @panic("physical destination mode is forced");
@@ -94,10 +94,10 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
-        candidate_time_sources.addTimeSource(context, .{
+        candidate_time_sources.addTimeSource(current_task, .{
             .name = "lapic",
             .priority = 150,
             .initialization = if (x64.info.lapic_base_tick_duration_fs != null)
@@ -112,15 +112,15 @@ pub const init = struct {
 
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer(context: *cascade.Task.Context) void {
+    fn initializeLapicTimer(current_task: *cascade.Task) void {
         std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
 
         globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
-        init_log.debug(context, "tick duration (fs) from cpuid: {}", .{globals.tick_duration_fs});
+        init_log.debug(current_task, "tick duration (fs) from cpuid: {}", .{globals.tick_duration_fs});
     }
 
     fn initializeLapicTimerCalibrate(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
@@ -174,7 +174,7 @@ pub const init = struct {
         const average_ticks = total_ticks / number_of_samples;
 
         globals.tick_duration_fs = (sample_duration.value * cascade.time.fs_per_ns) / average_ticks;
-        init_log.debug(context, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
+        init_log.debug(current_task, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
     fn perExecutorPeriodicEnableInterrupt(period: core.Duration) void {

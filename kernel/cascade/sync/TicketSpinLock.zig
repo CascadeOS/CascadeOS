@@ -17,10 +17,10 @@ container: Container = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
 /// Locks the spinlock.
-pub fn lock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) void {
-    context.incrementInterruptDisable();
+pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) void {
+    current_task.context.incrementInterruptDisable();
 
-    if (core.is_debug) std.debug.assert(!ticket_spin_lock.isLockedByCurrent(context)); // recursive locks are not supported
+    if (core.is_debug) std.debug.assert(!ticket_spin_lock.isLockedByCurrent(current_task)); // recursive locks are not supported
 
     const ticket = @atomicRmw(u32, &ticket_spin_lock.container.contents.ticket, .Add, 1, .monotonic);
 
@@ -33,21 +33,21 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) v
         _ = @atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire);
     }
 
-    ticket_spin_lock.holding_executor = context.executor.?;
-    context.spinlocks_held += 1;
+    ticket_spin_lock.holding_executor = current_task.context.executor.?;
+    current_task.context.spinlocks_held += 1;
 }
 
 /// Try to lock the spinlock.
-pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) bool {
+pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
 
-    context.incrementInterruptDisable();
+    current_task.context.incrementInterruptDisable();
 
     const old_container: Container = @bitCast(@atomicLoad(u64, &ticket_spin_lock.container.full, .monotonic));
 
     if (old_container.contents.current != old_container.contents.ticket) {
-        context.decrementInterruptDisable();
+        current_task.context.decrementInterruptDisable();
         return false;
     }
 
@@ -64,12 +64,12 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context
     )) |_| {
         @branchHint(.unlikely);
 
-        context.decrementInterruptDisable();
+        current_task.decrementInterruptDisable();
         return false;
     }
 
-    ticket_spin_lock.holding_executor = context.executor.?;
-    context.spinlocks_held += 1;
+    ticket_spin_lock.holding_executor = current_task.executor.?;
+    current_task.spinlocks_held += 1;
 
     return true;
 }
@@ -77,16 +77,16 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
-pub fn unlock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) void {
+pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) void {
     if (core.is_debug) {
-        std.debug.assert(context.spinlocks_held != 0);
-        std.debug.assert(ticket_spin_lock.isLockedByCurrent(context));
+        std.debug.assert(current_task.context.spinlocks_held != 0);
+        std.debug.assert(ticket_spin_lock.isLockedByCurrent(current_task));
     }
 
     ticket_spin_lock.unsafeUnlock();
 
-    context.spinlocks_held -= 1;
-    context.decrementInterruptDisable();
+    current_task.context.spinlocks_held -= 1;
+    current_task.context.decrementInterruptDisable();
 }
 
 /// Unlocks the spinlock, without decrementing interrupt disable count or spinlock held count.
@@ -103,8 +103,9 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 }
 
 /// Returns true if the spinlock is locked by the current executor.
-pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, context: *cascade.Task.Context) bool {
-    return ticket_spin_lock.holding_executor == context.executor.?;
+pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *cascade.Task) bool {
+    const executor = current_task.context.executor orelse return false;
+    return ticket_spin_lock.holding_executor == executor;
 }
 
 const Container = extern union {

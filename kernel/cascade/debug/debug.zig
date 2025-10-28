@@ -10,20 +10,20 @@ const core = @import("core");
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
 ) noreturn {
     @branchHint(.cold);
 
-    context.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
-    const executor = context.executor.?;
+    current_task.context.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
+    const executor = current_task.context.executor.?;
 
     panicDispatch(
-        executor.renderInterruptSourcePanicMessage(context, format, args),
+        executor.renderInterruptSourcePanicMessage(current_task, format, args),
         .{ .interrupt = interrupt_frame },
-        context,
+        current_task,
     );
 }
 
@@ -54,7 +54,7 @@ const PanicType = union(enum) {
 fn panicDispatch(
     msg: []const u8,
     panic_type: PanicType,
-    opt_context: ?*cascade.Task.Context,
+    opt_current_task: ?*cascade.Task,
 ) noreturn {
     @branchHint(.cold);
 
@@ -64,7 +64,7 @@ fn panicDispatch(
         .no_op => {},
         .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
         .init_panic => initPanic(
-            if (opt_context) |c| c else .panicked(),
+            if (opt_current_task) |c| c else cascade.Task.Context.panicked(),
             msg,
             panic_type,
         ),
@@ -99,7 +99,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -107,7 +107,7 @@ fn initPanic(
         var nested_panic_count: usize = 0;
     };
 
-    const executor = context.executor.?;
+    const executor = current_task.context.executor.?;
 
     if (globals.panicking_executor.cmpxchgStrong(
         null,
@@ -496,7 +496,7 @@ pub fn sdfSlice() ![]const u8 {
 pub const PanicMode = enum(u8) {
     /// Panic will disable interrupts and halt the current executor.
     ///
-    /// The current context is not guaranteed to be valid.
+    /// The current task is not guaranteed to be valid.
     no_op,
 
     /// Panic will print using init output with no locking.

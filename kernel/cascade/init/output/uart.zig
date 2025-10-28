@@ -267,7 +267,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                     }
                 }.splatFn,
                 .remapFn = struct {
-                    fn remapFn(state: *anyopaque, _: *cascade.Task.Context) anyerror!void {
+                    fn remapFn(state: *anyopaque, _: *cascade.Task) anyerror!void {
                         switch (mode) {
                             .io_port => {},
                             .memory => {
@@ -568,7 +568,7 @@ pub const PL011 = struct {
                 }
             }.splatFn,
             .remapFn = struct {
-                fn remapFn(state: *anyopaque, _: *cascade.Task.Context) anyerror!void {
+                fn remapFn(state: *anyopaque, _: *cascade.Task) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(state));
                     const write_register_physical_address = try cascade.mem.physicalFromDirectMap(
                         .fromPtr(@volatileCast(uart.write_register)),

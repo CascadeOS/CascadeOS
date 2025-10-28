@@ -31,15 +31,15 @@ pub fn withParkedTask(parked_task: *cascade.Task) Parker {
 /// Park (block) the current task.
 ///
 /// Spurious wakeups are possible.
-pub fn park(parker: *Parker, context: *cascade.Task.Context) void {
-    if (core.is_debug) std.debug.assert(context.task().state == .running);
+pub fn park(parker: *Parker, current_task: *cascade.Task) void {
+    if (core.is_debug) std.debug.assert(current_task.state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         return; // there were some wakeups, they might be spurious
     }
 
-    cascade.scheduler.lockScheduler(context);
-    defer cascade.scheduler.unlockScheduler(context);
+    cascade.scheduler.lockScheduler(current_task);
+    defer cascade.scheduler.unlockScheduler(current_task);
 
     // recheck for unpark attempts that happened while we were locking the scheduler
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -47,19 +47,19 @@ pub fn park(parker: *Parker, context: *cascade.Task.Context) void {
         return;
     }
 
-    parker.lock.lock(context);
+    parker.lock.lock(current_task);
     if (core.is_debug) std.debug.assert(parker.parked_task == null);
 
     // recheck for unpark attempts that happened while we were locking the parker lock
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         @branchHint(.unlikely);
-        parker.lock.unlock(context);
+        parker.lock.unlock(current_task);
         return;
     }
 
-    cascade.scheduler.drop(context, .{
+    cascade.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(_: *cascade.Task.Context, old_task: *cascade.Task, arg: usize) void {
+            fn action(_: *cascade.Task, old_task: *cascade.Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
@@ -79,7 +79,7 @@ pub fn park(parker: *Parker, context: *cascade.Task.Context) void {
 /// Unpark (wake) the parked task if it is currently parked.
 pub fn unpark(
     parker: *Parker,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
 ) void {
     if (parker.unpark_attempts.fetchAdd(1, .acq_rel) != 0) {
         // someone else was the first to attempt to unpark the task, so we can leave waking the task to them
@@ -87,8 +87,8 @@ pub fn unpark(
     }
 
     const parked_task = blk: {
-        parker.lock.lock(context);
-        defer parker.lock.unlock(context);
+        parker.lock.lock(current_task);
+        defer parker.lock.unlock(current_task);
 
         const parked_task = parker.parked_task orelse return;
         parker.parked_task = null;
@@ -98,16 +98,16 @@ pub fn unpark(
 
     parked_task.state = .ready;
 
-    const scheduler_already_locked = context.scheduler_locked;
+    const scheduler_already_locked = current_task.context.scheduler_locked;
 
     switch (scheduler_already_locked) {
-        true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(context),
-        false => cascade.scheduler.lockScheduler(context),
+        true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(current_task),
+        false => cascade.scheduler.lockScheduler(current_task),
     }
     defer switch (scheduler_already_locked) {
         true => {},
-        false => cascade.scheduler.unlockScheduler(context),
+        false => cascade.scheduler.unlockScheduler(current_task),
     };
 
-    cascade.scheduler.queueTask(context, parked_task);
+    cascade.scheduler.queueTask(current_task, parked_task);
 }

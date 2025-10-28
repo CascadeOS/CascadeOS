@@ -21,12 +21,12 @@ pub fn initStage1() !noreturn {
     // we need basic memory layout information to be able to panic
     cascade.mem.init.determineEarlyMemoryLayout();
 
-    var context = try constructBootstrapContext();
+    var current_task = try constructBootstrapTask();
 
-    // now that we have a context we can panic in a meaningful way
+    // now that we have a current_task we can panic in a meaningful way
     cascade.debug.setPanicMode(.single_executor_init_panic);
 
-    cascade.mem.phys.init.initializeBootstrapFrameAllocator(context);
+    cascade.mem.phys.init.initializeBootstrapFrameAllocator(current_task);
 
     // TODO: ensure all physical memory regions are mapped in the bootloader provided page table here, this would allow
     // us to switch to latter limine revisions and also allow us to support unusual systems with MMIO above 4GiB
@@ -34,62 +34,62 @@ pub fn initStage1() !noreturn {
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     try cascade.acpi.init.earlyInitialize();
 
-    Output.registerOutputs(context);
+    Output.registerOutputs(current_task);
 
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    cascade.mem.init.logEarlyMemoryLayout(context);
+    cascade.mem.init.logEarlyMemoryLayout(current_task);
 
-    try cascade.acpi.init.logAcpiTables(context);
+    try cascade.acpi.init.logAcpiTables(current_task);
 
-    log.debug(context, "initializing early interrupts", .{});
+    log.debug(current_task, "initializing early interrupts", .{});
     arch.interrupts.init.initializeEarlyInterrupts();
 
-    log.debug(context, "capturing early system information", .{});
-    arch.init.captureEarlySystemInformation(context);
+    log.debug(current_task, "capturing early system information", .{});
+    arch.init.captureEarlySystemInformation(current_task);
 
-    log.debug(context, "configuring per-executor system features", .{});
-    arch.init.configurePerExecutorSystemFeatures(context);
+    log.debug(current_task, "configuring per-executor system features", .{});
+    arch.init.configurePerExecutorSystemFeatures(current_task);
 
-    log.debug(context, "initializing memory system", .{});
-    try cascade.mem.init.initializeMemorySystem(context);
+    log.debug(current_task, "initializing memory system", .{});
+    try cascade.mem.init.initializeMemorySystem(current_task);
 
-    log.debug(context, "remapping init outputs", .{});
-    try Output.remapOutputs(context);
+    log.debug(current_task, "remapping init outputs", .{});
+    try Output.remapOutputs(current_task);
 
-    log.debug(context, "capturing system information", .{});
-    try arch.init.captureSystemInformation(context, switch (arch.current_arch) {
+    log.debug(current_task, "capturing system information", .{});
+    try arch.init.captureSystemInformation(current_task, switch (arch.current_arch) {
         .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
         else => .{},
     });
 
-    log.debug(context, "configuring global system features", .{});
-    arch.init.configureGlobalSystemFeatures(context);
+    log.debug(current_task, "configuring global system features", .{});
+    arch.init.configureGlobalSystemFeatures(current_task);
 
-    log.debug(context, "initializing time", .{});
-    try cascade.time.init.initializeTime(context);
+    log.debug(current_task, "initializing time", .{});
+    try cascade.time.init.initializeTime(current_task);
 
-    log.debug(context, "initializing interrupt routing", .{});
-    try arch.interrupts.init.initializeInterruptRouting(context);
+    log.debug(current_task, "initializing interrupt routing", .{});
+    try arch.interrupts.init.initializeInterruptRouting(current_task);
 
-    log.debug(context, "initializing kernel executors", .{});
-    const executors, const new_bootstrap_executor = try createExecutors(context);
+    log.debug(current_task, "initializing kernel executors", .{});
+    const executors, const new_bootstrap_executor = try createExecutors(current_task);
     cascade.globals.executors = executors;
-    context = &new_bootstrap_executor.current_task.context;
+    current_task = new_bootstrap_executor.current_task;
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
-    arch.init.loadExecutor(context);
+    arch.init.loadExecutor(current_task);
 
     cascade.debug.setPanicMode(.init_panic);
     cascade.debug.log.setLogMode(.init_log);
 
     if (executors.len > 1) {
-        log.debug(context, "booting non-bootstrap executors", .{});
+        log.debug(current_task, "booting non-bootstrap executors", .{});
         try bootNonBootstrapExecutors();
     }
 
-    try initStage2(context);
+    try initStage2(current_task);
     unreachable;
 }
 
@@ -98,26 +98,26 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(context: *cascade.Task.Context) !noreturn {
+fn initStage2(current_task: *cascade.Task) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     cascade.mem.globals.core_page_table.load();
-    const executor = context.executor.?;
-    arch.init.loadExecutor(context);
+    const executor = current_task.context.executor.?;
+    arch.init.loadExecutor(current_task);
 
-    log.debug(context, "configuring per-executor system features on {f}", .{executor.id});
-    arch.init.configurePerExecutorSystemFeatures(context);
+    log.debug(current_task, "configuring per-executor system features on {f}", .{executor.id});
+    arch.init.configurePerExecutorSystemFeatures(current_task);
 
-    log.debug(context, "configuring local interrupt controller on {f}", .{executor.id});
+    log.debug(current_task, "configuring local interrupt controller on {f}", .{executor.id});
     arch.init.initLocalInterruptController();
 
-    log.debug(context, "enabling per-executor interrupt on {f}", .{executor.id});
+    log.debug(current_task, "enabling per-executor interrupt on {f}", .{executor.id});
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
     try arch.scheduling.callOneArg(
         null,
-        context.task().stack,
-        @intFromPtr(context),
+        current_task.stack,
+        @intFromPtr(current_task),
         struct {
             fn initStage3Wrapper(inner_context_addr: usize) callconv(.c) noreturn {
                 initStage3(@ptrFromInt(inner_context_addr)) catch |err| {
@@ -134,49 +134,49 @@ fn initStage2(context: *cascade.Task.Context) !noreturn {
 /// This function is executed by all executors.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(context: *cascade.Task.Context) !noreturn {
+fn initStage3(current_task: *cascade.Task) !noreturn {
     if (Stage3Barrier.start()) {
-        log.debug(context, "loading standard interrupt handlers", .{});
+        log.debug(current_task, "loading standard interrupt handlers", .{});
         arch.interrupts.init.loadStandardInterruptHandlers();
 
-        log.debug(context, "creating and scheduling init stage 4 task", .{});
+        log.debug(current_task, "creating and scheduling init stage 4 task", .{});
         {
-            const init_stage4_task: *cascade.Task = try .createKernelTask(context, .{
+            const init_stage4_task: *cascade.Task = try .createKernelTask(current_task, .{
                 .name = try .fromSlice("init stage 4"),
                 .function = initStage4,
             });
 
-            cascade.scheduler.lockScheduler(context);
-            defer cascade.scheduler.unlockScheduler(context);
+            cascade.scheduler.lockScheduler(current_task);
+            defer cascade.scheduler.unlockScheduler(current_task);
 
-            cascade.scheduler.queueTask(context, init_stage4_task);
+            cascade.scheduler.queueTask(current_task, init_stage4_task);
         }
 
         Stage3Barrier.complete();
     }
 
-    cascade.scheduler.lockScheduler(context);
-    context.drop();
+    cascade.scheduler.lockScheduler(current_task);
+    current_task.context.drop();
     unreachable;
 }
 
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(context: *cascade.Task.Context, _: usize, _: usize) !void {
-    log.debug(context, "initializing PCI ECAM", .{});
-    try cascade.pci.init.initializeECAM(context);
+fn initStage4(current_task: *cascade.Task, _: usize, _: usize) !void {
+    log.debug(current_task, "initializing PCI ECAM", .{});
+    try cascade.pci.init.initializeECAM(current_task);
 
-    log.debug(context, "initializing ACPI", .{});
-    try cascade.acpi.init.initialize(context);
+    log.debug(current_task, "initializing ACPI", .{});
+    try cascade.acpi.init.initialize(current_task);
 
-    Output.globals.lock.lock(context);
-    defer Output.globals.lock.unlock(context);
+    Output.globals.lock.lock(current_task);
+    defer Output.globals.lock.unlock(current_task);
     try cascade.time.init.printInitializationTime(Output.writer);
     try Output.writer.flush();
 }
 
-fn constructBootstrapContext() !*cascade.Task.Context {
+fn constructBootstrapTask() !*cascade.Task {
     const static = struct {
         var bootstrap_init_task: cascade.Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
@@ -187,26 +187,26 @@ fn constructBootstrapContext() !*cascade.Task.Context {
         };
     };
 
-    const context = try cascade.Task.init.initializeBootstrapInitTask(
+    const current_task = try cascade.Task.init.initializeBootstrapInitTask(
         &static.bootstrap_init_task,
         &static.bootstrap_executor,
     );
 
     arch.init.prepareBootstrapExecutor(
-        context,
+        current_task,
         boot.bootstrapArchitectureProcessorId(),
     );
-    arch.init.loadExecutor(context);
+    arch.init.loadExecutor(current_task);
 
     cascade.globals.executors = @ptrCast(&static.bootstrap_executor);
 
-    return context;
+    return current_task;
 }
 
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(context: *cascade.Task.Context) !struct { []cascade.Executor, *cascade.Executor } {
+fn createExecutors(current_task: *cascade.Task) !struct { []cascade.Executor, *cascade.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > cascade.config.maximum_number_of_executors) {
@@ -216,7 +216,7 @@ fn createExecutors(context: *cascade.Task.Context) !struct { []cascade.Executor,
         );
     }
 
-    log.debug(context, "initializing {} executors", .{descriptors.count()});
+    log.debug(current_task, "initializing {} executors", .{descriptors.count()});
 
     const executors = try cascade.mem.heap.allocator.alloc(cascade.Executor, descriptors.count());
 
@@ -235,11 +235,11 @@ fn createExecutors(context: *cascade.Task.Context) !struct { []cascade.Executor,
             .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
         };
 
-        try cascade.Task.init.createAndAssignInitTask(context, executor);
-        try cascade.Task.init.initializeSchedulerTask(context, &executor.scheduler_task, executor);
+        try cascade.Task.init.createAndAssignInitTask(current_task, executor);
+        try cascade.Task.init.initializeSchedulerTask(current_task, &executor.scheduler_task, executor);
 
         arch.init.prepareExecutor(
-            context,
+            current_task,
             executor,
             desc.architectureProcessorId(),
         );
@@ -262,7 +262,7 @@ fn bootNonBootstrapExecutors() !void {
         if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
 
         desc.boot(
-            &cascade.globals.executors[i].current_task.context,
+            cascade.globals.executors[i].current_task,
             struct {
                 fn bootFn(inner_context: *anyopaque) !noreturn {
                     try initStage2(@ptrCast(@alignCast(inner_context)));

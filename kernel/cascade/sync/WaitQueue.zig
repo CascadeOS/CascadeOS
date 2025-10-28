@@ -33,12 +33,12 @@ pub fn popFirst(wait_queue: *WaitQueue) ?*cascade.Task {
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wakeOne(
     wait_queue: *WaitQueue,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     spinlock: *const cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(context.interrupt_disable_count != 0);
-        std.debug.assert(spinlock.isLockedByCurrent(context));
+        std.debug.assert(current_task.context.interrupt_disable_count != 0);
+        std.debug.assert(spinlock.isLockedByCurrent(current_task));
     }
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
@@ -47,18 +47,18 @@ pub fn wakeOne(
     if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
-    const scheduler_already_locked = context.scheduler_locked;
+    const scheduler_already_locked = current_task.context.scheduler_locked;
 
     switch (scheduler_already_locked) {
-        true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(context),
-        false => cascade.scheduler.lockScheduler(context),
+        true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(current_task),
+        false => cascade.scheduler.lockScheduler(current_task),
     }
     defer switch (scheduler_already_locked) {
         true => {},
-        false => cascade.scheduler.unlockScheduler(context),
+        false => cascade.scheduler.unlockScheduler(current_task),
     };
 
-    cascade.scheduler.queueTask(context, task_to_wake);
+    cascade.scheduler.queueTask(current_task, task_to_wake);
 }
 
 /// Add the current task to the wait queue.
@@ -68,22 +68,22 @@ pub fn wakeOne(
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     wait_queue: *WaitQueue,
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     spinlock: *cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(context.interrupt_disable_count != 0);
-        std.debug.assert(spinlock.isLockedByCurrent(context));
+        std.debug.assert(current_task.context.interrupt_disable_count != 0);
+        std.debug.assert(spinlock.isLockedByCurrent(current_task));
     }
 
-    wait_queue.waiting_tasks.append(&context.task().next_task_node);
+    wait_queue.waiting_tasks.append(&current_task.next_task_node);
 
-    cascade.scheduler.lockScheduler(context);
-    defer cascade.scheduler.unlockScheduler(context);
+    cascade.scheduler.lockScheduler(current_task);
+    defer cascade.scheduler.unlockScheduler(current_task);
 
-    cascade.scheduler.drop(context, .{
+    cascade.scheduler.drop(current_task, .{
         .action = struct {
-            fn action(_: *cascade.Task.Context, old_task: *cascade.Task, arg: usize) void {
+            fn action(_: *cascade.Task, old_task: *cascade.Task, arg: usize) void {
                 const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);
 
                 old_task.state = .blocked;

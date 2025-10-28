@@ -21,13 +21,13 @@ const globals = struct {
 
 pub const init = struct {
     pub fn registerTimeSource(
-        context: *cascade.Task.Context,
+        current_task: *cascade.Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         const acpi_table = AcpiTable.get(0) orelse return;
         acpi_table.deinit();
 
-        candidate_time_sources.addTimeSource(context, .{
+        candidate_time_sources.addTimeSource(current_task, .{
             .name = "hpet",
             .priority = 100,
             .initialization = .{ .simple = initializeHPET },
@@ -38,18 +38,18 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET(context: *cascade.Task.Context) void {
+    fn initializeHPET(current_task: *cascade.Task) void {
         globals.hpet = .{ .base = getHpetBase() };
-        init_log.debug(context, "using hpet: {}", .{globals.hpet});
+        init_log.debug(current_task, "using hpet: {}", .{globals.hpet});
 
         const general_capabilities = globals.hpet.readGeneralCapabilitiesAndIDRegister();
 
-        init_log.debug(context, "counter is 64-bit: {}", .{general_capabilities.counter_is_64bit});
+        init_log.debug(current_task, "counter is 64-bit: {}", .{general_capabilities.counter_is_64bit});
 
         globals.number_of_timers_minus_one = general_capabilities.number_of_timers_minus_one;
 
         globals.tick_duration_fs = general_capabilities.counter_tick_period_fs;
-        init_log.debug(context, "tick duration (fs): {}", .{globals.tick_duration_fs});
+        init_log.debug(current_task, "tick duration (fs): {}", .{globals.tick_duration_fs});
 
         var general_configuration = globals.hpet.readGeneralConfigurationRegister();
         general_configuration.enable = false;

@@ -13,22 +13,22 @@ const uart = cascade.init.Output.uart;
 
 const log = cascade.debug.log.scoped(.devicetree);
 
-pub fn tryGetSerialOutput(context: *cascade.Task.Context) ?uart.Uart {
-    const output_uart = tryGetSerialOutputInner(context) catch |err| switch (err) {
+pub fn tryGetSerialOutput(current_task: *cascade.Task) ?uart.Uart {
+    const output_uart = tryGetSerialOutputInner(current_task) catch |err| switch (err) {
         error.BadOffset => {
-            log.warn(context, "attempted to use a bad offset into the device tree", .{});
+            log.warn(current_task, "attempted to use a bad offset into the device tree", .{});
             return null;
         },
         error.Truncated => {
-            log.warn(context, "the device tree blob is truncated", .{});
+            log.warn(current_task, "the device tree blob is truncated", .{});
             return null;
         },
         error.DivisorTooLarge => {
-            log.warn(context, "baud divisor too large", .{});
+            log.warn(current_task, "baud divisor too large", .{});
             return null;
         },
         error.SizeNotMultiple => {
-            log.warn(context, "the regs property size is not a multiple of the address-cells + size-cells", .{});
+            log.warn(current_task, "the regs property size is not a multiple of the address-cells + size-cells", .{});
             return null;
         },
     } orelse return null;
@@ -36,31 +36,31 @@ pub fn tryGetSerialOutput(context: *cascade.Task.Context) ?uart.Uart {
     return output_uart;
 }
 
-fn tryGetSerialOutputInner(context: *cascade.Task.Context) GetSerialOutputError!?uart.Uart {
-    const dt = getDeviceTree(context) orelse return null;
+fn tryGetSerialOutputInner(current_task: *cascade.Task) GetSerialOutputError!?uart.Uart {
+    const dt = getDeviceTree(current_task) orelse return null;
 
-    if (try getSerialOutputFromChosenNode(context, dt)) |output_uart| return output_uart;
+    if (try getSerialOutputFromChosenNode(current_task, dt)) |output_uart| return output_uart;
 
     var iter = dt.compatibleMatchIterator({}, matchFunction);
 
     while (try iter.next(dt)) |compatible_match| {
         const func = compatible_lookup.get(compatible_match.compatible).?;
-        if (try func(context, dt, compatible_match.node.node)) |output_uart| return output_uart;
+        if (try func(current_task, dt, compatible_match.node.node)) |output_uart| return output_uart;
     }
 
     return null;
 }
 
-fn getDeviceTree(context: *cascade.Task.Context) ?DeviceTree {
+fn getDeviceTree(current_task: *cascade.Task) ?DeviceTree {
     const address = boot.deviceTreeBlob() orelse return null;
     const ptr = address.toPtr([*]align(8) const u8);
     return DeviceTree.fromPtr(ptr) catch |err| {
-        log.warn(context, "failed to parse device tree blob: {t}", .{err});
+        log.warn(current_task, "failed to parse device tree blob: {t}", .{err});
         return null;
     };
 }
 
-fn getSerialOutputFromChosenNode(context: *cascade.Task.Context, dt: DeviceTree) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromChosenNode(current_task: *cascade.Task, dt: DeviceTree) GetSerialOutputError!?uart.Uart {
     const chosen_node = (try DeviceTree.Node.root.firstMatchingSubnode(
         dt,
         .direct_children,
@@ -77,7 +77,7 @@ fn getSerialOutputFromChosenNode(context: *cascade.Task.Context, dt: DeviceTree)
     const node = (dt.nodeFromPath(stdout_path) catch |err| switch (err) {
         error.BadOffset, error.Truncated => |e| return e,
         error.BadPath => {
-            log.warn(context, "the chosen nodes stdout-path property is not a valid path", .{});
+            log.warn(current_task, "the chosen nodes stdout-path property is not a valid path", .{});
             return null;
         },
     }) orelse return null;
@@ -86,20 +86,20 @@ fn getSerialOutputFromChosenNode(context: *cascade.Task.Context, dt: DeviceTree)
 
     while (try compatible_iter.next()) |compatible| {
         if (compatible_lookup.get(compatible)) |getSerialOutputFn| {
-            return try getSerialOutputFn(context, dt, node.node);
+            return try getSerialOutputFn(current_task, dt, node.node);
         }
     }
 
     return null;
 }
 
-fn getSerialOutputFromNS16550a(context: *cascade.Task.Context, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromNS16550a(current_task: *cascade.Task, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = blk: {
         const clock_frequency_property = (try node.firstMatchingProperty(
             dt,
             .{ .name = "clock-frequency" },
         )) orelse {
-            log.warn(context, "no clock-frequency property found for ns16550a", .{});
+            log.warn(current_task, "no clock-frequency property found for ns16550a", .{});
             return null;
         };
         break :blk clock_frequency_property.value.toU32();
@@ -109,7 +109,7 @@ fn getSerialOutputFromNS16550a(context: *cascade.Task.Context, dt: DeviceTree, n
             dt,
             .{ .name = "reg" },
         )) orelse {
-            log.warn(context, "no reg property found for ns16550a", .{});
+            log.warn(current_task, "no reg property found for ns16550a", .{});
             return null;
         };
 
@@ -117,7 +117,7 @@ fn getSerialOutputFromNS16550a(context: *cascade.Task.Context, dt: DeviceTree, n
         var reg_iter = try reg_property.value.regIterator(2, 2);
 
         const reg = reg_iter.next() orelse {
-            log.warn(context, "no reg property found for ns16550a", .{});
+            log.warn(current_task, "no reg property found for ns16550a", .{});
             return null;
         };
         break :blk reg.address;
@@ -136,25 +136,25 @@ fn getSerialOutputFromNS16550a(context: *cascade.Task.Context, dt: DeviceTree, n
     };
 }
 
-fn getSerialOutputFromPL011(context: *cascade.Task.Context, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromPL011(current_task: *cascade.Task, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = clock_frequency: {
         const clocks_property = (try node.firstMatchingProperty(
             dt,
             .{ .name = "clocks" },
         )) orelse {
-            log.warn(context, "no clocks property found for pl011", .{});
+            log.warn(current_task, "no clocks property found for pl011", .{});
             return null;
         };
 
         // there are multiple clocks, but the first one happens to be the one we want
         var clocks_iter = try clocks_property.value.pHandleListIterator();
         const clock_phandle = clocks_iter.next() orelse {
-            log.warn(context, "no clocks phandle found for pl011", .{});
+            log.warn(current_task, "no clocks phandle found for pl011", .{});
             return null;
         };
 
         const clock_node = (try clock_phandle.node(dt)) orelse {
-            log.warn(context, "no clock node found for pl011", .{});
+            log.warn(current_task, "no clock node found for pl011", .{});
             return null;
         };
 
@@ -162,7 +162,7 @@ fn getSerialOutputFromPL011(context: *cascade.Task.Context, dt: DeviceTree, node
             dt,
             .{ .name = "clock-frequency" },
         )) orelse {
-            log.warn(context, "no clock-frequency property found for pl011", .{});
+            log.warn(current_task, "no clock-frequency property found for pl011", .{});
             return null;
         };
 
@@ -173,7 +173,7 @@ fn getSerialOutputFromPL011(context: *cascade.Task.Context, dt: DeviceTree, node
             dt,
             .{ .name = "reg" },
         )) orelse {
-            log.warn(context, "no reg property found for pl011", .{});
+            log.warn(current_task, "no reg property found for pl011", .{});
             return null;
         };
 
@@ -181,7 +181,7 @@ fn getSerialOutputFromPL011(context: *cascade.Task.Context, dt: DeviceTree, node
         var reg_iter = try reg_property.value.regIterator(2, 2);
 
         const reg = reg_iter.next() orelse {
-            log.warn(context, "no reg property found for pl011", .{});
+            log.warn(current_task, "no reg property found for pl011", .{});
             return null;
         };
         break :blk reg.address;
@@ -213,7 +213,7 @@ const GetSerialOutputError = DeviceTree.IteratorError ||
     DeviceTree.Property.Value.ListIteratorError ||
     uart.Baud.DivisorError;
 const GetSerialOutputFn = *const fn (
-    context: *cascade.Task.Context,
+    current_task: *cascade.Task,
     dt: DeviceTree,
     node: DeviceTree.Node,
 ) GetSerialOutputError!?uart.Uart;
