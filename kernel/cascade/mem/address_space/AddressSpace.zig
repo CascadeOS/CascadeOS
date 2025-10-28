@@ -1276,5 +1276,5 @@ pub fn print(address_space: *AddressSpace, current_task: *cascade.Task, writer: 
 }
 
 pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void {
-    return address_space.print(cascade.Task.Context.current().task(), writer, 0);
+    return address_space.print(.current(), writer, 0);
 }

@@ -102,7 +102,7 @@ fn initStage2(current_task: *cascade.Task) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     cascade.mem.globals.core_page_table.load();
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
     arch.init.loadExecutor(current_task);
 
     log.debug(current_task, "configuring per-executor system features on {f}", .{executor.id});
@@ -119,8 +119,8 @@ fn initStage2(current_task: *cascade.Task) !noreturn {
         current_task.stack,
         @intFromPtr(current_task),
         struct {
-            fn initStage3Wrapper(inner_context_addr: usize) callconv(.c) noreturn {
-                initStage3(@ptrFromInt(inner_context_addr)) catch |err| {
+            fn initStage3Wrapper(inner_task_addr: usize) callconv(.c) noreturn {
+                initStage3(@ptrFromInt(inner_task_addr)) catch |err| {
                     std.debug.panic("unhandled error: {t}", .{err});
                 };
             }
@@ -156,7 +156,7 @@ fn initStage3(current_task: *cascade.Task) !noreturn {
     }
 
     cascade.scheduler.lockScheduler(current_task);
-    current_task.context.drop();
+    current_task.drop();
     unreachable;
 }
 
@@ -187,10 +187,11 @@ fn constructBootstrapTask() !*cascade.Task {
         };
     };
 
-    const current_task = try cascade.Task.init.initializeBootstrapInitTask(
+    try cascade.Task.init.initializeBootstrapInitTask(
         &static.bootstrap_init_task,
         &static.bootstrap_executor,
     );
+    const current_task = &static.bootstrap_init_task;
 
     arch.init.prepareBootstrapExecutor(
         current_task,
@@ -264,8 +265,8 @@ fn bootNonBootstrapExecutors() !void {
         desc.boot(
             cascade.globals.executors[i].current_task,
             struct {
-                fn bootFn(inner_context: *anyopaque) !noreturn {
-                    try initStage2(@ptrCast(@alignCast(inner_context)));
+                fn bootFn(inner_current_task: *anyopaque) !noreturn {
+                    try initStage2(@ptrCast(@alignCast(inner_current_task)));
                 }
             }.bootFn,
         );

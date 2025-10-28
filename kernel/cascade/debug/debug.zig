@@ -17,8 +17,8 @@ pub fn interruptSourcePanic(
 ) noreturn {
     @branchHint(.cold);
 
-    current_task.context.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
-    const executor = current_task.context.executor.?;
+    current_task.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
+    const executor = current_task.known_executor.?;
 
     panicDispatch(
         executor.renderInterruptSourcePanicMessage(current_task, format, args),
@@ -64,7 +64,7 @@ fn panicDispatch(
         .no_op => {},
         .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
         .init_panic => initPanic(
-            if (opt_current_task) |c| c else cascade.Task.Context.panicked(),
+            if (opt_current_task) |c| c else .panicked(),
             msg,
             panic_type,
         ),
@@ -107,7 +107,7 @@ fn initPanic(
         var nested_panic_count: usize = 0;
     };
 
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
 
     if (globals.panicking_executor.cmpxchgStrong(
         null,

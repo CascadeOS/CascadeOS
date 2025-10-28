@@ -21,10 +21,10 @@ pub const Node = struct {
 
 pub fn submitAndWait(flush_request: *FlushRequest, current_task: *cascade.Task) void {
     {
-        current_task.context.incrementInterruptDisable();
-        defer current_task.context.decrementInterruptDisable();
+        current_task.incrementInterruptDisable();
+        defer current_task.decrementInterruptDisable();
 
-        const current_executor = current_task.context.executor.?;
+        const current_executor = current_task.known_executor.?;
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
@@ -42,9 +42,9 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *cascade.Task) 
 }
 
 pub fn processFlushRequests(current_task: *cascade.Task) void {
-    if (core.is_debug) std.debug.assert(current_task.context.interrupt_disable_count != 0);
+    if (core.is_debug) std.debug.assert(current_task.interrupt_disable_count != 0);
 
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
 
     while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const cascade.mem.FlushRequest.Node = @fieldParentPtr("node", node);
@@ -53,7 +53,7 @@ pub fn processFlushRequests(current_task: *cascade.Task) void {
 }
 
 fn flush(flush_request: *FlushRequest, current_task: *cascade.Task) void {
-    if (core.is_debug) std.debug.assert(current_task.context.interrupt_disable_count != 0);
+    if (core.is_debug) std.debug.assert(current_task.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 

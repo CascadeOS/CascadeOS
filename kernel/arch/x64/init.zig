@@ -63,7 +63,7 @@ pub fn prepareBootstrapExecutor(
     };
 
     prepareExecutorShared(
-        current_task.context.executor.?,
+        current_task.known_executor.?,
         @intCast(architecture_processor_id),
         .fromRange(
             .fromSlice(u8, &static.bootstrap_double_fault_stack),
@@ -110,9 +110,9 @@ fn prepareExecutorShared(
     );
 }
 
-/// Load the executor of the provided `Context` as the current executor.
+/// Load the executor that `current_task` is running on as the current executor.
 pub fn loadExecutor(current_task: *cascade.Task) void {
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
 
     executor.arch_specific.gdt.load();
     executor.arch_specific.gdt.setTss(&executor.arch_specific.tss);
@@ -258,7 +258,7 @@ fn disablePic() void {
 /// Configure any per-executor system features.
 pub fn configurePerExecutorSystemFeatures(current_task: *cascade.Task) void {
     if (x64.info.cpu_id.rdtscp) {
-        x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.context.executor.?.id));
+        x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.known_executor.?.id));
     }
 
     // TODO: be more thorough with setting up these registers

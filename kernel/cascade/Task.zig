@@ -24,6 +24,8 @@ name: Name,
 
 environment: Environment,
 
+is_scheduler_task: bool = false,
+
 state: State,
 
 /// The number of references to this task.
@@ -40,192 +42,40 @@ stack: Stack,
 /// - the kernel task cleanup service
 next_task_node: std.SinglyLinkedList.Node = .{},
 
-context: Context,
+/// Set to the executor the current task is running on if the state of the task means that the executor cannot
+/// change underneath us (for example when interrupts are disabled).
+///
+/// Set to null otherwise.
+///
+/// The value is undefined when the task is not running.
+known_executor: ?*cascade.Executor,
 
-is_scheduler_task: bool = false,
+/// Tracks the depth of nested interrupt disables.
+interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
 
-pub const Context = struct {
-    /// Set to the executor the current task is running on if the state of the context means that the executor cannot
-    /// change underneath us (for example when interrupts are disabled).
-    ///
-    /// Set to null otherwise.
-    ///
-    /// The value is undefined when the task is not running.
-    executor: ?*cascade.Executor,
+/// Tracks nested enables of access to user memory.
+enable_access_to_user_memory_count: u32 = 0,
 
-    /// Tracks the depth of nested interrupt disables.
-    interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
+spinlocks_held: u32,
+scheduler_locked: bool,
 
-    /// Tracks nested enables of access to user memory.
-    enable_access_to_user_memory_count: u32 = 0,
+pub fn current() *Task {
+    // TODO: some architectures can do this without disabling interrupts
 
-    spinlocks_held: u32,
-    scheduler_locked: bool,
+    arch.interrupts.disable();
 
-    pub inline fn task(context: *Context) *Task {
-        return @fieldParentPtr("context", context);
-    }
+    const executor = arch.getCurrentExecutor();
+    const current_task = executor.current_task;
+    if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
-    pub fn current() *Context {
-        // TODO: some architectures can do this without disabling interrupts
+    if (current_task.interrupt_disable_count == 0) arch.interrupts.enable();
 
-        arch.interrupts.disable();
-
-        const executor = arch.getCurrentExecutor();
-        const current_task = executor.current_task;
-        if (core.is_debug) std.debug.assert(current_task.state.running == executor);
-
-        const context: *Context = &current_task.context;
-        if (context.interrupt_disable_count == 0) arch.interrupts.enable();
-
-        return context;
-    }
-
-    pub const InterruptExit = struct {
-        previous_interrupt_disable_count: u32,
-        previous_enable_access_to_user_memory_count: u32,
-
-        pub fn exit(interrupt_exit: InterruptExit, current_task: *Task) void {
-            current_task.context.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
-
-            current_task.context.enable_access_to_user_memory_count = interrupt_exit.previous_enable_access_to_user_memory_count;
-            if (current_task.context.enable_access_to_user_memory_count == 0) {
-                @branchHint(.likely);
-                arch.paging.disableAccessToUserMemory();
-            } else {
-                arch.paging.enableAccessToUserMemory();
-            }
-
-            current_task.context.setExecutor();
-        }
-    };
-
-    pub fn onInterruptEntry() struct { *Task, InterruptExit } {
-        if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-        const executor = arch.getCurrentExecutor();
-        const current_task = executor.current_task;
-        if (core.is_debug) std.debug.assert(current_task.state.running == executor);
-
-        const context: *Context = &current_task.context;
-
-        const previous_interrupt_disable_count = context.interrupt_disable_count;
-        context.interrupt_disable_count = previous_interrupt_disable_count + 1;
-        context.executor = current_task.state.running;
-
-        const previous_enable_access_to_user_memory_count = context.enable_access_to_user_memory_count;
-        context.enable_access_to_user_memory_count = 0;
-        if (previous_enable_access_to_user_memory_count != 0) {
-            @branchHint(.unlikely);
-            arch.paging.disableAccessToUserMemory();
-        }
-
-        return .{
-            current_task, .{
-                .previous_interrupt_disable_count = previous_interrupt_disable_count,
-                .previous_enable_access_to_user_memory_count = previous_enable_access_to_user_memory_count,
-            },
-        };
-    }
-
-    pub fn incrementInterruptDisable(context: *Context) void {
-        const previous = context.interrupt_disable_count;
-
-        if (previous == 0) {
-            if (core.is_debug) std.debug.assert(arch.interrupts.areEnabled());
-            arch.interrupts.disable();
-            context.executor = context.task().state.running;
-        } else if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-        context.interrupt_disable_count = previous + 1;
-    }
-
-    pub fn decrementInterruptDisable(context: *Context) void {
-        if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-        const previous = context.interrupt_disable_count;
-        context.interrupt_disable_count = previous - 1;
-
-        if (previous == 1) {
-            context.setExecutor();
-            arch.interrupts.enable();
-        }
-    }
-
-    pub fn incrementEnableAccessToUserMemory(context: *Context) void {
-        if (core.is_debug) std.debug.assert(context.task().environment == .user);
-
-        const previous = context.enable_access_to_user_memory_count;
-        context.enable_access_to_user_memory_count = previous + 1;
-
-        if (previous == 0) {
-            arch.paging.enableAccessToUserMemory();
-        }
-    }
-
-    pub fn decrementEnableAccessToUserMemory(context: *Context) void {
-        if (core.is_debug) std.debug.assert(context.task().environment == .user);
-
-        const previous = context.enable_access_to_user_memory_count;
-        context.enable_access_to_user_memory_count = previous - 1;
-
-        if (previous == 1) {
-            arch.paging.disableAccessToUserMemory();
-        }
-    }
-
-    /// Drops the current task out of the scheduler.
-    ///
-    /// Decrements the reference count of the task to remove the implicit self reference.
-    ///
-    /// The scheduler lock must be held when this function is called.
-    pub fn drop(context: *Context) noreturn {
-        if (core.is_debug) {
-            cascade.scheduler.assertSchedulerLocked(context.task());
-            std.debug.assert(context.spinlocks_held == 1); // only the scheduler lock is held
-        }
-
-        cascade.scheduler.drop(context.task(), .{
-            .action = struct {
-                fn action(scheduler_task: *Task, old_task: *cascade.Task, _: usize) void {
-                    old_task.state = .{ .dropped = .{} };
-                    old_task.decrementReferenceCount(scheduler_task);
-                }
-            }.action,
-            .arg = undefined,
-        });
-        @panic("dropped task returned");
-    }
-
-    /// Called when panicking to fetch the current context.
-    ///
-    /// Interrupts must already be disabled when this function is called.
-    pub fn panicked() *Task {
-        std.debug.assert(!arch.interrupts.areEnabled());
-
-        const executor = arch.getCurrentExecutor();
-        const current_task = executor.current_task;
-        const context: *Context = &current_task.context;
-
-        context.interrupt_disable_count += 1;
-        context.executor = executor;
-
-        return current_task;
-    }
-
-    /// Set the `executor` field of the context based on the state of the context.
-    inline fn setExecutor(context: *Context) void {
-        if (context.interrupt_disable_count != 0) {
-            context.executor = context.task().state.running;
-        } else {
-            context.executor = null;
-        }
-    }
-};
+    return current_task;
+}
 
 pub const State = union(enum) {
     ready,
-    /// Do not access the executor directly, use the `context` instead.
+    /// Do not access the executor directly, use `known_executor` instead.
     running: *cascade.Executor,
     blocked,
     dropped: Dropped,
@@ -239,6 +89,153 @@ pub const Environment = union(cascade.Environment.Type) {
     kernel: void,
     user: *cascade.Process,
 };
+
+pub fn incrementReferenceCount(task: *Task) void {
+    _ = task.reference_count.fetchAdd(1, .acq_rel);
+}
+
+/// Decrements the reference count of the task.
+///
+/// If it reaches zero the task is submitted to the task cleanup service.
+///
+/// This must not be called when the task is the current task, see `Task.drop` instead.
+pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
+    if (core.is_debug) std.debug.assert(task != current_task);
+    if (task.reference_count.fetchSub(1, .acq_rel) != 1) {
+        @branchHint(.likely);
+        return;
+    }
+    cascade.services.task_cleanup.queueTaskForCleanup(current_task, task);
+}
+
+pub fn incrementInterruptDisable(current_task: *Task) void {
+    const previous = current_task.interrupt_disable_count;
+
+    if (previous == 0) {
+        if (core.is_debug) std.debug.assert(arch.interrupts.areEnabled());
+        arch.interrupts.disable();
+        current_task.known_executor = current_task.state.running;
+    } else if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+
+    current_task.interrupt_disable_count = previous + 1;
+}
+
+pub fn decrementInterruptDisable(current_task: *Task) void {
+    if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+
+    const previous = current_task.interrupt_disable_count;
+    current_task.interrupt_disable_count = previous - 1;
+
+    if (previous == 1) {
+        current_task.setKnownExecutor();
+        arch.interrupts.enable();
+    }
+}
+
+pub fn incrementEnableAccessToUserMemory(current_task: *Task) void {
+    if (core.is_debug) std.debug.assert(current_task.environment == .user);
+
+    const previous = current_task.enable_access_to_user_memory_count;
+    current_task.enable_access_to_user_memory_count = previous + 1;
+
+    if (previous == 0) {
+        arch.paging.enableAccessToUserMemory();
+    }
+}
+
+pub fn decrementEnableAccessToUserMemory(current_task: *Task) void {
+    if (core.is_debug) std.debug.assert(current_task.environment == .user);
+
+    const previous = current_task.enable_access_to_user_memory_count;
+    current_task.enable_access_to_user_memory_count = previous - 1;
+
+    if (previous == 1) {
+        arch.paging.disableAccessToUserMemory();
+    }
+}
+
+pub fn onInterruptEntry() struct { *Task, InterruptExit } {
+    if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+
+    const executor = arch.getCurrentExecutor();
+    const current_task = executor.current_task;
+    if (core.is_debug) std.debug.assert(current_task.state.running == executor);
+
+    const previous_interrupt_disable_count = current_task.interrupt_disable_count;
+    current_task.interrupt_disable_count = previous_interrupt_disable_count + 1;
+    current_task.known_executor = current_task.state.running;
+
+    const previous_enable_access_to_user_memory_count = current_task.enable_access_to_user_memory_count;
+    current_task.enable_access_to_user_memory_count = 0;
+    if (previous_enable_access_to_user_memory_count != 0) {
+        @branchHint(.unlikely);
+        arch.paging.disableAccessToUserMemory();
+    }
+
+    return .{
+        current_task, .{
+            .previous_interrupt_disable_count = previous_interrupt_disable_count,
+            .previous_enable_access_to_user_memory_count = previous_enable_access_to_user_memory_count,
+        },
+    };
+}
+
+pub const InterruptExit = struct {
+    previous_interrupt_disable_count: u32,
+    previous_enable_access_to_user_memory_count: u32,
+
+    pub fn exit(interrupt_exit: InterruptExit, current_task: *Task) void {
+        current_task.interrupt_disable_count = interrupt_exit.previous_interrupt_disable_count;
+
+        current_task.enable_access_to_user_memory_count = interrupt_exit.previous_enable_access_to_user_memory_count;
+        if (current_task.enable_access_to_user_memory_count == 0) {
+            @branchHint(.likely);
+            arch.paging.disableAccessToUserMemory();
+        } else {
+            arch.paging.enableAccessToUserMemory();
+        }
+
+        current_task.setKnownExecutor();
+    }
+};
+
+/// Drops the current task out of the scheduler.
+///
+/// Decrements the reference count of the task to remove the implicit self reference.
+///
+/// The scheduler lock must be held when this function is called.
+pub fn drop(current_task: *Task) noreturn {
+    if (core.is_debug) {
+        cascade.scheduler.assertSchedulerLocked(current_task);
+        std.debug.assert(current_task.spinlocks_held == 1); // only the scheduler lock is held
+    }
+
+    cascade.scheduler.drop(current_task, .{
+        .action = struct {
+            fn action(scheduler_task: *Task, old_task: *cascade.Task, _: usize) void {
+                old_task.state = .{ .dropped = .{} };
+                old_task.decrementReferenceCount(scheduler_task);
+            }
+        }.action,
+        .arg = undefined,
+    });
+    @panic("dropped task returned");
+}
+
+/// Called when panicking to fetch the current task.
+///
+/// Interrupts must already be disabled when this function is called.
+pub fn panicked() *Task {
+    std.debug.assert(!arch.interrupts.areEnabled());
+
+    const executor = arch.getCurrentExecutor();
+    const current_task = executor.current_task;
+
+    current_task.interrupt_disable_count += 1;
+    current_task.known_executor = executor;
+
+    return current_task;
+}
 
 pub const CreateKernelTaskOptions = struct {
     name: Name,
@@ -271,24 +268,6 @@ pub fn createKernelTask(current_task: *Task, options: CreateKernelTaskOptions) !
     return task;
 }
 
-pub fn incrementReferenceCount(task: *Task) void {
-    _ = task.reference_count.fetchAdd(1, .acq_rel);
-}
-
-/// Decrements the reference count of the task.
-///
-/// If it reaches zero the task is submitted to the task cleanup service.
-///
-/// This must not be called when the task is the current task, see `Context.drop` instead.
-pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
-    if (core.is_debug) std.debug.assert(task != current_task);
-    if (task.reference_count.fetchSub(1, .acq_rel) != 1) {
-        @branchHint(.likely);
-        return;
-    }
-    cascade.services.task_cleanup.queueTaskForCleanup(current_task, task);
-}
-
 pub fn format(
     task: *const Task,
     writer: *std.Io.Writer,
@@ -307,6 +286,15 @@ pub fn format(
 
 pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {
     return @fieldParentPtr("next_task_node", node);
+}
+
+/// Set the `known_executor` field of the task based on the state of the task.
+inline fn setKnownExecutor(current_task: *Task) void {
+    if (current_task.interrupt_disable_count != 0) {
+        current_task.known_executor = current_task.state.running;
+    } else {
+        current_task.known_executor = null;
+    }
 }
 
 pub const internal = struct {
@@ -330,11 +318,9 @@ pub const internal = struct {
             .state = .ready,
             .stack = preconstructed_stack,
             .environment = options.environment,
-            .context = .{
-                .executor = null,
-                .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-                .scheduler_locked = true, // fresh tasks start with the scheduler locked
-            },
+            .known_executor = null,
+            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
+            .scheduler_locked = true, // fresh tasks start with the scheduler locked
         };
 
         task.stack.reset();
@@ -541,7 +527,7 @@ pub const init = struct {
     pub fn initializeBootstrapInitTask(
         bootstrap_init_task: *cascade.Task,
         bootstrap_executor: *cascade.Executor,
-    ) !*Task {
+    ) !void {
         bootstrap_init_task.* = .{
             .name = try .fromSlice("bootstrap init"),
 
@@ -550,13 +536,10 @@ pub const init = struct {
 
             .environment = .kernel,
 
-            .context = .{
-                .executor = bootstrap_executor,
-                .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-                .scheduler_locked = false, // init tasks don't start with the scheduler locked
-            },
+            .known_executor = bootstrap_executor,
+            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
+            .scheduler_locked = false, // init tasks don't start with the scheduler locked
         };
-        return bootstrap_init_task;
     }
 
     pub fn createAndAssignInitTask(
@@ -570,11 +553,9 @@ pub const init = struct {
         errdefer comptime unreachable;
 
         task.state = .{ .running = executor };
-        task.context = .{
-            .executor = executor,
-            .spinlocks_held = 0, // init tasks don't start with the scheduler locked
-            .scheduler_locked = false, // init tasks don't start with the scheduler locked
-        };
+        task.known_executor = executor;
+        task.spinlocks_held = 0; // init tasks don't start with the scheduler locked
+        task.scheduler_locked = false; // init tasks don't start with the scheduler locked
 
         task.stack.reset(); // we don't care about the `function` and arguments
 
@@ -592,11 +573,9 @@ pub const init = struct {
             .state = .ready,
             .stack = try .createStack(current_task),
             .environment = .kernel,
-            .context = .{
-                .executor = null,
-                .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-                .scheduler_locked = true, // fresh tasks start with the scheduler locked
-            },
+            .known_executor = null,
+            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
+            .scheduler_locked = true, // fresh tasks start with the scheduler locked
             .is_scheduler_task = true,
         };
     }

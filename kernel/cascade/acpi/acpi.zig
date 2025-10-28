@@ -18,8 +18,8 @@ pub fn tryShutdown(current_task: *cascade.Task) !void {
 
     try uacpi.prepareForSleep(.S5);
 
-    current_task.context.incrementInterruptDisable();
-    defer current_task.context.decrementInterruptDisable();
+    current_task.incrementInterruptDisable();
+    defer current_task.decrementInterruptDisable();
 
     try uacpi.sleep(.S5);
 }
@@ -115,7 +115,7 @@ pub const init = struct {
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        const current_task: *cascade.Task = cascade.Task.Context.current().task();
+        const current_task: *cascade.Task = .current();
         log.warn(current_task, "power button pressed", .{});
         tryShutdown(current_task) catch |err| {
             std.debug.panic("failed to shutdown: {t}", .{err});

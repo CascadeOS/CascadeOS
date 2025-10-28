@@ -622,7 +622,7 @@ pub const init = struct {
         )(current_task, executor, architecture_processor_id);
     }
 
-    /// Load the executor of the provided `Context` as the current executor.
+    /// Load the executor that `current_task` is running on as the current executor.
     pub fn loadExecutor(current_task: *cascade.Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
@@ -991,7 +991,7 @@ pub const Functions = struct {
             architecture_processor_id: u64,
         ) void = null,
 
-        /// Load the executor of the provided `Context` as the current executor.
+        /// Load the executor that `current_task` is running on as the current executor.
         loadExecutor: ?fn (current_task: *cascade.Task) void = null,
 
         /// Capture any system information that can be without using mmio.

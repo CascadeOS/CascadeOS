@@ -35,7 +35,7 @@ pub fn renderInterruptSourcePanicMessage(
     args: anytype,
 ) []const u8 {
     // TODO: this treatment should be given to all panics
-    std.debug.assert(current_executor == current_task.context.executor.?);
+    std.debug.assert(current_executor == current_task.known_executor.?);
 
     const full_buffer = current_executor.interrupt_source_panic_buffer[0..];
 

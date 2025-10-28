@@ -31,9 +31,9 @@ pub fn queueProcessForCleanup(
 fn execute(current_task: *cascade.Task, _: usize, _: usize) noreturn {
     if (core.is_debug) {
         std.debug.assert(current_task == globals.process_cleanup_task);
-        std.debug.assert(current_task.context.interrupt_disable_count == 0);
-        std.debug.assert(current_task.context.spinlocks_held == 0);
-        std.debug.assert(!current_task.context.scheduler_locked);
+        std.debug.assert(current_task.interrupt_disable_count == 0);
+        std.debug.assert(current_task.spinlocks_held == 0);
+        std.debug.assert(!current_task.scheduler_locked);
         std.debug.assert(arch.interrupts.areEnabled());
     }
 

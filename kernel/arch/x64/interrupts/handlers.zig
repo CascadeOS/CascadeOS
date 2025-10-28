@@ -26,7 +26,7 @@ pub fn nonMaskableInterruptHandler(
 pub fn pageFaultHandler(
     current_task: *cascade.Task,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    interrupt_exit: cascade.Task.Context.InterruptExit,
+    interrupt_exit: cascade.Task.InterruptExit,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -110,6 +110,6 @@ pub fn unhandledInterrupt(
     _: usize,
     _: usize,
 ) void {
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
     std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });
 }

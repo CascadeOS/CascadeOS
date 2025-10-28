@@ -63,8 +63,8 @@ pub fn park(parker: *Parker, current_task: *cascade.Task) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
-                old_task.context.spinlocks_held -= 1;
-                old_task.context.interrupt_disable_count -= 1;
+                old_task.spinlocks_held -= 1;
+                old_task.interrupt_disable_count -= 1;
 
                 inner_parker.parked_task = old_task;
                 inner_parker.lock.unsafeUnlock();
@@ -98,7 +98,7 @@ pub fn unpark(
 
     parked_task.state = .ready;
 
-    const scheduler_already_locked = current_task.context.scheduler_locked;
+    const scheduler_already_locked = current_task.scheduler_locked;
 
     switch (scheduler_already_locked) {
         true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(current_task),

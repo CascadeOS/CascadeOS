@@ -54,7 +54,7 @@ pub const functions: arch.Functions = .{
                 current_task: *cascade.Task,
                 architecture_processor_id: u64,
             ) void {
-                current_task.context.executor.?.arch_specific = .{
+                current_task.known_executor.?.arch_specific = .{
                     .mpidr = architecture_processor_id,
                 };
             }
@@ -62,7 +62,7 @@ pub const functions: arch.Functions = .{
 
         .loadExecutor = struct {
             fn loadExecutor(current_task: *cascade.Task) void {
-                arm.registers.TPIDR_EL1.write(@intFromPtr(current_task.context.executor.?));
+                arm.registers.TPIDR_EL1.write(@intFromPtr(current_task.known_executor.?));
             }
         }.loadExecutor,
     },

@@ -30,7 +30,7 @@ pub fn maybePreempt(current_task: *cascade.Task) void {
 
     if (core.is_debug) {
         assertSchedulerNotLocked(current_task);
-        std.debug.assert(current_task.context.spinlocks_held == 0);
+        std.debug.assert(current_task.spinlocks_held == 0);
         std.debug.assert(current_task.state == .running);
     }
 
@@ -50,7 +50,7 @@ pub fn maybePreempt(current_task: *cascade.Task) void {
 pub fn yield(current_task: *cascade.Task) void {
     if (core.is_debug) {
         assertSchedulerLocked(current_task);
-        std.debug.assert(current_task.context.spinlocks_held == 1); // only the scheduler lock is held
+        std.debug.assert(current_task.spinlocks_held == 1); // only the scheduler lock is held
     }
 
     const new_task_node = globals.ready_to_run.pop() orelse return; // no tasks to run
@@ -119,8 +119,8 @@ pub fn drop(current_task: *cascade.Task, deferred_action: DeferredAction) void {
     if (core.is_debug) {
         std.debug.assert(!new_task.is_scheduler_task);
         std.debug.assert(current_task != new_task);
-        std.debug.assert(new_task.context.scheduler_locked);
-        std.debug.assert(new_task.context.spinlocks_held == 1); // only the scheduler lock is held
+        std.debug.assert(new_task.scheduler_locked);
+        std.debug.assert(new_task.spinlocks_held == 1); // only the scheduler lock is held
         std.debug.assert(new_task.state == .ready);
     }
 
@@ -150,8 +150,8 @@ fn switchToIdleDeferredAction(
             );
             if (core.is_debug) {
                 assertSchedulerLocked(scheduler_task);
-                std.debug.assert(scheduler_task.context.interrupt_disable_count == 1);
-                std.debug.assert(scheduler_task.context.spinlocks_held == 1);
+                std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+                std.debug.assert(scheduler_task.spinlocks_held == 1);
             }
 
             idle(scheduler_task);
@@ -161,14 +161,14 @@ fn switchToIdleDeferredAction(
 
     const old_task = current_task;
 
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
     const scheduler_task = &executor.scheduler_task;
     if (core.is_debug) std.debug.assert(scheduler_task.state == .ready);
 
     beforeSwitchTask(executor, old_task, scheduler_task);
 
     scheduler_task.state = .{ .running = executor };
-    scheduler_task.context.executor = executor;
+    scheduler_task.known_executor = executor;
     executor.current_task = scheduler_task;
 
     arch.scheduling.callFourArgs(
@@ -188,24 +188,24 @@ fn switchToIdleDeferredAction(
     };
 
     // returning to the old task
-    if (core.is_debug) std.debug.assert(old_task.context.executor == old_task.state.running);
+    if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
 }
 
 fn switchToTaskFromIdleYield(current_task: *cascade.Task, new_task: *cascade.Task) void {
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
     const scheduler_task = current_task;
     if (core.is_debug) std.debug.assert(&executor.scheduler_task == scheduler_task);
 
     beforeSwitchTask(executor, scheduler_task, new_task);
 
     new_task.state = .{ .running = executor };
-    new_task.context.executor = executor;
+    new_task.known_executor = executor;
     executor.current_task = new_task;
 
     scheduler_task.state = .ready;
 
     if (core.is_debug) std.debug.assert(
-        switch (scheduler_task.context.interrupt_disable_count) {
+        switch (scheduler_task.interrupt_disable_count) {
             1, 2 => true, // either we are here due to an explicit yield (1) or due to preemption by an interrupt (2)
             else => false,
         },
@@ -214,7 +214,7 @@ fn switchToTaskFromIdleYield(current_task: *cascade.Task, new_task: *cascade.Tas
     // we are abadoning the current scheduler tasks call stack, which means the interrupt increment that would have
     // happened if we are here due to preemption by an interrupt will not be decremented normally, so we set it to 1
     // which is the value is is expected to have upon entry to idle
-    scheduler_task.context.interrupt_disable_count = 1;
+    scheduler_task.interrupt_disable_count = 1;
 
     arch.scheduling.switchTask(null, new_task);
     @panic("task returned");
@@ -224,13 +224,13 @@ fn switchToTaskFromTaskYield(
     current_task: *cascade.Task,
     new_task: *cascade.Task,
 ) void {
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
     const old_task = current_task;
 
     beforeSwitchTask(executor, old_task, new_task);
 
     new_task.state = .{ .running = executor };
-    new_task.context.executor = executor;
+    new_task.known_executor = executor;
     executor.current_task = new_task;
 
     old_task.state = .ready;
@@ -238,7 +238,7 @@ fn switchToTaskFromTaskYield(
     arch.scheduling.switchTask(old_task, new_task);
 
     // returning to the old task
-    if (core.is_debug) std.debug.assert(old_task.context.executor == old_task.state.running);
+    if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
 }
 
 fn switchToTaskFromTaskDeferredAction(
@@ -256,7 +256,7 @@ fn switchToTaskFromTaskDeferredAction(
             const inner_old_task: *cascade.Task = @ptrFromInt(old_task_addr);
             const inner_new_task: *cascade.Task = @ptrFromInt(new_task_addr);
 
-            const executor = inner_old_task.context.executor.?;
+            const executor = inner_old_task.known_executor.?;
 
             const scheduler_task = &executor.scheduler_task;
 
@@ -268,12 +268,12 @@ fn switchToTaskFromTaskDeferredAction(
             );
             if (core.is_debug) {
                 assertSchedulerLocked(scheduler_task);
-                std.debug.assert(scheduler_task.context.interrupt_disable_count == 1);
-                std.debug.assert(scheduler_task.context.spinlocks_held == 1);
+                std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+                std.debug.assert(scheduler_task.spinlocks_held == 1);
             }
 
             inner_new_task.state = .{ .running = executor };
-            inner_new_task.context.executor = executor;
+            inner_new_task.known_executor = executor;
             executor.current_task = inner_new_task;
 
             scheduler_task.state = .ready;
@@ -283,7 +283,7 @@ fn switchToTaskFromTaskDeferredAction(
         }
     };
 
-    const executor = current_task.context.executor.?;
+    const executor = current_task.known_executor.?;
     const old_task = current_task;
 
     beforeSwitchTask(executor, old_task, new_task);
@@ -291,7 +291,7 @@ fn switchToTaskFromTaskDeferredAction(
     const scheduler_task = &executor.scheduler_task;
 
     scheduler_task.state = .{ .running = executor };
-    scheduler_task.context.executor = executor;
+    scheduler_task.known_executor = executor;
     executor.current_task = scheduler_task;
 
     arch.scheduling.callFourArgs(
@@ -311,28 +311,28 @@ fn switchToTaskFromTaskDeferredAction(
     };
 
     // returning to the old task
-    if (core.is_debug) std.debug.assert(old_task.context.executor == old_task.state.running);
+    if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
 }
 
 pub fn lockScheduler(current_task: *cascade.Task) void {
     globals.lock.lock(current_task);
-    current_task.context.scheduler_locked = true;
+    current_task.scheduler_locked = true;
 }
 
 pub fn unlockScheduler(current_task: *cascade.Task) void {
-    current_task.context.scheduler_locked = false;
+    current_task.scheduler_locked = false;
     globals.lock.unlock(current_task);
 }
 
 /// Asserts that the scheduler lock is held by the current task.
 pub inline fn assertSchedulerLocked(current_task: *cascade.Task) void {
-    std.debug.assert(current_task.context.scheduler_locked);
+    std.debug.assert(current_task.scheduler_locked);
     std.debug.assert(globals.lock.isLockedByCurrent(current_task));
 }
 
 /// Asserts that the scheduler lock is not held by the current task.
 pub inline fn assertSchedulerNotLocked(current_task: *cascade.Task) void {
-    std.debug.assert(!current_task.context.scheduler_locked);
+    std.debug.assert(!current_task.scheduler_locked);
     std.debug.assert(!globals.lock.isLockedByCurrent(current_task));
 }
 
@@ -343,9 +343,9 @@ fn beforeSwitchTask(
 ) void {
     arch.scheduling.beforeSwitchTask(executor, old_task, new_task);
 
-    if (old_task.context.enable_access_to_user_memory_count != new_task.context.enable_access_to_user_memory_count) {
+    if (old_task.enable_access_to_user_memory_count != new_task.enable_access_to_user_memory_count) {
         @branchHint(.unlikely); // we expect both to be 0 most of the time
-        if (new_task.context.enable_access_to_user_memory_count == 0) {
+        if (new_task.enable_access_to_user_memory_count == 0) {
             @branchHint(.likely);
             arch.paging.disableAccessToUserMemory();
         } else {
@@ -381,15 +381,15 @@ pub fn taskEntry(
     };
 
     lockScheduler(current_task);
-    current_task.context.drop();
+    current_task.drop();
     unreachable;
 }
 
 fn idle(current_task: *cascade.Task) callconv(.c) noreturn {
     if (core.is_debug) {
-        std.debug.assert(current_task.context.scheduler_locked);
-        std.debug.assert(current_task.context.interrupt_disable_count == 1);
-        std.debug.assert(current_task.context.spinlocks_held == 1);
+        std.debug.assert(current_task.scheduler_locked);
+        std.debug.assert(current_task.interrupt_disable_count == 1);
+        std.debug.assert(current_task.spinlocks_held == 1);
         std.debug.assert(!arch.interrupts.areEnabled());
     }
 

@@ -42,7 +42,7 @@ pub const allocator: std.mem.Allocator = .{
 
 /// This should only be called by uACPI.
 pub fn freeWithNoSize(ptr: [*]u8) void {
-    globals.heap_arena.deallocate(cascade.Task.Context.current().task(), allocator_impl.getAllocationHeader(ptr).*);
+    globals.heap_arena.deallocate(.current(), allocator_impl.getAllocationHeader(ptr).*);
 }
 
 pub fn allocateSpecial(
@@ -111,7 +111,7 @@ pub const allocator_impl = struct {
         const full_len = len + alignment_bytes - 1 + @sizeOf(Allocation);
 
         const allocation = globals.heap_arena.allocate(
-            cascade.Task.Context.current().task(),
+            .current(),
             full_len,
             .instant_fit,
         ) catch return null;
@@ -156,7 +156,7 @@ pub const allocator_impl = struct {
         _: std.mem.Alignment,
         _: usize,
     ) void {
-        globals.heap_arena.deallocate(cascade.Task.Context.current().task(), getAllocationHeader(memory.ptr).*);
+        globals.heap_arena.deallocate(.current(), getAllocationHeader(memory.ptr).*);
     }
 
     inline fn getAllocationHeader(ptr: [*]u8) *align(1) Allocation {

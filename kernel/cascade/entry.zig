@@ -21,7 +21,7 @@ pub fn onPageFault(
     page_fault_details: cascade.mem.PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
-    current_task.context.decrementInterruptDisable();
+    current_task.decrementInterruptDisable();
     switch (page_fault_details.faulting_environment) {
         .kernel => cascade.mem.onKernelPageFault(
             current_task,

@@ -50,7 +50,7 @@ pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interr
 }
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const current_task, const interrupt_exit = cascade.Task.Context.onInterruptEntry();
+    const current_task, const interrupt_exit = cascade.Task.onInterruptEntry();
     defer interrupt_exit.exit(current_task);
     globals.handlers[interrupt_frame.vector_number.full].call(
         current_task,
@@ -271,7 +271,7 @@ const Handler = struct {
         page_fault: *const fn (
             current_task: *cascade.Task,
             frame: arch.interrupts.InterruptFrame,
-            interrupt_exit: cascade.Task.Context.InterruptExit,
+            interrupt_exit: cascade.Task.InterruptExit,
         ) void,
     };
 
@@ -279,7 +279,7 @@ const Handler = struct {
         handler: *const Handler,
         current_task: *cascade.Task,
         interrupt_frame: *InterruptFrame,
-        interrupt_exit: cascade.Task.Context.InterruptExit,
+        interrupt_exit: cascade.Task.InterruptExit,
     ) void {
         switch (handler.func) {
             .normal => |func| func(
