@@ -121,7 +121,9 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, current_task: *casc
         std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
     }
 
-    try address_space.unmap(current_task, address_space.range);
+    address_space.unmap(current_task, address_space.range) catch |err| switch (err) {
+        error.OutOfMemory => unreachable, // as we are freeing the entire address space we do not need to split any entries
+    };
 
     address_space.entries_version = 0;
 }

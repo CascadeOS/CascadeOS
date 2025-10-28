@@ -138,27 +138,7 @@ pub const internal = struct {
         }
         process.threads.clearAndFree(cascade.mem.heap.allocator);
 
-        if (true) { // TODO: actually implement cleanup of the address space
-            log.err(current_task, "process destroy called - not fully implemented - leaking address space", .{});
-
-            const frame = cascade.mem.phys.allocator.allocate(current_task) catch
-                @panic("janky leaking process destory failed to allocate frame");
-
-            const page_table: arch.paging.PageTable = arch.paging.PageTable.create(frame);
-            cascade.mem.globals.core_page_table.copyTopLevelInto(page_table);
-
-            process.address_space.init(current_task, .{
-                .name = cascade.mem.AddressSpace.Name.fromSlice(
-                    process.name.constSlice(),
-                ) catch unreachable, // ensured in `cascade.config`
-                .range = cascade.config.user_address_space_range,
-                .page_table = page_table,
-                .environment = .{ .user = process },
-            }) catch @panic("janky leaking process destroy failed to init address space");
-        } else {
-            // TODO: not called as `reinitializeAndUnmapAll` is not implemented
-            process.address_space.reinitializeAndUnmapAll(current_task);
-        }
+        process.address_space.reinitializeAndUnmapAll(current_task);
 
         globals.cache.deallocate(current_task, process);
     }
