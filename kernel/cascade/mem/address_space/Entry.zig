@@ -50,13 +50,13 @@ needs_copy: bool,
 
 wired_count: u32,
 
-pub fn create(context: *cascade.Context) !*Entry {
+pub fn create(context: *cascade.Task.Context) !*Entry {
     var entry: [1]*Entry = undefined;
     try createMany(context, &entry);
     return entry[0];
 }
 
-pub fn createMany(context: *cascade.Context, items: []*Entry) !void {
+pub fn createMany(context: *cascade.Task.Context, items: []*Entry) !void {
     return globals.entry_cache.allocateMany(context, items) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
         error.ItemConstructionFailed => unreachable, // no constructor is provided
@@ -64,7 +64,7 @@ pub fn createMany(context: *cascade.Context, items: []*Entry) !void {
     };
 }
 
-pub fn destroy(entry: *Entry, context: *cascade.Context) void {
+pub fn destroy(entry: *Entry, context: *cascade.Task.Context) void {
     globals.entry_cache.deallocate(context, entry);
 }
 
@@ -77,7 +77,7 @@ pub fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
 /// This must be observed to be `true` before `merge` is can be called on the entries.
 ///
 /// Can only be `true` when `second_entry` immediately follows `first_entry` in the address space.
-pub fn canMerge(first_entry: *const Entry, context: *cascade.Context, second_entry: *const Entry) bool {
+pub fn canMerge(first_entry: *const Entry, context: *cascade.Task.Context, second_entry: *const Entry) bool {
     if (first_entry.protection != second_entry.protection) return false;
     if (first_entry.max_protection != second_entry.max_protection) return false;
     if (first_entry.copy_on_write != second_entry.copy_on_write) return false;
@@ -171,7 +171,7 @@ pub fn canMerge(first_entry: *const Entry, context: *cascade.Context, second_ent
 ///  - the entries are mergable, see `canMerge`
 ///  - the `second_entry` immediately follows` `first_entry` in the address space
 ///  - after this function `second_entry` is no longer treated as valid
-pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *const Entry) void {
+pub fn merge(first_entry: *Entry, context: *cascade.Task.Context, second_entry: *const Entry) void {
     const new_size = first_entry.range.size.add(second_entry.range.size);
 
     if (first_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
@@ -238,7 +238,7 @@ pub fn merge(first_entry: *Entry, context: *cascade.Context, second_entry: *cons
 ///  - `split_offset` is not `.zero`
 ///  - `split_offset` is less than or equal to `first_entry.range.size`
 ///  - `split_offset` is a multiple of the standard page size
-pub fn split(first_entry: *Entry, context: *cascade.Context, new_second_entry: *Entry, split_offset: core.Size) void {
+pub fn split(first_entry: *Entry, context: *cascade.Task.Context, new_second_entry: *Entry, split_offset: core.Size) void {
     if (core.is_debug) {
         std.debug.assert(first_entry != new_second_entry);
         std.debug.assert(first_entry.range.size.notEqual(.zero));
@@ -329,7 +329,7 @@ pub fn shrink(
 }
 
 /// Prints the entry.
-pub fn print(entry: *const Entry, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(entry: *const Entry, context: *cascade.Task.Context, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
@@ -392,7 +392,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(context: *cascade.Context) !void {
+    pub fn initializeCaches(context: *cascade.Task.Context) !void {
         globals.entry_cache.init(context, .{
             .name = try .fromSlice("address space entry"),
         });

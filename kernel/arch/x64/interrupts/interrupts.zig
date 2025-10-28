@@ -12,7 +12,7 @@ const Idt = @import("Idt.zig");
 const interrupt_handlers = @import("handlers.zig");
 
 pub fn allocateInterrupt(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
     arg1: usize,
     arg2: usize,
@@ -32,7 +32,7 @@ pub fn allocateInterrupt(
     return @enumFromInt(interrupt_number);
 }
 
-pub fn deallocateInterrupt(interrupt: Interrupt, context: *cascade.Context) void {
+pub fn deallocateInterrupt(interrupt: Interrupt, context: *cascade.Task.Context) void {
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
@@ -50,7 +50,7 @@ pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interr
 }
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const context, const interrupt_exit = cascade.Context.onInterruptEntry();
+    const context, const interrupt_exit = cascade.Task.Context.onInterruptEntry();
     defer interrupt_exit.exit(context);
     globals.handlers[interrupt_frame.vector_number.full].call(
         context,
@@ -185,7 +185,7 @@ pub const InterruptFrame = extern struct {
     /// Returns the environment that the interrupt was triggered from.
     pub fn environment(
         interrupt_frame: *const InterruptFrame,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
     ) cascade.Environment {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
@@ -269,17 +269,17 @@ const Handler = struct {
     const Func = union(enum) {
         normal: arch.interrupts.Interrupt.Handler,
         page_fault: *const fn (
-            context: *cascade.Context,
+            context: *cascade.Task.Context,
             frame: arch.interrupts.InterruptFrame,
-            interrupt_exit: cascade.Context.InterruptExit,
+            interrupt_exit: cascade.Task.Context.InterruptExit,
         ) void,
     };
 
     inline fn call(
         handler: *const Handler,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         interrupt_frame: *InterruptFrame,
-        interrupt_exit: cascade.Context.InterruptExit,
+        interrupt_exit: cascade.Task.Context.InterruptExit,
     ) void {
         switch (handler.func) {
             .normal => |func| func(
@@ -340,7 +340,7 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(context: *cascade.Context) void {
+    pub fn initializeInterruptRouting(context: *cascade.Task.Context) void {
         globals.interrupt_arena.init(
             context,
             .{

@@ -71,7 +71,7 @@ const FaultCheckError =
 /// Called `uvm_faultcheck` in OpenBSD uvm.
 pub fn faultCheck(
     fault_info: *FaultInfo,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     anonymous_page: *?*AnonymousPage,
     fault_type: cascade.mem.PageFaultDetails.FaultType,
 ) FaultCheckError!void {
@@ -173,7 +173,7 @@ pub fn faultCheck(
 /// Handle a object or zero fill fault.
 ///
 /// Called `uvm_fault_lower` in OpenBSD uvm.
-pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) error{ Restart, OutOfMemory }!void {
+pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Task.Context) error{ Restart, OutOfMemory }!void {
     log.verbose(context, "handling object or zero fill fault", .{});
 
     const opt_anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map;
@@ -328,7 +328,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, context: *cascade.Context) 
 /// If `write_lock` is `true` the `entries_lock` is acquired in write mode.
 ///
 /// Called `uvmfault_lookup` in OpenBSD uvm.
-fn faultLookup(fault_info: *FaultInfo, context: *cascade.Context, lock_type: core.LockType) bool {
+fn faultLookup(fault_info: *FaultInfo, context: *cascade.Task.Context, lock_type: core.LockType) bool {
     switch (lock_type) {
         .read => fault_info.address_space.entries_lock.readLock(context),
         .write => fault_info.address_space.entries_lock.writeLock(context),
@@ -359,7 +359,7 @@ fn faultLookup(fault_info: *FaultInfo, context: *cascade.Context, lock_type: cor
 /// Called `uvmfault_promote` in OpenBSD uvm.
 fn promote(
     fault_info: *FaultInfo,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     object_page: ObjectPage,
     anonymous_page: **AnonymousPage,
     page: **Page,
@@ -412,7 +412,7 @@ fn promote(
 /// The `entries_lock` must be unlocked.
 ///
 /// Called `uvmfault_amapcopy` in OpenBSD uvm.
-fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Context) error{ NotMapped, OutOfMemory }!void {
+fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Task.Context) error{ NotMapped, OutOfMemory }!void {
     // lookup entry and lock `entries_lock` for writing
     if (!fault_info.faultLookup(context, .write)) return error.NotMapped;
     defer fault_info.address_space.entries_lock.writeUnlock(context);
@@ -436,7 +436,7 @@ fn anonymousMapCopy(fault_info: *FaultInfo, context: *cascade.Context) error{ No
 /// Called `uvm_fault_upper_upgrade` in OpenBSD uvm.
 fn faultAnonymousMapLockUpgrade(
     fault_info: *FaultInfo,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     anonymous_map: *AnonymousMap,
 ) bool {
     if (core.is_debug) {
@@ -474,7 +474,7 @@ fn faultAnonymousMapLockUpgrade(
 /// Called `uvmfault_unlockall` in OpenBSD uvm.
 fn unlockAll(
     fault_info: *FaultInfo,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     opt_anonymous_map: ?*AnonymousMap,
     opt_object: ?*Object,
 ) void {

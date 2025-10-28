@@ -26,7 +26,7 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         if (!shouldUseTsc()) return;
@@ -38,7 +38,7 @@ pub const init = struct {
             .initialization = if (x64.info.tsc_tick_duration_fs != null)
                 .{
                     .simple = struct {
-                        fn simple(inner_context: *cascade.Context) void {
+                        fn simple(inner_context: *cascade.Task.Context) void {
                             std.debug.assert(shouldUseTsc());
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
@@ -93,7 +93,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());

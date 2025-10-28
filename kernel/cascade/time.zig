@@ -64,7 +64,7 @@ pub const init = struct {
         globals.kernel_start_time = .{ .kernel_start = arch.init.getStandardWallclockStartTime() };
     }
 
-    pub fn initializeTime(context: *cascade.Context) !void {
+    pub fn initializeTime(context: *cascade.Task.Context) !void {
         var candidate_time_sources: CandidateTimeSources = .{};
         arch.init.registerArchitecturalTimeSources(context, &candidate_time_sources);
 
@@ -128,7 +128,7 @@ pub const init = struct {
 
         pub fn addTimeSource(
             candidate_time_sources: *CandidateTimeSources,
-            context: *cascade.Context,
+            context: *cascade.Task.Context,
             time_source: CandidateTimeSource,
         ) void {
             if (time_source.reference_counter != null) {
@@ -180,7 +180,7 @@ pub const init = struct {
 
         fn initialize(
             candidate_time_source: *CandidateTimeSource,
-            context: *cascade.Context,
+            context: *cascade.Task.Context,
             reference_counter: ReferenceCounter,
         ) void {
             if (candidate_time_source.initialized) return;
@@ -194,8 +194,8 @@ pub const init = struct {
 
         pub const Initialization = union(enum) {
             none,
-            simple: *const fn (context: *cascade.Context) void,
-            calibration_required: *const fn (context: *cascade.Context, reference_counter: ReferenceCounter) void,
+            simple: *const fn (context: *cascade.Task.Context) void,
+            calibration_required: *const fn (context: *cascade.Task.Context, reference_counter: ReferenceCounter) void,
         };
 
         pub const ReferenceCounterOptions = struct {
@@ -268,7 +268,7 @@ pub const init = struct {
     };
 
     fn getReferenceCounter(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         time_sources: []CandidateTimeSource,
     ) ReferenceCounter {
         const time_source = findAndInitializeTimeSource(context, time_sources, .{
@@ -287,7 +287,7 @@ pub const init = struct {
     }
 
     fn getWallclockTimeSource(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) CandidateTimeSource.WallclockOptions {
@@ -312,7 +312,7 @@ pub const init = struct {
     }
 
     fn getPerExecutorPeriodicTimeSource(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) CandidateTimeSource.PerExecutorPeriodicOptions {
@@ -336,7 +336,7 @@ pub const init = struct {
     };
 
     fn findAndInitializeTimeSource(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         time_sources: []CandidateTimeSource,
         query: TimeSourceQuery,
         reference_counter: ReferenceCounter,

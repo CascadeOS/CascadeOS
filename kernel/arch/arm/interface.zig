@@ -44,14 +44,14 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(_: *cascade.Context) ?arch.init.InitOutput {
+            fn tryGetSerialOutput(_: *cascade.Task.Context) ?arch.init.InitOutput {
                 return null;
             }
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                context: *cascade.Context,
+                context: *cascade.Task.Context,
                 architecture_processor_id: u64,
             ) void {
                 context.executor.?.arch_specific = .{
@@ -61,7 +61,7 @@ pub const functions: arch.Functions = .{
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(context: *cascade.Context) void {
+            fn loadExecutor(context: *cascade.Task.Context) void {
                 arm.registers.TPIDR_EL1.write(@intFromPtr(context.executor.?));
             }
         }.loadExecutor,

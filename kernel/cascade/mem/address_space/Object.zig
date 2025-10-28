@@ -47,7 +47,7 @@ pub fn incrementReferenceCount(object: *Object) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(object: *Object, context: *cascade.Context) void {
+pub fn decrementReferenceCount(object: *Object, context: *cascade.Task.Context) void {
     if (core.is_debug) {
         std.debug.assert(object.reference_count != 0);
         std.debug.assert(object.lock.isWriteLocked());
@@ -71,7 +71,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         object_reference: Reference,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -108,7 +108,7 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     object: *Object,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {

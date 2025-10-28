@@ -10,7 +10,7 @@ const core = @import("core");
 const log = cascade.debug.log.scoped(.process_cleanup);
 
 pub fn queueProcessForCleanup(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     process: *cascade.Process,
 ) void {
     if (process.queued_for_cleanup.cmpxchgStrong(
@@ -28,7 +28,7 @@ pub fn queueProcessForCleanup(
     globals.parker.unpark(context);
 }
 
-fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
+fn execute(context: *cascade.Task.Context, _: usize, _: usize) noreturn {
     if (core.is_debug) {
         std.debug.assert(context.task() == globals.process_cleanup_task);
         std.debug.assert(context.interrupt_disable_count == 0);
@@ -49,7 +49,7 @@ fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
     }
 }
 
-fn handleProcess(context: *cascade.Context, process: *cascade.Process) void {
+fn handleProcess(context: *cascade.Task.Context, process: *cascade.Process) void {
     if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
     process.queued_for_cleanup.store(false, .release);
@@ -91,7 +91,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcessCleanupService(context: *cascade.Context) !void {
+    pub fn initializeProcessCleanupService(context: *cascade.Task.Context) !void {
         globals.process_cleanup_task = try cascade.Task.createKernelTask(context, .{
             .name = try .fromSlice("process cleanup"),
             .function = execute,

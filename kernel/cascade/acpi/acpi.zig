@@ -13,7 +13,7 @@ const uacpi = @import("uacpi.zig");
 
 const log = cascade.debug.log.scoped(.acpi);
 
-pub fn tryShutdown(context: *cascade.Context) !void {
+pub fn tryShutdown(context: *cascade.Task.Context) !void {
     if (!globals.acpi_initialized) return;
 
     try uacpi.prepareForSleep(.S5);
@@ -58,7 +58,7 @@ pub const init = struct {
         init_globals.acpi_present = true;
     }
 
-    pub fn logAcpiTables(context: *cascade.Context) !void {
+    pub fn logAcpiTables(context: *cascade.Task.Context) !void {
         if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
         // `directMapFromPhysical` is used as the non-cached direct map is not yet initialized
@@ -83,7 +83,7 @@ pub const init = struct {
     /// Initialize the ACPI subsystem.
     ///
     /// NOP if ACPI is not present.
-    pub fn initialize(context: *cascade.Context) !void {
+    pub fn initialize(context: *cascade.Task.Context) !void {
         if (!init_globals.acpi_present) {
             init_log.debug(context, "ACPI not present", .{});
             return;
@@ -115,7 +115,7 @@ pub const init = struct {
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        const context: *cascade.Context = .current();
+        const context: *cascade.Task.Context = .current();
         log.warn(context, "power button pressed", .{});
         tryShutdown(context) catch |err| {
             std.debug.panic("failed to shutdown: {t}", .{err});

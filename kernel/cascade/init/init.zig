@@ -98,7 +98,7 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(context: *cascade.Context) !noreturn {
+fn initStage2(context: *cascade.Task.Context) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     cascade.mem.globals.core_page_table.load();
@@ -134,7 +134,7 @@ fn initStage2(context: *cascade.Context) !noreturn {
 /// This function is executed by all executors.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(context: *cascade.Context) !noreturn {
+fn initStage3(context: *cascade.Task.Context) !noreturn {
     if (Stage3Barrier.start()) {
         log.debug(context, "loading standard interrupt handlers", .{});
         arch.interrupts.init.loadStandardInterruptHandlers();
@@ -163,7 +163,7 @@ fn initStage3(context: *cascade.Context) !noreturn {
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(context: *cascade.Context, _: usize, _: usize) !void {
+fn initStage4(context: *cascade.Task.Context, _: usize, _: usize) !void {
     log.debug(context, "initializing PCI ECAM", .{});
     try cascade.pci.init.initializeECAM(context);
 
@@ -176,7 +176,7 @@ fn initStage4(context: *cascade.Context, _: usize, _: usize) !void {
     try Output.writer.flush();
 }
 
-fn constructBootstrapContext() !*cascade.Context {
+fn constructBootstrapContext() !*cascade.Task.Context {
     const static = struct {
         var bootstrap_init_task: cascade.Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
@@ -206,7 +206,7 @@ fn constructBootstrapContext() !*cascade.Context {
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(context: *cascade.Context) !struct { []cascade.Executor, *cascade.Executor } {
+fn createExecutors(context: *cascade.Task.Context) !struct { []cascade.Executor, *cascade.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > cascade.config.maximum_number_of_executors) {

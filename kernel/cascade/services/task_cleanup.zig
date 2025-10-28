@@ -12,7 +12,7 @@ const log = cascade.debug.log.scoped(.task_cleanup);
 
 /// Queues a task to be cleaned up by the task cleanup service.
 pub fn queueTaskForCleanup(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     task: *Task,
 ) void {
     if (core.is_debug) {
@@ -35,7 +35,7 @@ pub fn queueTaskForCleanup(
     globals.parker.unpark(context);
 }
 
-fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
+fn execute(context: *cascade.Task.Context, _: usize, _: usize) noreturn {
     if (core.is_debug) {
         std.debug.assert(context.task() == globals.task_cleanup_task);
         std.debug.assert(context.interrupt_disable_count == 0);
@@ -56,7 +56,7 @@ fn execute(context: *cascade.Context, _: usize, _: usize) noreturn {
     }
 }
 
-fn handleTask(context: *cascade.Context, task: *Task) void {
+fn handleTask(context: *cascade.Task.Context, task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(task.state == .dropped);
         std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
@@ -118,7 +118,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeTaskCleanupService(context: *cascade.Context) !void {
+    pub fn initializeTaskCleanupService(context: *cascade.Task.Context) !void {
         globals.task_cleanup_task = try Task.createKernelTask(context, .{
             .name = try .fromSlice("task cleanup"),
             .function = execute,

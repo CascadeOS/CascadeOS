@@ -17,7 +17,7 @@ container: Container = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
 /// Locks the spinlock.
-pub fn lock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) void {
+pub fn lock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) void {
     context.incrementInterruptDisable();
 
     if (core.is_debug) std.debug.assert(!ticket_spin_lock.isLockedByCurrent(context)); // recursive locks are not supported
@@ -38,7 +38,7 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) void {
 }
 
 /// Try to lock the spinlock.
-pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) bool {
+pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
 
@@ -77,7 +77,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) boo
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
-pub fn unlock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Context) void {
+pub fn unlock(ticket_spin_lock: *TicketSpinLock, context: *cascade.Task.Context) void {
     if (core.is_debug) {
         std.debug.assert(context.spinlocks_held != 0);
         std.debug.assert(ticket_spin_lock.isLockedByCurrent(context));
@@ -103,7 +103,7 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 }
 
 /// Returns true if the spinlock is locked by the current executor.
-pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, context: *cascade.Context) bool {
+pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, context: *cascade.Task.Context) bool {
     return ticket_spin_lock.holding_executor == context.executor.?;
 }
 

@@ -59,7 +59,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         fadt: *const cascade.acpi.tables.FADT,
         madt: *const cascade.acpi.tables.MADT,
         x2apic_enabled: bool,
@@ -94,7 +94,7 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         candidate_time_sources.addTimeSource(context, .{
@@ -112,7 +112,7 @@ pub const init = struct {
 
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer(context: *cascade.Context) void {
+    fn initializeLapicTimer(context: *cascade.Task.Context) void {
         std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
 
         globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
@@ -120,7 +120,7 @@ pub const init = struct {
     }
 
     fn initializeLapicTimerCalibrate(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);

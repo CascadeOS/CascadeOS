@@ -368,7 +368,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.pci_init);
 
-    pub fn initializeECAM(context: *cascade.Context) !void {
+    pub fn initializeECAM(context: *cascade.Task.Context) !void {
         const acpi_table = cascade.acpi.init.AcpiTable(cascade.acpi.tables.MCFG).get(0) orelse
             return error.MCFGNotPresent;
         defer acpi_table.deinit();

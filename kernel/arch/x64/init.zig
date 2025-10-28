@@ -14,7 +14,7 @@ const x64 = @import("x64.zig");
 const log = cascade.debug.log.scoped(.x64_init);
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput(context: *cascade.Context) ?arch.init.InitOutput {
+pub fn tryGetSerialOutput(context: *cascade.Task.Context) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
         log.debug(context, "using debug console for serial output", .{});
         return .{
@@ -52,9 +52,9 @@ pub fn tryGetSerialOutput(context: *cascade.Context) ?arch.init.InitOutput {
     return null;
 }
 
-/// Prepares the provided `Executor` for the bootstrap executor.
+/// Prepares the current executor as the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
@@ -74,7 +74,7 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(context: *cascade.Context, executor: *cascade.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(context: *cascade.Task.Context, executor: *cascade.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
@@ -105,8 +105,8 @@ fn prepareExecutorShared(
     );
 }
 
-/// Load the provided `Executor` as the current executor.
-pub fn loadExecutor(context: *cascade.Context) void {
+/// Load the executor of the provided `Context` as the current executor.
+pub fn loadExecutor(context: *cascade.Task.Context) void {
     const executor = context.executor.?;
 
     executor.arch_specific.gdt.load();
@@ -120,7 +120,7 @@ pub fn loadExecutor(context: *cascade.Context) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation(context: *cascade.Context) void {
+pub fn captureEarlySystemInformation(context: *cascade.Task.Context) void {
     log.debug(context, "capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
@@ -159,7 +159,7 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     options: CaptureSystemInformationOptions,
 ) !void {
     const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
@@ -198,7 +198,7 @@ pub fn captureSystemInformation(
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures(context: *cascade.Context) void {
+pub fn configureGlobalSystemFeatures(context: *cascade.Task.Context) void {
     if (x64.info.have_pic) {
         log.debug(context, "disabling pic", .{});
         disablePic();
@@ -251,7 +251,7 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
-pub fn configurePerExecutorSystemFeatures(context: *cascade.Context) void {
+pub fn configurePerExecutorSystemFeatures(context: *cascade.Task.Context) void {
     if (x64.info.cpu_id.rdtscp) {
         x64.registers.IA32_TSC_AUX.write(@intFromEnum(context.executor.?.id));
     }
@@ -345,7 +345,7 @@ pub fn configurePerExecutorSystemFeatures(context: *cascade.Context) void {
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     candidate_time_sources: *cascade.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(context, candidate_time_sources);
@@ -400,7 +400,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: *cascade.Context) !void {
+            fn remapFn(_: *anyopaque, _: *cascade.Task.Context) !void {
                 return;
             }
         }.remapFn,

@@ -10,7 +10,7 @@ const core = @import("core");
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
@@ -54,7 +54,7 @@ const PanicType = union(enum) {
 fn panicDispatch(
     msg: []const u8,
     panic_type: PanicType,
-    opt_context: ?*cascade.Context,
+    opt_context: ?*cascade.Task.Context,
 ) noreturn {
     @branchHint(.cold);
 
@@ -99,7 +99,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     msg: []const u8,
     panic_type: PanicType,
 ) void {

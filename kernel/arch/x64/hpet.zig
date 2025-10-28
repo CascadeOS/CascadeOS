@@ -21,7 +21,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn registerTimeSource(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         const acpi_table = AcpiTable.get(0) orelse return;
@@ -38,7 +38,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET(context: *cascade.Context) void {
+    fn initializeHPET(context: *cascade.Task.Context) void {
         globals.hpet = .{ .base = getHpetBase() };
         init_log.debug(context, "using hpet: {}", .{globals.hpet});
 

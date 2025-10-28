@@ -10,7 +10,7 @@ const core = @import("core");
 const x64 = @import("../x64.zig");
 
 pub fn nonMaskableInterruptHandler(
-    _: *cascade.Context,
+    _: *cascade.Task.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
@@ -24,9 +24,9 @@ pub fn nonMaskableInterruptHandler(
 }
 
 pub fn pageFaultHandler(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    interrupt_exit: cascade.Context.InterruptExit,
+    interrupt_exit: cascade.Task.Context.InterruptExit,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -62,7 +62,7 @@ pub fn pageFaultHandler(
 }
 
 pub fn flushRequestHandler(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     _: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
@@ -73,7 +73,7 @@ pub fn flushRequestHandler(
 }
 
 pub fn perExecutorPeriodicHandler(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     _: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
@@ -84,7 +84,7 @@ pub fn perExecutorPeriodicHandler(
 }
 
 pub fn unhandledException(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
@@ -105,7 +105,7 @@ pub fn unhandledException(
 ///
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,

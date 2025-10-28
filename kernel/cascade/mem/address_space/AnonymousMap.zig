@@ -43,7 +43,7 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: properly support shared anonymous maps
 
-pub fn create(context: *cascade.Context, size: core.Size) error{OutOfMemory}!*AnonymousMap {
+pub fn create(context: *cascade.Task.Context, size: core.Size) error{OutOfMemory}!*AnonymousMap {
     if (core.is_debug) std.debug.assert(size.isAligned(arch.paging.standard_page_size));
 
     const anonymous_map = globals.anonymous_map_cache.allocate(context) catch return error.OutOfMemory;
@@ -68,7 +68,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.Context) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.Task.Context) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -96,7 +96,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, context: *cascade.C
 ///
 /// Called `amap_copy` in OpenBSD uvm.
 pub fn copy(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     address_space: *AddressSpace,
     entry: *Entry,
     faulting_address: core.VirtualAddress,
@@ -162,7 +162,7 @@ pub const Reference = struct {
     /// Called `amap_add` in OpenBSD uvm.
     pub fn add(
         reference: Reference,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         entry: *const Entry,
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
@@ -218,7 +218,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         anonymous_map_reference: Reference,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -283,7 +283,7 @@ pub const PageCount = extern struct {
 /// Locks the spinlock.
 pub fn print(
     anonymous_map: *AnonymousMap,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
@@ -317,7 +317,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(context: *cascade.Context) !void {
+    pub fn initializeCaches(context: *cascade.Task.Context) !void {
         globals.anonymous_map_cache.init(context, .{
             .name = try .fromSlice("anonymous map"),
         });

@@ -12,7 +12,7 @@ const core = @import("core");
 
 const log = cascade.debug.log.scoped(.heap);
 
-pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
+pub fn allocate(len: usize, context: *cascade.Task.Context) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         context,
         len,
@@ -26,7 +26,7 @@ pub fn allocate(len: usize, context: *cascade.Context) !core.VirtualRange {
     return virtual_range;
 }
 
-pub inline fn deallocate(range: core.VirtualRange, context: *cascade.Context) void {
+pub inline fn deallocate(range: core.VirtualRange, context: *cascade.Task.Context) void {
     globals.heap_arena.deallocate(context, .fromVirtualRange(range));
 }
 
@@ -46,7 +46,7 @@ pub fn freeWithNoSize(ptr: [*]u8) void {
 }
 
 pub fn allocateSpecial(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: cascade.mem.MapType,
@@ -78,7 +78,7 @@ pub fn allocateSpecial(
 }
 
 pub fn deallocateSpecial(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     virtual_range: core.VirtualRange,
 ) void {
     {
@@ -165,7 +165,7 @@ pub const allocator_impl = struct {
 
     pub fn heapPageArenaImport(
         arena_ptr: *anyopaque,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         len: usize,
         policy: resource_arena.Policy,
     ) resource_arena.AllocateError!resource_arena.Allocation {
@@ -205,7 +205,7 @@ pub const allocator_impl = struct {
 
     pub fn heapPageArenaRelease(
         arena_ptr: *anyopaque,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         allocation: resource_arena.Allocation,
     ) void {
         const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
@@ -273,7 +273,7 @@ pub const globals = struct {
 
 pub const init = struct {
     pub fn initializeHeaps(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
         // heap

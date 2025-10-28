@@ -98,7 +98,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn captureMADTInformation(context: *cascade.Context, madt: *const cascade.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(context: *cascade.Task.Context, madt: *const cascade.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {

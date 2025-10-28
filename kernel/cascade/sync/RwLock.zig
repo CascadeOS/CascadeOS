@@ -26,7 +26,7 @@ wait_queue: cascade.sync.WaitQueue = .{},
 /// Returns `true` if the upgrade was successful.
 ///
 /// If it fails the lock is left unlocked.
-pub fn tryUpgradeLock(rw_lock: *RwLock, context: *cascade.Context) bool {
+pub fn tryUpgradeLock(rw_lock: *RwLock, context: *cascade.Task.Context) bool {
     _ = @atomicRmw(usize, &rw_lock.state, .Add, WRITER, .acquire);
 
     if (rw_lock.mutex.tryLock(context)) {
@@ -47,7 +47,7 @@ pub fn tryUpgradeLock(rw_lock: *RwLock, context: *cascade.Context) bool {
     return false;
 }
 
-pub fn tryWriteLock(rw_lock: *RwLock, context: *cascade.Context) bool {
+pub fn tryWriteLock(rw_lock: *RwLock, context: *cascade.Task.Context) bool {
     if (rw_lock.mutex.tryLock(context)) {
         const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
@@ -62,7 +62,7 @@ pub fn tryWriteLock(rw_lock: *RwLock, context: *cascade.Context) bool {
     return false;
 }
 
-pub fn writeLock(rw_lock: *RwLock, context: *cascade.Context) void {
+pub fn writeLock(rw_lock: *RwLock, context: *cascade.Task.Context) void {
     _ = @atomicRmw(usize, &rw_lock.state, .Add, WRITER, .acquire);
     rw_lock.mutex.lock(context);
 
@@ -80,7 +80,7 @@ pub fn writeLock(rw_lock: *RwLock, context: *cascade.Context) void {
     }
 }
 
-pub fn writeUnlock(rw_lock: *RwLock, context: *cascade.Context) void {
+pub fn writeUnlock(rw_lock: *RwLock, context: *cascade.Task.Context) void {
     _ = @atomicRmw(usize, &rw_lock.state, .And, ~IS_WRITING, .release);
     rw_lock.mutex.unlock(context);
 }
@@ -101,7 +101,7 @@ pub fn isWriteLocked(rw_lock: *const RwLock) bool {
     return state & IS_WRITING != 0;
 }
 
-pub fn tryReadLock(rw_lock: *RwLock, context: *cascade.Context) bool {
+pub fn tryReadLock(rw_lock: *RwLock, context: *cascade.Task.Context) bool {
     const state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
     if (state & (IS_WRITING | WRITER_MASK) == 0) {
@@ -124,7 +124,7 @@ pub fn tryReadLock(rw_lock: *RwLock, context: *cascade.Context) bool {
     return false;
 }
 
-pub fn readLock(rw_lock: *RwLock, context: *cascade.Context) void {
+pub fn readLock(rw_lock: *RwLock, context: *cascade.Task.Context) void {
     var state = @atomicLoad(usize, &rw_lock.state, .monotonic);
 
     while (state & (IS_WRITING | WRITER_MASK) == 0) {
@@ -143,7 +143,7 @@ pub fn readLock(rw_lock: *RwLock, context: *cascade.Context) void {
     rw_lock.mutex.unlock(context);
 }
 
-pub fn readUnlock(rw_lock: *RwLock, context: *cascade.Context) void {
+pub fn readUnlock(rw_lock: *RwLock, context: *cascade.Task.Context) void {
     const state = @atomicRmw(usize, &rw_lock.state, .Sub, READER, .release);
 
     if ((state & READER_MASK == READER) and (state & IS_WRITING != 0)) {

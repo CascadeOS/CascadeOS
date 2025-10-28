@@ -41,7 +41,7 @@ pub const CreateOptions = struct {
 };
 
 /// Create a process with an initial task.
-pub fn create(context: *cascade.Context, options: CreateOptions) !struct { *Process, *cascade.Task } {
+pub fn create(context: *cascade.Task.Context, options: CreateOptions) !struct { *Process, *cascade.Task } {
     const process = blk: {
         const process = try globals.cache.allocate(context);
         errdefer comptime unreachable;
@@ -83,7 +83,7 @@ pub const CreateTaskOptions = struct {
 /// The task is in the `ready` state and is not scheduled.
 pub fn createUserTask(
     process: *Process,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     options: CreateTaskOptions,
 ) !*cascade.Task {
     const entry_task = try cascade.Task.internal.create(context, .{
@@ -123,7 +123,7 @@ pub fn incrementReferenceCount(process: *Process) void {
     _ = process.reference_count.fetchAdd(1, .acq_rel);
 }
 
-pub fn decrementReferenceCount(process: *Process, context: *cascade.Context) void {
+pub fn decrementReferenceCount(process: *Process, context: *cascade.Task.Context) void {
     if (process.reference_count.fetchSub(1, .acq_rel) != 1) return;
     cascade.services.process_cleanup.queueProcessForCleanup(context, process);
 }
@@ -133,7 +133,7 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
 }
 
 pub const internal = struct {
-    pub fn destroy(context: *cascade.Context, process: *Process) void {
+    pub fn destroy(context: *cascade.Task.Context, process: *Process) void {
         if (core.is_debug) {
             std.debug.assert(process.reference_count.load(.monotonic) == 0);
             std.debug.assert(process.queued_for_cleanup.load(.monotonic));
@@ -174,7 +174,7 @@ pub const internal = struct {
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.process_name_length);
 
-fn cacheConstructor(process: *Process, context: *cascade.Context) cascade.mem.cache.ConstructorError!void {
+fn cacheConstructor(process: *Process, context: *cascade.Task.Context) cascade.mem.cache.ConstructorError!void {
     const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
     process.* = .{
@@ -213,7 +213,7 @@ fn cacheConstructor(process: *Process, context: *cascade.Context) cascade.mem.ca
     };
 }
 
-fn cacheDestructor(process: *Process, context: *cascade.Context) void {
+fn cacheDestructor(process: *Process, context: *cascade.Task.Context) void {
     const page_table = process.address_space.page_table;
 
     process.address_space.deinit(context);
@@ -235,7 +235,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcesses(context: *cascade.Context) !void {
+    pub fn initializeProcesses(context: *cascade.Task.Context) !void {
         log.debug(context, "initializing process cache", .{});
         globals.cache.init(context, .{
             .name = try .fromSlice("process"),

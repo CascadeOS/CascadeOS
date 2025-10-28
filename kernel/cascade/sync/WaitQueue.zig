@@ -33,7 +33,7 @@ pub fn popFirst(wait_queue: *WaitQueue) ?*cascade.Task {
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wakeOne(
     wait_queue: *WaitQueue,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     spinlock: *const cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
@@ -68,7 +68,7 @@ pub fn wakeOne(
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     wait_queue: *WaitQueue,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     spinlock: *cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
@@ -83,7 +83,7 @@ pub fn wait(
 
     cascade.scheduler.drop(context, .{
         .action = struct {
-            fn action(_: *cascade.Context, old_task: *cascade.Task, arg: usize) void {
+            fn action(_: *cascade.Task.Context, old_task: *cascade.Task, arg: usize) void {
                 const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);
 
                 old_task.state = .blocked;

@@ -26,7 +26,7 @@ const log = cascade.debug.log.scoped(.mem);
 /// - `virtual_address` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: phys.Frame,
@@ -60,7 +60,7 @@ pub fn mapSinglePage(
 /// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalFrames(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
@@ -129,7 +129,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 /// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
@@ -195,7 +195,7 @@ pub fn mapRangeToPhysicalRange(
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn unmapRange(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     flush_target: cascade.Environment,
@@ -249,7 +249,7 @@ pub fn unmapRange(
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn changeProtection(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     flush_target: cascade.Environment,
@@ -330,7 +330,7 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
 }
 
 pub fn onKernelPageFault(
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
@@ -575,7 +575,7 @@ pub const init = struct {
         );
     }
 
-    pub fn logEarlyMemoryLayout(context: *cascade.Context) void {
+    pub fn logEarlyMemoryLayout(context: *cascade.Task.Context) void {
         if (!init_log.levelEnabled(.debug)) return;
 
         init_log.debug(context, "kernel memory offsets:", .{});
@@ -586,7 +586,7 @@ pub const init = struct {
         init_log.debug(context, "  direct map:                 {f}", .{globals.direct_map});
     }
 
-    pub fn initializeMemorySystem(context: *cascade.Context) !void {
+    pub fn initializeMemorySystem(context: *cascade.Task.Context) !void {
         var memory_map: MemoryMap = .{};
 
         const number_of_usable_pages, const number_of_usable_regions = try fillMemoryMap(
@@ -648,7 +648,7 @@ pub const init = struct {
         );
     }
 
-    fn fillMemoryMap(context: *cascade.Context, memory_map: *MemoryMap) !struct { usize, usize } {
+    fn fillMemoryMap(context: *cascade.Task.Context, memory_map: *MemoryMap) !struct { usize, usize } {
         var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         var number_of_usable_pages: usize = 0;
@@ -683,7 +683,7 @@ pub const init = struct {
     }
 
     fn buildMemoryLayout(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         kernel_regions: *KernelMemoryRegion.List,
@@ -877,7 +877,7 @@ pub const init = struct {
     }
 
     fn buildAndLoadCorePageTable(
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         kernel_regions: *KernelMemoryRegion.List,
     ) arch.paging.PageTable {
         const core_page_table = arch.paging.PageTable.create(

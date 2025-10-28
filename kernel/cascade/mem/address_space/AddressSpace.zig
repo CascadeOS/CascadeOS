@@ -69,7 +69,7 @@ pub const InitOptions = struct {
 
 pub fn init(
     address_space: *AddressSpace,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     options: InitOptions,
 ) !void {
     log.debug(context, "{s}: init with {f} environment {t}", .{
@@ -113,7 +113,7 @@ pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) voi
 ///
 /// Caller must ensure:
 ///  - the address space is not in use by any tasks
-pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.Context) void {
+pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.Task.Context) void {
     log.debug(context, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
     if (core.is_debug) {
@@ -131,7 +131,7 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, context: *cascade.C
 /// Caller must ensure:
 ///  - the address space is not in use by any tasks
 ///  - the address space is empty
-pub fn deinit(address_space: *AddressSpace, context: *cascade.Context) void {
+pub fn deinit(address_space: *AddressSpace, context: *cascade.Task.Context) void {
     // cannot use the name as it will reference a defunct process that this address space is now unrelated to
     log.debug(context, "deinit", .{});
 
@@ -205,7 +205,7 @@ pub const MapError = error{
 /// Map a range into the address space.
 pub fn map(
     address_space: *AddressSpace,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     options: MapOptions,
 ) MapError!core.VirtualRange {
     errdefer |err| log.debug(context, "{s}: map failed {t}", .{ address_space.name(), err });
@@ -523,7 +523,7 @@ pub const ChangeProtectionError = error{
 ///  - the `max_protection` if provided is not `.none`
 pub fn changeProtection(
     address_space: *AddressSpace,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     range: core.VirtualRange,
     change: ChangeProtection,
 ) ChangeProtectionError!void {
@@ -684,7 +684,7 @@ const ChangeProtectionResult = struct {
 
 fn performChangeProtection(
     address_space: *AddressSpace,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     entry_range: EntryRange,
     range: core.VirtualRange,
     request: ChangeProtection.Request,
@@ -849,7 +849,7 @@ pub const UnmapError = error{
 ///
 /// Caller must ensure:
 ///  - the size and address of the range are aligned to the standard page size
-pub fn unmap(address_space: *AddressSpace, context: *cascade.Context, range: core.VirtualRange) UnmapError!void {
+pub fn unmap(address_space: *AddressSpace, context: *cascade.Task.Context, range: core.VirtualRange) UnmapError!void {
     errdefer |err| log.debug(context, "{s}: unmap failed {t}", .{ address_space.name(), err });
 
     log.verbose(context, "{s}: unmap {f}", .{ address_space.name(), range });
@@ -937,7 +937,7 @@ const UnmapResult = struct {
 
 fn performUnmap(
     address_space: *AddressSpace,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     entry_range: EntryRange,
     range: core.VirtualRange,
     preallocated_entries: *PreallocatedEntries,
@@ -1037,7 +1037,7 @@ pub const HandlePageFaultError = error{
 /// Called `uvm_fault` in OpenBSD uvm.
 pub fn handlePageFault(
     address_space: *AddressSpace,
-    context: *cascade.Context,
+    context: *cascade.Task.Context,
     page_fault_details: cascade.mem.PageFaultDetails,
 ) HandlePageFaultError!void {
     errdefer |err| log.debug(context, "{s}: page fault failed {t}", .{ address_space.name(), err });
@@ -1101,7 +1101,7 @@ const PreallocatedEntries = struct {
     /// Only entries that straddle the start or end of the range might require a new entry, so we will need at most 2.
     pub fn preallocateChangeProtection(
         preallocated_entries: *PreallocatedEntries,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         address_space: *AddressSpace,
         entry_range: EntryRange,
     ) !void {
@@ -1127,7 +1127,7 @@ const PreallocatedEntries = struct {
     /// Only an entry that completely contains the range requires a new entry after spliting, so we will need at most 1.
     pub fn preallocateUnmap(
         preallocated_entries: *PreallocatedEntries,
-        context: *cascade.Context,
+        context: *cascade.Task.Context,
         address_space: *AddressSpace,
         entry_range: EntryRange,
     ) !void {
@@ -1137,7 +1137,7 @@ const PreallocatedEntries = struct {
         try address_space.entries.ensureUnusedCapacity(cascade.mem.heap.allocator, 1);
     }
 
-    fn deinit(preallocated_entries: *PreallocatedEntries, context: *cascade.Context) void {
+    fn deinit(preallocated_entries: *PreallocatedEntries, context: *cascade.Task.Context) void {
         for (preallocated_entries.entries.constSlice()) |entry| {
             entry.destroy(context); // free any preallocated entries that we didn't use
         }
@@ -1237,7 +1237,7 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
 /// Prints the address space.
 ///
 /// Locks the entries lock.
-pub fn print(address_space: *AddressSpace, context: *cascade.Context, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(address_space: *AddressSpace, context: *cascade.Task.Context, writer: *std.Io.Writer, indent: usize) !void {
     address_space.entries_lock.readLock(context);
     defer address_space.entries_lock.readUnlock(context);
 
