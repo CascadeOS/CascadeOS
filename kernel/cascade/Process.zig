@@ -36,39 +36,27 @@ next_task_id: std.atomic.Value(usize) = .init(0),
 
 pub const CreateOptions = struct {
     name: Name,
-
-    initial_task_options: CreateTaskOptions,
 };
 
 /// Create a process with an initial task.
-pub fn create(current_task: *cascade.Task, options: CreateOptions) !struct { *Process, *cascade.Task } {
-    const process = blk: {
-        const process = try globals.cache.allocate(current_task);
-        errdefer comptime unreachable;
+pub fn create(current_task: *cascade.Task, options: CreateOptions) !*Process {
+    const process = try globals.cache.allocate(current_task);
+    errdefer globals.cache.deallocate(current_task, process);
 
-        process.name = options.name;
-        process.address_space.retarget(process);
+    if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 0);
 
-        break :blk process;
-    };
+    process.name = options.name;
+    process.address_space.retarget(process);
 
-    const entry_task = process.createUserTask(current_task, options.initial_task_options) catch |err| {
-        globals.cache.deallocate(current_task, process);
-        return err;
-    };
-    errdefer entry_task.decrementReferenceCount(current_task);
-    if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 1);
+    cascade.globals.processes_lock.writeLock(current_task);
+    defer cascade.globals.processes_lock.writeUnlock(current_task);
 
-    {
-        cascade.globals.processes_lock.writeLock(current_task);
-        defer cascade.globals.processes_lock.writeUnlock(current_task);
+    const gop = try cascade.globals.processes.getOrPut(cascade.mem.heap.allocator, process);
+    if (gop.found_existing) @panic("process already in processes list");
 
-        const gop = try cascade.globals.processes.getOrPut(cascade.mem.heap.allocator, process);
-        if (gop.found_existing) @panic("process already in processes list");
-    }
-    errdefer comptime unreachable;
+    process.incrementReferenceCount();
 
-    return .{ process, entry_task };
+    return process;
 }
 
 pub const CreateTaskOptions = struct {
