@@ -9,6 +9,9 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
 
+const process_cleanup = @import("process_cleanup.zig");
+pub const Thread = @import("Thread.zig");
+
 const log = cascade.debug.log.scoped(.process);
 
 const Process = @This();
@@ -17,13 +20,13 @@ name: Name,
 
 /// The number of references to this process.
 ///
-/// Each task within the process has a reference to the process.
+/// Each thread within the process has a reference to the process.
 reference_count: std.atomic.Value(usize),
 
 address_space: cascade.mem.AddressSpace,
 
-tasks_lock: cascade.sync.RwLock = .{},
-tasks: std.AutoArrayHashMapUnmanaged(*cascade.Task, void) = .{},
+threads_lock: cascade.sync.RwLock = .{},
+threads: std.AutoArrayHashMapUnmanaged(*Thread, void) = .{},
 
 /// Tracks if this process has been queued for cleanup.
 queued_for_cleanup: std.atomic.Value(bool) = .init(false),
@@ -31,14 +34,14 @@ queued_for_cleanup: std.atomic.Value(bool) = .init(false),
 /// Used for the process cleanup queue.
 cleanup_node: std.SinglyLinkedList.Node = .{},
 
-/// Used for generating task names.
-next_task_id: std.atomic.Value(usize) = .init(0),
+/// Used for generating thread names.
+next_thread_id: std.atomic.Value(usize) = .init(0),
 
 pub const CreateOptions = struct {
     name: Name,
 };
 
-/// Create a process with an initial task.
+/// Create a process.
 pub fn create(current_task: *cascade.Task, options: CreateOptions) !*Process {
     const process = try globals.cache.allocate(current_task);
     errdefer globals.cache.deallocate(current_task, process);
@@ -59,52 +62,53 @@ pub fn create(current_task: *cascade.Task, options: CreateOptions) !*Process {
     return process;
 }
 
-pub const CreateTaskOptions = struct {
+pub const CreateThreadOptions = struct {
     name: ?cascade.Task.Name = null,
     function: arch.scheduling.TaskFunction,
     arg1: u64 = 0,
     arg2: u64 = 0,
 };
 
-/// Creates a task in the given process.
+/// Creates a thread in the given process.
 ///
-/// The task is in the `ready` state and is not scheduled.
-pub fn createUserTask(
+/// The thread is in the `ready` state and is not scheduled.
+pub fn createThread(
     process: *Process,
     current_task: *cascade.Task,
-    options: CreateTaskOptions,
-) !*cascade.Task {
-    const entry_task = try cascade.Task.internal.create(current_task, .{
-        .name = if (options.name) |provided_name|
-            provided_name
-        else
-            try .initPrint(
-                "{d}",
-                .{process.next_task_id.fetchAdd(1, .monotonic)},
-            ),
-        .function = options.function,
-        .arg1 = options.arg1,
-        .arg2 = options.arg2,
-        .environment = .{ .user = process },
-    });
+    options: CreateThreadOptions,
+) !*Thread {
+    const thread = try Thread.internal.create(
+        current_task,
+        process,
+        .{
+            .name = if (options.name) |provided_name|
+                provided_name
+            else
+                try .initPrint(
+                    "{d}",
+                    .{process.next_thread_id.fetchAdd(1, .monotonic)},
+                ),
+            .function = options.function,
+            .arg1 = options.arg1,
+            .arg2 = options.arg2,
+            .type = .user,
+        },
+    );
     errdefer {
-        entry_task.state = .{ .dropped = .{} }; // `destroy` will assert this
-        cascade.Task.internal.destroy(current_task, entry_task);
+        thread.task.state = .{ .dropped = .{} }; // `destroy` will assert this
+        thread.task.reference_count.store(0, .monotonic); // `destroy` will assert this
+        Thread.internal.destroy(current_task, thread);
     }
+
+    process.threads_lock.writeLock(current_task);
+    defer process.threads_lock.writeUnlock(current_task);
+
+    const gop = try process.threads.getOrPut(cascade.mem.heap.allocator, thread);
+    if (gop.found_existing) @panic("thread already in process threads list");
 
     process.incrementReferenceCount();
-    errdefer process.decrementReferenceCount(current_task);
 
-    {
-        process.tasks_lock.writeLock(current_task);
-        defer process.tasks_lock.writeUnlock(current_task);
-
-        const gop = try process.tasks.getOrPut(cascade.mem.heap.allocator, entry_task);
-        if (gop.found_existing) @panic("task already in tasks list");
-    }
-    errdefer comptime unreachable;
-
-    return entry_task;
+    return thread;
 }
 
 pub fn incrementReferenceCount(process: *Process) void {
@@ -113,7 +117,7 @@ pub fn incrementReferenceCount(process: *Process) void {
 
 pub fn decrementReferenceCount(process: *Process, current_task: *cascade.Task) void {
     if (process.reference_count.fetchSub(1, .acq_rel) != 1) return;
-    cascade.services.process_cleanup.queueProcessForCleanup(current_task, process);
+    process_cleanup.queueProcessForCleanup(current_task, process);
 }
 
 pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
@@ -129,10 +133,10 @@ pub const internal = struct {
         process.queued_for_cleanup.store(false, .monotonic);
 
         if (core.is_debug) {
-            std.debug.assert(!process.tasks_lock.isReadLocked() and !process.tasks_lock.isWriteLocked());
-            std.debug.assert(process.tasks.count() == 0);
+            std.debug.assert(!process.threads_lock.isReadLocked() and !process.threads_lock.isWriteLocked());
+            std.debug.assert(process.threads.count() == 0);
         }
-        process.tasks.clearAndFree(cascade.mem.heap.allocator);
+        process.threads.clearAndFree(cascade.mem.heap.allocator);
 
         if (true) { // TODO: actually implement cleanup of the address space
             log.err(current_task, "process destroy called - not fully implemented - leaking address space", .{});
@@ -229,7 +233,9 @@ pub const init = struct {
             .name = try .fromSlice("process"),
         });
 
+        try Thread.init.initializeThreads(current_task);
+
         log.debug(current_task, "initializing process cleanup service", .{});
-        try cascade.services.process_cleanup.init.initializeProcessCleanupService(current_task);
+        try process_cleanup.init.initializeProcessCleanupService(current_task);
     }
 };

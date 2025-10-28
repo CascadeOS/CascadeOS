@@ -10,11 +10,9 @@ pub const entry = @import("entry.zig");
 pub const Executor = @import("Executor.zig");
 pub const mem = @import("mem/mem.zig");
 pub const pci = @import("pci.zig");
-pub const Process = @import("Process.zig");
-pub const scheduler = @import("scheduler.zig");
-pub const services = @import("services/services.zig");
+pub const Process = @import("process/Process.zig");
 pub const sync = @import("sync/sync.zig");
-pub const Task = @import("Task.zig");
+pub const Task = @import("task/Task.zig");
 pub const time = @import("time.zig");
 
 pub const Environment = union(Type) {

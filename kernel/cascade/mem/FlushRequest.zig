@@ -59,9 +59,9 @@ fn flush(flush_request: *FlushRequest, current_task: *cascade.Task) void {
 
     switch (flush_request.flush_target) {
         .kernel => {},
-        .user => |target_process| switch (current_task.environment) {
+        .user => |target_process| switch (current_task.type) {
             .kernel => return,
-            .user => |current_process| if (current_process != target_process) return,
+            .user => if (current_task.toThread().process != target_process) return,
         },
     }
 

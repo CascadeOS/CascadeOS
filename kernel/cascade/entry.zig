@@ -8,11 +8,12 @@ const cascade = @import("cascade");
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.entry);
+
 /// Executed upon per executor periodic interrupt.
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
 pub fn onPerExecutorPeriodic(current_task: *cascade.Task) void {
-    cascade.scheduler.maybePreempt(current_task);
+    cascade.Task.Scheduler.maybePreempt(current_task);
 }
 
 /// Executed upon page fault.

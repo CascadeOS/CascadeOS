@@ -146,16 +146,16 @@ fn initStage3(current_task: *cascade.Task) !noreturn {
                 .function = initStage4,
             });
 
-            cascade.scheduler.lockScheduler(current_task);
-            defer cascade.scheduler.unlockScheduler(current_task);
+            cascade.Task.Scheduler.lockScheduler(current_task);
+            defer cascade.Task.Scheduler.unlockScheduler(current_task);
 
-            cascade.scheduler.queueTask(current_task, init_stage4_task);
+            cascade.Task.Scheduler.queueTask(current_task, init_stage4_task);
         }
 
         Stage3Barrier.complete();
     }
 
-    cascade.scheduler.lockScheduler(current_task);
+    cascade.Task.Scheduler.lockScheduler(current_task);
     current_task.drop();
     unreachable;
 }

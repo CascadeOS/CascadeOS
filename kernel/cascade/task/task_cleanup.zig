@@ -62,16 +62,17 @@ fn handleTask(current_task: *cascade.Task, task: *Task) void {
         std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
     }
 
-    const tasks_lock, const tasks = switch (task.environment) {
-        .kernel => .{ &cascade.globals.kernel_tasks_lock, &cascade.globals.kernel_tasks },
-        .user => |process| .{ &process.tasks_lock, &process.tasks },
-    };
-
     task.state.dropped.queued_for_cleanup.store(false, .release);
 
     {
-        tasks_lock.writeLock(current_task);
-        defer tasks_lock.writeUnlock(current_task);
+        switch (task.type) {
+            .kernel => cascade.globals.kernel_tasks_lock.writeLock(current_task),
+            .user => task.toThread().process.threads_lock.writeLock(current_task),
+        }
+        defer switch (task.type) {
+            .kernel => cascade.globals.kernel_tasks_lock.writeUnlock(current_task),
+            .user => task.toThread().process.threads_lock.writeUnlock(current_task),
+        };
 
         if (task.reference_count.load(.acquire) != 0) {
             @branchHint(.unlikely);
@@ -88,21 +89,26 @@ fn handleTask(current_task: *cascade.Task, task: *Task) void {
         }
 
         // the task is no longer referenced so we can safely destroy it
-        if (!tasks.swapRemove(task)) @panic("task not found in tasks");
+        switch (task.type) {
+            .kernel => if (!cascade.globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks"),
+            .user => {
+                const thread = task.toThread();
+                if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
+            },
+        }
     }
 
     // this log must happen before the process reference count is decremented
     log.debug(current_task, "destroying {f}", .{task});
 
-    switch (task.environment) {
-        .kernel => {},
-        .user => |process| {
-            task.environment = .{ .user = undefined };
-            process.decrementReferenceCount(current_task);
+    switch (task.type) {
+        .kernel => Task.internal.destroyKernelTask(current_task, task),
+        .user => {
+            const thread = task.toThread();
+            thread.process.decrementReferenceCount(current_task);
+            cascade.Process.Thread.internal.destroy(current_task, thread);
         },
     }
-
-    Task.internal.destroy(current_task, task);
 }
 
 const globals = struct {

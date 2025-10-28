@@ -130,7 +130,7 @@ pub fn prepareTaskForScheduling(
                         \\pop %rsi // target_function
                         \\pop %rdx // arg1
                         \\pop %rcx // arg2
-                        \\ret // the return address of `cascade.scheduler.taskEntry` should be on the stack
+                        \\ret // the return address of `cascade.Task.Scheduler.taskEntry` should be on the stack
                     );
                 }
             }.impl;
@@ -139,7 +139,7 @@ pub fn prepareTaskForScheduling(
         };
     };
 
-    try task.stack.push(@intFromPtr(&cascade.scheduler.taskEntry));
+    try task.stack.push(@intFromPtr(&cascade.Task.Scheduler.taskEntry));
 
     try task.stack.push(arg2);
     try task.stack.push(arg1);

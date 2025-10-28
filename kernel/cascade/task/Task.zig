@@ -11,6 +11,9 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
 
+pub const Scheduler = @import("Scheduler.zig");
+const task_cleanup = @import("task_cleanup.zig");
+
 const log = cascade.debug.log.scoped(.task);
 
 const Task = @This();
@@ -22,7 +25,7 @@ const Task = @This();
 /// For user tasks this starts as a process local incrementing number but can be changed by the user.
 name: Name,
 
-environment: Environment,
+type: cascade.Environment.Type,
 
 is_scheduler_task: bool = false,
 
@@ -59,6 +62,18 @@ enable_access_to_user_memory_count: u32 = 0,
 spinlocks_held: u32,
 scheduler_locked: bool,
 
+pub const State = union(enum) {
+    ready,
+    /// Do not access the executor directly, use `known_executor` instead.
+    running: *cascade.Executor,
+    blocked,
+    dropped: Dropped,
+
+    pub const Dropped = struct {
+        queued_for_cleanup: std.atomic.Value(bool) = .init(false),
+    };
+};
+
 pub fn current() *Task {
     // TODO: some architectures can do this without disabling interrupts
 
@@ -72,23 +87,6 @@ pub fn current() *Task {
 
     return current_task;
 }
-
-pub const State = union(enum) {
-    ready,
-    /// Do not access the executor directly, use `known_executor` instead.
-    running: *cascade.Executor,
-    blocked,
-    dropped: Dropped,
-
-    pub const Dropped = struct {
-        queued_for_cleanup: std.atomic.Value(bool) = .init(false),
-    };
-};
-
-pub const Environment = union(cascade.Environment.Type) {
-    kernel: void,
-    user: *cascade.Process,
-};
 
 pub fn incrementReferenceCount(task: *Task) void {
     _ = task.reference_count.fetchAdd(1, .acq_rel);
@@ -105,7 +103,7 @@ pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
         @branchHint(.likely);
         return;
     }
-    cascade.services.task_cleanup.queueTaskForCleanup(current_task, task);
+    task_cleanup.queueTaskForCleanup(current_task, task);
 }
 
 pub fn incrementInterruptDisable(current_task: *Task) void {
@@ -133,7 +131,7 @@ pub fn decrementInterruptDisable(current_task: *Task) void {
 }
 
 pub fn incrementEnableAccessToUserMemory(current_task: *Task) void {
-    if (core.is_debug) std.debug.assert(current_task.environment == .user);
+    if (core.is_debug) std.debug.assert(current_task.type == .user);
 
     const previous = current_task.enable_access_to_user_memory_count;
     current_task.enable_access_to_user_memory_count = previous + 1;
@@ -144,7 +142,7 @@ pub fn incrementEnableAccessToUserMemory(current_task: *Task) void {
 }
 
 pub fn decrementEnableAccessToUserMemory(current_task: *Task) void {
-    if (core.is_debug) std.debug.assert(current_task.environment == .user);
+    if (core.is_debug) std.debug.assert(current_task.type == .user);
 
     const previous = current_task.enable_access_to_user_memory_count;
     current_task.enable_access_to_user_memory_count = previous - 1;
@@ -206,13 +204,13 @@ pub const InterruptExit = struct {
 /// The scheduler lock must be held when this function is called.
 pub fn drop(current_task: *Task) noreturn {
     if (core.is_debug) {
-        cascade.scheduler.assertSchedulerLocked(current_task);
+        Scheduler.assertSchedulerLocked(current_task);
         std.debug.assert(current_task.spinlocks_held == 1); // only the scheduler lock is held
     }
 
-    cascade.scheduler.drop(current_task, .{
+    Scheduler.drop(current_task, .{
         .action = struct {
-            fn action(scheduler_task: *Task, old_task: *cascade.Task, _: usize) void {
+            fn action(scheduler_task: *Task, old_task: *Task, _: usize) void {
                 old_task.state = .{ .dropped = .{} };
                 old_task.decrementReferenceCount(scheduler_task);
             }
@@ -245,43 +243,48 @@ pub const CreateKernelTaskOptions = struct {
 };
 
 pub fn createKernelTask(current_task: *Task, options: CreateKernelTaskOptions) !*Task {
-    const task = try internal.create(current_task, .{
+    const task = try globals.cache.allocate(current_task);
+    errdefer globals.cache.deallocate(current_task, task);
+
+    try internal.init(task, .{
         .name = options.name,
         .function = options.function,
         .arg1 = options.arg1,
         .arg2 = options.arg2,
-        .environment = .kernel,
+        .type = .kernel,
     });
-    errdefer {
-        if (core.is_debug) std.debug.assert(task.reference_count.fetchSub(1, .monotonic) == 0);
-        internal.destroy(current_task, task);
-    }
 
-    {
-        cascade.globals.kernel_tasks_lock.writeLock(current_task);
-        defer cascade.globals.kernel_tasks_lock.writeUnlock(current_task);
+    cascade.globals.kernel_tasks_lock.writeLock(current_task);
+    defer cascade.globals.kernel_tasks_lock.writeUnlock(current_task);
 
-        const gop = try cascade.globals.kernel_tasks.getOrPut(cascade.mem.heap.allocator, task);
-        if (gop.found_existing) std.debug.panic("task already in kernel_tasks list", .{});
-    }
+    const gop = try cascade.globals.kernel_tasks.getOrPut(cascade.mem.heap.allocator, task);
+    if (gop.found_existing) std.debug.panic("task already in kernel tasks list", .{});
 
     return task;
 }
 
 pub fn format(
-    task: *const Task,
+    task: *Task,
     writer: *std.Io.Writer,
 ) !void {
-    switch (task.environment) {
+    switch (task.type) {
         .kernel => try writer.print(
             "Kernel<{s}>",
             .{task.name.constSlice()},
         ),
-        .user => |process| try writer.print(
-            "User<{s} - {s}>",
-            .{ process.name.constSlice(), task.name.constSlice() },
-        ),
+        .user => {
+            const process = task.toThread().process;
+            try writer.print(
+                "User<{s} - {s}>",
+                .{ process.name.constSlice(), task.name.constSlice() },
+            );
+        },
     }
+}
+
+pub inline fn toThread(task: *Task) *cascade.Process.Thread {
+    if (core.is_debug) std.debug.assert(task.type == .user);
+    return @fieldParentPtr("task", task);
 }
 
 pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {
@@ -296,55 +299,6 @@ inline fn setKnownExecutor(current_task: *Task) void {
         current_task.known_executor = null;
     }
 }
-
-pub const internal = struct {
-    pub const CreateOptions = struct {
-        name: Name,
-        function: arch.scheduling.TaskFunction,
-        arg1: u64,
-        arg2: u64,
-
-        environment: Environment,
-    };
-
-    pub fn create(current_task: *Task, options: CreateOptions) !*Task {
-        const task = try globals.cache.allocate(current_task);
-        errdefer globals.cache.deallocate(current_task, task);
-
-        const preconstructed_stack = task.stack;
-
-        task.* = .{
-            .name = options.name,
-            .state = .ready,
-            .stack = preconstructed_stack,
-            .environment = options.environment,
-            .known_executor = null,
-            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-            .scheduler_locked = true, // fresh tasks start with the scheduler locked
-        };
-
-        task.stack.reset();
-
-        try arch.scheduling.prepareTaskForScheduling(
-            task,
-            options.function,
-            options.arg1,
-            options.arg2,
-        );
-
-        return task;
-    }
-
-    pub fn destroy(current_task: *Task, task: *Task) void {
-        // for user tasks the process reference stored in `environment` has been set to `undefined` before this function
-        // is called
-        if (core.is_debug) {
-            std.debug.assert(task.state == .dropped);
-            std.debug.assert(task.reference_count.load(.monotonic) == 0);
-        }
-        globals.cache.deallocate(current_task, task);
-    }
-};
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.task_name_length);
 
@@ -411,7 +365,7 @@ pub const Stack = struct {
         stack.top_stack_pointer = stack.stack_pointer;
     }
 
-    fn createStack(current_task: *Task) !Stack {
+    pub fn createStack(current_task: *Task) !Stack {
         const stack_range = globals.stack_arena.allocate(
             current_task,
             stack_size_including_guard_page.value,
@@ -443,7 +397,7 @@ pub const Stack = struct {
         return .fromRange(range, usable_range);
     }
 
-    fn destroyStack(stack: Stack, current_task: *Task) void {
+    pub fn destroyStack(stack: Stack, current_task: *Task) void {
         {
             globals.stack_page_table_mutex.lock(current_task);
             defer globals.stack_page_table_mutex.unlock(current_task);
@@ -465,6 +419,48 @@ pub const Stack = struct {
     const stack_size_including_guard_page = cascade.config.kernel_stack_size.add(arch.paging.standard_page_size);
 };
 
+pub const internal = struct {
+    pub const InitOptions = struct {
+        name: Name,
+        function: arch.scheduling.TaskFunction,
+        arg1: u64,
+        arg2: u64,
+        type: cascade.Environment.Type,
+    };
+
+    pub fn init(task: *Task, options: InitOptions) !void {
+        const preconstructed_stack = task.stack;
+
+        task.* = .{
+            .name = options.name,
+            .state = .ready,
+            .stack = preconstructed_stack,
+            .type = options.type,
+            .known_executor = null,
+            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
+            .scheduler_locked = true, // fresh tasks start with the scheduler locked
+        };
+
+        task.stack.reset();
+
+        try arch.scheduling.prepareTaskForScheduling(
+            task,
+            options.function,
+            options.arg1,
+            options.arg2,
+        );
+    }
+
+    pub fn destroyKernelTask(current_task: *Task, task: *Task) void {
+        if (core.is_debug) {
+            std.debug.assert(task.type == .kernel);
+            std.debug.assert(task.state == .dropped);
+            std.debug.assert(task.reference_count.load(.monotonic) == 0);
+        }
+        globals.cache.deallocate(current_task, task);
+    }
+};
+
 const globals = struct {
     /// The source of task objects.
     ///
@@ -473,7 +469,7 @@ const globals = struct {
         Task,
         struct {
             fn constructor(task: *Task, current_task: *Task) cascade.mem.cache.ConstructorError!void {
-                task.* = undefined;
+                if (core.is_debug) task.* = undefined;
                 task.stack = try .createStack(current_task);
             }
         }.constructor,
@@ -521,11 +517,11 @@ pub const init = struct {
         );
 
         log.debug(current_task, "initializing task cleanup service", .{});
-        try cascade.services.task_cleanup.init.initializeTaskCleanupService(current_task);
+        try task_cleanup.init.initializeTaskCleanupService(current_task);
     }
 
     pub fn initializeBootstrapInitTask(
-        bootstrap_init_task: *cascade.Task,
+        bootstrap_init_task: *Task,
         bootstrap_executor: *cascade.Executor,
     ) !void {
         bootstrap_init_task.* = .{
@@ -534,7 +530,7 @@ pub const init = struct {
             .state = .{ .running = bootstrap_executor },
             .stack = undefined, // never used
 
-            .environment = .kernel,
+            .type = .kernel,
 
             .known_executor = bootstrap_executor,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
@@ -564,7 +560,7 @@ pub const init = struct {
 
     pub fn initializeSchedulerTask(
         current_task: *Task,
-        scheduler_task: *cascade.Task,
+        scheduler_task: *Task,
         executor: *cascade.Executor,
     ) !void {
         scheduler_task.* = .{
@@ -572,7 +568,7 @@ pub const init = struct {
 
             .state = .ready,
             .stack = try .createStack(current_task),
-            .environment = .kernel,
+            .type = .kernel,
             .known_executor = null,
             .spinlocks_held = 1, // fresh tasks start with the scheduler locked
             .scheduler_locked = true, // fresh tasks start with the scheduler locked

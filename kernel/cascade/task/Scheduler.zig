@@ -353,14 +353,20 @@ fn beforeSwitchTask(
         }
     }
 
-    switch (old_task.environment) {
-        .kernel => switch (new_task.environment) {
+    switch (old_task.type) {
+        .kernel => switch (new_task.type) {
             .kernel => {},
-            .user => |process| process.address_space.page_table.load(),
+            .user => new_task.toThread().process.address_space.page_table.load(),
         },
-        .user => |old_process| switch (new_task.environment) {
-            .kernel => cascade.mem.globals.core_page_table.load(),
-            .user => |new_process| if (old_process != new_process) new_process.address_space.page_table.load(),
+        .user => {
+            const old_process = old_task.toThread().process;
+            switch (new_task.type) {
+                .kernel => cascade.mem.globals.core_page_table.load(),
+                .user => {
+                    const new_process = new_task.toThread().process;
+                    if (old_process != new_process) new_process.address_space.page_table.load();
+                },
+            }
         },
     }
 }

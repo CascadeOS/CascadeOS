@@ -38,8 +38,8 @@ pub fn park(parker: *Parker, current_task: *cascade.Task) void {
         return; // there were some wakeups, they might be spurious
     }
 
-    cascade.scheduler.lockScheduler(current_task);
-    defer cascade.scheduler.unlockScheduler(current_task);
+    cascade.Task.Scheduler.lockScheduler(current_task);
+    defer cascade.Task.Scheduler.unlockScheduler(current_task);
 
     // recheck for unpark attempts that happened while we were locking the scheduler
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -57,7 +57,7 @@ pub fn park(parker: *Parker, current_task: *cascade.Task) void {
         return;
     }
 
-    cascade.scheduler.drop(current_task, .{
+    cascade.Task.Scheduler.drop(current_task, .{
         .action = struct {
             fn action(_: *cascade.Task, old_task: *cascade.Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
@@ -101,13 +101,13 @@ pub fn unpark(
     const scheduler_already_locked = current_task.scheduler_locked;
 
     switch (scheduler_already_locked) {
-        true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(current_task),
-        false => cascade.scheduler.lockScheduler(current_task),
+        true => if (core.is_debug) cascade.Task.Scheduler.assertSchedulerLocked(current_task),
+        false => cascade.Task.Scheduler.lockScheduler(current_task),
     }
     defer switch (scheduler_already_locked) {
         true => {},
-        false => cascade.scheduler.unlockScheduler(current_task),
+        false => cascade.Task.Scheduler.unlockScheduler(current_task),
     };
 
-    cascade.scheduler.queueTask(current_task, parked_task);
+    cascade.Task.Scheduler.queueTask(current_task, parked_task);
 }

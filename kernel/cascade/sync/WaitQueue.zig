@@ -50,15 +50,15 @@ pub fn wakeOne(
     const scheduler_already_locked = current_task.scheduler_locked;
 
     switch (scheduler_already_locked) {
-        true => if (core.is_debug) cascade.scheduler.assertSchedulerLocked(current_task),
-        false => cascade.scheduler.lockScheduler(current_task),
+        true => if (core.is_debug) cascade.Task.Scheduler.assertSchedulerLocked(current_task),
+        false => cascade.Task.Scheduler.lockScheduler(current_task),
     }
     defer switch (scheduler_already_locked) {
         true => {},
-        false => cascade.scheduler.unlockScheduler(current_task),
+        false => cascade.Task.Scheduler.unlockScheduler(current_task),
     };
 
-    cascade.scheduler.queueTask(current_task, task_to_wake);
+    cascade.Task.Scheduler.queueTask(current_task, task_to_wake);
 }
 
 /// Add the current task to the wait queue.
@@ -78,10 +78,10 @@ pub fn wait(
 
     wait_queue.waiting_tasks.append(&current_task.next_task_node);
 
-    cascade.scheduler.lockScheduler(current_task);
-    defer cascade.scheduler.unlockScheduler(current_task);
+    cascade.Task.Scheduler.lockScheduler(current_task);
+    defer cascade.Task.Scheduler.unlockScheduler(current_task);
 
-    cascade.scheduler.drop(current_task, .{
+    cascade.Task.Scheduler.drop(current_task, .{
         .action = struct {
             fn action(_: *cascade.Task, old_task: *cascade.Task, arg: usize) void {
                 const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);
