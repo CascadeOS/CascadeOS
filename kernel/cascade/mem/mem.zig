@@ -337,7 +337,7 @@ pub fn onKernelPageFault(
     if (page_fault_details.faulting_address.lessThan(arch.paging.higher_half_start)) {
         @branchHint(.cold);
 
-        const process = switch (current_task.type) {
+        const process: *cascade.Process = switch (current_task.type) {
             .kernel => {
                 @branchHint(.cold);
                 cascade.debug.interruptSourcePanic(
@@ -346,8 +346,9 @@ pub fn onKernelPageFault(
                     "kernel page fault in lower half\n{f}",
                     .{page_fault_details},
                 );
+                unreachable;
             },
-            .user => current_task.toThread().process,
+            .user => .fromTask(current_task),
         };
 
         if (!page_fault_details.faulting_environment.kernel.access_to_user_memory_enabled) {

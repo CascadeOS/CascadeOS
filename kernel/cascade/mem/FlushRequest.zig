@@ -61,7 +61,10 @@ fn flush(flush_request: *FlushRequest, current_task: *cascade.Task) void {
         .kernel => {},
         .user => |target_process| switch (current_task.type) {
             .kernel => return,
-            .user => if (current_task.toThread().process != target_process) return,
+            .user => {
+                const current_process: *cascade.Process = .fromTask(current_task);
+                if (current_process != target_process) return;
+            },
         },
     }
 

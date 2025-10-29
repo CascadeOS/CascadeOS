@@ -50,7 +50,7 @@ pub fn pageFaultHandler(
 
         .faulting_environment = if (error_code.user)
             .{
-                .user = current_task.toThread().process,
+                .user = .fromTask(current_task),
             }
         else
             .{

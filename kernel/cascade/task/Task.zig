@@ -9,6 +9,8 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Process = cascade.Process;
+const Thread = Process.Thread;
 const core = @import("core");
 
 pub const Scheduler = @import("Scheduler.zig");
@@ -273,18 +275,13 @@ pub fn format(
             .{task.name.constSlice()},
         ),
         .user => {
-            const process = task.toThread().process;
+            const process: *const Process = .fromTask(task);
             try writer.print(
                 "User<{s} - {s}>",
                 .{ process.name.constSlice(), task.name.constSlice() },
             );
         },
     }
-}
-
-pub inline fn toThread(task: *Task) *cascade.Process.Thread {
-    if (core.is_debug) std.debug.assert(task.type == .user);
-    return @fieldParentPtr("task", task);
 }
 
 pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {

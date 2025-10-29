@@ -17,7 +17,7 @@ waiting_tasks: core.containers.FIFO = .{},
 /// Not thread-safe.
 pub fn firstTask(wait_queue: *WaitQueue) ?*cascade.Task {
     const node = wait_queue.waiting_tasks.first_node orelse return null;
-    return cascade.Task.fromNode(node);
+    return .fromNode(node);
 }
 
 /// Removes the first task from the wait queue.
@@ -25,7 +25,7 @@ pub fn firstTask(wait_queue: *WaitQueue) ?*cascade.Task {
 /// Not thread-safe.
 pub fn popFirst(wait_queue: *WaitQueue) ?*cascade.Task {
     const node = wait_queue.waiting_tasks.pop() orelse return null;
-    return cascade.Task.fromNode(node);
+    return .fromNode(node);
 }
 
 /// Wake one task from the wait queue.
@@ -42,7 +42,7 @@ pub fn wakeOne(
     }
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
-    const task_to_wake = cascade.Task.fromNode(task_to_wake_node);
+    const task_to_wake: *cascade.Task = .fromNode(task_to_wake_node);
 
     if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;

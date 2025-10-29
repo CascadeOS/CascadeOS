@@ -189,7 +189,7 @@ pub const InterruptFrame = extern struct {
     ) cascade.Environment {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .{ .user = current_task.toThread().process },
+            .user_code => return .{ .user = .fromTask(current_task) },
             else => unreachable,
         };
     }

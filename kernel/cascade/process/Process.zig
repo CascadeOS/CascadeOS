@@ -7,6 +7,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const process_cleanup = @import("process_cleanup.zig");
@@ -42,7 +43,7 @@ pub const CreateOptions = struct {
 };
 
 /// Create a process.
-pub fn create(current_task: *cascade.Task, options: CreateOptions) !*Process {
+pub fn create(current_task: *Task, options: CreateOptions) !*Process {
     const process = try globals.cache.allocate(current_task);
     errdefer globals.cache.deallocate(current_task, process);
 
@@ -63,7 +64,7 @@ pub fn create(current_task: *cascade.Task, options: CreateOptions) !*Process {
 }
 
 pub const CreateThreadOptions = struct {
-    name: ?cascade.Task.Name = null,
+    name: ?Task.Name = null,
     function: arch.scheduling.TaskFunction,
     arg1: u64 = 0,
     arg2: u64 = 0,
@@ -74,7 +75,7 @@ pub const CreateThreadOptions = struct {
 /// The thread is in the `ready` state and is not scheduled.
 pub fn createThread(
     process: *Process,
-    current_task: *cascade.Task,
+    current_task: *Task,
     options: CreateThreadOptions,
 ) !*Thread {
     const thread = try Thread.internal.create(
@@ -115,9 +116,21 @@ pub fn incrementReferenceCount(process: *Process) void {
     _ = process.reference_count.fetchAdd(1, .acq_rel);
 }
 
-pub fn decrementReferenceCount(process: *Process, current_task: *cascade.Task) void {
-    if (process.reference_count.fetchSub(1, .acq_rel) != 1) return;
+pub fn decrementReferenceCount(process: *Process, current_task: *Task) void {
+    if (process.reference_count.fetchSub(1, .acq_rel) != 1) {
+        @branchHint(.likely);
+        return;
+    }
     process_cleanup.queueProcessForCleanup(current_task, process);
+}
+
+/// Returns the process that the given task belongs to.
+///
+/// Asserts that the task is a user task.
+pub inline fn fromTask(task: *Task) *Process {
+    if (core.is_debug) std.debug.assert(task.type == .user);
+    const thread: *Thread = @fieldParentPtr("task", task);
+    return thread.process;
 }
 
 pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
@@ -125,7 +138,7 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
 }
 
 pub const internal = struct {
-    pub fn destroy(current_task: *cascade.Task, process: *Process) void {
+    pub fn destroy(current_task: *Task, process: *Process) void {
         if (core.is_debug) {
             std.debug.assert(process.reference_count.load(.monotonic) == 0);
             std.debug.assert(process.queued_for_cleanup.load(.monotonic));
@@ -146,7 +159,7 @@ pub const internal = struct {
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.process_name_length);
 
-fn cacheConstructor(process: *Process, current_task: *cascade.Task) cascade.mem.cache.ConstructorError!void {
+fn cacheConstructor(process: *Process, current_task: *Task) cascade.mem.cache.ConstructorError!void {
     const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
     process.* = .{
@@ -185,7 +198,7 @@ fn cacheConstructor(process: *Process, current_task: *cascade.Task) cascade.mem.
     };
 }
 
-fn cacheDestructor(process: *Process, current_task: *cascade.Task) void {
+fn cacheDestructor(process: *Process, current_task: *Task) void {
     const page_table = process.address_space.page_table;
 
     process.address_space.deinit(current_task);
@@ -207,7 +220,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcesses(current_task: *cascade.Task) !void {
+    pub fn initializeProcesses(current_task: *Task) !void {
         log.debug(current_task, "initializing process cache", .{});
         globals.cache.init(current_task, .{
             .name = try .fromSlice("process"),

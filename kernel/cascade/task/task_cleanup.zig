@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Process = cascade.Process;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.task_cleanup);
@@ -64,15 +65,14 @@ fn handleTask(current_task: *cascade.Task, task: *Task) void {
 
     task.state.dropped.queued_for_cleanup.store(false, .release);
 
+    const lock: *cascade.sync.RwLock = switch (task.type) {
+        .kernel => &cascade.globals.kernel_tasks_lock,
+        .user => &Process.fromTask(task).threads_lock,
+    };
+
     {
-        switch (task.type) {
-            .kernel => cascade.globals.kernel_tasks_lock.writeLock(current_task),
-            .user => task.toThread().process.threads_lock.writeLock(current_task),
-        }
-        defer switch (task.type) {
-            .kernel => cascade.globals.kernel_tasks_lock.writeUnlock(current_task),
-            .user => task.toThread().process.threads_lock.writeUnlock(current_task),
-        };
+        lock.writeLock(current_task);
+        defer lock.writeUnlock(current_task);
 
         if (task.reference_count.load(.acquire) != 0) {
             @branchHint(.unlikely);
@@ -92,7 +92,7 @@ fn handleTask(current_task: *cascade.Task, task: *Task) void {
         switch (task.type) {
             .kernel => if (!cascade.globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks"),
             .user => {
-                const thread = task.toThread();
+                const thread: *Process.Thread = .fromTask(task);
                 if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
             },
         }
@@ -104,9 +104,9 @@ fn handleTask(current_task: *cascade.Task, task: *Task) void {
     switch (task.type) {
         .kernel => Task.internal.destroyKernelTask(current_task, task),
         .user => {
-            const thread = task.toThread();
+            const thread: *Process.Thread = .fromTask(task);
             thread.process.decrementReferenceCount(current_task);
-            cascade.Process.Thread.internal.destroy(current_task, thread);
+            Process.Thread.internal.destroy(current_task, thread);
         },
     }
 }
