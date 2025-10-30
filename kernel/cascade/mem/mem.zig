@@ -20,6 +20,10 @@ pub const resource_arena = @import("resource_arena.zig");
 
 const log = cascade.debug.log.scoped(.mem);
 
+pub inline fn kernelPageTable() arch.paging.PageTable {
+    return globals.kernel_page_table;
+}
+
 /// Maps a single page to a physical frame.
 ///
 /// **REQUIREMENTS**:
@@ -490,12 +494,12 @@ pub fn kernelVirtualOffset() core.Size {
 }
 
 pub const globals = struct {
-    /// The core page table.
+    /// The kernel page table.
     ///
     /// All other page tables start as a copy of this one.
     ///
-    /// Initialized during `init.buildCorePageTable`.
-    pub var core_page_table: arch.paging.PageTable = undefined;
+    /// Initialized during `init.initializeMemorySystem`.
+    var kernel_page_table: arch.paging.PageTable = undefined;
 
     /// The kernel pageable address space.
     ///
@@ -606,8 +610,8 @@ pub const init = struct {
         );
         globals.non_cached_direct_map = kernel_regions.find(.non_cached_direct_map).?.range;
 
-        init_log.debug(current_task, "building core page table", .{});
-        globals.core_page_table = buildAndLoadCorePageTable(
+        init_log.debug(current_task, "building kernel page table", .{});
+        globals.kernel_page_table = buildAndLoadKernelPageTable(
             current_task,
             kernel_regions,
         );
@@ -643,7 +647,7 @@ pub const init = struct {
             .{
                 .name = try .fromSlice("pageable_kernel"),
                 .range = kernel_regions.find(.pageable_kernel_address_space).?.range,
-                .page_table = globals.core_page_table,
+                .page_table = globals.kernel_page_table,
                 .context = .kernel,
             },
         );
@@ -877,23 +881,23 @@ pub const init = struct {
         });
     }
 
-    fn buildAndLoadCorePageTable(
+    fn buildAndLoadKernelPageTable(
         current_task: *Task,
         kernel_regions: *KernelMemoryRegion.List,
     ) arch.paging.PageTable {
-        const core_page_table = arch.paging.PageTable.create(
+        const kernel_page_table = arch.paging.PageTable.create(
             phys.init.bootstrap_allocator.allocate(current_task) catch unreachable,
         );
 
         for (kernel_regions.constSlice()) |region| {
-            init_log.debug(current_task, "mapping '{t}' into the core page table", .{region.type});
+            init_log.debug(current_task, "mapping '{t}' into the kernel page table", .{region.type});
 
             const map_info = region.mapInfo();
 
             switch (map_info) {
                 .top_level => arch.paging.init.fillTopLevel(
                     current_task,
-                    core_page_table,
+                    kernel_page_table,
                     region.range,
                     phys.init.bootstrap_allocator,
                 ) catch |err| {
@@ -901,7 +905,7 @@ pub const init = struct {
                 },
                 .full => |full| arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     current_task,
-                    core_page_table,
+                    kernel_page_table,
                     region.range,
                     full.physical_range,
                     full.map_type,
@@ -912,7 +916,7 @@ pub const init = struct {
                 .back_with_frames => |map_type| {
                     mapRangeAndBackWithPhysicalFrames(
                         current_task,
-                        core_page_table,
+                        kernel_page_table,
                         region.range,
                         map_type,
                         .kernel,
@@ -925,10 +929,10 @@ pub const init = struct {
             }
         }
 
-        init_log.debug(current_task, "loading core page table", .{});
-        core_page_table.load();
+        init_log.debug(current_task, "loading kernel page table", .{});
+        kernel_page_table.load();
 
-        return core_page_table;
+        return kernel_page_table;
     }
 
     pub fn kernelPhysicalToVirtualOffset() core.Size {

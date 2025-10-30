@@ -66,7 +66,7 @@ pub fn allocateSpecial(
 
     try cascade.mem.mapRangeToPhysicalRange(
         current_task,
-        cascade.mem.globals.core_page_table,
+        cascade.mem.kernelPageTable(),
         virtual_range,
         physical_range,
         map_type,
@@ -191,7 +191,7 @@ const allocator_impl = struct {
 
             cascade.mem.mapRangeAndBackWithPhysicalFrames(
                 current_task,
-                cascade.mem.globals.core_page_table,
+                cascade.mem.kernelPageTable(),
                 virtual_range,
                 .{ .type = .kernel, .protection = .read_write },
                 .kernel,
@@ -221,7 +221,7 @@ const allocator_impl = struct {
 
             cascade.mem.unmapRange(
                 current_task,
-                cascade.mem.globals.core_page_table,
+                cascade.mem.kernelPageTable(),
                 allocation.toVirtualRange(),
                 .kernel,
                 .free,

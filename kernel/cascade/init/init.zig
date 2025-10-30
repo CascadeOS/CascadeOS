@@ -102,7 +102,7 @@ pub fn initStage1() !noreturn {
 fn initStage2(current_task: *Task) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
-    cascade.mem.globals.core_page_table.load();
+    cascade.mem.kernelPageTable().load();
     const executor = current_task.known_executor.?;
     arch.init.loadExecutor(current_task);
 

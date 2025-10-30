@@ -158,7 +158,7 @@ fn cacheConstructor(process: *Process, current_task: *Task) cascade.mem.cache.Co
     }
 
     const page_table: arch.paging.PageTable = arch.paging.PageTable.create(frame);
-    cascade.mem.globals.core_page_table.copyTopLevelInto(page_table);
+    cascade.mem.kernelPageTable().copyTopLevelInto(page_table);
 
     process.address_space.init(current_task, .{
         .name = cascade.mem.AddressSpace.Name.fromSlice(

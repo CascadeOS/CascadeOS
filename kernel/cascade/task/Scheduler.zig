@@ -363,7 +363,7 @@ fn beforeSwitchTask(
         .user => {
             const old_process: *const Process = .fromTask(old_task);
             switch (new_task.type) {
-                .kernel => cascade.mem.globals.core_page_table.load(),
+                .kernel => cascade.mem.kernelPageTable().load(),
                 .user => {
                     const new_process: *Process = .fromTask(new_task);
                     if (old_process != new_process) new_process.address_space.page_table.load();

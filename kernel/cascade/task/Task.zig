@@ -390,7 +390,7 @@ pub const Stack = struct {
 
             cascade.mem.mapRangeAndBackWithPhysicalFrames(
                 current_task,
-                cascade.mem.globals.core_page_table,
+                cascade.mem.kernelPageTable(),
                 usable_range,
                 .{ .type = .kernel, .protection = .read_write },
                 .kernel,
@@ -409,7 +409,7 @@ pub const Stack = struct {
 
             cascade.mem.unmapRange(
                 current_task,
-                cascade.mem.globals.core_page_table,
+                cascade.mem.kernelPageTable(),
                 stack.usable_range,
                 .kernel,
                 .free,
