@@ -21,7 +21,7 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.S
         .{},
     );
 
-    out_rsdp_address.* = cascade.mem.physicalFromDirectMap(.fromPtr(acpi.globals.rsdp)) catch return .internal_error;
+    out_rsdp_address.* = cascade.mem.physicalFromDirectMap(.fromPtr(acpi.rsdpTable())) catch return .internal_error;
 
     return .ok;
 }

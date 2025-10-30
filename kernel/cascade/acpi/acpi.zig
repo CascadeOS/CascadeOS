@@ -15,6 +15,10 @@ const uacpi = @import("uacpi.zig");
 
 const log = cascade.debug.log.scoped(.acpi);
 
+pub fn rsdpTable() *const tables.RSDP {
+    return globals.rsdp;
+}
+
 pub fn tryShutdown(current_task: *Task) !void {
     if (!globals.acpi_initialized) return;
 
@@ -30,7 +34,7 @@ pub const globals = struct {
     /// Pointer to the RSDP table.
     ///
     /// Set by `init.earlyInitialize`.
-    pub var rsdp: *const tables.RSDP = undefined;
+    var rsdp: *const tables.RSDP = undefined;
 
     /// Set by `init.initialize`.
     var acpi_initialized: bool = false;
