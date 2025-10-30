@@ -297,7 +297,7 @@ pub fn map(
             const following_entry = address_space.entries.items[insertion_index];
             if (core.is_debug) std.debug.assert(!local_entry.anyOverlap(following_entry)); // entry overlaps with the following entry
 
-            if (local_entry.canMerge(current_task, following_entry)) {
+            if (local_entry.canMerge(following_entry)) {
                 local_entry.merge(current_task, following_entry);
                 following_entry.* = local_entry;
                 merges += 1;
@@ -309,7 +309,7 @@ pub fn map(
             const preceding_entry = address_space.entries.items[insertion_index - 1];
             if (core.is_debug) std.debug.assert(!local_entry.anyOverlap(preceding_entry)); // entry overlaps with the preceding entry
 
-            if (preceding_entry.canMerge(current_task, &local_entry)) {
+            if (preceding_entry.canMerge(&local_entry)) {
                 preceding_entry.merge(current_task, &local_entry);
 
                 if (merges != 0) {
@@ -800,7 +800,7 @@ fn performChangeProtection(
 
             const following_entry = address_space.entries.items[following_index];
 
-            if (entry.canMerge(current_task, following_entry)) {
+            if (entry.canMerge(following_entry)) {
                 entry.merge(current_task, following_entry);
 
                 _ = address_space.entries.orderedRemove(following_index);
@@ -822,7 +822,7 @@ fn performChangeProtection(
         const first_entry = address_space.entries.items[index];
         const preceeding_entry = address_space.entries.items[index - 1];
 
-        if (preceeding_entry.canMerge(current_task, first_entry)) {
+        if (preceeding_entry.canMerge(first_entry)) {
             preceeding_entry.merge(current_task, first_entry);
 
             _ = address_space.entries.orderedRemove(index);

@@ -77,7 +77,7 @@ pub fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
 /// This must be observed to be `true` before `merge` is can be called on the entries.
 ///
 /// Can only be `true` when `second_entry` immediately follows `first_entry` in the address space.
-pub fn canMerge(first_entry: *const Entry, current_task: *cascade.Task, second_entry: *const Entry) bool {
+pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
     if (first_entry.protection != second_entry.protection) return false;
     if (first_entry.max_protection != second_entry.max_protection) return false;
     if (first_entry.copy_on_write != second_entry.copy_on_write) return false;
@@ -88,13 +88,22 @@ pub fn canMerge(first_entry: *const Entry, current_task: *cascade.Task, second_e
         return false;
     }
 
-    if (first_entry.object_reference.object) |first_entry_object| {
-        const second_entry_object = second_entry.object_reference.object orelse {
-            // first_entry has an object reference, second_entry has no object reference
+    object: {
+        const first_object = first_entry.object_reference.object orelse {
+            if (second_entry.object_reference.object != null) {
+                // `second_entry` has an object reference, `first_entry` has no object reference
+                return false;
+            }
+            // no objects to prevent merging
+            break :object;
+        };
+
+        const second_object = second_entry.object_reference.object orelse {
+            // `first_entry` has an object reference, `second_entry` has no object reference
             return false;
         };
 
-        if (first_entry_object != second_entry_object) {
+        if (first_object != second_object) {
             // objects dont match
             return false;
         }
@@ -103,63 +112,49 @@ pub fn canMerge(first_entry: *const Entry, current_task: *cascade.Task, second_e
             .add(first_entry.range.size)
             .notEqual(second_entry.object_reference.start_offset))
         {
-            // second_entry's object reference does not immediately follow first_entry's object reference
+            // `second_entry` object reference does not immediately follow `first_entry` object reference
             return false;
         }
-    } else if (second_entry.object_reference.object != null) {
-        // first_entry has no object reference, second_entry has an object reference
-        return false;
     }
 
-    if (first_entry.anonymous_map_reference.anonymous_map) |first_entry_anonymous_map| {
-        if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
-            if (first_entry_anonymous_map != second_entry_anonymous_map) {
+    anonymous_map: {
+        const first_anonymous_map = first_entry.anonymous_map_reference.anonymous_map orelse {
+            if (second_entry.anonymous_map_reference.anonymous_map != null) {
+                // cannot safely move `second_entry` anonymous map reference backwards to cover `first_entry`
                 return false;
             }
-            if (first_entry.needs_copy != second_entry.needs_copy) {
-                return false;
-            }
+            // no anonymous maps to prevent merging
+            break :anonymous_map;
+        };
 
-            if (first_entry.anonymous_map_reference.start_offset
-                .add(first_entry.range.size)
-                .notEqual(second_entry.anonymous_map_reference.start_offset))
+        const second_anonymous_map = second_entry.anonymous_map_reference.anonymous_map orelse {
+            if (first_anonymous_map.number_of_pages.count !=
+                first_entry.anonymous_map_reference.start_offset
+                    .add(first_entry.range.size)
+                    .divide(arch.paging.standard_page_size))
             {
-                // second_entry's anonymous map reference does not immediately follow first_entry's anonymous map reference
+                // `first_entry` anonymous map reference does not extend to the end of the anonymous map, so it is not
+                // safe to extend the anonymous map
                 return false;
             }
-        } else {
-            if (core.is_debug) std.debug.assert(second_entry.needs_copy);
 
-            if (first_entry.needs_copy) {
-                first_entry_anonymous_map.lock.readLock(current_task);
-                defer first_entry_anonymous_map.lock.readUnlock(current_task);
+            // `first_entry` anonymous map reference extends to the end of the anonymous map, so it is safe to extend
+            // the anonymous map
+            break :anonymous_map;
+        };
 
-                if (first_entry_anonymous_map.reference_count > 1) {
-                    // the first entry's anonymous map is shared
-                    return false;
-                }
-            }
-        }
-    } else if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
-        if (core.is_debug) std.debug.assert(first_entry.needs_copy);
-
-        if (second_entry.anonymous_map_reference.start_offset.lessThan(first_entry.range.size)) {
-            // we can't move the second entry's start offset back far enough to cover the first entry
+        if (first_anonymous_map != second_anonymous_map) {
+            // anonymous maps dont match
             return false;
         }
 
-        if (second_entry.needs_copy) {
-            second_entry_anonymous_map.lock.readLock(current_task);
-            defer second_entry_anonymous_map.lock.readUnlock(current_task);
-
-            if (second_entry_anonymous_map.reference_count > 1) {
-                // the second entry's anonymous map is shared
-                return false;
-            }
+        if (first_entry.anonymous_map_reference.start_offset
+            .add(first_entry.range.size)
+            .notEqual(second_entry.anonymous_map_reference.start_offset))
+        {
+            // `second_entry` anonymous map reference does not immediately follow `first_entry` anonymous map reference
+            return false;
         }
-    } else {
-        // neither entry has an anonymous map
-        if (core.is_debug) std.debug.assert(first_entry.needs_copy and second_entry.needs_copy);
     }
 
     return true;
@@ -172,43 +167,6 @@ pub fn canMerge(first_entry: *const Entry, current_task: *cascade.Task, second_e
 ///  - the `second_entry` immediately follows` `first_entry` in the address space
 ///  - after this function `second_entry` is no longer treated as valid
 pub fn merge(first_entry: *Entry, current_task: *cascade.Task, second_entry: *const Entry) void {
-    const new_size = first_entry.range.size.add(second_entry.range.size);
-
-    if (first_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-        anonymous_map.lock.writeLock(current_task);
-        defer anonymous_map.lock.writeUnlock(current_task);
-
-        if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
-            if (core.is_debug) {
-                std.debug.assert(anonymous_map == second_entry_anonymous_map); // checked by `canMerge`
-                std.debug.assert(anonymous_map.reference_count >= 2);
-            }
-
-            anonymous_map.reference_count -= 1;
-        } else {
-            const size_of_anonymous_map = anonymous_map.number_of_pages.toSize();
-            const size_after_offset = size_of_anonymous_map.subtract(
-                first_entry.anonymous_map_reference.start_offset,
-            );
-            if (core.is_debug) std.debug.assert(size_after_offset.greaterThanOrEqual(first_entry.range.size));
-
-            if (size_after_offset.lessThan(new_size)) {
-                // we must extend the anonymous map to cover the second entries range
-                anonymous_map.number_of_pages.increaseBySize(new_size.subtract(size_after_offset));
-            }
-        }
-    } else if (second_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-        if (core.is_debug) std.debug.assert(second_entry.anonymous_map_reference.start_offset.greaterThanOrEqual(first_entry.range.size));
-
-        // we take over the anonymous map reference from the second entry and move the start offset back to cover the
-        // first entries range
-        first_entry.anonymous_map_reference.anonymous_map = anonymous_map;
-        first_entry.anonymous_map_reference.start_offset = second_entry.anonymous_map_reference.start_offset
-            .subtract(first_entry.range.size);
-
-        first_entry.needs_copy = false;
-    }
-
     object: {
         const object = first_entry.object_reference.object orelse {
             if (core.is_debug) std.debug.assert(second_entry.object_reference.object == null);
@@ -225,7 +183,28 @@ pub fn merge(first_entry: *Entry, current_task: *cascade.Task, second_entry: *co
         object.reference_count -= 1;
     }
 
-    first_entry.range.size = new_size;
+    anonymous_map: {
+        const anonymous_map = first_entry.anonymous_map_reference.anonymous_map orelse {
+            if (core.is_debug) std.debug.assert(second_entry.anonymous_map_reference.anonymous_map == null);
+            break :anonymous_map;
+        };
+
+        anonymous_map.lock.writeLock(current_task);
+        defer anonymous_map.lock.writeUnlock(current_task);
+
+        if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
+            if (core.is_debug) {
+                std.debug.assert(anonymous_map == second_entry_anonymous_map);
+                std.debug.assert(anonymous_map.reference_count >= 2);
+            }
+
+            anonymous_map.reference_count -= 1;
+        } else {
+            anonymous_map.number_of_pages.increaseBySize(second_entry.range.size);
+        }
+    }
+
+    first_entry.range.size.addInPlace(second_entry.range.size);
 }
 
 /// Split `first_entry` at `split_offset` into its range.
