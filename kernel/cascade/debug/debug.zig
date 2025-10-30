@@ -86,7 +86,7 @@ fn singleExecutorInitPanic(
         var nested_panic_count: usize = 0;
     };
 
-    cascade.init.Output.globals.lock.poison();
+    cascade.init.Output.lock.poison();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
@@ -123,7 +123,7 @@ fn initPanic(
         if (panicking_executor != executor) return; // another executor is panicking
     }
 
-    cascade.init.Output.globals.lock.poison();
+    cascade.init.Output.lock.poison();
     arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;

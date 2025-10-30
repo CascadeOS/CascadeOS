@@ -171,8 +171,8 @@ fn initStage4(current_task: *Task, _: usize, _: usize) !void {
     log.debug(current_task, "initializing ACPI", .{});
     try cascade.acpi.init.initialize(current_task);
 
-    Output.globals.lock.lock(current_task);
-    defer Output.globals.lock.unlock(current_task);
+    Output.lock.lock(current_task);
+    defer Output.lock.unlock(current_task);
     try cascade.time.init.printInitializationTime(Output.writer);
     try Output.writer.flush();
 }

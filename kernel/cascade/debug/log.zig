@@ -148,8 +148,8 @@ fn logFn(
         .init_log => {
             @branchHint(.unlikely);
 
-            cascade.init.Output.globals.lock.lock(current_task);
-            defer cascade.init.Output.globals.lock.unlock(current_task);
+            cascade.init.Output.lock.lock(current_task);
+            defer cascade.init.Output.lock.unlock(current_task);
 
             const writer = cascade.init.Output.writer;
 

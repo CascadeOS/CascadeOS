@@ -26,6 +26,7 @@ remapFn: *const fn (state: *anyopaque, current_task: *cascade.Task) anyerror!voi
 state: *anyopaque,
 
 pub const writer = &globals.writer;
+pub const lock = &globals.lock;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
 pub fn remapOutputs(current_task: *cascade.Task) !void {
@@ -103,8 +104,8 @@ fn splatToOutputs(str: []const u8, splat: usize) void {
     }
 }
 
-pub const globals = struct {
-    pub var lock: cascade.sync.TicketSpinLock = .{};
+const globals = struct {
+    var lock: cascade.sync.TicketSpinLock = .{};
 
     var framebuffer_output: ?Output = null;
     var serial_output: ?Output = null;
