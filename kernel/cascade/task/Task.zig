@@ -14,7 +14,6 @@ const Thread = Process.Thread;
 const core = @import("core");
 
 pub const Scheduler = @import("Scheduler.zig");
-const task_cleanup = @import("task_cleanup.zig");
 
 const log = cascade.debug.log.scoped(.task);
 
@@ -105,7 +104,7 @@ pub fn decrementReferenceCount(task: *Task, current_task: *Task) void {
         @branchHint(.likely);
         return;
     }
-    task_cleanup.queueTaskForCleanup(current_task, task);
+    globals.task_cleanup.queueTaskForCleanup(current_task, task);
 }
 
 pub fn incrementInterruptDisable(current_task: *Task) void {
@@ -256,13 +255,22 @@ pub fn createKernelTask(current_task: *Task, options: CreateKernelTaskOptions) !
         .type = .kernel,
     });
 
-    cascade.globals.kernel_tasks_lock.writeLock(current_task);
-    defer cascade.globals.kernel_tasks_lock.writeUnlock(current_task);
+    globals.kernel_tasks_lock.writeLock(current_task);
+    defer globals.kernel_tasks_lock.writeUnlock(current_task);
 
-    const gop = try cascade.globals.kernel_tasks.getOrPut(cascade.mem.heap.allocator, task);
+    const gop = try globals.kernel_tasks.getOrPut(cascade.mem.heap.allocator, task);
     if (gop.found_existing) std.debug.panic("task already in kernel tasks list", .{});
 
     return task;
+}
+
+fn destroyKernelTask(task: *Task, current_task: *Task) void {
+    if (core.is_debug) {
+        std.debug.assert(task.type == .kernel);
+        std.debug.assert(task.state == .dropped);
+        std.debug.assert(task.reference_count.load(.monotonic) == 0);
+    }
+    globals.cache.deallocate(current_task, task);
 }
 
 pub fn format(
@@ -447,14 +455,132 @@ pub const internal = struct {
             options.arg2,
         );
     }
+};
 
-    pub fn destroyKernelTask(current_task: *Task, task: *Task) void {
+const TaskCleanup = struct {
+    task: *Task,
+    parker: cascade.sync.Parker,
+    incoming: core.containers.AtomicSinglyLinkedList,
+
+    pub fn init(task_cleanup: *TaskCleanup, current_task: *Task) !void {
+        task_cleanup.* = .{
+            .task = try Task.createKernelTask(current_task, .{
+                .name = try .fromSlice("task cleanup"),
+                .function = TaskCleanup.entry,
+                .arg1 = @intFromPtr(task_cleanup),
+            }),
+            .parker = undefined, // set below
+            .incoming = .{},
+        };
+
+        task_cleanup.parker = .withParkedTask(task_cleanup.task);
+    }
+
+    /// Queues a task to be cleaned up by the task cleanup service.
+    pub fn queueTaskForCleanup(
+        task_cleanup: *TaskCleanup,
+        current_task: *Task,
+        task: *Task,
+    ) void {
         if (core.is_debug) {
-            std.debug.assert(task.type == .kernel);
+            std.debug.assert(current_task != task);
             std.debug.assert(task.state == .dropped);
-            std.debug.assert(task.reference_count.load(.monotonic) == 0);
         }
-        globals.cache.deallocate(current_task, task);
+
+        if (task.state.dropped.queued_for_cleanup.cmpxchgStrong(
+            false,
+            true,
+            .acq_rel,
+            .acquire,
+        ) != null) {
+            @panic("already queued for cleanup");
+        }
+
+        log.verbose(current_task, "queueing {f} for cleanup", .{task});
+
+        task_cleanup.incoming.prepend(&task.next_task_node);
+        task_cleanup.parker.unpark(current_task);
+    }
+
+    fn execute(task_cleanup: *TaskCleanup, current_task: *Task) noreturn {
+        while (true) {
+            while (task_cleanup.incoming.popFirst()) |node| {
+                handleTask(
+                    current_task,
+                    .fromNode(node),
+                );
+            }
+
+            task_cleanup.parker.park(current_task);
+        }
+    }
+
+    fn handleTask(current_task: *Task, task: *Task) void {
+        if (core.is_debug) {
+            std.debug.assert(task.state == .dropped);
+            std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
+        }
+
+        task.state.dropped.queued_for_cleanup.store(false, .release);
+
+        const lock: *cascade.sync.RwLock = switch (task.type) {
+            .kernel => &globals.kernel_tasks_lock,
+            .user => &Process.fromTask(task).threads_lock,
+        };
+
+        {
+            lock.writeLock(current_task);
+            defer lock.writeUnlock(current_task);
+
+            if (task.reference_count.load(.acquire) != 0) {
+                @branchHint(.unlikely);
+                // someone has acquired a reference to the task after it was queued for cleanup
+                log.verbose(current_task, "{f} still has references", .{task});
+                return;
+            }
+
+            if (task.state.dropped.queued_for_cleanup.swap(true, .acq_rel)) {
+                @branchHint(.unlikely);
+                // someone has requeued this task for cleanup
+                log.verbose(current_task, "{f} has been requeued for cleanup", .{task});
+                return;
+            }
+
+            // the task is no longer referenced so we can safely destroy it
+            switch (task.type) {
+                .kernel => if (!globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks"),
+                .user => {
+                    const thread: *Process.Thread = .fromTask(task);
+                    if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
+                },
+            }
+        }
+
+        // this log must happen before the process reference count is decremented
+        log.debug(current_task, "destroying {f}", .{task});
+
+        switch (task.type) {
+            .kernel => task.destroyKernelTask(current_task),
+            .user => {
+                const thread: *Process.Thread = .fromTask(task);
+                thread.process.decrementReferenceCount(current_task);
+                Process.Thread.internal.destroy(current_task, thread);
+            },
+        }
+    }
+
+    fn entry(current_task: *Task, task_cleanup_addr: usize, _: usize) noreturn {
+        const task_cleanup: *TaskCleanup = @ptrFromInt(task_cleanup_addr);
+
+        if (core.is_debug) {
+            std.debug.assert(current_task == task_cleanup.task);
+            std.debug.assert(current_task.interrupt_disable_count == 0);
+            std.debug.assert(current_task.spinlocks_held == 0);
+            std.debug.assert(!current_task.scheduler_locked);
+            std.debug.assert(arch.interrupts.areEnabled());
+        }
+
+        task_cleanup.execute(current_task);
     }
 };
 
@@ -479,6 +605,15 @@ const globals = struct {
 
     var stack_arena: cascade.mem.resource_arena.Arena(.none) = undefined;
     var stack_page_table_mutex: cascade.sync.Mutex = .{};
+
+    /// All currently living kernel tasks.
+    ///
+    /// This does not include the per-executor scheduler or bootstrap init tasks.
+    var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
+    var kernel_tasks_lock: cascade.sync.RwLock = .{};
+
+    /// Initialized during `init.initializeTasks`.
+    var task_cleanup: TaskCleanup = undefined;
 };
 
 pub const init = struct {
@@ -514,7 +649,7 @@ pub const init = struct {
         );
 
         log.debug(current_task, "initializing task cleanup service", .{});
-        try task_cleanup.init.initializeTaskCleanupService(current_task);
+        try globals.task_cleanup.init(current_task);
     }
 
     pub fn initializeBootstrapInitTask(

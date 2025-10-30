@@ -25,11 +25,3 @@ pub const Context = union(Type) {
         user,
     };
 };
-
-pub const globals = struct {
-    /// All currently living kernel tasks.
-    ///
-    /// This does not include the per-executor scheduler or bootstrap init tasks.
-    pub var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
-    pub var kernel_tasks_lock: sync.RwLock = .{};
-};
