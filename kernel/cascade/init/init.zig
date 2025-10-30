@@ -76,7 +76,7 @@ pub fn initStage1() !noreturn {
 
     log.debug(current_task, "initializing kernel executors", .{});
     const executors, const new_bootstrap_executor = try createExecutors(current_task);
-    cascade.globals.executors = executors;
+    cascade.Executor.init.setExecutors(executors);
     current_task = new_bootstrap_executor.current_task;
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
@@ -200,7 +200,7 @@ fn constructBootstrapTask() !*Task {
     );
     arch.init.loadExecutor(current_task);
 
-    cascade.globals.executors = @ptrCast(&static.bootstrap_executor);
+    cascade.Executor.init.setExecutors(@ptrCast(&static.bootstrap_executor));
 
     return current_task;
 }
@@ -264,7 +264,7 @@ fn bootNonBootstrapExecutors() !void {
         if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
 
         desc.boot(
-            cascade.globals.executors[i].current_task,
+            cascade.Executor.executors()[i].current_task,
             struct {
                 fn bootFn(inner_current_task: *anyopaque) !noreturn {
                     try initStage2(@ptrCast(@alignCast(inner_current_task)));
@@ -286,7 +286,7 @@ const Stage3Barrier = struct {
 
         if (stage3_executor) {
             // wait for all executors to signal that they are ready for stage 3 to occur
-            while (number_of_executors_ready.load(.acquire) != (cascade.globals.executors.len)) {
+            while (number_of_executors_ready.load(.acquire) != (cascade.Executor.executors().len)) {
                 arch.spinLoopHint();
             }
         } else {

@@ -53,6 +53,10 @@ pub fn renderInterruptSourcePanicMessage(
     return bw.buffered();
 }
 
+pub fn executors() []Executor {
+    return globals.executors;
+}
+
 pub inline fn format(
     executor: *const Executor,
     writer: *std.Io.Writer,
@@ -68,5 +72,15 @@ pub const Id = enum(u32) {
         writer: *std.Io.Writer,
     ) !void {
         try writer.print("Executor({d})", .{@intFromEnum(id)});
+    }
+};
+
+const globals = struct {
+    var executors: []Executor = &.{};
+};
+
+pub const init = struct {
+    pub fn setExecutors(executor_slice: []Executor) void {
+        globals.executors = executor_slice;
     }
 };

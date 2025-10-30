@@ -29,7 +29,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *Task) void {
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
-        for (cascade.globals.executors) |*executor| {
+        for (cascade.Executor.executors()) |*executor| {
             if (executor == current_executor) continue; // skip ourselves
             flush_request.requestExecutor(executor);
         }

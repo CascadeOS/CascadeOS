@@ -27,8 +27,6 @@ pub const Context = union(Type) {
 };
 
 pub const globals = struct {
-    pub var executors: []Executor = &.{};
-
     /// All currently living kernel tasks.
     ///
     /// This does not include the per-executor scheduler or bootstrap init tasks.
