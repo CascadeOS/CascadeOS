@@ -66,7 +66,7 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
         .writeable_section, .readonly_section, .executable_section, .sdf_section => {
             const physical_range = core.PhysicalRange.fromAddr(
                 core.PhysicalAddress.fromInt(
-                    kernel_memory_region.range.address.value - cascade.mem.globals.physical_to_virtual_offset.value,
+                    kernel_memory_region.range.address.value - cascade.mem.init.kernelPhysicalToVirtualOffset().value,
                 ),
                 kernel_memory_region.range.size,
             );

@@ -510,11 +510,6 @@ pub const globals = struct {
     /// Initialized during `init.determineEarlyMemoryLayout`.
     pub var virtual_offset: core.Size = undefined;
 
-    /// Offset from the virtual address of kernel sections to the physical address of the section.
-    ///
-    /// Initialized during `init.determineEarlyMemoryLayout`.
-    pub var physical_to_virtual_offset: core.Size = undefined;
-
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Initialized during `init.determineEarlyMemoryLayout`.
@@ -548,7 +543,7 @@ pub const init = struct {
         );
         globals.virtual_offset = virtual_offset;
 
-        globals.physical_to_virtual_offset = core.Size.from(
+        init_globals.kernel_physical_to_virtual_offset = core.Size.from(
             base_address.virtual.value - base_address.physical.value,
             .byte,
         );
@@ -584,7 +579,7 @@ pub const init = struct {
 
         init_log.debug(current_task, "  virtual base address:       {f}", .{globals.virtual_base_address});
         init_log.debug(current_task, "  virtual offset:             0x{x:0>16}", .{globals.virtual_offset.value});
-        init_log.debug(current_task, "  physical to virtual offset: 0x{x:0>16}", .{globals.physical_to_virtual_offset.value});
+        init_log.debug(current_task, "  kernel physical to virtual: 0x{x:0>16}", .{init_globals.kernel_physical_to_virtual_offset.value});
         init_log.debug(current_task, "  direct map:                 {f}", .{globals.direct_map});
     }
 
@@ -932,8 +927,19 @@ pub const init = struct {
         return core_page_table;
     }
 
+    pub fn kernelPhysicalToVirtualOffset() core.Size {
+        return init_globals.kernel_physical_to_virtual_offset;
+    }
+
     const MemoryMap = core.containers.BoundedArray(
         boot.MemoryMap.Entry,
         cascade.config.maximum_number_of_memory_map_entries,
     );
+
+    const init_globals = struct {
+        /// Offset from the virtual address of kernel sections to the physical address of the section.
+        ///
+        /// Initialized during `init.determineEarlyMemoryLayout`.
+        var kernel_physical_to_virtual_offset: core.Size = undefined;
+    };
 };
