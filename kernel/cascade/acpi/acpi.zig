@@ -30,7 +30,7 @@ pub fn tryShutdown(current_task: *Task) !void {
     try uacpi.sleep(.S5);
 }
 
-pub const globals = struct {
+const globals = struct {
     /// Pointer to the RSDP table.
     ///
     /// Set by `init.earlyInitialize`.

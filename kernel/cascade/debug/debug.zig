@@ -528,7 +528,7 @@ pub fn setPanicMode(mode: PanicMode) void {
 
 pub const panic_interface = std.debug.FullPanic(zigPanic);
 
-pub const globals = struct {
+const globals = struct {
     /// The executor that is currently panicking.
     ///
     /// Checked by executors to confirm receiving a panic IPI.
