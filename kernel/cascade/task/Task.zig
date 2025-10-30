@@ -27,7 +27,7 @@ const Task = @This();
 /// For user tasks this starts as a process local incrementing number but can be changed by the user.
 name: Name,
 
-type: cascade.Environment.Type,
+type: cascade.Context.Type,
 
 is_scheduler_task: bool = false,
 
@@ -38,7 +38,7 @@ state: State,
 /// Each task has a reference to itself which is dropped when the scheduler drops the task.
 reference_count: std.atomic.Value(usize) = .init(1), // tasks start with a reference to themselves
 
-/// The stack used by this task in kernel mode.
+/// The stack used by this task in kernelspace.
 stack: Stack,
 
 /// Used for various linked lists including:
@@ -384,7 +384,7 @@ pub const Stack = struct {
                 current_task,
                 cascade.mem.globals.core_page_table,
                 usable_range,
-                .{ .environment_type = .kernel, .protection = .read_write },
+                .{ .type = .kernel, .protection = .read_write },
                 .kernel,
                 .keep,
                 cascade.mem.phys.allocator,
@@ -422,7 +422,7 @@ pub const internal = struct {
         function: arch.scheduling.TaskFunction,
         arg1: u64,
         arg2: u64,
-        type: cascade.Environment.Type,
+        type: cascade.Context.Type,
     };
 
     pub fn init(task: *Task, options: InitOptions) !void {

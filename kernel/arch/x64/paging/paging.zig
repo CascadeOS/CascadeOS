@@ -254,7 +254,7 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
         entry.no_execute.write(map_type.protection != .execute);
     }
 
-    switch (map_type.environment_type) {
+    switch (map_type.type) {
         .user => {
             entry.user_accessible.write(true);
             entry.global.write(false);

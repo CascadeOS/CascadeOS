@@ -110,7 +110,7 @@ fn remapFramebuffer(_: *anyopaque, current_task: *Task) !void {
             framebuffer_size,
         ),
         .{
-            .environment_type = .kernel,
+            .type = .kernel,
             .protection = .read_write,
             .cache = .write_combining,
         },

@@ -291,7 +291,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo, current_task: *Task) error{
 
     {
         const map_type: cascade.mem.MapType = .{
-            .environment_type = fault_info.address_space.environment,
+            .type = fault_info.address_space.context,
             .protection = fault_info.enter_protection,
         };
 

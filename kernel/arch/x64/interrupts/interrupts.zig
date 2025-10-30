@@ -183,11 +183,11 @@ pub const InterruptFrame = extern struct {
         selector: x64.Gdt.Selector,
     },
 
-    /// Returns the environment that the interrupt was triggered from.
-    pub fn environment(
+    /// Returns the context that the interrupt was triggered from.
+    pub fn context(
         interrupt_frame: *const InterruptFrame,
         current_task: *Task,
-    ) cascade.Environment {
+    ) cascade.Context {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
             .user_code => return .{ .user = .fromTask(current_task) },

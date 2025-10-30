@@ -49,7 +49,7 @@ pub fn pageFaultHandler(
         else
             .invalid,
 
-        .faulting_environment = if (error_code.user)
+        .faulting_context = if (error_code.user)
             .{
                 .user = .fromTask(current_task),
             }
@@ -91,7 +91,7 @@ pub fn unhandledException(
     _: usize,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
-    switch (arch_interrupt_frame.environment(current_task)) {
+    switch (arch_interrupt_frame.context(current_task)) {
         .kernel => cascade.debug.interruptSourcePanic(
             current_task,
             interrupt_frame,

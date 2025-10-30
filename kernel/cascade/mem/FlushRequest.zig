@@ -11,7 +11,7 @@ const core = @import("core");
 const FlushRequest = @This();
 
 range: core.VirtualRange,
-flush_target: cascade.Environment,
+flush_target: cascade.Context,
 count: std.atomic.Value(usize) = .init(1), // starts at `1` to account for the current executor
 nodes: core.containers.BoundedArray(Node, cascade.config.maximum_number_of_executors) = .{},
 

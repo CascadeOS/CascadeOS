@@ -37,7 +37,7 @@ _name: Name,
 
 range: core.VirtualRange,
 
-environment: cascade.Environment,
+context: cascade.Context,
 
 page_table: arch.paging.PageTable,
 
@@ -66,7 +66,7 @@ pub const InitOptions = struct {
 
     page_table: arch.paging.PageTable,
 
-    environment: cascade.Environment,
+    context: cascade.Context,
 };
 
 pub fn init(
@@ -74,16 +74,16 @@ pub fn init(
     current_task: *Task,
     options: InitOptions,
 ) !void {
-    log.debug(current_task, "{s}: init with {f} environment {t}", .{
+    log.debug(current_task, "{s}: init with {f} context {t}", .{
         options.name.constSlice(),
         options.range,
-        options.environment,
+        options.context,
     });
 
     address_space.* = .{
         .range = options.range,
         ._name = options.name,
-        .environment = options.environment,
+        .context = options.context,
         .page_table = options.page_table,
         .entries = .empty,
         .entries_version = 0,
@@ -97,7 +97,7 @@ pub fn init(
 ///  - the address space is empty
 pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) void {
     if (core.is_debug) {
-        std.debug.assert(address_space.environment == .user);
+        std.debug.assert(address_space.context == .user);
         std.debug.assert(!address_space.page_table_lock.isLocked());
         std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
         std.debug.assert(address_space.entries.items.len == 0);
@@ -108,7 +108,7 @@ pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) voi
     address_space._name = cascade.mem.AddressSpace.Name.fromSlice(
         new_process.name.constSlice(),
     ) catch unreachable; // ensured in `cascade.config`
-    address_space.environment = .{ .user = new_process };
+    address_space.context = .{ .user = new_process };
 }
 
 /// Reinitialize the address space back to its initial state including unmapping everything.
@@ -574,7 +574,7 @@ pub fn changeProtection(
 
         if (validate_change_protection.update_page_table) {
             const map_type: cascade.mem.MapType = .{
-                .environment_type = address_space.environment,
+                .type = address_space.context,
                 // `update_page_table` is only true if `protection` is not null
                 .protection = request.protection.?,
             };
@@ -588,7 +588,7 @@ pub fn changeProtection(
                 current_task,
                 address_space.page_table,
                 range,
-                address_space.environment,
+                address_space.context,
                 map_type,
             );
         }
@@ -894,9 +894,9 @@ pub fn unmap(address_space: *AddressSpace, current_task: *Task, range: core.Virt
                 current_task,
                 address_space.page_table,
                 range,
-                address_space.environment,
+                address_space.context,
                 .keep, // backing pages are managed by anonymous maps
-                switch (address_space.environment) {
+                switch (address_space.context) {
                     .kernel => .keep,
                     .user => .free,
                 },
@@ -1250,7 +1250,7 @@ pub fn print(address_space: *AddressSpace, current_task: *Task, writer: *std.Io.
     try writer.writeAll("AddressSpace{\n");
 
     try writer.splatByteAll(' ', new_indent);
-    try writer.print("environment: {t},\n", .{address_space.environment});
+    try writer.print("context: {t},\n", .{address_space.context});
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("range: {f},\n", .{address_space.range});

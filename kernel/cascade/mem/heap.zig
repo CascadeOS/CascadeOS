@@ -191,7 +191,7 @@ pub const allocator_impl = struct {
                 current_task,
                 cascade.mem.globals.core_page_table,
                 virtual_range,
-                .{ .environment_type = .kernel, .protection = .read_write },
+                .{ .type = .kernel, .protection = .read_write },
                 .kernel,
                 .keep,
                 cascade.mem.phys.allocator,

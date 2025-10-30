@@ -10,13 +10,13 @@ const core = @import("core");
 
 const MapType = @This();
 
-/// The environment type of the mapping.
+/// The type of the mapping.
 ///
 /// If `.kernel` then the mapping is inaccessible from userspace, and is not flushed on context switch if supported.
 ///
 /// If` .user` then the mapping is accessible from userspace and if supported is not accessible from kernelspace by
 /// default.
-environment_type: cascade.Environment.Type,
+type: cascade.Context.Type,
 
 /// The protection of the mapping.
 protection: Protection,
@@ -56,7 +56,7 @@ pub fn format(
 ) !void {
     try writer.writeAll("Type{ ");
 
-    try writer.writeAll(switch (region.environment_type) {
+    try writer.writeAll(switch (region.type) {
         .user => "U_",
         .kernel => "K_",
     });

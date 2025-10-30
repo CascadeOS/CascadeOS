@@ -187,7 +187,7 @@ fn cacheConstructor(process: *Process, current_task: *Task) cascade.mem.cache.Co
         ) catch unreachable, // ensured in `cascade.config`
         .range = cascade.config.user_address_space_range,
         .page_table = page_table,
-        .environment = .{ .user = process },
+        .context = .{ .user = process },
     }) catch |err| {
         log.warn(
             current_task,

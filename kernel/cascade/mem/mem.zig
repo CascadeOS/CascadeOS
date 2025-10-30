@@ -65,7 +65,7 @@ pub fn mapRangeAndBackWithPhysicalFrames(
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
-    flush_target: cascade.Environment,
+    flush_target: cascade.Context,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -135,7 +135,7 @@ pub fn mapRangeToPhysicalRange(
     virtual_range: core.VirtualRange,
     physical_range: core.PhysicalRange,
     map_type: MapType,
-    flush_target: cascade.Environment,
+    flush_target: cascade.Context,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) MapError!void {
@@ -199,7 +199,7 @@ pub fn unmapRange(
     current_task: *Task,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
-    flush_target: cascade.Environment,
+    flush_target: cascade.Context,
     backing_page_decision: core.CleanupDecision,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
@@ -253,7 +253,7 @@ pub fn changeProtection(
     current_task: *Task,
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
-    flush_target: cascade.Environment,
+    flush_target: cascade.Context,
     map_type: cascade.mem.MapType,
 ) void {
     if (core.is_debug) {
@@ -352,7 +352,7 @@ pub fn onKernelPageFault(
             .user => .fromTask(current_task),
         };
 
-        if (!page_fault_details.faulting_environment.kernel.access_to_user_memory_enabled) {
+        if (!page_fault_details.faulting_context.kernel.access_to_user_memory_enabled) {
             @branchHint(.cold);
 
             cascade.debug.interruptSourcePanic(
@@ -422,13 +422,13 @@ pub const PageFaultDetails = struct {
     access_type: AccessType,
     fault_type: FaultType,
 
-    /// The environment that the fault was triggered from.
+    /// The context that the fault was triggered from.
     ///
-    /// This is not necessarily the same as the environment of the task that triggered the fault as a user task may have
-    /// triggered the fault while running in kernel mode.
-    faulting_environment: FaultingEnvironment,
+    /// This is not necessarily the same as the context of the task that triggered the fault as a user task may have
+    /// triggered the fault while running in kernelspace.
+    faulting_context: FaultingContext,
 
-    pub const FaultingEnvironment = union(cascade.Environment.Type) {
+    pub const FaultingContext = union(cascade.Context.Type) {
         kernel: struct {
             access_to_user_memory_enabled: bool,
         },
@@ -464,7 +464,7 @@ pub const PageFaultDetails = struct {
         try writer.print("fault_type: {t},\n", .{details.fault_type});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("faulting_environment: {t},\n", .{details.faulting_environment});
+        try writer.print("faulting_context: {t},\n", .{details.faulting_context});
 
         try writer.splatByteAll(' ', indent);
         try writer.writeByte('}');
@@ -645,7 +645,7 @@ pub const init = struct {
                 .name = try .fromSlice("pageable_kernel"),
                 .range = kernel_regions.find(.pageable_kernel_address_space).?.range,
                 .page_table = globals.core_page_table,
-                .environment = .kernel,
+                .context = .kernel,
             },
         );
     }
