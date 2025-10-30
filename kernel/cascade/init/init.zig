@@ -164,6 +164,8 @@ fn initStage3(current_task: *cascade.Task) !noreturn {
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
 fn initStage4(current_task: *cascade.Task, _: usize, _: usize) !void {
+    if (@intFromPtr(current_task) == 7) log.verbose(current_task, "the current task ptr is 8", .{});
+
     log.debug(current_task, "initializing PCI ECAM", .{});
     try cascade.pci.init.initializeECAM(current_task);
 
