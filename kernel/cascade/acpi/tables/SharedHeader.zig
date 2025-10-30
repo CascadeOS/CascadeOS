@@ -3,6 +3,10 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const acpi = cascade.acpi;
 const core = @import("core");
 
 /// All system description tables begin with this structure.

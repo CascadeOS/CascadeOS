@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const Tick = cascade.time.wallclock.Tick;
 const core = @import("core");
 
@@ -21,7 +22,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn registerTimeSource(
-        current_task: *cascade.Task,
+        current_task: *Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         const acpi_table = AcpiTable.get(0) orelse return;
@@ -38,7 +39,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET(current_task: *cascade.Task) void {
+    fn initializeHPET(current_task: *Task) void {
         globals.hpet = .{ .base = getHpetBase() };
         init_log.debug(current_task, "using hpet: {}", .{globals.hpet});
 

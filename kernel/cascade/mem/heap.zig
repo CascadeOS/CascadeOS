@@ -7,12 +7,13 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const resource_arena = cascade.mem.resource_arena;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.heap);
 
-pub fn allocate(len: usize, current_task: *cascade.Task) !core.VirtualRange {
+pub fn allocate(len: usize, current_task: *Task) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         current_task,
         len,
@@ -26,7 +27,7 @@ pub fn allocate(len: usize, current_task: *cascade.Task) !core.VirtualRange {
     return virtual_range;
 }
 
-pub inline fn deallocate(range: core.VirtualRange, current_task: *cascade.Task) void {
+pub inline fn deallocate(range: core.VirtualRange, current_task: *Task) void {
     globals.heap_arena.deallocate(current_task, .fromVirtualRange(range));
 }
 
@@ -46,7 +47,7 @@ pub fn freeWithNoSize(ptr: [*]u8) void {
 }
 
 pub fn allocateSpecial(
-    current_task: *cascade.Task,
+    current_task: *Task,
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: cascade.mem.MapType,
@@ -78,7 +79,7 @@ pub fn allocateSpecial(
 }
 
 pub fn deallocateSpecial(
-    current_task: *cascade.Task,
+    current_task: *Task,
     virtual_range: core.VirtualRange,
 ) void {
     {
@@ -165,7 +166,7 @@ pub const allocator_impl = struct {
 
     pub fn heapPageArenaImport(
         arena_ptr: *anyopaque,
-        current_task: *cascade.Task,
+        current_task: *Task,
         len: usize,
         policy: resource_arena.Policy,
     ) resource_arena.AllocateError!resource_arena.Allocation {
@@ -205,7 +206,7 @@ pub const allocator_impl = struct {
 
     pub fn heapPageArenaRelease(
         arena_ptr: *anyopaque,
-        current_task: *cascade.Task,
+        current_task: *Task,
         allocation: resource_arena.Allocation,
     ) void {
         const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
@@ -273,7 +274,7 @@ pub const globals = struct {
 
 pub const init = struct {
     pub fn initializeHeaps(
-        current_task: *cascade.Task,
+        current_task: *Task,
         kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
         // heap

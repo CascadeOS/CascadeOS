@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 const kernel_options = @import("kernel_options");
 const kernel_log_scopes = kernel_options.kernel_log_scopes;

@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const devicetree = @import("../devicetree.zig");

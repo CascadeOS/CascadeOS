@@ -18,6 +18,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const Cache = cascade.mem.cache.Cache;
 const Protection = cascade.mem.MapType.Protection;
 const core = @import("core");
@@ -50,13 +51,13 @@ needs_copy: bool,
 
 wired_count: u32,
 
-pub fn create(current_task: *cascade.Task) !*Entry {
+pub fn create(current_task: *Task) !*Entry {
     var entry: [1]*Entry = undefined;
     try createMany(current_task, &entry);
     return entry[0];
 }
 
-pub fn createMany(current_task: *cascade.Task, items: []*Entry) !void {
+pub fn createMany(current_task: *Task, items: []*Entry) !void {
     return globals.entry_cache.allocateMany(current_task, items) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
         error.ItemConstructionFailed => unreachable, // no constructor is provided
@@ -64,7 +65,7 @@ pub fn createMany(current_task: *cascade.Task, items: []*Entry) !void {
     };
 }
 
-pub fn destroy(entry: *Entry, current_task: *cascade.Task) void {
+pub fn destroy(entry: *Entry, current_task: *Task) void {
     globals.entry_cache.deallocate(current_task, entry);
 }
 
@@ -166,7 +167,7 @@ pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
 ///  - the entries are mergable, see `canMerge`
 ///  - the `second_entry` immediately follows` `first_entry` in the address space
 ///  - after this function `second_entry` is no longer treated as valid
-pub fn merge(first_entry: *Entry, current_task: *cascade.Task, second_entry: *const Entry) void {
+pub fn merge(first_entry: *Entry, current_task: *Task, second_entry: *const Entry) void {
     object: {
         const object = first_entry.object_reference.object orelse {
             if (core.is_debug) std.debug.assert(second_entry.object_reference.object == null);
@@ -217,7 +218,7 @@ pub fn merge(first_entry: *Entry, current_task: *cascade.Task, second_entry: *co
 ///  - `split_offset` is not `.zero`
 ///  - `split_offset` is less than or equal to `first_entry.range.size`
 ///  - `split_offset` is a multiple of the standard page size
-pub fn split(first_entry: *Entry, current_task: *cascade.Task, new_second_entry: *Entry, split_offset: core.Size) void {
+pub fn split(first_entry: *Entry, current_task: *Task, new_second_entry: *Entry, split_offset: core.Size) void {
     if (core.is_debug) {
         std.debug.assert(first_entry != new_second_entry);
         std.debug.assert(first_entry.range.size.notEqual(.zero));
@@ -308,7 +309,7 @@ pub fn shrink(
 }
 
 /// Prints the entry.
-pub fn print(entry: *const Entry, current_task: *cascade.Task, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(entry: *const Entry, current_task: *Task, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
@@ -371,7 +372,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(current_task: *cascade.Task) !void {
+    pub fn initializeCaches(current_task: *Task) !void {
         globals.entry_cache.init(current_task, .{
             .name = try .fromSlice("address space entry"),
         });

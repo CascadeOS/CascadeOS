@@ -16,9 +16,11 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const Cache = cascade.mem.cache.Cache;
-const Page = cascade.mem.Page; // called a `vm_page` in uvm
+const Page = cascade.mem.Page;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.address_space);
@@ -31,7 +33,7 @@ reference_count: u32 = 1,
 
 page: *Page,
 
-pub fn create(current_task: *cascade.Task, page: *Page) !*AnonymousPage {
+pub fn create(current_task: *Task, page: *Page) !*AnonymousPage {
     const anonymous_page = try globals.anonymous_page_cache.allocate(current_task);
     anonymous_page.* = .{
         .page = page,
@@ -42,7 +44,7 @@ pub fn create(current_task: *cascade.Task, page: *Page) !*AnonymousPage {
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *cascade.Task) void {
+pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
         std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
@@ -54,7 +56,7 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *ca
 /// Decrement the reference count.
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *cascade.Task) void {
+pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
         std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
@@ -82,7 +84,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(current_task: *cascade.Task) !void {
+    pub fn initializeCaches(current_task: *Task) !void {
         globals.anonymous_page_cache.init(current_task, .{
             .name = try .fromSlice("anonymous page"),
         });

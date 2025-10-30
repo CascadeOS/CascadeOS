@@ -5,16 +5,17 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const Executor = @This();
 
 id: Id,
 
-current_task: *cascade.Task,
+current_task: *Task,
 
 /// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
-scheduler_task: cascade.Task,
+scheduler_task: Task,
 
 arch_specific: arch.PerExecutor,
 
@@ -30,7 +31,7 @@ const interrupt_source_panic_truncated = " (msg truncated)";
 /// If the message is too large to fit in the buffer, the message is truncated.
 pub fn renderInterruptSourcePanicMessage(
     current_executor: *Executor,
-    current_task: *cascade.Task,
+    current_task: *Task,
     comptime fmt: []const u8,
     args: anytype,
 ) []const u8 {

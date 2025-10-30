@@ -9,6 +9,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const TicketSpinLock = @This();
@@ -17,7 +18,7 @@ container: Container = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
 /// Locks the spinlock.
-pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) void {
+pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) void {
     current_task.incrementInterruptDisable();
 
     if (core.is_debug) std.debug.assert(!ticket_spin_lock.isLockedByCurrent(current_task)); // recursive locks are not supported
@@ -38,7 +39,7 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) void
 }
 
 /// Try to lock the spinlock.
-pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) bool {
+pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
 
@@ -77,7 +78,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) b
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
-pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *cascade.Task) void {
+pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(current_task.spinlocks_held != 0);
         std.debug.assert(ticket_spin_lock.isLockedByCurrent(current_task));
@@ -103,7 +104,7 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 }
 
 /// Returns true if the spinlock is locked by the current executor.
-pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *cascade.Task) bool {
+pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *Task) bool {
     const executor = current_task.known_executor orelse return false;
     return ticket_spin_lock.holding_executor == executor;
 }

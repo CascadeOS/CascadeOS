@@ -16,8 +16,10 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const cascade = @import("cascade");
-const Page = cascade.mem.Page; // called a `vm_page` in uvm
+const Task = cascade.Task;
+const Page = cascade.mem.Page;
 const core = @import("core");
 
 const PageChunkMap = @import("chunk_map.zig").ChunkMap(Page);
@@ -47,7 +49,7 @@ pub fn incrementReferenceCount(object: *Object) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(object: *Object, current_task: *cascade.Task) void {
+pub fn decrementReferenceCount(object: *Object, current_task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(object.reference_count != 0);
         std.debug.assert(object.lock.isWriteLocked());
@@ -71,7 +73,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         object_reference: Reference,
-        current_task: *cascade.Task,
+        current_task: *Task,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -108,7 +110,7 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     object: *Object,
-    current_task: *cascade.Task,
+    current_task: *Task,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {

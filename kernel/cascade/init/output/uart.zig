@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 pub const Uart = union(enum) {
@@ -267,7 +268,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                     }
                 }.splatFn,
                 .remapFn = struct {
-                    fn remapFn(state: *anyopaque, _: *cascade.Task) anyerror!void {
+                    fn remapFn(state: *anyopaque, _: *Task) anyerror!void {
                         switch (mode) {
                             .io_port => {},
                             .memory => {
@@ -568,7 +569,7 @@ pub const PL011 = struct {
                 }
             }.splatFn,
             .remapFn = struct {
-                fn remapFn(state: *anyopaque, _: *cascade.Task) anyerror!void {
+                fn remapFn(state: *anyopaque, _: *Task) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(state));
                     const write_register_physical_address = try cascade.mem.physicalFromDirectMap(
                         .fromPtr(@volatileCast(uart.write_register)),

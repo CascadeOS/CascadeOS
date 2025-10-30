@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const boot = @import("boot");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 // Does not scroll instead wraps to the top of the screen.
@@ -93,7 +94,7 @@ fn newLine() void {
 }
 
 /// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(_: *anyopaque, current_task: *cascade.Task) !void {
+fn remapFramebuffer(_: *anyopaque, current_task: *Task) !void {
     const framebuffer = boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try cascade.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));

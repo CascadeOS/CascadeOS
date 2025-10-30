@@ -3,6 +3,10 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const acpi = cascade.acpi;
 const core = @import("core");
 
 /// The Generic Address Structure (GAS) provides the platform with a robust means to describe register locations.

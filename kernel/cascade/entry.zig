@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.entry);
@@ -12,13 +13,13 @@ const log = cascade.debug.log.scoped(.entry);
 /// Executed upon per executor periodic interrupt.
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
-pub fn onPerExecutorPeriodic(current_task: *cascade.Task) void {
-    cascade.Task.Scheduler.maybePreempt(current_task);
+pub fn onPerExecutorPeriodic(current_task: *Task) void {
+    Task.Scheduler.maybePreempt(current_task);
 }
 
 /// Executed upon page fault.
 pub fn onPageFault(
-    current_task: *cascade.Task,
+    current_task: *Task,
     page_fault_details: cascade.mem.PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
@@ -39,6 +40,6 @@ pub fn onPageFault(
 }
 
 /// Executed upon cross-executor flush request.
-pub fn onFlushRequest(current_task: *cascade.Task) void {
+pub fn onFlushRequest(current_task: *Task) void {
     cascade.mem.FlushRequest.processFlushRequests(current_task);
 }

@@ -7,19 +7,21 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const Mutex = @This();
 
-locked_by: std.atomic.Value(?*cascade.Task) = .init(null),
+locked_by: std.atomic.Value(?*Task) = .init(null),
 
 unlock_type: UnlockType = .unlocked,
 
 spinlock: cascade.sync.TicketSpinLock = .{},
 wait_queue: cascade.sync.WaitQueue = .{},
 
-pub fn lock(mutex: *Mutex, current_task: *cascade.Task) void {
+pub fn lock(mutex: *Mutex, current_task: *Task) void {
     while (true) {
         var locked_by = mutex.locked_by.cmpxchgWeak(
             null,
@@ -78,7 +80,7 @@ pub fn lock(mutex: *Mutex, current_task: *cascade.Task) void {
 }
 
 /// Try to lock the mutex.
-pub fn tryLock(mutex: *Mutex, current_task: *cascade.Task) bool {
+pub fn tryLock(mutex: *Mutex, current_task: *Task) bool {
     const locked_by = mutex.locked_by.cmpxchgStrong(
         null,
         current_task,
@@ -98,7 +100,7 @@ pub fn tryLock(mutex: *Mutex, current_task: *cascade.Task) bool {
     return false;
 }
 
-pub fn unlock(mutex: *Mutex, current_task: *cascade.Task) void {
+pub fn unlock(mutex: *Mutex, current_task: *Task) void {
     {
         mutex.spinlock.lock(current_task);
         defer mutex.spinlock.unlock(current_task);

@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 pub const interrupt_source_panic_buffer_size = arch.paging.standard_page_size;
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 const kernel_options = @import("kernel_options");
 pub const cascade_version = kernel_options.cascade_version;

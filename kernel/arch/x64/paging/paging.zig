@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const MapType = cascade.mem.MapType;
 const core = @import("core");
 
@@ -42,7 +43,7 @@ pub fn flushCache(virtual_range: core.VirtualRange) void {
 
 /// Maps a 4 KiB page.
 pub fn map4KiB(
-    current_task: *cascade.Task,
+    current_task: *Task,
     level4_table: *PageTable,
     virtual_address: core.VirtualAddress,
     physical_frame: cascade.mem.phys.Frame,
@@ -300,7 +301,7 @@ fn applyMapType(map_type: MapType, page_type: PageType, entry: *PageTable.Entry)
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
-    current_task: *cascade.Task,
+    current_task: *Task,
     raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: cascade.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
@@ -385,7 +386,7 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn fillTopLevel(
-        current_task: *cascade.Task,
+        current_task: *Task,
         page_table: *PageTable,
         range: core.VirtualRange,
         physical_frame_allocator: cascade.mem.phys.FrameAllocator,
@@ -417,7 +418,7 @@ pub const init = struct {
     ///  - does not flush the TLB
     ///  - does not rollback on error
     pub fn mapToPhysicalRangeAllPageSizes(
-        current_task: *cascade.Task,
+        current_task: *Task,
         level4_table: *PageTable,
         virtual_range: core.VirtualRange,
         physical_range: core.PhysicalRange,

@@ -3,7 +3,9 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const Tick = cascade.time.wallclock.Tick;
 const core = @import("core");
 
@@ -26,7 +28,7 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        current_task: *cascade.Task,
+        current_task: *Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         if (!shouldUseTsc()) return;
@@ -38,7 +40,7 @@ pub const init = struct {
             .initialization = if (x64.info.tsc_tick_duration_fs != null)
                 .{
                     .simple = struct {
-                        fn simple(inner_current_task: *cascade.Task) void {
+                        fn simple(inner_current_task: *Task) void {
                             std.debug.assert(shouldUseTsc());
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
@@ -93,7 +95,7 @@ pub const init = struct {
     }
 
     fn initializeTscCalibrate(
-        current_task: *cascade.Task,
+        current_task: *Task,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         std.debug.assert(shouldUseTsc());

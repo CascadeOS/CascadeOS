@@ -5,12 +5,13 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.process_cleanup);
 
 pub fn queueProcessForCleanup(
-    current_task: *cascade.Task,
+    current_task: *Task,
     process: *cascade.Process,
 ) void {
     if (process.queued_for_cleanup.cmpxchgStrong(
@@ -28,7 +29,7 @@ pub fn queueProcessForCleanup(
     globals.parker.unpark(current_task);
 }
 
-fn execute(current_task: *cascade.Task, _: usize, _: usize) noreturn {
+fn execute(current_task: *Task, _: usize, _: usize) noreturn {
     if (core.is_debug) {
         std.debug.assert(current_task == globals.process_cleanup_task);
         std.debug.assert(current_task.interrupt_disable_count == 0);
@@ -49,7 +50,7 @@ fn execute(current_task: *cascade.Task, _: usize, _: usize) noreturn {
     }
 }
 
-fn handleProcess(current_task: *cascade.Task, process: *cascade.Process) void {
+fn handleProcess(current_task: *Task, process: *cascade.Process) void {
     if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
     process.queued_for_cleanup.store(false, .release);
@@ -80,7 +81,7 @@ fn handleProcess(current_task: *cascade.Task, process: *cascade.Process) void {
 
 const globals = struct {
     // initialized during `init.initializeProcessCleanupService`
-    var process_cleanup_task: *cascade.Task = undefined;
+    var process_cleanup_task: *Task = undefined;
 
     /// Parker used to block the process cleanup service.
     ///
@@ -91,8 +92,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeProcessCleanupService(current_task: *cascade.Task) !void {
-        globals.process_cleanup_task = try cascade.Task.createKernelTask(current_task, .{
+    pub fn initializeProcessCleanupService(current_task: *Task) !void {
+        globals.process_cleanup_task = try Task.createKernelTask(current_task, .{
             .name = try .fromSlice("process cleanup"),
             .function = execute,
         });

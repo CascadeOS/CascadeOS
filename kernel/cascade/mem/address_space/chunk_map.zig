@@ -4,6 +4,8 @@
 const std = @import("std");
 
 const cascade = @import("cascade");
+const Task = cascade.Task;
+const core = @import("core");
 
 pub fn ChunkMap(comptime T: type) type {
     return struct {

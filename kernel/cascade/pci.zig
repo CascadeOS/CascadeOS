@@ -3,7 +3,9 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const acpi = cascade.acpi;
 const core = @import("core");
 
@@ -368,7 +370,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.pci_init);
 
-    pub fn initializeECAM(current_task: *cascade.Task) !void {
+    pub fn initializeECAM(current_task: *Task) !void {
         const acpi_table = cascade.acpi.init.AcpiTable(cascade.acpi.tables.MCFG).get(0) orelse
             return error.MCFGNotPresent;
         defer acpi_table.deinit();

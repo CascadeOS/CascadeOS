@@ -3,7 +3,9 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -59,7 +61,7 @@ const globals = struct {
 
 pub const init = struct {
     pub fn captureApicInformation(
-        current_task: *cascade.Task,
+        current_task: *Task,
         fadt: *const cascade.acpi.tables.FADT,
         madt: *const cascade.acpi.tables.MADT,
         x2apic_enabled: bool,
@@ -94,7 +96,7 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        current_task: *cascade.Task,
+        current_task: *Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         candidate_time_sources.addTimeSource(current_task, .{
@@ -112,7 +114,7 @@ pub const init = struct {
 
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer(current_task: *cascade.Task) void {
+    fn initializeLapicTimer(current_task: *Task) void {
         std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
 
         globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
@@ -120,7 +122,7 @@ pub const init = struct {
     }
 
     fn initializeLapicTimerCalibrate(
-        current_task: *cascade.Task,
+        current_task: *Task,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);

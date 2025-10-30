@@ -4,6 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const limine = @import("limine.zig");

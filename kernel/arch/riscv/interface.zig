@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const riscv = @import("riscv.zig");
@@ -45,7 +46,7 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(current_task: *cascade.Task) ?arch.init.InitOutput {
+            fn tryGetSerialOutput(current_task: *Task) ?arch.init.InitOutput {
                 if (riscv.sbi_debug_console.detect()) {
                     log.debug(current_task, "using sbi debug console for serial output", .{});
                     return .{
@@ -62,7 +63,7 @@ pub const functions: arch.Functions = .{
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                current_task: *cascade.Task,
+                current_task: *Task,
                 architecture_processor_id: u64,
             ) void {
                 current_task.known_executor.?.arch_specific = .{
@@ -72,7 +73,7 @@ pub const functions: arch.Functions = .{
         }.prepareBootstrapExecutor,
 
         .loadExecutor = struct {
-            fn loadExecutor(current_task: *cascade.Task) void {
+            fn loadExecutor(current_task: *Task) void {
                 riscv.registers.SupervisorScratch.write(@intFromPtr(current_task.known_executor.?));
             }
         }.loadExecutor,

@@ -18,6 +18,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const Cache = cascade.mem.cache.Cache;
 const core = @import("core");
 
@@ -43,7 +44,7 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: properly support shared anonymous maps
 
-pub fn create(current_task: *cascade.Task, size: core.Size) error{OutOfMemory}!*AnonymousMap {
+pub fn create(current_task: *Task, size: core.Size) error{OutOfMemory}!*AnonymousMap {
     if (core.is_debug) std.debug.assert(size.isAligned(arch.paging.standard_page_size));
 
     const anonymous_map = globals.anonymous_map_cache.allocate(current_task) catch return error.OutOfMemory;
@@ -68,7 +69,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *cascade.Task) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -96,7 +97,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: *casc
 ///
 /// Called `amap_copy` in OpenBSD uvm.
 pub fn copy(
-    current_task: *cascade.Task,
+    current_task: *Task,
     address_space: *AddressSpace,
     entry: *Entry,
     faulting_address: core.VirtualAddress,
@@ -162,7 +163,7 @@ pub const Reference = struct {
     /// Called `amap_add` in OpenBSD uvm.
     pub fn add(
         reference: Reference,
-        current_task: *cascade.Task,
+        current_task: *Task,
         entry: *const Entry,
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
@@ -213,7 +214,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         anonymous_map_reference: Reference,
-        current_task: *cascade.Task,
+        current_task: *Task,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -278,7 +279,7 @@ pub const PageCount = extern struct {
 /// Locks the spinlock.
 pub fn print(
     anonymous_map: *AnonymousMap,
-    current_task: *cascade.Task,
+    current_task: *Task,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
@@ -312,7 +313,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(current_task: *cascade.Task) !void {
+    pub fn initializeCaches(current_task: *Task) !void {
         globals.anonymous_map_cache.init(current_task, .{
             .name = try .fromSlice("anonymous map"),
         });

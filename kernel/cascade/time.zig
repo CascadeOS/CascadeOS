@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 /// Femptoseconds per nanosecond.
@@ -64,7 +65,7 @@ pub const init = struct {
         globals.kernel_start_time = .{ .kernel_start = arch.init.getStandardWallclockStartTime() };
     }
 
-    pub fn initializeTime(current_task: *cascade.Task) !void {
+    pub fn initializeTime(current_task: *Task) !void {
         var candidate_time_sources: CandidateTimeSources = .{};
         arch.init.registerArchitecturalTimeSources(current_task, &candidate_time_sources);
 
@@ -128,7 +129,7 @@ pub const init = struct {
 
         pub fn addTimeSource(
             candidate_time_sources: *CandidateTimeSources,
-            current_task: *cascade.Task,
+            current_task: *Task,
             time_source: CandidateTimeSource,
         ) void {
             if (time_source.reference_counter != null) {
@@ -180,7 +181,7 @@ pub const init = struct {
 
         fn initialize(
             candidate_time_source: *CandidateTimeSource,
-            current_task: *cascade.Task,
+            current_task: *Task,
             reference_counter: ReferenceCounter,
         ) void {
             if (candidate_time_source.initialized) return;
@@ -194,8 +195,8 @@ pub const init = struct {
 
         pub const Initialization = union(enum) {
             none,
-            simple: *const fn (current_task: *cascade.Task) void,
-            calibration_required: *const fn (current_task: *cascade.Task, reference_counter: ReferenceCounter) void,
+            simple: *const fn (current_task: *Task) void,
+            calibration_required: *const fn (current_task: *Task, reference_counter: ReferenceCounter) void,
         };
 
         pub const ReferenceCounterOptions = struct {
@@ -268,7 +269,7 @@ pub const init = struct {
     };
 
     fn getReferenceCounter(
-        current_task: *cascade.Task,
+        current_task: *Task,
         time_sources: []CandidateTimeSource,
     ) ReferenceCounter {
         const time_source = findAndInitializeTimeSource(current_task, time_sources, .{
@@ -287,7 +288,7 @@ pub const init = struct {
     }
 
     fn getWallclockTimeSource(
-        current_task: *cascade.Task,
+        current_task: *Task,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) CandidateTimeSource.WallclockOptions {
@@ -312,7 +313,7 @@ pub const init = struct {
     }
 
     fn getPerExecutorPeriodicTimeSource(
-        current_task: *cascade.Task,
+        current_task: *Task,
         time_sources: []CandidateTimeSource,
         reference_counter: ReferenceCounter,
     ) CandidateTimeSource.PerExecutorPeriodicOptions {
@@ -336,7 +337,7 @@ pub const init = struct {
     };
 
     fn findAndInitializeTimeSource(
-        current_task: *cascade.Task,
+        current_task: *Task,
         time_sources: []CandidateTimeSource,
         query: TimeSourceQuery,
         reference_counter: ReferenceCounter,

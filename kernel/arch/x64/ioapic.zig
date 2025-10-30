@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -98,7 +99,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn captureMADTInformation(current_task: *cascade.Task, madt: *const cascade.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(current_task: *Task, madt: *const cascade.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {

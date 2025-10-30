@@ -3,7 +3,12 @@
 
 const std = @import("std");
 
+const arch = @import("arch");
+const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
+
+const x64 = @import("../x64.zig");
 
 pub const PageFaultErrorCode = packed struct(u64) {
     /// When set, the page fault was caused by a page-protection violation.

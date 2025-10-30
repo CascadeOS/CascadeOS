@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const boot = @import("boot");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 pub const Output = @import("output/Output.zig");
@@ -98,7 +99,7 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(current_task: *cascade.Task) !noreturn {
+fn initStage2(current_task: *Task) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     cascade.mem.globals.core_page_table.load();
@@ -134,28 +135,28 @@ fn initStage2(current_task: *cascade.Task) !noreturn {
 /// This function is executed by all executors.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(current_task: *cascade.Task) !noreturn {
+fn initStage3(current_task: *Task) !noreturn {
     if (Stage3Barrier.start()) {
         log.debug(current_task, "loading standard interrupt handlers", .{});
         arch.interrupts.init.loadStandardInterruptHandlers();
 
         log.debug(current_task, "creating and scheduling init stage 4 task", .{});
         {
-            const init_stage4_task: *cascade.Task = try .createKernelTask(current_task, .{
+            const init_stage4_task: *Task = try .createKernelTask(current_task, .{
                 .name = try .fromSlice("init stage 4"),
                 .function = initStage4,
             });
 
-            cascade.Task.Scheduler.lockScheduler(current_task);
-            defer cascade.Task.Scheduler.unlockScheduler(current_task);
+            Task.Scheduler.lockScheduler(current_task);
+            defer Task.Scheduler.unlockScheduler(current_task);
 
-            cascade.Task.Scheduler.queueTask(current_task, init_stage4_task);
+            Task.Scheduler.queueTask(current_task, init_stage4_task);
         }
 
         Stage3Barrier.complete();
     }
 
-    cascade.Task.Scheduler.lockScheduler(current_task);
+    Task.Scheduler.lockScheduler(current_task);
     current_task.drop();
     unreachable;
 }
@@ -163,7 +164,7 @@ fn initStage3(current_task: *cascade.Task) !noreturn {
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(current_task: *cascade.Task, _: usize, _: usize) !void {
+fn initStage4(current_task: *Task, _: usize, _: usize) !void {
     log.debug(current_task, "initializing PCI ECAM", .{});
     try cascade.pci.init.initializeECAM(current_task);
 
@@ -176,9 +177,9 @@ fn initStage4(current_task: *cascade.Task, _: usize, _: usize) !void {
     try Output.writer.flush();
 }
 
-fn constructBootstrapTask() !*cascade.Task {
+fn constructBootstrapTask() !*Task {
     const static = struct {
-        var bootstrap_init_task: cascade.Task = undefined;
+        var bootstrap_init_task: Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
             .id = @enumFromInt(0),
             .current_task = &bootstrap_init_task,
@@ -187,7 +188,7 @@ fn constructBootstrapTask() !*cascade.Task {
         };
     };
 
-    try cascade.Task.init.initializeBootstrapInitTask(
+    try Task.init.initializeBootstrapInitTask(
         &static.bootstrap_init_task,
         &static.bootstrap_executor,
     );
@@ -207,7 +208,7 @@ fn constructBootstrapTask() !*cascade.Task {
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(current_task: *cascade.Task) !struct { []cascade.Executor, *cascade.Executor } {
+fn createExecutors(current_task: *Task) !struct { []cascade.Executor, *cascade.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > cascade.config.maximum_number_of_executors) {
@@ -236,8 +237,8 @@ fn createExecutors(current_task: *cascade.Task) !struct { []cascade.Executor, *c
             .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
         };
 
-        try cascade.Task.init.createAndAssignInitTask(current_task, executor);
-        try cascade.Task.init.initializeSchedulerTask(current_task, &executor.scheduler_task, executor);
+        try Task.init.createAndAssignInitTask(current_task, executor);
+        try Task.init.initializeSchedulerTask(current_task, &executor.scheduler_task, executor);
 
         arch.init.prepareExecutor(
             current_task,

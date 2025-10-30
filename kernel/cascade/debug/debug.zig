@@ -5,12 +5,13 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 pub const log = @import("log.zig");
 
 pub fn interruptSourcePanic(
-    current_task: *cascade.Task,
+    current_task: *Task,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
@@ -54,7 +55,7 @@ const PanicType = union(enum) {
 fn panicDispatch(
     msg: []const u8,
     panic_type: PanicType,
-    opt_current_task: ?*cascade.Task,
+    opt_current_task: ?*Task,
 ) noreturn {
     @branchHint(.cold);
 
@@ -99,7 +100,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
-    current_task: *cascade.Task,
+    current_task: *Task,
     msg: []const u8,
     panic_type: PanicType,
 ) void {

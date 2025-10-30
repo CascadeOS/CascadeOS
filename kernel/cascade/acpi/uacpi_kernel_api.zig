@@ -5,9 +5,10 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
+const acpi = cascade.acpi;
 const core = @import("core");
 
-const acpi = @import("acpi.zig");
 const uacpi = @import("uacpi.zig");
 
 const log = cascade.debug.log.scoped(.uacpi_kernel_api);
@@ -403,7 +404,7 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 
             if (!uacpi_log.levelEnabled(kernel_log_level)) return;
 
-            const current_task: *cascade.Task = .current();
+            const current_task: *Task = .current();
 
             const full_msg = std.mem.sliceTo(c_msg, 0);
 
@@ -488,7 +489,7 @@ export fn uacpi_kernel_free_mutex(mutex: *cascade.sync.Mutex) void {
 
 /// Create/free an opaque kernel (semaphore-like) event object.
 export fn uacpi_kernel_create_event() *anyopaque {
-    const current_task: *cascade.Task = .current(); // TODO: once this is implemented move this in to the if
+    const current_task: *Task = .current(); // TODO: once this is implemented move this in to the if
 
     if (log.levelEnabled(.verbose)) log.verbose(
         current_task,
@@ -520,7 +521,7 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 ///
 /// The returned thread id cannot be UACPI_THREAD_ID_NONE.
 export fn uacpi_kernel_get_thread_id() usize {
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_get_thread_id called", .{});
 
@@ -540,7 +541,7 @@ export fn uacpi_kernel_get_thread_id() usize {
 ///                           successful for calls with timeout=.none)
 /// 3. Any other value - signifies a host internal error and is treated as such
 export fn uacpi_kernel_acquire_mutex(mutex: *cascade.sync.Mutex, timeout: uacpi.Timeout) uacpi.Status {
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_acquire_mutex called", .{});
 
@@ -554,7 +555,7 @@ export fn uacpi_kernel_acquire_mutex(mutex: *cascade.sync.Mutex, timeout: uacpi.
 }
 
 export fn uacpi_kernel_release_mutex(mutex: *cascade.sync.Mutex) void {
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_release_mutex called", .{});
 
@@ -630,7 +631,7 @@ export fn uacpi_kernel_install_interrupt_handler(
 ) uacpi.Status {
     const HandlerWrapper = struct {
         fn HandlerWrapper(
-            _: *cascade.Task,
+            _: *Task,
             _: arch.interrupts.InterruptFrame,
             _handler: usize,
             _ctx: usize,
@@ -640,7 +641,7 @@ export fn uacpi_kernel_install_interrupt_handler(
         }
     }.HandlerWrapper;
 
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_install_interrupt_handler called", .{});
 
@@ -673,7 +674,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
     _: uacpi.RawInterruptHandler,
     irq_handle: *anyopaque,
 ) uacpi.Status {
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_uninstall_interrupt_handler called", .{});
 
@@ -718,7 +719,7 @@ export fn uacpi_kernel_free_spinlock(spinlock: *cascade.sync.TicketSpinLock) voi
 ///
 /// Note that lock is infalliable.
 export fn uacpi_kernel_lock_spinlock(spinlock: *cascade.sync.TicketSpinLock) uacpi.CpuFlags {
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_lock_spinlock called", .{});
 
@@ -727,7 +728,7 @@ export fn uacpi_kernel_lock_spinlock(spinlock: *cascade.sync.TicketSpinLock) uac
 }
 
 export fn uacpi_kernel_unlock_spinlock(spinlock: *cascade.sync.TicketSpinLock, cpu_flags: uacpi.CpuFlags) void {
-    const current_task: *cascade.Task = .current();
+    const current_task: *Task = .current();
 
     log.verbose(current_task, "uacpi_kernel_unlock_spinlock called", .{});
 

@@ -5,8 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-
+const Task = cascade.Task;
 pub const panic = cascade.debug.panic_interface;
+const core = @import("core");
 
 pub const std_options: std.Options = .{
     .log_level = cascade.debug.log.log_level.toStd(),

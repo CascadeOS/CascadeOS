@@ -4,17 +4,18 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const AcpiTable = cascade.acpi.init.AcpiTable;
-const cascade = @import("cascade");
-const core = @import("core");
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const AcpiTable = cascade.acpi.init.AcpiTable;
+const core = @import("core");
 
 const x64 = @import("x64.zig");
 
 const log = cascade.debug.log.scoped(.x64_init);
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput(current_task: *cascade.Task) ?arch.init.InitOutput {
+pub fn tryGetSerialOutput(current_task: *Task) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
         log.debug(current_task, "using debug console for serial output", .{});
         return .{
@@ -54,7 +55,7 @@ pub fn tryGetSerialOutput(current_task: *cascade.Task) ?arch.init.InitOutput {
 
 /// Prepares the current executor as the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    current_task: *cascade.Task,
+    current_task: *Task,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
@@ -79,20 +80,20 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(current_task: *cascade.Task, executor: *cascade.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(current_task: *Task, executor: *cascade.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        cascade.Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate double fault stack"),
-        cascade.Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate NMI stack"),
+        Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate double fault stack"),
+        Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate NMI stack"),
     );
 }
 
 fn prepareExecutorShared(
     executor: *cascade.Executor,
     apic_id: u32,
-    double_fault_stack: cascade.Task.Stack,
-    non_maskable_interrupt_stack: cascade.Task.Stack,
+    double_fault_stack: Task.Stack,
+    non_maskable_interrupt_stack: Task.Stack,
 ) void {
     executor.arch_specific = .{
         .apic_id = apic_id,
@@ -111,7 +112,7 @@ fn prepareExecutorShared(
 }
 
 /// Load the executor that `current_task` is running on as the current executor.
-pub fn loadExecutor(current_task: *cascade.Task) void {
+pub fn loadExecutor(current_task: *Task) void {
     const executor = current_task.known_executor.?;
 
     executor.arch_specific.gdt.load();
@@ -125,7 +126,7 @@ pub fn loadExecutor(current_task: *cascade.Task) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation(current_task: *cascade.Task) void {
+pub fn captureEarlySystemInformation(current_task: *Task) void {
     log.debug(current_task, "capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
@@ -164,7 +165,7 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(
-    current_task: *cascade.Task,
+    current_task: *Task,
     options: CaptureSystemInformationOptions,
 ) !void {
     const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
@@ -203,7 +204,7 @@ pub fn captureSystemInformation(
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures(current_task: *cascade.Task) void {
+pub fn configureGlobalSystemFeatures(current_task: *Task) void {
     if (x64.info.have_pic) {
         log.debug(current_task, "disabling pic", .{});
         disablePic();
@@ -256,7 +257,7 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
-pub fn configurePerExecutorSystemFeatures(current_task: *cascade.Task) void {
+pub fn configurePerExecutorSystemFeatures(current_task: *Task) void {
     if (x64.info.cpu_id.rdtscp) {
         x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.known_executor.?.id));
     }
@@ -350,7 +351,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: *cascade.Task) void {
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
-    current_task: *cascade.Task,
+    current_task: *Task,
     candidate_time_sources: *cascade.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(current_task, candidate_time_sources);
@@ -405,7 +406,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: *cascade.Task) !void {
+            fn remapFn(_: *anyopaque, _: *Task) !void {
                 return;
             }
         }.remapFn,

@@ -5,6 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const FlushRequest = @This();
@@ -19,7 +20,7 @@ pub const Node = struct {
     node: std.SinglyLinkedList.Node,
 };
 
-pub fn submitAndWait(flush_request: *FlushRequest, current_task: *cascade.Task) void {
+pub fn submitAndWait(flush_request: *FlushRequest, current_task: *Task) void {
     {
         current_task.incrementInterruptDisable();
         defer current_task.decrementInterruptDisable();
@@ -41,7 +42,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *cascade.Task) 
     }
 }
 
-pub fn processFlushRequests(current_task: *cascade.Task) void {
+pub fn processFlushRequests(current_task: *Task) void {
     if (core.is_debug) std.debug.assert(current_task.interrupt_disable_count != 0);
 
     const executor = current_task.known_executor.?;
@@ -52,7 +53,7 @@ pub fn processFlushRequests(current_task: *cascade.Task) void {
     }
 }
 
-fn flush(flush_request: *FlushRequest, current_task: *cascade.Task) void {
+fn flush(flush_request: *FlushRequest, current_task: *Task) void {
     if (core.is_debug) std.debug.assert(current_task.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);

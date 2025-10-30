@@ -7,6 +7,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.cache);
@@ -19,8 +20,8 @@ pub const Name = core.containers.BoundedArray(u8, cascade.config.cache_name_leng
 /// Wrapper around `RawCache` that provides a `T`-specifc API.
 pub fn Cache(
     comptime T: type,
-    comptime constructor: ?fn (item: *T, current_task: *cascade.Task) ConstructorError!void,
-    comptime destructor: ?fn (item: *T, current_task: *cascade.Task) void,
+    comptime constructor: ?fn (item: *T, current_task: *Task) ConstructorError!void,
+    comptime destructor: ?fn (item: *T, current_task: *Task) void,
 ) type {
     return struct {
         raw_cache: RawCache,
@@ -44,7 +45,7 @@ pub fn Cache(
         /// Initialize the cache.
         pub fn init(
             cache: *CacheT,
-            current_task: *cascade.Task,
+            current_task: *Task,
             options: InitOptions,
         ) void {
             cache.* = .{
@@ -57,7 +58,7 @@ pub fn Cache(
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
                     struct {
-                        fn innerConstructor(item: []u8, inner_current_task: *cascade.Task) ConstructorError!void {
+                        fn innerConstructor(item: []u8, inner_current_task: *Task) ConstructorError!void {
                             try con(@ptrCast(@alignCast(item)), inner_current_task);
                         }
                     }.innerConstructor
@@ -65,7 +66,7 @@ pub fn Cache(
                     null,
                 .destructor = if (destructor) |des|
                     struct {
-                        fn innerDestructor(item: []u8, inner_current_task: *cascade.Task) void {
+                        fn innerDestructor(item: []u8, inner_current_task: *Task) void {
                             des(@ptrCast(@alignCast(item)), inner_current_task);
                         }
                     }.innerDestructor
@@ -79,7 +80,7 @@ pub fn Cache(
         /// Deinitialize the cache.
         ///
         /// All items must have been deallocated before calling this.
-        pub fn deinit(cache: *CacheT, current_task: *cascade.Task) void {
+        pub fn deinit(cache: *CacheT, current_task: *Task) void {
             cache.raw_cache.deinit(current_task);
             cache.* = undefined;
         }
@@ -89,12 +90,12 @@ pub fn Cache(
         }
 
         /// Allocate an item from the cache.
-        pub fn allocate(cache: *CacheT, current_task: *cascade.Task) RawCache.AllocateError!*T {
+        pub fn allocate(cache: *CacheT, current_task: *Task) RawCache.AllocateError!*T {
             return @ptrCast(@alignCast(try cache.raw_cache.allocate(current_task)));
         }
 
         /// Allocate multiple items from the cache.
-        pub fn allocateMany(cache: *CacheT, current_task: *cascade.Task, items: []*T) RawCache.AllocateError!void {
+        pub fn allocateMany(cache: *CacheT, current_task: *Task, items: []*T) RawCache.AllocateError!void {
             var raw_item_buffer: [16][]u8 = undefined;
 
             var item_index: usize = 0;
@@ -112,12 +113,12 @@ pub fn Cache(
         }
 
         /// Deallocate an item back to the cache.
-        pub fn deallocate(cache: *CacheT, current_task: *cascade.Task, item: *T) void {
+        pub fn deallocate(cache: *CacheT, current_task: *Task, item: *T) void {
             cache.raw_cache.deallocate(current_task, std.mem.asBytes(item));
         }
 
         /// Deallocate multiple items back to the cache.
-        pub fn deallocateMany(cache: *CacheT, current_task: *cascade.Task, items: []const *T) void {
+        pub fn deallocateMany(cache: *CacheT, current_task: *Task, items: []const *T) void {
             var raw_item_buffer: [16][]u8 = undefined;
 
             var item_index: usize = 0;
@@ -165,8 +166,8 @@ pub const RawCache = struct {
     /// `.pmm` is only valid for small item caches.
     slab_source: InitOptions.SlabSource = .heap,
 
-    constructor: ?*const fn (item: []u8, current_task: *cascade.Task) ConstructorError!void,
-    destructor: ?*const fn (item: []u8, current_task: *cascade.Task) void,
+    constructor: ?*const fn (item: []u8, current_task: *Task) ConstructorError!void,
+    destructor: ?*const fn (item: []u8, current_task: *Task) void,
 
     available_slabs: std.DoublyLinkedList,
     full_slabs: std.DoublyLinkedList,
@@ -189,8 +190,8 @@ pub const RawCache = struct {
         size: usize,
         alignment: std.mem.Alignment,
 
-        constructor: ?*const fn (item: []u8, current_task: *cascade.Task) ConstructorError!void = null,
-        destructor: ?*const fn (item: []u8, current_task: *cascade.Task) void = null,
+        constructor: ?*const fn (item: []u8, current_task: *Task) ConstructorError!void = null,
+        destructor: ?*const fn (item: []u8, current_task: *Task) void = null,
 
         /// What should happen to the last available slab when it is unused?
         last_slab: core.CleanupDecision = .keep,
@@ -211,7 +212,7 @@ pub const RawCache = struct {
     /// Initialize the cache.
     pub fn init(
         raw_cache: *RawCache,
-        current_task: *cascade.Task,
+        current_task: *Task,
         options: InitOptions,
     ) void {
         const is_small = isSmallItem(options.size, options.alignment);
@@ -304,7 +305,7 @@ pub const RawCache = struct {
     /// Deinitialize the cache.
     ///
     /// All items must have been deallocated before calling this.
-    pub fn deinit(raw_cache: *RawCache, current_task: *cascade.Task) void {
+    pub fn deinit(raw_cache: *RawCache, current_task: *Task) void {
         log.debug(current_task, "{s}: deinit", .{raw_cache.name()});
 
         if (raw_cache.full_slabs.first != null) @panic("full slabs not empty");
@@ -342,14 +343,14 @@ pub const RawCache = struct {
     };
 
     /// Allocate an item from the cache.
-    pub fn allocate(raw_cache: *RawCache, current_task: *cascade.Task) AllocateError![]u8 {
+    pub fn allocate(raw_cache: *RawCache, current_task: *Task) AllocateError![]u8 {
         var item_buffer: [1][]u8 = undefined;
         try raw_cache.allocateMany(current_task, &item_buffer);
         return item_buffer[0];
     }
 
     /// Allocate multiple items from the cache.
-    pub fn allocateMany(raw_cache: *RawCache, current_task: *cascade.Task, items: [][]u8) AllocateError!void {
+    pub fn allocateMany(raw_cache: *RawCache, current_task: *Task, items: [][]u8) AllocateError!void {
         if (items.len == 0) return;
 
         log.verbose(current_task, "{s}: allocating {} items", .{ raw_cache.name(), items.len });
@@ -416,7 +417,7 @@ pub const RawCache = struct {
     /// Allocates a new slab.
     ///
     /// The cache's lock must be held when this is called, the lock is held on success and unlocked on failure.
-    fn allocateSlab(raw_cache: *RawCache, current_task: *cascade.Task) AllocateError!*Slab {
+    fn allocateSlab(raw_cache: *RawCache, current_task: *Task) AllocateError!*Slab {
         errdefer log.warn(current_task, "{s}: failed to allocate slab", .{raw_cache.name()});
 
         raw_cache.lock.unlock(current_task);
@@ -595,12 +596,12 @@ pub const RawCache = struct {
     }
 
     /// Deallocate an item back to the cache.
-    pub fn deallocate(raw_cache: *RawCache, current_task: *cascade.Task, item: []u8) void {
+    pub fn deallocate(raw_cache: *RawCache, current_task: *Task, item: []u8) void {
         raw_cache.deallocateMany(current_task, &.{item});
     }
 
     /// Deallocate many items back to the cache.
-    pub fn deallocateMany(raw_cache: *RawCache, current_task: *cascade.Task, items: []const []u8) void {
+    pub fn deallocateMany(raw_cache: *RawCache, current_task: *Task, items: []const []u8) void {
         if (items.len == 0) return;
 
         log.verbose(current_task, "{s}: deallocating {} items", .{ raw_cache.name(), items.len });
@@ -677,7 +678,7 @@ pub const RawCache = struct {
     /// Deallocate a slab.
     ///
     /// The cache's lock must *not* be held when this is called.
-    fn deallocateSlab(raw_cache: *RawCache, current_task: *cascade.Task, slab: *Slab) void {
+    fn deallocateSlab(raw_cache: *RawCache, current_task: *Task, slab: *Slab) void {
         log.debug(current_task, "{s}: deallocating slab", .{raw_cache.name()});
 
         switch (raw_cache.size_class) {
@@ -780,7 +781,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    pub fn initializeCaches(current_task: *cascade.Task) !void {
+    pub fn initializeCaches(current_task: *Task) !void {
         globals.slab_cache.init(current_task, .{
             .name = try .fromSlice("slab"),
             .slab_source = .pmm,
