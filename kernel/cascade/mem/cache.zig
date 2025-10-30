@@ -443,7 +443,7 @@ pub const RawCache = struct {
             .small => slab: {
                 const slab_base_ptr: [*]u8 = switch (raw_cache.slab_source) {
                     .heap => slab_base_ptr: {
-                        const slab_allocation = cascade.mem.heap.globals.heap_page_arena.allocate(
+                        const slab_allocation = cascade.mem.heap.heap_page_arena.allocate(
                             current_task,
                             arch.paging.standard_page_size.value,
                             .instant_fit,
@@ -463,7 +463,7 @@ pub const RawCache = struct {
                 };
 
                 errdefer switch (raw_cache.slab_source) {
-                    .heap => cascade.mem.heap.globals.heap_page_arena.deallocate(current_task, .{
+                    .heap => cascade.mem.heap.heap_page_arena.deallocate(current_task, .{
                         .base = @intFromPtr(slab_base_ptr),
                         .len = arch.paging.standard_page_size.value,
                     }),
@@ -514,12 +514,12 @@ pub const RawCache = struct {
                 break :slab slab;
             },
             .large => slab: {
-                const large_item_allocation = cascade.mem.heap.globals.heap_page_arena.allocate(
+                const large_item_allocation = cascade.mem.heap.heap_page_arena.allocate(
                     current_task,
                     raw_cache.effective_item_size * raw_cache.items_per_slab,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
-                errdefer cascade.mem.heap.globals.heap_page_arena.deallocate(current_task, large_item_allocation);
+                errdefer cascade.mem.heap.heap_page_arena.deallocate(current_task, large_item_allocation);
 
                 const slab = try globals.slab_cache.allocate(current_task);
                 slab.* = .{
@@ -694,7 +694,7 @@ pub const RawCache = struct {
                 }
 
                 switch (raw_cache.slab_source) {
-                    .heap => cascade.mem.heap.globals.heap_page_arena.deallocate(
+                    .heap => cascade.mem.heap.heap_page_arena.deallocate(
                         current_task,
                         .{
                             .base = @intFromPtr(slab_base_ptr),
@@ -727,7 +727,7 @@ pub const RawCache = struct {
                     }
                 }
 
-                cascade.mem.heap.globals.heap_page_arena.deallocate(current_task, slab.large_item_allocation);
+                cascade.mem.heap.heap_page_arena.deallocate(current_task, slab.large_item_allocation);
 
                 globals.slab_cache.deallocate(current_task, slab);
             },

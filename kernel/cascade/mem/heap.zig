@@ -100,7 +100,9 @@ pub fn deallocateSpecial(
     globals.special_heap_address_space_arena.deallocate(current_task, .fromVirtualRange(virtual_range));
 }
 
-pub const allocator_impl = struct {
+pub const heap_page_arena = &globals.heap_page_arena;
+
+const allocator_impl = struct {
     const Allocation = cascade.mem.resource_arena.Allocation;
     fn alloc(
         _: *anyopaque,
@@ -164,7 +166,7 @@ pub const allocator_impl = struct {
         return @ptrCast(ptr - @sizeOf(Allocation));
     }
 
-    pub fn heapPageArenaImport(
+    fn heapPageArenaImport(
         arena_ptr: *anyopaque,
         current_task: *Task,
         len: usize,
@@ -204,7 +206,7 @@ pub const allocator_impl = struct {
         return allocation;
     }
 
-    pub fn heapPageArenaRelease(
+    fn heapPageArenaRelease(
         arena_ptr: *anyopaque,
         current_task: *Task,
         allocation: resource_arena.Allocation,
@@ -234,11 +236,11 @@ pub const allocator_impl = struct {
         );
     }
 
-    pub const heap_arena_quantum: usize = 16;
-    pub const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
+    const heap_arena_quantum: usize = 16;
+    const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
 };
 
-pub const globals = struct {
+const globals = struct {
     /// An arena managing the heap's virtual address space.
     ///
     /// Has no source arena, provided with a single span representing the entire heap.
@@ -251,7 +253,7 @@ pub const globals = struct {
     /// Has a source arena of `heap_address_space_arena`. Backs imported spans with physical memory.
     ///
     /// Initialized during `init.initializeHeaps`.
-    pub var heap_page_arena: Arena = undefined;
+    var heap_page_arena: Arena = undefined;
 
     /// The heap arena.
     ///
