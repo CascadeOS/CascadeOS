@@ -253,7 +253,7 @@ const formatting = struct {
         }
 
         // we can't use `VirtualAddress` here as it is possible this subtraction results in a non-canonical address
-        const kernel_source_address = address - cascade.mem.globals.virtual_offset.value;
+        const kernel_source_address = address - cascade.mem.kernelVirtualOffset().value;
 
         const symbol = blk: {
             const symbol_source = opt_symbol_source orelse break :blk null;
