@@ -10,7 +10,6 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const core = @import("core");
 
-const process_cleanup = @import("process_cleanup.zig");
 pub const Thread = @import("Thread.zig");
 
 const log = cascade.debug.log.scoped(.process);
@@ -52,10 +51,10 @@ pub fn create(current_task: *Task, options: CreateOptions) !*Process {
     process.name = options.name;
     process.address_space.retarget(process);
 
-    cascade.globals.processes_lock.writeLock(current_task);
-    defer cascade.globals.processes_lock.writeUnlock(current_task);
+    globals.processes_lock.writeLock(current_task);
+    defer globals.processes_lock.writeUnlock(current_task);
 
-    const gop = try cascade.globals.processes.getOrPut(cascade.mem.heap.allocator, process);
+    const gop = try globals.processes.getOrPut(cascade.mem.heap.allocator, process);
     if (gop.found_existing) @panic("process already in processes list");
 
     process.incrementReferenceCount();
@@ -121,7 +120,7 @@ pub fn decrementReferenceCount(process: *Process, current_task: *Task) void {
         @branchHint(.likely);
         return;
     }
-    process_cleanup.queueProcessForCleanup(current_task, process);
+    globals.process_cleanup.queueProcessForCleanup(current_task, process);
 }
 
 /// Returns the process that the given task belongs to.
@@ -136,26 +135,6 @@ pub inline fn fromTask(task: *Task) *Process {
 pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
     try writer.print("Process('{s}')", .{process.name.constSlice()});
 }
-
-pub const internal = struct {
-    pub fn destroy(current_task: *Task, process: *Process) void {
-        if (core.is_debug) {
-            std.debug.assert(process.reference_count.load(.monotonic) == 0);
-            std.debug.assert(process.queued_for_cleanup.load(.monotonic));
-        }
-        process.queued_for_cleanup.store(false, .monotonic);
-
-        if (core.is_debug) {
-            std.debug.assert(!process.threads_lock.isReadLocked() and !process.threads_lock.isWriteLocked());
-            std.debug.assert(process.threads.count() == 0);
-        }
-        process.threads.clearAndFree(cascade.mem.heap.allocator);
-
-        process.address_space.reinitializeAndUnmapAll(current_task);
-
-        globals.cache.deallocate(current_task, process);
-    }
-};
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.process_name_length);
 
@@ -208,6 +187,120 @@ fn cacheDestructor(process: *Process, current_task: *Task) void {
     cascade.mem.phys.allocator.deallocate(current_task, frame_list);
 }
 
+fn destroy(process: *Process, current_task: *Task) void {
+    if (core.is_debug) {
+        std.debug.assert(process.reference_count.load(.monotonic) == 0);
+        std.debug.assert(process.queued_for_cleanup.load(.monotonic));
+    }
+    process.queued_for_cleanup.store(false, .monotonic);
+
+    if (core.is_debug) {
+        std.debug.assert(!process.threads_lock.isReadLocked() and !process.threads_lock.isWriteLocked());
+        std.debug.assert(process.threads.count() == 0);
+    }
+    process.threads.clearAndFree(cascade.mem.heap.allocator);
+
+    process.address_space.reinitializeAndUnmapAll(current_task);
+
+    globals.cache.deallocate(current_task, process);
+}
+
+const ProcessCleanup = struct {
+    task: *Task,
+    parker: cascade.sync.Parker,
+    incoming: core.containers.AtomicSinglyLinkedList,
+
+    pub fn init(process_cleanup: *ProcessCleanup, current_task: *Task) !void {
+        process_cleanup.* = .{
+            .task = try Task.createKernelTask(current_task, .{
+                .name = try .fromSlice("process cleanup"),
+                .function = ProcessCleanup.entry,
+                .arg1 = @intFromPtr(process_cleanup),
+            }),
+            .parker = undefined, // set below
+            .incoming = .{},
+        };
+
+        process_cleanup.parker = .withParkedTask(process_cleanup.task);
+    }
+
+    pub fn queueProcessForCleanup(
+        process_cleanup: *ProcessCleanup,
+        current_task: *Task,
+        process: *cascade.Process,
+    ) void {
+        if (process.queued_for_cleanup.cmpxchgStrong(
+            false,
+            true,
+            .acq_rel,
+            .acquire,
+        ) != null) {
+            @panic("already queued for cleanup");
+        }
+
+        log.verbose(current_task, "queueing {f} for cleanup", .{process});
+
+        process_cleanup.incoming.prepend(&process.cleanup_node);
+        process_cleanup.parker.unpark(current_task);
+    }
+
+    fn execute(process_cleanup: *ProcessCleanup, current_task: *Task) noreturn {
+        while (true) {
+            while (process_cleanup.incoming.popFirst()) |node| {
+                handleProcess(
+                    current_task,
+                    @fieldParentPtr("cleanup_node", node),
+                );
+            }
+
+            process_cleanup.parker.park(current_task);
+        }
+    }
+
+    fn handleProcess(current_task: *Task, process: *cascade.Process) void {
+        if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
+
+        process.queued_for_cleanup.store(false, .release);
+
+        {
+            globals.processes_lock.writeLock(current_task);
+            defer globals.processes_lock.writeUnlock(current_task);
+
+            if (process.reference_count.load(.acquire) != 0) {
+                @branchHint(.unlikely);
+                // someone has acquired a reference to the process after it was queued for cleanup
+                log.verbose(current_task, "{f} still has references", .{process});
+                return;
+            }
+
+            if (process.queued_for_cleanup.swap(true, .acq_rel)) {
+                @branchHint(.unlikely);
+                // someone has requeued this process for cleanup
+                log.verbose(current_task, "{f} has been requeued for cleanup", .{process});
+                return;
+            }
+
+            if (!globals.processes.swapRemove(process)) @panic("process not found in processes");
+        }
+
+        process.destroy(current_task);
+    }
+
+    fn entry(current_task: *Task, process_cleanup_addr: usize, _: usize) noreturn {
+        const process_cleanup: *ProcessCleanup = @ptrFromInt(process_cleanup_addr);
+
+        if (core.is_debug) {
+            std.debug.assert(current_task == process_cleanup.task);
+            std.debug.assert(current_task.interrupt_disable_count == 0);
+            std.debug.assert(current_task.spinlocks_held == 0);
+            std.debug.assert(!current_task.scheduler_locked);
+            std.debug.assert(arch.interrupts.areEnabled());
+        }
+
+        process_cleanup.execute(current_task);
+    }
+};
+
 const globals = struct {
     /// The source of process objects.
     ///
@@ -217,6 +310,12 @@ const globals = struct {
         cacheConstructor,
         cacheDestructor,
     ) = undefined;
+
+    var processes_lock: cascade.sync.RwLock = .{};
+    var processes: std.AutoArrayHashMapUnmanaged(*Process, void) = .{};
+
+    /// Initialized during `init.initializeProcesses`.
+    var process_cleanup: ProcessCleanup = undefined;
 };
 
 pub const init = struct {
@@ -229,6 +328,6 @@ pub const init = struct {
         try Thread.init.initializeThreads(current_task);
 
         log.debug(current_task, "initializing process cleanup service", .{});
-        try process_cleanup.init.initializeProcessCleanupService(current_task);
+        try globals.process_cleanup.init(current_task);
     }
 };

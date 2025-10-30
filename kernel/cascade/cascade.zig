@@ -32,7 +32,4 @@ pub const globals = struct {
     /// This does not include the per-executor scheduler or bootstrap init tasks.
     pub var kernel_tasks: std.AutoArrayHashMapUnmanaged(*Task, void) = .{};
     pub var kernel_tasks_lock: sync.RwLock = .{};
-
-    pub var processes_lock: sync.RwLock = .{};
-    pub var processes: std.AutoArrayHashMapUnmanaged(*Process, void) = .{};
 };
