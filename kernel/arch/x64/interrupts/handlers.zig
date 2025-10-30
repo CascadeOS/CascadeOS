@@ -16,7 +16,7 @@ pub fn nonMaskableInterruptHandler(
     _: usize,
     _: usize,
 ) void {
-    if (cascade.debug.globals.panicking_executor.load(.acquire) == null) {
+    if (!cascade.debug.hasAnExecutorPanicked()) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
     }
 

@@ -10,6 +10,10 @@ const core = @import("core");
 
 pub const log = @import("log.zig");
 
+pub fn hasAnExecutorPanicked() bool {
+    return globals.panicking_executor.load(.acquire) != null;
+}
+
 pub fn interruptSourcePanic(
     current_task: *Task,
     interrupt_frame: arch.interrupts.InterruptFrame,
@@ -527,8 +531,8 @@ pub const panic_interface = std.debug.FullPanic(zigPanic);
 pub const globals = struct {
     /// The executor that is currently panicking.
     ///
-    /// Public to allow other executors to check after receiving a panic IPI.
-    pub var panicking_executor: std.atomic.Value(?*const cascade.Executor) = .init(null);
+    /// Checked by executors to confirm receiving a panic IPI.
+    var panicking_executor: std.atomic.Value(?*const cascade.Executor) = .init(null);
 
     var panic_mode: PanicMode = .no_op;
 };
