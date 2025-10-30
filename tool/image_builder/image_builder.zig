@@ -122,7 +122,7 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
     const fsinfo_sector = 1;
     const reserved_sectors = sectors_per_track; // TODO: Is it always one track reserved?
 
-    const number_of_sectors = core.Size.from(slice.len, .byte).divide(sector_size).value;
+    const number_of_sectors = core.Size.from(slice.len, .byte).divide(sector_size);
     const number_of_clusters: u32 = @intCast(number_of_sectors / sectors_per_cluster);
 
     const bpb = asPtr(*fat.BPB, slice, 0, sector_size);
@@ -378,7 +378,7 @@ const FATContext = struct {
             .sectors_per_cluster = sectors_per_cluster,
             .cluster_size = cluster_size,
             .cluster_begin_sector = cluster_begin_sector,
-            .directory_entries_per_cluster = cluster_size.divide(core.Size.of(fat.DirectoryEntry)).value,
+            .directory_entries_per_cluster = cluster_size.divide(core.Size.of(fat.DirectoryEntry)),
             .date_time = getFATDateAndTime(),
             .number_of_clusters = number_of_clusters,
         };
@@ -741,7 +741,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
     )[0..number_of_partition_entries];
 
     const partition_table_crc = partition_table_crc: {
-        const partition_alignment = gpt.recommended_alignment_of_partitions.divide(disk_block_size).value;
+        const partition_alignment = gpt.recommended_alignment_of_partitions.divide(disk_block_size);
 
         var next_free_block = first_usable_block;
 

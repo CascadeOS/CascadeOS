@@ -70,7 +70,7 @@ pub const Size = extern struct {
     /// Caller must ensure `size` is not zero.
     pub fn amountToCover(size: Size, target: Size) u64 {
         const one_byte = core.Size{ .value = 1 };
-        return target.add(size.subtract(one_byte)).divide(size).value;
+        return target.add(size.subtract(one_byte)).divide(size);
     }
 
     test amountToCover {
@@ -169,8 +169,8 @@ pub const Size = extern struct {
         size.value *= value;
     }
 
-    pub fn divide(size: Size, other: Size) Size {
-        return .{ .value = size.value / other.value };
+    pub fn divide(size: Size, other: Size) usize {
+        return size.value / other.value;
     }
 
     pub fn divideInPlace(size: *Size, other: Size) void {

@@ -205,13 +205,8 @@ pub const Reference = struct {
         if (core.is_debug) std.debug.assert(entry.range.containsAddress(faulting_address));
 
         return @intCast(
-            faulting_address
-                .difference(entry.range.address)
-                .divide(arch.paging.standard_page_size)
-                .add(
-                    reference.start_offset
-                        .divide(arch.paging.standard_page_size),
-                ).value,
+            faulting_address.difference(entry.range.address).divide(arch.paging.standard_page_size) +
+                reference.start_offset.divide(arch.paging.standard_page_size),
         );
     }
 
@@ -260,7 +255,7 @@ pub const PageCount = extern struct {
     }
 
     pub fn increaseBySize(page_count: *PageCount, size: core.Size) void {
-        page_count.count += @intCast(size.divide(arch.paging.standard_page_size).value);
+        page_count.count += @intCast(size.divide(arch.paging.standard_page_size));
     }
 
     pub fn equal(page_count: PageCount, other: PageCount) bool {
@@ -269,7 +264,7 @@ pub const PageCount = extern struct {
 
     pub fn fromSize(size: core.Size) PageCount {
         return .{
-            .count = @intCast(size.divide(arch.paging.standard_page_size).value),
+            .count = @intCast(size.divide(arch.paging.standard_page_size)),
         };
     }
 

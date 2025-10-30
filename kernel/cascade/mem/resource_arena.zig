@@ -1333,7 +1333,7 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
 }
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
-const QUANTUM_CACHES_PER_FRAME = arch.paging.standard_page_size.divide(core.Size.of(RawCache)).value;
+const QUANTUM_CACHES_PER_FRAME = arch.paging.standard_page_size.divide(core.Size.of(RawCache));
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));
