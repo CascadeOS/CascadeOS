@@ -24,6 +24,10 @@ pub inline fn kernelPageTable() arch.paging.PageTable {
     return globals.kernel_page_table;
 }
 
+pub inline fn kernelAddressSpace() *AddressSpace {
+    return &globals.kernel_address_space;
+}
+
 /// Maps a single page to a physical frame.
 ///
 /// **REQUIREMENTS**:
@@ -395,7 +399,7 @@ pub fn onKernelPageFault(
     switch (region_type) {
         .pageable_kernel_address_space => {
             @branchHint(.likely);
-            globals.kernel_pageable_address_space.handlePageFault(current_task, page_fault_details) catch |err| switch (err) {
+            globals.kernel_address_space.handlePageFault(current_task, page_fault_details) catch |err| switch (err) {
                 error.OutOfMemory => std.debug.panic(
                     "no memory available to handle page fault in pageable kernel address space\n{f}",
                     .{page_fault_details},
@@ -493,7 +497,7 @@ pub fn kernelVirtualOffset() core.Size {
     return globals.kernel_virtual_offset;
 }
 
-pub const globals = struct {
+const globals = struct {
     /// The kernel page table.
     ///
     /// All other page tables start as a copy of this one.
@@ -501,12 +505,12 @@ pub const globals = struct {
     /// Initialized during `init.initializeMemorySystem`.
     var kernel_page_table: arch.paging.PageTable = undefined;
 
-    /// The kernel pageable address space.
+    /// The kernel address space.
     ///
-    /// Used for pageable kernel memory like file caches and for loaning memory from and to user space.
+    /// Used for file caches, loaning memory from userspace, etc.
     ///
     /// Initialized during `init.initializeMemorySystem`.
-    pub var kernel_pageable_address_space: AddressSpace = undefined;
+    var kernel_address_space: AddressSpace = undefined;
 
     /// The virtual base address that the kernel was loaded at.
     ///
@@ -642,7 +646,7 @@ pub const init = struct {
         try cascade.Process.init.initializeProcesses(current_task);
 
         init_log.debug(current_task, "initializing pageable kernel address space", .{});
-        try globals.kernel_pageable_address_space.init(
+        try globals.kernel_address_space.init(
             current_task,
             .{
                 .name = try .fromSlice("pageable_kernel"),
