@@ -608,13 +608,15 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.task_init);
+
     pub const earlyCreateStack = Stack.createStack;
 
     pub fn initializeTasks(
         current_task: *Task,
         kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
-        log.debug(current_task, "initializing task stacks", .{});
+        init_log.debug(current_task, "initializing task stacks", .{});
         try globals.stack_arena.init(
             current_task,
             .{
@@ -633,13 +635,13 @@ pub const init = struct {
             std.debug.panic("failed to add stack range to `stack_arena`: {t}", .{err});
         };
 
-        log.debug(current_task, "initializing task cache", .{});
+        init_log.debug(current_task, "initializing task cache", .{});
         globals.cache.init(
             current_task,
             .{ .name = try .fromSlice("task") },
         );
 
-        log.debug(current_task, "initializing task cleanup service", .{});
+        init_log.debug(current_task, "initializing task cleanup service", .{});
         try globals.task_cleanup.init(current_task);
     }
 

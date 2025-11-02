@@ -84,7 +84,11 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.anonymous_page_init);
+
     pub fn initializeCaches(current_task: *Task) !void {
+        log.debug(current_task, "initializing anonymous page cache", .{});
+
         globals.anonymous_page_cache.init(current_task, .{
             .name = try .fromSlice("anonymous page"),
         });

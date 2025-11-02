@@ -275,12 +275,15 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.heap_init);
+
     pub fn initializeHeaps(
         current_task: *Task,
         kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
         // heap
         {
+            init_log.debug(current_task, "initializing heap address space arena", .{});
             try globals.heap_address_space_arena.init(
                 current_task,
                 .{
@@ -289,6 +292,7 @@ pub const init = struct {
                 },
             );
 
+            init_log.debug(current_task, "initializing heap page arena", .{});
             try globals.heap_page_arena.init(
                 current_task,
                 .{
@@ -301,6 +305,7 @@ pub const init = struct {
                 },
             );
 
+            init_log.debug(current_task, "initializing heap arena", .{});
             try globals.heap_arena.init(
                 current_task,
                 .{
@@ -323,6 +328,7 @@ pub const init = struct {
 
         // special heap
         {
+            init_log.debug(current_task, "initializing special heap address space arena", .{});
             try globals.special_heap_address_space_arena.init(
                 current_task,
                 .{
@@ -333,6 +339,7 @@ pub const init = struct {
 
             const special_heap_range = kernel_regions.find(.special_heap).?.range;
 
+            init_log.debug(current_task, "adding special heap range to special heap address space arena", .{});
             globals.special_heap_address_space_arena.addSpan(
                 current_task,
                 special_heap_range.address.value,

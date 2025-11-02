@@ -781,12 +781,16 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.cache_init);
+
     pub fn initializeCaches(current_task: *Task) !void {
+        init_log.debug(current_task, "initializing slab cache", .{});
         globals.slab_cache.init(current_task, .{
             .name = try .fromSlice("slab"),
             .slab_source = .pmm,
         });
 
+        init_log.debug(current_task, "initializing large item cache", .{});
         globals.large_item_cache.init(current_task, .{
             .name = try .fromSlice("large item"),
             .slab_source = .pmm,

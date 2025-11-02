@@ -1355,7 +1355,9 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.resource_arena_init);
     pub fn initializeCaches(current_task: *Task) !void {
+        init_log.debug(current_task, "initializing boundary tag cache", .{});
         globals.tag_cache.init(current_task, .{
             .name = try .fromSlice("boundary tag"),
             .slab_source = .pmm,

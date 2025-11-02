@@ -304,15 +304,17 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.process_init);
+
     pub fn initializeProcesses(current_task: *Task) !void {
-        log.debug(current_task, "initializing process cache", .{});
+        init_log.debug(current_task, "initializing process cache", .{});
         globals.cache.init(current_task, .{
             .name = try .fromSlice("process"),
         });
 
         try Thread.init.initializeThreads(current_task);
 
-        log.debug(current_task, "initializing process cleanup service", .{});
+        init_log.debug(current_task, "initializing process cleanup service", .{});
         try globals.process_cleanup.init(current_task);
     }
 };

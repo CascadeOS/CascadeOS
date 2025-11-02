@@ -71,8 +71,10 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.thread_init);
+
     pub fn initializeThreads(current_task: *Task) !void {
-        log.debug(current_task, "initializing thread cache", .{});
+        init_log.debug(current_task, "initializing thread cache", .{});
         globals.cache.init(
             current_task,
             .{ .name = try .fromSlice("thread") },

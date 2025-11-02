@@ -372,7 +372,11 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.address_space_entry_init);
+
     pub fn initializeCaches(current_task: *Task) !void {
+        init_log.debug(current_task, "initializing address space entry cache", .{});
+
         globals.entry_cache.init(current_task, .{
             .name = try .fromSlice("address space entry"),
         });
