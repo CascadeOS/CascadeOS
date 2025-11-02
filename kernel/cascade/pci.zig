@@ -364,17 +364,23 @@ const globals = struct {
     /// All ECAMs in the system.
     ///
     /// Set by `init.initializeECAM`.
-    var ecams: []ECAM = undefined;
+    var ecams: []ECAM = &.{};
 };
 
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.pci_init);
+    const MCFGAcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.MCFG);
 
+    /// Initializes the PCI ECAM.
+    ///
+    /// No-op if no MCFG table is found.
     pub fn initializeECAM(current_task: *Task) !void {
-        const acpi_table = cascade.acpi.init.AcpiTable(cascade.acpi.tables.MCFG).get(0) orelse
-            return error.MCFGNotPresent;
-        defer acpi_table.deinit();
-        const mcfg = acpi_table.table;
+        const mcfg_acpi_table = MCFGAcpiTable.get(0) orelse {
+            init_log.warn(current_task, "no MCFG table found - skipping PCI ECAM initialization", .{});
+            return;
+        };
+        defer mcfg_acpi_table.deinit();
+        const mcfg = mcfg_acpi_table.table;
 
         const base_allocations = mcfg.baseAllocations();
 
