@@ -247,7 +247,7 @@ pub fn createKernelTask(current_task: *Task, options: CreateKernelTaskOptions) !
     const task = try globals.cache.allocate(current_task);
     errdefer globals.cache.deallocate(current_task, task);
 
-    try internal.init(task, .{
+    try Task.internal.init(task, .{
         .name = options.name,
         .function = options.function,
         .arg1 = options.arg1,
@@ -262,15 +262,6 @@ pub fn createKernelTask(current_task: *Task, options: CreateKernelTaskOptions) !
     if (gop.found_existing) std.debug.panic("task already in kernel tasks list", .{});
 
     return task;
-}
-
-fn destroyKernelTask(task: *Task, current_task: *Task) void {
-    if (core.is_debug) {
-        std.debug.assert(task.type == .kernel);
-        std.debug.assert(task.state == .dropped);
-        std.debug.assert(task.reference_count.load(.monotonic) == 0);
-    }
-    globals.cache.deallocate(current_task, task);
 }
 
 pub fn format(
@@ -424,39 +415,6 @@ pub const Stack = struct {
     const stack_size_including_guard_page = cascade.config.kernel_stack_size.add(arch.paging.standard_page_size);
 };
 
-pub const internal = struct {
-    pub const InitOptions = struct {
-        name: Name,
-        function: arch.scheduling.TaskFunction,
-        arg1: u64,
-        arg2: u64,
-        type: cascade.Context.Type,
-    };
-
-    pub fn init(task: *Task, options: InitOptions) !void {
-        const preconstructed_stack = task.stack;
-
-        task.* = .{
-            .name = options.name,
-            .state = .ready,
-            .stack = preconstructed_stack,
-            .type = options.type,
-            .known_executor = null,
-            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-            .scheduler_locked = true, // fresh tasks start with the scheduler locked
-        };
-
-        task.stack.reset();
-
-        try arch.scheduling.prepareTaskForScheduling(
-            task,
-            options.function,
-            options.arg1,
-            options.arg2,
-        );
-    }
-};
-
 const TaskCleanup = struct {
     task: *Task,
     parker: cascade.sync.Parker,
@@ -505,7 +463,7 @@ const TaskCleanup = struct {
     fn execute(task_cleanup: *TaskCleanup, current_task: *Task) noreturn {
         while (true) {
             while (task_cleanup.incoming.popFirst()) |node| {
-                handleTask(
+                cleanupTask(
                     current_task,
                     .fromNode(node),
                 );
@@ -515,7 +473,7 @@ const TaskCleanup = struct {
         }
     }
 
-    fn handleTask(current_task: *Task, task: *Task) void {
+    fn cleanupTask(current_task: *Task, task: *Task) void {
         if (core.is_debug) {
             std.debug.assert(task.state == .dropped);
             std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
@@ -539,7 +497,7 @@ const TaskCleanup = struct {
                 return;
             }
 
-            if (task.state.dropped.queued_for_cleanup.swap(true, .acq_rel)) {
+            if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
                 @branchHint(.unlikely);
                 // someone has requeued this task for cleanup
                 log.verbose(current_task, "{f} has been requeued for cleanup", .{task});
@@ -560,7 +518,7 @@ const TaskCleanup = struct {
         log.debug(current_task, "destroying {f}", .{task});
 
         switch (task.type) {
-            .kernel => task.destroyKernelTask(current_task),
+            .kernel => globals.cache.deallocate(current_task, task),
             .user => {
                 const thread: *Process.Thread = .fromTask(task);
                 thread.process.decrementReferenceCount(current_task);
@@ -581,6 +539,39 @@ const TaskCleanup = struct {
         }
 
         task_cleanup.execute(current_task);
+    }
+};
+
+pub const internal = struct {
+    pub const InitOptions = struct {
+        name: Name,
+        function: arch.scheduling.TaskFunction,
+        arg1: u64,
+        arg2: u64,
+        type: cascade.Context.Type,
+    };
+
+    pub fn init(task: *Task, options: InitOptions) !void {
+        const preconstructed_stack = task.stack;
+
+        task.* = .{
+            .name = options.name,
+            .state = .ready,
+            .stack = preconstructed_stack,
+            .type = options.type,
+            .known_executor = null,
+            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
+            .scheduler_locked = true, // fresh tasks start with the scheduler locked
+        };
+
+        task.stack.reset();
+
+        try arch.scheduling.prepareTaskForScheduling(
+            task,
+            options.function,
+            options.arg1,
+            options.arg2,
+        );
     }
 };
 

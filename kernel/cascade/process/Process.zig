@@ -138,73 +138,6 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
 
 pub const Name = core.containers.BoundedArray(u8, cascade.config.process_name_length);
 
-fn cacheConstructor(process: *Process, current_task: *Task) cascade.mem.cache.ConstructorError!void {
-    const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
-
-    process.* = .{
-        .name = temp_name,
-        .reference_count = .init(0),
-        .address_space = undefined, // initialized below
-    };
-
-    const frame = cascade.mem.phys.allocator.allocate(current_task) catch |err| {
-        log.warn(current_task, "process constructor failed during frame allocation: {t}", .{err});
-        return error.ItemConstructionFailed;
-    };
-    errdefer {
-        var frame_list: cascade.mem.phys.FrameList = .{};
-        frame_list.push(frame);
-        cascade.mem.phys.allocator.deallocate(current_task, frame_list);
-    }
-
-    const page_table: arch.paging.PageTable = arch.paging.PageTable.create(frame);
-    cascade.mem.kernelPageTable().copyTopLevelInto(page_table);
-
-    process.address_space.init(current_task, .{
-        .name = cascade.mem.AddressSpace.Name.fromSlice(
-            temp_name.constSlice(),
-        ) catch unreachable, // ensured in `cascade.config`
-        .range = cascade.config.user_address_space_range,
-        .page_table = page_table,
-        .context = .{ .user = process },
-    }) catch |err| {
-        log.warn(
-            current_task,
-            "process constructor failed during address space initialization: {t}",
-            .{err},
-        );
-        return error.ObjectConstructionFailed;
-    };
-}
-
-fn cacheDestructor(process: *Process, current_task: *Task) void {
-    const page_table = process.address_space.page_table;
-
-    process.address_space.deinit(current_task);
-
-    var frame_list: cascade.mem.phys.FrameList = .{};
-    frame_list.push(page_table.physical_frame);
-    cascade.mem.phys.allocator.deallocate(current_task, frame_list);
-}
-
-fn destroy(process: *Process, current_task: *Task) void {
-    if (core.is_debug) {
-        std.debug.assert(process.reference_count.load(.monotonic) == 0);
-        std.debug.assert(process.queued_for_cleanup.load(.monotonic));
-    }
-    process.queued_for_cleanup.store(false, .monotonic);
-
-    if (core.is_debug) {
-        std.debug.assert(!process.threads_lock.isReadLocked() and !process.threads_lock.isWriteLocked());
-        std.debug.assert(process.threads.count() == 0);
-    }
-    process.threads.clearAndFree(cascade.mem.heap.allocator);
-
-    process.address_space.reinitializeAndUnmapAll(current_task);
-
-    globals.cache.deallocate(current_task, process);
-}
-
 const ProcessCleanup = struct {
     task: *Task,
     parker: cascade.sync.Parker,
@@ -247,7 +180,7 @@ const ProcessCleanup = struct {
     fn execute(process_cleanup: *ProcessCleanup, current_task: *Task) noreturn {
         while (true) {
             while (process_cleanup.incoming.popFirst()) |node| {
-                handleProcess(
+                cleanupProcess(
                     current_task,
                     @fieldParentPtr("cleanup_node", node),
                 );
@@ -257,7 +190,7 @@ const ProcessCleanup = struct {
         }
     }
 
-    fn handleProcess(current_task: *Task, process: *cascade.Process) void {
+    fn cleanupProcess(current_task: *Task, process: *cascade.Process) void {
         if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
         process.queued_for_cleanup.store(false, .release);
@@ -273,7 +206,7 @@ const ProcessCleanup = struct {
                 return;
             }
 
-            if (process.queued_for_cleanup.swap(true, .acq_rel)) {
+            if (process.queued_for_cleanup.load(.acquire)) {
                 @branchHint(.unlikely);
                 // someone has requeued this process for cleanup
                 log.verbose(current_task, "{f} has been requeued for cleanup", .{process});
@@ -283,7 +216,10 @@ const ProcessCleanup = struct {
             if (!globals.processes.swapRemove(process)) @panic("process not found in processes");
         }
 
-        process.destroy(current_task);
+        process.threads.clearAndFree(cascade.mem.heap.allocator);
+        process.address_space.reinitializeAndUnmapAll(current_task);
+
+        globals.cache.deallocate(current_task, process);
     }
 
     fn entry(current_task: *Task, process_cleanup_addr: usize, _: usize) noreturn {
@@ -307,8 +243,57 @@ const globals = struct {
     /// Initialized during `init.initializeCache`.
     var cache: cascade.mem.cache.Cache(
         Process,
-        cacheConstructor,
-        cacheDestructor,
+        struct {
+            fn constructor(process: *Process, current_task: *Task) cascade.mem.cache.ConstructorError!void {
+                const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
+
+                process.* = .{
+                    .name = temp_name,
+                    .reference_count = .init(0),
+                    .address_space = undefined, // initialized below
+                };
+
+                const frame = cascade.mem.phys.allocator.allocate(current_task) catch |err| {
+                    log.warn(current_task, "process constructor failed during frame allocation: {t}", .{err});
+                    return error.ItemConstructionFailed;
+                };
+                errdefer {
+                    var frame_list: cascade.mem.phys.FrameList = .{};
+                    frame_list.push(frame);
+                    cascade.mem.phys.allocator.deallocate(current_task, frame_list);
+                }
+
+                const page_table: arch.paging.PageTable = .create(frame);
+                cascade.mem.kernelPageTable().copyTopLevelInto(page_table);
+
+                process.address_space.init(current_task, .{
+                    .name = cascade.mem.AddressSpace.Name.fromSlice(
+                        temp_name.constSlice(),
+                    ) catch unreachable, // ensured in `cascade.config`
+                    .range = cascade.config.user_address_space_range,
+                    .page_table = page_table,
+                    .context = .{ .user = process },
+                }) catch |err| {
+                    log.warn(
+                        current_task,
+                        "process constructor failed during address space initialization: {t}",
+                        .{err},
+                    );
+                    return error.ObjectConstructionFailed;
+                };
+            }
+        }.constructor,
+        struct {
+            fn destructor(process: *Process, current_task: *Task) void {
+                const page_table = process.address_space.page_table;
+
+                process.address_space.deinit(current_task);
+
+                var frame_list: cascade.mem.phys.FrameList = .{};
+                frame_list.push(page_table.physical_frame);
+                cascade.mem.phys.allocator.deallocate(current_task, frame_list);
+            }
+        }.destructor,
     ) = undefined;
 
     var processes_lock: cascade.sync.RwLock = .{};
