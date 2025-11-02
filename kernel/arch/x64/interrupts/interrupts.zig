@@ -14,53 +14,6 @@ const interrupt_handlers = @import("handlers.zig");
 
 const log = cascade.debug.log.scoped(.interrupt);
 
-pub fn allocateInterrupt(
-    current_task: *Task,
-    interrupt_handler: arch.interrupts.Interrupt.Handler,
-    arg1: usize,
-    arg2: usize,
-) arch.interrupts.Interrupt.AllocateError!Interrupt {
-    const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
-        return error.InterruptAllocationFailed;
-    };
-
-    const interrupt_number: u8 = @intCast(allocation.base);
-
-    globals.handlers[interrupt_number] = .{
-        .handler = interrupt_handler,
-        .arg1 = arg1,
-        .arg2 = arg2,
-    };
-
-    // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
-    const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
-    _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
-
-    const interrupt: Interrupt = @enumFromInt(interrupt_number);
-    log.debug(current_task, "allocated interrupt {}", .{interrupt});
-
-    return interrupt;
-}
-
-pub fn deallocateInterrupt(interrupt: Interrupt, current_task: *Task) void {
-    log.debug(current_task, "deallocating interrupt {}", .{interrupt});
-
-    const interrupt_number = @intFromEnum(interrupt);
-
-    globals.handlers[interrupt_number] = .{
-        .handler = interrupt_handlers.unhandledInterrupt,
-    };
-
-    // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
-    const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
-    _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
-
-    globals.interrupt_arena.deallocate(current_task, .{
-        .base = interrupt_number,
-        .len = 1,
-    });
-}
-
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
     const current_task, const interrupt_exit = Task.onInterruptEntry();
     defer interrupt_exit.exit(current_task);
@@ -161,6 +114,53 @@ pub const Interrupt = enum(u8) {
             return vector != Interrupt.non_maskable_interrupt;
         }
         return false;
+    }
+
+    pub fn allocate(
+        current_task: *Task,
+        interrupt_handler: arch.interrupts.Interrupt.Handler,
+        arg1: usize,
+        arg2: usize,
+    ) arch.interrupts.Interrupt.AllocateError!Interrupt {
+        const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
+            return error.InterruptAllocationFailed;
+        };
+
+        const interrupt_number: u8 = @intCast(allocation.base);
+
+        globals.handlers[interrupt_number] = .{
+            .handler = interrupt_handler,
+            .arg1 = arg1,
+            .arg2 = arg2,
+        };
+
+        // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
+        const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
+        _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
+
+        const interrupt: Interrupt = @enumFromInt(interrupt_number);
+        log.debug(current_task, "allocated interrupt {}", .{interrupt});
+
+        return interrupt;
+    }
+
+    pub fn deallocate(interrupt: Interrupt, current_task: *Task) void {
+        log.debug(current_task, "deallocating interrupt {}", .{interrupt});
+
+        const interrupt_number = @intFromEnum(interrupt);
+
+        globals.handlers[interrupt_number] = .{
+            .handler = interrupt_handlers.unhandledInterrupt,
+        };
+
+        // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
+        const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
+        _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
+
+        globals.interrupt_arena.deallocate(current_task, .{
+            .base = interrupt_number,
+            .len = 1,
+        });
     }
 
     pub fn route(interrupt: Interrupt, current_task: *Task, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
@@ -316,7 +316,9 @@ pub const init = struct {
     /// Ensure that any exceptions/faults that occur during early initialization are handled.
     ///
     /// The handler is not expected to do anything other than panic.
-    pub fn initializeEarlyInterrupts() void {
+    pub fn initializeEarlyInterrupts(current_task: *Task) void {
+        _ = current_task;
+
         for (raw_interrupt_handlers, 0..) |raw_handler, i| {
             globals.idt.handlers[i].init(
                 .kernel_code,
@@ -355,7 +357,9 @@ pub const init = struct {
 
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
-    pub fn loadStandardInterruptHandlers() void {
+    pub fn loadStandardInterruptHandlers(current_task: *Task) void {
+        _ = current_task;
+
         globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
             .handler = interrupt_handlers.nonMaskableInterruptHandler,
         };

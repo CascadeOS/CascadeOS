@@ -10,14 +10,24 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
+/// Called before `old_task` is switched to `new_task`.
+///
+/// This function does not perform page table switching or managing ability to access user memory.
+///
+/// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
+/// `current_task` is not null.
 pub fn beforeSwitchTask(
-    executor: *cascade.Executor,
+    current_task: *Task,
     old_task: *Task,
     new_task: *Task,
 ) void {
     _ = old_task;
 
-    executor.arch_specific.tss.setPrivilegeStack(
+    const executor = current_task.known_executor.?;
+
+    const arch_specific: *x64.PerExecutor = &executor.arch_specific;
+
+    arch_specific.tss.setPrivilegeStack(
         .ring0,
         new_task.stack.top_stack_pointer,
     );
@@ -26,6 +36,8 @@ pub fn beforeSwitchTask(
 /// Switches to `new_task`.
 ///
 /// If `old_task` is not null its state is saved to allow it to be resumed later.
+///
+/// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
 pub fn switchTask(
     old_task: ?*Task,
     new_task: *Task,

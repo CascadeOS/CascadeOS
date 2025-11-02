@@ -16,7 +16,9 @@ pub fn eoi() void {
 }
 
 /// Send a panic IPI to all other executors.
-pub fn sendPanicIPI() void {
+pub fn sendPanicIPI(current_task: *Task) void {
+    _ = current_task;
+
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .non_maskable_interrupt;
@@ -31,7 +33,9 @@ pub fn sendPanicIPI() void {
 }
 
 /// Send a flush IPI to the given executor.
-pub fn sendFlushIPI(executor: *cascade.Executor) void {
+pub fn sendFlushIPI(current_task: *Task, executor: *cascade.Executor) void {
+    _ = current_task;
+
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .flush_request;

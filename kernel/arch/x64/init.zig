@@ -364,7 +364,8 @@ pub fn registerArchitecturalTimeSources(
 /// Initialize the local interrupt controller for the current executor.
 ///
 /// For example, on x86_64 this should initialize the APIC.
-pub fn initLocalInterruptController() void {
+pub fn initLocalInterruptController(current_task: *Task) void {
+    _ = current_task;
     x64.apic.init.initApicOnCurrentExecutor();
 }
 

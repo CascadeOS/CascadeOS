@@ -93,7 +93,11 @@ fn singleExecutorInitPanic(
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(cascade.init.Output.writer, msg, panic_type) catch {},
+        0 => formatting.printPanic(
+            cascade.init.Output.writer,
+            msg,
+            panic_type,
+        ) catch {},
         // on second panic print a shorter message
         1 => cascade.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
         // don't trigger any more panics
@@ -124,7 +128,7 @@ fn initPanic(
     }
 
     cascade.init.Output.lock.poison();
-    arch.interrupts.sendPanicIPI();
+    arch.interrupts.sendPanicIPI(current_task);
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
@@ -172,10 +176,7 @@ const formatting = struct {
         }
     }
 
-    fn printInterruptError(
-        writer: *std.Io.Writer,
-        interrupt_frame: arch.interrupts.InterruptFrame,
-    ) !void {
+    fn printInterruptError(writer: *std.Io.Writer, interrupt_frame: arch.interrupts.InterruptFrame) !void {
         const symbol_source = SymbolSource.load();
 
         try printSourceAtAddress(

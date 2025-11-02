@@ -45,7 +45,7 @@ pub fn initStage1() !noreturn {
     try cascade.acpi.init.logAcpiTables(current_task);
 
     log.debug(current_task, "initializing early interrupts", .{});
-    arch.interrupts.init.initializeEarlyInterrupts();
+    arch.interrupts.init.initializeEarlyInterrupts(current_task);
 
     log.debug(current_task, "capturing early system information", .{});
     arch.init.captureEarlySystemInformation(current_task);
@@ -102,7 +102,7 @@ pub fn initStage1() !noreturn {
 fn initStage2(current_task: *Task) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
-    cascade.mem.kernelPageTable().load();
+    cascade.mem.kernelPageTable().load(current_task);
     const executor = current_task.known_executor.?;
     arch.init.loadExecutor(current_task);
 
@@ -110,7 +110,7 @@ fn initStage2(current_task: *Task) !noreturn {
     arch.init.configurePerExecutorSystemFeatures(current_task);
 
     log.debug(current_task, "configuring local interrupt controller on {f}", .{executor.id});
-    arch.init.initLocalInterruptController();
+    arch.init.initLocalInterruptController(current_task);
 
     log.debug(current_task, "enabling per-executor interrupt on {f}", .{executor.id});
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
@@ -138,7 +138,7 @@ fn initStage2(current_task: *Task) !noreturn {
 fn initStage3(current_task: *Task) !noreturn {
     if (Stage3Barrier.start()) {
         log.debug(current_task, "loading standard interrupt handlers", .{});
-        arch.interrupts.init.loadStandardInterruptHandlers();
+        arch.interrupts.init.loadStandardInterruptHandlers(current_task);
 
         log.debug(current_task, "creating and scheduling init stage 4 task", .{});
         {

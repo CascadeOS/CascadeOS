@@ -82,19 +82,19 @@ pub const interrupts = struct {
     }
 
     /// Send a panic IPI to all other executors.
-    pub fn sendPanicIPI() callconv(core.inline_in_non_debug) void {
+    pub fn sendPanicIPI(current_task: *Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.interrupts,
             "sendPanicIPI",
-        )();
+        )(current_task);
     }
 
     /// Send a flush IPI to the given executor.
-    pub fn sendFlushIPI(executor: *cascade.Executor) callconv(core.inline_in_non_debug) void {
+    pub fn sendFlushIPI(current_task: *Task, executor: *cascade.Executor) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.interrupts,
             "sendFlushIPI",
-        )(executor);
+        )(current_task, executor);
     }
 
     pub const Interrupt = struct {
@@ -182,11 +182,11 @@ pub const interrupts = struct {
         /// Ensure that any exceptions/faults that occur during early initialization are handled.
         ///
         /// The handler is not expected to do anything other than panic.
-        pub fn initializeEarlyInterrupts() callconv(core.inline_in_non_debug) void {
+        pub fn initializeEarlyInterrupts(current_task: *Task) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts.init,
                 "initializeEarlyInterrupts",
-            )();
+            )(current_task);
         }
 
         /// Prepare interrupt allocation and routing.
@@ -199,11 +199,11 @@ pub const interrupts = struct {
 
         /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
         /// system interrupt handlers.
-        pub fn loadStandardInterruptHandlers() callconv(core.inline_in_non_debug) void {
+        pub fn loadStandardInterruptHandlers(current_task: *Task) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts.init,
                 "loadStandardInterruptHandlers",
-            )();
+            )(current_task);
         }
     };
 };
@@ -228,111 +228,121 @@ pub const paging = struct {
         arch_specific: *current_decls.paging.PageTable,
 
         /// Create a page table in the given physical frame.
-        pub fn create(physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
+        pub fn create(current_task: *Task, physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
             return .{
                 .physical_frame = physical_frame,
                 .arch_specific = getFunction(
                     current_functions.paging,
                     "createPageTable",
-                )(physical_frame),
+                )(current_task, physical_frame),
             };
         }
 
-        pub fn load(page_table: PageTable) callconv(core.inline_in_non_debug) void {
+        pub fn load(page_table: PageTable, current_task: *Task) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
                 "loadPageTable",
-            )(page_table.physical_frame);
+            )(current_task, page_table.physical_frame);
         }
 
         /// Copies the top level of `page_table` into `target_page_table`.
         pub fn copyTopLevelInto(
             page_table: PageTable,
+            current_task: *Task,
             target_page_table: PageTable,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
                 "copyTopLevelIntoPageTable",
-            )(page_table.arch_specific, target_page_table.arch_specific);
+            )(page_table.arch_specific, current_task, target_page_table.arch_specific);
+        }
+
+        /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual address is aligned to the standard page size
+        ///  - the virtual address is not already mapped
+        ///
+        /// This function:
+        ///  - only supports the standard page size for the architecture
+        ///  - does not flush the TLB
+        pub fn mapSinglePage(
+            page_table: PageTable,
+            current_task: *Task,
+            virtual_address: core.VirtualAddress,
+            physical_frame: cascade.mem.phys.Frame,
+            map_type: cascade.mem.MapType,
+            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+        ) callconv(core.inline_in_non_debug) cascade.mem.MapError!void {
+            return getFunction(
+                current_functions.paging,
+                "mapSinglePage",
+            )(page_table.arch_specific, current_task, virtual_address, physical_frame, map_type, physical_frame_allocator);
+        }
+
+        /// Unmaps `virtual_address`.
+        ///
+        /// NOP if the page is not mapped.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual address is aligned to the standard page size
+        ///
+        /// This function:
+        ///  - only supports the standard page size for the architecture
+        ///  - does not flush the TLB
+        pub fn unmapSinglePage(
+            page_table: PageTable,
+            current_task: *Task,
+            virtual_address: core.VirtualAddress,
+            backing_page_decision: core.CleanupDecision,
+            top_level_decision: core.CleanupDecision,
+            deallocate_frame_list: *cascade.mem.phys.FrameList,
+        ) callconv(core.inline_in_non_debug) void {
+            getFunction(
+                current_functions.paging,
+                "unmapSinglePage",
+            )(
+                page_table.arch_specific,
+                current_task,
+                virtual_address,
+                backing_page_decision,
+                top_level_decision,
+                deallocate_frame_list,
+            );
+        }
+
+        /// Changes the protection of the given virtual address.
+        ///
+        /// NOP if the page is not mapped.
+        ///
+        /// Caller must ensure:
+        ///   - the virtual address is aligned to the standard page size
+        ///
+        /// This function:
+        ///   - only supports the standard page size for the architecture
+        ///   - does not flush the TLB
+        pub fn changeSinglePageProtection(
+            page_table: PageTable,
+            current_task: *Task,
+            virtual_address: core.VirtualAddress,
+            map_type: cascade.mem.MapType,
+        ) callconv(core.inline_in_non_debug) void {
+            getFunction(
+                current_functions.paging,
+                "changeSinglePageProtection",
+            )(page_table.arch_specific, current_task, virtual_address, map_type);
         }
     };
-
-    /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
-    ///
-    /// Caller must ensure:
-    ///  - the virtual address is aligned to the standard page size
-    ///  - the virtual address is not already mapped
-    ///
-    /// This function:
-    ///  - only supports the standard page size for the architecture
-    ///  - does not flush the TLB
-    pub fn mapSinglePage(
-        current_task: *Task,
-        page_table: PageTable,
-        virtual_address: core.VirtualAddress,
-        physical_frame: cascade.mem.phys.Frame,
-        map_type: cascade.mem.MapType,
-        physical_frame_allocator: cascade.mem.phys.FrameAllocator,
-    ) callconv(core.inline_in_non_debug) cascade.mem.MapError!void {
-        return getFunction(
-            current_functions.paging,
-            "mapSinglePage",
-        )(current_task, page_table.arch_specific, virtual_address, physical_frame, map_type, physical_frame_allocator);
-    }
-
-    /// Unmaps `virtual_address`.
-    ///
-    /// NOP if the page is not mapped.
-    ///
-    /// Caller must ensure:
-    ///  - the virtual address is aligned to the standard page size
-    ///
-    /// This function:
-    ///  - only supports the standard page size for the architecture
-    ///  - does not flush the TLB
-    pub fn unmapSinglePage(
-        page_table: PageTable,
-        virtual_address: core.VirtualAddress,
-        backing_page_decision: core.CleanupDecision,
-        top_level_decision: core.CleanupDecision,
-        deallocate_frame_list: *cascade.mem.phys.FrameList,
-    ) callconv(core.inline_in_non_debug) void {
-        getFunction(
-            current_functions.paging,
-            "unmapSinglePage",
-        )(page_table.arch_specific, virtual_address, backing_page_decision, top_level_decision, deallocate_frame_list);
-    }
-
-    /// Changes the protection of the given virtual address.
-    ///
-    /// NOP if the page is not mapped.
-    ///
-    /// Caller must ensure:
-    ///   - the virtual address is aligned to the standard page size
-    ///
-    /// This function:
-    ///   - only supports the standard page size for the architecture
-    ///   - does not flush the TLB
-    pub fn changeSinglePageProtection(
-        page_table: PageTable,
-        virtual_address: core.VirtualAddress,
-        map_type: cascade.mem.MapType,
-    ) callconv(core.inline_in_non_debug) void {
-        getFunction(
-            current_functions.paging,
-            "changeSinglePageProtection",
-        )(page_table.arch_specific, virtual_address, map_type);
-    }
 
     /// Flushes the cache for the given virtual range on the current executor.
     ///
     /// Caller must ensure:
     ///   - the `virtual_range` address and size must be aligned to the standard page size
-    pub fn flushCache(virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
+    pub fn flushCache(current_task: *Task, virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.paging,
             "flushCache",
-        )(virtual_range);
+        )(current_task, virtual_range);
     }
 
     /// Enable the kernel to access user memory.
@@ -417,15 +427,18 @@ pub const scheduling = struct {
     /// Called before `old_task` is switched to `new_task`.
     ///
     /// This function does not perform page table switching or managing ability to access user memory.
+    ///
+    /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
+    /// `current_task` is not null.
     pub fn beforeSwitchTask(
-        executor: *cascade.Executor,
+        current_task: *Task,
         old_task: *Task,
         new_task: *Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
             "beforeSwitchTask",
-        )(executor, old_task, new_task);
+        )(current_task, old_task, new_task);
     }
 
     /// Switches to `new_task`.
@@ -690,11 +703,11 @@ pub const init = struct {
     /// Initialize the local interrupt controller for the current executor.
     ///
     /// For example, on x86_64 this should initialize the APIC.
-    pub fn initLocalInterruptController() callconv(core.inline_in_non_debug) void {
+    pub fn initLocalInterruptController(current_task: *Task) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "initLocalInterruptController",
-        )();
+        )(current_task);
     }
 };
 
@@ -734,10 +747,10 @@ pub const Functions = struct {
         eoi: ?fn () void = null,
 
         /// Send a panic IPI to all other executors.
-        sendPanicIPI: ?fn () void = null,
+        sendPanicIPI: ?fn (current_task: *Task) void = null,
 
         /// Send a flush IPI to the given executor.
-        sendFlushIPI: ?fn (*cascade.Executor) void = null,
+        sendFlushIPI: ?fn (current_task: *Task, executor: *cascade.Executor) void = null,
 
         allocateInterrupt: ?fn (
             current_task: *Task,
@@ -769,26 +782,27 @@ pub const Functions = struct {
             /// Ensure that any exceptions/faults that occur during early initialization are handled.
             ///
             /// The handler is not expected to do anything other than panic.
-            initializeEarlyInterrupts: ?fn () void = null,
+            initializeEarlyInterrupts: ?fn (current_task: *Task) void = null,
 
             /// Prepare interrupt allocation and routing.
             initializeInterruptRouting: ?fn (current_task: *Task) void = null,
 
             /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
             /// system interrupt handlers.
-            loadStandardInterruptHandlers: ?fn () void = null,
+            loadStandardInterruptHandlers: ?fn (current_task: *Task) void = null,
         },
     },
 
     paging: struct {
         /// Create a page table in the given physical frame.
-        createPageTable: ?fn (physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
+        createPageTable: ?fn (current_task: *Task, physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
 
-        loadPageTable: ?fn (physical_frame: cascade.mem.phys.Frame) void = null,
+        loadPageTable: ?fn (current_task: *Task, physical_frame: cascade.mem.phys.Frame) void = null,
 
         /// Copies the top level of `page_table` into `target_page_table`.
         copyTopLevelIntoPageTable: ?fn (
             page_table: *current_decls.paging.PageTable,
+            current_task: *Task,
             target_page_table: *current_decls.paging.PageTable,
         ) void = null,
 
@@ -802,8 +816,8 @@ pub const Functions = struct {
         ///  - only supports the standard page size for the architecture
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
-            current_task: *Task,
             page_table: *current_decls.paging.PageTable,
+            current_task: *Task,
             virtual_address: core.VirtualAddress,
             physical_frame: cascade.mem.phys.Frame,
             map_type: cascade.mem.MapType,
@@ -822,6 +836,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         unmapSinglePage: ?fn (
             page_table: *current_decls.paging.PageTable,
+            current_task: *Task,
             virtual_address: core.VirtualAddress,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
@@ -840,6 +855,7 @@ pub const Functions = struct {
         ///   - does not flush the TLB
         changeSinglePageProtection: ?fn (
             page_table: *current_decls.paging.PageTable,
+            current_task: *Task,
             virtual_address: core.VirtualAddress,
             map_type: cascade.mem.MapType,
         ) void = null,
@@ -848,7 +864,7 @@ pub const Functions = struct {
         ///
         /// Caller must ensure:
         ///   - the `virtual_range` address and size must be aligned to the standard page size
-        flushCache: ?fn (virtual_range: core.VirtualRange) void = null,
+        flushCache: ?fn (current_task: *Task, virtual_range: core.VirtualRange) void = null,
 
         /// Enable the kernel to access user memory.
         ///
@@ -907,8 +923,11 @@ pub const Functions = struct {
         /// Called before `old_task` is switched to `new_task`.
         ///
         /// This function does not perform page table switching or managing ability to access user memory.
+        ///
+        /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
+        /// `current_task` is not null.
         beforeSwitchTask: ?fn (
-            executor: *cascade.Executor,
+            current_task: *Task,
             old_task: *Task,
             new_task: *Task,
         ) void = null,
@@ -1032,7 +1051,7 @@ pub const Functions = struct {
         /// Initialize the local interrupt controller for the current executor.
         ///
         /// For example, on x86_64 this should initialize the APIC.
-        initLocalInterruptController: ?fn () void = null,
+        initLocalInterruptController: ?fn (current_task: *Task) void = null,
     },
 };
 

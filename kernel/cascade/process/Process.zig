@@ -263,8 +263,8 @@ const globals = struct {
                     cascade.mem.phys.allocator.deallocate(current_task, frame_list);
                 }
 
-                const page_table: arch.paging.PageTable = .create(frame);
-                cascade.mem.kernelPageTable().copyTopLevelInto(page_table);
+                const page_table: arch.paging.PageTable = .create(current_task, frame);
+                cascade.mem.kernelPageTable().copyTopLevelInto(current_task, page_table);
 
                 process.address_space.init(current_task, .{
                     .name = cascade.mem.AddressSpace.Name.fromSlice(

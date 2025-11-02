@@ -31,7 +31,7 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *Task) void {
         // TODO: is there a better way to determine which executors to target?
         for (cascade.Executor.executors()) |*executor| {
             if (executor == current_executor) continue; // skip ourselves
-            flush_request.requestExecutor(executor);
+            flush_request.requestExecutor(current_task, executor);
         }
 
         flush_request.flush(current_task);
@@ -69,10 +69,10 @@ fn flush(flush_request: *FlushRequest, current_task: *Task) void {
         },
     }
 
-    arch.paging.flushCache(flush_request.range);
+    arch.paging.flushCache(current_task, flush_request.range);
 }
 
-fn requestExecutor(flush_request: *FlushRequest, executor: *cascade.Executor) void {
+fn requestExecutor(flush_request: *FlushRequest, current_task: *Task, executor: *cascade.Executor) void {
     _ = flush_request.count.fetchAdd(1, .monotonic);
 
     const node = flush_request.nodes.addOne() catch @panic("exceeded maximum number of executors");
@@ -82,5 +82,5 @@ fn requestExecutor(flush_request: *FlushRequest, executor: *cascade.Executor) vo
     };
     executor.flush_requests.prepend(&node.node);
 
-    arch.interrupts.sendFlushIPI(executor);
+    arch.interrupts.sendFlushIPI(current_task, executor);
 }

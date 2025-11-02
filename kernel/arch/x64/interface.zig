@@ -30,12 +30,14 @@ pub const functions: arch.Functions = .{
         .sendPanicIPI = x64.apic.sendPanicIPI,
         .sendFlushIPI = x64.apic.sendFlushIPI,
 
-        .allocateInterrupt = x64.interrupts.allocateInterrupt,
-        .deallocateInterrupt = x64.interrupts.deallocateInterrupt,
+        .allocateInterrupt = x64.interrupts.Interrupt.allocate,
+        .deallocateInterrupt = x64.interrupts.Interrupt.deallocate,
         .routeInterrupt = x64.interrupts.Interrupt.route,
 
         .createStackIterator = struct {
-            fn createStackIterator(interrupt_frame: *const x64.interrupts.InterruptFrame) std.debug.StackIterator {
+            fn createStackIterator(
+                interrupt_frame: *const x64.interrupts.InterruptFrame,
+            ) std.debug.StackIterator {
                 return .init(null, interrupt_frame.rbp);
             }
         }.createStackIterator,
@@ -53,10 +55,11 @@ pub const functions: arch.Functions = .{
     },
 
     .paging = .{
-        .createPageTable = x64.paging.createPageTable,
+        .createPageTable = x64.paging.PageTable.create,
 
         .loadPageTable = struct {
-            fn loadPageTable(physical_frame: cascade.mem.phys.Frame) void {
+            fn loadPageTable(current_task: *Task, physical_frame: cascade.mem.phys.Frame) void {
+                _ = current_task;
                 x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
             }
         }.loadPageTable,
@@ -64,16 +67,18 @@ pub const functions: arch.Functions = .{
         .copyTopLevelIntoPageTable = struct {
             fn copyTopLevelIntoPageTable(
                 page_table: *x64.paging.PageTable,
+                current_task: *Task,
                 target_page_table: *x64.paging.PageTable,
             ) void {
+                _ = current_task;
                 if (core.is_debug) std.debug.assert(page_table != target_page_table);
                 @memcpy(&target_page_table.entries, &page_table.entries);
             }
         }.copyTopLevelIntoPageTable,
 
-        .mapSinglePage = x64.paging.map4KiB,
-        .unmapSinglePage = x64.paging.unmap4KiB,
-        .changeSinglePageProtection = x64.paging.change4KiBProtection,
+        .mapSinglePage = x64.paging.PageTable.map4KiB,
+        .unmapSinglePage = x64.paging.PageTable.unmap4KiB,
+        .changeSinglePageProtection = x64.paging.PageTable.change4KiBProtection,
         .flushCache = x64.paging.flushCache,
         .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
         .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,
@@ -86,8 +91,8 @@ pub const functions: arch.Functions = .{
                 }
             }.sizeOfTopLevelEntry,
 
-            .fillTopLevel = x64.paging.init.fillTopLevel,
-            .mapToPhysicalRangeAllPageSizes = x64.paging.init.mapToPhysicalRangeAllPageSizes,
+            .fillTopLevel = x64.paging.PageTable.init.fillTopLevel,
+            .mapToPhysicalRangeAllPageSizes = x64.paging.PageTable.init.mapToPhysicalRangeAllPageSizes,
         },
     },
 

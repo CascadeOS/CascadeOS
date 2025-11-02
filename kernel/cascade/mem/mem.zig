@@ -49,9 +49,8 @@ pub fn mapSinglePage(
 
     // TODO: replace with `mapRangeToPhysicalRange`
 
-    try arch.paging.mapSinglePage(
+    try page_table.mapSinglePage(
         current_task,
-        page_table,
         virtual_address,
         physical_frame,
         map_type,
@@ -114,9 +113,8 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             physical_frame_allocator.deallocate(current_task, deallocate_frame_list);
         }
 
-        try arch.paging.mapSinglePage(
+        try page_table.mapSinglePage(
             current_task,
-            page_table,
             current_virtual_address,
             physical_frame,
             map_type,
@@ -180,9 +178,8 @@ pub fn mapRangeToPhysicalRange(
     var current_physical_address = physical_range.address;
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        try arch.paging.mapSinglePage(
+        try page_table.mapSinglePage(
             current_task,
-            page_table,
             current_virtual_address,
             .fromAddress(current_physical_address),
             map_type,
@@ -225,8 +222,8 @@ pub fn unmapRange(
     var current_virtual_address = virtual_range.address;
 
     while (current_virtual_address.lessThan(last_virtual_address)) {
-        arch.paging.unmapSinglePage(
-            page_table,
+        page_table.unmapSinglePage(
+            current_task,
             current_virtual_address,
             backing_page_decision,
             top_level_decision,
@@ -275,8 +272,8 @@ pub fn changeProtection(
     var current_virtual_address = virtual_range.address;
 
     while (current_virtual_address.lessThan(last_virtual_address)) {
-        arch.paging.changeSinglePageProtection(
-            page_table,
+        page_table.changeSinglePageProtection(
+            current_task,
             current_virtual_address,
             map_type,
         );
@@ -889,7 +886,8 @@ pub const init = struct {
         current_task: *Task,
         kernel_regions: *KernelMemoryRegion.List,
     ) arch.paging.PageTable {
-        const kernel_page_table = arch.paging.PageTable.create(
+        const kernel_page_table: arch.paging.PageTable = .create(
+            current_task,
             phys.init.bootstrap_allocator.allocate(current_task) catch unreachable,
         );
 
@@ -934,7 +932,7 @@ pub const init = struct {
         }
 
         init_log.debug(current_task, "loading kernel page table", .{});
-        kernel_page_table.load();
+        kernel_page_table.load(current_task);
 
         return kernel_page_table;
     }

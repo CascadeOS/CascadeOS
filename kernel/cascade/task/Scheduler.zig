@@ -167,7 +167,7 @@ fn switchToIdleDeferredAction(
     const scheduler_task = &executor.scheduler_task;
     if (core.is_debug) std.debug.assert(scheduler_task.state == .ready);
 
-    beforeSwitchTask(executor, old_task, scheduler_task);
+    beforeSwitchTask(current_task, old_task, scheduler_task);
 
     scheduler_task.state = .{ .running = executor };
     scheduler_task.known_executor = executor;
@@ -198,7 +198,7 @@ fn switchToTaskFromIdleYield(current_task: *Task, new_task: *Task) void {
     const scheduler_task = current_task;
     if (core.is_debug) std.debug.assert(&executor.scheduler_task == scheduler_task);
 
-    beforeSwitchTask(executor, scheduler_task, new_task);
+    beforeSwitchTask(current_task, scheduler_task, new_task);
 
     new_task.state = .{ .running = executor };
     new_task.known_executor = executor;
@@ -229,7 +229,7 @@ fn switchToTaskFromTaskYield(
     const executor = current_task.known_executor.?;
     const old_task = current_task;
 
-    beforeSwitchTask(executor, old_task, new_task);
+    beforeSwitchTask(current_task, old_task, new_task);
 
     new_task.state = .{ .running = executor };
     new_task.known_executor = executor;
@@ -288,7 +288,7 @@ fn switchToTaskFromTaskDeferredAction(
     const executor = current_task.known_executor.?;
     const old_task = current_task;
 
-    beforeSwitchTask(executor, old_task, new_task);
+    beforeSwitchTask(current_task, old_task, new_task);
 
     const scheduler_task = &executor.scheduler_task;
 
@@ -339,11 +339,11 @@ pub inline fn assertSchedulerNotLocked(current_task: *Task) void {
 }
 
 fn beforeSwitchTask(
-    executor: *cascade.Executor,
+    current_task: *Task,
     old_task: *Task,
     new_task: *Task,
 ) void {
-    arch.scheduling.beforeSwitchTask(executor, old_task, new_task);
+    arch.scheduling.beforeSwitchTask(current_task, old_task, new_task);
 
     if (old_task.enable_access_to_user_memory_count != new_task.enable_access_to_user_memory_count) {
         @branchHint(.unlikely); // we expect both to be 0 most of the time
@@ -358,15 +358,18 @@ fn beforeSwitchTask(
     switch (old_task.type) {
         .kernel => switch (new_task.type) {
             .kernel => {},
-            .user => Process.fromTask(new_task).address_space.page_table.load(),
+            .user => {
+                const new_process: *Process = .fromTask(new_task);
+                new_process.address_space.page_table.load(current_task);
+            },
         },
         .user => {
             const old_process: *const Process = .fromTask(old_task);
             switch (new_task.type) {
-                .kernel => cascade.mem.kernelPageTable().load(),
+                .kernel => cascade.mem.kernelPageTable().load(current_task),
                 .user => {
                     const new_process: *Process = .fromTask(new_task);
-                    if (old_process != new_process) new_process.address_space.page_table.load();
+                    if (old_process != new_process) new_process.address_space.page_table.load(current_task);
                 },
             }
         },
