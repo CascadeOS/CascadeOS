@@ -133,11 +133,11 @@ pub const interrupts = struct {
 
         pub const RouteError = error{UnableToRouteExternalInterrupt};
 
-        pub fn route(interrupt: Interrupt, external_interrupt: u32) callconv(core.inline_in_non_debug) RouteError!void {
+        pub fn route(interrupt: Interrupt, current_task: *Task, external_interrupt: u32) callconv(core.inline_in_non_debug) RouteError!void {
             return getFunction(
                 current_functions.interrupts,
                 "routeInterrupt",
-            )(interrupt.arch_specific, external_interrupt);
+            )(interrupt.arch_specific, current_task, external_interrupt);
         }
 
         pub fn toUsize(interrupt: Interrupt) callconv(core.inline_in_non_debug) usize {
@@ -753,6 +753,7 @@ pub const Functions = struct {
 
         routeInterrupt: ?fn (
             interrupt: current_decls.interrupts.Interrupt,
+            current_task: *Task,
             external_interrupt: u32,
         ) interrupts.Interrupt.RouteError!void = null,
 

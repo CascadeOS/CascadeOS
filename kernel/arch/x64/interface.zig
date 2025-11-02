@@ -32,7 +32,7 @@ pub const functions: arch.Functions = .{
 
         .allocateInterrupt = x64.interrupts.allocateInterrupt,
         .deallocateInterrupt = x64.interrupts.deallocateInterrupt,
-        .routeInterrupt = x64.interrupts.routeInterrupt,
+        .routeInterrupt = x64.interrupts.Interrupt.route,
 
         .createStackIterator = struct {
             fn createStackIterator(interrupt_frame: *const x64.interrupts.InterruptFrame) std.debug.StackIterator {

@@ -656,7 +656,7 @@ export fn uacpi_kernel_install_interrupt_handler(
         return .internal_error;
     };
 
-    interrupt.route(irq) catch |err| {
+    interrupt.route(current_task, irq) catch |err| {
         interrupt.deallocate(current_task);
 
         log.err(current_task, "failed to route interrupt: {}", .{err});

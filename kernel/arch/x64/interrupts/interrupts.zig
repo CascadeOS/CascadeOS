@@ -12,6 +12,8 @@ const x64 = @import("../x64.zig");
 const Idt = @import("Idt.zig");
 const interrupt_handlers = @import("handlers.zig");
 
+const log = cascade.debug.log.scoped(.interrupt);
+
 pub fn allocateInterrupt(
     current_task: *Task,
     interrupt_handler: arch.interrupts.Interrupt.Handler,
@@ -30,24 +32,33 @@ pub fn allocateInterrupt(
         .arg2 = arg2,
     };
 
-    return @enumFromInt(interrupt_number);
+    // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
+    const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
+    _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
+
+    const interrupt: Interrupt = @enumFromInt(interrupt_number);
+    log.debug(current_task, "allocated interrupt {}", .{interrupt});
+
+    return interrupt;
 }
 
 pub fn deallocateInterrupt(interrupt: Interrupt, current_task: *Task) void {
+    log.debug(current_task, "deallocating interrupt {}", .{interrupt});
+
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
         .handler = interrupt_handlers.unhandledInterrupt,
     };
 
+    // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
+    const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
+    _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
+
     globals.interrupt_arena.deallocate(current_task, .{
         .base = interrupt_number,
         .len = 1,
     });
-}
-
-pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
-    try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
 }
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
@@ -150,6 +161,12 @@ pub const Interrupt = enum(u8) {
             return vector != Interrupt.non_maskable_interrupt;
         }
         return false;
+    }
+
+    pub fn route(interrupt: Interrupt, current_task: *Task, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
+        log.debug(current_task, "routing interrupt {} to {}", .{ interrupt, external_interrupt });
+
+        try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
     }
 };
 
@@ -373,4 +390,6 @@ pub const init = struct {
 
         break :blk raw_interrupt_handlers_temp;
     };
+
+    const init_log = cascade.debug.log.scoped(.interrupt_init);
 };
