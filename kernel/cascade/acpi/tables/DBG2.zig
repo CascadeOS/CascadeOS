@@ -291,11 +291,17 @@ pub const DBG2 = extern struct {
     }
 
     pub const init = struct {
-        pub fn tryGetSerialOutput() ?uart.Uart {
-            const dbg2 = AcpiTable.get(0) orelse return null;
-            defer dbg2.deinit();
+        const DBG2AcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.DBG2);
+        const uart = cascade.init.Output.uart;
+        const log = cascade.debug.log.scoped(.output_init);
 
-            var devices: DBG2.DebugDeviceIterator = dbg2.table.debugDevices();
+        pub fn tryGetSerialOutput() ?uart.Uart {
+            const dbg2_table = DBG2AcpiTable.get(0) orelse return null;
+            defer dbg2_table.deinit();
+
+            const dbg2 = dbg2_table.table;
+
+            var devices: DBG2.DebugDeviceIterator = dbg2.debugDevices();
 
             while (devices.next()) |device| {
                 const address = blk: {
@@ -367,9 +373,5 @@ pub const DBG2 = extern struct {
 
             return null;
         }
-
-        const AcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.DBG2);
-        const uart = cascade.init.Output.uart;
-        const log = cascade.debug.log.scoped(.output_init);
     };
 };
