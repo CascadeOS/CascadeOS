@@ -480,47 +480,148 @@ pub const scheduling = struct {
 
     pub const CallError = error{StackOverflow};
 
-    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-    pub fn callOneArg(
+    /// Calls `function` on `new_stack` and if non-null saves the state of `old_task`.
+    ///
+    /// The supported argument types are:
+    ///  - bool
+    ///  - int (if it fits in a usize)
+    ///  - float (if it fits in a usize)
+    ///  - enum (if it fits in a usize)
+    ///  - union (if it fits in a usize)
+    ///  - pointer (including optional pointers)
+    ///  - struct (if it fits in a usize)
+    ///  - array (if it fits in a usize)
+    ///
+    /// Caller must ensure:
+    ///  - `args` has a length of 0, 1, 2, 3 or 4
+    ///  - `function` has a return type of `noreturn` or `!noreturn`
+    pub fn call(
         opt_old_task: ?*Task,
         new_stack: Task.Stack,
-        arg1: usize,
-        target_function: *const fn (usize) callconv(.c) noreturn,
+        comptime function: anytype,
+        args: anytype,
     ) callconv(core.inline_in_non_debug) CallError!void {
-        return getFunction(
-            current_functions.scheduling,
-            "callOneArg",
-        )(opt_old_task, new_stack, arg1, target_function);
-    }
+        const fn_info = @typeInfo(@TypeOf(function)).@"fn";
 
-    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-    pub fn callTwoArgs(
-        opt_old_task: ?*Task,
-        new_stack: Task.Stack,
-        arg1: usize,
-        arg2: usize,
-        target_function: *const fn (usize, usize) callconv(.c) noreturn,
-    ) callconv(core.inline_in_non_debug) CallError!void {
-        return getFunction(
-            current_functions.scheduling,
-            "callTwoArgs",
-        )(opt_old_task, new_stack, arg1, arg2, target_function);
-    }
+        const return_type: enum { noreturn, error_union } = blk: {
+            const ReturnType = fn_info.return_type.?;
 
-    /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-    pub fn callFourArgs(
-        opt_old_task: ?*Task,
-        new_stack: Task.Stack,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
-    ) callconv(core.inline_in_non_debug) CallError!void {
-        return getFunction(
-            current_functions.scheduling,
-            "callFourArgs",
-        )(opt_old_task, new_stack, arg1, arg2, arg3, arg4, target_function);
+            if (ReturnType == noreturn) break :blk .noreturn;
+            if (@typeInfo(ReturnType) == .error_union) break :blk .error_union;
+
+            @compileError("`function` must have a return type of `noreturn` or `!noreturn`");
+        };
+
+        const parameters = fn_info.params;
+        if (comptime parameters.len != args.len) @compileError("incorrect number of arguments");
+
+        return switch (comptime args.len) {
+            0 => getFunction(current_functions.scheduling, "callZeroArg")(
+                opt_old_task,
+                new_stack,
+                struct {
+                    fn wrapperFn() callconv(.c) noreturn {
+                        const ret = function();
+                        switch (comptime return_type) {
+                            .noreturn => {},
+                            .error_union => ret catch |err| {
+                                std.debug.panic("unhandled error: {t}", .{err});
+                            },
+                        }
+                        @panic("`function` returned");
+                    }
+                }.wrapperFn,
+            ),
+            1 => getFunction(current_functions.scheduling, "callOneArg")(
+                opt_old_task,
+                new_stack,
+                argToUsize(@as(parameters[0].type.?, args[0])),
+                struct {
+                    fn wrapperFn(arg0: usize) callconv(.c) noreturn {
+                        const ret = function(
+                            usizeToArg(parameters[0].type.?, arg0),
+                        );
+                        switch (comptime return_type) {
+                            .noreturn => {},
+                            .error_union => ret catch |err| {
+                                std.debug.panic("unhandled error: {t}", .{err});
+                            },
+                        }
+                        @panic("`function` returned");
+                    }
+                }.wrapperFn,
+            ),
+            2 => getFunction(current_functions.scheduling, "callTwoArg")(
+                opt_old_task,
+                new_stack,
+                argToUsize(@as(parameters[0].type.?, args[0])),
+                argToUsize(@as(parameters[1].type.?, args[1])),
+                struct {
+                    fn wrapperFn(arg0: usize, arg1: usize) callconv(.c) noreturn {
+                        const ret = function(
+                            usizeToArg(parameters[0].type.?, arg0),
+                            usizeToArg(parameters[1].type.?, arg1),
+                        );
+                        switch (comptime return_type) {
+                            .noreturn => {},
+                            .error_union => ret catch |err| {
+                                std.debug.panic("unhandled error: {t}", .{err});
+                            },
+                        }
+                        @panic("`function` returned");
+                    }
+                }.wrapperFn,
+            ),
+            3 => getFunction(current_functions.scheduling, "callThreeArg")(
+                opt_old_task,
+                new_stack,
+                argToUsize(@as(parameters[0].type.?, args[0])),
+                argToUsize(@as(parameters[1].type.?, args[1])),
+                argToUsize(@as(parameters[2].type.?, args[2])),
+                struct {
+                    fn wrapperFn(arg0: usize, arg1: usize, arg2: usize) callconv(.c) noreturn {
+                        const ret = function(
+                            usizeToArg(parameters[0].type.?, arg0),
+                            usizeToArg(parameters[1].type.?, arg1),
+                            usizeToArg(parameters[2].type.?, arg2),
+                        );
+                        switch (comptime return_type) {
+                            .noreturn => {},
+                            .error_union => ret catch |err| {
+                                std.debug.panic("unhandled error: {t}", .{err});
+                            },
+                        }
+                        @panic("`function` returned");
+                    }
+                }.wrapperFn,
+            ),
+            4 => getFunction(current_functions.scheduling, "callFourArg")(
+                opt_old_task,
+                new_stack,
+                argToUsize(@as(parameters[0].type.?, args[0])),
+                argToUsize(@as(parameters[1].type.?, args[1])),
+                argToUsize(@as(parameters[2].type.?, args[2])),
+                argToUsize(@as(parameters[3].type.?, args[3])),
+                struct {
+                    fn wrapperFn(arg0: usize, arg1: usize, arg2: usize, arg3: usize) callconv(.c) noreturn {
+                        const ret = function(
+                            usizeToArg(parameters[0].type.?, arg0),
+                            usizeToArg(parameters[1].type.?, arg1),
+                            usizeToArg(parameters[2].type.?, arg2),
+                            usizeToArg(parameters[3].type.?, arg3),
+                        );
+                        switch (comptime return_type) {
+                            .noreturn => {},
+                            .error_union => ret catch |err| {
+                                std.debug.panic("unhandled error: {t}", .{err});
+                            },
+                        }
+                        @panic("`function` returned");
+                    }
+                }.wrapperFn,
+            ),
+            else => @compileError("`args` must have a length of 0, 1, 2, 3 or 4"),
+        };
     }
 };
 
@@ -951,6 +1052,13 @@ pub const Functions = struct {
         ) error{StackOverflow}!void = null,
 
         /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+        callZeroArg: ?fn (
+            opt_old_task: ?*Task,
+            new_stack: Task.Stack,
+            target_function: *const fn () callconv(.c) noreturn,
+        ) scheduling.CallError!void = null,
+
+        /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
         callOneArg: ?fn (
             opt_old_task: ?*Task,
             new_stack: Task.Stack,
@@ -959,7 +1067,7 @@ pub const Functions = struct {
         ) scheduling.CallError!void = null,
 
         /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-        callTwoArgs: ?fn (
+        callTwoArg: ?fn (
             opt_old_task: ?*Task,
             new_stack: Task.Stack,
             arg1: usize,
@@ -968,7 +1076,17 @@ pub const Functions = struct {
         ) scheduling.CallError!void = null,
 
         /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
-        callFourArgs: ?fn (
+        callThreeArg: ?fn (
+            opt_old_task: ?*Task,
+            new_stack: Task.Stack,
+            arg1: usize,
+            arg2: usize,
+            arg3: usize,
+            target_function: *const fn (usize, usize, usize) callconv(.c) noreturn,
+        ) scheduling.CallError!void = null,
+
+        /// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+        callFourArg: ?fn (
             opt_old_task: ?*Task,
             new_stack: Task.Stack,
             arg1: usize,
@@ -1104,6 +1222,151 @@ const current_interface = switch (current_arch) {
     .riscv => @import("riscv/interface.zig"),
     .x64 => @import("x64/interface.zig"),
 };
+
+inline fn argToUsize(arg: anytype) usize {
+    const ArgT = @TypeOf(arg);
+    switch (@typeInfo(ArgT)) {
+        .bool => return @intFromBool(arg),
+        .int => |int| {
+            if (comptime @sizeOf(ArgT) > @sizeOf(usize)) {
+                @compileError("integer type '" ++ @typeName(ArgT) ++ "' is larger than a usize");
+            }
+
+            return if (int.signedness == .signed)
+                @bitCast(@as(isize, arg))
+            else
+                arg;
+        },
+        .float => |float| {
+            if (comptime float.bits > @bitSizeOf(usize)) {
+                @compileError("float type '" ++ @typeName(ArgT) ++ "' is larger than a usize");
+            }
+
+            const int_value: std.meta.Int(.unsigned, float.bits) = @bitCast(arg);
+            return int_value;
+        },
+        .pointer => return @intFromPtr(arg),
+        .array => {
+            if (comptime @sizeOf(ArgT) > @sizeOf(usize)) {
+                @compileError("array type '" ++ @typeName(ArgT) ++ "' is larger than a usize");
+            }
+
+            const int_value: std.meta.Int(.unsigned, @bitSizeOf(ArgT)) = @bitCast(arg);
+            return int_value;
+        },
+        .@"struct" => |stru| {
+            if (comptime @sizeOf(ArgT) > @sizeOf(usize)) {
+                @compileError("struct type '" ++ @typeName(ArgT) ++ "' is larger than a usize");
+            }
+
+            switch (stru.layout) {
+                .@"extern", .@"packed" => {
+                    const int_value: std.meta.Int(.unsigned, @bitSizeOf(ArgT)) = @bitCast(arg);
+                    return int_value;
+                },
+                .auto => {},
+            }
+
+            const bytes = std.mem.asBytes(&arg);
+            const int_value: std.meta.Int(.unsigned, @sizeOf(ArgT) * 8) = @bitCast(bytes.*);
+            return int_value;
+        },
+        .optional => |opt| {
+            if (comptime @typeInfo(opt.child) != .pointer) {
+                @compileError("optional type '" ++ @typeName(ArgT) ++ "' is not a pointer");
+            }
+            return @intFromPtr(arg);
+        },
+        .error_set => return @intFromError(arg),
+        .@"enum" => |enu| {
+            const Tag = enu.tag_type;
+            const tag_info = @typeInfo(Tag).int;
+
+            if (tag_info.signedness == .signed) {
+                return @bitCast(@intFromEnum(arg));
+            }
+
+            return @intFromEnum(arg);
+        },
+        .@"union" => |uni| {
+            if (comptime @sizeOf(ArgT) > @sizeOf(usize)) {
+                @compileError("union type '" ++ @typeName(ArgT) ++ "' is larger than a usize");
+            }
+
+            switch (uni.layout) {
+                .@"extern", .@"packed" => {
+                    const int_value: std.meta.Int(.unsigned, @sizeOf(ArgT) * 8) = @bitCast(arg);
+                    return int_value;
+                },
+                .auto => {},
+            }
+
+            const bytes = std.mem.asBytes(&arg);
+            const int_value: std.meta.Int(.unsigned, @sizeOf(ArgT) * 8) = @bitCast(bytes.*);
+            return int_value;
+        },
+        else => @compileError("unsupported type " ++ @typeName(ArgT)),
+    }
+}
+
+inline fn usizeToArg(comptime ArgT: type, value: usize) ArgT {
+    switch (@typeInfo(ArgT)) {
+        .bool => return value != 0,
+        .int => |int| {
+            if (int.signedness == .signed) {
+                const signed_value: isize = @bitCast(value);
+                return @truncate(signed_value);
+            }
+
+            return @truncate(value);
+        },
+        .float => |float| {
+            const int_value: std.meta.Int(.unsigned, float.bits) = @truncate(value);
+            return @bitCast(int_value);
+        },
+        .pointer => return @ptrFromInt(value),
+        .array => {
+            const int_value: std.meta.Int(.unsigned, @bitSizeOf(ArgT)) = @truncate(value);
+
+            return @bitCast(int_value);
+        },
+        .@"struct" => |stru| {
+            switch (stru.layout) {
+                .@"extern", .@"packed" => return @bitCast(value),
+                .auto => {},
+            }
+
+            const int_value: std.meta.Int(.unsigned, @sizeOf(ArgT) * 8) = @truncate(value);
+            return std.mem.bytesToValue(ArgT, std.mem.asBytes(&int_value));
+        },
+        .optional => return @ptrFromInt(value),
+        .error_set => return @errorCast(@errorFromInt(@as(u16, @truncate(value)))), // TODO: `u16` is a hack
+        .@"enum" => |enu| {
+            const Tag = enu.tag_type;
+            const tag_info = @typeInfo(Tag).int;
+
+            if (tag_info.signedness == .signed) {
+                const signed_value: isize = @bitCast(value);
+                return @enumFromInt(@as(enu.tag_type, @truncate(signed_value)));
+            }
+
+            return @enumFromInt(@as(enu.tag_type, @truncate(value)));
+        },
+        .@"union" => |uni| {
+            switch (uni.layout) {
+                .@"extern", .@"packed" => {
+                    const int_value: std.meta.Int(.unsigned, @sizeOf(ArgT) * 8) = @truncate(value);
+                    return @bitCast(int_value);
+                },
+                .auto => {},
+            }
+
+            const int_value: std.meta.Int(.unsigned, @sizeOf(ArgT) * 8) = @truncate(value);
+            return std.mem.bytesToValue(ArgT, std.mem.asBytes(&int_value));
+        },
+        else => unreachable,
+    }
+}
 
 // `Functions` and `Decls` must be seperate types to avoid dependency loops.
 const current_functions: Functions = current_interface.functions;

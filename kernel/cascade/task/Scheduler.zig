@@ -137,19 +137,12 @@ fn switchToIdleDeferredAction(
 ) void {
     const static = struct {
         fn idleEntryDeferredAction(
-            scheduler_task_addr: usize,
-            old_task_addr: usize,
-            action_addr: usize,
+            scheduler_task: *Task,
+            old_task: *Task,
+            action: DeferredAction.Action,
             action_arg: usize,
-        ) callconv(.c) noreturn {
-            const scheduler_task: *Task = @ptrFromInt(scheduler_task_addr);
-
-            const action: DeferredAction.Action = @ptrFromInt(action_addr);
-            action(
-                scheduler_task,
-                @ptrFromInt(old_task_addr),
-                action_arg,
-            );
+        ) noreturn {
+            action(scheduler_task, old_task, action_arg);
             if (core.is_debug) {
                 assertSchedulerLocked(scheduler_task);
                 std.debug.assert(scheduler_task.interrupt_disable_count == 1);
@@ -173,16 +166,16 @@ fn switchToIdleDeferredAction(
     scheduler_task.known_executor = executor;
     executor.current_task = scheduler_task;
 
-    arch.scheduling.callFourArgs(
+    arch.scheduling.call(
         old_task,
         scheduler_task.stack,
-
-        @intFromPtr(scheduler_task),
-        @intFromPtr(old_task),
-        @intFromPtr(deferred_action.action),
-        deferred_action.arg,
-
         static.idleEntryDeferredAction,
+        .{
+            scheduler_task,
+            old_task,
+            deferred_action.action,
+            deferred_action.arg,
+        },
     ) catch |err| {
         switch (err) {
             error.StackOverflow => @panic("insufficent space on the scheduler task stack"),
@@ -250,19 +243,15 @@ fn switchToTaskFromTaskDeferredAction(
 ) void {
     const static = struct {
         fn switchToTaskDeferredAction(
-            old_task_addr: usize,
-            new_task_addr: usize,
-            action_addr: usize,
+            inner_old_task: *Task,
+            inner_new_task: *Task,
+            action: DeferredAction.Action,
             action_arg: usize,
-        ) callconv(.c) noreturn {
-            const inner_old_task: *Task = @ptrFromInt(old_task_addr);
-            const inner_new_task: *Task = @ptrFromInt(new_task_addr);
-
+        ) noreturn {
             const executor = inner_old_task.known_executor.?;
 
             const scheduler_task = &executor.scheduler_task;
 
-            const action: DeferredAction.Action = @ptrFromInt(action_addr);
             action(
                 scheduler_task,
                 inner_old_task,
@@ -296,16 +285,16 @@ fn switchToTaskFromTaskDeferredAction(
     scheduler_task.known_executor = executor;
     executor.current_task = scheduler_task;
 
-    arch.scheduling.callFourArgs(
+    arch.scheduling.call(
         old_task,
         scheduler_task.stack,
-
-        @intFromPtr(old_task),
-        @intFromPtr(new_task),
-        @intFromPtr(deferred_action.action),
-        deferred_action.arg,
-
         static.switchToTaskDeferredAction,
+        .{
+            old_task,
+            new_task,
+            deferred_action.action,
+            deferred_action.arg,
+        },
     ) catch |err| {
         switch (err) {
             error.StackOverflow => @panic("insufficent space on the scheduler task stack"),

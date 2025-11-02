@@ -115,17 +115,11 @@ fn initStage2(current_task: *Task) !noreturn {
     log.debug(current_task, "enabling per-executor interrupt on {f}", .{executor.id});
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
-    try arch.scheduling.callOneArg(
+    try arch.scheduling.call(
         null,
         current_task.stack,
-        @intFromPtr(current_task),
-        struct {
-            fn initStage3Wrapper(inner_task_addr: usize) callconv(.c) noreturn {
-                initStage3(@ptrFromInt(inner_task_addr)) catch |err| {
-                    std.debug.panic("unhandled error: {t}", .{err});
-                };
-            }
-        }.initStage3Wrapper,
+        initStage3,
+        .{current_task},
     );
     unreachable;
 }
