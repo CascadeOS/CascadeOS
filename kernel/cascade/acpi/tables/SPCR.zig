@@ -388,8 +388,12 @@ pub const SPCR = extern struct {
     }
 
     pub const init = struct {
+        const SPCRAcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.SPCR);
+        const uart = cascade.init.Output.uart;
+        const log = cascade.debug.log.scoped(.output_init);
+
         pub fn tryGetSerialOutput(current_task: *cascade.Task) ?uart.Uart {
-            const output_uart = tryGetSerialOutputInner() catch |err| switch (err) {
+            const output_uart = tryGetSerialOutputInner(current_task) catch |err| switch (err) {
                 error.DivisorTooLarge => {
                     log.warn(current_task, "baud divisor from SPCR too large", .{});
                     return null;
@@ -399,11 +403,13 @@ pub const SPCR = extern struct {
             return output_uart;
         }
 
-        fn tryGetSerialOutputInner() uart.Baud.DivisorError!?uart.Uart {
-            const spcr = AcpiTable.get(0) orelse return null;
-            defer spcr.deinit();
+        fn tryGetSerialOutputInner(current_task: *Task) uart.Baud.DivisorError!?uart.Uart {
+            const spcr_table = SPCRAcpiTable.get(0) orelse return null;
+            defer spcr_table.deinit();
 
-            const baud_rate: ?uart.Baud.BaudRate = switch (spcr.table.configured_baud_rate) {
+            const spcr = spcr_table.table;
+
+            const baud_rate: ?uart.Baud.BaudRate = switch (spcr.configured_baud_rate) {
                 .as_is => null,
                 .@"9600" => .@"9600",
                 .@"19200" => .@"19200",
@@ -411,26 +417,26 @@ pub const SPCR = extern struct {
                 .@"115200" => .@"115200",
             };
 
-            if (spcr.table.header.revision < 2) {
-                switch (spcr.table.interface_type.revision_1) {
+            if (spcr.header.revision < 2) {
+                switch (spcr.interface_type.revision_1) {
                     .@"16550" => {
                         const baud: ?uart.Baud = if (baud_rate) |br| .{
                             .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
                             .baud_rate = br,
                         } else null;
 
-                        switch (spcr.table.base_address.address_space) {
+                        switch (spcr.base_address.address_space) {
                             .memory => return .{
                                 .memory_16550 = try uart.Memory16550.create(
                                     cascade.mem.directMapFromPhysical(
-                                        .fromInt(spcr.table.base_address.address),
+                                        .fromInt(spcr.base_address.address),
                                     ).toPtr([*]volatile u8),
                                     baud,
                                 ) orelse return null,
                             },
                             .io => return .{
                                 .io_port_16550 = try uart.IoPort16550.create(
-                                    @intCast(spcr.table.base_address.address),
+                                    @intCast(spcr.base_address.address),
                                     baud,
                                 ) orelse return null,
                             },
@@ -443,18 +449,18 @@ pub const SPCR = extern struct {
                             .baud_rate = br,
                         } else null;
 
-                        switch (spcr.table.base_address.address_space) {
+                        switch (spcr.base_address.address_space) {
                             .memory => return .{
                                 .memory_16450 = try uart.Memory16450.create(
                                     cascade.mem.directMapFromPhysical(
-                                        .fromInt(spcr.table.base_address.address),
+                                        .fromInt(spcr.base_address.address),
                                     ).toPtr([*]volatile u8),
                                     baud,
                                 ) orelse return null,
                             },
                             .io => return .{
                                 .io_port_16450 = try uart.IoPort16450.create(
-                                    @intCast(spcr.table.base_address.address),
+                                    @intCast(spcr.base_address.address),
                                     baud,
                                 ) orelse return null,
                             },
@@ -464,25 +470,25 @@ pub const SPCR = extern struct {
                 }
             }
 
-            switch (spcr.table.interface_type.revision_2_or_higher) {
+            switch (spcr.interface_type.revision_2_or_higher) {
                 .@"16550", .@"16550-GAS" => {
                     const baud: ?uart.Baud = if (baud_rate) |br| .{
                         .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
                         .baud_rate = br,
                     } else null;
 
-                    switch (spcr.table.base_address.address_space) {
+                    switch (spcr.base_address.address_space) {
                         .memory => return .{
                             .memory_16550 = try uart.Memory16550.create(
                                 cascade.mem.directMapFromPhysical(
-                                    .fromInt(spcr.table.base_address.address),
+                                    .fromInt(spcr.base_address.address),
                                 ).toPtr([*]volatile u8),
                                 baud,
                             ) orelse return null,
                         },
                         .io => return .{
                             .io_port_16550 = try uart.IoPort16550.create(
-                                @intCast(spcr.table.base_address.address),
+                                @intCast(spcr.base_address.address),
                                 baud,
                             ) orelse return null,
                         },
@@ -495,18 +501,18 @@ pub const SPCR = extern struct {
                         .baud_rate = br,
                     } else null;
 
-                    switch (spcr.table.base_address.address_space) {
+                    switch (spcr.base_address.address_space) {
                         .memory => return .{
                             .memory_16450 = try uart.Memory16450.create(
                                 cascade.mem.directMapFromPhysical(
-                                    .fromInt(spcr.table.base_address.address),
+                                    .fromInt(spcr.base_address.address),
                                 ).toPtr([*]volatile u8),
                                 baud,
                             ) orelse return null,
                         },
                         .io => return .{
                             .io_port_16450 = try uart.IoPort16450.create(
-                                @intCast(spcr.table.base_address.address),
+                                @intCast(spcr.base_address.address),
                                 baud,
                             ) orelse return null,
                         },
@@ -520,25 +526,25 @@ pub const SPCR = extern struct {
                     } else null;
 
                     if (core.is_debug) {
-                        std.debug.assert(spcr.table.base_address.address_space == .memory);
-                        std.debug.assert(spcr.table.base_address.access_size == .dword);
+                        std.debug.assert(spcr.base_address.address_space == .memory);
+                        std.debug.assert(spcr.base_address.access_size == .dword);
                     }
 
                     return .{
                         .pl011 = try uart.PL011.create(
                             cascade.mem.directMapFromPhysical(
-                                .fromInt(spcr.table.base_address.address),
+                                .fromInt(spcr.base_address.address),
                             ).toPtr([*]volatile u32),
                             baud,
                         ) orelse return null,
                     };
                 },
-                else => return null, // TODO: implement other UARTs
+                else => |tag| {
+                    // TODO: implement other UARTs
+                    log.warn(current_task, "unsupported UART: {t}", .{tag});
+                    return null;
+                },
             }
         }
-
-        const AcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.SPCR);
-        const uart = cascade.init.Output.uart;
-        const log = cascade.debug.log.scoped(.output_init);
     };
 };
