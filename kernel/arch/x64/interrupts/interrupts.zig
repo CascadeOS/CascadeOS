@@ -25,7 +25,7 @@ pub fn allocateInterrupt(
     const interrupt_number: u8 = @intCast(allocation.base);
 
     globals.handlers[interrupt_number] = .{
-        .func = .{ .normal = interrupt_handler },
+        .handler = interrupt_handler,
         .arg1 = arg1,
         .arg2 = arg2,
     };
@@ -37,7 +37,7 @@ pub fn deallocateInterrupt(interrupt: Interrupt, current_task: *Task) void {
     const interrupt_number = @intFromEnum(interrupt);
 
     globals.handlers[interrupt_number] = .{
-        .func = .{ .normal = interrupt_handlers.unhandledInterrupt },
+        .handler = interrupt_handlers.unhandledInterrupt,
     };
 
     globals.interrupt_arena.deallocate(current_task, .{
@@ -53,9 +53,12 @@ pub fn routeInterrupt(interrupt: Interrupt, external_interrupt: u32) arch.interr
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
     const current_task, const interrupt_exit = Task.onInterruptEntry();
     defer interrupt_exit.exit(current_task);
-    globals.handlers[interrupt_frame.vector_number.full].call(
+    const handler: *const Handler = &globals.handlers[interrupt_frame.vector_number.full];
+    handler.handler(
         current_task,
-        interrupt_frame,
+        .{ .arch_specific = interrupt_frame },
+        handler.arg1,
+        handler.arg2,
         interrupt_exit,
     );
 }
@@ -263,39 +266,9 @@ pub const InterruptStackSelector = enum(u3) {
 };
 
 const Handler = struct {
-    func: Func,
+    handler: arch.interrupts.Interrupt.Handler,
     arg1: usize = 0,
     arg2: usize = 0,
-
-    const Func = union(enum) {
-        normal: arch.interrupts.Interrupt.Handler,
-        page_fault: *const fn (
-            current_task: *Task,
-            frame: arch.interrupts.InterruptFrame,
-            interrupt_exit: Task.InterruptExit,
-        ) void,
-    };
-
-    inline fn call(
-        handler: *const Handler,
-        current_task: *Task,
-        interrupt_frame: *InterruptFrame,
-        interrupt_exit: Task.InterruptExit,
-    ) void {
-        switch (handler.func) {
-            .normal => |func| func(
-                current_task,
-                .{ .arch_specific = interrupt_frame },
-                handler.arg1,
-                handler.arg2,
-            ),
-            .page_fault => |func| func(
-                current_task,
-                .{ .arch_specific = interrupt_frame },
-                interrupt_exit,
-            ),
-        }
-    }
 };
 
 const globals = struct {
@@ -309,9 +282,9 @@ const globals = struct {
             const interrupt: Interrupt = @enumFromInt(i);
 
             temp_handlers[i] = if (interrupt.isException()) .{
-                .func = .{ .normal = interrupt_handlers.unhandledException },
+                .handler = interrupt_handlers.unhandledException,
             } else .{
-                .func = .{ .normal = interrupt_handlers.unhandledInterrupt },
+                .handler = interrupt_handlers.unhandledInterrupt,
             };
         }
 
@@ -365,16 +338,16 @@ pub const init = struct {
     /// system interrupt handlers.
     pub fn loadStandardInterruptHandlers() void {
         globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
-            .func = .{ .normal = interrupt_handlers.nonMaskableInterruptHandler },
+            .handler = interrupt_handlers.nonMaskableInterruptHandler,
         };
         globals.handlers[@intFromEnum(Interrupt.page_fault)] = .{
-            .func = .{ .page_fault = interrupt_handlers.pageFaultHandler },
+            .handler = interrupt_handlers.pageFaultHandler,
         };
         globals.handlers[@intFromEnum(Interrupt.flush_request)] = .{
-            .func = .{ .normal = interrupt_handlers.flushRequestHandler },
+            .handler = interrupt_handlers.flushRequestHandler,
         };
         globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
-            .func = .{ .normal = interrupt_handlers.perExecutorPeriodicHandler },
+            .handler = interrupt_handlers.perExecutorPeriodicHandler,
         };
     }
 
