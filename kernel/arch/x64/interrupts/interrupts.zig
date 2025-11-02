@@ -311,6 +311,8 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.interrupt_init);
+
     /// Ensure that any exceptions/faults that occur during early initialization are handled.
     ///
     /// The handler is not expected to do anything other than panic.
@@ -390,6 +392,4 @@ pub const init = struct {
 
         break :blk raw_interrupt_handlers_temp;
     };
-
-    const init_log = cascade.debug.log.scoped(.interrupt_init);
 };

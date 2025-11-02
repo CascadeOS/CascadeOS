@@ -99,6 +99,8 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.ioapic_init);
+
     pub fn captureMADTInformation(current_task: *Task, madt: *const cascade.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
@@ -139,8 +141,6 @@ pub const init = struct {
             }.lessThan,
         );
     }
-
-    const init_log = cascade.debug.log.scoped(.ioapic_init);
 };
 
 const IOAPIC = struct {

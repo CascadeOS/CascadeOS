@@ -20,6 +20,8 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.tsc_init);
+
     // Read current wallclock time from the standard wallclock source of the current architecture.
     ///
     /// For example on x86_64 this is the TSC.
@@ -123,6 +125,4 @@ pub const init = struct {
     fn shouldUseTsc() bool {
         return x64.info.cpu_id.invariant_tsc or x64.info.cpu_id.hypervisor == .tcg;
     }
-
-    const init_log = cascade.debug.log.scoped(.tsc_init);
 };

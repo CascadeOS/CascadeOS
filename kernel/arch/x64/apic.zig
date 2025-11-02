@@ -60,6 +60,8 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.apic_init);
+
     pub fn captureApicInformation(
         current_task: *Task,
         fadt: *const cascade.acpi.tables.FADT,
@@ -200,8 +202,6 @@ pub const init = struct {
 
         globals.lapic.writeInitialCountRegister(ticks);
     }
-
-    const init_log = cascade.debug.log.scoped(.apic_init);
 };
 
 pub const LAPIC = union(enum) {

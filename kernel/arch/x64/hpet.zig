@@ -21,12 +21,15 @@ const globals = struct {
 };
 
 pub const init = struct {
+    const HPETAcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.HPET);
+    const init_log = cascade.debug.log.scoped(.hpet_init);
+
     pub fn registerTimeSource(
         current_task: *Task,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
-        const acpi_table = AcpiTable.get(0) orelse return;
-        acpi_table.deinit();
+        const hpet_acpi_table = HPETAcpiTable.get(0) orelse return;
+        hpet_acpi_table.deinit(); // immediately deinitialize the table as we only need to check if it exists
 
         candidate_time_sources.addTimeSource(current_task, .{
             .name = "hpet",
@@ -86,23 +89,19 @@ pub const init = struct {
     }
 
     fn getHpetBase() [*]volatile u64 {
-        const acpi_table = AcpiTable.get(0) orelse {
+        const hpet_acpi_table = HPETAcpiTable.get(0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
             @panic("hpet table missing");
         };
-        defer acpi_table.deinit();
+        defer hpet_acpi_table.deinit();
+        const hpet = hpet_acpi_table.table;
 
-        const hpet_table = acpi_table.table;
-
-        if (hpet_table.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
+        if (hpet.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
 
         return cascade.mem
-            .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet_table.base_address.address))
+            .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet.base_address.address))
             .toPtr([*]volatile u64);
     }
-
-    const AcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.HPET);
-    const init_log = cascade.debug.log.scoped(.hpet_init);
 };
 
 /// High Precision Event Timer (HPET)
