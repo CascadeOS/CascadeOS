@@ -397,17 +397,17 @@ pub fn onKernelPageFault(
     };
 
     switch (region_type) {
-        .pageable_kernel_address_space => {
+        .kernel_address_space => {
             @branchHint(.likely);
             globals.kernel_address_space.handlePageFault(current_task, page_fault_details) catch |err| switch (err) {
                 error.OutOfMemory => std.debug.panic(
-                    "no memory available to handle page fault in pageable kernel address space\n{f}",
+                    "no memory available to handle page fault in kernel address space\n{f}",
                     .{page_fault_details},
                 ),
                 else => |e| cascade.debug.interruptSourcePanic(
                     current_task,
                     interrupt_frame,
-                    "failed to handle page fault in pageable kernel address space: {t}\n{f}",
+                    "failed to handle page fault in kernel address space: {t}\n{f}",
                     .{ e, page_fault_details },
                 ),
             };
@@ -645,12 +645,12 @@ pub const init = struct {
         init_log.debug(current_task, "initializing processes", .{});
         try cascade.Process.init.initializeProcesses(current_task);
 
-        init_log.debug(current_task, "initializing pageable kernel address space", .{});
+        init_log.debug(current_task, "initializing kernel address space", .{});
         try globals.kernel_address_space.init(
             current_task,
             .{
-                .name = try .fromSlice("pageable_kernel"),
-                .range = kernel_regions.find(.pageable_kernel_address_space).?.range,
+                .name = try .fromSlice("kernel"),
+                .range = kernel_regions.find(.kernel_address_space).?.range,
                 .page_table = globals.kernel_page_table,
                 .context = .kernel,
             },
@@ -843,15 +843,15 @@ pub const init = struct {
             .type = .kernel_stacks,
         });
 
-        const pageable_kernel_address_space_range = kernel_regions.findFreeRange(
+        const kernel_address_space_range = kernel_regions.findFreeRange(
             size_of_top_level,
             size_of_top_level,
         ) orelse
-            @panic("no space in kernel memory layout for the pageable kernel address space");
+            @panic("no space in kernel memory layout for the kernel address space");
 
         kernel_regions.append(.{
-            .range = pageable_kernel_address_space_range,
-            .type = .pageable_kernel_address_space,
+            .range = kernel_address_space_range,
+            .type = .kernel_address_space,
         });
     }
 

@@ -30,7 +30,7 @@ pub const Type = enum {
 
     pages,
 
-    pageable_kernel_address_space,
+    kernel_address_space,
 };
 
 pub const RegionMapInfo = union(enum) {
@@ -81,7 +81,7 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
             return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
         },
 
-        .kernel_heap, .kernel_stacks, .special_heap, .pageable_kernel_address_space => return .top_level,
+        .kernel_heap, .kernel_stacks, .special_heap, .kernel_address_space => return .top_level,
 
         .pages => return .{ .back_with_frames = .{
             .type = .kernel,
