@@ -499,7 +499,7 @@ pub const scheduling = struct {
         opt_old_task: ?*Task,
         new_stack: Task.Stack,
         comptime function: anytype,
-        args: anytype,
+        args: std.meta.ArgsTuple(@TypeOf(function)),
     ) callconv(core.inline_in_non_debug) CallError!void {
         const fn_info = @typeInfo(@TypeOf(function)).@"fn";
 
@@ -512,9 +512,6 @@ pub const scheduling = struct {
             @compileError("`function` must have a return type of `noreturn` or `!noreturn`");
         };
 
-        const parameters = fn_info.params;
-        if (comptime parameters.len != args.len) @compileError("incorrect number of arguments");
-
         return switch (comptime args.len) {
             0 => getFunction(current_functions.scheduling, "callZeroArg")(
                 opt_old_task,
@@ -524,9 +521,10 @@ pub const scheduling = struct {
                         const ret = function();
                         switch (comptime return_type) {
                             .noreturn => {},
-                            .error_union => ret catch |err| {
-                                std.debug.panic("unhandled error: {t}", .{err});
-                            },
+                            .error_union => ret catch |err| std.debug.panic(
+                                "unhandled error: {t}",
+                                .{err},
+                            ),
                         }
                         @panic("`function` returned");
                     }
@@ -535,17 +533,18 @@ pub const scheduling = struct {
             1 => getFunction(current_functions.scheduling, "callOneArg")(
                 opt_old_task,
                 new_stack,
-                argToUsize(@as(parameters[0].type.?, args[0])),
+                argToUsize(args[0]),
                 struct {
                     fn wrapperFn(arg0: usize) callconv(.c) noreturn {
                         const ret = function(
-                            usizeToArg(parameters[0].type.?, arg0),
+                            usizeToArg(@TypeOf(args[0]), arg0),
                         );
                         switch (comptime return_type) {
                             .noreturn => {},
-                            .error_union => ret catch |err| {
-                                std.debug.panic("unhandled error: {t}", .{err});
-                            },
+                            .error_union => ret catch |err| std.debug.panic(
+                                "unhandled error: {t}",
+                                .{err},
+                            ),
                         }
                         @panic("`function` returned");
                     }
@@ -554,19 +553,20 @@ pub const scheduling = struct {
             2 => getFunction(current_functions.scheduling, "callTwoArg")(
                 opt_old_task,
                 new_stack,
-                argToUsize(@as(parameters[0].type.?, args[0])),
-                argToUsize(@as(parameters[1].type.?, args[1])),
+                argToUsize(args[0]),
+                argToUsize(args[1]),
                 struct {
                     fn wrapperFn(arg0: usize, arg1: usize) callconv(.c) noreturn {
                         const ret = function(
-                            usizeToArg(parameters[0].type.?, arg0),
-                            usizeToArg(parameters[1].type.?, arg1),
+                            usizeToArg(@TypeOf(args[0]), arg0),
+                            usizeToArg(@TypeOf(args[1]), arg1),
                         );
                         switch (comptime return_type) {
                             .noreturn => {},
-                            .error_union => ret catch |err| {
-                                std.debug.panic("unhandled error: {t}", .{err});
-                            },
+                            .error_union => ret catch |err| std.debug.panic(
+                                "unhandled error: {t}",
+                                .{err},
+                            ),
                         }
                         @panic("`function` returned");
                     }
@@ -575,21 +575,22 @@ pub const scheduling = struct {
             3 => getFunction(current_functions.scheduling, "callThreeArg")(
                 opt_old_task,
                 new_stack,
-                argToUsize(@as(parameters[0].type.?, args[0])),
-                argToUsize(@as(parameters[1].type.?, args[1])),
-                argToUsize(@as(parameters[2].type.?, args[2])),
+                argToUsize(args[0]),
+                argToUsize(args[1]),
+                argToUsize(args[2]),
                 struct {
                     fn wrapperFn(arg0: usize, arg1: usize, arg2: usize) callconv(.c) noreturn {
                         const ret = function(
-                            usizeToArg(parameters[0].type.?, arg0),
-                            usizeToArg(parameters[1].type.?, arg1),
-                            usizeToArg(parameters[2].type.?, arg2),
+                            usizeToArg(@TypeOf(args[0]), arg0),
+                            usizeToArg(@TypeOf(args[1]), arg1),
+                            usizeToArg(@TypeOf(args[2]), arg2),
                         );
                         switch (comptime return_type) {
                             .noreturn => {},
-                            .error_union => ret catch |err| {
-                                std.debug.panic("unhandled error: {t}", .{err});
-                            },
+                            .error_union => ret catch |err| std.debug.panic(
+                                "unhandled error: {t}",
+                                .{err},
+                            ),
                         }
                         @panic("`function` returned");
                     }
@@ -598,23 +599,24 @@ pub const scheduling = struct {
             4 => getFunction(current_functions.scheduling, "callFourArg")(
                 opt_old_task,
                 new_stack,
-                argToUsize(@as(parameters[0].type.?, args[0])),
-                argToUsize(@as(parameters[1].type.?, args[1])),
-                argToUsize(@as(parameters[2].type.?, args[2])),
-                argToUsize(@as(parameters[3].type.?, args[3])),
+                argToUsize(args[0]),
+                argToUsize(args[1]),
+                argToUsize(args[2]),
+                argToUsize(args[3]),
                 struct {
                     fn wrapperFn(arg0: usize, arg1: usize, arg2: usize, arg3: usize) callconv(.c) noreturn {
                         const ret = function(
-                            usizeToArg(parameters[0].type.?, arg0),
-                            usizeToArg(parameters[1].type.?, arg1),
-                            usizeToArg(parameters[2].type.?, arg2),
-                            usizeToArg(parameters[3].type.?, arg3),
+                            usizeToArg(@TypeOf(args[0]), arg0),
+                            usizeToArg(@TypeOf(args[1]), arg1),
+                            usizeToArg(@TypeOf(args[2]), arg2),
+                            usizeToArg(@TypeOf(args[3]), arg3),
                         );
                         switch (comptime return_type) {
                             .noreturn => {},
-                            .error_union => ret catch |err| {
-                                std.debug.panic("unhandled error: {t}", .{err});
-                            },
+                            .error_union => ret catch |err| std.debug.panic(
+                                "unhandled error: {t}",
+                                .{err},
+                            ),
                         }
                         @panic("`function` returned");
                     }
