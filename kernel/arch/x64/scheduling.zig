@@ -165,14 +165,14 @@ pub fn prepareTaskForScheduling(
     for (0..6) |_| try task.stack.push(0);
 }
 
-/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+/// Calls `target_function` on `new_stack` and saves the state of `old_task`.
 pub fn callZeroArg(
-    opt_old_task: ?*Task,
+    old_task: *Task,
     new_stack: Task.Stack,
     target_function: *const fn () callconv(.c) noreturn,
 ) arch.scheduling.CallError!void {
     const impls = struct {
-        const callZeroArgs: *const fn (
+        const callZeroArg: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
         ) callconv(.c) void = blk: {
@@ -198,49 +198,49 @@ pub fn callZeroArg(
 
             break :blk @ptrCast(&impl);
         };
-
-        const callZeroArgsNoPrevious: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
     };
 
     var stack = new_stack;
 
     try stack.push(@intFromPtr(target_function));
 
-    if (opt_old_task) |old_task| {
-        impls.callZeroArgs(
-            stack.stack_pointer,
-            &old_task.stack.stack_pointer,
-        );
-    } else {
-        impls.callZeroArgsNoPrevious(stack.stack_pointer);
-    }
+    impls.callZeroArg(
+        stack.stack_pointer,
+        &old_task.stack.stack_pointer,
+    );
 }
 
-/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+/// Calls `target_function` on `new_stack`.
+pub fn callZeroArgNoSave(
+    new_stack: Task.Stack,
+    target_function: *const fn () callconv(.c) noreturn,
+) arch.scheduling.CallError!noreturn {
+    var stack = new_stack;
+
+    try stack.push(@intFromPtr(target_function));
+
+    asm volatile (
+        \\mov %[stack_pointer], %rsp
+        \\ret
+        :
+        : [stack_pointer] "r" (stack.stack_pointer),
+        : .{
+          .memory = true,
+          .rsp = true,
+        });
+
+    unreachable;
+}
+
+/// Calls `target_function` on `new_stack` and saves the state of `old_task`.
 pub fn callOneArg(
-    opt_old_task: ?*Task,
+    old_task: *Task,
     new_stack: Task.Stack,
     arg0: usize,
     target_function: *const fn (usize) callconv(.c) noreturn,
 ) arch.scheduling.CallError!void {
     const impls = struct {
-        const callOneArgs: *const fn (
+        const callOneArg: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
         ) callconv(.c) void = blk: {
@@ -268,26 +268,6 @@ pub fn callOneArg(
 
             break :blk @ptrCast(&impl);
         };
-
-        const callOneArgsNoPrevious: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\pop %rdi
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
     };
 
     var stack = new_stack;
@@ -295,19 +275,41 @@ pub fn callOneArg(
     try stack.push(@intFromPtr(target_function));
     try stack.push(arg0);
 
-    if (opt_old_task) |old_task| {
-        impls.callOneArgs(
-            stack.stack_pointer,
-            &old_task.stack.stack_pointer,
-        );
-    } else {
-        impls.callOneArgsNoPrevious(stack.stack_pointer);
-    }
+    impls.callOneArg(
+        stack.stack_pointer,
+        &old_task.stack.stack_pointer,
+    );
 }
 
-/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+/// Calls `target_function` on `new_stack`.
+pub fn callOneArgNoSave(
+    new_stack: Task.Stack,
+    arg0: usize,
+    target_function: *const fn (usize) callconv(.c) noreturn,
+) arch.scheduling.CallError!noreturn {
+    var stack = new_stack;
+
+    try stack.push(@intFromPtr(target_function));
+    try stack.push(arg0);
+
+    asm volatile (
+        \\mov %[stack_pointer], %rsp
+        \\pop %rdi // arg0
+        \\ret
+        :
+        : [stack_pointer] "r" (stack.stack_pointer),
+        : .{
+          .memory = true,
+          .rsp = true,
+          .rdi = true,
+        });
+
+    unreachable;
+}
+
+/// Calls `target_function` on `new_stack` and saves the state of `old_task`.
 pub fn callTwoArg(
-    opt_old_task: ?*Task,
+    old_task: *Task,
     new_stack: Task.Stack,
     arg0: usize,
     arg1: usize,
@@ -344,28 +346,6 @@ pub fn callTwoArg(
 
             break :blk @ptrCast(&impl);
         };
-
-        const callTwoArgNoPrevious: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\pop %rdi // arg0
-                        \\pop %rsi // arg1
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                            .rsi = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
     };
 
     var stack = new_stack;
@@ -374,19 +354,45 @@ pub fn callTwoArg(
     try stack.push(arg1);
     try stack.push(arg0);
 
-    if (opt_old_task) |old_task| {
-        impls.callTwoArg(
-            stack.stack_pointer,
-            &old_task.stack.stack_pointer,
-        );
-    } else {
-        impls.callTwoArgNoPrevious(stack.stack_pointer);
-    }
+    impls.callTwoArg(
+        stack.stack_pointer,
+        &old_task.stack.stack_pointer,
+    );
 }
 
-/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+/// Calls `target_function` on `new_stack`.
+pub fn callTwoArgNoSave(
+    new_stack: Task.Stack,
+    arg0: usize,
+    arg1: usize,
+    target_function: *const fn (usize, usize) callconv(.c) noreturn,
+) arch.scheduling.CallError!noreturn {
+    var stack = new_stack;
+
+    try stack.push(@intFromPtr(target_function));
+    try stack.push(arg1);
+    try stack.push(arg0);
+
+    asm volatile (
+        \\mov %[stack_pointer], %rsp
+        \\pop %rdi // arg0
+        \\pop %rsi // arg1
+        \\ret
+        :
+        : [stack_pointer] "r" (stack.stack_pointer),
+        : .{
+          .memory = true,
+          .rsp = true,
+          .rdi = true,
+          .rsi = true,
+        });
+
+    unreachable;
+}
+
+/// Calls `target_function` on `new_stack` and saves the state of `old_task`.
 pub fn callThreeArg(
-    opt_old_task: ?*Task,
+    old_task: *Task,
     new_stack: Task.Stack,
     arg0: usize,
     arg1: usize,
@@ -426,30 +432,6 @@ pub fn callThreeArg(
 
             break :blk @ptrCast(&impl);
         };
-
-        const callThreeArgNoPrevious: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\pop %rdi // arg0
-                        \\pop %rsi // arg1
-                        \\pop %rdx // arg2
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                            .rsi = true,
-                            .rdx = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
     };
 
     var stack = new_stack;
@@ -459,19 +441,49 @@ pub fn callThreeArg(
     try stack.push(arg1);
     try stack.push(arg0);
 
-    if (opt_old_task) |old_task| {
-        impls.callThreeArg(
-            stack.stack_pointer,
-            &old_task.stack.stack_pointer,
-        );
-    } else {
-        impls.callThreeArgNoPrevious(stack.stack_pointer);
-    }
+    impls.callThreeArg(
+        stack.stack_pointer,
+        &old_task.stack.stack_pointer,
+    );
 }
 
-/// Calls `target_function` on `new_stack` and if non-null saves the state of `old_task`.
+/// Calls `target_function` on `new_stack`.
+pub fn callThreeArgNoSave(
+    new_stack: Task.Stack,
+    arg0: usize,
+    arg1: usize,
+    arg2: usize,
+    target_function: *const fn (usize, usize, usize) callconv(.c) noreturn,
+) arch.scheduling.CallError!noreturn {
+    var stack = new_stack;
+
+    try stack.push(@intFromPtr(target_function));
+    try stack.push(arg2);
+    try stack.push(arg1);
+    try stack.push(arg0);
+
+    asm volatile (
+        \\mov %[stack_pointer], %rsp
+        \\pop %rdi // arg0
+        \\pop %rsi // arg1
+        \\pop %rdx // arg2
+        \\ret
+        :
+        : [stack_pointer] "r" (stack.stack_pointer),
+        : .{
+          .memory = true,
+          .rsp = true,
+          .rdi = true,
+          .rsi = true,
+          .rdx = true,
+        });
+
+    unreachable;
+}
+
+/// Calls `target_function` on `new_stack` and saves the state of `old_task`.
 pub fn callFourArg(
-    opt_old_task: ?*Task,
+    old_task: *Task,
     new_stack: Task.Stack,
     arg0: usize,
     arg1: usize,
@@ -514,32 +526,6 @@ pub fn callFourArg(
 
             break :blk @ptrCast(&impl);
         };
-
-        const callFourArgNoPrevious: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\pop %rdi // arg0
-                        \\pop %rsi // arg1
-                        \\pop %rdx // arg2
-                        \\pop %rcx // arg3
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                            .rsi = true,
-                            .rdx = true,
-                            .rcx = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
     };
 
     var stack = new_stack;
@@ -550,12 +536,46 @@ pub fn callFourArg(
     try stack.push(arg1);
     try stack.push(arg0);
 
-    if (opt_old_task) |old_task| {
-        impls.callFourArg(
-            stack.stack_pointer,
-            &old_task.stack.stack_pointer,
-        );
-    } else {
-        impls.callFourArgNoPrevious(stack.stack_pointer);
-    }
+    impls.callFourArg(
+        stack.stack_pointer,
+        &old_task.stack.stack_pointer,
+    );
+}
+
+/// Calls `target_function` on `new_stack`.
+pub fn callFourArgNoSave(
+    new_stack: Task.Stack,
+    arg0: usize,
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
+) arch.scheduling.CallError!noreturn {
+    var stack = new_stack;
+
+    try stack.push(@intFromPtr(target_function));
+    try stack.push(arg3);
+    try stack.push(arg2);
+    try stack.push(arg1);
+    try stack.push(arg0);
+
+    asm volatile (
+        \\mov %[stack_pointer], %rsp
+        \\pop %rdi // arg0
+        \\pop %rsi // arg1
+        \\pop %rdx // arg2
+        \\pop %rcx // arg3
+        \\ret
+        :
+        : [stack_pointer] "r" (stack.stack_pointer),
+        : .{
+          .memory = true,
+          .rsp = true,
+          .rdi = true,
+          .rsi = true,
+          .rdx = true,
+          .rcx = true,
+        });
+
+    unreachable;
 }

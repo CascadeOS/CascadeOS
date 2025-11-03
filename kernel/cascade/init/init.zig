@@ -115,8 +115,7 @@ fn initStage2(current_task: *Task) !noreturn {
     log.debug(current_task, "enabling per-executor interrupt on {f}", .{executor.id});
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
-    try arch.scheduling.call(
-        null,
+    try arch.scheduling.callNoSave(
         current_task.stack,
         initStage3,
         .{current_task},
