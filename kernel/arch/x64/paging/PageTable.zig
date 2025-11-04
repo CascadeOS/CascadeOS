@@ -38,7 +38,7 @@ pub const PageTable = extern struct {
     }
 
     /// Create a page table in the given physical frame.
-    pub fn create(current_task: *Task, physical_frame: cascade.mem.phys.Frame) *PageTable {
+    pub fn create(current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) *PageTable {
         _ = current_task;
 
         const page_table = cascade.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
@@ -49,7 +49,7 @@ pub const PageTable = extern struct {
     /// Maps a 4 KiB page.
     pub fn map4KiB(
         level4_table: *PageTable,
-        current_task: *Task,
+        current_task: Task.Current,
         virtual_address: core.VirtualAddress,
         physical_frame: cascade.mem.phys.Frame,
         map_type: MapType,
@@ -123,7 +123,7 @@ pub const PageTable = extern struct {
     /// Panics if the page is not present or is a huge page.
     pub fn unmap4KiB(
         level4_table: *PageTable,
-        current_task: *Task,
+        current_task: Task.Current,
         virtual_address: core.VirtualAddress,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
@@ -197,7 +197,7 @@ pub const PageTable = extern struct {
     /// Panics if the page is a huge page.
     pub fn change4KiBProtection(
         level4_table: *PageTable,
-        current_task: *Task,
+        current_task: Task.Current,
         virtual_address: core.VirtualAddress,
         map_type: MapType,
     ) void {
@@ -797,7 +797,7 @@ pub const PageTable = extern struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn fillTopLevel(
-            current_task: *Task,
+            current_task: Task.Current,
             page_table: *PageTable,
             range: core.VirtualRange,
             physical_frame_allocator: cascade.mem.phys.FrameAllocator,
@@ -829,7 +829,7 @@ pub const PageTable = extern struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
-            current_task: *Task,
+            current_task: Task.Current,
             level4_table: *PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
@@ -984,7 +984,7 @@ pub const PageTable = extern struct {
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
-    current_task: *Task,
+    current_task: Task.Current,
     raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: cascade.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {

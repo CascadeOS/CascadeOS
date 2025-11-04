@@ -77,7 +77,7 @@ pub fn initStage1() !noreturn {
     log.debug(current_task, "initializing kernel executors", .{});
     const executors, const new_bootstrap_executor = try createExecutors(current_task);
     cascade.Executor.init.setExecutors(executors);
-    current_task = new_bootstrap_executor.current_task;
+    current_task.task = new_bootstrap_executor.current_task;
 
     // ensure the bootstrap executor is re-loaded before we change panic and log modes
     arch.init.loadExecutor(current_task);
@@ -99,11 +99,11 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(current_task: *Task) !noreturn {
+fn initStage2(current_task: Task.Current) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     cascade.mem.kernelPageTable().load(current_task);
-    const executor = current_task.known_executor.?;
+    const executor = current_task.knownExecutor();
     arch.init.loadExecutor(current_task);
 
     log.debug(current_task, "configuring per-executor system features on {f}", .{executor.id});
@@ -116,7 +116,7 @@ fn initStage2(current_task: *Task) !noreturn {
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
     try arch.scheduling.callNoSave(
-        current_task.stack,
+        current_task.task.stack,
         initStage3,
         .{current_task},
     );
@@ -128,7 +128,7 @@ fn initStage2(current_task: *Task) !noreturn {
 /// This function is executed by all executors.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(current_task: *Task) !noreturn {
+fn initStage3(current_task: Task.Current) !noreturn {
     if (Stage3Barrier.start()) {
         log.debug(current_task, "loading standard interrupt handlers", .{});
         arch.interrupts.init.loadStandardInterruptHandlers(current_task);
@@ -157,7 +157,7 @@ fn initStage3(current_task: *Task) !noreturn {
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(current_task: *Task, _: usize, _: usize) !void {
+fn initStage4(current_task: Task.Current, _: usize, _: usize) !void {
     log.debug(current_task, "initializing PCI ECAM", .{});
     try cascade.pci.init.initializeECAM(current_task);
 
@@ -170,7 +170,7 @@ fn initStage4(current_task: *Task, _: usize, _: usize) !void {
     try Output.writer.flush();
 }
 
-fn constructBootstrapTask() !*Task {
+fn constructBootstrapTask() !Task.Current {
     const static = struct {
         var bootstrap_init_task: Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
@@ -185,7 +185,7 @@ fn constructBootstrapTask() !*Task {
         &static.bootstrap_init_task,
         &static.bootstrap_executor,
     );
-    const current_task = &static.bootstrap_init_task;
+    const current_task: Task.Current = .{ .task = &static.bootstrap_init_task };
 
     arch.init.prepareBootstrapExecutor(
         current_task,
@@ -201,7 +201,7 @@ fn constructBootstrapTask() !*Task {
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(current_task: *Task) !struct { []cascade.Executor, *cascade.Executor } {
+fn createExecutors(current_task: Task.Current) !struct { []cascade.Executor, *cascade.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > cascade.config.maximum_number_of_executors) {
@@ -260,7 +260,7 @@ fn bootNonBootstrapExecutors() !void {
             cascade.Executor.executors()[i].current_task,
             struct {
                 fn bootFn(inner_current_task: *anyopaque) !noreturn {
-                    try initStage2(@ptrCast(@alignCast(inner_current_task)));
+                    try initStage2(.{ .task = @ptrCast(@alignCast(inner_current_task)) });
                 }
             }.bootFn,
         );

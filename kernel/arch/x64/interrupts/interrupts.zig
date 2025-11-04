@@ -15,7 +15,7 @@ const interrupt_handlers = @import("handlers.zig");
 const log = cascade.debug.log.scoped(.interrupt);
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const current_task, const interrupt_exit = Task.onInterruptEntry();
+    const current_task, const interrupt_exit = Task.Current.onInterruptEntry();
     defer interrupt_exit.exit(current_task);
     const handler: *const Handler = &globals.handlers[interrupt_frame.vector_number.full];
     handler.handler(
@@ -117,7 +117,7 @@ pub const Interrupt = enum(u8) {
     }
 
     pub fn allocate(
-        current_task: *Task,
+        current_task: Task.Current,
         interrupt_handler: arch.interrupts.Interrupt.Handler,
         arg1: usize,
         arg2: usize,
@@ -144,7 +144,7 @@ pub const Interrupt = enum(u8) {
         return interrupt;
     }
 
-    pub fn deallocate(interrupt: Interrupt, current_task: *Task) void {
+    pub fn deallocate(interrupt: Interrupt, current_task: Task.Current) void {
         log.debug(current_task, "deallocating interrupt {}", .{interrupt});
 
         const interrupt_number = @intFromEnum(interrupt);
@@ -163,7 +163,7 @@ pub const Interrupt = enum(u8) {
         });
     }
 
-    pub fn route(interrupt: Interrupt, current_task: *Task, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
+    pub fn route(interrupt: Interrupt, current_task: Task.Current, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
         log.debug(current_task, "routing interrupt {} to {}", .{ interrupt, external_interrupt });
 
         try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
@@ -206,11 +206,11 @@ pub const InterruptFrame = extern struct {
     /// Returns the context that the interrupt was triggered from.
     pub fn context(
         interrupt_frame: *const InterruptFrame,
-        current_task: *Task,
+        current_task: Task.Current,
     ) cascade.Context {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .{ .user = .fromTask(current_task) },
+            .user_code => return .{ .user = .fromTask(current_task.task) },
             else => unreachable,
         };
     }
@@ -316,7 +316,7 @@ pub const init = struct {
     /// Ensure that any exceptions/faults that occur during early initialization are handled.
     ///
     /// The handler is not expected to do anything other than panic.
-    pub fn initializeEarlyInterrupts(current_task: *Task) void {
+    pub fn initializeEarlyInterrupts(current_task: Task.Current) void {
         _ = current_task;
 
         for (raw_interrupt_handlers, 0..) |raw_handler, i| {
@@ -335,7 +335,7 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(current_task: *Task) void {
+    pub fn initializeInterruptRouting(current_task: Task.Current) void {
         globals.interrupt_arena.init(
             current_task,
             .{
@@ -357,7 +357,7 @@ pub const init = struct {
 
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
-    pub fn loadStandardInterruptHandlers(current_task: *Task) void {
+    pub fn loadStandardInterruptHandlers(current_task: Task.Current) void {
         _ = current_task;
 
         globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{

@@ -63,8 +63,8 @@ pub const FrameAllocator = struct {
 
     pub const AllocateError = error{FramesExhausted};
 
-    pub const Allocate = *const fn (current_task: *Task) AllocateError!Frame;
-    pub const Deallocate = *const fn (current_task: *Task, frame_list: FrameList) void;
+    pub const Allocate = *const fn (current_task: Task.Current) AllocateError!Frame;
+    pub const Deallocate = *const fn (current_task: Task.Current, frame_list: FrameList) void;
 };
 
 pub const FrameList = struct {
@@ -89,7 +89,7 @@ pub const FrameList = struct {
     }
 };
 
-fn allocate(_: *Task) FrameAllocator.AllocateError!Frame {
+fn allocate(_: Task.Current) FrameAllocator.AllocateError!Frame {
     const node = globals.free_page_list.popFirst() orelse return error.FramesExhausted;
 
     _ = globals.free_memory.fetchSub(
@@ -111,7 +111,7 @@ fn allocate(_: *Task) FrameAllocator.AllocateError!Frame {
     return page.physical_frame;
 }
 
-fn deallocate(_: *Task, frame_list: FrameList) void {
+fn deallocate(_: Task.Current, frame_list: FrameList) void {
     if (frame_list.count == 0) {
         @branchHint(.unlikely);
         return;
@@ -183,7 +183,7 @@ pub const init = struct {
 
     pub const bootstrap_allocator: FrameAllocator = .{
         .allocate = struct {
-            fn allocate(current_task: *Task) !Frame {
+            fn allocate(current_task: Task.Current) !Frame {
                 const non_empty_region: *FreePhysicalRegion =
                     region: for (init_globals.free_physical_regions.slice()) |*region| {
                         if (region.first_free_frame_index < region.frame_count) break :region region;
@@ -202,7 +202,7 @@ pub const init = struct {
             }
         }.allocate,
         .deallocate = struct {
-            fn deallocate(_: *Task, _: FrameList) void {
+            fn deallocate(_: Task.Current, _: FrameList) void {
                 @panic("deallocate not supported");
             }
         }.deallocate,
@@ -210,7 +210,7 @@ pub const init = struct {
 
     /// Initialize the bootstrap physical frame allocator that is used for allocating physical frames before the full memory
     /// system is initialized.
-    pub fn initializeBootstrapFrameAllocator(_: *Task) void {
+    pub fn initializeBootstrapFrameAllocator(_: Task.Current) void {
         var memory_map = boot.memoryMap(.forward) catch @panic("no memory map");
         while (memory_map.next()) |entry| {
             if (entry.type != .free) continue;
@@ -234,7 +234,7 @@ pub const init = struct {
     ///
     /// Pulls all memory out of the bootstrap physical frame allocator and uses it to populate the normal allocator.
     pub fn initializePhysicalMemory(
-        current_task: *Task,
+        current_task: Task.Current,
         number_of_usable_pages: usize,
         number_of_usable_regions: usize,
         pages_range: core.VirtualRange,

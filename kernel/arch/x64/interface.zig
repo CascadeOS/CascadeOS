@@ -58,7 +58,7 @@ pub const functions: arch.Functions = .{
         .createPageTable = x64.paging.PageTable.create,
 
         .loadPageTable = struct {
-            fn loadPageTable(current_task: *Task, physical_frame: cascade.mem.phys.Frame) void {
+            fn loadPageTable(current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) void {
                 _ = current_task;
                 x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
             }
@@ -67,7 +67,7 @@ pub const functions: arch.Functions = .{
         .copyTopLevelIntoPageTable = struct {
             fn copyTopLevelIntoPageTable(
                 page_table: *x64.paging.PageTable,
-                current_task: *Task,
+                current_task: Task.Current,
                 target_page_table: *x64.paging.PageTable,
             ) void {
                 _ = current_task;

@@ -15,7 +15,7 @@ const x64 = @import("x64.zig");
 const log = cascade.debug.log.scoped(.x64_init);
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput(current_task: *Task) ?arch.init.InitOutput {
+pub fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
     if (DebugCon.detect()) {
         log.debug(current_task, "using debug console for serial output", .{});
         return .{
@@ -55,7 +55,7 @@ pub fn tryGetSerialOutput(current_task: *Task) ?arch.init.InitOutput {
 
 /// Prepares the current executor as the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    current_task: *Task,
+    current_task: Task.Current,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
@@ -64,7 +64,7 @@ pub fn prepareBootstrapExecutor(
     };
 
     prepareExecutorShared(
-        current_task.known_executor.?,
+        current_task.knownExecutor(),
         @intCast(architecture_processor_id),
         .fromRange(
             .fromSlice(u8, &static.bootstrap_double_fault_stack),
@@ -80,7 +80,7 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(current_task: *Task, executor: *cascade.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(current_task: Task.Current, executor: *cascade.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
@@ -112,8 +112,8 @@ fn prepareExecutorShared(
 }
 
 /// Load the executor that `current_task` is running on as the current executor.
-pub fn loadExecutor(current_task: *Task) void {
-    const executor = current_task.known_executor.?;
+pub fn loadExecutor(current_task: Task.Current) void {
+    const executor = current_task.knownExecutor();
 
     executor.arch_specific.gdt.load();
     executor.arch_specific.gdt.setTss(&executor.arch_specific.tss);
@@ -126,7 +126,7 @@ pub fn loadExecutor(current_task: *Task) void {
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation(current_task: *Task) void {
+pub fn captureEarlySystemInformation(current_task: Task.Current) void {
     log.debug(current_task, "capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
@@ -165,7 +165,7 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(
-    current_task: *Task,
+    current_task: Task.Current,
     options: CaptureSystemInformationOptions,
 ) !void {
     const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
@@ -204,7 +204,7 @@ pub fn captureSystemInformation(
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures(current_task: *Task) void {
+pub fn configureGlobalSystemFeatures(current_task: Task.Current) void {
     if (x64.info.have_pic) {
         log.debug(current_task, "disabling pic", .{});
         disablePic();
@@ -257,9 +257,9 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
-pub fn configurePerExecutorSystemFeatures(current_task: *Task) void {
+pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
     if (x64.info.cpu_id.rdtscp) {
-        x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.known_executor.?.id));
+        x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.knownExecutor().id));
     }
 
     // TODO: be more thorough with setting up these registers
@@ -351,7 +351,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: *Task) void {
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
-    current_task: *Task,
+    current_task: Task.Current,
     candidate_time_sources: *cascade.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(current_task, candidate_time_sources);
@@ -364,7 +364,7 @@ pub fn registerArchitecturalTimeSources(
 /// Initialize the local interrupt controller for the current executor.
 ///
 /// For example, on x86_64 this should initialize the APIC.
-pub fn initLocalInterruptController(current_task: *Task) void {
+pub fn initLocalInterruptController(current_task: Task.Current) void {
     _ = current_task;
     x64.apic.init.initApicOnCurrentExecutor();
 }
@@ -407,7 +407,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: *Task) !void {
+            fn remapFn(_: *anyopaque, _: Task.Current) !void {
                 return;
             }
         }.remapFn,

@@ -33,8 +33,8 @@ pub fn withParkedTask(parked_task: *Task) Parker {
 /// Park (block) the current task.
 ///
 /// Spurious wakeups are possible.
-pub fn park(parker: *Parker, current_task: *Task) void {
-    if (core.is_debug) std.debug.assert(current_task.state == .running);
+pub fn park(parker: *Parker, current_task: Task.Current) void {
+    if (core.is_debug) std.debug.assert(current_task.task.state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         return; // there were some wakeups, they might be spurious
@@ -61,7 +61,7 @@ pub fn park(parker: *Parker, current_task: *Task) void {
 
     Task.Scheduler.drop(current_task, .{
         .action = struct {
-            fn action(_: *Task, old_task: *Task, arg: usize) void {
+            fn action(_: Task.Current, old_task: *Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
@@ -81,7 +81,7 @@ pub fn park(parker: *Parker, current_task: *Task) void {
 /// Unpark (wake) the parked task if it is currently parked.
 pub fn unpark(
     parker: *Parker,
-    current_task: *Task,
+    current_task: Task.Current,
 ) void {
     if (parker.unpark_attempts.fetchAdd(1, .acq_rel) != 0) {
         // someone else was the first to attempt to unpark the task, so we can leave waking the task to them
@@ -100,7 +100,7 @@ pub fn unpark(
 
     parked_task.state = .ready;
 
-    const scheduler_already_locked = current_task.scheduler_locked;
+    const scheduler_already_locked = current_task.task.scheduler_locked;
 
     switch (scheduler_already_locked) {
         true => if (core.is_debug) Task.Scheduler.assertSchedulerLocked(current_task),

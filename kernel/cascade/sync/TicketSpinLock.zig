@@ -18,7 +18,7 @@ container: Container = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
 /// Locks the spinlock.
-pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) void {
+pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: Task.Current) void {
     current_task.incrementInterruptDisable();
 
     if (core.is_debug) std.debug.assert(!ticket_spin_lock.isLockedByCurrent(current_task)); // recursive locks are not supported
@@ -34,12 +34,12 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) void {
         _ = @atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire);
     }
 
-    ticket_spin_lock.holding_executor = current_task.known_executor.?;
-    current_task.spinlocks_held += 1;
+    ticket_spin_lock.holding_executor = current_task.knownExecutor();
+    current_task.task.spinlocks_held += 1;
 }
 
 /// Try to lock the spinlock.
-pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) bool {
+pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: Task.Current) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
 
@@ -78,15 +78,15 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) bool {
 /// Unlock the spinlock.
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
-pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: *Task) void {
+pub fn unlock(ticket_spin_lock: *TicketSpinLock, current_task: Task.Current) void {
     if (core.is_debug) {
-        std.debug.assert(current_task.spinlocks_held != 0);
+        std.debug.assert(current_task.task.spinlocks_held != 0);
         std.debug.assert(ticket_spin_lock.isLockedByCurrent(current_task));
     }
 
     ticket_spin_lock.unsafeUnlock();
 
-    current_task.spinlocks_held -= 1;
+    current_task.task.spinlocks_held -= 1;
     current_task.decrementInterruptDisable();
 }
 
@@ -104,8 +104,8 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 }
 
 /// Returns true if the spinlock is locked by the current executor.
-pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: *Task) bool {
-    const executor = current_task.known_executor orelse return false;
+pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock, current_task: Task.Current) bool {
+    const executor = current_task.task.known_executor orelse return false;
     return ticket_spin_lock.holding_executor == executor;
 }
 

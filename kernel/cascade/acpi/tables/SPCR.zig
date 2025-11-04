@@ -392,7 +392,7 @@ pub const SPCR = extern struct {
         const uart = cascade.init.Output.uart;
         const log = cascade.debug.log.scoped(.output_init);
 
-        pub fn tryGetSerialOutput(current_task: *cascade.Task) ?uart.Uart {
+        pub fn tryGetSerialOutput(current_task: Task.Current) ?uart.Uart {
             const output_uart = tryGetSerialOutputInner(current_task) catch |err| switch (err) {
                 error.DivisorTooLarge => {
                     log.warn(current_task, "baud divisor from SPCR too large", .{});
@@ -403,7 +403,7 @@ pub const SPCR = extern struct {
             return output_uart;
         }
 
-        fn tryGetSerialOutputInner(current_task: *Task) uart.Baud.DivisorError!?uart.Uart {
+        fn tryGetSerialOutputInner(current_task: Task.Current) uart.Baud.DivisorError!?uart.Uart {
             const spcr_table = SPCRAcpiTable.get(0) orelse return null;
             defer spcr_table.deinit();
 

@@ -19,7 +19,7 @@ pub fn rsdpTable() *const tables.RSDP {
     return globals.rsdp;
 }
 
-pub fn tryShutdown(current_task: *Task) !void {
+pub fn tryShutdown(current_task: Task.Current) !void {
     if (!globals.acpi_initialized) return;
 
     try uacpi.prepareForSleep(.S5);
@@ -64,7 +64,7 @@ pub const init = struct {
         init_globals.acpi_present = true;
     }
 
-    pub fn logAcpiTables(current_task: *Task) !void {
+    pub fn logAcpiTables(current_task: Task.Current) !void {
         if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
         // `directMapFromPhysical` is used as the non-cached direct map is not yet initialized
@@ -89,7 +89,7 @@ pub const init = struct {
     /// Initialize the ACPI subsystem.
     ///
     /// NOP if ACPI is not present.
-    pub fn initialize(current_task: *Task) !void {
+    pub fn initialize(current_task: Task.Current) !void {
         if (!init_globals.acpi_present) {
             init_log.debug(current_task, "ACPI not present", .{});
             return;
@@ -121,7 +121,7 @@ pub const init = struct {
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        const current_task: *Task = .current();
+        const current_task: Task.Current = .current();
         log.warn(current_task, "power button pressed", .{});
         tryShutdown(current_task) catch |err| {
             std.debug.panic("failed to shutdown: {t}", .{err});

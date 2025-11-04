@@ -101,7 +101,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.ioapic_init);
 
-    pub fn captureMADTInformation(current_task: *Task, madt: *const cascade.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(current_task: Task.Current, madt: *const cascade.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {

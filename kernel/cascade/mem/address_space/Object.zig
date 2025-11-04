@@ -49,7 +49,7 @@ pub fn incrementReferenceCount(object: *Object) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(object: *Object, current_task: *Task) void {
+pub fn decrementReferenceCount(object: *Object, current_task: Task.Current) void {
     if (core.is_debug) {
         std.debug.assert(object.reference_count != 0);
         std.debug.assert(object.lock.isWriteLocked());
@@ -73,7 +73,7 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         object_reference: Reference,
-        current_task: *Task,
+        current_task: Task.Current,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -110,7 +110,7 @@ pub const Reference = struct {
 /// Locks the spinlock.
 pub fn print(
     object: *Object,
-    current_task: *Task,
+    current_task: Task.Current,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {

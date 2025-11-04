@@ -94,7 +94,7 @@ fn newLine() void {
 }
 
 /// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(_: *anyopaque, current_task: *Task) !void {
+fn remapFramebuffer(_: *anyopaque, current_task: Task.Current) !void {
     const framebuffer = boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try cascade.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));

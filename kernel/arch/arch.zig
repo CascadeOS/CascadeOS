@@ -82,7 +82,7 @@ pub const interrupts = struct {
     }
 
     /// Send a panic IPI to all other executors.
-    pub fn sendPanicIPI(current_task: *Task) callconv(core.inline_in_non_debug) void {
+    pub fn sendPanicIPI(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.interrupts,
             "sendPanicIPI",
@@ -90,7 +90,7 @@ pub const interrupts = struct {
     }
 
     /// Send a flush IPI to the given executor.
-    pub fn sendFlushIPI(current_task: *Task, executor: *cascade.Executor) callconv(core.inline_in_non_debug) void {
+    pub fn sendFlushIPI(current_task: Task.Current, executor: *cascade.Executor) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.interrupts,
             "sendFlushIPI",
@@ -101,17 +101,17 @@ pub const interrupts = struct {
         arch_specific: current_decls.interrupts.Interrupt,
 
         pub const Handler = *const fn (
-            current_task: *Task,
+            current_task: Task.Current,
             frame: InterruptFrame,
             arg1: usize,
             arg2: usize,
-            interrupt_exit: Task.InterruptExit,
+            interrupt_exit: Task.Current.InterruptExit,
         ) void;
 
         pub const AllocateError = error{InterruptAllocationFailed};
 
         pub fn allocate(
-            current_task: *Task,
+            current_task: Task.Current,
             handler: Handler,
             arg1: usize,
             arg2: usize,
@@ -124,7 +124,7 @@ pub const interrupts = struct {
             };
         }
 
-        pub fn deallocate(interrupt: Interrupt, current_task: *Task) callconv(core.inline_in_non_debug) void {
+        pub fn deallocate(interrupt: Interrupt, current_task: Task.Current) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts,
                 "deallocateInterrupt",
@@ -133,7 +133,7 @@ pub const interrupts = struct {
 
         pub const RouteError = error{UnableToRouteExternalInterrupt};
 
-        pub fn route(interrupt: Interrupt, current_task: *Task, external_interrupt: u32) callconv(core.inline_in_non_debug) RouteError!void {
+        pub fn route(interrupt: Interrupt, current_task: Task.Current, external_interrupt: u32) callconv(core.inline_in_non_debug) RouteError!void {
             return getFunction(
                 current_functions.interrupts,
                 "routeInterrupt",
@@ -182,7 +182,7 @@ pub const interrupts = struct {
         /// Ensure that any exceptions/faults that occur during early initialization are handled.
         ///
         /// The handler is not expected to do anything other than panic.
-        pub fn initializeEarlyInterrupts(current_task: *Task) callconv(core.inline_in_non_debug) void {
+        pub fn initializeEarlyInterrupts(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts.init,
                 "initializeEarlyInterrupts",
@@ -190,7 +190,7 @@ pub const interrupts = struct {
         }
 
         /// Prepare interrupt allocation and routing.
-        pub fn initializeInterruptRouting(current_task: *Task) callconv(core.inline_in_non_debug) !void {
+        pub fn initializeInterruptRouting(current_task: Task.Current) callconv(core.inline_in_non_debug) !void {
             return getFunction(
                 current_functions.interrupts.init,
                 "initializeInterruptRouting",
@@ -199,7 +199,7 @@ pub const interrupts = struct {
 
         /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
         /// system interrupt handlers.
-        pub fn loadStandardInterruptHandlers(current_task: *Task) callconv(core.inline_in_non_debug) void {
+        pub fn loadStandardInterruptHandlers(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.interrupts.init,
                 "loadStandardInterruptHandlers",
@@ -228,7 +228,7 @@ pub const paging = struct {
         arch_specific: *current_decls.paging.PageTable,
 
         /// Create a page table in the given physical frame.
-        pub fn create(current_task: *Task, physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
+        pub fn create(current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
             return .{
                 .physical_frame = physical_frame,
                 .arch_specific = getFunction(
@@ -238,7 +238,7 @@ pub const paging = struct {
             };
         }
 
-        pub fn load(page_table: PageTable, current_task: *Task) callconv(core.inline_in_non_debug) void {
+        pub fn load(page_table: PageTable, current_task: Task.Current) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
                 "loadPageTable",
@@ -248,7 +248,7 @@ pub const paging = struct {
         /// Copies the top level of `page_table` into `target_page_table`.
         pub fn copyTopLevelInto(
             page_table: PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             target_page_table: PageTable,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
@@ -268,7 +268,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn mapSinglePage(
             page_table: PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             virtual_address: core.VirtualAddress,
             physical_frame: cascade.mem.phys.Frame,
             map_type: cascade.mem.MapType,
@@ -292,7 +292,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn unmapSinglePage(
             page_table: PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             virtual_address: core.VirtualAddress,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
@@ -323,7 +323,7 @@ pub const paging = struct {
         ///   - does not flush the TLB
         pub fn changeSinglePageProtection(
             page_table: PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             virtual_address: core.VirtualAddress,
             map_type: cascade.mem.MapType,
         ) callconv(core.inline_in_non_debug) void {
@@ -338,7 +338,7 @@ pub const paging = struct {
     ///
     /// Caller must ensure:
     ///   - the `virtual_range` address and size must be aligned to the standard page size
-    pub fn flushCache(current_task: *Task, virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
+    pub fn flushCache(current_task: Task.Current, virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.paging,
             "flushCache",
@@ -384,7 +384,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn fillTopLevel(
-            current_task: *Task,
+            current_task: Task.Current,
             page_table: PageTable,
             range: core.VirtualRange,
             physical_frame_allocator: cascade.mem.phys.FrameAllocator,
@@ -408,7 +408,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
-            current_task: *Task,
+            current_task: Task.Current,
             page_table: PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
@@ -431,7 +431,7 @@ pub const scheduling = struct {
     /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
     /// `current_task` is not null.
     pub fn beforeSwitchTask(
-        current_task: *Task,
+        current_task: Task.Current,
         old_task: *Task,
         new_task: *Task,
     ) callconv(core.inline_in_non_debug) void {
@@ -457,7 +457,7 @@ pub const scheduling = struct {
     }
 
     pub const TaskFunction = *const fn (
-        current_task: *Task,
+        current_task: Task.Current,
         arg1: usize,
         arg2: usize,
     ) anyerror!void;
@@ -768,7 +768,7 @@ pub const init = struct {
     };
 
     /// Attempt to get some form of architecture specific init output if it is available.
-    pub fn tryGetSerialOutput(current_task: *Task) callconv(core.inline_in_non_debug) ?InitOutput {
+    pub fn tryGetSerialOutput(current_task: Task.Current) callconv(core.inline_in_non_debug) ?InitOutput {
         return getFunction(
             current_functions.init,
             "tryGetSerialOutput",
@@ -777,7 +777,7 @@ pub const init = struct {
 
     /// Prepares the current executor as the bootstrap executor.
     pub fn prepareBootstrapExecutor(
-        current_task: *Task,
+        current_task: Task.Current,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
@@ -790,7 +790,7 @@ pub const init = struct {
     ///
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
     pub fn prepareExecutor(
-        current_task: *Task,
+        current_task: Task.Current,
         executor: *cascade.Executor,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
@@ -801,7 +801,7 @@ pub const init = struct {
     }
 
     /// Load the executor that `current_task` is running on as the current executor.
-    pub fn loadExecutor(current_task: *Task) callconv(core.inline_in_non_debug) void {
+    pub fn loadExecutor(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "loadExecutor",
@@ -811,7 +811,7 @@ pub const init = struct {
     /// Capture any system information that can be without using mmio.
     ///
     /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-    pub fn captureEarlySystemInformation(current_task: *Task) callconv(core.inline_in_non_debug) void {
+    pub fn captureEarlySystemInformation(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "captureEarlySystemInformation",
@@ -824,7 +824,7 @@ pub const init = struct {
     ///
     /// For example, on x64 this should capture APIC and ACPI information.
     pub fn captureSystemInformation(
-        current_task: *Task,
+        current_task: Task.Current,
         options: CaptureSystemInformationOptions,
     ) callconv(core.inline_in_non_debug) anyerror!void {
         return getFunction(
@@ -834,7 +834,7 @@ pub const init = struct {
     }
 
     /// Configure any global system features.
-    pub fn configureGlobalSystemFeatures(current_task: *Task) callconv(core.inline_in_non_debug) void {
+    pub fn configureGlobalSystemFeatures(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "configureGlobalSystemFeatures",
@@ -842,7 +842,7 @@ pub const init = struct {
     }
 
     /// Configure any per-executor system features.
-    pub fn configurePerExecutorSystemFeatures(current_task: *Task) callconv(core.inline_in_non_debug) void {
+    pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "configurePerExecutorSystemFeatures",
@@ -853,7 +853,7 @@ pub const init = struct {
     ///
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
     pub fn registerArchitecturalTimeSources(
-        current_task: *Task,
+        current_task: Task.Current,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
@@ -865,7 +865,7 @@ pub const init = struct {
     /// Initialize the local interrupt controller for the current executor.
     ///
     /// For example, on x86_64 this should initialize the APIC.
-    pub fn initLocalInterruptController(current_task: *Task) callconv(core.inline_in_non_debug) void {
+    pub fn initLocalInterruptController(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
             "initLocalInterruptController",
@@ -909,13 +909,13 @@ pub const Functions = struct {
         eoi: ?fn () void = null,
 
         /// Send a panic IPI to all other executors.
-        sendPanicIPI: ?fn (current_task: *Task) void = null,
+        sendPanicIPI: ?fn (current_task: Task.Current) void = null,
 
         /// Send a flush IPI to the given executor.
-        sendFlushIPI: ?fn (current_task: *Task, executor: *cascade.Executor) void = null,
+        sendFlushIPI: ?fn (current_task: Task.Current, executor: *cascade.Executor) void = null,
 
         allocateInterrupt: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
             handler: interrupts.Interrupt.Handler,
             arg1: usize,
             arg2: usize,
@@ -923,12 +923,12 @@ pub const Functions = struct {
 
         deallocateInterrupt: ?fn (
             interrupt: current_decls.interrupts.Interrupt,
-            current_task: *Task,
+            current_task: Task.Current,
         ) void = null,
 
         routeInterrupt: ?fn (
             interrupt: current_decls.interrupts.Interrupt,
-            current_task: *Task,
+            current_task: Task.Current,
             external_interrupt: u32,
         ) interrupts.Interrupt.RouteError!void = null,
 
@@ -944,27 +944,27 @@ pub const Functions = struct {
             /// Ensure that any exceptions/faults that occur during early initialization are handled.
             ///
             /// The handler is not expected to do anything other than panic.
-            initializeEarlyInterrupts: ?fn (current_task: *Task) void = null,
+            initializeEarlyInterrupts: ?fn (current_task: Task.Current) void = null,
 
             /// Prepare interrupt allocation and routing.
-            initializeInterruptRouting: ?fn (current_task: *Task) void = null,
+            initializeInterruptRouting: ?fn (current_task: Task.Current) void = null,
 
             /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
             /// system interrupt handlers.
-            loadStandardInterruptHandlers: ?fn (current_task: *Task) void = null,
+            loadStandardInterruptHandlers: ?fn (current_task: Task.Current) void = null,
         },
     },
 
     paging: struct {
         /// Create a page table in the given physical frame.
-        createPageTable: ?fn (current_task: *Task, physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
+        createPageTable: ?fn (current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
 
-        loadPageTable: ?fn (current_task: *Task, physical_frame: cascade.mem.phys.Frame) void = null,
+        loadPageTable: ?fn (current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) void = null,
 
         /// Copies the top level of `page_table` into `target_page_table`.
         copyTopLevelIntoPageTable: ?fn (
             page_table: *current_decls.paging.PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             target_page_table: *current_decls.paging.PageTable,
         ) void = null,
 
@@ -979,7 +979,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
             page_table: *current_decls.paging.PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             virtual_address: core.VirtualAddress,
             physical_frame: cascade.mem.phys.Frame,
             map_type: cascade.mem.MapType,
@@ -998,7 +998,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         unmapSinglePage: ?fn (
             page_table: *current_decls.paging.PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             virtual_address: core.VirtualAddress,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
@@ -1017,7 +1017,7 @@ pub const Functions = struct {
         ///   - does not flush the TLB
         changeSinglePageProtection: ?fn (
             page_table: *current_decls.paging.PageTable,
-            current_task: *Task,
+            current_task: Task.Current,
             virtual_address: core.VirtualAddress,
             map_type: cascade.mem.MapType,
         ) void = null,
@@ -1026,7 +1026,7 @@ pub const Functions = struct {
         ///
         /// Caller must ensure:
         ///   - the `virtual_range` address and size must be aligned to the standard page size
-        flushCache: ?fn (current_task: *Task, virtual_range: core.VirtualRange) void = null,
+        flushCache: ?fn (current_task: Task.Current, virtual_range: core.VirtualRange) void = null,
 
         /// Enable the kernel to access user memory.
         ///
@@ -1052,7 +1052,7 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             fillTopLevel: ?fn (
-                current_task: *Task,
+                current_task: Task.Current,
                 page_table: *current_decls.paging.PageTable,
                 range: core.VirtualRange,
                 physical_frame_allocator: cascade.mem.phys.FrameAllocator,
@@ -1071,7 +1071,7 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             mapToPhysicalRangeAllPageSizes: ?fn (
-                current_task: *Task,
+                current_task: Task.Current,
                 page_table: *current_decls.paging.PageTable,
                 virtual_range: core.VirtualRange,
                 physical_range: core.PhysicalRange,
@@ -1089,7 +1089,7 @@ pub const Functions = struct {
         /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
         /// `current_task` is not null.
         beforeSwitchTask: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
             old_task: *Task,
             new_task: *Task,
         ) void = null,
@@ -1219,58 +1219,58 @@ pub const Functions = struct {
         /// Attempt to get some form of architecture specific init output if it is available.
         ///
         /// Non-optional because it is used during early initialization.
-        tryGetSerialOutput: fn (current_task: *Task) ?init.InitOutput,
+        tryGetSerialOutput: fn (current_task: Task.Current) ?init.InitOutput,
 
         /// Prepares the current executor as the bootstrap executor.
-        prepareBootstrapExecutor: ?fn (current_task: *Task, u64) void = null,
+        prepareBootstrapExecutor: ?fn (current_task: Task.Current, u64) void = null,
 
         /// Prepares the provided `Executor` for use.
         ///
         /// **WARNING**: This function will panic if the cpu cannot be prepared.
         prepareExecutor: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
             executor: *cascade.Executor,
             architecture_processor_id: u64,
         ) void = null,
 
         /// Load the executor that `current_task` is running on as the current executor.
-        loadExecutor: ?fn (current_task: *Task) void = null,
+        loadExecutor: ?fn (current_task: Task.Current) void = null,
 
         /// Capture any system information that can be without using mmio.
         ///
         /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
         captureEarlySystemInformation: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
         ) void = null,
 
         /// Capture any system information that needs mmio.
         ///
         /// For example, on x64 this should capture APIC and ACPI information.
         captureSystemInformation: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
             options: current_decls.init.CaptureSystemInformationOptions,
         ) anyerror!void = null,
 
         /// Configure any global system features.
         configureGlobalSystemFeatures: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
         ) void = null,
 
         /// Configure any per-executor system features.
-        configurePerExecutorSystemFeatures: ?fn (current_task: *Task) void = null,
+        configurePerExecutorSystemFeatures: ?fn (current_task: Task.Current) void = null,
 
         /// Register any architectural time sources.
         ///
         /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
         registerArchitecturalTimeSources: ?fn (
-            current_task: *Task,
+            current_task: Task.Current,
             candidate_time_sources: *cascade.time.init.CandidateTimeSources,
         ) void = null,
 
         /// Initialize the local interrupt controller for the current executor.
         ///
         /// For example, on x86_64 this should initialize the APIC.
-        initLocalInterruptController: ?fn (current_task: *Task) void = null,
+        initLocalInterruptController: ?fn (current_task: Task.Current) void = null,
     },
 };
 

@@ -15,7 +15,7 @@ pub fn hasAnExecutorPanicked() bool {
 }
 
 pub fn interruptSourcePanic(
-    current_task: *Task,
+    current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
@@ -23,7 +23,7 @@ pub fn interruptSourcePanic(
     @branchHint(.cold);
 
     current_task.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
-    const executor = current_task.known_executor.?;
+    const executor = current_task.knownExecutor();
 
     panicDispatch(
         executor.renderInterruptSourcePanicMessage(current_task, format, args),
@@ -59,7 +59,7 @@ const PanicType = union(enum) {
 fn panicDispatch(
     msg: []const u8,
     panic_type: PanicType,
-    opt_current_task: ?*Task,
+    opt_current_task: ?Task.Current,
 ) noreturn {
     @branchHint(.cold);
 
@@ -108,7 +108,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
-    current_task: *Task,
+    current_task: Task.Current,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -116,7 +116,7 @@ fn initPanic(
         var nested_panic_count: usize = 0;
     };
 
-    const executor = current_task.known_executor.?;
+    const executor = current_task.knownExecutor();
 
     if (globals.panicking_executor.cmpxchgStrong(
         null,

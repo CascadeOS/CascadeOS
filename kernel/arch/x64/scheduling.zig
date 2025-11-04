@@ -17,13 +17,13 @@ const x64 = @import("x64.zig");
 /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
 /// `current_task` is not null.
 pub fn beforeSwitchTask(
-    current_task: *Task,
+    current_task: Task.Current,
     old_task: *Task,
     new_task: *Task,
 ) void {
     _ = old_task;
 
-    const executor = current_task.known_executor.?;
+    const executor = current_task.knownExecutor();
 
     const arch_specific: *x64.PerExecutor = &executor.arch_specific;
 

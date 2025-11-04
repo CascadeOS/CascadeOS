@@ -21,11 +21,11 @@ unlock_type: UnlockType = .unlocked,
 spinlock: cascade.sync.TicketSpinLock = .{},
 wait_queue: cascade.sync.WaitQueue = .{},
 
-pub fn lock(mutex: *Mutex, current_task: *Task) void {
+pub fn lock(mutex: *Mutex, current_task: Task.Current) void {
     while (true) {
         var locked_by = mutex.locked_by.cmpxchgWeak(
             null,
-            current_task,
+            current_task.task,
             .acquire,
             .monotonic,
         ) orelse {
@@ -33,7 +33,7 @@ pub fn lock(mutex: *Mutex, current_task: *Task) void {
             return;
         };
 
-        if (locked_by == current_task) {
+        if (locked_by == current_task.task) {
             switch (mutex.unlock_type) {
                 .passed_to_waiter => {
                     @branchHint(.likely);
@@ -51,7 +51,7 @@ pub fn lock(mutex: *Mutex, current_task: *Task) void {
 
         locked_by = mutex.locked_by.cmpxchgStrong(
             null,
-            current_task,
+            current_task.task,
             .acquire,
             .monotonic,
         ) orelse {
@@ -60,7 +60,7 @@ pub fn lock(mutex: *Mutex, current_task: *Task) void {
             return;
         };
 
-        if (locked_by == current_task) {
+        if (locked_by == current_task.task) {
             switch (mutex.unlock_type) {
                 .passed_to_waiter => {
                     @branchHint(.likely);
@@ -80,15 +80,15 @@ pub fn lock(mutex: *Mutex, current_task: *Task) void {
 }
 
 /// Try to lock the mutex.
-pub fn tryLock(mutex: *Mutex, current_task: *Task) bool {
+pub fn tryLock(mutex: *Mutex, current_task: Task.Current) bool {
     const locked_by = mutex.locked_by.cmpxchgStrong(
         null,
-        current_task,
+        current_task.task,
         .acquire,
         .monotonic,
     ) orelse return true;
 
-    if (locked_by == current_task) {
+    if (locked_by == current_task.task) {
         @branchHint(.cold);
         if (core.is_debug) {
             // this could only happen if we were queued for the mutex but then how would we call tryLock?
@@ -100,7 +100,7 @@ pub fn tryLock(mutex: *Mutex, current_task: *Task) bool {
     return false;
 }
 
-pub fn unlock(mutex: *Mutex, current_task: *Task) void {
+pub fn unlock(mutex: *Mutex, current_task: Task.Current) void {
     {
         mutex.spinlock.lock(current_task);
         defer mutex.spinlock.unlock(current_task);
@@ -109,7 +109,7 @@ pub fn unlock(mutex: *Mutex, current_task: *Task) void {
             mutex.unlock_type = .unlocked;
 
             if (mutex.locked_by.cmpxchgStrong(
-                current_task,
+                current_task.task,
                 null,
                 .release,
                 .monotonic,
@@ -125,7 +125,7 @@ pub fn unlock(mutex: *Mutex, current_task: *Task) void {
         mutex.unlock_type = .passed_to_waiter;
 
         if (mutex.locked_by.cmpxchgStrong(
-            current_task,
+            current_task.task,
             waiting_task,
             .release,
             .monotonic,

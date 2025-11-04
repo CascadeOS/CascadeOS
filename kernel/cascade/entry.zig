@@ -13,13 +13,13 @@ const log = cascade.debug.log.scoped(.entry);
 /// Executed upon per executor periodic interrupt.
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
-pub fn onPerExecutorPeriodic(current_task: *Task) void {
+pub fn onPerExecutorPeriodic(current_task: Task.Current) void {
     Task.Scheduler.maybePreempt(current_task);
 }
 
 /// Executed upon page fault.
 pub fn onPageFault(
-    current_task: *Task,
+    current_task: Task.Current,
     page_fault_details: cascade.mem.PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
@@ -40,6 +40,6 @@ pub fn onPageFault(
 }
 
 /// Executed upon cross-executor flush request.
-pub fn onFlushRequest(current_task: *Task) void {
+pub fn onFlushRequest(current_task: Task.Current) void {
     cascade.mem.FlushRequest.processFlushRequests(current_task);
 }

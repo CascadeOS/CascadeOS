@@ -20,12 +20,12 @@ pub const Node = struct {
     node: std.SinglyLinkedList.Node,
 };
 
-pub fn submitAndWait(flush_request: *FlushRequest, current_task: *Task) void {
+pub fn submitAndWait(flush_request: *FlushRequest, current_task: Task.Current) void {
     {
         current_task.incrementInterruptDisable();
         defer current_task.decrementInterruptDisable();
 
-        const current_executor = current_task.known_executor.?;
+        const current_executor = current_task.knownExecutor();
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
@@ -42,10 +42,10 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: *Task) void {
     }
 }
 
-pub fn processFlushRequests(current_task: *Task) void {
-    if (core.is_debug) std.debug.assert(current_task.interrupt_disable_count != 0);
+pub fn processFlushRequests(current_task: Task.Current) void {
+    if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
 
-    const executor = current_task.known_executor.?;
+    const executor = current_task.knownExecutor();
 
     while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const cascade.mem.FlushRequest.Node = @fieldParentPtr("node", node);
@@ -53,17 +53,17 @@ pub fn processFlushRequests(current_task: *Task) void {
     }
 }
 
-fn flush(flush_request: *FlushRequest, current_task: *Task) void {
-    if (core.is_debug) std.debug.assert(current_task.interrupt_disable_count != 0);
+fn flush(flush_request: *FlushRequest, current_task: Task.Current) void {
+    if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 
     switch (flush_request.flush_target) {
         .kernel => {},
-        .user => |target_process| switch (current_task.type) {
+        .user => |target_process| switch (current_task.task.type) {
             .kernel => return,
             .user => {
-                const current_process: *cascade.Process = .fromTask(current_task);
+                const current_process: *cascade.Process = .fromTask(current_task.task);
                 if (current_process != target_process) return;
             },
         },
@@ -72,7 +72,7 @@ fn flush(flush_request: *FlushRequest, current_task: *Task) void {
     arch.paging.flushCache(current_task, flush_request.range);
 }
 
-fn requestExecutor(flush_request: *FlushRequest, current_task: *Task, executor: *cascade.Executor) void {
+fn requestExecutor(flush_request: *FlushRequest, current_task: Task.Current, executor: *cascade.Executor) void {
     _ = flush_request.count.fetchAdd(1, .monotonic);
 
     const node = flush_request.nodes.addOne() catch @panic("exceeded maximum number of executors");

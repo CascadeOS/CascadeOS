@@ -13,7 +13,7 @@ const kernel_log_scopes = kernel_options.kernel_log_scopes;
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub fn err(
-            current_task: *cascade.Task,
+            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -22,7 +22,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn warn(
-            current_task: *cascade.Task,
+            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -31,7 +31,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn info(
-            current_task: *cascade.Task,
+            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -40,7 +40,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn debug(
-            current_task: *cascade.Task,
+            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -49,7 +49,7 @@ pub fn scoped(comptime scope: @Type(.enum_literal)) type {
         }
 
         pub fn verbose(
-            current_task: *cascade.Task,
+            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
@@ -108,7 +108,7 @@ pub const Level = enum {
 };
 
 fn logFn(
-    current_task: *cascade.Task,
+    current_task: Task.Current,
     prefix: []const u8,
     comptime format: []const u8,
     args: anytype,

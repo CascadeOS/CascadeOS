@@ -31,12 +31,12 @@ const interrupt_source_panic_truncated = " (msg truncated)";
 /// If the message is too large to fit in the buffer, the message is truncated.
 pub fn renderInterruptSourcePanicMessage(
     current_executor: *Executor,
-    current_task: *Task,
+    current_task: Task.Current,
     comptime fmt: []const u8,
     args: anytype,
 ) []const u8 {
     // TODO: this treatment should be given to all panics
-    std.debug.assert(current_executor == current_task.known_executor.?);
+    std.debug.assert(current_executor == current_task.knownExecutor());
 
     const full_buffer = current_executor.interrupt_source_panic_buffer[0..];
 

@@ -374,7 +374,7 @@ pub const init = struct {
     /// Initializes the PCI ECAM.
     ///
     /// No-op if no MCFG table is found.
-    pub fn initializeECAM(current_task: *Task) !void {
+    pub fn initializeECAM(current_task: Task.Current) !void {
         const mcfg_acpi_table = MCFGAcpiTable.get(0) orelse {
             init_log.warn(current_task, "no MCFG table found - skipping PCI ECAM initialization", .{});
             return;

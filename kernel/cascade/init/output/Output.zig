@@ -21,7 +21,7 @@ splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
-remapFn: *const fn (state: *anyopaque, current_task: *cascade.Task) anyerror!void,
+remapFn: *const fn (state: *anyopaque, current_task: Task.Current) anyerror!void,
 
 state: *anyopaque,
 
@@ -29,12 +29,12 @@ pub const writer = &globals.writer;
 pub const lock = &globals.lock;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
-pub fn remapOutputs(current_task: *cascade.Task) !void {
+pub fn remapOutputs(current_task: Task.Current) !void {
     if (globals.framebuffer_output) |output| try output.remapFn(output.state, current_task);
     if (globals.serial_output) |output| try output.remapFn(output.state, current_task);
 }
 
-pub fn registerOutputs(current_task: *cascade.Task) void {
+pub fn registerOutputs(current_task: Task.Current) void {
     if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
         globals.framebuffer_output = output;
     }
@@ -53,7 +53,7 @@ pub fn registerOutputs(current_task: *cascade.Task) void {
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources(current_task: *cascade.Task) ?cascade.init.Output {
+fn tryGetSerialOutputFromGenericSources(current_task: Task.Current) ?cascade.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };

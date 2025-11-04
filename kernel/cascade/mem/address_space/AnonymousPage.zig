@@ -33,7 +33,7 @@ reference_count: u32 = 1,
 
 page: *Page,
 
-pub fn create(current_task: *Task, page: *Page) !*AnonymousPage {
+pub fn create(current_task: Task.Current, page: *Page) !*AnonymousPage {
     const anonymous_page = try globals.anonymous_page_cache.allocate(current_task);
     anonymous_page.* = .{
         .page = page,
@@ -44,7 +44,7 @@ pub fn create(current_task: *Task, page: *Page) !*AnonymousPage {
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *Task) void {
+pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Task.Current) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
         std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
@@ -56,7 +56,7 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *Ta
 /// Decrement the reference count.
 ///
 /// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: *Task) void {
+pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Task.Current) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
         std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
@@ -86,7 +86,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.anonymous_page_init);
 
-    pub fn initializeCaches(current_task: *Task) !void {
+    pub fn initializeCaches(current_task: Task.Current) !void {
         log.debug(current_task, "initializing anonymous page cache", .{});
 
         globals.anonymous_page_cache.init(current_task, .{

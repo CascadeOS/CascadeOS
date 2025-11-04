@@ -15,7 +15,7 @@ pub const DeviceTree = @import("DeviceTree");
 
 const log = cascade.debug.log.scoped(.devicetree);
 
-pub fn tryGetSerialOutput(current_task: *Task) ?uart.Uart {
+pub fn tryGetSerialOutput(current_task: Task.Current) ?uart.Uart {
     const output_uart = tryGetSerialOutputInner(current_task) catch |err| switch (err) {
         error.BadOffset => {
             log.warn(current_task, "attempted to use a bad offset into the device tree", .{});
@@ -38,7 +38,7 @@ pub fn tryGetSerialOutput(current_task: *Task) ?uart.Uart {
     return output_uart;
 }
 
-fn tryGetSerialOutputInner(current_task: *Task) GetSerialOutputError!?uart.Uart {
+fn tryGetSerialOutputInner(current_task: Task.Current) GetSerialOutputError!?uart.Uart {
     const dt = getDeviceTree(current_task) orelse return null;
 
     if (try getSerialOutputFromChosenNode(current_task, dt)) |output_uart| return output_uart;
@@ -53,7 +53,7 @@ fn tryGetSerialOutputInner(current_task: *Task) GetSerialOutputError!?uart.Uart 
     return null;
 }
 
-fn getDeviceTree(current_task: *Task) ?DeviceTree {
+fn getDeviceTree(current_task: Task.Current) ?DeviceTree {
     const address = boot.deviceTreeBlob() orelse return null;
     const ptr = address.toPtr([*]align(8) const u8);
     return DeviceTree.fromPtr(ptr) catch |err| {
@@ -62,7 +62,7 @@ fn getDeviceTree(current_task: *Task) ?DeviceTree {
     };
 }
 
-fn getSerialOutputFromChosenNode(current_task: *Task, dt: DeviceTree) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromChosenNode(current_task: Task.Current, dt: DeviceTree) GetSerialOutputError!?uart.Uart {
     const chosen_node = (try DeviceTree.Node.root.firstMatchingSubnode(
         dt,
         .direct_children,
@@ -95,7 +95,7 @@ fn getSerialOutputFromChosenNode(current_task: *Task, dt: DeviceTree) GetSerialO
     return null;
 }
 
-fn getSerialOutputFromNS16550a(current_task: *Task, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromNS16550a(current_task: Task.Current, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = blk: {
         const clock_frequency_property = (try node.firstMatchingProperty(
             dt,
@@ -138,7 +138,7 @@ fn getSerialOutputFromNS16550a(current_task: *Task, dt: DeviceTree, node: Device
     };
 }
 
-fn getSerialOutputFromPL011(current_task: *Task, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromPL011(current_task: Task.Current, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = clock_frequency: {
         const clocks_property = (try node.firstMatchingProperty(
             dt,
@@ -215,7 +215,7 @@ const GetSerialOutputError = DeviceTree.IteratorError ||
     DeviceTree.Property.Value.ListIteratorError ||
     uart.Baud.DivisorError;
 const GetSerialOutputFn = *const fn (
-    current_task: *Task,
+    current_task: Task.Current,
     dt: DeviceTree,
     node: DeviceTree.Node,
 ) GetSerialOutputError!?uart.Uart;

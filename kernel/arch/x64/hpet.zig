@@ -25,7 +25,7 @@ pub const init = struct {
     const init_log = cascade.debug.log.scoped(.hpet_init);
 
     pub fn registerTimeSource(
-        current_task: *Task,
+        current_task: Task.Current,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         const hpet_acpi_table = HPETAcpiTable.get(0) orelse return;
@@ -42,7 +42,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeHPET(current_task: *Task) void {
+    fn initializeHPET(current_task: Task.Current) void {
         globals.hpet = .{ .base = getHpetBase() };
         init_log.debug(current_task, "using hpet: {}", .{globals.hpet});
 

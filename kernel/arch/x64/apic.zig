@@ -16,7 +16,7 @@ pub fn eoi() void {
 }
 
 /// Send a panic IPI to all other executors.
-pub fn sendPanicIPI(current_task: *Task) void {
+pub fn sendPanicIPI(current_task: Task.Current) void {
     _ = current_task;
 
     var icr = globals.lapic.readInterruptCommandRegister();
@@ -33,7 +33,7 @@ pub fn sendPanicIPI(current_task: *Task) void {
 }
 
 /// Send a flush IPI to the given executor.
-pub fn sendFlushIPI(current_task: *Task, executor: *cascade.Executor) void {
+pub fn sendFlushIPI(current_task: Task.Current, executor: *cascade.Executor) void {
     _ = current_task;
 
     var icr = globals.lapic.readInterruptCommandRegister();
@@ -67,7 +67,7 @@ pub const init = struct {
     const init_log = cascade.debug.log.scoped(.apic_init);
 
     pub fn captureApicInformation(
-        current_task: *Task,
+        current_task: Task.Current,
         fadt: *const cascade.acpi.tables.FADT,
         madt: *const cascade.acpi.tables.MADT,
         x2apic_enabled: bool,
@@ -102,7 +102,7 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        current_task: *Task,
+        current_task: Task.Current,
         candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         candidate_time_sources.addTimeSource(current_task, .{
@@ -120,7 +120,7 @@ pub const init = struct {
 
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer(current_task: *Task) void {
+    fn initializeLapicTimer(current_task: Task.Current) void {
         std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
 
         globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
@@ -128,7 +128,7 @@ pub const init = struct {
     }
 
     fn initializeLapicTimerCalibrate(
-        current_task: *Task,
+        current_task: Task.Current,
         reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);

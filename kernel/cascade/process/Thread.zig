@@ -26,7 +26,7 @@ pub inline fn fromTask(task: *Task) *Thread {
 
 pub const internal = struct {
     pub fn create(
-        current_task: *Task,
+        current_task: Task.Current,
         process: *Process,
         options: Task.internal.InitOptions,
     ) !*Thread {
@@ -39,7 +39,7 @@ pub const internal = struct {
         return thread;
     }
 
-    pub fn destroy(current_task: *Task, thread: *Thread) void {
+    pub fn destroy(current_task: Task.Current, thread: *Thread) void {
         if (core.is_debug) {
             const task = &thread.task;
             std.debug.assert(task.type == .user);
@@ -57,13 +57,13 @@ const globals = struct {
     var cache: cascade.mem.cache.Cache(
         Thread,
         struct {
-            fn constructor(thread: *Thread, current_task: *Task) cascade.mem.cache.ConstructorError!void {
+            fn constructor(thread: *Thread, current_task: Task.Current) cascade.mem.cache.ConstructorError!void {
                 if (core.is_debug) thread.* = undefined;
                 thread.task.stack = try .createStack(current_task);
             }
         }.constructor,
         struct {
-            fn destructor(thread: *Thread, current_task: *Task) void {
+            fn destructor(thread: *Thread, current_task: Task.Current) void {
                 thread.task.stack.destroyStack(current_task);
             }
         }.destructor,
@@ -73,7 +73,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.thread_init);
 
-    pub fn initializeThreads(current_task: *Task) !void {
+    pub fn initializeThreads(current_task: Task.Current) !void {
         init_log.debug(current_task, "initializing thread cache", .{});
         globals.cache.init(
             current_task,

@@ -35,11 +35,11 @@ pub fn popFirst(wait_queue: *WaitQueue) ?*Task {
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wakeOne(
     wait_queue: *WaitQueue,
-    current_task: *Task,
+    current_task: Task.Current,
     spinlock: *const cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(current_task.interrupt_disable_count != 0);
+        std.debug.assert(current_task.task.interrupt_disable_count != 0);
         std.debug.assert(spinlock.isLockedByCurrent(current_task));
     }
 
@@ -49,7 +49,7 @@ pub fn wakeOne(
     if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
-    const scheduler_already_locked = current_task.scheduler_locked;
+    const scheduler_already_locked = current_task.task.scheduler_locked;
 
     switch (scheduler_already_locked) {
         true => if (core.is_debug) Task.Scheduler.assertSchedulerLocked(current_task),
@@ -70,22 +70,22 @@ pub fn wakeOne(
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     wait_queue: *WaitQueue,
-    current_task: *Task,
+    current_task: Task.Current,
     spinlock: *cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(current_task.interrupt_disable_count != 0);
+        std.debug.assert(current_task.task.interrupt_disable_count != 0);
         std.debug.assert(spinlock.isLockedByCurrent(current_task));
     }
 
-    wait_queue.waiting_tasks.append(&current_task.next_task_node);
+    wait_queue.waiting_tasks.append(&current_task.task.next_task_node);
 
     Task.Scheduler.lockScheduler(current_task);
     defer Task.Scheduler.unlockScheduler(current_task);
 
     Task.Scheduler.drop(current_task, .{
         .action = struct {
-            fn action(_: *Task, old_task: *Task, arg: usize) void {
+            fn action(_: Task.Current, old_task: *Task, arg: usize) void {
                 const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);
 
                 old_task.state = .blocked;

@@ -42,7 +42,7 @@ pub const CreateOptions = struct {
 };
 
 /// Create a process.
-pub fn create(current_task: *Task, options: CreateOptions) !*Process {
+pub fn create(current_task: Task.Current, options: CreateOptions) !*Process {
     const process = try globals.cache.allocate(current_task);
     errdefer globals.cache.deallocate(current_task, process);
 
@@ -74,7 +74,7 @@ pub const CreateThreadOptions = struct {
 /// The thread is in the `ready` state and is not scheduled.
 pub fn createThread(
     process: *Process,
-    current_task: *Task,
+    current_task: Task.Current,
     options: CreateThreadOptions,
 ) !*Thread {
     const thread = try Thread.internal.create(
@@ -115,7 +115,7 @@ pub fn incrementReferenceCount(process: *Process) void {
     _ = process.reference_count.fetchAdd(1, .acq_rel);
 }
 
-pub fn decrementReferenceCount(process: *Process, current_task: *Task) void {
+pub fn decrementReferenceCount(process: *Process, current_task: Task.Current) void {
     if (process.reference_count.fetchSub(1, .acq_rel) != 1) {
         @branchHint(.likely);
         return;
@@ -143,7 +143,7 @@ const ProcessCleanup = struct {
     parker: cascade.sync.Parker,
     incoming: core.containers.AtomicSinglyLinkedList,
 
-    pub fn init(process_cleanup: *ProcessCleanup, current_task: *Task) !void {
+    pub fn init(process_cleanup: *ProcessCleanup, current_task: Task.Current) !void {
         process_cleanup.* = .{
             .task = try Task.createKernelTask(current_task, .{
                 .name = try .fromSlice("process cleanup"),
@@ -159,7 +159,7 @@ const ProcessCleanup = struct {
 
     pub fn queueProcessForCleanup(
         process_cleanup: *ProcessCleanup,
-        current_task: *Task,
+        current_task: Task.Current,
         process: *cascade.Process,
     ) void {
         if (process.queued_for_cleanup.cmpxchgStrong(
@@ -177,7 +177,7 @@ const ProcessCleanup = struct {
         process_cleanup.parker.unpark(current_task);
     }
 
-    fn execute(process_cleanup: *ProcessCleanup, current_task: *Task) noreturn {
+    fn execute(process_cleanup: *ProcessCleanup, current_task: Task.Current) noreturn {
         while (true) {
             while (process_cleanup.incoming.popFirst()) |node| {
                 cleanupProcess(
@@ -190,7 +190,7 @@ const ProcessCleanup = struct {
         }
     }
 
-    fn cleanupProcess(current_task: *Task, process: *cascade.Process) void {
+    fn cleanupProcess(current_task: Task.Current, process: *cascade.Process) void {
         if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
         process.queued_for_cleanup.store(false, .release);
@@ -222,14 +222,14 @@ const ProcessCleanup = struct {
         globals.cache.deallocate(current_task, process);
     }
 
-    fn entry(current_task: *Task, process_cleanup_addr: usize, _: usize) noreturn {
+    fn entry(current_task: Task.Current, process_cleanup_addr: usize, _: usize) noreturn {
         const process_cleanup: *ProcessCleanup = @ptrFromInt(process_cleanup_addr);
 
         if (core.is_debug) {
-            std.debug.assert(current_task == process_cleanup.task);
-            std.debug.assert(current_task.interrupt_disable_count == 0);
-            std.debug.assert(current_task.spinlocks_held == 0);
-            std.debug.assert(!current_task.scheduler_locked);
+            std.debug.assert(current_task.task == process_cleanup.task);
+            std.debug.assert(current_task.task.interrupt_disable_count == 0);
+            std.debug.assert(current_task.task.spinlocks_held == 0);
+            std.debug.assert(!current_task.task.scheduler_locked);
             std.debug.assert(arch.interrupts.areEnabled());
         }
 
@@ -244,7 +244,7 @@ const globals = struct {
     var cache: cascade.mem.cache.Cache(
         Process,
         struct {
-            fn constructor(process: *Process, current_task: *Task) cascade.mem.cache.ConstructorError!void {
+            fn constructor(process: *Process, current_task: Task.Current) cascade.mem.cache.ConstructorError!void {
                 const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
                 process.* = .{
@@ -284,7 +284,7 @@ const globals = struct {
             }
         }.constructor,
         struct {
-            fn destructor(process: *Process, current_task: *Task) void {
+            fn destructor(process: *Process, current_task: Task.Current) void {
                 const page_table = process.address_space.page_table;
 
                 process.address_space.deinit(current_task);
@@ -306,7 +306,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.process_init);
 
-    pub fn initializeProcesses(current_task: *Task) !void {
+    pub fn initializeProcesses(current_task: Task.Current) !void {
         init_log.debug(current_task, "initializing process cache", .{});
         globals.cache.init(current_task, .{
             .name = try .fromSlice("process"),

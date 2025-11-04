@@ -13,7 +13,7 @@ const core = @import("core");
 
 const log = cascade.debug.log.scoped(.heap);
 
-pub fn allocate(len: usize, current_task: *Task) !core.VirtualRange {
+pub fn allocate(len: usize, current_task: Task.Current) !core.VirtualRange {
     const allocation = try globals.heap_arena.allocate(
         current_task,
         len,
@@ -27,7 +27,7 @@ pub fn allocate(len: usize, current_task: *Task) !core.VirtualRange {
     return virtual_range;
 }
 
-pub inline fn deallocate(range: core.VirtualRange, current_task: *Task) void {
+pub inline fn deallocate(range: core.VirtualRange, current_task: Task.Current) void {
     globals.heap_arena.deallocate(current_task, .fromVirtualRange(range));
 }
 
@@ -47,7 +47,7 @@ pub fn freeWithNoSize(ptr: [*]u8) void {
 }
 
 pub fn allocateSpecial(
-    current_task: *Task,
+    current_task: Task.Current,
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: cascade.mem.MapType,
@@ -79,7 +79,7 @@ pub fn allocateSpecial(
 }
 
 pub fn deallocateSpecial(
-    current_task: *Task,
+    current_task: Task.Current,
     virtual_range: core.VirtualRange,
 ) void {
     {
@@ -168,7 +168,7 @@ const allocator_impl = struct {
 
     fn heapPageArenaImport(
         arena_ptr: *anyopaque,
-        current_task: *Task,
+        current_task: Task.Current,
         len: usize,
         policy: resource_arena.Policy,
     ) resource_arena.AllocateError!resource_arena.Allocation {
@@ -208,7 +208,7 @@ const allocator_impl = struct {
 
     fn heapPageArenaRelease(
         arena_ptr: *anyopaque,
-        current_task: *Task,
+        current_task: Task.Current,
         allocation: resource_arena.Allocation,
     ) void {
         const arena: *Arena = @ptrCast(@alignCast(arena_ptr));
@@ -278,7 +278,7 @@ pub const init = struct {
     const init_log = cascade.debug.log.scoped(.heap_init);
 
     pub fn initializeHeaps(
-        current_task: *Task,
+        current_task: Task.Current,
         kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
     ) !void {
         // heap
