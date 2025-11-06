@@ -14,6 +14,7 @@ pub const containers = @import("containers.zig");
 pub const Duration = @import("duration.zig").Duration;
 pub const Size = @import("size.zig").Size;
 pub const testing = @import("testing.zig");
+pub const TypeErasedCall = @import("TypeErasedCall.zig").TypeErasedCall;
 
 const native_endian: std.builtin.Endian = builtin.cpu.arch.endian();
 
