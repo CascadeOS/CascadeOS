@@ -456,26 +456,19 @@ pub const scheduling = struct {
         )(old_task, new_task);
     }
 
-    pub const TaskFunction = *const fn (
-        current_task: Task.Current,
-        arg1: usize,
-        arg2: usize,
-    ) anyerror!void;
-
     /// Prepares the given task for being scheduled.
     ///
-    /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
-    /// the given arguments.
+    /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
+    ///
+    /// This function *must* be called before the task is scheduled and can only be called once.
     pub fn prepareTaskForScheduling(
         task: *Task,
-        target_function: TaskFunction,
-        arg1: usize,
-        arg2: usize,
-    ) callconv(core.inline_in_non_debug) error{StackOverflow}!void {
+        type_erased_call: core.TypeErasedCall,
+    ) callconv(core.inline_in_non_debug) void {
         return getFunction(
             current_functions.scheduling,
             "prepareTaskForScheduling",
-        )(task, target_function, arg1, arg2);
+        )(task, type_erased_call);
     }
 
     pub const CallError = error{StackOverflow};
@@ -922,14 +915,13 @@ pub const Functions = struct {
 
         /// Prepares the given task for being scheduled.
         ///
-        /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
-        /// the given arguments.
+        /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
+        ///
+        /// This function *must* be called before the task is scheduled and can only be called once.
         prepareTaskForScheduling: ?fn (
             task: *Task,
-            target_function: scheduling.TaskFunction,
-            arg1: usize,
-            arg2: usize,
-        ) error{StackOverflow}!void = null,
+            type_erased_call: core.TypeErasedCall,
+        ) void = null,
 
         /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
         call: ?fn (

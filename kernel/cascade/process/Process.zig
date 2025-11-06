@@ -64,14 +64,13 @@ pub fn create(current_task: Task.Current, options: CreateOptions) !*Process {
 
 pub const CreateThreadOptions = struct {
     name: ?Task.Name = null,
-    function: arch.scheduling.TaskFunction,
-    arg1: u64 = 0,
-    arg2: u64 = 0,
 };
 
 /// Creates a thread in the given process.
 ///
 /// The thread is in the `ready` state and is not scheduled.
+///
+/// `Thread.setThreadEntry` *must* be called before the thread is scheduled.
 pub fn createThread(
     process: *Process,
     current_task: Task.Current,
@@ -88,9 +87,6 @@ pub fn createThread(
                     "{d}",
                     .{process.next_thread_id.fetchAdd(1, .monotonic)},
                 ),
-            .function = options.function,
-            .arg1 = options.arg1,
-            .arg2 = options.arg2,
             .type = .user,
         },
     );
@@ -145,14 +141,11 @@ const ProcessCleanup = struct {
 
     pub fn init(process_cleanup: *ProcessCleanup, current_task: Task.Current) !void {
         process_cleanup.* = .{
-            .task = try Task.createKernelTask(current_task, .{
-                .name = try .fromSlice("process cleanup"),
-                .function = ProcessCleanup.entry,
-                .arg1 = @intFromPtr(process_cleanup),
-            }),
+            .task = try Task.createKernelTask(current_task, try .fromSlice("process cleanup")),
             .parker = undefined, // set below
             .incoming = .{},
         };
+        process_cleanup.task.setTaskEntry(.prepare(ProcessCleanup.execute, .{process_cleanup}));
 
         process_cleanup.parker = .withParkedTask(process_cleanup.task);
     }
@@ -177,7 +170,10 @@ const ProcessCleanup = struct {
         process_cleanup.parker.unpark(current_task);
     }
 
-    fn execute(process_cleanup: *ProcessCleanup, current_task: Task.Current) noreturn {
+    fn execute(process_cleanup: *ProcessCleanup) noreturn {
+        if (core.is_debug) std.debug.assert(process_cleanup.task == Task.Current.current().task);
+        const current_task: Task.Current = .{ .task = process_cleanup.task };
+
         while (true) {
             while (process_cleanup.incoming.popFirst()) |node| {
                 cleanupProcess(
@@ -220,20 +216,6 @@ const ProcessCleanup = struct {
         process.address_space.reinitializeAndUnmapAll(current_task);
 
         globals.cache.deallocate(current_task, process);
-    }
-
-    fn entry(current_task: Task.Current, process_cleanup_addr: usize, _: usize) noreturn {
-        const process_cleanup: *ProcessCleanup = @ptrFromInt(process_cleanup_addr);
-
-        if (core.is_debug) {
-            std.debug.assert(current_task.task == process_cleanup.task);
-            std.debug.assert(current_task.task.interrupt_disable_count == 0);
-            std.debug.assert(current_task.task.spinlocks_held == 0);
-            std.debug.assert(!current_task.task.scheduler_locked);
-            std.debug.assert(arch.interrupts.areEnabled());
-        }
-
-        process_cleanup.execute(current_task);
     }
 };
 

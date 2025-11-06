@@ -63,6 +63,14 @@ pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
     stack.stack_pointer = new_stack_pointer;
 }
 
+/// Returns true if there is space for `number` of `usize` values on the stack.
+pub fn spaceFor(stack: *Stack, number: usize) bool {
+    const size = core.Size.of(usize).multiplyScalar(number);
+    const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(size);
+    if (new_stack_pointer.lessThan(stack.usable_range.address)) return false;
+    return true;
+}
+
 pub fn reset(stack: *Stack) void {
     stack.stack_pointer = stack.usable_range.endBound();
 

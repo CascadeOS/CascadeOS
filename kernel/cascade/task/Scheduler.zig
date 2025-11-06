@@ -370,26 +370,6 @@ fn beforeSwitchTask(
     }
 }
 
-// Called directly by assembly code in `arch.scheduling.prepareTaskForScheduling`, so the signature must match.
-pub fn taskEntry(
-    current_task: Task.Current,
-    /// must be a function compatible with `arch.scheduling.TaskFunction`
-    target_function_addr: *const anyopaque,
-    task_arg1: usize,
-    task_arg2: usize,
-) callconv(.c) noreturn {
-    unlockScheduler(current_task);
-
-    const func: arch.scheduling.TaskFunction = @ptrCast(target_function_addr);
-    func(current_task, task_arg1, task_arg2) catch |err| {
-        std.debug.panic("unhandled error: {t}", .{err});
-    };
-
-    lockScheduler(current_task);
-    current_task.drop();
-    unreachable;
-}
-
 fn idle(current_task: Task.Current) callconv(.c) noreturn {
     if (core.is_debug) {
         std.debug.assert(current_task.task.scheduler_locked);

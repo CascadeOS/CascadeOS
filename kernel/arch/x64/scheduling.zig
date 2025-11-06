@@ -126,24 +126,25 @@ pub fn switchTask(
 
 /// Prepares the given task for being scheduled.
 ///
-/// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `target_function` with
-/// the given arguments.
+/// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
+///
+/// This function *must* be called before the task is scheduled and can only be called once.
 pub fn prepareTaskForScheduling(
     task: *Task,
-    target_function: arch.scheduling.TaskFunction,
-    arg1: usize,
-    arg2: usize,
-) error{StackOverflow}!void {
+    type_erased_call: core.TypeErasedCall,
+) void {
     const impls = struct {
-        const startTaskStage1: *const fn () callconv(.c) void = blk: {
+        const taskEntryTrampoline: *const fn () callconv(.c) void = blk: {
             const impl = struct {
                 fn impl() callconv(.naked) void {
                     asm volatile (
                         \\pop %rdi // current_task
-                        \\pop %rsi // target_function
-                        \\pop %rdx // arg1
-                        \\pop %rcx // arg2
-                        \\ret // the return address of `Task.Scheduler.taskEntry` should be on the stack
+                        \\pop %rsi // type_erased_call.typeErased
+                        \\pop %rdx // type_erased_call.arg_slots[0]
+                        \\pop %rcx // type_erased_call.arg_slots[1]
+                        \\pop %r8  // type_erased_call.arg_slots[2]
+                        \\pop %r9  // type_erased_call.arg_slots[3]
+                        \\ret      // the address of `Task.Scheduler.taskEntry` is on the stack
                     );
                 }
             }.impl;
@@ -152,17 +153,21 @@ pub fn prepareTaskForScheduling(
         };
     };
 
-    try task.stack.push(@intFromPtr(&Task.Scheduler.taskEntry));
+    std.debug.assert(task.stack.spaceFor(8 + 6));
 
-    try task.stack.push(arg2);
-    try task.stack.push(arg1);
-    try task.stack.push(@intFromPtr(target_function));
-    try task.stack.push(@intFromPtr(task));
+    task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
-    try task.stack.push(@intFromPtr(impls.startTaskStage1));
+    task.stack.push(type_erased_call.arg_slots[3]) catch unreachable;
+    task.stack.push(type_erased_call.arg_slots[2]) catch unreachable;
+    task.stack.push(type_erased_call.arg_slots[1]) catch unreachable;
+    task.stack.push(type_erased_call.arg_slots[0]) catch unreachable;
+    task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
+    task.stack.push(@intFromPtr(task)) catch unreachable;
+
+    task.stack.push(@intFromPtr(impls.taskEntryTrampoline)) catch unreachable;
 
     // general purpose registers
-    for (0..6) |_| try task.stack.push(0);
+    for (0..6) |_| task.stack.push(0) catch unreachable;
 }
 
 /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
