@@ -170,13 +170,15 @@ fn switchToIdleDeferredAction(
     arch.scheduling.call(
         old_task,
         scheduler_task.stack,
-        static.idleEntryDeferredAction,
-        .{
-            scheduler_task,
-            old_task,
-            deferred_action.action,
-            deferred_action.arg,
-        },
+        .prepare(
+            static.idleEntryDeferredAction,
+            .{
+                scheduler_task,
+                old_task,
+                deferred_action.action,
+                deferred_action.arg,
+            },
+        ),
     ) catch |err| {
         switch (err) {
             error.StackOverflow => @panic("insufficent space on the scheduler task stack"),
@@ -289,13 +291,15 @@ fn switchToTaskFromTaskDeferredAction(
     arch.scheduling.call(
         old_task,
         scheduler_task.stack,
-        static.switchToTaskDeferredAction,
-        .{
-            old_task,
-            new_task,
-            deferred_action.action,
-            deferred_action.arg,
-        },
+        .prepare(
+            static.switchToTaskDeferredAction,
+            .{
+                old_task,
+                new_task,
+                deferred_action.action,
+                deferred_action.arg,
+            },
+        ),
     ) catch |err| {
         switch (err) {
             error.StackOverflow => @panic("insufficent space on the scheduler task stack"),

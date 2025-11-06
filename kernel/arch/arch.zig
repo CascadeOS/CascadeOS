@@ -480,209 +480,28 @@ pub const scheduling = struct {
 
     pub const CallError = error{StackOverflow};
 
-    /// Calls `function` on `new_stack` and saves the state of `old_task`.
-    ///
-    /// Caller must ensure:
-    ///  - `args` has a length of 0, 1, 2, 3 or 4
-    ///  - `function` has a return type of `noreturn` or `!noreturn`
-    pub inline fn call(
+    /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
+    pub fn call(
         old_task: *Task,
         new_stack: Task.Stack,
-        comptime function: anytype,
-        args: std.meta.ArgsTuple(@TypeOf(function)),
-    ) CallError!void {
-        return callInner(old_task, new_stack, function, args);
+        type_erased_call: core.TypeErasedCall,
+    ) callconv(core.inline_in_non_debug) CallError!void {
+        return getFunction(current_functions.scheduling, "call")(
+            old_task,
+            new_stack,
+            type_erased_call,
+        );
     }
 
-    /// Calls `function` on `new_stack`.
-    ///
-    /// Caller must ensure:
-    ///  - `args` has a length of 0, 1, 2, 3 or 4
-    ///  - `function` has a return type of `noreturn` or `!noreturn`
-    pub inline fn callNoSave(
+    /// Calls `type_erased_call` on `new_stack`.
+    pub fn callNoSave(
         new_stack: Task.Stack,
-        comptime function: anytype,
-        args: std.meta.ArgsTuple(@TypeOf(function)),
-    ) CallError!noreturn {
-        try callInner(null, new_stack, function, args);
-    }
-
-    inline fn callInner(
-        old_task: anytype,
-        new_stack: Task.Stack,
-        comptime function: anytype,
-        args: std.meta.ArgsTuple(@TypeOf(function)),
-    ) CallError!(if (@TypeOf(old_task) == *Task) void else noreturn) {
-        const has_old_task = @TypeOf(old_task) == *Task;
-
-        const fn_info = @typeInfo(@TypeOf(function)).@"fn";
-
-        const return_type: enum { noreturn, error_union } = blk: {
-            const ReturnType = fn_info.return_type.?;
-
-            if (ReturnType == noreturn) break :blk .noreturn;
-            if (@typeInfo(ReturnType) == .error_union) break :blk .error_union;
-
-            @compileError("`function` must have a return type of `noreturn` or `!noreturn`");
-        };
-
-        switch (comptime args.len) {
-            0 => {
-                const wrapperFn = struct {
-                    fn wrapperFn() callconv(.c) noreturn {
-                        const ret = function();
-                        switch (comptime return_type) {
-                            .noreturn => {},
-                            .error_union => ret catch |err| std.debug.panic(
-                                "unhandled error: {t}",
-                                .{err},
-                            ),
-                        }
-                        @panic("`function` returned");
-                    }
-                }.wrapperFn;
-
-                return if (has_old_task) getFunction(current_functions.scheduling, "callZeroArg")(
-                    old_task,
-                    new_stack,
-                    wrapperFn,
-                ) else getFunction(current_functions.scheduling, "callZeroArgNoSave")(
-                    new_stack,
-                    wrapperFn,
-                );
-            },
-            1 => {
-                const wrapperFn = struct {
-                    fn wrapperFn(arg0: usize) callconv(.c) noreturn {
-                        const ret = function(
-                            usizeToArg(@TypeOf(args[0]), arg0),
-                        );
-                        switch (comptime return_type) {
-                            .noreturn => {},
-                            .error_union => ret catch |err| std.debug.panic(
-                                "unhandled error: {t}",
-                                .{err},
-                            ),
-                        }
-                        @panic("`function` returned");
-                    }
-                }.wrapperFn;
-
-                return if (has_old_task) getFunction(current_functions.scheduling, "callOneArg")(
-                    old_task,
-                    new_stack,
-                    argToUsize(args[0]),
-                    wrapperFn,
-                ) else getFunction(current_functions.scheduling, "callOneArgNoSave")(
-                    new_stack,
-                    argToUsize(args[0]),
-                    wrapperFn,
-                );
-            },
-            2 => {
-                const wrapperFn = struct {
-                    fn wrapperFn(arg0: usize, arg1: usize) callconv(.c) noreturn {
-                        const ret = function(
-                            usizeToArg(@TypeOf(args[0]), arg0),
-                            usizeToArg(@TypeOf(args[1]), arg1),
-                        );
-                        switch (comptime return_type) {
-                            .noreturn => {},
-                            .error_union => ret catch |err| std.debug.panic(
-                                "unhandled error: {t}",
-                                .{err},
-                            ),
-                        }
-                        @panic("`function` returned");
-                    }
-                }.wrapperFn;
-
-                return if (has_old_task) getFunction(current_functions.scheduling, "callTwoArg")(
-                    old_task,
-                    new_stack,
-                    argToUsize(args[0]),
-                    argToUsize(args[1]),
-                    wrapperFn,
-                ) else getFunction(current_functions.scheduling, "callTwoArgNoSave")(
-                    new_stack,
-                    argToUsize(args[0]),
-                    argToUsize(args[1]),
-                    wrapperFn,
-                );
-            },
-            3 => {
-                const wrapperFn = struct {
-                    fn wrapperFn(arg0: usize, arg1: usize, arg2: usize) callconv(.c) noreturn {
-                        const ret = function(
-                            usizeToArg(@TypeOf(args[0]), arg0),
-                            usizeToArg(@TypeOf(args[1]), arg1),
-                            usizeToArg(@TypeOf(args[2]), arg2),
-                        );
-                        switch (comptime return_type) {
-                            .noreturn => {},
-                            .error_union => ret catch |err| std.debug.panic(
-                                "unhandled error: {t}",
-                                .{err},
-                            ),
-                        }
-                        @panic("`function` returned");
-                    }
-                }.wrapperFn;
-
-                return if (has_old_task) getFunction(current_functions.scheduling, "callThreeArg")(
-                    old_task,
-                    new_stack,
-                    argToUsize(args[0]),
-                    argToUsize(args[1]),
-                    argToUsize(args[2]),
-                    wrapperFn,
-                ) else getFunction(current_functions.scheduling, "callThreeArgNoSave")(
-                    new_stack,
-                    argToUsize(args[0]),
-                    argToUsize(args[1]),
-                    argToUsize(args[2]),
-                    wrapperFn,
-                );
-            },
-            4 => {
-                const wrapperFn = struct {
-                    fn wrapperFn(arg0: usize, arg1: usize, arg2: usize, arg3: usize) callconv(.c) noreturn {
-                        const ret = function(
-                            usizeToArg(@TypeOf(args[0]), arg0),
-                            usizeToArg(@TypeOf(args[1]), arg1),
-                            usizeToArg(@TypeOf(args[2]), arg2),
-                            usizeToArg(@TypeOf(args[3]), arg3),
-                        );
-                        switch (comptime return_type) {
-                            .noreturn => {},
-                            .error_union => ret catch |err| std.debug.panic(
-                                "unhandled error: {t}",
-                                .{err},
-                            ),
-                        }
-                        @panic("`function` returned");
-                    }
-                }.wrapperFn;
-
-                return if (has_old_task) getFunction(current_functions.scheduling, "callFourArg")(
-                    old_task,
-                    new_stack,
-                    argToUsize(args[0]),
-                    argToUsize(args[1]),
-                    argToUsize(args[2]),
-                    argToUsize(args[3]),
-                    wrapperFn,
-                ) else getFunction(current_functions.scheduling, "callFourArgNoSave")(
-                    new_stack,
-                    argToUsize(args[0]),
-                    argToUsize(args[1]),
-                    argToUsize(args[2]),
-                    argToUsize(args[3]),
-                    wrapperFn,
-                );
-            },
-            else => @compileError("`args` must have a length of 0, 1, 2, 3 or 4"),
-        }
+        type_erased_call: core.TypeErasedCall,
+    ) callconv(core.inline_in_non_debug) CallError!noreturn {
+        return getFunction(current_functions.scheduling, "callNoSave")(
+            new_stack,
+            type_erased_call,
+        );
     }
 };
 
@@ -1112,89 +931,17 @@ pub const Functions = struct {
             arg2: usize,
         ) error{StackOverflow}!void = null,
 
-        /// Calls `target_function` on `new_stack` and saves the state of `old_task`.
-        callZeroArg: ?fn (
+        /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
+        call: ?fn (
             old_task: *Task,
             new_stack: Task.Stack,
-            target_function: *const fn () callconv(.c) noreturn,
+            type_erased_call: core.TypeErasedCall,
         ) scheduling.CallError!void = null,
 
-        /// Calls `target_function` on `new_stack`.
-        callZeroArgNoSave: ?fn (
+        /// Calls `type_erased_call` on `new_stack`.
+        callNoSave: ?fn (
             new_stack: Task.Stack,
-            target_function: *const fn () callconv(.c) noreturn,
-        ) scheduling.CallError!noreturn = null,
-
-        /// Calls `target_function` on `new_stack` and saves the state of `old_task`.
-        callOneArg: ?fn (
-            old_task: *Task,
-            new_stack: Task.Stack,
-            arg1: usize,
-            target_function: *const fn (usize) callconv(.c) noreturn,
-        ) scheduling.CallError!void = null,
-
-        /// Calls `target_function` on `new_stack`.
-        callOneArgNoSave: ?fn (
-            new_stack: Task.Stack,
-            arg1: usize,
-            target_function: *const fn (usize) callconv(.c) noreturn,
-        ) scheduling.CallError!noreturn = null,
-
-        /// Calls `target_function` on `new_stack` and saves the state of `old_task`.
-        callTwoArg: ?fn (
-            old_task: *Task,
-            new_stack: Task.Stack,
-            arg1: usize,
-            arg2: usize,
-            target_function: *const fn (usize, usize) callconv(.c) noreturn,
-        ) scheduling.CallError!void = null,
-
-        /// Calls `target_function` on `new_stack`.
-        callTwoArgNoSave: ?fn (
-            new_stack: Task.Stack,
-            arg1: usize,
-            arg2: usize,
-            target_function: *const fn (usize, usize) callconv(.c) noreturn,
-        ) scheduling.CallError!noreturn = null,
-
-        /// Calls `target_function` on `new_stack` and saves the state of `old_task`.
-        callThreeArg: ?fn (
-            old_task: *Task,
-            new_stack: Task.Stack,
-            arg1: usize,
-            arg2: usize,
-            arg3: usize,
-            target_function: *const fn (usize, usize, usize) callconv(.c) noreturn,
-        ) scheduling.CallError!void = null,
-
-        /// Calls `target_function` on `new_stack`.
-        callThreeArgNoSave: ?fn (
-            new_stack: Task.Stack,
-            arg1: usize,
-            arg2: usize,
-            arg3: usize,
-            target_function: *const fn (usize, usize, usize) callconv(.c) noreturn,
-        ) scheduling.CallError!noreturn = null,
-
-        /// Calls `target_function` on `new_stack` and saves the state of `old_task`.
-        callFourArg: ?fn (
-            old_task: *Task,
-            new_stack: Task.Stack,
-            arg1: usize,
-            arg2: usize,
-            arg3: usize,
-            arg4: usize,
-            target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
-        ) scheduling.CallError!void = null,
-
-        /// Calls `target_function` on `new_stack`.
-        callFourArgNoSave: ?fn (
-            new_stack: Task.Stack,
-            arg1: usize,
-            arg2: usize,
-            arg3: usize,
-            arg4: usize,
-            target_function: *const fn (usize, usize, usize, usize) callconv(.c) noreturn,
+            type_erased_call: core.TypeErasedCall,
         ) scheduling.CallError!noreturn = null,
     },
 

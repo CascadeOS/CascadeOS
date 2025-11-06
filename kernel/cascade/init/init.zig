@@ -117,8 +117,10 @@ fn initStage2(current_task: Task.Current) !noreturn {
 
     try arch.scheduling.callNoSave(
         current_task.task.stack,
-        initStage3,
-        .{current_task},
+        .prepare(
+            initStage3,
+            .{current_task},
+        ),
     );
     unreachable;
 }

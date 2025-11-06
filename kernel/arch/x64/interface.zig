@@ -100,16 +100,8 @@ pub const functions: arch.Functions = .{
         .beforeSwitchTask = x64.scheduling.beforeSwitchTask,
         .switchTask = x64.scheduling.switchTask,
         .prepareTaskForScheduling = x64.scheduling.prepareTaskForScheduling,
-        .callZeroArg = x64.scheduling.callZeroArg,
-        .callZeroArgNoSave = x64.scheduling.callZeroArgNoSave,
-        .callOneArg = x64.scheduling.callOneArg,
-        .callOneArgNoSave = x64.scheduling.callOneArgNoSave,
-        .callTwoArg = x64.scheduling.callTwoArg,
-        .callTwoArgNoSave = x64.scheduling.callTwoArgNoSave,
-        .callThreeArg = x64.scheduling.callThreeArg,
-        .callThreeArgNoSave = x64.scheduling.callThreeArgNoSave,
-        .callFourArg = x64.scheduling.callFourArg,
-        .callFourArgNoSave = x64.scheduling.callFourArgNoSave,
+        .call = x64.scheduling.call,
+        .callNoSave = x64.scheduling.callNoSave,
     },
 
     .io = .{
