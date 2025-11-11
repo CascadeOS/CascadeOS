@@ -216,13 +216,16 @@ const allocator_impl = struct {
         log.verbose(current_task, "unmapping {f} from heap", .{allocation});
 
         {
+            var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
+            unmap_batch.appendMergeIfFull(allocation.toVirtualRange());
+
             globals.heap_page_table_mutex.lock(current_task);
             defer globals.heap_page_table_mutex.unlock(current_task);
 
-            cascade.mem.unmapRange(
+            cascade.mem.unmap(
                 current_task,
                 cascade.mem.kernelPageTable(),
-                allocation.toVirtualRange(),
+                &unmap_batch,
                 .kernel,
                 .free,
                 .keep,

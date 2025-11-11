@@ -77,20 +77,14 @@ pub const functions: arch.Functions = .{
         }.copyTopLevelIntoPageTable,
 
         .mapSinglePage = x64.paging.PageTable.map4KiB,
-        .unmapSinglePage = x64.paging.PageTable.unmap4KiB,
+        .unmap = x64.paging.PageTable.unmap,
         .changeSinglePageProtection = x64.paging.PageTable.change4KiBProtection,
         .flushCache = x64.paging.flushCache,
         .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
         .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,
 
         .init = .{
-            .sizeOfTopLevelEntry = struct {
-                fn sizeOfTopLevelEntry() core.Size {
-                    // TODO: Only correct for 4 level paging
-                    return core.Size.from(0x8000000000, .byte);
-                }
-            }.sizeOfTopLevelEntry,
-
+            .sizeOfTopLevelEntry = x64.paging.PageTable.sizeOfTopLevelEntry,
             .fillTopLevel = x64.paging.PageTable.init.fillTopLevel,
             .mapToPhysicalRangeAllPageSizes = x64.paging.PageTable.init.mapToPhysicalRangeAllPageSizes,
         },

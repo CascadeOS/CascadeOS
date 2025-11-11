@@ -39,6 +39,13 @@ pub const user_address_space_range: core.VirtualRange = .{
     .address = .fromInt(arch.paging.standard_page_size.value),
     .size = arch.paging.lower_half_size.subtract(arch.paging.standard_page_size),
 };
+
+/// The number of virtual ranges to batch together when unmapping/changing protection.
+pub const virtual_ranges_to_batch = 16;
+
+/// When batching virtual ranges are merged together if the seperation between them is less than or equal to this value.
+pub const virtual_range_batching_seperation_to_merge_over = arch.paging.standard_page_size.multiplyScalar(4);
+
 comptime {
     // No special handing of the undefined address is required as it does not overlap with the user address space range.
     std.debug.assert(!user_address_space_range.containsAddress(.undefined_address));

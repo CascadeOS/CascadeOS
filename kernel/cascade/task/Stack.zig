@@ -117,10 +117,13 @@ pub fn destroyStack(stack: Stack, current_task: Task.Current) void {
         globals.stack_page_table_mutex.lock(current_task);
         defer globals.stack_page_table_mutex.unlock(current_task);
 
-        cascade.mem.unmapRange(
+        var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
+        unmap_batch.appendMergeIfFull(stack.usable_range);
+
+        cascade.mem.unmap(
             current_task,
             cascade.mem.kernelPageTable(),
-            stack.usable_range,
+            &unmap_batch,
             .kernel,
             .free,
             .keep,

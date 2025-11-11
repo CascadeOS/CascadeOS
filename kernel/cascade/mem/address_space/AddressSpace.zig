@@ -885,23 +885,52 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
         errdefer comptime unreachable;
 
         {
-            // TODO: as we have a write lock to the entries do we need to lock the page table?
-            address_space.page_table_lock.lock(current_task);
-            defer address_space.page_table_lock.unlock(current_task);
+            var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
 
-            // TODO: use `entry_range` to only unmap ranges covered by the entry range
-            cascade.mem.unmapRange(
-                current_task,
-                address_space.page_table,
-                range,
-                address_space.context,
-                .keep, // backing pages are managed by anonymous maps
-                switch (address_space.context) {
-                    .kernel => .keep,
-                    .user => .free,
-                },
-                cascade.mem.phys.allocator,
-            );
+            var entry_range_iter = entry_range.iterator(range, address_space.entries.items);
+            while (entry_range_iter.next()) |r| {
+                if (!unmap_batch.append(r)) {
+                    // TODO: as we have a write lock to the entries do we need to lock the page table?
+                    address_space.page_table_lock.lock(current_task);
+                    defer address_space.page_table_lock.unlock(current_task);
+
+                    cascade.mem.unmap(
+                        current_task,
+                        address_space.page_table,
+                        &unmap_batch,
+                        address_space.context,
+                        .keep, // backing pages are managed by anonymous maps
+                        switch (address_space.context) {
+                            .kernel => .keep,
+                            .user => .free,
+                        },
+                        cascade.mem.phys.allocator,
+                    );
+
+                    unmap_batch.clear();
+
+                    unmap_batch.appendMergeIfFull(r);
+                }
+            }
+
+            if (unmap_batch.ranges.len != 0) {
+                // TODO: as we have a write lock to the entries do we need to lock the page table?
+                address_space.page_table_lock.lock(current_task);
+                defer address_space.page_table_lock.unlock(current_task);
+
+                cascade.mem.unmap(
+                    current_task,
+                    address_space.page_table,
+                    &unmap_batch,
+                    address_space.context,
+                    .keep, // backing pages are managed by anonymous maps
+                    switch (address_space.context) {
+                        .kernel => .keep,
+                        .user => .free,
+                    },
+                    cascade.mem.phys.allocator,
+                );
+            }
         }
 
         address_space.entries_version +%= 1;
@@ -1190,6 +1219,63 @@ const EntryRange = struct {
             entry_range.start_overlap and
             entry_range.end_overlap;
     }
+
+    pub fn iterator(entry_range: EntryRange, range: core.VirtualRange, entries: []const *const Entry) Iterator {
+        return .{
+            .entry_range = entry_range,
+            .range = range,
+            .entries = entries,
+            .index = entry_range.start,
+        };
+    }
+
+    const Iterator = struct {
+        entry_range: EntryRange,
+        range: core.VirtualRange,
+        entries: []const *const Entry,
+
+        index: usize,
+
+        pub fn next(iter: *Iterator) ?core.VirtualRange {
+            const entry_range = &iter.entry_range;
+            const end_index = entry_range.start + entry_range.length;
+
+            const index = iter.index;
+            if (index >= end_index) return null;
+
+            const entry = iter.entries[index];
+            iter.index += 1;
+
+            const range = iter.range;
+
+            if (index == entry_range.start and entry_range.start_overlap) {
+                @branchHint(.unlikely);
+
+                if (index == end_index - 1 and entry_range.end_overlap) {
+                    @branchHint(.unlikely);
+
+                    std.debug.assert(entry_range.length == 1);
+                    return range;
+                }
+
+                return .fromAddr(
+                    range.address,
+                    entry.range.endBound().difference(range.address),
+                );
+            }
+
+            if (index == end_index - 1 and entry_range.end_overlap) {
+                @branchHint(.unlikely);
+
+                return .fromAddr(
+                    entry.range.address,
+                    range.endBound().difference(entry.range.address),
+                );
+            }
+
+            return entry.range;
+        }
+    };
 };
 
 /// Return the start index and length of the entries that overlap the given range.

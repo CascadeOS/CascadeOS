@@ -87,13 +87,17 @@ pub fn mapRangeAndBackWithPhysicalFrames(
 
     errdefer {
         // Unmap all pages that have been mapped.
-        unmapRange(
+
+        var unmap_batch: VirtualRangeBatch = .{};
+        unmap_batch.appendMergeIfFull(.{
+            .address = virtual_range.address,
+            .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
+        });
+
+        unmap(
             current_task,
             page_table,
-            .{
-                .address = virtual_range.address,
-                .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
-            },
+            &unmap_batch,
             flush_target,
             .free,
             top_level_decision,
@@ -159,13 +163,17 @@ pub fn mapRangeToPhysicalRange(
 
     errdefer {
         // Unmap all pages that have been mapped.
-        unmapRange(
+
+        var unmap_batch: VirtualRangeBatch = .{};
+        unmap_batch.appendMergeIfFull(.{
+            .address = virtual_range.address,
+            .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
+        });
+
+        unmap(
             current_task,
             page_table,
-            .{
-                .address = virtual_range.address,
-                .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
-            },
+            &unmap_batch,
             flush_target,
             .keep,
             top_level_decision,
@@ -191,56 +199,51 @@ pub fn mapRangeToPhysicalRange(
     }
 }
 
-/// Unmaps a virtual range.
-///
-/// Only unmaps the pages in the range that are actually mapped.
+/// Unmaps all ranges in the given batch.
 ///
 /// Performs TLB shootdown.
-///
-/// **REQUIREMENTS**:
-/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
-/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
-pub fn unmapRange(
+pub fn unmap(
     current_task: Task.Current,
     page_table: arch.paging.PageTable,
-    virtual_range: core.VirtualRange,
+    unmap_batch: *const VirtualRangeBatch,
     flush_target: cascade.Context,
     backing_page_decision: core.CleanupDecision,
     top_level_decision: core.CleanupDecision,
     physical_frame_allocator: phys.FrameAllocator,
 ) void {
-    if (core.is_debug) {
-        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    }
-
     var deallocate_frame_list: phys.FrameList = .{};
+    var flush_batch: VirtualRangeBatch = .{};
 
-    // TODO: this can be optimized by implementing `arch.paging.unmapRange`
-
-    const last_virtual_address = virtual_range.last();
-    var current_virtual_address = virtual_range.address;
-
-    while (current_virtual_address.lessThan(last_virtual_address)) {
-        page_table.unmapSinglePage(
+    for (unmap_batch.ranges.constSlice()) |range| {
+        page_table.unmap(
             current_task,
-            current_virtual_address,
+            range,
             backing_page_decision,
             top_level_decision,
+            &flush_batch,
             &deallocate_frame_list,
         );
-        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+
+        if (flush_batch.full()) {
+            var request: FlushRequest = .{
+                .batch = &flush_batch,
+                .flush_target = flush_target,
+            };
+
+            request.submitAndWait(current_task);
+
+            flush_batch.clear();
+        }
     }
 
-    // TODO: once `arch.paging.unmapRange` is implemented it can return the actual range unmapped and we can use that
-    //       for the flush instead of the entire virtual range
+    if (flush_batch.ranges.len != 0) {
+        var request: FlushRequest = .{
+            .batch = &flush_batch,
+            .flush_target = flush_target,
+        };
 
-    var request: FlushRequest = .{
-        .range = virtual_range,
-        .flush_target = flush_target,
-    };
-
-    request.submitAndWait(current_task);
+        request.submitAndWait(current_task);
+    }
 
     physical_frame_allocator.deallocate(current_task, deallocate_frame_list);
 }
@@ -271,6 +274,8 @@ pub fn changeProtection(
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
 
+    var flush_batch: VirtualRangeBatch = .{}; // TODO: pass this to `changeProtection`
+
     while (current_virtual_address.lessThan(last_virtual_address)) {
         page_table.changeSinglePageProtection(
             current_task,
@@ -280,11 +285,10 @@ pub fn changeProtection(
         current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
     }
 
-    // TODO: once `arch.paging.changeProtection` is implemented it can return the actual range modified and we can use
-    //       that for the flush instead of the entire virtual range
+    flush_batch.appendMergeIfFull(virtual_range);
 
     var request: FlushRequest = .{
-        .range = virtual_range,
+        .batch = &flush_batch,
         .flush_target = flush_target,
     };
 
@@ -493,6 +497,115 @@ pub const MapError = error{
 pub fn kernelVirtualOffset() core.Size {
     return globals.kernel_virtual_offset;
 }
+
+/// A batch of virtual ranges.
+///
+/// Attempts to merge adjacent ranges if they are reasonable close together see
+/// `cascade.config.virtual_range_batching_seperation_to_merge_over`.
+pub const VirtualRangeBatch = struct {
+    ranges: core.containers.BoundedArray(
+        core.VirtualRange,
+        cascade.config.virtual_ranges_to_batch,
+    ) = .{},
+
+    /// Appends a virtual range to the batch.
+    ///
+    /// If full then always merges with the last range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - `range.address` must be greater than or equal to the end of the last range in the batch
+    /// - `range.address` must be aligned to `arch.paging.standard_page_size`
+    /// - `range.size` must be aligned to `arch.paging.standard_page_size`
+    pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: core.VirtualRange) void {
+        if (core.is_debug) {
+            std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+        }
+
+        switch (batch.ranges.len) {
+            0 => {
+                @branchHint(.unlikely);
+                batch.ranges.appendAssumeCapacity(range);
+            },
+            cascade.config.virtual_ranges_to_batch => {
+                // we have hit the limit of virtual ranges to batch together so we always merge with the last range
+                const last: *core.VirtualRange = &batch.ranges.slice()[cascade.config.virtual_ranges_to_batch - 1];
+
+                if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
+
+                const seperation = range.address.difference(last.endBound());
+                last.size.addInPlace(seperation);
+                last.size.addInPlace(range.size);
+            },
+            else => |len| {
+                @branchHint(.likely);
+                const last: *core.VirtualRange = &batch.ranges.slice()[len - 1];
+
+                if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
+
+                const seperation = range.address.difference(last.endBound());
+
+                if (seperation.lessThanOrEqual(cascade.config.virtual_range_batching_seperation_to_merge_over)) {
+                    last.size.addInPlace(seperation);
+                    last.size.addInPlace(range.size);
+                } else {
+                    batch.ranges.appendAssumeCapacity(range);
+                }
+            },
+        }
+    }
+
+    /// Appends a virtual range to the batch.
+    ///
+    /// Returns `false` if the batch is full and the range could not be appended.
+    ///
+    /// **REQUIREMENTS**:
+    /// - `range.address` must be greater than or equal to the end of the last range in the batch
+    /// - `range.address` must be aligned to `arch.paging.standard_page_size`
+    /// - `range.size` must be aligned to `arch.paging.standard_page_size`
+    pub fn append(batch: *VirtualRangeBatch, range: core.VirtualRange) bool {
+        if (core.is_debug) {
+            std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+        }
+
+        const len = batch.ranges.len;
+
+        if (len == 0) {
+            @branchHint(.unlikely);
+            batch.ranges.appendAssumeCapacity(range);
+            return true;
+        }
+
+        const last: *core.VirtualRange = &batch.ranges.slice()[len - 1];
+
+        if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
+
+        const seperation = range.address.difference(last.endBound());
+
+        if (seperation.lessThanOrEqual(cascade.config.virtual_range_batching_seperation_to_merge_over)) {
+            last.size.addInPlace(seperation);
+            last.size.addInPlace(range.size);
+            return true;
+        }
+
+        if (batch.full()) {
+            @branchHint(.cold);
+            return false;
+        }
+
+        batch.ranges.appendAssumeCapacity(range);
+        return true;
+    }
+
+    pub fn full(batch: *VirtualRangeBatch) bool {
+        return batch.ranges.len == cascade.config.virtual_ranges_to_batch;
+    }
+
+    pub fn clear(batch: *VirtualRangeBatch) void {
+        batch.ranges.clear();
+    }
+};
 
 const globals = struct {
     /// The kernel page table.

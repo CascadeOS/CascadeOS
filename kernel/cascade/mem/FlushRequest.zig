@@ -10,7 +10,7 @@ const core = @import("core");
 
 const FlushRequest = @This();
 
-range: core.VirtualRange,
+batch: *const cascade.mem.VirtualRangeBatch,
 flush_target: cascade.Context,
 count: std.atomic.Value(usize) = .init(1), // starts at `1` to account for the current executor
 nodes: core.containers.BoundedArray(Node, cascade.config.maximum_number_of_executors) = .{},
@@ -69,7 +69,9 @@ fn flush(flush_request: *FlushRequest, current_task: Task.Current) void {
         },
     }
 
-    arch.paging.flushCache(current_task, flush_request.range);
+    for (flush_request.batch.ranges.constSlice()) |range| {
+        arch.paging.flushCache(current_task, range);
+    }
 }
 
 fn requestExecutor(flush_request: *FlushRequest, current_task: Task.Current, executor: *cascade.Executor) void {

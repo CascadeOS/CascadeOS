@@ -26,6 +26,11 @@ pub const PageTable = extern struct {
     pub const level_3_address_space_size = large_page_size;
     pub const level_4_address_space_size = core.Size.from(512, .gib);
 
+    pub fn sizeOfTopLevelEntry() core.Size {
+        // TODO: Only correct for 4 level paging
+        return level_4_address_space_size;
+    }
+
     fn zero(page_table: *PageTable) void {
         @memset(std.mem.asBytes(page_table), 0);
     }
@@ -116,77 +121,167 @@ pub const PageTable = extern struct {
         );
     }
 
-    /// Unmaps a 4 KiB page.
+    /// Unmaps the given virtual range.
     ///
-    /// NOP if the page is not mapped.
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
     ///
-    /// Panics if the page is not present or is a huge page.
-    pub fn unmap4KiB(
+    /// This function:
+    ///  - only supports the standard page size for the architecture
+    ///  - does not flush the TLB
+    pub fn unmap(
         level4_table: *PageTable,
         current_task: Task.Current,
-        virtual_address: core.VirtualAddress,
+        virtual_range: core.VirtualRange,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
+        flush_batch: *cascade.mem.VirtualRangeBatch,
         deallocate_frame_list: *cascade.mem.phys.FrameList,
     ) void {
         _ = current_task;
 
-        if (core.is_debug) std.debug.assert(virtual_address.isAligned(small_page_size));
+        if (core.is_debug) {
+            std.debug.assert(virtual_range.address.isAligned(small_page_size));
+            std.debug.assert(virtual_range.size.isAligned(small_page_size));
+        }
 
-        const level4_index = p4Index(virtual_address);
-        const level4_entry = level4_table.entries[level4_index].load();
+        var current_virtual_address = virtual_range.address;
+        const last_virtual_address = virtual_range.last();
 
-        const level3_table = level4_entry.getNextLevel(
-            cascade.mem.directMapFromPhysical,
-        ) catch |err| switch (err) {
-            error.NotPresent => return,
-            error.HugePage => @panic("page table entry is huge"),
-        };
+        const last_virtual_address_p4_index = p4Index(last_virtual_address);
+        const last_virtual_address_p3_index = p3Index(last_virtual_address);
+        const last_virtual_address_p2_index = p2Index(last_virtual_address);
+        const last_virtual_address_p1_index = p1Index(last_virtual_address);
 
-        defer if (top_level_decision == .free and level3_table.isEmpty()) {
-            level4_table.entries[level4_index].zero();
-            deallocate_frame_list.push(.fromAddress(level4_entry.getAddress4kib()));
-        };
+        var level4_index = p4Index(current_virtual_address);
 
-        const level3_index = p3Index(virtual_address);
-        const level3_entry = level3_table.entries[level3_index].load();
+        var opt_in_progress_range: ?core.VirtualRange = null;
 
-        const level2_table = level3_entry.getNextLevel(
-            cascade.mem.directMapFromPhysical,
-        ) catch |err| switch (err) {
-            error.NotPresent => return,
-            error.HugePage => @panic("page table entry is huge"),
-        };
+        while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
+            const level4_entry = level4_table.entries[level4_index].load();
 
-        defer if (level2_table.isEmpty()) {
-            level3_table.entries[level3_index].zero();
-            deallocate_frame_list.push(.fromAddress(level3_entry.getAddress4kib()));
-        };
+            const level3_table = level4_entry.getNextLevel(
+                cascade.mem.directMapFromPhysical,
+            ) catch |err| switch (err) {
+                error.NotPresent => {
+                    if (opt_in_progress_range) |in_progress_range| {
+                        flush_batch.appendMergeIfFull(in_progress_range);
+                        opt_in_progress_range = null;
+                    }
 
-        const level2_index = p2Index(virtual_address);
-        const level2_entry = level2_table.entries[level2_index].load();
+                    current_virtual_address.moveForwardInPlace(level_4_address_space_size);
+                    current_virtual_address.alignBackwardInPlace(level_4_address_space_size);
+                    continue;
+                },
+                error.HugePage => @panic("page table entry is huge"),
+            };
 
-        const level1_table = level2_entry.getNextLevel(
-            cascade.mem.directMapFromPhysical,
-        ) catch |err| switch (err) {
-            error.NotPresent => return,
-            error.HugePage => @panic("page table entry is huge"),
-        };
+            defer if (top_level_decision == .free and level3_table.isEmpty()) {
+                level4_table.entries[level4_index].zero();
+                deallocate_frame_list.push(.fromAddress(level4_entry.getAddress4kib()));
+            };
 
-        defer if (level1_table.isEmpty()) {
-            level2_table.entries[level2_index].zero();
-            deallocate_frame_list.push(.fromAddress(level2_entry.getAddress4kib()));
-        };
+            var level3_index = p3Index(current_virtual_address);
+            const last_level3_index = if (last_virtual_address_p4_index == level4_index)
+                last_virtual_address_p3_index
+            else
+                number_of_entries - 1;
 
-        const level1_index = p1Index(virtual_address);
-        const level1_entry = level1_table.entries[level1_index].load();
+            while (level3_index <= last_level3_index) : (level3_index += 1) {
+                const level3_entry = level3_table.entries[level3_index].load();
 
-        if (!level1_entry.present.read()) return;
+                const level2_table = level3_entry.getNextLevel(
+                    cascade.mem.directMapFromPhysical,
+                ) catch |err| switch (err) {
+                    error.NotPresent => {
+                        if (opt_in_progress_range) |in_progress_range| {
+                            flush_batch.appendMergeIfFull(in_progress_range);
+                            opt_in_progress_range = null;
+                        }
 
-        level1_table.entries[level1_index].zero();
+                        current_virtual_address.moveForwardInPlace(large_page_size);
+                        current_virtual_address.alignBackwardInPlace(large_page_size);
+                        continue;
+                    },
+                    error.HugePage => @panic("page table entry is huge"),
+                };
 
-        if (backing_page_decision == .free) {
-            deallocate_frame_list.push(.fromAddress(level1_entry.getAddress4kib()));
+                defer if (level2_table.isEmpty()) {
+                    level3_table.entries[level3_index].zero();
+                    deallocate_frame_list.push(.fromAddress(level3_entry.getAddress4kib()));
+                };
+
+                var level2_index = p2Index(current_virtual_address);
+                const last_level2_index = if (last_virtual_address_p3_index == level3_index)
+                    last_virtual_address_p2_index
+                else
+                    number_of_entries - 1;
+
+                while (level2_index <= last_level2_index) : (level2_index += 1) {
+                    const level2_entry = level2_table.entries[level2_index].load();
+
+                    const level1_table = level2_entry.getNextLevel(
+                        cascade.mem.directMapFromPhysical,
+                    ) catch |err| switch (err) {
+                        error.NotPresent => {
+                            if (opt_in_progress_range) |in_progress_range| {
+                                flush_batch.appendMergeIfFull(in_progress_range);
+                                opt_in_progress_range = null;
+                            }
+
+                            current_virtual_address.moveForwardInPlace(medium_page_size);
+                            current_virtual_address.alignBackwardInPlace(medium_page_size);
+                            continue;
+                        },
+                        error.HugePage => @panic("page table entry is huge"),
+                    };
+
+                    defer if (level1_table.isEmpty()) {
+                        level2_table.entries[level2_index].zero();
+                        deallocate_frame_list.push(.fromAddress(level2_entry.getAddress4kib()));
+                    };
+
+                    var level1_index = p1Index(current_virtual_address);
+                    const last_level1_index = if (last_virtual_address_p2_index == level2_index)
+                        last_virtual_address_p1_index
+                    else
+                        number_of_entries - 1;
+
+                    while (level1_index <= last_level1_index) : (level1_index += 1) {
+                        defer current_virtual_address.moveForwardInPlace(small_page_size);
+
+                        const level1_entry = level1_table.entries[level1_index].load();
+
+                        if (!level1_entry.present.read()) {
+                            if (opt_in_progress_range) |in_progress_range| {
+                                flush_batch.appendMergeIfFull(in_progress_range);
+                                opt_in_progress_range = null;
+                            }
+
+                            continue;
+                        }
+
+                        level1_table.entries[level1_index].zero();
+
+                        if (backing_page_decision == .free) {
+                            deallocate_frame_list.push(.fromAddress(level1_entry.getAddress4kib()));
+                        }
+
+                        if (opt_in_progress_range) |*in_progress_range| {
+                            in_progress_range.size.addInPlace(small_page_size);
+                        } else {
+                            opt_in_progress_range = .fromAddr(
+                                current_virtual_address,
+                                small_page_size,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if (opt_in_progress_range) |in_progress_range| {
+            flush_batch.appendMergeIfFull(in_progress_range);
         }
     }
 
@@ -1060,16 +1155,3 @@ const maximum_physical_address_bit = 39;
 const length_of_4kib_aligned_address = maximum_physical_address_bit - level_1_shift;
 const length_of_2mib_aligned_address = maximum_physical_address_bit - level_2_shift;
 const length_of_1gib_aligned_address = maximum_physical_address_bit - level_3_shift;
-
-const type_of_4kib: type = std.meta.Int(
-    .unsigned,
-    maximum_physical_address_bit - level_1_shift,
-);
-const type_of_2mib: type = std.meta.Int(
-    .unsigned,
-    maximum_physical_address_bit - level_2_shift,
-);
-const type_of_1gib: type = std.meta.Int(
-    .unsigned,
-    maximum_physical_address_bit - level_3_shift,
-);

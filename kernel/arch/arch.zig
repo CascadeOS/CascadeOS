@@ -277,36 +277,42 @@ pub const paging = struct {
             return getFunction(
                 current_functions.paging,
                 "mapSinglePage",
-            )(page_table.arch_specific, current_task, virtual_address, physical_frame, map_type, physical_frame_allocator);
-        }
-
-        /// Unmaps `virtual_address`.
-        ///
-        /// NOP if the page is not mapped.
-        ///
-        /// Caller must ensure:
-        ///  - the virtual address is aligned to the standard page size
-        ///
-        /// This function:
-        ///  - only supports the standard page size for the architecture
-        ///  - does not flush the TLB
-        pub fn unmapSinglePage(
-            page_table: PageTable,
-            current_task: Task.Current,
-            virtual_address: core.VirtualAddress,
-            backing_page_decision: core.CleanupDecision,
-            top_level_decision: core.CleanupDecision,
-            deallocate_frame_list: *cascade.mem.phys.FrameList,
-        ) callconv(core.inline_in_non_debug) void {
-            getFunction(
-                current_functions.paging,
-                "unmapSinglePage",
             )(
                 page_table.arch_specific,
                 current_task,
                 virtual_address,
+                physical_frame,
+                map_type,
+                physical_frame_allocator,
+            );
+        }
+
+        /// Unmaps the given virtual range.
+        ///
+        /// Caller must ensure:
+        ///  - the virtual range address and size are aligned to the standard page size
+        ///
+        /// This function:
+        ///  - does not flush the TLB
+        pub fn unmap(
+            page_table: PageTable,
+            current_task: Task.Current,
+            virtual_range: core.VirtualRange,
+            backing_page_decision: core.CleanupDecision,
+            top_level_decision: core.CleanupDecision,
+            flush_batch: *cascade.mem.VirtualRangeBatch,
+            deallocate_frame_list: *cascade.mem.phys.FrameList,
+        ) callconv(core.inline_in_non_debug) void {
+            getFunction(
+                current_functions.paging,
+                "unmap",
+            )(
+                page_table.arch_specific,
+                current_task,
+                virtual_range,
                 backing_page_decision,
                 top_level_decision,
+                flush_batch,
                 deallocate_frame_list,
             );
         }
@@ -798,22 +804,20 @@ pub const Functions = struct {
             physical_frame_allocator: cascade.mem.phys.FrameAllocator,
         ) cascade.mem.MapError!void = null,
 
-        /// Unmaps `virtual_address`.
-        ///
-        /// NOP if the page is not mapped.
+        /// Unmaps the given virtual range.
         ///
         /// Caller must ensure:
-        ///  - the virtual address is aligned to the standard page size
+        ///  - the virtual range address and size are aligned to the standard page size
         ///
         /// This function:
-        ///  - only supports the standard page size for the architecture
         ///  - does not flush the TLB
-        unmapSinglePage: ?fn (
+        unmap: ?fn (
             page_table: *current_decls.paging.PageTable,
             current_task: Task.Current,
-            virtual_address: core.VirtualAddress,
+            virtual_range: core.VirtualRange,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
+            flush_batch: *cascade.mem.VirtualRangeBatch,
             deallocate_frame_list: *cascade.mem.phys.FrameList,
         ) void = null,
 
