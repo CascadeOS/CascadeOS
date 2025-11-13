@@ -50,6 +50,12 @@ pub const Cache = enum {
     uncached,
 };
 
+pub fn equal(region: MapType, other: MapType) bool {
+    return region.type == other.type and
+        region.protection == other.protection and
+        region.cache == other.cache;
+}
+
 pub fn format(
     region: MapType,
     writer: *std.Io.Writer,
