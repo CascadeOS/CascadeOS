@@ -250,51 +250,51 @@ pub fn unmap(
     physical_frame_allocator.deallocate(current_task, deallocate_frame_list);
 }
 
-/// Changes the protection of the given virtual range.
+/// Changes the protection of all the ranges in the given batch.
 ///
-/// Only modifies the pages in the range that are actually mapped.
+/// Only modifies the pages that are actually mapped.
 ///
 /// Performs TLB shootdown if required.
-///
-/// **REQUIREMENTS**:
-/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
-/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 pub fn changeProtection(
     current_task: Task.Current,
     page_table: arch.paging.PageTable,
-    virtual_range: core.VirtualRange,
+    change_proection_batch: *const ChangeProtectionBatch,
     flush_target: cascade.Context,
-    map_type: cascade.mem.MapType,
+    new_map_type: cascade.mem.MapType,
 ) void {
-    if (core.is_debug) {
-        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-    }
+    var flush_batch: VirtualRangeBatch = .{};
 
-    // TODO: this can be optimized by implementing `arch.paging.changeProtection`
-
-    const last_virtual_address = virtual_range.last();
-    var current_virtual_address = virtual_range.address;
-
-    var flush_batch: VirtualRangeBatch = .{}; // TODO: pass this to `changeProtection`
-
-    while (current_virtual_address.lessThan(last_virtual_address)) {
-        page_table.changeSinglePageProtection(
+    for (change_proection_batch.ranges.constSlice()) |range| {
+        page_table.changeProtection(
             current_task,
-            current_virtual_address,
-            map_type,
+            range.virtual_range,
+            range.previous_map_type,
+            new_map_type,
+            &flush_batch,
         );
-        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+
+        if (flush_batch.full()) {
+            @branchHint(.unlikely);
+
+            var request: FlushRequest = .{
+                .batch = &flush_batch,
+                .flush_target = flush_target,
+            };
+
+            request.submitAndWait(current_task);
+
+            flush_batch.clear();
+        }
     }
 
-    flush_batch.appendMergeIfFull(virtual_range);
+    if (flush_batch.ranges.len != 0) {
+        var request: FlushRequest = .{
+            .batch = &flush_batch,
+            .flush_target = flush_target,
+        };
 
-    var request: FlushRequest = .{
-        .batch = &flush_batch,
-        .flush_target = flush_target,
-    };
-
-    request.submitAndWait(current_task);
+        request.submitAndWait(current_task);
+    }
 }
 
 /// Returns the virtual address corresponding to this physical address in the direct map.
@@ -605,6 +605,73 @@ pub const VirtualRangeBatch = struct {
     }
 
     pub fn clear(batch: *VirtualRangeBatch) void {
+        batch.ranges.clear();
+    }
+};
+
+/// A batch of virtual ranges with their current map type.
+///
+/// Attempts to merge adjacent ranges if they have the same map type and are reasonably close together see
+/// `cascade.config.virtual_range_batching_seperation_to_merge_over`.
+pub const ChangeProtectionBatch = struct {
+    ranges: core.containers.BoundedArray(
+        VirtualRangeWithMapType,
+        cascade.config.virtual_ranges_to_batch,
+    ) = .{},
+
+    pub const VirtualRangeWithMapType = struct {
+        virtual_range: core.VirtualRange,
+        previous_map_type: MapType,
+    };
+
+    /// Appends a virtual range to the batch.
+    ///
+    /// **REQUIREMENTS**:
+    /// - `range.virtual_range.address` must be greater than or equal to the end of the last range in the batch
+    /// - `range.virtual_range.address` must be aligned to `arch.paging.standard_page_size`
+    /// - `range.virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+    pub fn append(batch: *ChangeProtectionBatch, range: VirtualRangeWithMapType) bool {
+        if (core.is_debug) {
+            std.debug.assert(range.virtual_range.address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(range.virtual_range.size.isAligned(arch.paging.standard_page_size));
+        }
+
+        const len = batch.ranges.len;
+
+        if (len == 0) {
+            @branchHint(.unlikely);
+            batch.ranges.appendAssumeCapacity(range);
+            return true;
+        }
+
+        const last: *VirtualRangeWithMapType = &batch.ranges.slice()[len - 1];
+
+        if (core.is_debug) std.debug.assert(range.virtual_range.address.greaterThanOrEqual(last.virtual_range.endBound()));
+
+        const seperation = range.virtual_range.address.difference(last.virtual_range.endBound());
+
+        if (seperation.lessThanOrEqual(cascade.config.virtual_range_batching_seperation_to_merge_over) and
+            last.previous_map_type.equal(range.previous_map_type))
+        {
+            last.virtual_range.size.addInPlace(seperation);
+            last.virtual_range.size.addInPlace(range.virtual_range.size);
+            return true;
+        }
+
+        if (batch.full()) {
+            @branchHint(.cold);
+            return false;
+        }
+
+        batch.ranges.appendAssumeCapacity(range);
+        return true;
+    }
+
+    pub fn full(batch: *ChangeProtectionBatch) bool {
+        return batch.ranges.len == cascade.config.virtual_ranges_to_batch;
+    }
+
+    pub fn clear(batch: *ChangeProtectionBatch) void {
         batch.ranges.clear();
     }
 };

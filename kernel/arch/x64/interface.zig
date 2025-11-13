@@ -78,7 +78,7 @@ pub const functions: arch.Functions = .{
 
         .mapSinglePage = x64.paging.PageTable.map4KiB,
         .unmap = x64.paging.PageTable.unmap,
-        .changeSinglePageProtection = x64.paging.PageTable.change4KiBProtection,
+        .changeProtection = x64.paging.PageTable.changeProtection,
         .flushCache = x64.paging.flushCache,
         .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
         .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,

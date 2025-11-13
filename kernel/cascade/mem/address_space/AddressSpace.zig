@@ -548,6 +548,7 @@ pub fn changeProtection(
 
         address_space.entries_lock.writeLock(current_task);
         defer address_space.entries_lock.writeUnlock(current_task);
+        if (core.is_debug) std.debug.assert(!address_space.page_table_lock.isLocked());
 
         const entry_range = address_space.entryRange(range) orelse {
             // no entries overlap the range
@@ -569,24 +570,53 @@ pub fn changeProtection(
         errdefer comptime unreachable;
 
         if (validate_change_protection.update_page_table) {
-            const map_type: cascade.mem.MapType = .{
+            const new_map_type: cascade.mem.MapType = .{
                 .type = address_space.context,
-                // `update_page_table` is only true if `protection` is not null
                 .protection = request.protection.?,
             };
 
-            // TODO: as we have a write lock to the entries do we need to lock the page table?
-            address_space.page_table_lock.lock(current_task);
-            defer address_space.page_table_lock.unlock(current_task);
+            var change_protection_batch: cascade.mem.ChangeProtectionBatch = .{};
 
-            // TODO: use `entry_range` to only modify ranges covered by the entry range
-            cascade.mem.changeProtection(
-                current_task,
-                address_space.page_table,
+            var entry_range_iter = entry_range.rangeAndProtectionIterator(
                 range,
-                address_space.context,
-                map_type,
+                address_space.entries.items,
             );
+
+            while (entry_range_iter.next()) |r| {
+                const range_with_map_type: cascade.mem.ChangeProtectionBatch.VirtualRangeWithMapType = .{
+                    .virtual_range = r.virtual_range,
+                    .previous_map_type = .{
+                        .type = address_space.context,
+                        .protection = r.protection,
+                    },
+                };
+
+                if (!change_protection_batch.append(range_with_map_type)) {
+                    @branchHint(.unlikely);
+
+                    cascade.mem.changeProtection(
+                        current_task,
+                        address_space.page_table,
+                        &change_protection_batch,
+                        address_space.context,
+                        new_map_type,
+                    );
+
+                    change_protection_batch.clear();
+
+                    _ = change_protection_batch.append(range_with_map_type);
+                }
+            }
+
+            if (change_protection_batch.ranges.len != 0) {
+                cascade.mem.changeProtection(
+                    current_task,
+                    address_space.page_table,
+                    &change_protection_batch,
+                    address_space.context,
+                    new_map_type,
+                );
+            }
         }
 
         address_space.entries_version +%= 1;
@@ -1263,6 +1293,84 @@ const EntryRange = struct {
             }
 
             return entry.range;
+        }
+    };
+
+    pub fn rangeAndProtectionIterator(
+        entry_range: EntryRange,
+        range: core.VirtualRange,
+        entries: []const *const Entry,
+    ) RangeAndProtectionIterator {
+        return .{
+            .entry_range = entry_range,
+            .range = range,
+            .entries = entries,
+            .index = entry_range.start,
+        };
+    }
+
+    const RangeAndProtectionIterator = struct {
+        entry_range: EntryRange,
+        range: core.VirtualRange,
+        entries: []const *const Entry,
+
+        index: usize,
+
+        const VirtualRangeWithProtection = struct {
+            virtual_range: core.VirtualRange,
+            protection: cascade.mem.MapType.Protection,
+        };
+
+        pub fn next(iter: *RangeAndProtectionIterator) ?VirtualRangeWithProtection {
+            const entry_range = &iter.entry_range;
+            const end_index = entry_range.start + entry_range.length;
+
+            const index = iter.index;
+            if (index >= end_index) return null;
+
+            const entry = iter.entries[index];
+            iter.index += 1;
+
+            const range = iter.range;
+
+            if (index == entry_range.start and entry_range.start_overlap) {
+                @branchHint(.unlikely);
+
+                if (index == end_index - 1 and entry_range.end_overlap) {
+                    @branchHint(.unlikely);
+
+                    std.debug.assert(entry_range.length == 1);
+                    return .{
+                        .virtual_range = range,
+                        .protection = entry.protection,
+                    };
+                }
+
+                return .{
+                    .virtual_range = .fromAddr(
+                        range.address,
+                        entry.range.endBound().difference(range.address),
+                    ),
+                    .protection = entry.protection,
+                };
+            }
+
+            if (index == end_index - 1 and entry_range.end_overlap) {
+                @branchHint(.unlikely);
+
+                return .{
+                    .virtual_range = .fromAddr(
+                        entry.range.address,
+                        range.endBound().difference(entry.range.address),
+                    ),
+                    .protection = entry.protection,
+                };
+            }
+
+            return .{
+                .virtual_range = entry.range,
+                .protection = entry.protection,
+            };
         }
     };
 };

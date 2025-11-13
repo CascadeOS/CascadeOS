@@ -317,26 +317,25 @@ pub const paging = struct {
             );
         }
 
-        /// Changes the protection of the given virtual address.
-        ///
-        /// NOP if the page is not mapped.
+        /// Changes the protection of the given virtual range.
         ///
         /// Caller must ensure:
-        ///   - the virtual address is aligned to the standard page size
+        ///  - the virtual range address and size are aligned to the standard page size
         ///
         /// This function:
-        ///   - only supports the standard page size for the architecture
-        ///   - does not flush the TLB
-        pub fn changeSinglePageProtection(
+        ///  - does not flush the TLB
+        pub fn changeProtection(
             page_table: PageTable,
             current_task: Task.Current,
-            virtual_address: core.VirtualAddress,
-            map_type: cascade.mem.MapType,
+            virtual_range: core.VirtualRange,
+            previous_map_type: cascade.mem.MapType,
+            new_map_type: cascade.mem.MapType,
+            flush_batch: *cascade.mem.VirtualRangeBatch,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
-                "changeSinglePageProtection",
-            )(page_table.arch_specific, current_task, virtual_address, map_type);
+                "changeProtection",
+            )(page_table.arch_specific, current_task, virtual_range, previous_map_type, new_map_type, flush_batch);
         }
     };
 
@@ -821,21 +820,20 @@ pub const Functions = struct {
             deallocate_frame_list: *cascade.mem.phys.FrameList,
         ) void = null,
 
-        /// Changes the protection of the given virtual address.
-        ///
-        /// NOP if the page is not mapped.
+        /// Changes the protection of the given virtual range.
         ///
         /// Caller must ensure:
-        ///   - the virtual address is aligned to the standard page size
+        ///  - the virtual range address and size are aligned to the standard page size
         ///
         /// This function:
-        ///   - only supports the standard page size for the architecture
-        ///   - does not flush the TLB
-        changeSinglePageProtection: ?fn (
+        ///  - does not flush the TLB
+        changeProtection: ?fn (
             page_table: *current_decls.paging.PageTable,
             current_task: Task.Current,
-            virtual_address: core.VirtualAddress,
-            map_type: cascade.mem.MapType,
+            virtual_range: core.VirtualRange,
+            previous_map_type: cascade.mem.MapType,
+            new_map_type: cascade.mem.MapType,
+            flush_batch: *cascade.mem.VirtualRangeBatch,
         ) void = null,
 
         /// Flushes the cache for the given virtual range on the current executor.
