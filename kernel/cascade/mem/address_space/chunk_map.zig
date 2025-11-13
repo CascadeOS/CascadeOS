@@ -30,6 +30,11 @@ pub fn ChunkMap(comptime T: type) type {
             return chunk.value_ptr;
         }
 
+        /// Deinitializes the chunk map.
+        pub fn deinit(chunk_map: *@This()) void {
+            chunk_map.chunks.deinit(cascade.mem.heap.allocator);
+        }
+
         pub inline fn chunkIndex(index: u32) u32 {
             // valid as `slots_per_chunk` is a power of two
             return index >> slots_per_chunk_shift;
