@@ -225,6 +225,8 @@ pub fn unmap(
         );
 
         if (flush_batch.full()) {
+            @branchHint(.unlikely);
+
             var request: FlushRequest = .{
                 .batch = &flush_batch,
                 .flush_target = flush_target,
@@ -500,7 +502,7 @@ pub fn kernelVirtualOffset() core.Size {
 
 /// A batch of virtual ranges.
 ///
-/// Attempts to merge adjacent ranges if they are reasonable close together see
+/// Attempts to merge adjacent ranges if they are reasonably close together see
 /// `cascade.config.virtual_range_batching_seperation_to_merge_over`.
 pub const VirtualRangeBatch = struct {
     ranges: core.containers.BoundedArray(

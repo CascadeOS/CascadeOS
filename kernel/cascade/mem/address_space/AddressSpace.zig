@@ -886,6 +886,8 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
         var entry_range_iter = entry_range.rangeIterator(range, address_space.entries.items);
         while (entry_range_iter.next()) |r| {
             if (!unmap_batch.append(r)) {
+                @branchHint(.unlikely);
+
                 cascade.mem.unmap(
                     current_task,
                     address_space.page_table,
