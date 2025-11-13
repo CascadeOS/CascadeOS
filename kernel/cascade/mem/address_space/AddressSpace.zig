@@ -887,7 +887,7 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
 
         var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
 
-        var entry_range_iter = entry_range.iterator(range, address_space.entries.items);
+        var entry_range_iter = entry_range.rangeIterator(range, address_space.entries.items);
         while (entry_range_iter.next()) |r| {
             if (!unmap_batch.append(r)) {
                 cascade.mem.unmap(
@@ -1211,7 +1211,7 @@ const EntryRange = struct {
             entry_range.end_overlap;
     }
 
-    pub fn iterator(entry_range: EntryRange, range: core.VirtualRange, entries: []const *const Entry) Iterator {
+    pub fn rangeIterator(entry_range: EntryRange, range: core.VirtualRange, entries: []const *const Entry) RangeIterator {
         return .{
             .entry_range = entry_range,
             .range = range,
@@ -1220,14 +1220,14 @@ const EntryRange = struct {
         };
     }
 
-    const Iterator = struct {
+    const RangeIterator = struct {
         entry_range: EntryRange,
         range: core.VirtualRange,
         entries: []const *const Entry,
 
         index: usize,
 
-        pub fn next(iter: *Iterator) ?core.VirtualRange {
+        pub fn next(iter: *RangeIterator) ?core.VirtualRange {
             const entry_range = &iter.entry_range;
             const end_index = entry_range.start + entry_range.length;
 
