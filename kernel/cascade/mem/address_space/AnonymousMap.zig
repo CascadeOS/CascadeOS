@@ -69,7 +69,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: Task.Current) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: Task.Current, deallocate_frame_list: *cascade.mem.phys.FrameList) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -77,15 +77,48 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: Task.
 
     const reference_count = anonymous_map.reference_count;
     anonymous_map.reference_count = reference_count - 1;
-    anonymous_map.lock.writeUnlock(current_task);
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous map
-
-        if (true) @panic("NOT IMPLEMENTED"); // TODO
-
-        globals.anonymous_map_cache.deallocate(current_task, anonymous_map);
+        anonymous_map.destroy(current_task, deallocate_frame_list);
+        return;
     }
+
+    // TODO: once `shared` is supported:
+    // https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_amap.c#L1342-L1347
+
+    anonymous_map.lock.writeUnlock(current_task);
+}
+
+/// Destroy the anonymous map.
+///
+/// Only called by `decrementReferenceCount` when the reference count is zero.
+///
+/// Called `amap_wipeout` in OpenBSD uvm.
+fn destroy(
+    anonymous_map: *AnonymousMap,
+    current_task: Task.Current,
+    deallocate_frame_list: *cascade.mem.phys.FrameList,
+) void {
+    if (core.is_debug) {
+        std.debug.assert(anonymous_map.lock.isWriteLocked());
+        std.debug.assert(anonymous_map.reference_count == 0);
+    }
+
+    var iter = anonymous_map.anonymous_page_chunks.chunks.valueIterator();
+
+    while (iter.next()) |chunk| {
+        for (chunk) |opt_page| {
+            const page = opt_page orelse continue;
+            page.lock.writeLock(current_task);
+            page.decrementReferenceCount(current_task, deallocate_frame_list);
+        }
+    }
+    anonymous_map.anonymous_page_chunks.deinit();
+    anonymous_map.anonymous_page_chunks.chunks = .{};
+
+    anonymous_map.lock.writeUnlock(current_task);
+    globals.anonymous_map_cache.deallocate(current_task, anonymous_map);
 }
 
 /// Ensure an entries `needs_copy` flag is false, by copying the anonymous map if needed.

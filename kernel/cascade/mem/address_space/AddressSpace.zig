@@ -1049,6 +1049,8 @@ fn performUnmap(
         length -= 1;
     }
 
+    var deallocate_frame_list: cascade.mem.phys.FrameList = .{};
+
     // iterate over entries in range in reverse order and remove them
     var index = first_entry_index + length;
     while (index > first_entry_index) {
@@ -1058,7 +1060,7 @@ fn performUnmap(
 
         if (entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
             anonymous_map.lock.writeLock(current_task);
-            anonymous_map.decrementReferenceCount(current_task);
+            anonymous_map.decrementReferenceCount(current_task, &deallocate_frame_list);
         }
 
         if (entry.object_reference.object) |object| {
@@ -1069,6 +1071,8 @@ fn performUnmap(
         entry.destroy(current_task);
         result.entries_removed += 1;
     }
+
+    cascade.mem.phys.allocator.deallocate(current_task, deallocate_frame_list);
 
     return result;
 }

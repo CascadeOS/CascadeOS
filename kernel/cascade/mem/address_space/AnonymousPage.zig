@@ -55,11 +55,15 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Tas
 
 /// Decrement the reference count.
 ///
-/// When called the lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Task.Current) void {
+/// When called the a write lock must be held, upon return the lock is unlocked.
+pub fn decrementReferenceCount(
+    anonymous_page: *AnonymousPage,
+    current_task: Task.Current,
+    deallocate_frame_list: *cascade.mem.phys.FrameList,
+) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
-        std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
+        std.debug.assert(anonymous_page.lock.isWriteLocked());
     }
 
     const reference_count = anonymous_page.reference_count;
@@ -67,15 +71,32 @@ pub fn decrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Tas
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous page
-
-        if (true) @panic("NOT IMPLEMENTED"); // TODO
-
-        anonymous_page.lock.unlock(current_task);
-
-        globals.anonymous_page_cache.deallocate(current_task, anonymous_page);
-    } else {
-        anonymous_page.lock.unlock(current_task);
+        anonymous_page.destroy(current_task, deallocate_frame_list);
+        return;
     }
+
+    anonymous_page.lock.writeUnlock(current_task);
+}
+
+/// Destroy the anonymous page.
+///
+/// Only called by `decrementReferenceCount` when the reference count is zero.
+///
+/// Called `uvm_anfree` in OpenBSD uvm.
+fn destroy(
+    anonymous_page: *AnonymousPage,
+    current_task: Task.Current,
+    deallocate_frame_list: *cascade.mem.phys.FrameList,
+) void {
+    if (core.is_debug) {
+        std.debug.assert(anonymous_page.lock.isWriteLocked());
+        std.debug.assert(anonymous_page.reference_count == 0);
+    }
+
+    deallocate_frame_list.push(anonymous_page.page.physical_frame);
+
+    anonymous_page.lock.writeUnlock(current_task);
+    globals.anonymous_page_cache.deallocate(current_task, anonymous_page);
 }
 
 const globals = struct {
