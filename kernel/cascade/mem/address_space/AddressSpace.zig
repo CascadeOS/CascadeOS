@@ -74,11 +74,7 @@ pub fn init(
     current_task: Task.Current,
     options: InitOptions,
 ) !void {
-    log.debug(current_task, "{s}: init with {f} context {t}", .{
-        options.name.constSlice(),
-        options.range,
-        options.context,
-    });
+    _ = current_task;
 
     address_space.* = .{
         .range = options.range,
