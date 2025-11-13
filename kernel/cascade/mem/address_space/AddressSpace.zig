@@ -871,6 +871,7 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
 
         address_space.entries_lock.writeLock(current_task);
         defer address_space.entries_lock.writeUnlock(current_task);
+        if (core.is_debug) std.debug.assert(!address_space.page_table_lock.isLocked());
 
         const entry_range = address_space.entryRange(range) orelse {
             @branchHint(.cold);
@@ -884,40 +885,11 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
         try preallocated_entries.preallocateUnmap(current_task, address_space, entry_range);
         errdefer comptime unreachable;
 
-        {
-            var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
+        var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
 
-            var entry_range_iter = entry_range.iterator(range, address_space.entries.items);
-            while (entry_range_iter.next()) |r| {
-                if (!unmap_batch.append(r)) {
-                    // TODO: as we have a write lock to the entries do we need to lock the page table?
-                    address_space.page_table_lock.lock(current_task);
-                    defer address_space.page_table_lock.unlock(current_task);
-
-                    cascade.mem.unmap(
-                        current_task,
-                        address_space.page_table,
-                        &unmap_batch,
-                        address_space.context,
-                        .keep, // backing pages are managed by anonymous maps
-                        switch (address_space.context) {
-                            .kernel => .keep,
-                            .user => .free,
-                        },
-                        cascade.mem.phys.allocator,
-                    );
-
-                    unmap_batch.clear();
-
-                    unmap_batch.appendMergeIfFull(r);
-                }
-            }
-
-            if (unmap_batch.ranges.len != 0) {
-                // TODO: as we have a write lock to the entries do we need to lock the page table?
-                address_space.page_table_lock.lock(current_task);
-                defer address_space.page_table_lock.unlock(current_task);
-
+        var entry_range_iter = entry_range.iterator(range, address_space.entries.items);
+        while (entry_range_iter.next()) |r| {
+            if (!unmap_batch.append(r)) {
                 cascade.mem.unmap(
                     current_task,
                     address_space.page_table,
@@ -930,7 +902,26 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
                     },
                     cascade.mem.phys.allocator,
                 );
+
+                unmap_batch.clear();
+
+                unmap_batch.appendMergeIfFull(r);
             }
+        }
+
+        if (unmap_batch.ranges.len != 0) {
+            cascade.mem.unmap(
+                current_task,
+                address_space.page_table,
+                &unmap_batch,
+                address_space.context,
+                .keep, // backing pages are managed by anonymous maps
+                switch (address_space.context) {
+                    .kernel => .keep,
+                    .user => .free,
+                },
+                cascade.mem.phys.allocator,
+            );
         }
 
         address_space.entries_version +%= 1;
