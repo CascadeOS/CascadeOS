@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/c163b24bada6069e13c564e57d1b0bbeb1c6d21f/LICENSE)
 

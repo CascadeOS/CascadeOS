@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT AND 0BSD
+// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND 0BSD
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2025 Mintsuki and contributors (https://github.com/limine-bootloader/limine-protocol/blob/trunk/LICENSE)
 

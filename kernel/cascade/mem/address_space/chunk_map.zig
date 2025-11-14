@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT and BSD-2-Clause
+// SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 const std = @import("std");

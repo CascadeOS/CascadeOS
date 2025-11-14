@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 2022 Diego Barria (https://github.com/xyaman/mibu/blob/c2d3719d5dcc1e5a723d3b06459c3b6275d2cef0/LICENSE)
 

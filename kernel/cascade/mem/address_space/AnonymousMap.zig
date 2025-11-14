@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT and BSD-2-Clause
+// SPDX-License-Identifier: LicenseRef-NON-AI-MIT and BSD-2-Clause
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 1997 Charles D. Cranor and Washington University.
 
