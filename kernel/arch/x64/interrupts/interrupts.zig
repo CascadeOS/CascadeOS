@@ -15,15 +15,16 @@ const interrupt_handlers = @import("handlers.zig");
 const log = cascade.debug.log.scoped(.interrupt);
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const current_task, const interrupt_exit = Task.Current.onInterruptEntry();
-    defer interrupt_exit.exit(current_task);
-    const handler: *const Handler = &globals.handlers[interrupt_frame.vector_number.full];
+    const current_task, const state_before_interrupt = Task.Current.onInterruptEntry();
+    defer state_before_interrupt.onInterruptExit(current_task);
+
+    const handler = &globals.handlers[interrupt_frame.vector_number.full];
     handler.handler(
         current_task,
         .{ .arch_specific = interrupt_frame },
         handler.arg1,
         handler.arg2,
-        interrupt_exit,
+        state_before_interrupt,
     );
 }
 

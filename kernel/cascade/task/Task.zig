@@ -268,28 +268,30 @@ pub const Current = extern struct {
         return .{ .task = current_task };
     }
 
-    pub fn onInterruptEntry() struct { Task.Current, InterruptExit } {
+    pub fn onInterruptEntry() struct { Task.Current, StateBeforeInterrupt } {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
         const executor = arch.getCurrentExecutor();
         const current_task = executor.current_task;
         if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
-        const interrupt_disable_count_before_interrupt = current_task.interrupt_disable_count;
-        current_task.interrupt_disable_count = interrupt_disable_count_before_interrupt + 1;
-        current_task.known_executor = current_task.state.running;
+        const before_interrupt_interrupt_disable_count = current_task.interrupt_disable_count;
+        current_task.interrupt_disable_count = before_interrupt_interrupt_disable_count + 1;
 
-        const enable_access_to_user_memory_count_before_interrupt = current_task.enable_access_to_user_memory_count;
+        const before_interrupt_enable_access_to_user_memory_count = current_task.enable_access_to_user_memory_count;
         current_task.enable_access_to_user_memory_count = 0;
-        if (enable_access_to_user_memory_count_before_interrupt != 0) {
+
+        if (before_interrupt_enable_access_to_user_memory_count != 0) {
             @branchHint(.unlikely);
             arch.paging.disableAccessToUserMemory();
         }
 
+        current_task.known_executor = current_task.state.running;
+
         return .{
             .{ .task = current_task }, .{
-                .interrupt_disable_count_before_interrupt = interrupt_disable_count_before_interrupt,
-                .enable_access_to_user_memory_count_before_interrupt = enable_access_to_user_memory_count_before_interrupt,
+                .interrupt_disable_count = before_interrupt_interrupt_disable_count,
+                .enable_access_to_user_memory_count = before_interrupt_enable_access_to_user_memory_count,
             },
         };
     }
@@ -297,22 +299,22 @@ pub const Current = extern struct {
     /// Tracks the state of the task before an interrupt was triggered.
     ///
     /// Stored seperately from the task to allow nested interrupts.
-    pub const InterruptExit = struct {
-        interrupt_disable_count_before_interrupt: u32,
-        enable_access_to_user_memory_count_before_interrupt: u32,
+    pub const StateBeforeInterrupt = struct {
+        interrupt_disable_count: u32,
+        enable_access_to_user_memory_count: u32,
 
-        pub fn exit(interrupt_exit: InterruptExit, current_task: Task.Current) void {
-            current_task.task.interrupt_disable_count = interrupt_exit.interrupt_disable_count_before_interrupt;
+        pub fn onInterruptExit(state_before_interrupt: StateBeforeInterrupt, current_task: Task.Current) void {
+            current_task.task.interrupt_disable_count = state_before_interrupt.interrupt_disable_count;
 
-            const enable_access_to_user_memory_count_before_interrupt = interrupt_exit.enable_access_to_user_memory_count_before_interrupt;
+            const before_interrupt_enable_access_to_user_memory_count = state_before_interrupt.enable_access_to_user_memory_count;
             const current_enable_access_to_user_memory_count = current_task.task.enable_access_to_user_memory_count;
 
-            current_task.task.enable_access_to_user_memory_count = enable_access_to_user_memory_count_before_interrupt;
+            current_task.task.enable_access_to_user_memory_count = before_interrupt_enable_access_to_user_memory_count;
 
-            if (current_enable_access_to_user_memory_count != enable_access_to_user_memory_count_before_interrupt) {
+            if (current_enable_access_to_user_memory_count != before_interrupt_enable_access_to_user_memory_count) {
                 @branchHint(.unlikely);
 
-                if (enable_access_to_user_memory_count_before_interrupt == 0) {
+                if (before_interrupt_enable_access_to_user_memory_count == 0) {
                     arch.paging.disableAccessToUserMemory();
                 } else {
                     arch.paging.enableAccessToUserMemory();

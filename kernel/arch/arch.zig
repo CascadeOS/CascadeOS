@@ -105,7 +105,7 @@ pub const interrupts = struct {
             frame: InterruptFrame,
             arg1: usize,
             arg2: usize,
-            interrupt_exit: Task.Current.InterruptExit,
+            state_before_interrupt: Task.Current.StateBeforeInterrupt,
         ) void;
 
         pub const AllocateError = error{InterruptAllocationFailed};

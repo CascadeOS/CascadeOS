@@ -15,7 +15,7 @@ pub fn nonMaskableInterruptHandler(
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
-    _: Task.Current.InterruptExit,
+    _: Task.Current.StateBeforeInterrupt,
 ) void {
     if (!cascade.debug.hasAnExecutorPanicked()) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
@@ -30,7 +30,7 @@ pub fn pageFaultHandler(
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
-    interrupt_exit: Task.Current.InterruptExit,
+    state_before_interrupt: Task.Current.StateBeforeInterrupt,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -59,7 +59,7 @@ pub fn pageFaultHandler(
         else
             .{
                 .kernel = .{
-                    .access_to_user_memory_enabled = interrupt_exit.enable_access_to_user_memory_count_before_interrupt != 0,
+                    .access_to_user_memory_enabled = state_before_interrupt.enable_access_to_user_memory_count != 0,
                 },
             },
     }, interrupt_frame);
@@ -70,7 +70,7 @@ pub fn flushRequestHandler(
     _: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
-    _: Task.Current.InterruptExit,
+    _: Task.Current.StateBeforeInterrupt,
 ) void {
     cascade.entry.onFlushRequest(current_task);
     // eoi after all current flush requests have been handled
@@ -82,7 +82,7 @@ pub fn perExecutorPeriodicHandler(
     _: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
-    _: Task.Current.InterruptExit,
+    _: Task.Current.StateBeforeInterrupt,
 ) void {
     // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
@@ -94,7 +94,7 @@ pub fn unhandledException(
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
-    _: Task.Current.InterruptExit,
+    _: Task.Current.StateBeforeInterrupt,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
     switch (arch_interrupt_frame.context(current_task)) {
@@ -116,7 +116,7 @@ pub fn unhandledInterrupt(
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: usize,
     _: usize,
-    _: Task.Current.InterruptExit,
+    _: Task.Current.StateBeforeInterrupt,
 ) void {
     const executor = current_task.knownExecutor();
     std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });

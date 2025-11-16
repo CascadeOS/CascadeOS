@@ -635,7 +635,7 @@ export fn uacpi_kernel_install_interrupt_handler(
             _: arch.interrupts.InterruptFrame,
             _handler: usize,
             _ctx: usize,
-            _: Task.Current.InterruptExit,
+            _: Task.Current.StateBeforeInterrupt,
         ) void {
             const inner_handler: uacpi.RawInterruptHandler = @ptrFromInt(_handler);
             _ = inner_handler(@ptrFromInt(_ctx)); // FIXME: should we do something with the return value?
