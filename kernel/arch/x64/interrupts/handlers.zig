@@ -59,7 +59,7 @@ pub fn pageFaultHandler(
         else
             .{
                 .kernel = .{
-                    .access_to_user_memory_enabled = interrupt_exit.previous_enable_access_to_user_memory_count != 0,
+                    .access_to_user_memory_enabled = interrupt_exit.enable_access_to_user_memory_count_before_interrupt != 0,
                 },
             },
     }, interrupt_frame);
