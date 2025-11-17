@@ -13,8 +13,6 @@ const x64 = @import("../x64.zig");
 pub fn nonMaskableInterruptHandler(
     _: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     if (!cascade.debug.hasAnExecutorPanicked()) {
@@ -28,8 +26,6 @@ pub fn nonMaskableInterruptHandler(
 pub fn pageFaultHandler(
     current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
     state_before_interrupt: Task.Current.StateBeforeInterrupt,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
@@ -68,8 +64,6 @@ pub fn pageFaultHandler(
 pub fn flushRequestHandler(
     current_task: Task.Current,
     _: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     cascade.entry.onFlushRequest(current_task);
@@ -80,8 +74,6 @@ pub fn flushRequestHandler(
 pub fn perExecutorPeriodicHandler(
     current_task: Task.Current,
     _: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
@@ -92,8 +84,6 @@ pub fn perExecutorPeriodicHandler(
 pub fn unhandledException(
     current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
@@ -114,8 +104,6 @@ pub fn unhandledException(
 pub fn unhandledInterrupt(
     current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: usize,
-    _: usize,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     const executor = current_task.knownExecutor();

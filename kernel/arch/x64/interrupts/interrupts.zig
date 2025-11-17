@@ -4,6 +4,7 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const Handler = arch.interrupts.Interrupt.Handler;
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const core = @import("core");
@@ -18,14 +19,9 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
     const current_task, const state_before_interrupt = Task.Current.onInterruptEntry();
     defer state_before_interrupt.onInterruptExit(current_task);
 
-    const handler = &globals.handlers[interrupt_frame.vector_number.full];
-    handler.handler(
-        current_task,
-        .{ .arch_specific = interrupt_frame },
-        handler.arg1,
-        handler.arg2,
-        state_before_interrupt,
-    );
+    var handler = globals.handlers[interrupt_frame.vector_number.full];
+    handler.setTemplatedArgs(.{ current_task, .{ .arch_specific = interrupt_frame }, state_before_interrupt });
+    handler.call();
 }
 
 pub const Interrupt = enum(u8) {
@@ -119,9 +115,7 @@ pub const Interrupt = enum(u8) {
 
     pub fn allocate(
         current_task: Task.Current,
-        interrupt_handler: arch.interrupts.Interrupt.Handler,
-        arg1: usize,
-        arg2: usize,
+        interrupt_handler: Handler,
     ) arch.interrupts.Interrupt.AllocateError!Interrupt {
         const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
             return error.InterruptAllocationFailed;
@@ -129,11 +123,7 @@ pub const Interrupt = enum(u8) {
 
         const interrupt_number: u8 = @intCast(allocation.base);
 
-        globals.handlers[interrupt_number] = .{
-            .handler = interrupt_handler,
-            .arg1 = arg1,
-            .arg2 = arg2,
-        };
+        globals.handlers[interrupt_number] = interrupt_handler;
 
         // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
         const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
@@ -150,9 +140,7 @@ pub const Interrupt = enum(u8) {
 
         const interrupt_number = @intFromEnum(interrupt);
 
-        globals.handlers[interrupt_number] = .{
-            .handler = interrupt_handlers.unhandledInterrupt,
-        };
+        globals.handlers[interrupt_number] = .prepare(interrupt_handlers.unhandledInterrupt, .{});
 
         // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
         const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
@@ -283,12 +271,6 @@ pub const InterruptStackSelector = enum(u3) {
     non_maskable_interrupt,
 };
 
-const Handler = struct {
-    handler: arch.interrupts.Interrupt.Handler,
-    arg1: usize = 0,
-    arg2: usize = 0,
-};
-
 const globals = struct {
     var idt: Idt = .{};
     var handlers: [Idt.number_of_handlers]Handler = handlers: {
@@ -299,11 +281,10 @@ const globals = struct {
         for (0..Idt.number_of_handlers) |i| {
             const interrupt: Interrupt = @enumFromInt(i);
 
-            temp_handlers[i] = if (interrupt.isException()) .{
-                .handler = interrupt_handlers.unhandledException,
-            } else .{
-                .handler = interrupt_handlers.unhandledInterrupt,
-            };
+            temp_handlers[i] = if (interrupt.isException())
+                .prepare(interrupt_handlers.unhandledException, .{})
+            else
+                .prepare(interrupt_handlers.unhandledInterrupt, .{});
         }
 
         break :handlers temp_handlers;
@@ -361,18 +342,10 @@ pub const init = struct {
     pub fn loadStandardInterruptHandlers(current_task: Task.Current) void {
         _ = current_task;
 
-        globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
-            .handler = interrupt_handlers.nonMaskableInterruptHandler,
-        };
-        globals.handlers[@intFromEnum(Interrupt.page_fault)] = .{
-            .handler = interrupt_handlers.pageFaultHandler,
-        };
-        globals.handlers[@intFromEnum(Interrupt.flush_request)] = .{
-            .handler = interrupt_handlers.flushRequestHandler,
-        };
-        globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
-            .handler = interrupt_handlers.perExecutorPeriodicHandler,
-        };
+        globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .prepare(interrupt_handlers.nonMaskableInterruptHandler, .{});
+        globals.handlers[@intFromEnum(Interrupt.page_fault)] = .prepare(interrupt_handlers.pageFaultHandler, .{});
+        globals.handlers[@intFromEnum(Interrupt.flush_request)] = .prepare(interrupt_handlers.flushRequestHandler, .{});
+        globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .prepare(interrupt_handlers.perExecutorPeriodicHandler, .{});
     }
 
     pub fn loadIdt() void {

@@ -100,27 +100,23 @@ pub const interrupts = struct {
     pub const Interrupt = struct {
         arch_specific: current_decls.interrupts.Interrupt,
 
-        pub const Handler = *const fn (
-            current_task: Task.Current,
-            frame: InterruptFrame,
-            arg1: usize,
-            arg2: usize,
-            state_before_interrupt: Task.Current.StateBeforeInterrupt,
-        ) void;
+        pub const Handler = core.TypeErasedCall.Templated(&.{
+            Task.Current,
+            InterruptFrame,
+            Task.Current.StateBeforeInterrupt,
+        });
 
         pub const AllocateError = error{InterruptAllocationFailed};
 
         pub fn allocate(
             current_task: Task.Current,
             handler: Handler,
-            arg1: usize,
-            arg2: usize,
         ) callconv(core.inline_in_non_debug) AllocateError!Interrupt {
             return .{
                 .arch_specific = try getFunction(
                     current_functions.interrupts,
                     "allocateInterrupt",
-                )(current_task, handler, arg1, arg2),
+                )(current_task, handler),
             };
         }
 
@@ -734,8 +730,6 @@ pub const Functions = struct {
         allocateInterrupt: ?fn (
             current_task: Task.Current,
             handler: interrupts.Interrupt.Handler,
-            arg1: usize,
-            arg2: usize,
         ) interrupts.Interrupt.AllocateError!current_decls.interrupts.Interrupt = null,
 
         deallocateInterrupt: ?fn (
