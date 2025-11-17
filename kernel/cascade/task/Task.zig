@@ -306,9 +306,10 @@ pub const internal = struct {
         arg1: usize,
         arg2: usize,
         arg3: usize,
+        arg4: usize,
     ) callconv(.c) noreturn {
         SchedulerHandle.internal.unsafeUnlock(current_task);
-        target_function(arg0, arg1, arg2, arg3);
+        target_function(arg0, arg1, arg2, arg3, arg4);
 
         const scheduler_handle: Task.SchedulerHandle = .get(current_task);
         scheduler_handle.drop(current_task);

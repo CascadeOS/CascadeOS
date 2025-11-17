@@ -26,9 +26,9 @@ pub const TypeErasedCall = extern struct {
     typeErased: *const TypeErasedFn,
     args: [supported_number_of_args]usize,
 
-    pub const supported_number_of_args = 4;
+    pub const supported_number_of_args = 5;
 
-    pub const TypeErasedFn = fn (usize, usize, usize, usize) callconv(.c) void;
+    pub const TypeErasedFn = fn (usize, usize, usize, usize, usize) callconv(.c) void;
 
     pub inline fn call(type_erased: TypeErasedCall) void {
         type_erased.typeErased(
@@ -36,6 +36,7 @@ pub const TypeErasedCall = extern struct {
             type_erased.args[1],
             type_erased.args[2],
             type_erased.args[3],
+            type_erased.args[4],
         );
     }
 
@@ -298,7 +299,7 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
 
     return switch (function_parameters.len) {
         0 => struct {
-            fn typeErased0Args(_: usize, _: usize, _: usize, _: usize) callconv(.c) void {
+            fn typeErased0Args(_: usize, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
                 return if (returns_error)
                     function() catch |err| std.debug.panic("unhandled error: {t}", .{err})
                 else
@@ -306,7 +307,7 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
             }
         }.typeErased0Args,
         1 => struct {
-            fn typeErased1Args(arg0: usize, _: usize, _: usize, _: usize) callconv(.c) void {
+            fn typeErased1Args(arg0: usize, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
                 return if (returns_error)
                     function(
                         argFromUsize(function_parameters[0].type.?, arg0),
@@ -318,7 +319,7 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
             }
         }.typeErased1Args,
         2 => struct {
-            fn typeErased2Args(arg0: usize, arg1: usize, _: usize, _: usize) callconv(.c) void {
+            fn typeErased2Args(arg0: usize, arg1: usize, _: usize, _: usize, _: usize) callconv(.c) void {
                 return if (returns_error)
                     function(
                         argFromUsize(function_parameters[0].type.?, arg0),
@@ -332,7 +333,7 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
             }
         }.typeErased2Args,
         3 => struct {
-            fn typeErased3Ags(arg0: usize, arg1: usize, arg2: usize, _: usize) callconv(.c) void {
+            fn typeErased3Ags(arg0: usize, arg1: usize, arg2: usize, _: usize, _: usize) callconv(.c) void {
                 return if (returns_error)
                     function(
                         argFromUsize(function_parameters[0].type.?, arg0),
@@ -348,7 +349,7 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
             }
         }.typeErased3Ags,
         4 => struct {
-            fn typeErased4Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize) callconv(.c) void {
+            fn typeErased4Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize, _: usize) callconv(.c) void {
                 return if (returns_error)
                     function(
                         argFromUsize(function_parameters[0].type.?, arg0),
@@ -365,6 +366,26 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
                     );
             }
         }.typeErased4Args,
+        5 => struct {
+            fn typeErased5Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) callconv(.c) void {
+                return if (returns_error)
+                    function(
+                        argFromUsize(function_parameters[0].type.?, arg0),
+                        argFromUsize(function_parameters[1].type.?, arg1),
+                        argFromUsize(function_parameters[2].type.?, arg2),
+                        argFromUsize(function_parameters[3].type.?, arg3),
+                        argFromUsize(function_parameters[4].type.?, arg4),
+                    ) catch |err| std.debug.panic("unhandled error: {t}", .{err})
+                else
+                    function(
+                        argFromUsize(function_parameters[0].type.?, arg0),
+                        argFromUsize(function_parameters[1].type.?, arg1),
+                        argFromUsize(function_parameters[2].type.?, arg2),
+                        argFromUsize(function_parameters[3].type.?, arg3),
+                        argFromUsize(function_parameters[4].type.?, arg4),
+                    );
+            }
+        }.typeErased5Args,
         else => @compileError(
             std.fmt.comptimePrint(
                 "number of function parameters must be less than or equal to {d} found {d}",

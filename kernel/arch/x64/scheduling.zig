@@ -153,7 +153,9 @@ pub fn prepareTaskForScheduling(
         };
     };
 
-    std.debug.assert(task.stack.spaceFor(8 + 6));
+    std.debug.assert(task.stack.spaceFor(9 + 6));
+
+    task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `impls.taskEntryTrampoline` as per System V ABI
 
     task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
@@ -193,11 +195,12 @@ pub fn call(
                         \\mov %rsp, %rax
                         \\mov %rax, (%rsi)
                         \\mov %rdi, %rsp
-                        \\pop %rdi // arg0
-                        \\pop %rsi // arg1
-                        \\pop %rdx // arg2
-                        \\pop %rcx // arg3
-                        \\ret
+                        \\pop %rdi         // arg0
+                        \\pop %rsi         // arg1
+                        \\pop %rdx         // arg2
+                        \\pop %rcx         // arg3
+                        \\pop %r8          // arg4
+                        \\ret              // the address of `type_erased_call.typeErased` is on the stack
                         ::: .{
                             .memory = true,
                             .rsp = true,
@@ -205,6 +208,7 @@ pub fn call(
                             .rsi = true,
                             .rdx = true,
                             .rcx = true,
+                            .r8 = true,
                         });
                 }
             }.impl;
@@ -216,6 +220,7 @@ pub fn call(
     var stack = new_stack;
 
     try stack.push(@intFromPtr(type_erased_call.typeErased));
+    try stack.push(type_erased_call.args[4]);
     try stack.push(type_erased_call.args[3]);
     try stack.push(type_erased_call.args[2]);
     try stack.push(type_erased_call.args[1]);
@@ -235,6 +240,7 @@ pub fn callNoSave(
     var stack = new_stack;
 
     try stack.push(@intFromPtr(type_erased_call.typeErased));
+    try stack.push(type_erased_call.args[4]);
     try stack.push(type_erased_call.args[3]);
     try stack.push(type_erased_call.args[2]);
     try stack.push(type_erased_call.args[1]);
@@ -242,11 +248,12 @@ pub fn callNoSave(
 
     asm volatile (
         \\mov %[stack_pointer], %rsp
-        \\pop %rdi // arg0
-        \\pop %rsi // arg1
-        \\pop %rdx // arg2
-        \\pop %rcx // arg3
-        \\ret
+        \\pop %rdi                   // arg0
+        \\pop %rsi                   // arg1
+        \\pop %rdx                   // arg2
+        \\pop %rcx                   // arg3
+        \\pop %r8                    // arg4
+        \\ret                        // the address of `type_erased_call.typeErased` is on the stack
         :
         : [stack_pointer] "r" (stack.stack_pointer),
         : .{
@@ -256,6 +263,7 @@ pub fn callNoSave(
           .rsi = true,
           .rdx = true,
           .rcx = true,
+          .r8 = true,
         });
 
     unreachable;
