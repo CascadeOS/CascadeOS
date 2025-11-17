@@ -83,7 +83,7 @@ pub fn wait(
     Task.Scheduler.lockScheduler(current_task);
     defer Task.Scheduler.unlockScheduler(current_task);
 
-    Task.Scheduler.drop(current_task, .{
+    current_task.dropWithDeferredAction(.{
         .action = struct {
             fn action(_: Task.Current, old_task: *Task, arg: usize) void {
                 const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);

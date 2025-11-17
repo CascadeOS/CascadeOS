@@ -14,7 +14,7 @@ const log = cascade.debug.log.scoped(.entry);
 ///
 /// The timers interrupt has already been acknowledged by the architecture specific code.
 pub fn onPerExecutorPeriodic(current_task: Task.Current) void {
-    Task.Scheduler.maybePreempt(current_task);
+    current_task.maybePreempt();
 }
 
 /// Executed upon page fault.

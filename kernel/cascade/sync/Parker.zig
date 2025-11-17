@@ -59,7 +59,7 @@ pub fn park(parker: *Parker, current_task: Task.Current) void {
         return;
     }
 
-    Task.Scheduler.drop(current_task, .{
+    current_task.dropWithDeferredAction(.{
         .action = struct {
             fn action(_: Task.Current, old_task: *Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
