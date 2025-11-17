@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-/// Stores a type erased call that supports passing up to four arguments.
+/// Stores a type erased call that supports passing `supported_number_of_args` arguments.
 ///
 /// The return type must be `void`, `noreturn`, `!void` or `!noreturn`.
 ///
@@ -50,6 +50,108 @@ pub const TypeErasedCall = extern struct {
         }
 
         return type_erased;
+    }
+
+    /// Create a templated type erased call that supports passing `supported_number_of_args` arguments.
+    ///
+    /// The first parameters of the function must match the provided `template_parameters`.
+    ///
+    /// The return type must be `void`, `noreturn`, `!void` or `!noreturn`.
+    ///
+    /// If an error is returned then an "unhandled error" panic will occur.
+    ///
+    /// Argument types that are always supported:
+    /// - bool
+    /// - pointer and optional pointer
+    /// - error set
+    ///
+    /// Argument types that are supported if its size is less than or equal to the size of `usize`:
+    /// - int
+    /// - float
+    /// - array
+    /// - struct, packed struct and extern struct
+    /// - optional
+    /// - enum
+    /// - union, tagged union, packed union and extern union
+    pub fn Templated(comptime template_parameters: []const type) type {
+        if (template_parameters.len > TypeErasedCall.supported_number_of_args) {
+            @compileError(
+                std.fmt.comptimePrint(
+                    "number of template parameters must be less than or equal to {d}",
+                    .{TypeErasedCall.supported_number_of_args},
+                ),
+            );
+        }
+
+        return struct {
+            type_erased_call: TypeErasedCall,
+
+            /// Calls the templated type erased call.
+            ///
+            /// `setTemplatedArgs` must be called before calling this function.
+            pub inline fn call(templated_type_erased: *@This()) void {
+                templated_type_erased.type_erased_call.call();
+            }
+
+            /// Prepares the templated type erased call.
+            ///
+            /// `setTemplatedArgs` must be called before making use of the returned `TypeErasedCall.Templated`.
+            pub fn prepare(comptime function: anytype, args: NonTemplateArgsTuple(@TypeOf(function))) @This() {
+                var templated_type_erased: @This() = .{
+                    .type_erased_call = .{
+                        .typeErased = typeErasedFn(function),
+                        .args = undefined,
+                    },
+                };
+
+                inline for (args, template_parameters.len..) |arg, i| {
+                    templated_type_erased.type_erased_call.args[i] = usizeFromArg(arg);
+                }
+
+                return templated_type_erased;
+            }
+
+            pub fn setTemplatedArgs(templated_type_erased: *@This(), template_args: TemplateArgsTuple) void {
+                inline for (template_args, 0..) |arg, i| {
+                    templated_type_erased.type_erased_call.args[i] = usizeFromArg(arg);
+                }
+            }
+
+            const TemplateArgsTuple: type = std.meta.Tuple(template_parameters);
+
+            fn NonTemplateArgsTuple(comptime Function: type) type {
+                @setEvalBranchQuota(10_000);
+
+                const info = @typeInfo(Function);
+                if (info != .@"fn") {
+                    @compileError("NonTemplateArgsTuple expects a function type");
+                }
+
+                const function_info = info.@"fn";
+                if (function_info.is_var_args) {
+                    @compileError("Cannot create NonTemplateArgsTuple for variadic function");
+                }
+
+                const function_params = function_info.params;
+
+                if (function_params.len < template_parameters.len) {
+                    @compileError(std.fmt.comptimePrint(
+                        "`function` requires at least {d} parameters to match the template found {d}",
+                        .{ template_parameters.len, function_params.len },
+                    ));
+                }
+
+                const non_templated_parameter_count = function_params.len - template_parameters.len;
+
+                var argument_field_list: [non_templated_parameter_count]type = undefined;
+                inline for (function_info.params[template_parameters.len..], 0..) |arg, i| {
+                    const T = arg.type orelse @compileError("cannot create NonTemplateArgsTuple for function with an 'anytype' parameter");
+                    argument_field_list[i] = T;
+                }
+
+                return std.meta.Tuple(&argument_field_list);
+            }
+        };
     }
 };
 
