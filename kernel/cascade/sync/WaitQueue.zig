@@ -49,18 +49,10 @@ pub fn wakeOne(
     if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
-    const scheduler_already_locked = current_task.task.scheduler_locked;
+    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get(current_task);
+    defer maybe_locked.unlock(current_task);
 
-    switch (scheduler_already_locked) {
-        true => if (core.is_debug) Task.Scheduler.assertSchedulerLocked(current_task),
-        false => Task.Scheduler.lockScheduler(current_task),
-    }
-    defer switch (scheduler_already_locked) {
-        true => {},
-        false => Task.Scheduler.unlockScheduler(current_task),
-    };
-
-    Task.Scheduler.queueTask(current_task, task_to_wake);
+    maybe_locked.scheduler_handle.queueTask(current_task, task_to_wake);
 }
 
 /// Add the current task to the wait queue.
@@ -80,10 +72,10 @@ pub fn wait(
 
     wait_queue.waiting_tasks.append(&current_task.task.next_task_node);
 
-    Task.Scheduler.lockScheduler(current_task);
-    defer Task.Scheduler.unlockScheduler(current_task);
+    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+    defer scheduler_handle.unlock(current_task);
 
-    current_task.dropWithDeferredAction(.{
+    scheduler_handle.dropWithDeferredAction(current_task, .{
         .action = struct {
             fn action(_: Task.Current, old_task: *Task, arg: usize) void {
                 const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);

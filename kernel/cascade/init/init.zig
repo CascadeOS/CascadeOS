@@ -140,17 +140,17 @@ fn initStage3(current_task: Task.Current) !noreturn {
             const init_stage4_task: *Task = try .createKernelTask(current_task, try .fromSlice("init stage 4"));
             init_stage4_task.setTaskEntry(.prepare(initStage4, .{init_stage4_task}));
 
-            Task.Scheduler.lockScheduler(current_task);
-            defer Task.Scheduler.unlockScheduler(current_task);
+            const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+            defer scheduler_handle.unlock(current_task);
 
-            Task.Scheduler.queueTask(current_task, init_stage4_task);
+            scheduler_handle.queueTask(current_task, init_stage4_task);
         }
 
         Stage3Barrier.complete();
     }
 
-    Task.Scheduler.lockScheduler(current_task);
-    current_task.drop();
+    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+    scheduler_handle.drop(current_task);
     unreachable;
 }
 

@@ -14,7 +14,7 @@ const Thread = Process.Thread;
 const core = @import("core");
 
 pub const Current = @import("Current.zig").Current;
-pub const Scheduler = @import("Scheduler.zig");
+pub const SchedulerHandle = @import("SchedulerHandle.zig");
 pub const Stack = @import("Stack.zig");
 
 const log = cascade.debug.log.scoped(.task);
@@ -307,10 +307,11 @@ pub const internal = struct {
         arg2: usize,
         arg3: usize,
     ) callconv(.c) noreturn {
-        Scheduler.unlockScheduler(current_task);
+        SchedulerHandle.internal.unsafeUnlock(current_task);
         target_function(arg0, arg1, arg2, arg3);
-        Scheduler.lockScheduler(current_task);
-        current_task.drop();
+
+        const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+        scheduler_handle.drop(current_task);
         unreachable;
     }
 };

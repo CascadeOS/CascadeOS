@@ -40,8 +40,8 @@ pub fn park(parker: *Parker, current_task: Task.Current) void {
         return; // there were some wakeups, they might be spurious
     }
 
-    Task.Scheduler.lockScheduler(current_task);
-    defer Task.Scheduler.unlockScheduler(current_task);
+    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+    defer scheduler_handle.unlock(current_task);
 
     // recheck for unpark attempts that happened while we were locking the scheduler
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -59,7 +59,7 @@ pub fn park(parker: *Parker, current_task: Task.Current) void {
         return;
     }
 
-    current_task.dropWithDeferredAction(.{
+    scheduler_handle.dropWithDeferredAction(current_task, .{
         .action = struct {
             fn action(_: Task.Current, old_task: *Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
@@ -100,16 +100,8 @@ pub fn unpark(
 
     parked_task.state = .ready;
 
-    const scheduler_already_locked = current_task.task.scheduler_locked;
+    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get(current_task);
+    defer maybe_locked.unlock(current_task);
 
-    switch (scheduler_already_locked) {
-        true => if (core.is_debug) Task.Scheduler.assertSchedulerLocked(current_task),
-        false => Task.Scheduler.lockScheduler(current_task),
-    }
-    defer switch (scheduler_already_locked) {
-        true => {},
-        false => Task.Scheduler.unlockScheduler(current_task),
-    };
-
-    Task.Scheduler.queueTask(current_task, parked_task);
+    maybe_locked.scheduler_handle.queueTask(current_task, parked_task);
 }
