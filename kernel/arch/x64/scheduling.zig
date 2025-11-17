@@ -140,10 +140,10 @@ pub fn prepareTaskForScheduling(
                     asm volatile (
                         \\pop %rdi // current_task
                         \\pop %rsi // type_erased_call.typeErased
-                        \\pop %rdx // type_erased_call.arg_slots[0]
-                        \\pop %rcx // type_erased_call.arg_slots[1]
-                        \\pop %r8  // type_erased_call.arg_slots[2]
-                        \\pop %r9  // type_erased_call.arg_slots[3]
+                        \\pop %rdx // type_erased_call.args[0]
+                        \\pop %rcx // type_erased_call.args[1]
+                        \\pop %r8  // type_erased_call.args[2]
+                        \\pop %r9  // type_erased_call.args[3]
                         \\ret      // the address of `Task.Scheduler.taskEntry` is on the stack
                     );
                 }
@@ -157,10 +157,10 @@ pub fn prepareTaskForScheduling(
 
     task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
-    task.stack.push(type_erased_call.arg_slots[3]) catch unreachable;
-    task.stack.push(type_erased_call.arg_slots[2]) catch unreachable;
-    task.stack.push(type_erased_call.arg_slots[1]) catch unreachable;
-    task.stack.push(type_erased_call.arg_slots[0]) catch unreachable;
+    task.stack.push(type_erased_call.args[3]) catch unreachable;
+    task.stack.push(type_erased_call.args[2]) catch unreachable;
+    task.stack.push(type_erased_call.args[1]) catch unreachable;
+    task.stack.push(type_erased_call.args[0]) catch unreachable;
     task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
     task.stack.push(@intFromPtr(task)) catch unreachable;
 
@@ -216,10 +216,10 @@ pub fn call(
     var stack = new_stack;
 
     try stack.push(@intFromPtr(type_erased_call.typeErased));
-    try stack.push(type_erased_call.arg_slots[3]);
-    try stack.push(type_erased_call.arg_slots[2]);
-    try stack.push(type_erased_call.arg_slots[1]);
-    try stack.push(type_erased_call.arg_slots[0]);
+    try stack.push(type_erased_call.args[3]);
+    try stack.push(type_erased_call.args[2]);
+    try stack.push(type_erased_call.args[1]);
+    try stack.push(type_erased_call.args[0]);
 
     impls.callImpl(
         stack.stack_pointer,
@@ -235,10 +235,10 @@ pub fn callNoSave(
     var stack = new_stack;
 
     try stack.push(@intFromPtr(type_erased_call.typeErased));
-    try stack.push(type_erased_call.arg_slots[3]);
-    try stack.push(type_erased_call.arg_slots[2]);
-    try stack.push(type_erased_call.arg_slots[1]);
-    try stack.push(type_erased_call.arg_slots[0]);
+    try stack.push(type_erased_call.args[3]);
+    try stack.push(type_erased_call.args[2]);
+    try stack.push(type_erased_call.args[1]);
+    try stack.push(type_erased_call.args[0]);
 
     asm volatile (
         \\mov %[stack_pointer], %rsp

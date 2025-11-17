@@ -3,9 +3,7 @@
 
 const std = @import("std");
 
-/// Stores a type erased call that supports passing up to four "argument slots".
-///
-/// Each supported argument type uses up one of the argument slots with exception of slices which use two.
+/// Stores a type erased call that supports passing up to four arguments.
 ///
 /// The return type must be `void`, `noreturn`, `!void` or `!noreturn`.
 ///
@@ -15,7 +13,6 @@ const std = @import("std");
 /// - bool
 /// - pointer and optional pointer
 /// - error set
-/// - slice
 ///
 /// Argument types that are supported if its size is less than or equal to the size of `usize`:
 /// - int
@@ -27,17 +24,17 @@ const std = @import("std");
 /// - union, tagged union, packed union and extern union
 pub const TypeErasedCall = extern struct {
     typeErased: TypeErasedFn,
-    arg_slots: [number_of_arg_slots]usize,
+    args: [number_of_args]usize,
 
     pub const TypeErasedFn = *const fn (usize, usize, usize, usize) callconv(.c) void;
-    pub const number_of_arg_slots = 4;
+    pub const number_of_args = 4;
 
     pub inline fn call(type_erased: TypeErasedCall) void {
         type_erased.typeErased(
-            type_erased.arg_slots[0],
-            type_erased.arg_slots[1],
-            type_erased.arg_slots[2],
-            type_erased.arg_slots[3],
+            type_erased.args[0],
+            type_erased.args[1],
+            type_erased.args[2],
+            type_erased.args[3],
         );
     }
 
@@ -57,68 +54,8 @@ pub const TypeErasedCall = extern struct {
             @compileError("`function` must have a return type of `void`, `noreturn`, `!void` or `!noreturn`");
         };
 
-        // we check for any slices as in that case a more complex implementation is required
-        const has_any_slices = comptime blk: {
-            const args_info = @typeInfo(@TypeOf(args)).@"struct";
-            std.debug.assert(args_info.is_tuple);
-
-            var any_slices = false;
-            var required_arg_slots = 0;
-
-            for (args_info.fields) |field| {
-                if (isSlice(field.type)) {
-                    required_arg_slots += 2;
-                    any_slices = true;
-                } else {
-                    required_arg_slots += 1;
-                }
-            }
-
-            if (required_arg_slots > number_of_arg_slots) {
-                @compileError(std.fmt.comptimePrint(
-                    if (any_slices)
-                        "only {d} argument slots supported found {d} (slices take up two argument slots)"
-                    else
-                        "only {d} argument slots supported found {d}",
-                    .{ number_of_arg_slots, required_arg_slots },
-                ));
-            }
-
-            break :blk any_slices;
-        };
-
         var type_erased: TypeErasedCall = .{
-            .typeErased = if (has_any_slices)
-                struct {
-                    fn typeErasedSlice(arg0: usize, arg1: usize, arg2: usize, arg3: usize) callconv(.c) void {
-                        const raw_args: [number_of_arg_slots]usize = .{ arg0, arg1, arg2, arg3 };
-
-                        var inner_args: std.meta.ArgsTuple(@TypeOf(function)) = undefined;
-
-                        var raw_i: usize = 0;
-                        inline for (&inner_args, 0..) |*arg, arg_i| {
-                            if (isSlice(@TypeOf(args[arg_i]))) {
-                                const ptr = argFromUsize(@TypeOf(args[arg_i].ptr), raw_args[raw_i]);
-                                raw_i += 1;
-                                const len = argFromUsize(@TypeOf(args[arg_i].len), raw_args[raw_i]);
-                                raw_i += 1;
-                                arg.* = ptr[0..len];
-                            } else {
-                                arg.* = argFromUsize(@TypeOf(args[arg_i]), raw_args[raw_i]);
-                                raw_i += 1;
-                            }
-                        }
-
-                        return if (returns_error)
-                            @call(.auto, function, inner_args) catch |err| std.debug.panic(
-                                "unhandled error: {t}",
-                                .{err},
-                            )
-                        else
-                            @call(.auto, function, inner_args);
-                    }
-                }.typeErasedSlice
-            else switch (comptime args.len) {
+            .typeErased = comptime switch (args.len) {
                 0 => struct {
                     fn typeErased0Args(_: usize, _: usize, _: usize, _: usize) callconv(.c) void {
                         return if (returns_error)
@@ -189,20 +126,11 @@ pub const TypeErasedCall = extern struct {
                 }.typeErased4Args,
                 else => unreachable,
             },
-            .arg_slots = undefined,
+            .args = undefined,
         };
 
-        var arg_slot: usize = 0;
-        inline for (args) |arg| {
-            if (isSlice(@TypeOf(arg))) {
-                type_erased.arg_slots[arg_slot] = usizeFromArg(arg.ptr);
-                arg_slot += 1;
-                type_erased.arg_slots[arg_slot] = usizeFromArg(arg.len);
-                arg_slot += 1;
-            } else {
-                type_erased.arg_slots[arg_slot] = usizeFromArg(arg);
-                arg_slot += 1;
-            }
+        inline for (args, 0..) |arg, i| {
+            type_erased.args[i] = usizeFromArg(arg);
         }
 
         return type_erased;
@@ -328,14 +256,4 @@ inline fn argFromUsize(comptime ArgT: type, value: usize) ArgT {
         },
         else => unreachable, // `usizeFromArg` prevents us from reaching here
     }
-}
-
-inline fn isSlice(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .pointer => |pointer| switch (pointer.size) {
-            .slice => true,
-            else => false,
-        },
-        else => false,
-    };
 }
