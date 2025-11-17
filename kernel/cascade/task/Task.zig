@@ -301,7 +301,7 @@ pub const internal = struct {
     // Called directly by assembly code in `arch.scheduling.prepareTaskForScheduling`, so the signature must match.
     pub fn taskEntry(
         current_task: Task.Current,
-        target_function: core.TypeErasedCall.TypeErasedFn,
+        target_function: *const core.TypeErasedCall.TypeErasedFn,
         arg0: usize,
         arg1: usize,
         arg2: usize,
