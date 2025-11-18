@@ -64,6 +64,7 @@ pub fn create(current_task: Task.Current, options: CreateOptions) !*Process {
 
 pub const CreateThreadOptions = struct {
     name: ?Task.Name = null,
+    entry: Task.EntryFunction,
 };
 
 /// Creates a thread in the given process.
@@ -88,6 +89,7 @@ pub fn createThread(
                     .{process.next_thread_id.fetchAdd(1, .monotonic)},
                 ),
             .type = .user,
+            .entry = options.entry,
         },
     );
     errdefer {
@@ -141,11 +143,13 @@ const ProcessCleanup = struct {
 
     pub fn init(process_cleanup: *ProcessCleanup, current_task: Task.Current) !void {
         process_cleanup.* = .{
-            .task = try Task.createKernelTask(current_task, try .fromSlice("process cleanup")),
+            .task = try Task.createKernelTask(current_task, .{
+                .name = try .fromSlice("process cleanup"),
+                .entry = .prepare(ProcessCleanup.execute, .{process_cleanup}),
+            }),
             .parker = undefined, // set below
             .incoming = .{},
         };
-        process_cleanup.task.setTaskEntry(.prepare(ProcessCleanup.execute, .{process_cleanup}));
 
         process_cleanup.parker = .withParkedTask(process_cleanup.task);
     }
@@ -170,9 +174,8 @@ const ProcessCleanup = struct {
         process_cleanup.parker.unpark(current_task);
     }
 
-    fn execute(process_cleanup: *ProcessCleanup) noreturn {
-        if (core.is_debug) std.debug.assert(process_cleanup.task == Task.Current.current().task);
-        const current_task: Task.Current = .{ .task = process_cleanup.task };
+    fn execute(current_task: Task.Current, process_cleanup: *ProcessCleanup) noreturn {
+        if (core.is_debug) std.debug.assert(process_cleanup.task == current_task.task);
 
         while (true) {
             while (process_cleanup.incoming.popFirst()) |node| {

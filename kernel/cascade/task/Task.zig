@@ -17,6 +17,8 @@ pub const Current = @import("Current.zig").Current;
 pub const SchedulerHandle = @import("SchedulerHandle.zig");
 pub const Stack = @import("Stack.zig");
 
+pub const EntryFunction = core.TypeErasedCall.Templated(&.{Current});
+
 const log = cascade.debug.log.scoped(.task);
 
 const Task = @This();
@@ -97,21 +99,20 @@ pub fn decrementReferenceCount(task: *Task, current_task: Task.Current) void {
 
 pub const CreateKernelTaskOptions = struct {
     name: Name,
-    type_erased_call: core.TypeErasedCall,
+    entry: EntryFunction,
 };
 
 /// Create a kernel task.
 ///
 /// The task is in the `ready` state and is not scheduled.
-///
-/// `setTaskEntry` *must* be called before the task is scheduled.
-pub fn createKernelTask(current_task: Task.Current, name: Name) !*Task {
+pub fn createKernelTask(current_task: Task.Current, options: CreateKernelTaskOptions) !*Task {
     const task = try globals.cache.allocate(current_task);
     errdefer globals.cache.deallocate(current_task, task);
 
     try Task.internal.init(task, .{
-        .name = name,
+        .name = options.name,
         .type = .kernel,
+        .entry = options.entry,
     });
 
     globals.kernel_tasks_lock.writeLock(current_task);
@@ -121,21 +122,6 @@ pub fn createKernelTask(current_task: Task.Current, name: Name) !*Task {
     if (gop.found_existing) std.debug.panic("task already in kernel tasks list", .{});
 
     return task;
-}
-
-/// Prepares the task for being scheduled.
-///
-/// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
-///
-/// This function *must* be called before the task is scheduled and can only be called once.
-pub fn setTaskEntry(
-    task: *Task,
-    type_erased_call: core.TypeErasedCall,
-) void {
-    arch.scheduling.prepareTaskForScheduling(
-        task,
-        type_erased_call,
-    );
 }
 
 pub fn format(
@@ -170,11 +156,13 @@ const TaskCleanup = struct {
 
     pub fn init(task_cleanup: *TaskCleanup, current_task: Task.Current) !void {
         task_cleanup.* = .{
-            .task = try Task.createKernelTask(current_task, try .fromSlice("task cleanup")),
+            .task = try Task.createKernelTask(current_task, .{
+                .name = try .fromSlice("task cleanup"),
+                .entry = .prepare(TaskCleanup.execute, .{task_cleanup}),
+            }),
             .parker = undefined, // set below
             .incoming = .{},
         };
-        task_cleanup.task.setTaskEntry(.prepare(TaskCleanup.execute, .{task_cleanup}));
 
         task_cleanup.parker = .withParkedTask(task_cleanup.task);
     }
@@ -205,9 +193,8 @@ const TaskCleanup = struct {
         task_cleanup.parker.unpark(current_task);
     }
 
-    fn execute(task_cleanup: *TaskCleanup) noreturn {
-        if (core.is_debug) std.debug.assert(task_cleanup.task == Task.Current.current().task);
-        const current_task: Task.Current = .{ .task = task_cleanup.task };
+    fn execute(current_task: Task.Current, task_cleanup: *TaskCleanup) noreturn {
+        if (core.is_debug) std.debug.assert(task_cleanup.task == current_task.task);
 
         while (true) {
             while (task_cleanup.incoming.popFirst()) |node| {
@@ -280,6 +267,7 @@ pub const internal = struct {
     pub const InitOptions = struct {
         name: Name,
         type: cascade.Context.Type,
+        entry: EntryFunction,
     };
 
     pub fn init(task: *Task, options: InitOptions) !void {
@@ -296,6 +284,14 @@ pub const internal = struct {
         };
 
         task.stack.reset();
+
+        var entry = options.entry;
+        entry.setTemplatedArgs(.{.{ .task = task }});
+
+        arch.scheduling.prepareTaskForScheduling(
+            task,
+            entry.type_erased_call,
+        );
     }
 
     // Called directly by assembly code in `arch.scheduling.prepareTaskForScheduling`, so the signature must match.
@@ -389,9 +385,18 @@ pub const init = struct {
         current_task: Task.Current,
         executor: *cascade.Executor,
     ) !void {
+        const dummyInitEntry = struct {
+            fn dummyInitEntry(_: Task.Current) noreturn {
+                @panic("init task should not be scheduled");
+            }
+        }.dummyInitEntry;
+
         const task = try createKernelTask(
             current_task,
-            try .initPrint("init {}", .{@intFromEnum(executor.id)}),
+            .{
+                .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
+                .entry = .prepare(dummyInitEntry, .{}),
+            },
         );
         errdefer comptime unreachable;
 
@@ -400,7 +405,7 @@ pub const init = struct {
         task.spinlocks_held = 0; // init tasks don't start with the scheduler locked
         task.scheduler_locked = false; // init tasks don't start with the scheduler locked
 
-        task.stack.reset(); // we don't care about the `function` and arguments
+        task.stack.reset(); // we don't care about the entry function or its arguments
 
         executor.current_task = task;
     }

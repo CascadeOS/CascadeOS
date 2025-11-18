@@ -137,8 +137,13 @@ fn initStage3(current_task: Task.Current) !noreturn {
 
         log.debug(current_task, "creating and scheduling init stage 4 task", .{});
         {
-            const init_stage4_task: *Task = try .createKernelTask(current_task, try .fromSlice("init stage 4"));
-            init_stage4_task.setTaskEntry(.prepare(initStage4, .{init_stage4_task}));
+            const init_stage4_task: *Task = try .createKernelTask(
+                current_task,
+                .{
+                    .name = try .fromSlice("init stage 4"),
+                    .entry = .prepare(initStage4, .{}),
+                },
+            );
 
             const scheduler_handle: Task.SchedulerHandle = .get(current_task);
             defer scheduler_handle.unlock(current_task);
@@ -157,10 +162,7 @@ fn initStage3(current_task: Task.Current) !noreturn {
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(task: *Task) !void {
-    if (core.is_debug) std.debug.assert(task == Task.Current.current().task);
-    const current_task: Task.Current = .{ .task = task };
-
+fn initStage4(current_task: Task.Current) !void {
     log.debug(current_task, "initializing PCI ECAM", .{});
     try cascade.pci.init.initializeECAM(current_task);
 

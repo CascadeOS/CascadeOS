@@ -24,18 +24,6 @@ pub inline fn fromTask(task: *Task) *Thread {
     return @fieldParentPtr("task", task);
 }
 
-/// Prepares the thread for being scheduled.
-///
-/// Ensures that when the thread is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
-///
-/// This function *must* be called before the thread is scheduled and can only be called once.
-pub fn setThreadEntry(
-    thread: *Thread,
-    type_erased_call: core.TypeErasedCall,
-) void {
-    thread.task.setTaskEntry(type_erased_call);
-}
-
 pub const internal = struct {
     pub fn create(
         current_task: Task.Current,
