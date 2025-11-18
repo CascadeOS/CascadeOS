@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/c163b24bada6069e13c564e57d1b0bbeb1c6d21f/LICENSE)
+// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/e5e5deea6f4dea0ea81237db39ca061ead048e60/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI 3.0.0 (56258b3b9edc6dedbfce81955c9331caf9f4e2da).
+//! Provides a nice zig API wrapping uACPI 3.2.0 (e5e5deea6f4dea0ea81237db39ca061ead048e60).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
-//! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the
-//!    root node.
+//! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the root node.
+//! - `uacpi_for_each_subtable` is not exposed as per table iterators are superior.
 //!
 
 const std = @import("std");
@@ -181,6 +181,10 @@ pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
     pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
     ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
     iosapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOSAPIC,
+    platform_specific = c_uacpi.UACPI_INTERRUPT_MODEL_PLATFORM_SPECIFIC,
+    gic = c_uacpi.UACPI_INTERRUPT_MODEL_GIC,
+    lpic = c_uacpi.UACPI_INTERRUPT_MODEL_LPIC,
+    rintc = c_uacpi.UACPI_INTERRUPT_MODEL_RINTC,
 };
 
 pub fn setInterruptModel(model: InterruptModel) !void {
@@ -3685,7 +3689,9 @@ pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
 
     @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
 
-    /// Only applicable for uacpi_namespace_for_each_child
+    /// Ignore all of the children of the current node and proceed directly to its peer nodes.
+    ///
+    /// Only applicable for API that interacts with the AML namespace such as `forEachChild`, `findDevices`, etc.
     next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
 };
 

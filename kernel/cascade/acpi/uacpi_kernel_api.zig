@@ -394,10 +394,11 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
     const uacpi_log = cascade.debug.log.scoped(.uacpi);
 
     switch (uacpi_log_level) {
-        inline else => |level| {
+        inline else => |level| blk: {
             const kernel_log_level: cascade.debug.log.Level = comptime switch (level) {
-                .DEBUG => .verbose, // DEBUG is the most verbose in uACPI
-                .TRACE, .INFO => .debug,
+                .DEBUG => break :blk, // DEBUG is way too verbose
+                .TRACE => .verbose,
+                .INFO => .debug,
                 .WARN => .warn,
                 .ERROR => .err,
             };
