@@ -11,8 +11,8 @@
 
     .dependencies = .{
         .devicetree = .{
-            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#26f662ab399a15b06158af16891ea3a1723489a6",
-            .hash = "devicetree-3.0.1-cZRcrHOfAQAmao-6kHxeulFJhgnQFZq9E7vEPanvhZ-g",
+            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#54571ee6e4196f6248658dcbc71eb5f0aff4ce94",
+            .hash = "devicetree-3.0.1-cZRcrDugAQCBlQ4DAyQy0LBVEJKn_IEPr6MTn0S-aDF3",
         },
 
         .edk2 = .{
@@ -36,8 +36,8 @@
         },
 
         .sbi = .{
-            .url = "git+https://github.com/CascadeOS/zig-sbi?ref=master#86c454675dc68b9a07db055aa86c9e5c33acd9b3",
-            .hash = "sbi-6.0.1-Muvb-pDuAQCRlEpJaRBRIcIiqAmAj0bDflQgUTOBvzi8",
+            .url = "git+https://github.com/CascadeOS/zig-sbi.git?ref=master#610993bf1c9d4ff5e6fd710495bea58ac7176980",
+            .hash = "sbi-6.0.1-Muvb-mnvAQBph7J2NjhdU3NGhar9S1t6KD-g-n6wp3NP",
         },
     },
 
