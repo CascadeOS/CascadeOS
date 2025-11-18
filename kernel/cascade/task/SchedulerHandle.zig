@@ -397,8 +397,6 @@ fn idle(current_task: Task.Current) callconv(.c) noreturn {
         std.debug.assert(!arch.interrupts.areEnabled());
     }
 
-    log.verbose(current_task, "entering idle", .{});
-
     globals.scheduler.unlock(current_task);
 
     while (true) {
