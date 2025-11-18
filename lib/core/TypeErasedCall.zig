@@ -98,6 +98,29 @@ pub const TypeErasedCall = extern struct {
             ///
             /// `setTemplatedArgs` must be called before making use of the returned `TypeErasedCall.Templated`.
             pub fn prepare(comptime function: anytype, args: NonTemplateArgsTuple(@TypeOf(function))) @This() {
+                comptime {
+                    const function_parameters = @typeInfo(@TypeOf(function)).@"fn".params;
+                    if (function_parameters.len < template_parameters.len) {
+                        @compileError(
+                            std.fmt.comptimePrint(
+                                "function requires at least {d} parameters to match the template found {d}",
+                                .{ template_parameters.len, function_parameters.len },
+                            ),
+                        );
+                    }
+
+                    for (function_parameters[0..template_parameters.len], template_parameters, 0..) |function_parameter, template_parameter, i| {
+                        if (function_parameter.type.? != template_parameter) {
+                            @compileError(
+                                std.fmt.comptimePrint(
+                                    "function parameter {d} with type '{s}' does not match template parameter with type '{s}'",
+                                    .{ i, @typeName(function_parameter.type.?), @typeName(template_parameter) },
+                                ),
+                            );
+                        }
+                    }
+                }
+
                 var templated_type_erased: @This() = .{
                     .type_erased_call = .{
                         .typeErased = typeErasedFn(function),
