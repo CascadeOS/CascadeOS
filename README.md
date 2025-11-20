@@ -1,7 +1,6 @@
 # CascadeOS
-
-[![justforfunnoreally.dev badge](https://img.shields.io/badge/justforfunnoreally-dev-9ff)](https://justforfunnoreally.dev)
-[![NO AI](https://raw.githubusercontent.com/nuxy/no-ai-badge/master/badge.svg)](https://github.com/nuxy/no-ai-badge)
+![NO AI](/.assets/no_ai.svg)
+[![justforfunnoreally.dev badge](/.assets/justforfunnoreally_dev.svg)](https://justforfunnoreally.dev)
 
 CascadeOS is a general purpose operating system targeting standard desktops and laptops.
 
@@ -39,3 +38,5 @@ Run `zig build -h` for a listing of the available steps and options.
 
 ## License
 This project follows the [REUSE Specification](https://reuse.software/spec/) for specifying license information.
+
+[![REUSE status](https://api.reuse.software/badge/github.com/CascadeOS/CascadeOS)](https://api.reuse.software/info/github.com/CascadeOS/CascadeOS)
