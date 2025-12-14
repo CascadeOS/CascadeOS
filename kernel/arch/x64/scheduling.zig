@@ -262,41 +262,20 @@ pub fn callNoSave(
     new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) arch.scheduling.CallError!noreturn {
-    var stack = new_stack;
-
-    if (core.is_debug) {
-        std.debug.assert(stack.spaceFor(
-            1 + // type_erased_call.typeErased
-                5, // args[0..5]
-        ));
-    }
-
-    try stack.push(@intFromPtr(type_erased_call.typeErased));
-    try stack.push(type_erased_call.args[4]);
-    try stack.push(type_erased_call.args[3]);
-    try stack.push(type_erased_call.args[2]);
-    try stack.push(type_erased_call.args[1]);
-    try stack.push(type_erased_call.args[0]);
-
+    // no clobbers are listed as the calling context is abandoned
     asm volatile (
         \\mov %[stack_pointer], %rsp
-        \\pop %rdi                   // arg0
-        \\pop %rsi                   // arg1
-        \\pop %rdx                   // arg2
-        \\pop %rcx                   // arg3
-        \\pop %r8                    // arg4
-        \\ret                        // the address of `type_erased_call.typeErased` is on the stack
+        \\xor %ebp, %ebp
+        \\jmp *%[typeErased]
+        \\ud2
         :
-        : [stack_pointer] "r" (stack.stack_pointer),
-        : .{
-          .memory = true,
-          .rsp = true,
-          .rdi = true,
-          .rsi = true,
-          .rdx = true,
-          .rcx = true,
-          .r8 = true,
-        });
-
+        : [arg0] "{rdi}" (type_erased_call.args[0]),
+          [arg1] "{rsi}" (type_erased_call.args[1]),
+          [arg2] "{rdx}" (type_erased_call.args[2]),
+          [arg3] "{rcx}" (type_erased_call.args[3]),
+          [arg4] "{r8}" (type_erased_call.args[4]),
+          [stack_pointer] "r" (new_stack.stack_pointer),
+          [typeErased] "r" (@intFromPtr(type_erased_call.typeErased)),
+    );
     unreachable;
 }
