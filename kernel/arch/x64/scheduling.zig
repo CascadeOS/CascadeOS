@@ -161,7 +161,7 @@ pub fn prepareTaskForScheduling(
 
     std.debug.assert(
         task.stack.spaceFor(1 + // args[4]
-            1 + // frame pointer
+            1 + // task entry return address
             1 + // taskEntry
             4 + // args[..4]
             1 + // type_erased_call.typeErased
@@ -173,7 +173,7 @@ pub fn prepareTaskForScheduling(
 
     task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `impls.taskEntryTrampoline` as per System V ABI
 
-    task.stack.push(0) catch unreachable; // frame pointer
+    task.stack.push(0) catch unreachable; // task entry return address
 
     task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
@@ -235,24 +235,22 @@ pub fn call(
         };
     };
 
-    var stack = new_stack;
-
     if (core.is_debug) {
-        std.debug.assert(stack.spaceFor(
+        std.debug.assert(new_stack.spaceFor(
             1 + // type_erased_call.typeErased
                 5, // args[0..5]
         ));
     }
 
-    try stack.push(@intFromPtr(type_erased_call.typeErased));
-    try stack.push(type_erased_call.args[4]);
-    try stack.push(type_erased_call.args[3]);
-    try stack.push(type_erased_call.args[2]);
-    try stack.push(type_erased_call.args[1]);
-    try stack.push(type_erased_call.args[0]);
+    try new_stack.push(@intFromPtr(type_erased_call.typeErased));
+    try new_stack.push(type_erased_call.args[4]);
+    try new_stack.push(type_erased_call.args[3]);
+    try new_stack.push(type_erased_call.args[2]);
+    try new_stack.push(type_erased_call.args[1]);
+    try new_stack.push(type_erased_call.args[0]);
 
     impls.callImpl(
-        stack.stack_pointer,
+        new_stack.stack_pointer,
         &old_task.stack.stack_pointer,
     );
 }
