@@ -116,7 +116,7 @@ fn initStage2(current_task: Task.Current) !noreturn {
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
 
     try arch.scheduling.callNoSave(
-        current_task.task.stack,
+        &current_task.task.stack,
         .prepare(
             initStage3,
             .{current_task},

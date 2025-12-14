@@ -207,7 +207,7 @@ fn switchToIdleDeferredAction(
 
     arch.scheduling.call(
         old_task,
-        scheduler_task.stack,
+        &scheduler_task.stack,
         .prepare(
             static.idleEntryDeferredAction,
             .{
@@ -329,7 +329,7 @@ fn switchToTaskFromTaskDeferredAction(
 
     arch.scheduling.call(
         old_task,
-        scheduler_task.stack,
+        &scheduler_task.stack,
         .prepare(
             static.switchToTaskDeferredAction,
             .{

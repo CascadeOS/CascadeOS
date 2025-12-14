@@ -193,7 +193,7 @@ pub fn prepareTaskForScheduling(
 /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
 pub fn call(
     old_task: *Task,
-    new_stack: Task.Stack,
+    new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) arch.scheduling.CallError!void {
     const impls = struct {
@@ -259,7 +259,7 @@ pub fn call(
 
 /// Calls `type_erased_call` on `new_stack`.
 pub fn callNoSave(
-    new_stack: Task.Stack,
+    new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) arch.scheduling.CallError!noreturn {
     var stack = new_stack;
