@@ -118,6 +118,12 @@ pub fn switchTask(
         @panic("task returned");
     };
 
+    if (core.is_debug) {
+        std.debug.assert(new_task.stack.spaceFor(
+            6, // general purpose registers
+        ));
+    }
+
     impls.switchToTaskWithOld(
         new_task.stack.stack_pointer,
         &old.stack.stack_pointer,
@@ -144,7 +150,7 @@ pub fn prepareTaskForScheduling(
                         \\pop %rcx // type_erased_call.args[1]
                         \\pop %r8  // type_erased_call.args[2]
                         \\pop %r9  // type_erased_call.args[3]
-                        \\ret      // the address of `Task.Scheduler.taskEntry` is on the stack
+                        \\ret      // the address of `Task.internal.taskEntry` is on the stack
                     );
                 }
             }.impl;
@@ -153,9 +159,21 @@ pub fn prepareTaskForScheduling(
         };
     };
 
-    std.debug.assert(task.stack.spaceFor(9 + 6));
+    std.debug.assert(
+        task.stack.spaceFor(1 + // args[4]
+            1 + // frame pointer
+            1 + // taskEntry
+            4 + // args[..4]
+            1 + // type_erased_call.typeErased
+            1 + // task
+            1 + // taskEntryTrampoline
+            6 // general purpose registers
+        ),
+    );
 
     task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `impls.taskEntryTrampoline` as per System V ABI
+
+    task.stack.push(0) catch unreachable; // frame pointer
 
     task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
@@ -219,6 +237,13 @@ pub fn call(
 
     var stack = new_stack;
 
+    if (core.is_debug) {
+        std.debug.assert(stack.spaceFor(
+            1 + // type_erased_call.typeErased
+                5, // args[0..5]
+        ));
+    }
+
     try stack.push(@intFromPtr(type_erased_call.typeErased));
     try stack.push(type_erased_call.args[4]);
     try stack.push(type_erased_call.args[3]);
@@ -238,6 +263,13 @@ pub fn callNoSave(
     type_erased_call: core.TypeErasedCall,
 ) arch.scheduling.CallError!noreturn {
     var stack = new_stack;
+
+    if (core.is_debug) {
+        std.debug.assert(stack.spaceFor(
+            1 + // type_erased_call.typeErased
+                5, // args[0..5]
+        ));
+    }
 
     try stack.push(@intFromPtr(type_erased_call.typeErased));
     try stack.push(type_erased_call.args[4]);
