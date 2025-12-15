@@ -19,7 +19,6 @@
                 "isDefault": true
             }
         },
-
         // Kernel
         {
             "label": "build - kernel_x64",
@@ -33,7 +32,6 @@
                 "kind": "build"
             }
         },
-
         // Libraries
         {
             "label": "test - libs",
@@ -47,7 +45,6 @@
                 "kind": "build"
             }
         },
-
         // Tools
         {
             "label": "build - tools",
@@ -68,6 +65,19 @@
             "args": [
                 "build",
                 "tools"
+            ],
+            "group": {
+                "kind": "build"
+            }
+        },
+        // Image Builder
+        {
+            "label": "image_builder",
+            "type": "process",
+            "command": "zig",
+            "args": [
+                "build",
+                "image_builder_build",
             ],
             "group": {
                 "kind": "build"

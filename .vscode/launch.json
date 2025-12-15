@@ -12,7 +12,7 @@
                 "x64"
             ],
             "default": "x64",
-            "description": "Architecture that is being debugged."
+            "description": "Architecture that is being debugged (only applicable for QEMU debugging)"
         }
     ],
     "configurations": [
@@ -32,6 +32,18 @@
                 "group": "QEMU remote",
                 "order": 1
             }
-        }
+        },
+        {
+            "name": "image_builder",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/tool/image_builder/image_builder",
+            "args": [
+                "image_description.json",
+                "output.hdd"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "image_builder"
+        },
     ]
 }
