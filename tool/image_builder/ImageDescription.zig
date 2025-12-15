@@ -33,6 +33,7 @@ pub const Partition = struct {
 };
 
 pub const Filesystem = enum {
+    none,
     fat32,
 };
 

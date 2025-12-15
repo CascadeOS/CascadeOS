@@ -105,6 +105,7 @@ fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: s
         const partition_slice = disk_image[gpt_partition.start_block * disk_block_size.value ..][0 .. gpt_partition.block_count * disk_block_size.value];
 
         switch (partition.filesystem) {
+            .none => {},
             .fat32 => try buildFATPartition(allocator, partition, partition_slice),
         }
     }
