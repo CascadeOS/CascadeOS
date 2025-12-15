@@ -38,6 +38,7 @@ pub const Filesystem = enum {
 
 pub const PartitionType = enum {
     efi,
+    bios_boot,
     data,
 };
 

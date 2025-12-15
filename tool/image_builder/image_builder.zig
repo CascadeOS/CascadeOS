@@ -763,11 +763,6 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
                 break :blk disk_block_size.amountToCover(core.Size.from(partition.size, .byte));
             };
 
-            const type_guid = switch (partition.partition_type) {
-                .efi => gpt.partition_types.efi_system_partition,
-                .data => gpt.partition_types.linux_filesystem_data,
-            };
-
             const ending_block = blk: {
                 const ending_block = starting_block + desired_blocks_in_partition - 1;
 
@@ -784,8 +779,12 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
 
             const blocks_in_partition = (ending_block - starting_block) + 1;
 
-            entries[i] = gpt.PartitionEntry{
-                .partition_type_guid = type_guid,
+            entries[i] = .{
+                .partition_type_guid = switch (partition.partition_type) {
+                    .efi => gpt.partition_types.efi_system_partition,
+                    .bios_boot => gpt.partition_types.bios_boot_partition,
+                    .data => gpt.partition_types.linux_filesystem_data,
+                },
                 .unique_partition_guid = UUID.generateV4(random),
                 .starting_lba = starting_block,
                 .ending_lba = ending_block,
