@@ -254,10 +254,10 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
 fn limineEntryPoint() callconv(.c) noreturn {
     boot.bootloader_api = .limine;
 
-    if (requests.limine_base_revison.revison == .@"0") {
-        // limine sets the `revison` field to `0` to signal that the requested revision is supported
-        limine_revison = target_limine_revison;
-    }
+    limine_revison = requests.limine_base_revison.loadedRevision() orelse {
+        // TODO: attempt loading with limine revision 0 and log that the requested revision was not available
+        @panic("bootloader does not supported requested limine revision");
+    };
 
     @call(.never_inline, cascade.init.initStage1, .{}) catch |err| {
         std.debug.panic("unhandled error: {t}", .{err});
@@ -265,7 +265,7 @@ fn limineEntryPoint() callconv(.c) noreturn {
     @panic("`initStage1` returned");
 }
 
-// TODO: ACPI tables and UART are not mapped to HHDM from revision 3 onwards
+// TODO: ACPI tables and UART are not mapped to HHDM from revision 3 onwards, revision 4 maps ACPI tables but not UART :(
 const target_limine_revison: limine.BaseRevison.Revison = .@"2";
 var limine_revison: limine.BaseRevison.Revison = .@"0";
 
