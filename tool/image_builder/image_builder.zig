@@ -765,19 +765,17 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
                     break :blk last_usable_block - starting_block;
                 }
 
-                break :blk disk_block_size.amountToCover(core.Size.from(partition.size, .byte));
+                break :blk disk_block_size.amountToCover(.from(partition.size, .byte));
             };
 
             const ending_block = blk: {
                 const ending_block = starting_block + desired_blocks_in_partition - 1;
 
-                const aligned_ending_block = std.mem.alignBackward(usize, ending_block, partition_alignment) - 1;
+                const aligned_ending_block = std.mem.alignForward(usize, ending_block, partition_alignment) - 1;
 
                 if (aligned_ending_block <= last_usable_block) break :blk aligned_ending_block;
 
-                // TODO: Should we really truncate the partition here?
-                //       Should we panic?
-                break :blk last_usable_block;
+                std.debug.panic("partition {d}: aligned end block is larger than the last usable block", .{i});
             };
 
             if (ending_block < starting_block) @panic("ending block is less than starting block");
