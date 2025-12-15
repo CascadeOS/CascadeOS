@@ -762,7 +762,7 @@ fn createGpt(allocator: std.mem.Allocator, image_description: ImageDescription, 
                     if (i != image_description.partitions.len - 1) {
                         @panic("partition with zero size that is not the last partition");
                     }
-                    break :blk last_usable_block - starting_block;
+                    break :blk std.mem.alignBackward(usize, last_usable_block - starting_block, partition_alignment);
                 }
 
                 break :blk disk_block_size.amountToCover(.from(partition.size, .byte));
