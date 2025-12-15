@@ -65,6 +65,8 @@ pub fn registerImageSteps(
 
             const install_limine = b.addRunArtifact(limine_install_tool.release_safe_exe);
 
+            install_limine.addArgs(&.{ "-p", "1" }); // 1-based index of bios-boot partition
+
             install_limine.addArg("-i");
             install_limine.addFileArg(raw_image);
 
@@ -276,9 +278,7 @@ const ImageDescriptionStep = struct {
     const ImageDescription = @import("../tool/image_builder/ImageDescription.zig");
 
     fn buildImageDescription(image_description_step: *ImageDescriptionStep) ![]const u8 {
-        const image_size = 256 * 1024 * 1024; // 256 MiB
-        const efi_partition_size = 64 * 1024 * 1024; // 64 MiB
-        _ = efi_partition_size;
+        const image_size = 64 * 1024 * 1024; // 64 MiB
 
         var builder = ImageDescription.Builder.create(
             image_description_step.b.allocator,
@@ -286,7 +286,22 @@ const ImageDescriptionStep = struct {
         );
         defer builder.deinit();
 
-        const efi_partition = try builder.addPartition("EFI", 0, .fat32, .efi);
+        if (image_description_step.architecture == .x64) {
+            // create a bios boot partition for limine, it is the first partition on the image
+            _ = try builder.addPartition(
+                "bios-boot",
+                32 * 1024, // 32 KiB
+                .none,
+                .bios_boot,
+            );
+        }
+
+        const efi_partition = try builder.addPartition(
+            "EFI",
+            0, // expand to fill the rest of the image
+            .fat32,
+            .efi,
+        );
 
         try efi_partition.addFile(.{
             .destination_path = "/limine.conf",
