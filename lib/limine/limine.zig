@@ -2,50 +2,41 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2025 Mintsuki and contributors (https://github.com/limine-bootloader/limine-protocol/blob/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of fedf97facd1c473ee8720f8dfd5a71d03490d928.
+//! This module contains the definitions of the Limine protocol as of 8a888d7ab3b274fad1a357a922e799fc2ff20729.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine-protocol/blob/fedf97facd1c473ee8720f8dfd5a71d03490d928/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine-protocol/blob/8a888d7ab3b274fad1a357a922e799fc2ff20729/PROTOCOL.md)
 
 const std = @import("std");
 
 const core = @import("core");
 const UUID = @import("uuid").UUID;
 
-/// Base protocol revisions change certain behaviours of the Limine boot protocol
-/// outside any specific feature. The specifics are going to be described as
-/// needed throughout this specification.
+/// Base protocol revisions change certain behaviours of the Limine boot protocol outside any specific feature.
+/// The specifics are going to be described as needed throughout this specification.
 pub const BaseRevison = extern struct {
     id: [2]u64 = [_]u64{ 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc },
 
-    /// The Limine boot protocol comes in several base revisions; so far, 4
-    /// base revisions are specified: 0 through 3.
+    /// The Limine boot protocol comes in several base revisions; so far, 5 base revisions are specified: 0 through 4.
     ///
-    /// Base protocol revisions change certain behaviours of the Limine boot protocol
-    /// outside any specific feature. The specifics are going to be described as
-    /// needed throughout this specification.
-    ///
-    /// Base revision 0 through 2 are considered deprecated. Base revision 0 is the default
-    /// base revision an executable is assumed to be requesting and complying to if no base
+    /// Base revision 0 through 3 are considered deprecated.
+    /// Base revision 0 is the default base revision an executable is assumed to be requesting and complying to if no base
     /// revision tag is provided by the executable, for backwards compatibility.
     ///
-    /// A base revision tag is a set of 3 64-bit values placed somewhere in the loaded executable
-    /// image on an 8-byte aligned boundary; the first 2 values are a magic number
-    /// for the bootloader to be able to identify the tag, and the last value is the
-    /// requested base revision number. Lack of base revision tag implies revision 0.
+    /// A base revision tag is a set of 3 64-bit values placed somewhere in the loaded executable image on an 8-byte aligned boundary;
+    /// the first 2 values are a magic number for the bootloader to be able to identify the tag, and the last value is the requested base
+    /// revision number.
     ///
-    /// If a bootloader drops support for an older base revision, the bootloader must
-    /// fail to boot an executable requesting such base revision. If a bootloader does not yet
-    /// support a requested base revision (i.e. if the requested base revision is higher
-    /// than the maximum base revision supported), it must boot the executable using any
-    /// arbitrary revision it supports, and communicate failure to comply to the executable by
-    /// *leaving the 3rd component of the base revision tag unchanged*.
-    /// On the other hand, if the executable's requested base revision is supported,
-    /// *the 3rd component of the base revision tag must be set to 0 by the bootloader*.
+    /// If a bootloader drops support for an older base revision, the bootloader must fail to boot an executable requesting such base
+    /// revision.
+    /// If a bootloader does not yet support a requested base revision (i.e. if the requested base revision is higher than the
+    /// maximum base revision supported), it must boot the executable using any arbitrary revision it supports, and communicate failure to
+    /// comply to the executable by *leaving the 3rd component of the base revision tag unchanged*.
+    /// On the other hand, if the executable's requested base revision is supported, *the 3rd component of the base revision tag must be
+    /// set to 0 by the bootloader*.
     ///
-    /// Note: this means that unlike when the bootloader drops support for an older base
-    /// revision and *it* is responsible for failing to boot the executable, in case the
-    /// bootloader does not yet support the executable's requested base revision,
-    /// it is up to the executable itself to fail (or handle the condition otherwise).
+    /// Note: this means that unlike when the bootloader drops support for an older base revision and *it* is responsible for failing to
+    /// boot the executable, in case the bootloader does not yet support the executable's requested base revision, it is up to the
+    /// executable itself to fail (or handle the condition otherwise).
     ///
     /// **WARNING**: if the requested revision is supported this is set to 0
     revison: Revison,
@@ -55,6 +46,7 @@ pub const BaseRevison = extern struct {
         @"1" = 1,
         @"2" = 2,
         @"3" = 3,
+        @"4" = 4,
 
         _,
 
@@ -63,22 +55,28 @@ pub const BaseRevison = extern struct {
         }
     };
 
+    /// Returns the revision that the bootloader is providing or `null` if the requested revision is unknown to the bootloader.
+    pub fn loadedRevision(base_revision: *const BaseRevison) ?Revison {
+        if (base_revision.id[1] == 0x6a7b384944536bdc) return null;
+        return @enumFromInt(base_revision.id[1]);
+    }
+
     comptime {
         core.testing.expectSize(BaseRevison, 3 * @sizeOf(u64));
     }
 };
 
-/// The bootloader can be told to start and/or stop searching for requests (including base revision tags) in an
-/// executable's loaded image by placing start and/or end markers, on an 8-byte aligned boundary.
+/// The bootloader can be told to start and/or stop searching for requests (including base revision tags) in an executable's loaded image
+/// by placing start and/or end markers, on an 8-byte aligned boundary.
 ///
-/// The bootloader will only accept requests placed between the last start marker found (if there happen to be more
-/// than 1, which there should not, ideally) and the first end marker found.
+/// The bootloader will only accept requests placed between the last start marker found (if there happen to be more than 1, which there
+/// should not, ideally) and the first end marker found.
 ///
-/// For base revisions 0 and 1, the requests delimiters are *hints*. The bootloader can still search for requests
-/// and base revision tags outside the delimited area if it doesn't support the hints.
+/// For base revisions 0 and 1, the requests delimiters are *hints*. The bootloader can still search for requests and base revision tags
+/// outside the delimited area if it doesn't support the hints.
 ///
-/// Base revision 2's sole difference compared to base revision 1 is that support for request delimiters has to be
-/// provided and the delimiters must be honoured, if present, rather than them just being a hint.
+/// Base revision 2's sole difference compared to base revision 1 is that support for request delimiters has to be provided and the
+/// delimiters must be honoured, if present, rather than them just being a hint.
 pub const RequestDelimiters = struct {
     pub const start_marker = extern struct {
         id: [4]u64 = [_]u64{
@@ -114,11 +112,47 @@ pub const BootloaderInfo = extern struct {
             return std.mem.sliceTo(response._version, 0);
         }
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("Bootloader({s} {s})", .{
                 response.name(),
                 response.version(),
             });
+        }
+    };
+};
+
+/// Executable Command Line Feature
+pub const ExecutableCommandLine = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x4b161536e598651e, 0xb390ad4a2f1f303a },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// String containing the command line associated with the booted executable.
+        ///
+        /// This is equivalent to the `string` member of the `executable_file` structure of the Executable File feature.
+        _cmdline: ?[*:0]const u8,
+
+        /// String containing the command line associated with the booted executable.
+        ///
+        /// This is a pointer to the same memory as the `string` member of the `executable_file` structure of the Executable File feature.
+        pub fn cmdline(response: *const Response) ?[:0]const u8 {
+            const str = std.mem.sliceTo(
+                response._cmdline orelse return null,
+                0,
+            );
+            return if (str.len == 0) null else str;
+        }
+
+        pub fn format(response: *const Response, writer: *std.Io.Writer) !void {
+            if (response.cmdline()) |c| {
+                try writer.print("ExecutableCommandLine(\"{s}\")", .{c});
+            } else {
+                try writer.writeAll("ExecutableCommandLine(null)");
+            }
         }
     };
 };
@@ -134,15 +168,15 @@ pub const FirmwareType = extern struct {
         revision: u64,
         firmware_type: Type,
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("Firmware({t})", .{response.firmware_type});
         }
     };
 
     pub const Type = enum(u64) {
         x86_bios = 0,
-        uefi_32 = 1,
-        uefi_64 = 2,
+        efi_32 = 1,
+        efi_64 = 2,
         sbi = 3,
 
         _,
@@ -177,7 +211,7 @@ pub const HHDM = extern struct {
         /// the virtual address offset of the beginning of the higher half direct map
         offset: core.VirtualAddress,
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("HHDM({f})", .{response.offset});
         }
     };
@@ -188,6 +222,7 @@ pub const Framebuffer = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x9d5827dcd881dd75, 0xa3148604f6fab11b },
     revision: u64 = 0,
 
+    /// If no framebuffer is available no response will be provided.
     response: ?*const Response = null,
 
     pub const Response = extern struct {
@@ -231,7 +266,26 @@ pub const Framebuffer = extern struct {
         /// Response revision 1 required
         _video_modes: [*]const *const VideoMode,
 
-        pub fn print(limine_framebuffer: LimineFramebuffer, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn edid(limine_framebuffer: *const LimineFramebuffer) ?[]const u8 {
+            if (limine_framebuffer._edid.value == 0) return null;
+
+            return core.VirtualRange.fromAddr(
+                limine_framebuffer._edid,
+                limine_framebuffer._edid_size,
+            ).toByteSlice();
+        }
+
+        pub fn videoModes(
+            limine_framebuffer: *const LimineFramebuffer,
+            revision: BaseRevison.Revison,
+        ) []const *const VideoMode {
+            if (revision.equalToOrGreaterThan(.@"1"))
+                return limine_framebuffer._video_modes[0..limine_framebuffer._video_mode_count];
+
+            return &.{};
+        }
+
+        pub fn print(limine_framebuffer: *const LimineFramebuffer, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("Framebuffer{\n");
@@ -256,29 +310,10 @@ pub const Framebuffer = extern struct {
         }
 
         pub inline fn format(
-            limine_framebuffer: LimineFramebuffer,
+            limine_framebuffer: *const LimineFramebuffer,
             writer: *std.Io.Writer,
         ) !void {
             return limine_framebuffer.print(limine_framebuffer, writer, 0);
-        }
-
-        pub fn edid(limine_framebuffer: *const LimineFramebuffer) ?[]const u8 {
-            if (limine_framebuffer._edid.value == 0) return null;
-
-            return core.VirtualRange.fromAddr(
-                limine_framebuffer._edid,
-                limine_framebuffer._edid_size,
-            ).toByteSlice();
-        }
-
-        pub fn videoModes(
-            limine_framebuffer: *const LimineFramebuffer,
-            revision: BaseRevison.Revison,
-        ) []const *const VideoMode {
-            if (revision.equalToOrGreaterThan(.@"1"))
-                return limine_framebuffer._video_modes[0..limine_framebuffer._video_mode_count];
-
-            return &.{};
         }
     };
 
@@ -298,7 +333,7 @@ pub const Framebuffer = extern struct {
         blue_mask_size: u8,
         blue_mask_shift: u8,
 
-        pub fn print(video_mode: VideoMode, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(video_mode: *const VideoMode, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("VideoMode{\n");
@@ -319,7 +354,7 @@ pub const Framebuffer = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(video_mode: VideoMode, writer: *std.Io.Writer) !void {
+        pub inline fn format(video_mode: *const VideoMode, writer: *std.Io.Writer) !void {
             return video_mode.print(writer, 0);
         }
     };
@@ -338,11 +373,11 @@ pub const Framebuffer = extern struct {
 ///
 /// Executables must be prepared to handle the case where the requested paging mode is not supported by the hardware.
 ///
-/// If no Paging Mode Request is provided, the values of `mode`, `max_mode`, and `min_mode` that the bootloader assumes
-/// are `PagingMode.default_mode`, `PagingMode.max_mode`, and `PagingMode.min_mode`, respectively.
+/// If no Paging Mode Request is provided, the values of `mode`, `max_mode`, and `min_mode` that the bootloader assumes are
+/// `PagingMode.default_mode`, `PagingMode.max_mode`, and `PagingMode.min_mode`, respectively.
 ///
-/// If request revision 0 is used, the values of `max_mode` and `min_mode` that the bootloader assumes are the value of
-/// `mode` and `PagingMode.min_mode`, respectively.
+/// If request revision 0 is used, the values of `max_mode` and `min_mode` that the bootloader assumes are the value of `mode` and
+/// `PagingMode.min_mode`, respectively.
 pub const PagingMode = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95c1a0edab0944cb, 0xa4e5cb3842f7488a },
     revision: u64 = 0,
@@ -351,22 +386,22 @@ pub const PagingMode = extern struct {
 
     /// The preferred paging mode by the OS.
     ///
-    /// The bootloader should always aim to pick this mode unless unavailable or overridden by the user in the
-    /// bootloader's configuration file.
+    /// The bootloader should always aim to pick this mode unless unavailable or overridden by the user in the bootloader's configuration
+    /// file.
     mode: Mode = .default,
 
     // Request revision 1 and above
 
     /// The highest paging mode that the OS supports.
     ///
-    /// The bootloader will refuse to boot the OS if no paging modes of this type or lower (but equal or greater than
-    /// `min_mode`) are available.
+    /// The bootloader will refuse to boot the OS if no paging modes of this type or lower (but equal or greater than `min_mode`) are
+    /// available.
     max_mode: Mode,
 
     /// The lowest paging mode that the OS supports.
     ///
-    /// The bootloader will refuse to boot the OS if no paging modes of this type or greater (but equal or lower than
-    /// `max_mode`) are available.
+    /// The bootloader will refuse to boot the OS if no paging modes of this type or greater (but equal or lower than `max_mode`) are
+    /// available.
     min_mode: Mode = .default_min,
 
     pub const Response = extern struct {
@@ -377,7 +412,7 @@ pub const PagingMode = extern struct {
         /// Executables must be prepared to handle the case where the requested paging mode is not supported by the hardware.
         mode: Mode,
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("PagingMode({t})", .{response.mode});
         }
     };
@@ -424,7 +459,7 @@ pub const PagingMode = extern struct {
     };
 };
 
-/// MP (multiprocessor) Feature
+/// MP (Multiprocessor) Feature
 ///
 /// Notes: The presence of this request will prompt the bootloader to bootstrap the secondary processors.
 /// This will not be done if this request is not present.
@@ -437,7 +472,7 @@ pub const MP = extern struct {
     flags: Flags = .{},
 
     pub const Flags = packed struct(u64) {
-        /// Enable X2APIC, if possible. (x86-64 only)
+        /// Enable x2APIC, if possible. (x86-64 only)
         x2apic: bool = false,
 
         _: u63 = 0,
@@ -466,7 +501,7 @@ pub const MP = extern struct {
             return response._cpus[0..response._cpu_count];
         }
 
-        pub fn print(response: aarch64, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const aarch64, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("MP{\n");
@@ -487,7 +522,7 @@ pub const MP = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: aarch64, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const aarch64, writer: *std.Io.Writer) !void {
             return response.print(writer.any(), 0);
         }
 
@@ -502,8 +537,8 @@ pub const MP = extern struct {
 
             _reserved2: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address,
-            /// on a 64KiB (or Stack Size Request size) stack
+            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in X0.
             ///
@@ -515,7 +550,7 @@ pub const MP = extern struct {
             /// A free for use field
             extra_argument: u64,
 
-            pub fn print(mp_info: MPInfo, writer: *std.Io.Writer, indent: usize) !void {
+            pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
                 const new_indent = indent + 2;
 
                 try writer.writeAll("CPU{\n");
@@ -530,7 +565,7 @@ pub const MP = extern struct {
                 try writer.writeByte('}');
             }
 
-            pub inline fn format(mp_info: MPInfo, writer: *std.Io.Writer) !void {
+            pub inline fn format(mp_info: *const MPInfo, writer: *std.Io.Writer) !void {
                 return mp_info.print(writer, 0);
             }
         };
@@ -548,7 +583,7 @@ pub const MP = extern struct {
         _cpu_count: u64,
         _cpus: [*]*MPInfo,
 
-        pub fn print(response: riscv64, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const riscv64, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("MP{\n");
@@ -569,7 +604,7 @@ pub const MP = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: riscv64, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const riscv64, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
         }
 
@@ -586,8 +621,8 @@ pub const MP = extern struct {
 
             _reserved: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB
-            /// (or Stack Size Request size) stack.
+            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in x10(a0).
             ///
@@ -599,7 +634,7 @@ pub const MP = extern struct {
             /// A free for use field
             extra_argument: u64,
 
-            pub fn print(mp_info: MPInfo, writer: *std.Io.Writer, indent: usize) !void {
+            pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
                 const new_indent = indent + 2;
 
                 try writer.writeAll("CPU{\n");
@@ -614,7 +649,7 @@ pub const MP = extern struct {
                 try writer.writeByte('}');
             }
 
-            pub inline fn format(mp_info: MPInfo, writer: *std.Io.Writer) !void {
+            pub inline fn format(mp_info: *const MPInfo, writer: *std.Io.Writer) !void {
                 return mp_info.print(mp_info, writer, 0);
             }
         };
@@ -632,7 +667,7 @@ pub const MP = extern struct {
         _cpus: [*]*MPInfo,
 
         pub const ResponseFlags = packed struct(u32) {
-            /// X2APIC has been enabled
+            /// x2APIC has been enabled
             x2apic_enabled: bool = false,
             _: u31 = 0,
         };
@@ -641,7 +676,7 @@ pub const MP = extern struct {
             return response._cpus[0..response._cpu_count];
         }
 
-        pub fn print(response: x86_64, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const x86_64, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("MP{\n");
@@ -665,7 +700,7 @@ pub const MP = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: x86_64, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const x86_64, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
         }
 
@@ -678,8 +713,8 @@ pub const MP = extern struct {
 
             _reserved: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address,
-            /// on a 64KiB (or Stack Size Request size) stack.
+            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in RDI.
             ///
@@ -694,7 +729,7 @@ pub const MP = extern struct {
             /// A free for use field
             extra_argument: u64,
 
-            pub fn print(mp_info: MPInfo, writer: *std.Io.Writer, indent: usize) !void {
+            pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
                 const new_indent = indent + 2;
 
                 try writer.writeAll("CPU{\n");
@@ -709,10 +744,31 @@ pub const MP = extern struct {
                 try writer.writeByte('}');
             }
 
-            pub inline fn format(mp_info: MPInfo, writer: *std.Io.Writer) !void {
+            pub inline fn format(mp_info: *const MPInfo, writer: *std.Io.Writer) !void {
                 return mp_info.print(writer, 0);
             }
         };
+    };
+};
+
+/// RISC-V BSP Hart ID Feature
+///
+/// This request contains the same information as `MP.riscv64.bsp_hartid`, but doesn't boot up other APs.
+pub const BSPHartID = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x1369359f025525f9, 0x2ff2a56178391bb6 },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// The Hart ID of the boot processor.
+        bsp_hartid: u64,
+
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
+            try writer.print("BSPHartID({})", .{response.bsp_hartid});
+        }
     };
 };
 
@@ -725,8 +781,9 @@ pub const MP = extern struct {
 /// Usable and bootloader reclaimable entries are guaranteed to be 4096 byte aligned for both base and length.
 ///
 /// Usable and bootloader reclaimable entries are guaranteed not to overlap with any other entry.
-/// To the contrary, all non-usable entries (including executable/modules) are not guaranteed any alignment, nor is it
-/// guaranteed that they do not overlap other entries.
+///
+/// To the contrary, all non-usable entries (including executable/modules) are not guaranteed any alignment, nor is it guaranteed that they
+/// do not overlap other entries.
 pub const Memmap = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x67cf3d9d378a806f, 0xe304acdfc50c3c62 },
     revision: u64 = 0,
@@ -742,7 +799,7 @@ pub const Memmap = extern struct {
             return response._entries[0..response._entry_count];
         }
 
-        pub fn print(response: Response, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("Memmap{\n");
@@ -759,7 +816,7 @@ pub const Memmap = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
         }
     };
@@ -774,18 +831,18 @@ pub const Memmap = extern struct {
         type: Type,
 
         pub const Type = enum(u64) {
-            /// A region of the address space that is usable RAM, and does not contain other data, the executable,
-            /// bootloader information, or anything valuable, and is therefore free for use.
+            /// A region of the address space that is usable RAM, and does not contain other data, the executable, bootloader information,
+            /// or anything valuable, and is therefore free for use.
             usable = 0,
 
-            /// A region of the address space that are reserved for unspecified purposes by the firmware, hardware, or
-            /// otherwise, and should not be touched by the executable.
+            /// A region of the address space that are reserved for unspecified purposes by the firmware, hardware, or otherwise, and
+            /// should not be touched by the executable.
             reserved = 1,
 
             /// A region of the address space containing ACPI related data, such as ACPI tables and AML code.
             ///
-            /// The executable should make absolutely sure that no data contained in these regions is still needed
-            /// before deciding to reclaim these memory regions for itself.
+            /// The executable should make absolutely sure that no data contained in these regions is still needed before deciding to
+            /// reclaim these memory regions for itself.
             ///
             /// Refer to the ACPI specification for further information.
             acpi_reclaimable = 2,
@@ -795,33 +852,39 @@ pub const Memmap = extern struct {
             /// Refer to the ACPI specification for further information.
             acpi_nvs = 3,
 
-            /// A region of the address space that contains bad RAM, which may be unreliable, and therefore these
-            /// regions should be treated the same as reserved regions.
+            /// A region of the address space that contains bad RAM, which may be unreliable, and therefore these regions should be treated
+            /// the same as reserved regions.
             bad_memory = 4,
 
-            /// A region of the address space containing RAM used to store bootloader or firmware information that
-            /// should be available to the executable (or, in some cases, hardware, such as for MP trampolines).
+            /// A region of the address space containing RAM used to store bootloader or firmware information that should be available to
+            /// the executable (or, in some cases, hardware, such as for MP trampolines).
             ///
-            /// The executable should make absolutely sure that no data contained in these regions is still needed
-            /// before deciding to reclaim these memory regions for itself.
+            /// The executable should make absolutely sure that no data contained in these regions is still needed before deciding to
+            /// reclaim these memory regions for itself.
             bootloader_reclaimable = 5,
 
-            /// An entry that is meant to have an illustrative purpose only, and are not authoritative sources to be
-            /// used as a means to find the addresses of the executable or modules.
+            /// An entry that is meant to have an illustrative purpose only, and are not authoritative sources to be used as a means to find
+            /// the addresses of the executable or modules.
             ///
             /// One must use the specific Limine features (executable address and module features) to do that.
             executable_and_modules = 6,
 
             /// A region of the address space containing memory-mapped framebuffers.
             ///
-            /// These entries exist for illustrative purposes only, and are not to be used to acquire the address of any
-            /// framebuffer. One must use the framebuffer feature for that.
+            /// These entries exist for illustrative purposes only, and are not to be used to acquire the address of any framebuffer.
+            /// One must use the framebuffer feature for that.
             framebuffer = 7,
+
+            /// A region of the address space containing ACPI tables, if the firmware did not already map them within either the ACPI
+            /// reclaimable or an ACPI NVS region.
+            ///
+            /// Base revision 4 or greater.
+            acpi_tables = 8,
 
             _,
         };
 
-        pub inline fn format(entry: Entry, writer: *std.Io.Writer) !void {
+        pub inline fn format(entry: *const Entry, writer: *std.Io.Writer) !void {
             try writer.print("Entry({f} - {f} - {t})", .{ entry.base, entry.length, entry.type });
         }
     };
@@ -853,7 +916,7 @@ pub const ExecutableFile = extern struct {
         revision: u64,
         executable_file: *const File,
 
-        pub fn print(response: Response, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("ExecutableFile{\n");
@@ -866,44 +929,8 @@ pub const ExecutableFile = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
-        }
-    };
-};
-
-/// Executable Command Line Feature
-pub const ExecutableCommandLine = extern struct {
-    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x4b161536e598651e, 0xb390ad4a2f1f303a },
-    revision: u64 = 0,
-
-    response: ?*const Response = null,
-
-    pub const Response = extern struct {
-        revision: u64,
-
-        /// String containing the command line associated with the booted executable.
-        ///
-        /// This is equivalent to the `string` member of the `executable_file` structure of the Executable File feature.
-        _cmdline: ?[*:0]const u8,
-
-        /// String containing the command line associated with the booted executable.
-        ///
-        /// This is equivalent to the `string` member of the `executable_file` structure of the Executable File feature.
-        pub fn cmdline(response: *const Response) ?[:0]const u8 {
-            const str = std.mem.sliceTo(
-                response._cmdline orelse return null,
-                0,
-            );
-            return if (str.len == 0) null else str;
-        }
-
-        pub fn format(response: Response, writer: *std.Io.Writer) !void {
-            if (response.cmdline()) |c| {
-                try writer.print("ExecutableCommandLine(\"{s}\")", .{c});
-            } else {
-                try writer.writeAll("ExecutableCommandLine(null)");
-            }
         }
     };
 };
@@ -939,7 +966,7 @@ pub const Module = extern struct {
             return response._modules[0..response._module_count];
         }
 
-        pub fn print(response: Response, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             if (response._module_count == 0) {
@@ -959,7 +986,7 @@ pub const Module = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
         }
     };
@@ -1013,12 +1040,12 @@ pub const RSDP = extern struct {
         revision: u64,
         _address: core.Address.Raw,
 
-        /// Address of the RSDP table. Physical for base @intFromEnum(revision) >= 3.
+        /// Address of the RSDP table. Physical for base revision 3.
         pub fn address(response: *const Response, revision: BaseRevison.Revison) core.Address {
-            return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = response._address.physical }
-            else
-                .{ .virtual = response._address.virtual };
+            return switch (revision) {
+                .@"3" => .{ .physical = response._address.physical },
+                else => .{ .virtual = response._address.virtual },
+            };
         }
     };
 };
@@ -1035,7 +1062,7 @@ pub const SMBIOS = extern struct {
         _entry_32: core.Address.Raw,
         _entry_64: core.Address.Raw,
 
-        /// Address of the 32-bit SMBIOS entry point, `null` if not present. Physical for base @intFromEnum(revision) >= 3.
+        /// Address of the 32-bit SMBIOS entry point, `null` if not present. Physical for base revision >= 3.
         pub fn entry32(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
                 .{ .physical = response._entry_32.physical }
@@ -1043,7 +1070,7 @@ pub const SMBIOS = extern struct {
                 .{ .virtual = response._entry_32.virtual };
         }
 
-        /// Address of the 64-bit SMBIOS entry point, `null` if not present. Physical for base @intFromEnum(revision) >= 3.
+        /// Address of the 64-bit SMBIOS entry point, `null` if not present. Physical for base revision >= 3.
         pub fn entry64(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
                 .{ .physical = response._entry_64.physical }
@@ -1064,7 +1091,7 @@ pub const EFISystemTable = extern struct {
         revision: u64,
         _address: core.Address.Raw,
 
-        /// Address of EFI system table. Physical for base @intFromEnum(revision) >= 3.
+        /// Address of EFI system table. Physical for base revision >= 3.
         pub fn address(response: *const Response, revision: BaseRevison.Revison) core.Address {
             return if (revision.equalToOrGreaterThan(.@"3"))
                 .{ .physical = response._address.physical }
@@ -1098,7 +1125,7 @@ pub const EFIMemoryMap = extern struct {
         /// Version of EFI memory map descriptors.
         desc_version: u64,
 
-        pub fn print(response: Response, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("EFIMemoryMap{\n");
@@ -1119,7 +1146,7 @@ pub const EFIMemoryMap = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             return response.print(response, writer, 0);
         }
     };
@@ -1138,7 +1165,7 @@ pub const DateAtBoot = extern struct {
         /// The UNIX timestamp, in seconds, taken from the system RTC, representing the date and time of boot.
         timestamp: i64,
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("DateAtBoot({})", .{response.timestamp});
         }
     };
@@ -1160,7 +1187,7 @@ pub const ExecutableAddress = extern struct {
         /// The virtual base address of the executable.
         virtual_base: core.VirtualAddress,
 
-        pub fn print(response: Response, writer: *std.Io.Writer, indent: usize) !void {
+        pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
 
             try writer.writeAll("ExecutableAddress{\n");
@@ -1175,7 +1202,7 @@ pub const ExecutableAddress = extern struct {
             try writer.writeByte('}');
         }
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
         }
     };
@@ -1200,17 +1227,14 @@ pub const DeviceTreeBlob = extern struct {
         /// Virtual (HHDM) pointer to the device tree blob, in bootloader reclaimable memory.
         address: core.VirtualAddress,
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("DeviceTreeBlob({f})", .{response.address});
         }
     };
 };
 
-/// RISC-V BSP Hart ID Feature
-///
-/// This request contains the same information as `MP.riscv64.bsp_hartid`, but doesn't boot up other APs.
-pub const BSPHartID = extern struct {
-    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x1369359f025525f9, 0x2ff2a56178391bb6 },
+pub const BootloaderPerformance = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x6b50ad9bf36d13ad, 0xdc4c7e88fc759e17 },
     revision: u64 = 0,
 
     response: ?*const Response = null,
@@ -1218,11 +1242,35 @@ pub const BSPHartID = extern struct {
     pub const Response = extern struct {
         revision: u64,
 
-        /// The Hart ID of the boot processor.
-        bsp_hartid: u64,
+        /// Time of system reset in microseconds relative to an arbitrary point in the past.
+        reset_usec: u64,
 
-        pub inline fn format(response: Response, writer: *std.Io.Writer) !void {
-            try writer.print("BSPHartID({})", .{response.bsp_hartid});
+        /// Time of bootloader initialisation in microseconds relative to an arbitrary point in the past.
+        init_usec: u64,
+
+        /// Time of executable handoff in microseconds relative to an arbitrary point in the past.
+        exec_usec: u64,
+
+        pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
+            const new_indent = indent + 2;
+
+            try writer.writeAll("BootloaderPerformance{\n");
+
+            try writer.splatByteAll(' ', new_indent);
+            try writer.print("reset_usec: {}\n", .{response.reset_usec});
+
+            try writer.splatByteAll(' ', new_indent);
+            try writer.print("init_usec: {}\n", .{response.init_usec});
+
+            try writer.splatByteAll(' ', new_indent);
+            try writer.print("exec_usec: {}\n", .{response.exec_usec});
+
+            try writer.splatByteAll(' ', indent);
+            try writer.writeByte('}');
+        }
+
+        pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
+            return response.print(writer, 0);
         }
     };
 };
@@ -1289,7 +1337,7 @@ pub const File = extern struct {
         return core.VirtualRange.fromAddr(file.address, file.size).toByteSlice();
     }
 
-    pub fn print(file: File, writer: *std.Io.Writer, indent: usize) !void {
+    pub fn print(file: *const File, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
 
         try writer.writeAll("File{\n");
@@ -1358,7 +1406,7 @@ pub const File = extern struct {
         });
     }
 
-    pub inline fn format(file: File, writer: *std.Io.Writer) !void {
+    pub inline fn format(file: *const File, writer: *std.Io.Writer) !void {
         return File.print(file, writer, 0);
     }
 
