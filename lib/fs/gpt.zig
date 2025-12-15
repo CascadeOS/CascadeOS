@@ -310,6 +310,9 @@ pub const partition_types = struct {
     /// Defined by the UEFI specification.
     pub const partition_containing_legacy_mbr: UUID = UUID.parse("024DEE41-33E7-11D3-9D69-0008C781F39F") catch unreachable;
 
+    /// BIOS boot partition
+    pub const bios_boot_partition: UUID = UUID.parse("21686148-6449-6E6F-744E-656564454649") catch unreachable;
+
     /// Microsoft Basic Data Partition
     ///
     /// https://en.wikipedia.org/wiki/Microsoft_basic_data_partition
