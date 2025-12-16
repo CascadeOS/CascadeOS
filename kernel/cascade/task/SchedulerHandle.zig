@@ -351,41 +351,60 @@ fn switchToTaskFromTaskDeferredAction(
 
 fn beforeSwitchTask(
     current_task: Task.Current,
-    new_task: *Task,
+    new_task_: *Task,
 ) void {
-    const old_task = current_task.task;
+    const transition: Task.Transition = .from(current_task.task, new_task_);
 
-    arch.scheduling.beforeSwitchTask(current_task, old_task, new_task);
-
-    if (old_task.enable_access_to_user_memory_count != new_task.enable_access_to_user_memory_count) {
-        @branchHint(.unlikely); // we expect both to be 0 most of the time
-        if (new_task.enable_access_to_user_memory_count == 0) {
-            @branchHint(.likely);
-            arch.paging.disableAccessToUserMemory();
-        } else {
-            arch.paging.enableAccessToUserMemory();
-        }
-    }
-
-    switch (old_task.type) {
-        .kernel => switch (new_task.type) {
-            .kernel => {},
-            .user => {
-                const new_process: *Process = .fromTask(new_task);
-                new_process.address_space.page_table.load(current_task);
-            },
+    switch (transition.type) {
+        .kernel_to_kernel => {
+            if (core.is_debug) {
+                std.debug.assert(transition.old_task.enable_access_to_user_memory_count == 0);
+                std.debug.assert(transition.new_task.enable_access_to_user_memory_count == 0);
+            }
         },
-        .user => {
-            const old_process: *const Process = .fromTask(old_task);
-            switch (new_task.type) {
-                .kernel => cascade.mem.kernelPageTable().load(current_task),
-                .user => {
-                    const new_process: *Process = .fromTask(new_task);
-                    if (old_process != new_process) new_process.address_space.page_table.load(current_task);
-                },
+        .kernel_to_user => {
+            if (core.is_debug) {
+                std.debug.assert(transition.old_task.enable_access_to_user_memory_count == 0);
+            }
+
+            const new_process: *Process = .fromTask(transition.new_task);
+            new_process.address_space.page_table.load(current_task);
+
+            if (transition.new_task.enable_access_to_user_memory_count != 0) {
+                @branchHint(.unlikely); // we expect this to be 0 most of the time
+                arch.paging.enableAccessToUserMemory();
+            }
+        },
+        .user_to_kernel => {
+            if (core.is_debug) {
+                std.debug.assert(transition.new_task.enable_access_to_user_memory_count == 0);
+            }
+
+            cascade.mem.kernelPageTable().load(current_task);
+
+            if (transition.old_task.enable_access_to_user_memory_count != 0) {
+                @branchHint(.unlikely); // we expect this to be 0 most of the time
+                arch.paging.disableAccessToUserMemory();
+            }
+        },
+        .user_to_user => {
+            const old_process: *const Process = .fromTask(transition.old_task);
+            const new_process: *Process = .fromTask(transition.new_task);
+            if (old_process != new_process) new_process.address_space.page_table.load(current_task);
+
+            if (transition.old_task.enable_access_to_user_memory_count != transition.new_task.enable_access_to_user_memory_count) {
+                @branchHint(.unlikely); // we expect both to be 0 most of the time
+
+                if (transition.new_task.enable_access_to_user_memory_count == 0) {
+                    arch.paging.disableAccessToUserMemory();
+                } else {
+                    arch.paging.enableAccessToUserMemory();
+                }
             }
         },
     }
+
+    arch.scheduling.beforeSwitchTask(current_task, transition);
 }
 
 fn idle(current_task: Task.Current) callconv(.c) noreturn {

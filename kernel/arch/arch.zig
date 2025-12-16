@@ -425,21 +425,17 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
-    /// Called before `old_task` is switched to `new_task`.
+    /// Called before `transition.old_task` is switched to `transition.new_task`.
     ///
-    /// This function does not perform page table switching or managing ability to access user memory.
+    /// Page table switching and managing ability to access user memory has already been performed before this function is called.
     ///
-    /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
-    /// `current_task` is not null.
-    pub fn beforeSwitchTask(
-        current_task: Task.Current,
-        old_task: *Task,
-        new_task: *Task,
-    ) callconv(core.inline_in_non_debug) void {
+    /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of `current_task` is not
+    /// null.
+    pub fn beforeSwitchTask(current_task: Task.Current, transition: Task.Transition) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
             "beforeSwitchTask",
-        )(current_task, old_task, new_task);
+        )(current_task, transition);
     }
 
     /// Switches to `new_task`.
@@ -890,16 +886,15 @@ pub const Functions = struct {
     },
 
     scheduling: struct {
-        /// Called before `old_task` is switched to `new_task`.
+        /// Called before `transition.old_task` is switched to `transition.new_task`.
         ///
-        /// This function does not perform page table switching or managing ability to access user memory.
+        /// Page table switching and managing ability to access user memory has already been performed before this function is called.
         ///
-        /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of
-        /// `current_task` is not null.
+        /// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of `current_task` is not
+        /// null.
         beforeSwitchTask: ?fn (
             current_task: Task.Current,
-            old_task: *Task,
-            new_task: *Task,
+            transition: Task.Transition,
         ) void = null,
 
         /// Switches to `new_task`.

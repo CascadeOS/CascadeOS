@@ -126,7 +126,7 @@ pub fn decrementReferenceCount(process: *Process, current_task: Task.Current) vo
 /// Asserts that the task is a user task.
 pub inline fn fromTask(task: *Task) *Process {
     if (core.is_debug) std.debug.assert(task.type == .user);
-    const thread: *Thread = @fieldParentPtr("task", task);
+    const thread: *Thread = .fromTask(task);
     return thread.process;
 }
 

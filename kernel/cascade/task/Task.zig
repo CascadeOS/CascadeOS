@@ -147,6 +147,51 @@ pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *Task {
     return @fieldParentPtr("next_task_node", node);
 }
 
+/// Represents a scheduler transition between two tasks.
+pub const Transition = struct {
+    old_task: *Task,
+    new_task: *Task,
+    type: Type,
+
+    pub const Type = enum {
+        kernel_to_kernel,
+        kernel_to_user,
+        user_to_kernel,
+        user_to_user,
+
+        pub fn oldType(type_: Type) cascade.Context.Type {
+            return switch (type_) {
+                .kernel_to_kernel, .kernel_to_user => .kernel,
+                .user_to_kernel, .user_to_user => .user,
+            };
+        }
+
+        pub fn newType(type_: Type) cascade.Context.Type {
+            return switch (type_) {
+                .kernel_to_kernel, .user_to_kernel => .kernel,
+                .kernel_to_user, .user_to_user => .user,
+            };
+        }
+    };
+
+    pub fn from(old_task: *Task, new_task: *Task) Transition {
+        return .{
+            .old_task = old_task,
+            .new_task = new_task,
+            .type = switch (old_task.type) {
+                .kernel => switch (new_task.type) {
+                    .kernel => .kernel_to_kernel,
+                    .user => .kernel_to_user,
+                },
+                .user => switch (new_task.type) {
+                    .kernel => .user_to_kernel,
+                    .user => .user_to_user,
+                },
+            },
+        };
+    }
+};
+
 pub const Name = core.containers.BoundedArray(u8, cascade.config.task_name_length);
 
 const TaskCleanup = struct {
