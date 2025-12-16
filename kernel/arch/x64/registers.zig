@@ -39,7 +39,7 @@ pub const RFlags = packed struct(u64) {
     interrupt: bool,
 
     /// Determines the order in which strings are processed.
-    direction: bool,
+    direction: Direction,
 
     /// Set by hardware to indicate that the sign bit of the result of the last signed integer operation differs from
     /// the source operands.
@@ -80,6 +80,11 @@ pub const RFlags = packed struct(u64) {
     id: bool,
 
     _reserved5: u42,
+
+    pub const Direction = enum(u1) {
+        up = 0,
+        down = 1,
+    };
 
     /// Returns the current value of the RFLAGS register.
     pub inline fn read() RFlags {
