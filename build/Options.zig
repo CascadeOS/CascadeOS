@@ -63,9 +63,9 @@ number_of_cpus: usize,
 /// Defaults to false, some architectures always run in UEFI mode.
 uefi: bool,
 
-/// How much memory (in MB) to request from QEMU.
+/// How much memory (in MiB) to request from QEMU.
 ///
-/// Defaults to 256 for UEFI and 128 otherwise.
+/// Defaults to 256 MiB.
 memory: usize,
 
 /// Disable KASLR.
@@ -193,8 +193,8 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
     const memory: usize = b.option(
         usize,
         "memory",
-        "How much memory (in MB) to request from QEMU (defaults to 256 for UEFI and 128 otherwise)",
-    ) orelse if (uefi) 256 else 128;
+        "How much memory (in MiB) to request from QEMU (defaults to 256 MiB)",
+    ) orelse 256;
 
     const no_kaslr = b.option(
         bool,
