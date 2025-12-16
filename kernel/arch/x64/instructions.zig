@@ -22,6 +22,16 @@ pub inline fn disableInterrupts() void {
     asm volatile ("cli");
 }
 
+pub inline fn enableSSEUsage() void {
+    asm volatile ("clts");
+}
+
+pub fn disableSSEUsage() void {
+    var cr0: x64.registers.Cr0 = .read();
+    cr0.task_switched = true;
+    cr0.write();
+}
+
 pub inline fn disableInterruptsAndHalt() noreturn {
     while (true) {
         asm volatile ("cli; hlt");

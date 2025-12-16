@@ -19,6 +19,13 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
     const current_task, const state_before_interrupt = Task.Current.onInterruptEntry();
     defer state_before_interrupt.onInterruptExit(current_task);
 
+    switch (interrupt_frame.cs.selector) {
+        .kernel_code => {},
+        .user_code => x64.instructions.disableSSEUsage(),
+        else => unreachable,
+    }
+    defer if (interrupt_frame.cs.selector == .user_code) x64.instructions.enableSSEUsage();
+
     var handler = globals.handlers[interrupt_frame.vector_number.full];
     handler.setTemplatedArgs(.{ current_task, .{ .arch_specific = interrupt_frame }, state_before_interrupt });
     handler.call();

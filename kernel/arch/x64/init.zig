@@ -275,6 +275,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
             @panic("paging not enabled");
         }
 
+        cr0.task_switched = true; // disable SSE instructions in the kernel
         cr0.write_protect = true;
 
         cr0.write();
