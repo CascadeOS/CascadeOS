@@ -19,6 +19,7 @@ pub const interrupts = @import("interrupts/interrupts.zig");
 pub const ioapic = @import("ioapic.zig");
 pub const paging = @import("paging/paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
+pub const PerThread = @import("PerThread.zig");
 pub const registers = @import("registers.zig");
 pub const scheduling = @import("scheduling.zig");
 pub const tsc = @import("tsc.zig");

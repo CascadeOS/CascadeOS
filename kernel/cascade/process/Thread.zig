@@ -19,6 +19,8 @@ task: Task,
 
 process: *Process,
 
+arch_specific: arch.process.PerThread,
+
 pub inline fn fromTask(task: *Task) *Thread {
     if (core.is_debug) std.debug.assert(task.type == .user);
     return @fieldParentPtr("task", task);
@@ -33,8 +35,14 @@ pub const internal = struct {
         const thread = try globals.cache.allocate(current_task);
         errdefer globals.cache.deallocate(current_task, thread);
 
+        thread.* = .{
+            .task = thread.task, // reinitialized below
+            .process = process,
+            .arch_specific = thread.arch_specific, // reinitialized below
+        };
+
         try Task.internal.init(&thread.task, options);
-        thread.process = process;
+        arch.process.initializeThread(current_task, thread);
 
         return thread;
     }
@@ -60,10 +68,13 @@ const globals = struct {
             fn constructor(thread: *Thread, current_task: Task.Current) cascade.mem.cache.ConstructorError!void {
                 if (core.is_debug) thread.* = undefined;
                 thread.task.stack = try .createStack(current_task);
+                errdefer thread.task.stack.destroyStack(current_task);
+                try arch.process.createThread(current_task, thread);
             }
         }.constructor,
         struct {
             fn destructor(thread: *Thread, current_task: Task.Current) void {
+                arch.process.destroyThread(current_task, thread);
                 thread.task.stack.destroyStack(current_task);
             }
         }.destructor,

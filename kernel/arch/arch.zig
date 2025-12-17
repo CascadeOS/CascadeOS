@@ -11,6 +11,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Thread = cascade.Process.Thread;
 const core = @import("core");
 pub const current_arch = @import("cascade_architecture").arch;
 
@@ -495,6 +496,50 @@ pub const scheduling = struct {
     }
 };
 
+pub const process = struct {
+    /// Architecture specific per-thread data.
+    pub const PerThread = current_decls.process.PerThread;
+
+    /// Create the `PerThread` data of a thread.
+    ///
+    /// Non-architecture specific creation has already been performed but no initialization.
+    ///
+    /// This function is called in the `Thread` cache constructor.
+    pub fn createThread(
+        current_task: Task.Current,
+        thread: *cascade.Process.Thread,
+    ) callconv(core.inline_in_non_debug) cascade.mem.cache.ConstructorError!void {
+        return getFunction(
+            current_functions.process,
+            "createThread",
+        )(current_task, thread);
+    }
+
+    /// Destroy the `PerThread` data of a thread.
+    ///
+    /// Non-architecture specific destruction has not already been performed.
+    ///
+    /// This function is called in the `Thread` cache destructor.
+    pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread) callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.process,
+            "destroyThread",
+        )(current_task, thread);
+    }
+
+    /// Initialize the `PerThread` data of a thread.
+    ///
+    /// All non-architecture specific initialization has already been performed.
+    ///
+    /// This function is called in `Thread.internal.create`.
+    pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thread) callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.process,
+            "initializeThread",
+        )(current_task, thread);
+    }
+};
+
 pub const io = struct {
     pub const Port = struct {
         arch_specific: current_decls.io.Port,
@@ -885,6 +930,38 @@ pub const Functions = struct {
         },
     },
 
+    process: struct {
+        /// Create the `PerThread` data of a thread.
+        ///
+        /// Non-architecture specific creation has already been performed but no initialization.
+        ///
+        /// This function is called in the `Thread` cache constructor.
+        createThread: ?fn (
+            current_task: Task.Current,
+            thread: *cascade.Process.Thread,
+        ) cascade.mem.cache.ConstructorError!void = null,
+
+        /// Destroy the `PerThread` data of a thread.
+        ///
+        /// Non-architecture specific destruction has not already been performed.
+        ///
+        /// This function is called in the `Thread` cache destructor.
+        destroyThread: ?fn (
+            current_task: Task.Current,
+            thread: *cascade.Process.Thread,
+        ) void = null,
+
+        /// Initialize the `PerThread` data of a thread.
+        ///
+        /// All non-architecture specific initialization has already been performed.
+        ///
+        /// This function is called in `Thread.internal.create`.
+        initializeThread: ?fn (
+            current_task: Task.Current,
+            thread: *cascade.Process.Thread,
+        ) void = null,
+    },
+
     scheduling: struct {
         /// Called before `transition.old_task` is switched to `transition.new_task`.
         ///
@@ -1034,6 +1111,11 @@ pub const Decls = struct {
         higher_half_start: core.VirtualAddress,
 
         PageTable: type,
+    },
+
+    process: struct {
+        /// Architecture specific per-thread data.
+        PerThread: type,
     },
 
     io: struct {

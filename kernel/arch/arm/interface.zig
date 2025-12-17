@@ -33,6 +33,8 @@ pub const functions: arch.Functions = .{
         .init = .{},
     },
 
+    .process = .{},
+
     .scheduling = .{},
 
     .io = .{},
@@ -84,6 +86,10 @@ pub const decls: arch.Decls = .{
         .lower_half_size = .from(128, .tib),
         .higher_half_start = .fromInt(0xffff800000000000),
         .PageTable = extern struct {},
+    },
+
+    .process = .{
+        .PerThread = struct {},
     },
 
     .io = .{

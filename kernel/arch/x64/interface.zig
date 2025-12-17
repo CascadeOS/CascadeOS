@@ -90,6 +90,12 @@ pub const functions: arch.Functions = .{
         },
     },
 
+    .process = .{
+        .createThread = x64.PerThread.createThread,
+        .destroyThread = x64.PerThread.destroyThread,
+        .initializeThread = x64.PerThread.initializeThread,
+    },
+
     .scheduling = .{
         .beforeSwitchTask = x64.scheduling.beforeSwitchTask,
         .switchTask = x64.scheduling.switchTask,
@@ -160,6 +166,10 @@ pub const decls: arch.Decls = .{
         .lower_half_size = .from(128, .tib),
         .higher_half_start = .fromInt(0xffff800000000000),
         .PageTable = x64.paging.PageTable,
+    },
+
+    .process = .{
+        .PerThread = x64.PerThread,
     },
 
     .io = .{
