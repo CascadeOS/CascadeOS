@@ -50,7 +50,7 @@ pub fn initStage1() !noreturn {
     log.debug(current_task, "capturing early system information", .{});
     arch.init.captureEarlySystemInformation(current_task);
 
-    log.debug(current_task, "configuring per-executor system features", .{});
+    log.debug(current_task, "configuring per-executor system features with early system information", .{});
     arch.init.configurePerExecutorSystemFeatures(current_task);
 
     log.debug(current_task, "initializing memory system", .{});
@@ -64,6 +64,9 @@ pub fn initStage1() !noreturn {
         .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
         else => .{},
     });
+
+    log.debug(current_task, "configuring per-executor system features with full system information", .{});
+    arch.init.configurePerExecutorSystemFeatures(current_task);
 
     log.debug(current_task, "configuring global system features", .{});
     arch.init.configureGlobalSystemFeatures(current_task);

@@ -696,6 +696,11 @@ pub const init = struct {
     }
 
     /// Configure any per-executor system features.
+    ///
+    /// This function is called in a few different contexts and must leave the system in a reasonable state for each of them:
+    ///  - By the bootstrap executor after calling `captureEarlySystemInformation`
+    ///  - By the bootstrap executor after calling `captureSystemInformation`
+    ///  - By every executor after `captureSystemInformation` has been called
     pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,

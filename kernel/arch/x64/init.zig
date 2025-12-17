@@ -257,6 +257,11 @@ fn disablePic() void {
 }
 
 /// Configure any per-executor system features.
+///
+/// This function is called in a few different contexts and must leave the system in a reasonable state for each of them:
+///  - By the bootstrap executor after calling `captureEarlySystemInformation`
+///  - By the bootstrap executor after calling `captureSystemInformation`
+///  - By every executor after `captureSystemInformation` has been called
 pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
     if (x64.info.cpu_id.rdtscp) {
         x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.knownExecutor().id));
