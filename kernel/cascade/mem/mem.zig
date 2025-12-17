@@ -20,6 +20,10 @@ pub const resource_arena = @import("resource_arena.zig");
 
 const log = cascade.debug.log.scoped(.mem);
 
+pub inline fn kernelRegions() *KernelMemoryRegion.List {
+    return &globals.regions;
+}
+
 pub inline fn kernelPageTable() arch.paging.PageTable {
     return globals.kernel_page_table;
 }
@@ -817,12 +821,6 @@ pub const init = struct {
 
         init_log.debug(current_task, "initializing kernel and special heap", .{});
         try heap.init.initializeHeaps(current_task, kernel_regions);
-
-        init_log.debug(current_task, "initializing tasks", .{});
-        try Task.init.initializeTasks(current_task, kernel_regions);
-
-        init_log.debug(current_task, "initializing processes", .{});
-        try cascade.Process.init.initializeProcesses(current_task);
 
         init_log.debug(current_task, "initializing kernel address space", .{});
         try globals.kernel_address_space.init(

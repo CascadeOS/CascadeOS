@@ -144,10 +144,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.task_init);
 
-    pub fn initializeStacks(
-        current_task: Task.Current,
-        kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
-    ) !void {
+    pub fn initializeStacks(current_task: Task.Current) !void {
         init_log.debug(current_task, "initializing task stacks", .{});
         try globals.stack_arena.init(
             current_task,
@@ -157,7 +154,7 @@ pub const init = struct {
             },
         );
 
-        const stacks_range = kernel_regions.find(.kernel_stacks).?.range;
+        const stacks_range = cascade.mem.kernelRegions().find(.kernel_stacks).?.range;
 
         globals.stack_arena.addSpan(
             current_task,

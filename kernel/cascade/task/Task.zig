@@ -392,11 +392,8 @@ pub const init = struct {
 
     pub const earlyCreateStack = Stack.createStack;
 
-    pub fn initializeTasks(
-        current_task: Task.Current,
-        kernel_regions: *const cascade.mem.KernelMemoryRegion.List,
-    ) !void {
-        try Stack.init.initializeStacks(current_task, kernel_regions);
+    pub fn initializeTasks(current_task: Task.Current) !void {
+        try Stack.init.initializeStacks(current_task);
 
         init_log.debug(current_task, "initializing task cache", .{});
         globals.cache.init(
