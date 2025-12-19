@@ -12,6 +12,9 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
+xsave_area: []align(64) u8,
+xsave_area_needs_load: bool = true,
+
 /// Create the `PerThread` data of a thread.
 ///
 /// Non-architecture specific creation has already been performed but no initialization.
@@ -21,8 +24,11 @@ pub fn createThread(
     current_task: Task.Current,
     thread: *cascade.Process.Thread,
 ) cascade.mem.cache.ConstructorError!void {
-    _ = current_task;
-    _ = thread;
+    thread.arch_specific = .{
+        .xsave_area = @alignCast(
+            globals.xsave_area_cache.allocate(current_task) catch return error.ItemConstructionFailed,
+        ),
+    };
 }
 
 /// Destroy the `PerThread` data of a thread.
@@ -31,8 +37,7 @@ pub fn createThread(
 ///
 /// This function is called in the `Thread` cache destructor.
 pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread) void {
-    _ = current_task;
-    _ = thread;
+    globals.xsave_area_cache.deallocate(current_task, thread.arch_specific.xsave_area);
 }
 
 /// Initialize the `PerThread` data of a thread.
@@ -42,5 +47,24 @@ pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread
 /// This function is called in `Thread.internal.create`.
 pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thread) void {
     _ = current_task;
-    _ = thread;
+    @memset(thread.arch_specific.xsave_area, 0);
+    thread.arch_specific.xsave_area_needs_load = true;
 }
+
+const globals = struct {
+    /// Initialized during `init.initializeXSAVEAreaCache`.
+    var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
+};
+
+pub const init = struct {
+    const init_log = cascade.debug.log.scoped(.thread_init);
+
+    pub fn initializeXSAVEAreaCache(current_task: Task.Current) !void {
+        init_log.debug(current_task, "initializing xsave area cache", .{});
+        globals.xsave_area_cache.init(current_task, .{
+            .name = try .fromSlice("xsave"),
+            .size = x64.info.xsave.xsave_area_size.value,
+            .alignment = .fromByteUnits(64),
+        });
+    }
+};
