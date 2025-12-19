@@ -29,6 +29,7 @@ pub fn capture() !void {
     capture01H();
     capture06H();
     capture07H();
+    capture0DH();
     capture15H();
     capture16H();
 
@@ -419,17 +420,192 @@ pub var intel_tsc_deadline: bool = false;
 /// CPUID.01H: ECX[25]
 pub var aesni: bool = false;
 
-/// Indicates that the processor supports the XSAVE/XRSTOR processor extended states feature; the XSETBV/XGETBV
-/// instructions; and XCR0.
-///
-/// CPUID.01H: ECX[26]
-pub var xsave: bool = false;
+pub const xsave = struct {
+    /// Indicates that the processor supports the XSAVE/XRSTOR processor extended states feature; the XSETBV/XGETBV
+    /// instructions; and XCR0.
+    ///
+    /// CPUID.01H: ECX[26]
+    pub var supported: bool = false;
 
-/// Indicates that the OS has set CR4.OSXSAVE[bit 18] to enable XSETBV/XGETBV instructions to access XCR0 and to support
-/// processor extended state management using XSAVE/XRSTOR.
-///
-/// CPUID.01H: ECX[27]
-pub var osxsave: bool = false;
+    /// Indicates that the OS has set CR4.OSXSAVE[bit 18] to enable XSETBV/XGETBV instructions to access XCR0 and to support
+    /// processor extended state management using XSAVE/XRSTOR.
+    ///
+    /// CPUID.01H: ECX[27]
+    pub var os_supported: bool = false;
+
+    /// Get the size of the XSAVE area required for all supported states.
+    ///
+    /// `null` if XSAVE is not supported.
+    pub var maximum_state_size: ?core.Size = null;
+
+    /// Get the size of the XSAVE area required for the currently enabled states in XCR0.
+    ///
+    /// Returns `null` if XSAVE is not supported.
+    pub fn enabledStateSize() ?core.Size {
+        if (!supported) return null;
+        const cpuid_result = raw(0x0D, 0);
+        return .from(cpuid_result.ebx, .byte);
+    }
+
+    /// The state that is supported by XSAVE/XRSTOR
+    pub var supported_state: SupportedState = .{};
+
+    pub const SupportedState = struct {
+        /// x87 FPU state management is supported
+        ///
+        /// CPUID.0DH.00H: EAX[0]
+        x87: bool = false,
+
+        /// 128-bit SSE state management is supported
+        ///
+        /// CPUID.0DH.00H: EAX[1]
+        sse: bool = false,
+
+        /// 256-bit SSE state management is supported
+        ///
+        /// CPUID.0DH.00H: EAX[2]
+        avx: bool = false,
+
+        /// MPX 128-bit bounds registers BND0–BND3
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[3]
+        mpx_bndregs: bool = false,
+
+        /// 64-bit user-mode MPX configuration register BNDCFGU and the 64-bit MPX status register BNDSTATUS
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[4]
+        mpx_bndcsr: bool = false,
+
+        /// K0-K7 opmask register state management is supported
+        ///
+        /// CPUID.0DH.00H: EAX[5]
+        avx_opmask: bool = false,
+
+        /// ZMM0-ZMM15 register state management, upper half, is supported
+        ///
+        /// CPUID.0DH.00H: EAX[6]
+        avx_zmm_hi256: bool = false,
+
+        /// ZMM16-ZMM31 register state management is supported
+        ///
+        /// CPUID.0DH.00H: EAX[7]
+        avx_hi16_zmm: bool = false,
+
+        /// Intel Processor Trace
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[8]
+        pt: bool = false,
+
+        /// PKRU state management is supported
+        ///
+        /// CPUID.0DH.00H: EAX[9]
+        pkru: bool = false,
+
+        /// IA32_PASID MSR used by the ENQCMD instruction for a process address space identifiers
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[10]
+        pasid: bool = false,
+
+        /// Control-Flow Enforcement User
+        ///
+        /// Intel: CPUID.0DH.00H: EAX[11]
+        /// AMD: CPUID.0DH.01H: ECX[11]
+        cet_u: bool = false,
+
+        /// Control-Flow Enforcement Supervisor
+        ///
+        /// Intel: CPUID.0DH.00H: EAX[12]
+        /// AMD: CPUID.0DH.01H: ECX[12]
+        cet_s: bool = false,
+
+        /// Hardware Duty Cycling
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[13]
+        hdc: bool = false,
+
+        /// User Interrupts
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[14]
+        uintr: bool = false,
+
+        /// Last-Branch Record Configuration
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[15]
+        lbr: bool = false,
+
+        /// Hardware P-states
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[16]
+        hwp: bool = false,
+
+        /// AMX 64-byte TILECFG register
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[17]
+        amx_tilecfg: bool = false,
+
+        /// AMX 8192 bytes of tile data
+        ///
+        /// Intel Only
+        ///
+        /// CPUID.0DH.00H: EAX[18]
+        amx_tiledata: bool = false,
+
+        /// Lightweight Profiling (LWP) extensions are supported
+        ///
+        /// AMD Only
+        ///
+        /// CPUID.0DH.00H: EDX[30]
+        lwp: bool = false,
+    };
+
+    /// The optional features supported by XSAVE/XRSTOR
+    pub var supported_features: SupportedFeatures = .{};
+
+    pub const SupportedFeatures = struct {
+        /// XSAVEOPT is available.
+        ///
+        /// CPUID.0DH.01H: EAX[0]
+        xsaveopt: bool = false,
+
+        /// XSAVEC and compact XRSTOR supported.
+        ///
+        /// CPUID.0DH.01H: EAX[1]
+        xsavec: bool = false,
+
+        /// XGETBV with ECX = 1 supported.
+        ///
+        /// CPUID.0DH.01H: EAX[2]
+        xgetbv1: bool = false,
+
+        /// XSAVES, XRSTOR, and XSS are supported.
+        ///
+        /// CPUID.0DH.01H: EAX[3]
+        xsaves: bool = false,
+
+        /// Intel Only
+        ///
+        /// CPUID.0DH.01H: EAX[4]
+        xfd: bool = false,
+    };
+};
 
 /// Indicates the processor supports the AVX instruction extensions.
 ///
@@ -959,14 +1135,14 @@ pub fn intelIndexInHardwareFeedbackInterface() ?u16 {
 
 /// Supports RDFSBASE/RDGSBASE/WRFSBASE/WRGSBASE.
 ///
-/// CPUID.07.00H: EBX[0]
+/// CPUID.07H.00H: EBX[0]
 pub var fsgsbase: bool = false;
 
 /// IA32_TSC_ADJUST MSR is supported
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[1]
+/// CPUID.07H.00H: EBX[1]
 pub var intel_ia32_tsc_adjust: bool = false;
 
 /// SGX.
@@ -975,26 +1151,26 @@ pub var intel_ia32_tsc_adjust: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[2]
+/// CPUID.07H.00H: EBX[2]
 pub var intel_sgx: bool = false;
 
 /// BMI1.
 ///
-/// CPUID.07.00H: EBX[3]
+/// CPUID.07H.00H: EBX[3]
 pub var bmi1: bool = false;
 
 /// HLE.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[4]
+/// CPUID.07H.00H: EBX[4]
 pub var intel_hle: bool = false;
 
 /// AVX2.
 ///
 /// Supports Intel Advanced Vector Extensions 2 (Intel® AVX2)
 ///
-/// CPUID.07.00H: EBX[5]
+/// CPUID.07H.00H: EBX[5]
 pub var avx2: bool = false;
 
 /// FDP_EXCPTN_ONLY.
@@ -1003,40 +1179,40 @@ pub var avx2: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[6]
+/// CPUID.07H.00H: EBX[6]
 pub var intel_fdp_excptn_only: bool = false;
 
 /// SMEP.
 ///
 /// Supports Supervisor-Mode Execution Prevention.
 ///
-/// CPUID.07.00H: EBX[7]
+/// CPUID.07H.00H: EBX[7]
 pub var smep: bool = false;
 
 /// BMI2.
 ///
-/// CPUID.07.00H: EBX[8]
+/// CPUID.07H.00H: EBX[8]
 pub var bmi2: bool = false;
 
 /// Supports Enhanced REP MOVSB/STOSB.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[9]
+/// CPUID.07H.00H: EBX[9]
 pub var intel_enhanced_repmovsb: bool = false;
 
 /// INVPCID.
 ///
 /// Supports INVPCID instruction for system software that manages process-context identifiers.
 ///
-/// CPUID.07.00H: EBX[10]
+/// CPUID.07H.00H: EBX[10]
 pub var invpcid: bool = false;
 
 /// RTM.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[11]
+/// CPUID.07H.00H: EBX[11]
 pub var intel_rtm: bool = false;
 
 /// RDT-M.
@@ -1045,7 +1221,7 @@ pub var intel_rtm: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[12]
+/// CPUID.07H.00H: EBX[12]
 pub var intel_rdt_m: bool = false;
 
 /// PQM.
@@ -1054,14 +1230,14 @@ pub var intel_rdt_m: bool = false;
 ///
 /// AMD Only.
 ///
-/// CPUID.07.00H: EBX[12]
+/// CPUID.07H.00H: EBX[12]
 pub var amd_pqm: bool = false;
 
 /// Deprecates FPU CS and FPU DS values.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[13]
+/// CPUID.07H.00H: EBX[13]
 pub var intel_deprecate_fpu_cs_ds: bool = false;
 
 /// MPX.
@@ -1070,7 +1246,7 @@ pub var intel_deprecate_fpu_cs_ds: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[14]
+/// CPUID.07H.00H: EBX[14]
 pub var intel_mpx: bool = false;
 
 /// RDT-A.
@@ -1079,7 +1255,7 @@ pub var intel_mpx: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[15]
+/// CPUID.07H.00H: EBX[15]
 pub var intel_rdt_a: bool = false;
 
 /// PQE.
@@ -1088,67 +1264,67 @@ pub var intel_rdt_a: bool = false;
 ///
 /// AMD Only.
 ///
-/// CPUID.07.00H: EBX[15]
+/// CPUID.07H.00H: EBX[15]
 pub var amd_pqe: bool = false;
 
 /// AVX512F.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[16]
+/// CPUID.07H.00H: EBX[16]
 pub var intel_avx512f: bool = false;
 
 /// AVX512DQ.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[17]
+/// CPUID.07H.00H: EBX[17]
 pub var intel_avx512dq: bool = false;
 
 /// RDSEED.
 ///
-/// CPUID.07.00H: EBX[18]
+/// CPUID.07H.00H: EBX[18]
 pub var rdseed: bool = false;
 
 /// ADX.
 ///
-/// CPUID.07.00H: EBX[19]
+/// CPUID.07H.00H: EBX[19]
 pub var adx: bool = false;
 
 /// SMAP.
 ///
 /// Supports Supervisor-Mode Access Prevention (and the CLAC/STAC instructions).
 ///
-/// CPUID.07.00H: EBX[20]
+/// CPUID.07H.00H: EBX[20]
 pub var smap: bool = false;
 
 /// AVX512_IFMA.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[21]
+/// CPUID.07H.00H: EBX[21]
 pub var intel_avx512_ifma: bool = false;
 
 /// RDPID and IA32_TSC_AUX are available.
 ///
-/// CPUID.07.00H: ECX[22]
+/// CPUID.07H.00H: ECX[22]
 pub var rdpid: bool = false;
 
 /// CLFLUSHOPT.
 ///
-/// CPUID.07.00H: EBX[23]
+/// CPUID.07H.00H: EBX[23]
 pub var clflushopt: bool = false;
 
 /// CLWB.
 ///
-/// CPUID.07.00H: EBX[24]
+/// CPUID.07H.00H: EBX[24]
 pub var clwb: bool = false;
 
 /// Intel Processor Trace.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[25]
+/// CPUID.07H.00H: EBX[25]
 pub var intel_processor_trace: bool = false;
 
 /// AVX512PF.
@@ -1157,7 +1333,7 @@ pub var intel_processor_trace: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[26]
+/// CPUID.07H.00H: EBX[26]
 pub var intel_avx512pf: bool = false;
 
 /// AVX512ER.
@@ -1166,35 +1342,35 @@ pub var intel_avx512pf: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[27]
+/// CPUID.07H.00H: EBX[27]
 pub var intel_avx512er: bool = false;
 
 /// AVX512CD.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[28]
+/// CPUID.07H.00H: EBX[28]
 pub var intel_avx512cd: bool = false;
 
 /// SHA.
 ///
 /// Supports Intel Secure Hash Algorithm Extensions.
 ///
-/// CPUID.07.00H: EBX[29]
+/// CPUID.07H.00H: EBX[29]
 pub var sha: bool = false;
 
 /// AVX512BW.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[30]
+/// CPUID.07H.00H: EBX[30]
 pub var intel_avx512bw: bool = false;
 
 /// AVX512VL.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EBX[31]
+/// CPUID.07H.00H: EBX[31]
 pub var intel_avx512vl: bool = false;
 
 /// PREFETCHWT1.
@@ -1203,35 +1379,35 @@ pub var intel_avx512vl: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[0]
+/// CPUID.07H.00H: ECX[0]
 pub var intel_prefetchwt1: bool = false;
 
 /// AVX512_VBMI.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[1]
+/// CPUID.07H.00H: ECX[1]
 pub var intel_avx512_vbmi: bool = false;
 
 /// UMIP.
 ///
 /// Supports user-mode instruction prevention.
 ///
-/// CPUID.07.00H: ECX[2]
+/// CPUID.07H.00H: ECX[2]
 pub var umip: bool = false;
 
 /// PKU.
 ///
 /// Supports protection keys for user-mode pages.
 ///
-/// CPUID.07.00H: ECX[3]
+/// CPUID.07H.00H: ECX[3]
 pub var pku: bool = false;
 
 /// OSPKE.
 ///
 /// If `true` the OS has set CR4.PKE to enable protection keys (and the RDPKRU/WRPKRU instructions).
 ///
-/// CPUID.07.00H: ECX[4]
+/// CPUID.07H.00H: ECX[4]
 pub fn ospke() bool {
     if (max_standard_leaf < 0x7) return false;
     const leaf0 = raw(0x7, 0);
@@ -1242,14 +1418,14 @@ pub fn ospke() bool {
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[5]
+/// CPUID.07H.00H: ECX[5]
 pub var intel_waitpkg: bool = false;
 
 /// AVX512_VBMI2.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[6]
+/// CPUID.07H.00H: ECX[6]
 pub var intel_avx512_vbmi2: bool = false;
 
 /// CET_SS. Supports CET shadow stack features.
@@ -1263,38 +1439,38 @@ pub var intel_avx512_vbmi2: bool = false;
 ///  - IA32_PL1_SSP
 ///  - IA32_PL0_SSP.
 ///
-/// CPUID.07.00H: ECX[7]
+/// CPUID.07H.00H: ECX[7]
 pub var cet_ss: bool = false;
 
 /// GFNI.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[8]
+/// CPUID.07H.00H: ECX[8]
 pub var intel_gfni: bool = false;
 
 /// VAES.
 ///
-/// CPUID.07.00H: ECX[9]
+/// CPUID.07H.00H: ECX[9]
 pub var vaes: bool = false;
 
 /// VPCLMULQDQ.
 ///
-/// CPUID.07.00H: ECX[10]
+/// CPUID.07H.00H: ECX[10]
 pub var vpclmulqdq: bool = false;
 
 /// AVX512_VNNI.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[11]
+/// CPUID.07H.00H: ECX[11]
 pub var intel_avx512_vnni: bool = false;
 
 /// AVX512_BITALG.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[12]
+/// CPUID.07H.00H: ECX[12]
 pub var intel_avx512_bitalg: bool = false;
 
 /// TME_EN.
@@ -1307,42 +1483,42 @@ pub var intel_avx512_bitalg: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[13]
+/// CPUID.07H.00H: ECX[13]
 pub var intel_tme_en: bool = false;
 
 /// AVX512_VPOPCNTDQ.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[14]
+/// CPUID.07H.00H: ECX[14]
 pub var intel_avx512_vpopcntdq: bool = false;
 
 /// LA57.
 ///
 /// Supports 57-bit linear addresses and five-level paging.
 ///
-/// CPUID.07.00H: ECX[16]
+/// CPUID.07H.00H: ECX[16]
 pub var la57: bool = false;
 
 /// The value of MAWAU used by the BNDLDX and BNDSTX instructions in 64-bit mode.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[21:17]
+/// CPUID.07H.00H: ECX[21:17]
 pub var intel_mawau: ?u5 = null;
 
 /// KL. Supports Key Locker.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[23]
+/// CPUID.07H.00H: ECX[23]
 pub var intel_kl: bool = false;
 
 /// BUS_LOCK_DETECT.
 ///
 /// If `true`, indicates support for OS bus-lock detection.
 ///
-/// CPUID.07.00H: ECX[24]
+/// CPUID.07H.00H: ECX[24]
 pub fn busLockDetect() bool {
     if (max_standard_leaf < 0x7) return false;
     const leaf0 = raw(0x7, 0);
@@ -1353,21 +1529,21 @@ pub fn busLockDetect() bool {
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[25]
+/// CPUID.07H.00H: ECX[25]
 pub var intel_cldemote: bool = false;
 
 /// MOVDIRI.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[27]
+/// CPUID.07H.00H: ECX[27]
 pub var intel_movdiri: bool = false;
 
 /// MOVDIR64B.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[28]
+/// CPUID.07H.00H: ECX[28]
 pub var intel_movdir64b: bool = false;
 
 /// ENQCMD.
@@ -1376,7 +1552,7 @@ pub var intel_movdir64b: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[29]
+/// CPUID.07H.00H: ECX[29]
 pub var intel_enqcmd: bool = false;
 
 /// SGX_LC.
@@ -1385,7 +1561,7 @@ pub var intel_enqcmd: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[30]
+/// CPUID.07H.00H: ECX[30]
 pub var intel_sgx_lc: bool = false;
 
 /// PKS.
@@ -1394,7 +1570,7 @@ pub var intel_sgx_lc: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: ECX[31]
+/// CPUID.07H.00H: ECX[31]
 pub var intel_pks: bool = false;
 
 /// SGX-KEYS.
@@ -1403,7 +1579,7 @@ pub var intel_pks: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[1]
+/// CPUID.07H.00H: EDX[1]
 pub var intel_sgx_keys: bool = false;
 
 /// AVX512_4VNNIW.
@@ -1412,7 +1588,7 @@ pub var intel_sgx_keys: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[2]
+/// CPUID.07H.00H: EDX[2]
 pub var intel_avx512_4vnniw: bool = false;
 
 /// AVX512_4FMAPS.
@@ -1421,14 +1597,14 @@ pub var intel_avx512_4vnniw: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[3]
+/// CPUID.07H.00H: EDX[3]
 pub var intel_avx512_4fmaps: bool = false;
 
 /// Fast Short REP MOV.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[4]
+/// CPUID.07H.00H: EDX[4]
 pub var intel_fast_short_rep_mov: bool = false;
 
 /// UINTR.
@@ -1437,14 +1613,14 @@ pub var intel_fast_short_rep_mov: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[5]
+/// CPUID.07H.00H: EDX[5]
 pub var intel_uintr: bool = false;
 
 /// AVX512_VP2INTERSECT.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[8]
+/// CPUID.07H.00H: EDX[8]
 pub var intel_avx512_vp2intersect: bool = false;
 
 /// SRBDS_CTRL.
@@ -1453,14 +1629,14 @@ pub var intel_avx512_vp2intersect: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[9]
+/// CPUID.07H.00H: EDX[9]
 pub var intel_srbds_ctrl: bool = false;
 
 /// MD_CLEAR.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[10]
+/// CPUID.07H.00H: EDX[10]
 pub var intel_md_clear: bool = false;
 
 /// RTM_ALWAYS_ABORT.
@@ -1469,7 +1645,7 @@ pub var intel_md_clear: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[11]
+/// CPUID.07H.00H: EDX[11]
 pub var intel_rtm_always_abort: bool = false;
 
 /// RTM_FORCE_ABORT supported.
@@ -1479,14 +1655,14 @@ pub var intel_rtm_always_abort: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[13]
+/// CPUID.07H.00H: EDX[13]
 pub var intel_rtm_force_abort: bool = false;
 
 /// SERIALIZE.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[14]
+/// CPUID.07H.00H: EDX[14]
 pub var intel_serialize: bool = false;
 
 /// Hybrid.
@@ -1497,7 +1673,7 @@ pub var intel_serialize: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[15]
+/// CPUID.07H.00H: EDX[15]
 pub var intel_hybrid: bool = false;
 
 /// TSXLDTRK.
@@ -1506,21 +1682,21 @@ pub var intel_hybrid: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[16]
+/// CPUID.07H.00H: EDX[16]
 pub var intel_tsxldtrk: bool = false;
 
 /// PCONFIG.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[18]
+/// CPUID.07H.00H: EDX[18]
 pub var intel_pconfig: bool = false;
 
 /// Architectural LBRs.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[19]
+/// CPUID.07H.00H: EDX[19]
 pub var intel_architectural_lbrs: bool = false;
 
 /// CET_IBT.
@@ -1531,7 +1707,7 @@ pub var intel_architectural_lbrs: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[20]
+/// CPUID.07H.00H: EDX[20]
 pub var intel_cet_ibt: bool = false;
 
 /// AMX-BF16.
@@ -1540,14 +1716,14 @@ pub var intel_cet_ibt: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[22]
+/// CPUID.07H.00H: EDX[22]
 pub var intel_amx_bf16: bool = false;
 
 /// AVX512_FP16.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[23]
+/// CPUID.07H.00H: EDX[23]
 pub var intel_avx512_fp16: bool = false;
 
 /// AMX-TILE.
@@ -1556,7 +1732,7 @@ pub var intel_avx512_fp16: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[24]
+/// CPUID.07H.00H: EDX[24]
 pub var intel_amx_tile: bool = false;
 
 /// AMX-INT8.
@@ -1565,7 +1741,7 @@ pub var intel_amx_tile: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[25]
+/// CPUID.07H.00H: EDX[25]
 pub var intel_amx_int8: bool = false;
 
 /// Enumerates support for indirect branch restricted speculation (IBRS) and the indirect branch predictor barrier
@@ -1577,7 +1753,7 @@ pub var intel_amx_int8: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[26]
+/// CPUID.07H.00H: EDX[26]
 pub var intel_ibrs_ibpb: bool = false;
 
 /// Enumerates support for single thread indirect branch predictors (STIBP).
@@ -1586,7 +1762,7 @@ pub var intel_ibrs_ibpb: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[27]
+/// CPUID.07H.00H: EDX[27]
 pub var intel_stibp: bool = false;
 
 /// Enumerates support for L1D_FLUSH.
@@ -1597,14 +1773,14 @@ pub var intel_stibp: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[28]
+/// CPUID.07H.00H: EDX[28]
 pub var intel_l1d_flush: bool = false;
 
 /// IA32_ARCH_CAPABILITIES MSR.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[29]
+/// CPUID.07H.00H: EDX[29]
 pub var intel_ia32_arch_capabilities: bool = false;
 
 /// IA32_CORE_CAPABILITIES MSR.
@@ -1621,7 +1797,7 @@ pub var intel_ia32_arch_capabilities: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[30]
+/// CPUID.07H.00H: EDX[30]
 pub var intel_ia32_core_capabilities: bool = false;
 
 /// Enumerates support for Speculative Store Bypass Disable (SSBD).
@@ -1632,7 +1808,7 @@ pub var intel_ia32_core_capabilities: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.00H: EDX[31]
+/// CPUID.07H.00H: EDX[31]
 pub var intel_ssbd: bool = false;
 
 /// AVX-VNNI.
@@ -1641,7 +1817,7 @@ pub var intel_ssbd: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[4]
+/// CPUID.07H.01H: EAX[4]
 pub var intel_avx_vnni: bool = false;
 
 /// AVX512_BF16.
@@ -1650,28 +1826,28 @@ pub var intel_avx_vnni: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[5]
+/// CPUID.07H.01H: EAX[5]
 pub var intel_avx512_bf16: bool = false;
 
 /// Fast zero-length REP MOVSB.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[10]
+/// CPUID.07H.01H: EAX[10]
 pub var intel_fast_zero_length_repmovsb: bool = false;
 
 /// Fast short REP STOSB.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[11]
+/// CPUID.07H.01H: EAX[11]
 pub var intel_fast_short_repstosb: bool = false;
 
 /// Fast short REP CMPSB, REP SCASB.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[12]
+/// CPUID.07H.01H: EAX[12]
 pub var intel_fast_short_repcmpsb: bool = false;
 
 /// HRESET.
@@ -1682,7 +1858,7 @@ pub var intel_fast_short_repcmpsb: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[22]
+/// CPUID.07H.01H: EAX[22]
 pub var intel_hreset: bool = false;
 
 /// INVD_DISABLE_POST_BIOS_DONE.
@@ -1691,14 +1867,14 @@ pub var intel_hreset: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EAX[30]
+/// CPUID.07H.01H: EAX[30]
 pub var intel_invd_disable_post_bios_done: bool = false;
 
 /// Enumerates the presence of the IA32_PPIN and IA32_PPIN_CTL MSRs.
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EBX[0]
+/// CPUID.07H.01H: EBX[0]
 pub var intel_ia32_ppin: bool = false;
 
 /// CET_SSS.
@@ -1713,7 +1889,7 @@ pub var intel_ia32_ppin: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.01H: EDX[18]
+/// CPUID.07H.01H: EDX[18]
 pub var intel_cet_sss: bool = false;
 
 /// PSFD.
@@ -1724,7 +1900,7 @@ pub var intel_cet_sss: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.02H: EDX[0]
+/// CPUID.07H.02H: EDX[0]
 pub var intel_psfd: bool = false;
 
 /// IPRED_CTRL.
@@ -1737,7 +1913,7 @@ pub var intel_psfd: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.02H: EDX[1]
+/// CPUID.07H.02H: EDX[1]
 pub var intel_ipred_ctrl: bool = false;
 
 /// RRSBA_CTRL.
@@ -1750,7 +1926,7 @@ pub var intel_ipred_ctrl: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.02H: EDX[2]
+/// CPUID.07H.02H: EDX[2]
 pub var intel_rrsba_ctrl: bool = false;
 
 /// DDPD_U.
@@ -1761,7 +1937,7 @@ pub var intel_rrsba_ctrl: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.02H: EDX[3]
+/// CPUID.07H.02H: EDX[3]
 pub var intel_ddpd_u: bool = false;
 
 /// BHI_CTRL.
@@ -1772,7 +1948,7 @@ pub var intel_ddpd_u: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.02H: EDX[4]
+/// CPUID.07H.02H: EDX[4]
 pub var intel_bhi_ctrl: bool = false;
 
 /// MCDT_NO.
@@ -1782,7 +1958,7 @@ pub var intel_bhi_ctrl: bool = false;
 ///
 /// Intel Only.
 ///
-/// CPUID.07.02H: EDX[5]
+/// CPUID.07H.02H: EDX[5]
 pub var intel_mcdt_no: bool = false;
 
 /// Time Stamp Counter and Nominal Core Crystal Clock Information.
@@ -2689,8 +2865,8 @@ fn capture01H() void {
         popcnt = bitjuggle.isBitSet(cpuid_result.ecx, 23);
         if (vendor == .intel) intel_tsc_deadline = bitjuggle.isBitSet(cpuid_result.ecx, 24);
         aesni = bitjuggle.isBitSet(cpuid_result.ecx, 25);
-        xsave = bitjuggle.isBitSet(cpuid_result.ecx, 26);
-        osxsave = bitjuggle.isBitSet(cpuid_result.ecx, 27);
+        xsave.supported = bitjuggle.isBitSet(cpuid_result.ecx, 26);
+        xsave.os_supported = bitjuggle.isBitSet(cpuid_result.ecx, 27);
         avx = bitjuggle.isBitSet(cpuid_result.ecx, 28);
         f16c = bitjuggle.isBitSet(cpuid_result.ecx, 29);
         rdrand = bitjuggle.isBitSet(cpuid_result.ecx, 30);
@@ -2938,14 +3114,14 @@ fn capture07H() void {
         if (vendor == .intel) intel_avx512_bitalg = bitjuggle.isBitSet(subleaf0.ecx, 12);
         if (vendor == .intel) intel_tme_en = bitjuggle.isBitSet(subleaf0.ecx, 13);
         if (vendor == .intel) intel_avx512_vpopcntdq = bitjuggle.isBitSet(subleaf0.ecx, 14);
-        // CPUID.07.00H: ECX[15] reserved
+        // CPUID.07H.00H: ECX[15] reserved
         la57 = bitjuggle.isBitSet(subleaf0.ecx, 16);
         if (vendor == .intel) intel_mawau = bitjuggle.getBits(subleaf0.ecx, 17, 5);
         rdpid = bitjuggle.isBitSet(subleaf0.ecx, 22);
         if (vendor == .intel) intel_kl = bitjuggle.isBitSet(subleaf0.ecx, 23);
         // Provided by `busLockDetect`
         if (vendor == .intel) intel_cldemote = bitjuggle.isBitSet(subleaf0.ecx, 25);
-        // CPUID.07.00H: ECX[26] reserved
+        // CPUID.07H.00H: ECX[26] reserved
         if (vendor == .intel) intel_movdiri = bitjuggle.isBitSet(subleaf0.ecx, 27);
         if (vendor == .intel) intel_movdir64b = bitjuggle.isBitSet(subleaf0.ecx, 28);
         if (vendor == .intel) intel_enqcmd = bitjuggle.isBitSet(subleaf0.ecx, 29);
@@ -2955,28 +3131,28 @@ fn capture07H() void {
 
     // subleaf 0 EDX
     {
-        // CPUID.07.00H: EDX[0] reserved
+        // CPUID.07H.00H: EDX[0] reserved
         if (vendor == .intel) intel_sgx_keys = bitjuggle.isBitSet(subleaf0.edx, 1);
         if (vendor == .intel) intel_avx512_4vnniw = bitjuggle.isBitSet(subleaf0.edx, 2);
         if (vendor == .intel) intel_avx512_4fmaps = bitjuggle.isBitSet(subleaf0.edx, 3);
         if (vendor == .intel) intel_fast_short_rep_mov = bitjuggle.isBitSet(subleaf0.edx, 4);
         if (vendor == .intel) intel_uintr = bitjuggle.isBitSet(subleaf0.edx, 5);
-        // CPUID.07.00H: EDX[6] reserved
-        // CPUID.07.00H: EDX[7] reserved
+        // CPUID.07H.00H: EDX[6] reserved
+        // CPUID.07H.00H: EDX[7] reserved
         if (vendor == .intel) intel_avx512_vp2intersect = bitjuggle.isBitSet(subleaf0.edx, 8);
         if (vendor == .intel) intel_srbds_ctrl = bitjuggle.isBitSet(subleaf0.edx, 9);
         if (vendor == .intel) intel_md_clear = bitjuggle.isBitSet(subleaf0.edx, 10);
         if (vendor == .intel) intel_rtm_always_abort = bitjuggle.isBitSet(subleaf0.edx, 11);
-        // CPUID.07.00H: EDX[12] reserved
+        // CPUID.07H.00H: EDX[12] reserved
         if (vendor == .intel) intel_rtm_force_abort = bitjuggle.isBitSet(subleaf0.edx, 13);
         if (vendor == .intel) intel_serialize = bitjuggle.isBitSet(subleaf0.edx, 14);
         if (vendor == .intel) intel_hybrid = bitjuggle.isBitSet(subleaf0.edx, 15);
         if (vendor == .intel) intel_tsxldtrk = bitjuggle.isBitSet(subleaf0.edx, 16);
-        // CPUID.07.00H: EDX[17] reserved
+        // CPUID.07H.00H: EDX[17] reserved
         if (vendor == .intel) intel_pconfig = bitjuggle.isBitSet(subleaf0.edx, 18);
         if (vendor == .intel) intel_architectural_lbrs = bitjuggle.isBitSet(subleaf0.edx, 19);
         if (vendor == .intel) intel_cet_ibt = bitjuggle.isBitSet(subleaf0.edx, 20);
-        // CPUID.07.00H: EDX[21] reserved
+        // CPUID.07H.00H: EDX[21] reserved
         if (vendor == .intel) intel_amx_bf16 = bitjuggle.isBitSet(subleaf0.edx, 22);
         if (vendor == .intel) intel_avx512_fp16 = bitjuggle.isBitSet(subleaf0.edx, 23);
         if (vendor == .intel) intel_amx_tile = bitjuggle.isBitSet(subleaf0.edx, 24);
@@ -2995,112 +3171,112 @@ fn capture07H() void {
 
     // subleaf 1 EAX
     {
-        // CPUID.07.01H: EAX[0] reserved
-        // CPUID.07.01H: EAX[1] reserved
-        // CPUID.07.01H: EAX[2] reserved
-        // CPUID.07.01H: EAX[3] reserved
+        // CPUID.07H.01H: EAX[0] reserved
+        // CPUID.07H.01H: EAX[1] reserved
+        // CPUID.07H.01H: EAX[2] reserved
+        // CPUID.07H.01H: EAX[3] reserved
         if (vendor == .intel) intel_avx_vnni = bitjuggle.isBitSet(subleaf1.eax, 4);
         if (vendor == .intel) intel_avx512_bf16 = bitjuggle.isBitSet(subleaf1.eax, 5);
-        // CPUID.07.01H: EAX[6] reserved
-        // CPUID.07.01H: EAX[7] reserved
-        // CPUID.07.01H: EAX[8] reserved
-        // CPUID.07.01H: EAX[9] reserved
+        // CPUID.07H.01H: EAX[6] reserved
+        // CPUID.07H.01H: EAX[7] reserved
+        // CPUID.07H.01H: EAX[8] reserved
+        // CPUID.07H.01H: EAX[9] reserved
         if (vendor == .intel) intel_fast_zero_length_repmovsb = bitjuggle.isBitSet(subleaf1.eax, 10);
         if (vendor == .intel) intel_fast_short_repstosb = bitjuggle.isBitSet(subleaf1.eax, 11);
         if (vendor == .intel) intel_fast_short_repcmpsb = bitjuggle.isBitSet(subleaf1.eax, 12);
-        // CPUID.07.01H: EAX[13] reserved
-        // CPUID.07.01H: EAX[14] reserved
-        // CPUID.07.01H: EAX[15] reserved
-        // CPUID.07.01H: EAX[16] reserved
-        // CPUID.07.01H: EAX[17] reserved
-        // CPUID.07.01H: EAX[18] reserved
-        // CPUID.07.01H: EAX[19] reserved
-        // CPUID.07.01H: EAX[20] reserved
-        // CPUID.07.01H: EAX[21] reserved
+        // CPUID.07H.01H: EAX[13] reserved
+        // CPUID.07H.01H: EAX[14] reserved
+        // CPUID.07H.01H: EAX[15] reserved
+        // CPUID.07H.01H: EAX[16] reserved
+        // CPUID.07H.01H: EAX[17] reserved
+        // CPUID.07H.01H: EAX[18] reserved
+        // CPUID.07H.01H: EAX[19] reserved
+        // CPUID.07H.01H: EAX[20] reserved
+        // CPUID.07H.01H: EAX[21] reserved
         if (vendor == .intel) intel_hreset = bitjuggle.isBitSet(subleaf1.eax, 22);
-        // CPUID.07.01H: EAX[23] reserved
-        // CPUID.07.01H: EAX[24] reserved
-        // CPUID.07.01H: EAX[25] reserved
-        // CPUID.07.01H: EAX[26] reserved
-        // CPUID.07.01H: EAX[27] reserved
-        // CPUID.07.01H: EAX[28] reserved
-        // CPUID.07.01H: EAX[29] reserved
+        // CPUID.07H.01H: EAX[23] reserved
+        // CPUID.07H.01H: EAX[24] reserved
+        // CPUID.07H.01H: EAX[25] reserved
+        // CPUID.07H.01H: EAX[26] reserved
+        // CPUID.07H.01H: EAX[27] reserved
+        // CPUID.07H.01H: EAX[28] reserved
+        // CPUID.07H.01H: EAX[29] reserved
         if (vendor == .intel) intel_invd_disable_post_bios_done = bitjuggle.isBitSet(subleaf1.eax, 30);
-        // CPUID.07.01H: EAX[31] reserved
+        // CPUID.07H.01H: EAX[31] reserved
     }
 
     // subleaf 1 EBX
     {
         if (vendor == .intel) intel_ia32_ppin = bitjuggle.isBitSet(subleaf1.ebx, 0);
-        // CPUID.07.01H: EBX[1] reserved
-        // CPUID.07.01H: EBX[2] reserved
-        // CPUID.07.01H: EBX[3] reserved
-        // CPUID.07.01H: EBX[4] reserved
-        // CPUID.07.01H: EBX[5] reserved
-        // CPUID.07.01H: EBX[6] reserved
-        // CPUID.07.01H: EBX[7] reserved
-        // CPUID.07.01H: EBX[8] reserved
-        // CPUID.07.01H: EBX[9] reserved
-        // CPUID.07.01H: EBX[10] reserved
-        // CPUID.07.01H: EBX[11] reserved
-        // CPUID.07.01H: EBX[12] reserved
-        // CPUID.07.01H: EBX[13] reserved
-        // CPUID.07.01H: EBX[14] reserved
-        // CPUID.07.01H: EBX[15] reserved
-        // CPUID.07.01H: EBX[16] reserved
-        // CPUID.07.01H: EBX[17] reserved
-        // CPUID.07.01H: EBX[18] reserved
-        // CPUID.07.01H: EBX[19] reserved
-        // CPUID.07.01H: EBX[20] reserved
-        // CPUID.07.01H: EBX[21] reserved
-        // CPUID.07.01H: EBX[22] reserved
-        // CPUID.07.01H: EBX[23] reserved
-        // CPUID.07.01H: EBX[24] reserved
-        // CPUID.07.01H: EBX[25] reserved
-        // CPUID.07.01H: EBX[26] reserved
-        // CPUID.07.01H: EBX[27] reserved
-        // CPUID.07.01H: EBX[28] reserved
-        // CPUID.07.01H: EBX[29] reserved
-        // CPUID.07.01H: EBX[30] reserved
-        // CPUID.07.01H: EBX[31] reserved
+        // CPUID.07H.01H: EBX[1] reserved
+        // CPUID.07H.01H: EBX[2] reserved
+        // CPUID.07H.01H: EBX[3] reserved
+        // CPUID.07H.01H: EBX[4] reserved
+        // CPUID.07H.01H: EBX[5] reserved
+        // CPUID.07H.01H: EBX[6] reserved
+        // CPUID.07H.01H: EBX[7] reserved
+        // CPUID.07H.01H: EBX[8] reserved
+        // CPUID.07H.01H: EBX[9] reserved
+        // CPUID.07H.01H: EBX[10] reserved
+        // CPUID.07H.01H: EBX[11] reserved
+        // CPUID.07H.01H: EBX[12] reserved
+        // CPUID.07H.01H: EBX[13] reserved
+        // CPUID.07H.01H: EBX[14] reserved
+        // CPUID.07H.01H: EBX[15] reserved
+        // CPUID.07H.01H: EBX[16] reserved
+        // CPUID.07H.01H: EBX[17] reserved
+        // CPUID.07H.01H: EBX[18] reserved
+        // CPUID.07H.01H: EBX[19] reserved
+        // CPUID.07H.01H: EBX[20] reserved
+        // CPUID.07H.01H: EBX[21] reserved
+        // CPUID.07H.01H: EBX[22] reserved
+        // CPUID.07H.01H: EBX[23] reserved
+        // CPUID.07H.01H: EBX[24] reserved
+        // CPUID.07H.01H: EBX[25] reserved
+        // CPUID.07H.01H: EBX[26] reserved
+        // CPUID.07H.01H: EBX[27] reserved
+        // CPUID.07H.01H: EBX[28] reserved
+        // CPUID.07H.01H: EBX[29] reserved
+        // CPUID.07H.01H: EBX[30] reserved
+        // CPUID.07H.01H: EBX[31] reserved
     }
 
     // subleaf 1 ECX reserved
 
     // subleaf 1 EDX
     {
-        // CPUID.07.01H: EDX[0] reserved
-        // CPUID.07.01H: EDX[1] reserved
-        // CPUID.07.01H: EDX[2] reserved
-        // CPUID.07.01H: EDX[3] reserved
-        // CPUID.07.01H: EDX[4] reserved
-        // CPUID.07.01H: EDX[5] reserved
-        // CPUID.07.01H: EDX[6] reserved
-        // CPUID.07.01H: EDX[7] reserved
-        // CPUID.07.01H: EDX[8] reserved
-        // CPUID.07.01H: EDX[9] reserved
-        // CPUID.07.01H: EDX[10] reserved
-        // CPUID.07.01H: EDX[11] reserved
-        // CPUID.07.01H: EDX[12] reserved
-        // CPUID.07.01H: EDX[13] reserved
-        // CPUID.07.01H: EDX[14] reserved
-        // CPUID.07.01H: EDX[15] reserved
-        // CPUID.07.01H: EDX[16] reserved
-        // CPUID.07.01H: EDX[17] reserved
+        // CPUID.07H.01H: EDX[0] reserved
+        // CPUID.07H.01H: EDX[1] reserved
+        // CPUID.07H.01H: EDX[2] reserved
+        // CPUID.07H.01H: EDX[3] reserved
+        // CPUID.07H.01H: EDX[4] reserved
+        // CPUID.07H.01H: EDX[5] reserved
+        // CPUID.07H.01H: EDX[6] reserved
+        // CPUID.07H.01H: EDX[7] reserved
+        // CPUID.07H.01H: EDX[8] reserved
+        // CPUID.07H.01H: EDX[9] reserved
+        // CPUID.07H.01H: EDX[10] reserved
+        // CPUID.07H.01H: EDX[11] reserved
+        // CPUID.07H.01H: EDX[12] reserved
+        // CPUID.07H.01H: EDX[13] reserved
+        // CPUID.07H.01H: EDX[14] reserved
+        // CPUID.07H.01H: EDX[15] reserved
+        // CPUID.07H.01H: EDX[16] reserved
+        // CPUID.07H.01H: EDX[17] reserved
         if (vendor == .intel) intel_cet_sss = bitjuggle.isBitSet(subleaf1.edx, 18);
-        // CPUID.07.01H: EDX[19] reserved
-        // CPUID.07.01H: EDX[20] reserved
-        // CPUID.07.01H: EDX[21] reserved
-        // CPUID.07.01H: EDX[22] reserved
-        // CPUID.07.01H: EDX[23] reserved
-        // CPUID.07.01H: EDX[24] reserved
-        // CPUID.07.01H: EDX[25] reserved
-        // CPUID.07.01H: EDX[26] reserved
-        // CPUID.07.01H: EDX[27] reserved
-        // CPUID.07.01H: EDX[28] reserved
-        // CPUID.07.01H: EDX[29] reserved
-        // CPUID.07.01H: EDX[30] reserved
-        // CPUID.07.01H: EDX[31] reserved
+        // CPUID.07H.01H: EDX[19] reserved
+        // CPUID.07H.01H: EDX[20] reserved
+        // CPUID.07H.01H: EDX[21] reserved
+        // CPUID.07H.01H: EDX[22] reserved
+        // CPUID.07H.01H: EDX[23] reserved
+        // CPUID.07H.01H: EDX[24] reserved
+        // CPUID.07H.01H: EDX[25] reserved
+        // CPUID.07H.01H: EDX[26] reserved
+        // CPUID.07H.01H: EDX[27] reserved
+        // CPUID.07H.01H: EDX[28] reserved
+        // CPUID.07H.01H: EDX[29] reserved
+        // CPUID.07H.01H: EDX[30] reserved
+        // CPUID.07H.01H: EDX[31] reserved
     }
 
     if (max_07_subleaf < 0x2) return;
@@ -3119,32 +3295,193 @@ fn capture07H() void {
         if (vendor == .intel) intel_ddpd_u = bitjuggle.isBitSet(subleaf2.edx, 3);
         if (vendor == .intel) intel_bhi_ctrl = bitjuggle.isBitSet(subleaf2.edx, 4);
         if (vendor == .intel) intel_mcdt_no = bitjuggle.isBitSet(subleaf2.edx, 5);
-        // CPUID.07.02H: EDX[6] reserved
-        // CPUID.07.02H: EDX[7] reserved
-        // CPUID.07.02H: EDX[8] reserved
-        // CPUID.07.02H: EDX[9] reserved
-        // CPUID.07.02H: EDX[10] reserved
-        // CPUID.07.02H: EDX[11] reserved
-        // CPUID.07.02H: EDX[12] reserved
-        // CPUID.07.02H: EDX[13] reserved
-        // CPUID.07.02H: EDX[14] reserved
-        // CPUID.07.02H: EDX[15] reserved
-        // CPUID.07.02H: EDX[16] reserved
-        // CPUID.07.02H: EDX[17] reserved
-        // CPUID.07.02H: EDX[18] reserved
-        // CPUID.07.02H: EDX[19] reserved
-        // CPUID.07.02H: EDX[20] reserved
-        // CPUID.07.02H: EDX[21] reserved
-        // CPUID.07.02H: EDX[22] reserved
-        // CPUID.07.02H: EDX[23] reserved
-        // CPUID.07.02H: EDX[24] reserved
-        // CPUID.07.02H: EDX[25] reserved
-        // CPUID.07.02H: EDX[26] reserved
-        // CPUID.07.02H: EDX[27] reserved
-        // CPUID.07.02H: EDX[28] reserved
-        // CPUID.07.02H: EDX[29] reserved
-        // CPUID.07.02H: EDX[30] reserved
-        // CPUID.07.02H: EDX[31] reserved
+        // CPUID.07H.02H: EDX[6] reserved
+        // CPUID.07H.02H: EDX[7] reserved
+        // CPUID.07H.02H: EDX[8] reserved
+        // CPUID.07H.02H: EDX[9] reserved
+        // CPUID.07H.02H: EDX[10] reserved
+        // CPUID.07H.02H: EDX[11] reserved
+        // CPUID.07H.02H: EDX[12] reserved
+        // CPUID.07H.02H: EDX[13] reserved
+        // CPUID.07H.02H: EDX[14] reserved
+        // CPUID.07H.02H: EDX[15] reserved
+        // CPUID.07H.02H: EDX[16] reserved
+        // CPUID.07H.02H: EDX[17] reserved
+        // CPUID.07H.02H: EDX[18] reserved
+        // CPUID.07H.02H: EDX[19] reserved
+        // CPUID.07H.02H: EDX[20] reserved
+        // CPUID.07H.02H: EDX[21] reserved
+        // CPUID.07H.02H: EDX[22] reserved
+        // CPUID.07H.02H: EDX[23] reserved
+        // CPUID.07H.02H: EDX[24] reserved
+        // CPUID.07H.02H: EDX[25] reserved
+        // CPUID.07H.02H: EDX[26] reserved
+        // CPUID.07H.02H: EDX[27] reserved
+        // CPUID.07H.02H: EDX[28] reserved
+        // CPUID.07H.02H: EDX[29] reserved
+        // CPUID.07H.02H: EDX[30] reserved
+        // CPUID.07H.02H: EDX[31] reserved
+    }
+}
+
+/// Captures CPUID.0DH.
+///
+/// Processor Extended State Enumeration
+fn capture0DH() void {
+    if (max_standard_leaf < 0x0D or !xsave.supported) return;
+
+    const subleaf0 = raw(0x0D, 0);
+
+    // subleaf 0 EAX
+    {
+        xsave.supported_state.x87 = bitjuggle.isBitSet(subleaf0.eax, 0);
+        xsave.supported_state.sse = bitjuggle.isBitSet(subleaf0.eax, 1);
+        xsave.supported_state.avx = bitjuggle.isBitSet(subleaf0.eax, 2);
+        if (vendor == .intel) xsave.supported_state.mpx_bndregs = bitjuggle.isBitSet(subleaf0.eax, 3);
+        if (vendor == .intel) xsave.supported_state.mpx_bndcsr = bitjuggle.isBitSet(subleaf0.eax, 4);
+        xsave.supported_state.avx_opmask = bitjuggle.isBitSet(subleaf0.eax, 5);
+        xsave.supported_state.avx_zmm_hi256 = bitjuggle.isBitSet(subleaf0.eax, 6);
+        xsave.supported_state.avx_hi16_zmm = bitjuggle.isBitSet(subleaf0.eax, 7);
+        if (vendor == .intel) xsave.supported_state.pt = bitjuggle.isBitSet(subleaf0.eax, 8);
+        xsave.supported_state.pkru = bitjuggle.isBitSet(subleaf0.eax, 9);
+        if (vendor == .intel) xsave.supported_state.pasid = bitjuggle.isBitSet(subleaf0.eax, 10);
+        if (vendor == .intel) xsave.supported_state.cet_u = bitjuggle.isBitSet(subleaf0.eax, 11);
+        if (vendor == .intel) xsave.supported_state.cet_s = bitjuggle.isBitSet(subleaf0.eax, 12);
+        if (vendor == .intel) xsave.supported_state.hdc = bitjuggle.isBitSet(subleaf0.eax, 13);
+        if (vendor == .intel) xsave.supported_state.uintr = bitjuggle.isBitSet(subleaf0.eax, 14);
+        if (vendor == .intel) xsave.supported_state.lbr = bitjuggle.isBitSet(subleaf0.eax, 15);
+        if (vendor == .intel) xsave.supported_state.hwp = bitjuggle.isBitSet(subleaf0.eax, 16);
+        if (vendor == .intel) xsave.supported_state.amx_tilecfg = bitjuggle.isBitSet(subleaf0.eax, 17);
+        if (vendor == .intel) xsave.supported_state.amx_tiledata = bitjuggle.isBitSet(subleaf0.eax, 18);
+        // CPUID.0DH.00H: EAX[19] reserved
+        // CPUID.0DH.00H: EAX[20] reserved
+        // CPUID.0DH.00H: EAX[21] reserved
+        // CPUID.0DH.00H: EAX[22] reserved
+        // CPUID.0DH.00H: EAX[23] reserved
+        // CPUID.0DH.00H: EAX[24] reserved
+        // CPUID.0DH.00H: EAX[25] reserved
+        // CPUID.0DH.00H: EAX[26] reserved
+        // CPUID.0DH.00H: EAX[27] reserved
+        // CPUID.0DH.00H: EAX[28] reserved
+        // CPUID.0DH.00H: EAX[29] reserved
+        // CPUID.0DH.00H: EAX[30] reserved
+        // CPUID.0DH.00H: EAX[31] reserved
+    }
+
+    // subleaf 0 ECX
+    {
+        xsave.maximum_state_size = .from(subleaf0.ecx, .byte);
+    }
+
+    // subleaf 0 EDX
+    {
+        // CPUID.0DH.00H: EDX[0] reserved
+        // CPUID.0DH.00H: EDX[1] reserved
+        // CPUID.0DH.00H: EDX[2] reserved
+        // CPUID.0DH.00H: EDX[3] reserved
+        // CPUID.0DH.00H: EDX[4] reserved
+        // CPUID.0DH.00H: EDX[5] reserved
+        // CPUID.0DH.00H: EDX[6] reserved
+        // CPUID.0DH.00H: EDX[7] reserved
+        // CPUID.0DH.00H: EDX[8] reserved
+        // CPUID.0DH.00H: EDX[9] reserved
+        // CPUID.0DH.00H: EDX[10] reserved
+        // CPUID.0DH.00H: EDX[11] reserved
+        // CPUID.0DH.00H: EDX[12] reserved
+        // CPUID.0DH.00H: EDX[13] reserved
+        // CPUID.0DH.00H: EDX[14] reserved
+        // CPUID.0DH.00H: EDX[15] reserved
+        // CPUID.0DH.00H: EDX[16] reserved
+        // CPUID.0DH.00H: EDX[17] reserved
+        // CPUID.0DH.00H: EDX[18] reserved
+        // CPUID.0DH.00H: EDX[19] reserved
+        // CPUID.0DH.00H: EDX[20] reserved
+        // CPUID.0DH.00H: EDX[21] reserved
+        // CPUID.0DH.00H: EDX[22] reserved
+        // CPUID.0DH.00H: EDX[23] reserved
+        // CPUID.0DH.00H: EDX[24] reserved
+        // CPUID.0DH.00H: EDX[25] reserved
+        // CPUID.0DH.00H: EDX[26] reserved
+        // CPUID.0DH.00H: EDX[27] reserved
+        // CPUID.0DH.00H: EDX[28] reserved
+        // CPUID.0DH.00H: EDX[29] reserved
+        if (vendor == .amd) xsave.supported_state.lwp = bitjuggle.isBitSet(subleaf0.edx, 30);
+        // CPUID.0DH.00H: EDX[31] reserved
+    }
+
+    const subleaf1 = raw(0x0D, 1);
+
+    // subleaf 1 EAX
+    {
+        xsave.supported_features.xsaveopt = bitjuggle.isBitSet(subleaf1.eax, 0);
+        xsave.supported_features.xsavec = bitjuggle.isBitSet(subleaf1.eax, 1);
+        xsave.supported_features.xgetbv1 = bitjuggle.isBitSet(subleaf1.eax, 2);
+        xsave.supported_features.xsaves = bitjuggle.isBitSet(subleaf1.eax, 3);
+        if (vendor == .intel) xsave.supported_features.xfd = bitjuggle.isBitSet(subleaf1.eax, 4);
+        // CPUID.0DH.01H: EAX[5] reserved
+        // CPUID.0DH.01H: EAX[6] reserved
+        // CPUID.0DH.01H: EAX[7] reserved
+        // CPUID.0DH.01H: EAX[8] reserved
+        // CPUID.0DH.01H: EAX[9] reserved
+        // CPUID.0DH.01H: EAX[10] reserved
+        // CPUID.0DH.01H: EAX[11] reserved
+        // CPUID.0DH.01H: EAX[12] reserved
+        // CPUID.0DH.01H: EAX[13] reserved
+        // CPUID.0DH.01H: EAX[14] reserved
+        // CPUID.0DH.01H: EAX[15] reserved
+        // CPUID.0DH.01H: EAX[16] reserved
+        // CPUID.0DH.01H: EAX[17] reserved
+        // CPUID.0DH.01H: EAX[18] reserved
+        // CPUID.0DH.01H: EAX[19] reserved
+        // CPUID.0DH.01H: EAX[20] reserved
+        // CPUID.0DH.01H: EAX[21] reserved
+        // CPUID.0DH.01H: EAX[22] reserved
+        // CPUID.0DH.01H: EAX[23] reserved
+        // CPUID.0DH.01H: EAX[24] reserved
+        // CPUID.0DH.01H: EAX[25] reserved
+        // CPUID.0DH.01H: EAX[26] reserved
+        // CPUID.0DH.01H: EAX[27] reserved
+        // CPUID.0DH.01H: EAX[28] reserved
+        // CPUID.0DH.01H: EAX[29] reserved
+        // CPUID.0DH.01H: EAX[30] reserved
+        // CPUID.0DH.01H: EAX[31] reserved
+    }
+
+    // subleaf 1 ECX
+    {
+        // CPUID.0DH.01H: ECX[0] reserved
+        // CPUID.0DH.01H: ECX[1] reserved
+        // CPUID.0DH.01H: ECX[2] reserved
+        // CPUID.0DH.01H: ECX[3] reserved
+        // CPUID.0DH.01H: ECX[4] reserved
+        // CPUID.0DH.01H: ECX[5] reserved
+        // CPUID.0DH.01H: ECX[6] reserved
+        // CPUID.0DH.01H: ECX[7] reserved
+        // CPUID.0DH.01H: ECX[8] reserved
+        // CPUID.0DH.01H: ECX[9] reserved
+        // CPUID.0DH.01H: ECX[10] reserved
+        if (vendor == .amd) xsave.supported_state.cet_u = bitjuggle.isBitSet(subleaf1.ecx, 11);
+        if (vendor == .amd) xsave.supported_state.cet_s = bitjuggle.isBitSet(subleaf1.ecx, 12);
+        // CPUID.0DH.01H: ECX[12] reserved
+        // CPUID.0DH.01H: ECX[13] reserved
+        // CPUID.0DH.01H: ECX[14] reserved
+        // CPUID.0DH.01H: ECX[15] reserved
+        // CPUID.0DH.01H: ECX[16] reserved
+        // CPUID.0DH.01H: ECX[17] reserved
+        // CPUID.0DH.01H: ECX[18] reserved
+        // CPUID.0DH.01H: ECX[19] reserved
+        // CPUID.0DH.01H: ECX[20] reserved
+        // CPUID.0DH.01H: ECX[21] reserved
+        // CPUID.0DH.01H: ECX[22] reserved
+        // CPUID.0DH.01H: ECX[23] reserved
+        // CPUID.0DH.01H: ECX[24] reserved
+        // CPUID.0DH.01H: ECX[25] reserved
+        // CPUID.0DH.01H: ECX[26] reserved
+        // CPUID.0DH.01H: ECX[27] reserved
+        // CPUID.0DH.01H: ECX[28] reserved
+        // CPUID.0DH.01H: ECX[29] reserved
+        // CPUID.0DH.01H: ECX[30] reserved
+        // CPUID.0DH.01H: ECX[31] reserved
     }
 }
 
@@ -3543,7 +3880,7 @@ pub fn raw(leaf_id: u32, subid: u32) Leaf {
     var ebx: u32 = undefined;
     var ecx: u32 = undefined;
     var edx: u32 = undefined;
-    asm volatile ("cpuid"
+    asm ("cpuid"
         : [_] "={eax}" (eax),
           [_] "={ebx}" (ebx),
           [_] "={ecx}" (ecx),
@@ -3572,7 +3909,6 @@ pub const ProcessorType = enum(u2) {
 // TODO: CPUID.09H - Direct Cache Access Information (Intel Only)
 // TODO: CPUID.0AH - Architectural Performance Monitoring (Intel Only)
 // TODO: CPUID.0BH - Extended Topology Enumeration
-// TODO: CPUID.0DH - Processor Extended State Enumeration
 // TODO: CPUID.0FH - Intel Resource Director Technology Monitoring Enumeration Information (Intel Only)
 // TODO: CPUID.0FH - PQOS Monitoring (AMD Only)
 // TODO: CPUID.10H - Intel Resource Director Technology Allocation Enumeration Information (Intel Only)
