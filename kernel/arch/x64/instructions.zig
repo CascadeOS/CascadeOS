@@ -32,6 +32,39 @@ pub fn disableSSEUsage() void {
     cr0.write();
 }
 
+pub fn xsave(xsave_area: []align(64) u8, state_to_save: x64.registers.XCr0) void {
+    const raw: u64 = @bitCast(state_to_save);
+
+    asm volatile ("xsave64 %[xsave_area]"
+        :
+        : [xsave_area] "*p" (xsave_area.ptr),
+          [hi] "{edx}" (@as(u32, @truncate(raw >> 32))),
+          [lo] "{eax}" (@as(u32, @truncate(raw))),
+        : .{ .memory = true });
+}
+
+pub fn xsaveopt(xsave_area: []align(64) u8, state_to_save: x64.registers.XCr0) void {
+    const raw: u64 = @bitCast(state_to_save);
+
+    asm volatile ("xsaveopt64 %[xsave_area]"
+        :
+        : [xsave_area] "*p" (xsave_area.ptr),
+          [hi] "{edx}" (@as(u32, @truncate(raw >> 32))),
+          [lo] "{eax}" (@as(u32, @truncate(raw))),
+        : .{ .memory = true });
+}
+
+pub fn xrstor(xsave_area: []align(64) const u8, state_to_restore: x64.registers.XCr0) void {
+    const raw: u64 = @bitCast(state_to_restore);
+
+    asm volatile ("xrstor64 %[xsave_area]"
+        :
+        : [xsave_area] "*p" (xsave_area.ptr),
+          [hi] "{edx}" (@as(u32, @truncate(raw >> 32))),
+          [lo] "{eax}" (@as(u32, @truncate(raw))),
+    );
+}
+
 pub inline fn disableInterruptsAndHalt() noreturn {
     while (true) {
         asm volatile ("cli; hlt");
