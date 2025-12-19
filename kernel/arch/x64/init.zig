@@ -12,7 +12,7 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
-const log = cascade.debug.log.scoped(.x64_init);
+const log = cascade.debug.log.scoped(.init_x64);
 
 /// Attempt to get some form of init output.
 pub fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
@@ -155,6 +155,40 @@ pub fn captureEarlySystemInformation(current_task: Task.Current) void {
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
         log.debug(current_task, "tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
+
+    captureXsaveInformation(current_task);
+}
+
+fn captureXsaveInformation(current_task: Task.Current) void {
+    if (!x64.info.cpu_id.xsave.supported) @panic("XSAVE is not supported");
+
+    x64.info.xsave.method = if (x64.info.cpu_id.xsave.supported_features.xsaveopt) .xsaveopt else .xsave;
+    log.debug(current_task, "xsave method: {t}", .{x64.info.xsave.method});
+
+    var cr4 = x64.registers.Cr4.read();
+    cr4.osxsave = true; // enable `xgetbv`/`xsetbv`
+    cr4.write();
+
+    const supported_state = x64.info.cpu_id.xsave.supported_state;
+
+    var xcr0: x64.registers.XCr0 = .read();
+    std.debug.assert(supported_state.x87);
+    xcr0.x87 = true;
+    std.debug.assert(supported_state.sse);
+    xcr0.sse = true;
+    if (supported_state.avx) xcr0.avx = true;
+    if (supported_state.avx_opmask or supported_state.avx_zmm_hi256 or supported_state.avx_hi16_zmm) {
+        std.debug.assert(supported_state.avx_opmask and supported_state.avx_zmm_hi256 and supported_state.avx_hi16_zmm);
+        xcr0.avx512 = .true;
+    }
+    x64.info.xsave.xcr0_value = xcr0;
+    log.debug(current_task, "state managed by XSAVE: {f}", .{xcr0});
+
+    // set xcr0 on the bootstrap executor to allow capturing the required size of the XSAVE area
+    xcr0.write();
+
+    x64.info.xsave.xsave_area_size = x64.info.cpu_id.xsave.enabledStateSize().?;
+    log.debug(current_task, "size of XSAVE area: {f}", .{x64.info.xsave.xsave_area_size});
 }
 
 pub const CaptureSystemInformationOptions = struct {
@@ -280,6 +314,8 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
             @panic("paging not enabled");
         }
 
+        cr0.monitor_coprocessor = true;
+        cr0.emulate_coprocessor = false;
         cr0.task_switched = true; // disable SSE instructions in the kernel
         cr0.write_protect = true;
 
@@ -299,13 +335,13 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
         cr4.machine_check_exception = x64.info.cpu_id.mce;
         cr4.page_global = true;
         cr4.performance_monitoring_counter = true;
-        cr4.os_fxsave = false; // TODO
-        cr4.unmasked_exception_support = false; // TODO
+        cr4.os_fxsave = true;
+        cr4.unmasked_exception_support = true;
         cr4.usermode_instruction_prevention = x64.info.cpu_id.umip;
         cr4.level_5_paging = false;
         cr4.fsgsbase = x64.info.cpu_id.fsgsbase;
         cr4.pcid = false; // TODO
-        cr4.osxsave = false; // TODO
+        cr4.osxsave = true; // XSAVE support is asserted in `captureEarlySystemInformation`
         cr4.supervisor_mode_execution_prevention = x64.info.cpu_id.smep;
         cr4.supervisor_mode_access_prevention = x64.info.cpu_id.smap;
 
@@ -350,6 +386,13 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
         cr4.write();
         cr4.page_global = true;
         cr4.write();
+    }
+
+    // XCr0
+    {
+        x64.instructions.enableSSEUsage();
+        x64.info.xsave.xcr0_value.write();
+        x64.instructions.disableSSEUsage();
     }
 }
 
