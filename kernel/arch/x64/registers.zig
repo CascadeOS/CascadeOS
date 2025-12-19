@@ -382,6 +382,136 @@ pub const Cr4 = packed struct(u64) {
     }
 };
 
+pub const XCr0 = packed struct(u64) {
+    /// x87 FPU state
+    ///
+    /// Must always be `true`
+    x87: bool,
+
+    /// 128-bit SSE state
+    sse: bool,
+
+    /// 256-bit SSE (AVX) state
+    ///
+    /// If `true` then `sse` must be `true`
+    avx: bool,
+
+    /// Intel Only
+    mpx: MPX,
+
+    avx512: AVX512,
+
+    /// Intel Processor Trace
+    ///
+    /// Intel Only
+    pt: bool,
+
+    pkru: bool,
+
+    _reserved0: u7,
+
+    /// Intel Only
+    amx: AMX,
+
+    _reserved1: u43,
+
+    /// Lightweight Profiling
+    ///
+    /// AMD Only
+    lwp: bool,
+
+    _reserved2: u1,
+
+    pub const MPX = enum(u2) {
+        false = 0b00,
+        true = 0b11,
+    };
+
+    pub const AVX512 = enum(u3) {
+        false = 0b000,
+        true = 0b111,
+    };
+
+    pub const AMX = enum(u2) {
+        false = 0b00,
+        true = 0b11,
+    };
+
+    pub fn read() XCr0 {
+        var lo: u32 = undefined;
+        var hi: u32 = undefined;
+
+        asm ("xgetbv"
+            : [hi] "={edx}" (hi),
+              [lo] "={eax}" (lo),
+            : [_] "{ecx}" (0),
+        );
+
+        return @bitCast(
+            @as(u64, hi) << 32 |
+                @as(u64, lo),
+        );
+    }
+
+    pub fn write(xcr0: XCr0) void {
+        const raw: u64 = @bitCast(xcr0);
+
+        asm volatile ("xsetbv"
+            :
+            : [_] "{ecx}" (0),
+              [hi] "{edx}" (@as(u32, @truncate(raw >> 32))),
+              [lo] "{eax}" (@as(u32, @truncate(raw))),
+        );
+    }
+
+    pub fn print(xcr0: XCr0, writer: *std.Io.Writer, indent: usize) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("XCr0{\n");
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("x87: {},\n", .{xcr0.x87});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("sse: {},\n", .{xcr0.sse});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("avx: {},\n", .{xcr0.avx});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("mpx: {t},\n", .{xcr0.mpx});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("avx512: {t},\n", .{xcr0.avx512});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("pt: {},\n", .{xcr0.pt});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("pkru: {},\n", .{xcr0.pkru});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("amx: {t},\n", .{xcr0.amx});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("lwp: {},\n", .{xcr0.lwp});
+
+        try writer.splatByteAll(' ', indent);
+        try writer.writeAll("}");
+    }
+
+    pub inline fn format(
+        xcr0: XCr0,
+        writer: *std.Io.Writer,
+    ) !void {
+        return print(xcr0, writer, 0);
+    }
+
+    comptime {
+        core.testing.expectSize(XCr0, @sizeOf(u64));
+    }
+};
+
 /// Extended Feature Enable Register (EFER)
 pub const EFER = packed struct(u64) {
     syscall_enable: bool,
