@@ -133,9 +133,9 @@ pub fn unlock(mutex: *Mutex, current_task: Task.Current) void {
             @branchHint(.cold);
             @panic("not locked by current task");
         }
-    }
 
-    mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
+        mutex.wait_queue.wakeOne(current_task, &mutex.spinlock);
+    }
 }
 
 /// Returns `true` if the mutex is locked.
