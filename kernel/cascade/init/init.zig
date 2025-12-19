@@ -77,6 +77,8 @@ pub fn initStage1() !noreturn {
     log.debug(current_task, "initializing interrupt routing", .{});
     try arch.interrupts.init.initializeInterruptRouting(current_task);
 
+    try arch.process.init.initializeProcesses(current_task);
+
     log.debug(current_task, "initializing tasks", .{});
     try Task.init.initializeTasks(current_task);
 

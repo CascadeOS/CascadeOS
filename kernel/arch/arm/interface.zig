@@ -33,7 +33,9 @@ pub const functions: arch.Functions = .{
         .init = .{},
     },
 
-    .process = .{},
+    .process = .{
+        .init = .{},
+    },
 
     .scheduling = .{},
 

@@ -94,6 +94,8 @@ pub const functions: arch.Functions = .{
         .createThread = x64.PerThread.createThread,
         .destroyThread = x64.PerThread.destroyThread,
         .initializeThread = x64.PerThread.initializeThread,
+
+        .init = .{},
     },
 
     .scheduling = .{

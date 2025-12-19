@@ -538,6 +538,16 @@ pub const process = struct {
             "initializeThread",
         )(current_task, thread);
     }
+
+    pub const init = struct {
+        /// Perform any per-achitecture initialization needed for processes/threads.
+        pub fn initializeProcesses(current_task: Task.Current) anyerror!void {
+            return getFunction(
+                current_functions.process.init,
+                "initializeProcesses",
+            )(current_task);
+        }
+    };
 };
 
 pub const io = struct {
@@ -965,6 +975,11 @@ pub const Functions = struct {
             current_task: Task.Current,
             thread: *cascade.Process.Thread,
         ) void = null,
+
+        init: struct {
+            /// Perform any per-achitecture initialization needed for processes/threads.
+            initializeProcesses: ?fn (current_task: Task.Current) anyerror!void = null,
+        },
     },
 
     scheduling: struct {

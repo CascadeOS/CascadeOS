@@ -30,9 +30,11 @@ pub const functions: arch.Functions = .{
         .init = .{},
     },
 
-    .process = .{},
-
     .paging = .{
+        .init = .{},
+    },
+
+    .process = .{
         .init = .{},
     },
 
