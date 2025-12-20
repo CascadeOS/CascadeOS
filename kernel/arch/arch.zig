@@ -539,6 +539,24 @@ pub const user = struct {
         )(current_task, thread);
     }
 
+    pub const EnterUserspaceOptions = struct {
+        entry_point: core.VirtualAddress, // TODO: type for userspace addresses
+        stack_pointer: core.VirtualAddress,
+    };
+
+    /// Enter userspace for the first time in the current task.
+    ///
+    /// Asserts that the current task is a user task.
+    pub fn enterUserspace(current_task: Task.Current, options: EnterUserspaceOptions) callconv(core.inline_in_non_debug) noreturn {
+        if (core.is_debug) {
+            std.debug.assert(current_task.task.type == .user);
+        }
+        getFunction(
+            current_functions.user,
+            "enterUserspace",
+        )(current_task, options);
+    }
+
     pub const init = struct {
         /// Perform any per-achitecture initialization needed for userspace processes/threads.
         pub fn initialize(current_task: Task.Current) anyerror!void {
@@ -975,6 +993,12 @@ pub const Functions = struct {
             current_task: Task.Current,
             thread: *cascade.Process.Thread,
         ) void = null,
+
+        /// Enter userspace for the first time in the current task.
+        enterUserspace: ?fn (
+            current_task: Task.Current,
+            options: user.EnterUserspaceOptions,
+        ) noreturn = null,
 
         init: struct {
             /// Perform any per-achitecture initialization needed for userspace processes/threads.
