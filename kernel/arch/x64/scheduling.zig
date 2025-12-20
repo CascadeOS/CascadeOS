@@ -14,8 +14,7 @@ const x64 = @import("x64.zig");
 ///
 /// Page table switching and managing ability to access user memory has already been performed before this function is called.
 ///
-/// Interrupts are expected to be disabled when this function is called meaning the `known_executor` field of `current_task` is not
-/// null.
+/// Interrupts are disabled when this function is called meaning the `known_executor` field of `current_task` is not null.
 pub fn beforeSwitchTask(
     current_task: Task.Current,
     transition: Task.Transition,

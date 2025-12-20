@@ -37,6 +37,8 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
     var handler = globals.handlers[interrupt_frame.vector_number.full];
     handler.setTemplatedArgs(.{ current_task, .{ .arch_specific = interrupt_frame }, state_before_interrupt });
     handler.call();
+
+    x64.instructions.disableInterrupts();
 }
 
 pub const Interrupt = enum(u8) {
