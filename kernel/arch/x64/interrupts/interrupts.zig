@@ -175,6 +175,8 @@ pub const Interrupt = enum(u8) {
 };
 
 pub const InterruptFrame = extern struct {
+    fs: u64,
+    gs: u64,
     r15: u64,
     r14: u64,
     r13: u64,

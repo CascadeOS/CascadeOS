@@ -37,10 +37,14 @@
     push %r13
     push %r14
     push %r15
+    push %gs
+    push %fs
 
     mov %rsp, %rdi
     call interruptDispatch
 
+    pop %fs
+    pop %gs
     pop %r15
     pop %r14
     pop %r13
