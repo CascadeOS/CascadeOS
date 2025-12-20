@@ -19,7 +19,7 @@ task: Task,
 
 process: *Process,
 
-arch_specific: arch.process.PerThread,
+arch_specific: arch.user.PerThread,
 
 pub inline fn fromTask(task: *Task) *Thread {
     if (core.is_debug) std.debug.assert(task.type == .user);
@@ -42,7 +42,7 @@ pub const internal = struct {
         };
 
         try Task.internal.init(&thread.task, options);
-        arch.process.initializeThread(current_task, thread);
+        arch.user.initializeThread(current_task, thread);
 
         return thread;
     }
@@ -69,12 +69,12 @@ const globals = struct {
                 if (core.is_debug) thread.* = undefined;
                 thread.task.stack = try .createStack(current_task);
                 errdefer thread.task.stack.destroyStack(current_task);
-                try arch.process.createThread(current_task, thread);
+                try arch.user.createThread(current_task, thread);
             }
         }.constructor,
         struct {
             fn destructor(thread: *Thread, current_task: Task.Current) void {
-                arch.process.destroyThread(current_task, thread);
+                arch.user.destroyThread(current_task, thread);
                 thread.task.stack.destroyStack(current_task);
             }
         }.destructor,

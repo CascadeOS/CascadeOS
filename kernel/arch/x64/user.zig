@@ -12,8 +12,10 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
-xsave_area: []align(64) u8,
-xsave_area_needs_load: bool = true,
+pub const PerThread = struct {
+    xsave_area: []align(64) u8,
+    xsave_area_needs_load: bool = true,
+};
 
 /// Create the `PerThread` data of a thread.
 ///
@@ -52,14 +54,15 @@ pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thr
 }
 
 const globals = struct {
-    /// Initialized during `init.initializeXSAVEAreaCache`.
+    /// Initialized during `init.initialize`.
     var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
 };
 
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.thread_init);
 
-    pub fn initializeXSAVEAreaCache(current_task: Task.Current) !void {
+    /// Perform any per-achitecture initialization needed for userspace processes/threads.
+    pub fn initialize(current_task: Task.Current) !void {
         init_log.debug(current_task, "initializing xsave area cache", .{});
         globals.xsave_area_cache.init(current_task, .{
             .name = try .fromSlice("xsave"),

@@ -90,13 +90,13 @@ pub const functions: arch.Functions = .{
         },
     },
 
-    .process = .{
-        .createThread = x64.PerThread.createThread,
-        .destroyThread = x64.PerThread.destroyThread,
-        .initializeThread = x64.PerThread.initializeThread,
+    .user = .{
+        .createThread = x64.user.createThread,
+        .destroyThread = x64.user.destroyThread,
+        .initializeThread = x64.user.initializeThread,
 
         .init = .{
-            .initializeProcesses = x64.PerThread.init.initializeXSAVEAreaCache,
+            .initialize = x64.user.init.initialize,
         },
     },
 
@@ -172,8 +172,8 @@ pub const decls: arch.Decls = .{
         .PageTable = x64.paging.PageTable,
     },
 
-    .process = .{
-        .PerThread = x64.PerThread,
+    .user = .{
+        .PerThread = x64.user.PerThread,
     },
 
     .io = .{

@@ -19,11 +19,11 @@ pub const interrupts = @import("interrupts/interrupts.zig");
 pub const ioapic = @import("ioapic.zig");
 pub const paging = @import("paging/paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
-pub const PerThread = @import("PerThread.zig");
 pub const registers = @import("registers.zig");
 pub const scheduling = @import("scheduling.zig");
 pub const tsc = @import("tsc.zig");
 pub const Tss = @import("Tss.zig").Tss;
+pub const user = @import("user.zig");
 
 pub const PrivilegeLevel = enum(u2) {
     ring0 = 0,

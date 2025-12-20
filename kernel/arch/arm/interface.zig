@@ -33,7 +33,7 @@ pub const functions: arch.Functions = .{
         .init = .{},
     },
 
-    .process = .{
+    .user = .{
         .init = .{},
     },
 
@@ -90,7 +90,7 @@ pub const decls: arch.Decls = .{
         .PageTable = extern struct {},
     },
 
-    .process = .{
+    .user = .{
         .PerThread = struct {},
     },
 

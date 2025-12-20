@@ -496,9 +496,9 @@ pub const scheduling = struct {
     }
 };
 
-pub const process = struct {
+pub const user = struct {
     /// Architecture specific per-thread data.
-    pub const PerThread = current_decls.process.PerThread;
+    pub const PerThread = current_decls.user.PerThread;
 
     /// Create the `PerThread` data of a thread.
     ///
@@ -510,7 +510,7 @@ pub const process = struct {
         thread: *cascade.Process.Thread,
     ) callconv(core.inline_in_non_debug) cascade.mem.cache.ConstructorError!void {
         return getFunction(
-            current_functions.process,
+            current_functions.user,
             "createThread",
         )(current_task, thread);
     }
@@ -522,7 +522,7 @@ pub const process = struct {
     /// This function is called in the `Thread` cache destructor.
     pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread) callconv(core.inline_in_non_debug) void {
         getFunction(
-            current_functions.process,
+            current_functions.user,
             "destroyThread",
         )(current_task, thread);
     }
@@ -534,17 +534,17 @@ pub const process = struct {
     /// This function is called in `Thread.internal.create`.
     pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thread) callconv(core.inline_in_non_debug) void {
         getFunction(
-            current_functions.process,
+            current_functions.user,
             "initializeThread",
         )(current_task, thread);
     }
 
     pub const init = struct {
-        /// Perform any per-achitecture initialization needed for processes/threads.
-        pub fn initializeProcesses(current_task: Task.Current) anyerror!void {
+        /// Perform any per-achitecture initialization needed for userspace processes/threads.
+        pub fn initialize(current_task: Task.Current) anyerror!void {
             return getFunction(
-                current_functions.process.init,
-                "initializeProcesses",
+                current_functions.user.init,
+                "initialize",
             )(current_task);
         }
     };
@@ -945,7 +945,7 @@ pub const Functions = struct {
         },
     },
 
-    process: struct {
+    user: struct {
         /// Create the `PerThread` data of a thread.
         ///
         /// Non-architecture specific creation has already been performed but no initialization.
@@ -977,8 +977,8 @@ pub const Functions = struct {
         ) void = null,
 
         init: struct {
-            /// Perform any per-achitecture initialization needed for processes/threads.
-            initializeProcesses: ?fn (current_task: Task.Current) anyerror!void = null,
+            /// Perform any per-achitecture initialization needed for userspace processes/threads.
+            initialize: ?fn (current_task: Task.Current) anyerror!void = null,
         },
     },
 
@@ -1133,7 +1133,7 @@ pub const Decls = struct {
         PageTable: type,
     },
 
-    process: struct {
+    user: struct {
         /// Architecture specific per-thread data.
         PerThread: type,
     },
