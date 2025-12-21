@@ -7,14 +7,71 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const Process = cascade.Process;
-const Thread = Process;
+const Thread = Process.Thread;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
 
 pub const PerThread = struct {
-    xsave_area: []align(64) u8,
-    xsave_area_needs_load: bool = true,
+    xsave: XSave,
+
+    pub const XSave = struct {
+        area: []align(64) u8,
+
+        /// Where is the xsave data currently stored.
+        state: State = .area,
+
+        pub const State = enum {
+            registers,
+            area,
+        };
+
+        pub fn zero(xsave: *XSave) void {
+            @memset(xsave.area, 0);
+            xsave.state = .area;
+        }
+
+        /// Save the xsave state into the xsave area if it is currently stored in the registers.
+        ///
+        /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
+        pub fn save(xsave: *XSave) void {
+            switch (xsave.state) {
+                .area => {},
+                .registers => {
+                    switch (x64.info.xsave.method) {
+                        .xsaveopt => {
+                            @branchHint(.likely); // modern machines support xsaveopt
+                            x64.instructions.xsaveopt(
+                                xsave.area,
+                                x64.info.xsave.xcr0_value,
+                            );
+                        },
+                        .xsave => x64.instructions.xsave(
+                            xsave.area,
+                            x64.info.xsave.xcr0_value,
+                        ),
+                    }
+                    xsave.state = .area;
+                },
+            }
+        }
+
+        /// Load the xsave state into registers if it is currently stored in the xsave area.
+        ///
+        /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
+        pub fn load(xsave: *XSave) void {
+            switch (xsave.state) {
+                .area => {
+                    x64.instructions.xrstor(
+                        xsave.area,
+                        x64.info.xsave.xcr0_value,
+                    );
+                    xsave.state = .registers;
+                },
+                .registers => {},
+            }
+        }
+    };
 };
 
 /// Create the `PerThread` data of a thread.
@@ -27,9 +84,11 @@ pub fn createThread(
     thread: *cascade.Process.Thread,
 ) cascade.mem.cache.ConstructorError!void {
     thread.arch_specific = .{
-        .xsave_area = @alignCast(
-            globals.xsave_area_cache.allocate(current_task) catch return error.ItemConstructionFailed,
-        ),
+        .xsave = .{
+            .area = @alignCast(
+                globals.xsave_area_cache.allocate(current_task) catch return error.ItemConstructionFailed,
+            ),
+        },
     };
 }
 
@@ -39,7 +98,7 @@ pub fn createThread(
 ///
 /// This function is called in the `Thread` cache destructor.
 pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread) void {
-    globals.xsave_area_cache.deallocate(current_task, thread.arch_specific.xsave_area);
+    globals.xsave_area_cache.deallocate(current_task, thread.arch_specific.xsave.area);
 }
 
 /// Initialize the `PerThread` data of a thread.
@@ -49,8 +108,7 @@ pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread
 /// This function is called in `Thread.internal.create`.
 pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thread) void {
     _ = current_task;
-    @memset(thread.arch_specific.xsave_area, 0);
-    thread.arch_specific.xsave_area_needs_load = true;
+    thread.arch_specific.xsave.zero();
 }
 
 const globals = struct {

@@ -25,13 +25,9 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
         else => unreachable,
     }
     defer if (interrupt_frame.cs.selector == .user_code) {
-        x64.instructions.enableSSEUsage();
-
         const thread: *cascade.Process.Thread = .fromTask(current_task.task);
-        if (thread.arch_specific.xsave_area_needs_load) {
-            x64.instructions.xrstor(thread.arch_specific.xsave_area, x64.info.xsave.xcr0_value);
-            thread.arch_specific.xsave_area_needs_load = false;
-        }
+        x64.instructions.enableSSEUsage();
+        thread.arch_specific.xsave.load();
     };
 
     var handler = globals.handlers[interrupt_frame.vector_number.full];

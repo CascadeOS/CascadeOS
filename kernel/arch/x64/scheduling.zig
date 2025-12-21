@@ -33,18 +33,8 @@ pub fn beforeSwitchTask(
             const old_thread: *cascade.Process.Thread = .fromTask(transition.old_task);
 
             x64.instructions.enableSSEUsage();
-
-            switch (x64.info.xsave.method) {
-                .xsaveopt => {
-                    @branchHint(.likely); // modern machine support xsaveopt
-                    x64.instructions.xsaveopt(old_thread.arch_specific.xsave_area, x64.info.xsave.xcr0_value);
-                },
-                .xsave => x64.instructions.xsave(old_thread.arch_specific.xsave_area, x64.info.xsave.xcr0_value),
-            }
-
+            old_thread.arch_specific.xsave.save();
             x64.instructions.disableSSEUsage();
-
-            old_thread.arch_specific.xsave_area_needs_load = true;
         },
         .kernel_to_kernel, .kernel_to_user => {},
     }
