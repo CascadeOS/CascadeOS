@@ -23,10 +23,12 @@ pub inline fn disableInterrupts() void {
 }
 
 pub inline fn enableSSEUsage() void {
+    if (core.is_debug) std.debug.assert(!interruptsEnabled());
     asm volatile ("clts");
 }
 
 pub fn disableSSEUsage() void {
+    if (core.is_debug) std.debug.assert(!interruptsEnabled());
     var cr0: x64.registers.Cr0 = .read();
     cr0.task_switched = true;
     cr0.write();
