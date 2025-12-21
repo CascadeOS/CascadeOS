@@ -94,6 +94,7 @@ pub const functions: arch.Functions = .{
         .createThread = x64.user.createThread,
         .destroyThread = x64.user.destroyThread,
         .initializeThread = x64.user.initializeThread,
+        .enterUserspace = x64.user.enterUserspace,
 
         .init = .{
             .initialize = x64.user.init.initialize,

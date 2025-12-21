@@ -111,6 +111,90 @@ pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thr
     thread.arch_specific.xsave.zero();
 }
 
+/// Enter userspace for the first time in the current task.
+pub fn enterUserspace(
+    current_task: Task.Current,
+    options: arch.user.EnterUserspaceOptions,
+) noreturn {
+    const thread: *Thread = .fromTask(current_task.task);
+
+    x64.instructions.disableInterrupts();
+
+    x64.instructions.enableSSEUsage();
+    thread.arch_specific.xsave.load();
+
+    const frame: EnterUserspaceFrame = .{
+        .rip = options.entry_point,
+        .rsp = options.stack_pointer,
+    };
+
+    asm volatile (
+        \\mov %[frame], %rsp
+        \\xor %eax, %eax
+        \\xor %ebx, %ebx
+        \\xor %ecx, %ecx
+        \\xor %edx, %edx
+        \\xor %esi, %esi
+        \\xor %edi, %edi
+        \\xor %ebp, %ebp
+        \\xor %r8, %r8
+        \\xor %r9, %r9
+        \\xor %r10, %r10
+        \\xor %r11, %r11
+        \\xor %r12, %r12
+        \\xor %r13, %r13
+        \\xor %r14, %r14
+        \\xor %r15, %r15
+        \\mov %ax, %fs
+        \\mov %ax, %gs
+        \\iretq
+        \\ud2
+        :
+        : [frame] "r" (&frame),
+    );
+
+    unreachable;
+}
+
+const EnterUserspaceFrame = extern struct {
+    rip: core.VirtualAddress,
+    cs: extern union {
+        full: u64,
+        selector: x64.Gdt.Selector,
+    } = .{ .selector = .user_code },
+    rflags: x64.registers.RFlags = user_rflags,
+    rsp: core.VirtualAddress,
+    ss: extern union {
+        full: u64,
+        selector: x64.Gdt.Selector,
+    } = .{ .selector = .user_data },
+
+    const user_rflags: x64.registers.RFlags = .{
+        .carry = false,
+        ._reserved1 = 0,
+        .parity = false,
+        ._reserved2 = 0,
+        .auxiliary_carry = false,
+        ._reserved3 = 0,
+        .zero = false,
+        .sign = false,
+        .trap = false,
+        .interrupt = true,
+        .direction = .up,
+        .overflow = false,
+        .iopl = .ring0,
+        .nested = false,
+        ._reserved4 = 0,
+        .@"resume" = false,
+        .virtual_8086 = false,
+        .alignment_check = false,
+        .virtual_interrupt = false,
+        .virtual_interrupt_pending = false,
+        .id = false,
+        ._reserved5 = 0,
+    };
+};
+
 const globals = struct {
     /// Initialized during `init.initialize`.
     var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
