@@ -95,13 +95,17 @@ pub const CascadeTarget = struct {
 
                 .riscv => {
                     const features = std.Target.riscv.Feature;
-                    _ = features;
-                    return b.resolveTargetQuery(.{
+                    var target_query: std.Target.Query = .{
                         .cpu_arch = .riscv64,
                         .os_tag = .freestanding,
                         .abi = .none,
                         .cpu_model = architecture.cascadeTargetCpuModel(),
-                    });
+                    };
+
+                    target_query.cpu_features_add.addFeature(@intFromEnum(features.zicsr));
+                    target_query.cpu_features_add.addFeature(@intFromEnum(features.zihintpause));
+
+                    return b.resolveTargetQuery(target_query);
                 },
 
                 .x64 => {
