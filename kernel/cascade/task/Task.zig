@@ -9,8 +9,8 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Process = cascade.Process;
-const Thread = Process.Thread;
+const Process = cascade.user.Process;
+const Thread = cascade.user.Thread;
 const core = @import("core");
 
 pub const Current = @import("Current.zig").Current;
@@ -288,7 +288,7 @@ const TaskCleanup = struct {
             switch (task.type) {
                 .kernel => if (!globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks"),
                 .user => {
-                    const thread: *Process.Thread = .fromTask(task);
+                    const thread: *Thread = .fromTask(task);
                     if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
                 },
             }
@@ -300,9 +300,9 @@ const TaskCleanup = struct {
         switch (task.type) {
             .kernel => globals.cache.deallocate(current_task, task),
             .user => {
-                const thread: *Process.Thread = .fromTask(task);
+                const thread: *Thread = .fromTask(task);
                 thread.process.decrementReferenceCount(current_task);
-                Process.Thread.internal.destroy(current_task, thread);
+                Thread.internal.destroy(current_task, thread);
             },
         }
     }

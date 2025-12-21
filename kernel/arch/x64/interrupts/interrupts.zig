@@ -7,6 +7,7 @@ const arch = @import("arch");
 const Handler = arch.interrupts.Interrupt.Handler;
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Thread = cascade.user.Thread;
 const core = @import("core");
 
 const x64 = @import("../x64.zig");
@@ -25,7 +26,7 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
         else => unreachable,
     }
     defer if (interrupt_frame.cs.selector == .user_code) {
-        const thread: *cascade.Process.Thread = .fromTask(current_task.task);
+        const thread: *Thread = .fromTask(current_task.task);
         x64.instructions.enableSSEUsage();
         thread.arch_specific.xsave.load();
     };

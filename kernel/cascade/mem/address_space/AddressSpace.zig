@@ -21,6 +21,7 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const Page = cascade.mem.Page;
 const Protection = cascade.mem.MapType.Protection;
+const Process = cascade.user.Process;
 const core = @import("core");
 
 pub const AnonymousMap = @import("AnonymousMap.zig");
@@ -91,7 +92,7 @@ pub fn init(
 /// Caller must ensure:
 ///  - the address space is not in use by any tasks
 ///  - the address space is empty
-pub fn retarget(address_space: *AddressSpace, new_process: *cascade.Process) void {
+pub fn retarget(address_space: *AddressSpace, new_process: *Process) void {
     if (core.is_debug) {
         std.debug.assert(address_space.context == .user);
         std.debug.assert(!address_space.page_table_lock.isLocked());

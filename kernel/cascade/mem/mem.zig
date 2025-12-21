@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Process = cascade.user.Process;
 const core = @import("core");
 
 pub const AddressSpace = @import("address_space/AddressSpace.zig");
@@ -353,7 +354,7 @@ pub fn onKernelPageFault(
     if (page_fault_details.faulting_address.lessThan(arch.paging.higher_half_start)) {
         @branchHint(.cold);
 
-        const process: *cascade.Process = switch (current_task.task.type) {
+        const process: *Process = switch (current_task.task.type) {
             .kernel => {
                 @branchHint(.cold);
                 cascade.debug.interruptSourcePanic(
@@ -447,7 +448,7 @@ pub const PageFaultDetails = struct {
         kernel: struct {
             access_to_user_memory_enabled: bool,
         },
-        user: *cascade.Process,
+        user: *Process,
     };
 
     pub const AccessType = enum {

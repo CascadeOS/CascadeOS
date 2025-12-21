@@ -6,7 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const Process = cascade.Process;
+const Process = cascade.user.Process;
 const core = @import("core");
 
 pub const Scheduler = @import("Scheduler.zig");

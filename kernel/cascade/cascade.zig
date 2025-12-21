@@ -11,14 +11,14 @@ pub const Executor = @import("Executor.zig");
 pub const init = @import("init/init.zig");
 pub const mem = @import("mem/mem.zig");
 pub const pci = @import("pci.zig");
-pub const Process = @import("process/Process.zig");
 pub const sync = @import("sync/sync.zig");
 pub const Task = @import("task/Task.zig");
 pub const time = @import("time.zig");
+pub const user = @import("user/user.zig");
 
 pub const Context = union(Type) {
     kernel,
-    user: *Process,
+    user: *user.Process,
 
     pub const Type = enum {
         kernel,

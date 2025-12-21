@@ -81,7 +81,7 @@ pub fn initStage1() !noreturn {
     try Task.init.initializeTasks(current_task);
 
     log.debug(current_task, "initializing processes", .{});
-    try cascade.Process.init.initializeProcesses(current_task);
+    try cascade.user.Process.init.initializeProcesses(current_task);
     try arch.user.init.initialize(current_task);
 
     log.debug(current_task, "initializing kernel executors", .{});

@@ -11,7 +11,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const Thread = cascade.Process.Thread;
+const Thread = cascade.user.Thread;
 const core = @import("core");
 pub const current_arch = @import("cascade_architecture").arch;
 
@@ -507,7 +507,7 @@ pub const user = struct {
     /// This function is called in the `Thread` cache constructor.
     pub fn createThread(
         current_task: Task.Current,
-        thread: *cascade.Process.Thread,
+        thread: *Thread,
     ) callconv(core.inline_in_non_debug) cascade.mem.cache.ConstructorError!void {
         return getFunction(
             current_functions.user,
@@ -520,7 +520,7 @@ pub const user = struct {
     /// Non-architecture specific destruction has not already been performed.
     ///
     /// This function is called in the `Thread` cache destructor.
-    pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread) callconv(core.inline_in_non_debug) void {
+    pub fn destroyThread(current_task: Task.Current, thread: *Thread) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.user,
             "destroyThread",
@@ -532,7 +532,7 @@ pub const user = struct {
     /// All non-architecture specific initialization has already been performed.
     ///
     /// This function is called in `Thread.internal.create`.
-    pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thread) callconv(core.inline_in_non_debug) void {
+    pub fn initializeThread(current_task: Task.Current, thread: *Thread) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.user,
             "initializeThread",
@@ -971,7 +971,7 @@ pub const Functions = struct {
         /// This function is called in the `Thread` cache constructor.
         createThread: ?fn (
             current_task: Task.Current,
-            thread: *cascade.Process.Thread,
+            thread: *Thread,
         ) cascade.mem.cache.ConstructorError!void = null,
 
         /// Destroy the `PerThread` data of a thread.
@@ -981,7 +981,7 @@ pub const Functions = struct {
         /// This function is called in the `Thread` cache destructor.
         destroyThread: ?fn (
             current_task: Task.Current,
-            thread: *cascade.Process.Thread,
+            thread: *Thread,
         ) void = null,
 
         /// Initialize the `PerThread` data of a thread.
@@ -991,7 +991,7 @@ pub const Functions = struct {
         /// This function is called in `Thread.internal.create`.
         initializeThread: ?fn (
             current_task: Task.Current,
-            thread: *cascade.Process.Thread,
+            thread: *Thread,
         ) void = null,
 
         /// Enter userspace for the first time in the current task.

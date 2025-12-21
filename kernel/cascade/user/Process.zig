@@ -8,9 +8,8 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Thread = cascade.user.Thread;
 const core = @import("core");
-
-pub const Thread = @import("Thread.zig");
 
 const log = cascade.debug.log.scoped(.process);
 
@@ -157,7 +156,7 @@ const ProcessCleanup = struct {
     pub fn queueProcessForCleanup(
         process_cleanup: *ProcessCleanup,
         current_task: Task.Current,
-        process: *cascade.Process,
+        process: *Process,
     ) void {
         if (process.queued_for_cleanup.cmpxchgStrong(
             false,
@@ -189,7 +188,7 @@ const ProcessCleanup = struct {
         }
     }
 
-    fn cleanupProcess(current_task: Task.Current, process: *cascade.Process) void {
+    fn cleanupProcess(current_task: Task.Current, process: *Process) void {
         if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
         process.queued_for_cleanup.store(false, .release);

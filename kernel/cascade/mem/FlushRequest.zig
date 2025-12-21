@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Process = cascade.user.Process;
 const core = @import("core");
 
 const FlushRequest = @This();
@@ -63,7 +64,7 @@ fn flush(flush_request: *FlushRequest, current_task: Task.Current) void {
         .user => |target_process| switch (current_task.task.type) {
             .kernel => return,
             .user => {
-                const current_process: *cascade.Process = .fromTask(current_task.task);
+                const current_process: *Process = .fromTask(current_task.task);
                 if (current_process != target_process) return;
             },
         },

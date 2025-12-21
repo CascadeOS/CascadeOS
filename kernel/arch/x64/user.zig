@@ -6,8 +6,8 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const Process = cascade.Process;
-const Thread = Process.Thread;
+const Process = cascade.user.Process;
+const Thread = cascade.user.Thread;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -81,7 +81,7 @@ pub const PerThread = struct {
 /// This function is called in the `Thread` cache constructor.
 pub fn createThread(
     current_task: Task.Current,
-    thread: *cascade.Process.Thread,
+    thread: *Thread,
 ) cascade.mem.cache.ConstructorError!void {
     thread.arch_specific = .{
         .xsave = .{
@@ -97,7 +97,7 @@ pub fn createThread(
 /// Non-architecture specific destruction has not already been performed.
 ///
 /// This function is called in the `Thread` cache destructor.
-pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread) void {
+pub fn destroyThread(current_task: Task.Current, thread: *Thread) void {
     globals.xsave_area_cache.deallocate(current_task, thread.arch_specific.xsave.area);
 }
 
@@ -106,7 +106,7 @@ pub fn destroyThread(current_task: Task.Current, thread: *cascade.Process.Thread
 /// All non-architecture specific initialization has already been performed.
 ///
 /// This function is called in `Thread.internal.create`.
-pub fn initializeThread(current_task: Task.Current, thread: *cascade.Process.Thread) void {
+pub fn initializeThread(current_task: Task.Current, thread: *Thread) void {
     _ = current_task;
     thread.arch_specific.xsave.zero();
 }

@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const Task = cascade.Task;
+const Thread = cascade.user.Thread;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -30,7 +31,7 @@ pub fn beforeSwitchTask(
 
     switch (transition.type) {
         .user_to_kernel, .user_to_user => {
-            const old_thread: *cascade.Process.Thread = .fromTask(transition.old_task);
+            const old_thread: *Thread = .fromTask(transition.old_task);
 
             x64.instructions.enableSSEUsage();
             old_thread.arch_specific.xsave.save();
