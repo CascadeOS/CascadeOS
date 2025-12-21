@@ -210,7 +210,7 @@ fn constructKernelModule(
     const kernel_module = b.createModule(.{
         .root_source_file = b.path("kernel/kernel.zig"),
 
-        .target = kernelCrossTarget(architecture, b),
+        .target = architecture.kernelTarget(b),
         .optimize = options.optimize,
 
         // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
@@ -494,81 +494,6 @@ const SourceFileModule = struct {
     name: []const u8,
     module: *std.Build.Module,
 };
-
-/// Returns a CrossTarget for building the kernel for the given architecture.
-pub fn kernelCrossTarget(architecture: CascadeTarget.Architecture, b: *std.Build) std.Build.ResolvedTarget {
-    switch (architecture) {
-        .arm => {
-            const features = std.Target.aarch64.Feature;
-            var target_query = std.Target.Query{
-                .cpu_arch = .aarch64,
-                .os_tag = .freestanding,
-                .abi = .none,
-                .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.generic },
-            };
-
-            // Remove neon and fp features
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.neon));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.fp_armv8));
-
-            return b.resolveTargetQuery(target_query);
-        },
-
-        .riscv => {
-            const features = std.Target.riscv.Feature;
-            var target_query = std.Target.Query{
-                .cpu_arch = .riscv64,
-                .os_tag = .freestanding,
-                .abi = .none,
-                .cpu_model = .{ .explicit = &std.Target.riscv.cpu.generic_rv64 },
-            };
-            target_query.cpu_features_add.addFeature(@intFromEnum(features.a));
-            target_query.cpu_features_add.addFeature(@intFromEnum(features.m));
-            // The compiler will not emit instructions from the below features but it is better to be explicit.
-            target_query.cpu_features_add.addFeature(@intFromEnum(features.zicsr));
-            target_query.cpu_features_add.addFeature(@intFromEnum(features.zifencei));
-            target_query.cpu_features_add.addFeature(@intFromEnum(features.zihintpause));
-            return b.resolveTargetQuery(target_query);
-        },
-
-        .x64 => {
-            const features = std.Target.x86.Feature;
-            var target_query = std.Target.Query{
-                .cpu_arch = .x86_64,
-                .os_tag = .freestanding,
-                .abi = .none,
-                .cpu_model = .{ .explicit = &std.Target.x86.cpu.x86_64_v2 },
-            };
-
-            // Remove all SSE/AVX features
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.x87));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.mmx));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.f16c));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.fma));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.fxsr));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse2));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse3));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse4_1));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.sse4_2));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.ssse3));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.vzeroupper));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx2));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512bw));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512cd));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512dq));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512f));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.avx512vl));
-            target_query.cpu_features_sub.addFeature(@intFromEnum(features.evex512));
-
-            // Add soft float
-            target_query.cpu_features_add.addFeature(@intFromEnum(features.soft_float));
-
-            return b.resolveTargetQuery(target_query);
-        },
-    }
-}
 
 const kernel_components: std.StaticStringMap(*const KernelComponent) = .initComptime(blk: {
     const component_listing = @import("../kernel/listing.zig").components;
