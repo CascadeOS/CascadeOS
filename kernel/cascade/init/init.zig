@@ -80,9 +80,8 @@ pub fn initStage1() !noreturn {
     log.debug(current_task, "initializing tasks", .{});
     try Task.init.initializeTasks(current_task);
 
-    log.debug(current_task, "initializing processes", .{});
-    try cascade.user.Process.init.initializeProcesses(current_task);
-    try arch.user.init.initialize(current_task);
+    log.debug(current_task, "initializing user processes and threads", .{});
+    try cascade.user.init.initialize(current_task);
 
     log.debug(current_task, "initializing kernel executors", .{});
     const executors, const new_bootstrap_executor = try createExecutors(current_task);

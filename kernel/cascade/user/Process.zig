@@ -296,8 +296,6 @@ pub const init = struct {
             .name = try .fromSlice("process"),
         });
 
-        try Thread.init.initializeThreads(current_task);
-
         init_log.debug(current_task, "initializing process cleanup service", .{});
         try globals.process_cleanup.init(current_task);
     }
