@@ -102,6 +102,23 @@ pub const Current = extern struct {
         scheduler_handle.yield(current_task);
     }
 
+    /// Fetches the current task, and enables interrupts.
+    pub fn onSyscallEntry() Task.Current {
+        if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+
+        const executor = arch.getCurrentExecutor();
+        const current_task = executor.current_task;
+        if (core.is_debug) {
+            std.debug.assert(current_task.state.running == executor);
+            std.debug.assert(current_task.interrupt_disable_count == 0);
+            std.debug.assert(current_task.enable_access_to_user_memory_count == 0);
+        }
+
+        arch.interrupts.enable();
+
+        return .{ .task = current_task };
+    }
+
     pub fn onInterruptEntry() struct { Task.Current, StateBeforeInterrupt } {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
