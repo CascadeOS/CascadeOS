@@ -36,7 +36,7 @@ pub const RFlags = packed struct(u64) {
     trap: bool,
 
     /// Enable interrupts.
-    interrupt: bool,
+    enable_interrupts: bool,
 
     /// Determines the order in which strings are processed.
     direction: Direction,
@@ -127,7 +127,7 @@ pub const RFlags = packed struct(u64) {
         try writer.print("trap: {},\n", .{rflags.trap});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("interrupt: {},\n", .{rflags.interrupt});
+        try writer.print("enable_interrupts: {},\n", .{rflags.enable_interrupts});
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("direction: {},\n", .{rflags.direction});

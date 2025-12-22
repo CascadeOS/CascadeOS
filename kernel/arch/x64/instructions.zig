@@ -11,7 +11,7 @@ const core = @import("core");
 const x64 = @import("x64.zig");
 
 pub inline fn interruptsEnabled() bool {
-    return x64.registers.RFlags.read().interrupt;
+    return x64.registers.RFlags.read().enable_interrupts;
 }
 
 pub inline fn enableInterrupts() void {
