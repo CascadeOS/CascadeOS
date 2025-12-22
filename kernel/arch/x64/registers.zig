@@ -898,6 +898,78 @@ pub const DR7 = packed struct(u64) {
 /// The atomicity of RDTSCP ensures that no context switch can occur between the reads of the TSC and TSC_AUX values.
 pub const IA32_TSC_AUX = MSR(u64, 0xC0000103);
 
+pub const IA32_STAR = extern struct {
+    /// The target EIP of syscall in 32-bit compatibility or legacy mode.
+    syscall_target_eip_32bit: u32,
+
+    /// This field is used to specify both the CS and SS selectors loaded into CS and SS during SYSCALL.
+    ///
+    /// This field is copied directly into CS.Sel.
+    /// SS.Sel is set to this field + 8.
+    ///
+    /// Because SYSCALL always switches to CPL 0, the RPL bits 33:32 should be initialized to 00b.
+    syscall_cs_ss: x64.Gdt.Selector,
+
+    /// This field is used to specify both the CS and SS selectors loaded into CS and SS during SYSRET.
+    ///
+    /// If SYSRET is returning to 32-bit mode (either legacy or compatibility), this field is copied directly into the CS selector field.
+    /// If SYSRET is returning to 64-bit mode, the CS selector is set to this field + 16.
+    /// SS.Sel is set to this field + 8, regardless of the target mode.
+    ///
+    /// Because SYSRET always returns to CPL 3, the RPL bits 49:48 should be initialized to 11b.
+    sysret_cs_ss: x64.Gdt.Selector,
+
+    pub inline fn read() IA32_STAR {
+        return @bitCast(msr.read());
+    }
+
+    pub inline fn write(star: IA32_STAR) void {
+        msr.write(@bitCast(star));
+    }
+
+    const msr = MSR(u64, 0xC0000081);
+};
+
+pub const IA32_SFMASK = packed struct(u64) {
+    clear_carry: bool = false,
+    _reserved1: u1 = 0,
+    clear_parity: bool = false,
+    _reserved2: u1 = 0,
+    clear_auxiliary_carry: bool = false,
+    _reserved3: u1 = 0,
+    clear_zero: bool = false,
+    clear_sign: bool = false,
+    clear_trap: bool = false,
+    clear_enable_interrupts: bool = false,
+    clear_direction: bool = false,
+    clear_overflow: bool = false,
+    clear_iopl: enum(u2) {
+        false = 0b00,
+        true = 0b11,
+    } = .false,
+    clear_nested: bool = false,
+    _reserved4: u1 = 0,
+    clear_resume: bool = false,
+    clear_virtual_8086: bool = false,
+    clear_alignment_check: bool = false,
+    clear_virtual_interrupt: bool = false,
+    clear_virtual_interrupt_pending: bool = false,
+    clear_id: bool = false,
+    _reserved5: u42 = 0,
+
+    pub inline fn read() IA32_SFMASK {
+        return @bitCast(msr.read());
+    }
+
+    pub inline fn write(sfmask: IA32_SFMASK) void {
+        msr.write(@bitCast(sfmask));
+    }
+
+    const msr = MSR(u64, 0xC0000084);
+};
+
+pub const IA32_LSTAR = MSR(u64, 0xC0000082);
+
 pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);
 
 pub inline fn readMSR(comptime T: type, register: u32) T {
