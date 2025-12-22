@@ -10,6 +10,9 @@ const core = @import("core");
 
 const Executor = @This();
 
+/// Unique identifier per executor.
+///
+/// As no executor hotswapping is supported this is guaranteed to be the index of this executor in `globals.executors`.
 id: Id,
 
 current_task: *Task,
