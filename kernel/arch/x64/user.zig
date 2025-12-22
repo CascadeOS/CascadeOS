@@ -10,6 +10,8 @@ const Process = cascade.user.Process;
 const Thread = cascade.user.Thread;
 const core = @import("core");
 
+const log = cascade.debug.log.scoped(.user_x64);
+
 const x64 = @import("x64.zig");
 
 pub const PerThread = struct {
@@ -79,10 +81,7 @@ pub const PerThread = struct {
 /// Non-architecture specific creation has already been performed but no initialization.
 ///
 /// This function is called in the `Thread` cache constructor.
-pub fn createThread(
-    current_task: Task.Current,
-    thread: *Thread,
-) cascade.mem.cache.ConstructorError!void {
+pub fn createThread(current_task: Task.Current, thread: *Thread) cascade.mem.cache.ConstructorError!void {
     thread.arch_specific = .{
         .xsave = .{
             .area = @alignCast(
@@ -112,10 +111,7 @@ pub fn initializeThread(current_task: Task.Current, thread: *Thread) void {
 }
 
 /// Enter userspace for the first time in the current task.
-pub fn enterUserspace(
-    current_task: Task.Current,
-    options: arch.user.EnterUserspaceOptions,
-) noreturn {
+pub fn enterUserspace(current_task: Task.Current, options: arch.user.EnterUserspaceOptions) noreturn {
     const thread: *Thread = .fromTask(current_task.task);
 
     x64.instructions.disableInterrupts();
@@ -195,9 +191,109 @@ const EnterUserspaceFrame = extern struct {
     };
 };
 
+export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
+    _ = syscall_frame;
+
+    x64.instructions.disableSSEUsage();
+
+    const current_task: Task.Current = .onSyscallEntry();
+
+    defer {
+        const thread: *Thread = .fromTask(current_task.task);
+        x64.instructions.enableSSEUsage();
+        thread.arch_specific.xsave.load();
+    }
+
+    // TODO: actually do something with syscalls
+    {
+        const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+        scheduler_handle.drop(current_task);
+        unreachable;
+    }
+
+    x64.instructions.disableInterrupts();
+}
+
+pub fn getSyscallEntryPoint(executor: *cascade.Executor) *const anyopaque {
+    return globals.syscall_entry_points[@intFromEnum(executor.id)];
+}
+
+const SyscallFrame = extern struct {
+    fs: u64,
+    gs: u64,
+    r15: u64,
+    r14: u64,
+    r13: u64,
+    r12: u64,
+    r10: u64,
+    r9: u64,
+    r8: u64,
+    rdi: u64,
+    rsi: u64,
+    rbp: u64,
+    rdx: u64,
+    rbx: u64,
+    rax: u64,
+    rflags: x64.registers.RFlags,
+    rip: u64,
+    rsp: u64,
+
+    pub fn print(
+        value: *const SyscallFrame,
+        writer: *std.Io.Writer,
+        indent: usize,
+    ) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("SyscallFrame{\n");
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("rsp: 0x{x:0>16}, rip: 0x{x:0>16},\n", .{ value.rsp, value.rip });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("rax: 0x{x:0>16}, rbx: 0x{x:0>16},\n", .{ value.rax, value.rbx });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("rdx: 0x{x:0>16}, rbp: 0x{x:0>16},\n", .{ value.rdx, value.rbp });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("rsi: 0x{x:0>16}, rdi: 0x{x:0>16},\n", .{ value.rsi, value.rdi });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("r8: 0x{x:0>16}, r9:  0x{x:0>16},\n", .{ value.r8, value.r9 });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("r10:  0x{x:0>16}, r12: 0x{x:0>16},\n", .{ value.r10, value.r12 });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("r13: 0x{x:0>16}, r14: 0x{x:0>16},\n", .{ value.r13, value.r14 });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("r15: 0x{x:0>16},\n", .{value.r15});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.writeAll("rflags: ");
+        try value.rflags.print(writer, new_indent);
+        try writer.writeAll(",\n");
+
+        try writer.splatByteAll(' ', indent);
+        try writer.writeByte('}');
+    }
+
+    pub inline fn format(
+        value: *const SyscallFrame,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        return print(value, writer, 0);
+    }
+};
+
 const globals = struct {
     /// Initialized during `init.initialize`.
     var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
+
+    export var syscall_temp_rsp_storage: [cascade.config.maximum_number_of_executors]u64 = undefined;
+    const syscall_entry_points: [cascade.config.maximum_number_of_executors]*const fn () callconv(.naked) noreturn = createSyscallEntryPoints();
 };
 
 pub const init = struct {
@@ -213,3 +309,95 @@ pub const init = struct {
         });
     }
 };
+
+fn createSyscallEntryPoints() [cascade.config.maximum_number_of_executors](*const fn () callconv(.naked) noreturn) {
+    var temp_entry_points: [cascade.config.maximum_number_of_executors]*const fn () callconv(.naked) noreturn = undefined;
+
+    @setEvalBranchQuota(temp_entry_points.len * 1024);
+
+    // TODO: we should really switch to using KERNEL_GS_BASE correctly...
+
+    const current_task_offset = std.fmt.comptimePrint(
+        "{d}",
+        .{@offsetOf(cascade.Executor, "current_task")},
+    );
+    const stack_top_offset = std.fmt.comptimePrint(
+        "{d}",
+        .{@offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer")},
+    );
+
+    for (0..temp_entry_points.len) |i| {
+        const user_rsp_offset = std.fmt.comptimePrint(
+            "{d}",
+            .{i * @sizeOf(u64)},
+        );
+
+        const syscallEntryPoint = struct {
+            fn syscallEntryPoint() callconv(.naked) noreturn {
+                // zig fmt: off
+                    asm volatile (
+                        "mov %rsp, syscall_temp_rsp_storage+" ++ user_rsp_offset ++ "(%rip)\n" ++
+                        \\swapgs
+                        ++ "\nmov %gs:" ++ current_task_offset ++ ", %rsp\n" ++
+                        \\swapgs
+                        ++ "\nmov " ++ stack_top_offset ++ "(%rsp), %rsp\n" ++
+                        \\
+                        \\sub $8, %rsp // reserve space for the user rsp
+                        \\push %rcx // user rip
+                        \\push %r11 // user rflags
+                        \\
+                        ++ "\nmov syscall_temp_rsp_storage+" ++ user_rsp_offset ++ "(%rip), %r11\n" ++
+                        \\mov %r11, 16(%rsp) // store user rsp in reserved space
+                        \\
+                        \\push %rax
+                        \\push %rbx
+                        \\push %rdx
+                        \\push %rbp
+                        \\push %rsi
+                        \\push %rdi
+                        \\push %r8
+                        \\push %r9
+                        \\push %r10
+                        \\push %r12
+                        \\push %r13
+                        \\push %r14
+                        \\push %r15
+                        \\push %gs
+                        \\push %fs
+                        \\
+                        \\xor %ebp, %ebp
+                        \\mov %rsp, %rdi
+                        \\call syscallDispatch
+                        \\
+                        \\pop %fs
+                        \\pop %gs
+                        \\pop %r15
+                        \\pop %r14
+                        \\pop %r13
+                        \\pop %r12
+                        \\pop %r10
+                        \\pop %r9
+                        \\pop %r8
+                        \\pop %rdi
+                        \\pop %rsi
+                        \\pop %rbp
+                        \\pop %rdx
+                        \\pop %rbx
+                        \\pop %rax
+                        \\
+                        \\pop %r11 // user rflags
+                        \\pop %rcx // user rip
+                        \\
+                        \\pop %rsp // user rsp
+                        \\sysretq
+                        \\ud2
+                    );
+                    // zig fmt: on
+            }
+        }.syscallEntryPoint;
+
+        temp_entry_points[i] = syscallEntryPoint;
+    }
+
+    return temp_entry_points;
+}

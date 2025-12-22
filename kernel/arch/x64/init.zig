@@ -351,10 +351,30 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
 
         if (!efer.long_mode_active or !efer.long_mode_enable) @panic("not in long mode");
 
-        efer.syscall_enable = x64.info.cpu_id.syscall_sysret;
+        if (!x64.info.cpu_id.syscall_sysret) @panic("syscall/sysret not supported");
+        efer.syscall_enable = true;
+
         efer.no_execute_enable = x64.info.cpu_id.execute_disable;
 
         efer.write();
+    }
+
+    // SYSCALL/SYSRET
+    {
+        x64.registers.IA32_SFMASK.write(.{
+            .clear_enable_interrupts = true,
+            .clear_direction = true,
+        });
+
+        x64.registers.IA32_STAR.write(.{
+            .syscall_target_eip_32bit = 0, // 32-bit mode not supported
+            .syscall_cs_ss = .kernel_code,
+            .sysret_cs_ss = .user_code_32bit,
+        });
+
+        x64.registers.IA32_LSTAR.write(
+            @intFromPtr(x64.user.getSyscallEntryPoint(current_task.knownExecutor())),
+        );
     }
 
     // PAT
