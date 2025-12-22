@@ -307,12 +307,8 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
     {
         var cr0 = x64.registers.Cr0.read();
 
-        if (!cr0.protected_mode_enable) {
-            @panic("protected mode not enabled");
-        }
-        if (!cr0.paging) {
-            @panic("paging not enabled");
-        }
+        if (!cr0.protected_mode_enable) @panic("protected mode not enabled");
+        if (!cr0.paging) @panic("paging not enabled");
 
         cr0.monitor_coprocessor = true;
         cr0.emulate_coprocessor = false;
@@ -326,9 +322,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
     {
         var cr4 = x64.registers.Cr4.read();
 
-        if (!cr4.physical_address_extension) {
-            @panic("physical address extension not enabled");
-        }
+        if (!cr4.physical_address_extension) @panic("physical address extension not enabled");
 
         cr4.time_stamp_disable = false;
         cr4.debugging_extensions = true;
@@ -341,7 +335,10 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
         cr4.level_5_paging = false;
         cr4.fsgsbase = x64.info.cpu_id.fsgsbase;
         cr4.pcid = false; // TODO
-        cr4.osxsave = true; // XSAVE support is asserted in `captureEarlySystemInformation`
+
+        if (!x64.info.cpu_id.xsave.supported) @panic("XSAVE not supported");
+        cr4.osxsave = true;
+
         cr4.supervisor_mode_execution_prevention = x64.info.cpu_id.smep;
         cr4.supervisor_mode_access_prevention = x64.info.cpu_id.smap;
 
@@ -352,9 +349,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
     {
         var efer = x64.registers.EFER.read();
 
-        if (!efer.long_mode_active or !efer.long_mode_enable) {
-            @panic("not in long mode");
-        }
+        if (!efer.long_mode_active or !efer.long_mode_enable) @panic("not in long mode");
 
         efer.syscall_enable = x64.info.cpu_id.syscall_sysret;
         efer.no_execute_enable = x64.info.cpu_id.execute_disable;
