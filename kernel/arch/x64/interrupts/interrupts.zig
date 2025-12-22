@@ -22,13 +22,16 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
 
     switch (interrupt_frame.cs.selector) {
         .kernel_code => {},
-        .user_code => x64.instructions.disableSSEUsage(),
+        .user_code, .user_code_32bit => x64.instructions.disableSSEUsage(),
         else => unreachable,
     }
-    defer if (interrupt_frame.cs.selector == .user_code) {
-        const thread: *Thread = .fromTask(current_task.task);
-        x64.instructions.enableSSEUsage();
-        thread.arch_specific.xsave.load();
+    defer switch (interrupt_frame.cs.selector) {
+        .user_code, .user_code_32bit => {
+            const thread: *Thread = .fromTask(current_task.task);
+            x64.instructions.enableSSEUsage();
+            thread.arch_specific.xsave.load();
+        },
+        else => {},
     };
 
     var handler = globals.handlers[interrupt_frame.vector_number.full];

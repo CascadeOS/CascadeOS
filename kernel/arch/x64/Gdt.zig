@@ -12,12 +12,13 @@ const x64 = @import("x64.zig");
 
 /// The Global Descriptor Table for x64.
 pub const Gdt = extern struct {
-    descriptors: [7]u64 = [7]u64{
+    descriptors: [8]u64 = [_]u64{
         0x0000000000000000, // Null
         0x00A09A0000000000, // 64 bit code
         0x0000920000000000, // 64 bit data
-        0x00A09A0000000000 | (3 << 45), // Userspace 64 bit code
+        0x00CFFA000000FFFF | (3 << 45), // Userspace 32 bit code
         0x0000920000000000 | (3 << 45), // Userspace 64 bit data
+        0x00A09A0000000000 | (3 << 45), // Userspace 64 bit code
         0, // TSS - set by `setTss`
         0,
     },
@@ -26,9 +27,10 @@ pub const Gdt = extern struct {
         null = 0x00,
         kernel_code = 0x08,
         kernel_data = 0x10,
-        user_code = 0x18 | 3,
+        user_code_32bit = 0x18 | 3,
         user_data = 0x20 | 3,
-        tss = 0x28,
+        user_code = 0x28 | 3,
+        tss = 0x30,
     };
 
     pub fn setTss(gdt: *Gdt, tss: *x64.Tss) void {
@@ -49,8 +51,10 @@ pub const Gdt = extern struct {
 
         const limit: u64 = (@sizeOf(x64.Tss) - 1) & mask_u16;
 
-        gdt.descriptors[5] = low_base | mid_base | limit | present | available_64_bit_tss;
-        gdt.descriptors[6] = high_base;
+        const tss_index = @intFromEnum(Selector.tss) / @sizeOf(u64);
+
+        gdt.descriptors[tss_index] = low_base | mid_base | limit | present | available_64_bit_tss;
+        gdt.descriptors[tss_index + 1] = high_base;
 
         asm volatile (
             \\  ltr %[ts_sel]
