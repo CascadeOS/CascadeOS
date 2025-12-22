@@ -40,6 +40,7 @@
     push %gs
     push %fs
 
+    xor %ebp, %ebp
     mov %rsp, %rdi
     call interruptDispatch
 
