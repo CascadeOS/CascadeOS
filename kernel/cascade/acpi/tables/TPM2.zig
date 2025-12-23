@@ -492,7 +492,7 @@ pub const TPM2 = extern struct {
                 );
                 try writer.writeAll(",\n");
             },
-            else => {},
+            _ => {},
         }
 
         try writer.splatByteAll(' ', new_indent);
