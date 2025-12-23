@@ -438,7 +438,7 @@ pub const PageTable = extern struct {
 
         return switch (previous_map_type.protection) {
             .none => false,
-            inline else => |previous_protection| @intFromEnum(new_map_type.protection) < @intFromEnum(previous_protection),
+            else => |previous_protection| @intFromEnum(new_map_type.protection) < @intFromEnum(previous_protection),
         };
     }
 
