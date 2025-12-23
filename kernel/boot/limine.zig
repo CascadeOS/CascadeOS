@@ -73,9 +73,9 @@ pub const MemoryMapIterator = struct {
                 .executable_and_modules, .framebuffer => .in_use,
                 .reserved, .acpi_nvs => .reserved,
                 .bootloader_reclaimable => .bootloader_reclaimable,
-                .acpi_reclaimable => .acpi_reclaimable,
+                .acpi_reclaimable, .acpi_tables => .acpi_reclaimable,
                 .bad_memory => .unusable,
-                else => .unknown,
+                _ => .unknown,
             },
         };
     }
