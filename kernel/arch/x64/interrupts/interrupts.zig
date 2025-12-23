@@ -221,7 +221,7 @@ pub const InterruptFrame = extern struct {
     ) cascade.Context {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code => return .{ .user = .fromTask(current_task.task) },
+            .user_code, .user_code_32bit => return .{ .user = .fromTask(current_task.task) },
             else => unreachable,
         };
     }
