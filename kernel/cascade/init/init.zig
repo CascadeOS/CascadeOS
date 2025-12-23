@@ -62,7 +62,7 @@ pub fn initStage1() !noreturn {
     log.debug(current_task, "capturing system information", .{});
     try arch.init.captureSystemInformation(current_task, switch (arch.current_arch) {
         .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
-        else => .{},
+        .arm, .riscv => .{},
     });
 
     log.debug(current_task, "configuring per-executor system features with full system information", .{});
