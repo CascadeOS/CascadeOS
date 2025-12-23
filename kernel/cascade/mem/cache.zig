@@ -215,52 +215,23 @@ pub const RawCache = struct {
         current_task: Task.Current,
         options: InitOptions,
     ) void {
-        const is_small = isSmallItem(options.size, options.alignment);
+        const item_size: ItemSize = .determine(options.size, options.alignment);
 
-        if (!is_small and options.slab_source == .pmm) {
+        if (!item_size.is_small and options.slab_source == .pmm) {
             @panic("only small item caches can have `slab_source` set to `.pmm`");
         }
 
-        const effective_item_size = if (is_small)
-            sizeOfItemWithNodeAppended(options.size, options.alignment)
-        else
-            options.alignment.forward(options.size);
-
-        const items_per_slab = if (is_small)
-            (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_item_size
-        else blk: {
-            // TODO: why search when we can calculate?
-
-            var candidate_large_items_per_slab: usize = default_large_items_per_slab;
-
-            const initial_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
-                .from(candidate_large_items_per_slab * effective_item_size, .byte),
-            );
-
-            while (true) {
-                const next_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
-                    .from((candidate_large_items_per_slab + 1) * effective_item_size, .byte),
-                );
-
-                if (next_pages_for_allocation != initial_pages_for_allocation) break;
-
-                candidate_large_items_per_slab += 1;
-            }
-
-            break :blk candidate_large_items_per_slab;
-        };
-
-        if (is_small) {
+        if (item_size.is_small) {
             log.debug(
                 current_task,
                 "{s}: init small item cache with effective size {f} (requested size {f} alignment {}) items per slab {} ({f})",
                 .{
                     options.name.constSlice(),
-                    core.Size.from(effective_item_size, .byte),
+                    core.Size.from(item_size.effective_item_size, .byte),
                     core.Size.from(options.size, .byte),
                     options.alignment.toByteUnits(),
-                    items_per_slab,
-                    core.Size.from(effective_item_size * items_per_slab, .byte),
+                    item_size.items_per_slab,
+                    core.Size.from(item_size.effective_item_size * item_size.items_per_slab, .byte),
                 },
             );
         } else {
@@ -269,11 +240,11 @@ pub const RawCache = struct {
                 "{s}: init large item cache with effective size {f} (requested size {f} alignment {}) items per slab {} ({f})",
                 .{
                     options.name.constSlice(),
-                    core.Size.from(effective_item_size, .byte),
+                    core.Size.from(item_size.effective_item_size, .byte),
                     core.Size.from(options.size, .byte),
                     options.alignment.toByteUnits(),
-                    items_per_slab,
-                    core.Size.from(effective_item_size * items_per_slab, .byte),
+                    item_size.items_per_slab,
+                    core.Size.from(item_size.effective_item_size * item_size.items_per_slab, .byte),
                 },
             );
         }
@@ -283,15 +254,15 @@ pub const RawCache = struct {
             .allocate_mutex = .{},
             .lock = .{},
             .item_size = options.size,
-            .effective_item_size = effective_item_size,
+            .effective_item_size = item_size.effective_item_size,
             .constructor = options.constructor,
             .destructor = options.destructor,
             .available_slabs = .{},
             .full_slabs = .{},
-            .items_per_slab = items_per_slab,
+            .items_per_slab = item_size.items_per_slab,
             .last_slab = options.last_slab,
             .slab_source = options.slab_source,
-            .size_class = if (is_small)
+            .size_class = if (item_size.is_small)
                 .small
             else
                 .{
@@ -756,6 +727,51 @@ pub const RawCache = struct {
     };
 
     const default_large_items_per_slab = 16;
+
+    const ItemSize = struct {
+        is_small: bool,
+        effective_item_size: usize,
+        items_per_slab: usize,
+
+        fn determine(size: usize, alignment: std.mem.Alignment) ItemSize {
+            const is_small = isSmallItem(size, alignment);
+
+            const effective_item_size = if (is_small)
+                sizeOfItemWithNodeAppended(size, alignment)
+            else
+                alignment.forward(size);
+
+            const items_per_slab = if (is_small)
+                (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_item_size
+            else blk: {
+                // TODO: why search when we can calculate?
+
+                var candidate_large_items_per_slab: usize = default_large_items_per_slab;
+
+                const initial_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
+                    .from(candidate_large_items_per_slab * effective_item_size, .byte),
+                );
+
+                while (true) {
+                    const next_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
+                        .from((candidate_large_items_per_slab + 1) * effective_item_size, .byte),
+                    );
+
+                    if (next_pages_for_allocation != initial_pages_for_allocation) break;
+
+                    candidate_large_items_per_slab += 1;
+                }
+
+                break :blk candidate_large_items_per_slab;
+            };
+
+            return .{
+                .is_small = is_small,
+                .effective_item_size = effective_item_size,
+                .items_per_slab = items_per_slab,
+            };
+        }
+    };
 };
 
 const minimum_small_items_per_slab = 8;
