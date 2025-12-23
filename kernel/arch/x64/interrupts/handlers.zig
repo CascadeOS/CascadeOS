@@ -76,9 +76,9 @@ pub fn perExecutorPeriodicHandler(
     _: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    // eoi before calling `onPerExecutorPeriodic` as we may get scheduled out and need to re-enable timer interrupts
+    // eoi before calling `maybePreempt` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
-    cascade.entry.onPerExecutorPeriodic(current_task);
+    current_task.maybePreempt();
 }
 
 pub fn unhandledException(
