@@ -346,7 +346,29 @@ pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) cor
     return .{ .value = virtual_address.value - globals.physical_to_virtual_offset.value };
 }
 
-pub fn onKernelPageFault(
+/// Executed upon page fault.
+pub fn onPageFault(
+    current_task: Task.Current,
+    page_fault_details: PageFaultDetails,
+    interrupt_frame: arch.interrupts.InterruptFrame,
+) void {
+    current_task.decrementInterruptDisable();
+    switch (page_fault_details.faulting_context) {
+        .kernel => onKernelPageFault(
+            current_task,
+            page_fault_details,
+            interrupt_frame,
+        ),
+        .user => |process| process.address_space.handlePageFault(
+            current_task,
+            page_fault_details,
+        ) catch |err| {
+            std.debug.panic("user page fault failed: {t}\n{f}", .{ err, page_fault_details });
+        },
+    }
+}
+
+fn onKernelPageFault(
     current_task: Task.Current,
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,

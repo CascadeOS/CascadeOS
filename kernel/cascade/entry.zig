@@ -16,25 +16,3 @@ const log = cascade.debug.log.scoped(.entry);
 pub fn onPerExecutorPeriodic(current_task: Task.Current) void {
     current_task.maybePreempt();
 }
-
-/// Executed upon page fault.
-pub fn onPageFault(
-    current_task: Task.Current,
-    page_fault_details: cascade.mem.PageFaultDetails,
-    interrupt_frame: arch.interrupts.InterruptFrame,
-) void {
-    current_task.decrementInterruptDisable();
-    switch (page_fault_details.faulting_context) {
-        .kernel => cascade.mem.onKernelPageFault(
-            current_task,
-            page_fault_details,
-            interrupt_frame,
-        ),
-        .user => |process| process.address_space.handlePageFault(
-            current_task,
-            page_fault_details,
-        ) catch |err| {
-            std.debug.panic("user page fault failed: {t}\n{f}", .{ err, page_fault_details });
-        },
-    }
-}
