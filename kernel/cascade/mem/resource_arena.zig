@@ -197,7 +197,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                         },
                     ),
                     .allocated => any_allocations = true,
-                    else => {},
+                    .span, .free => {},
                 }
 
                 tags_to_release.push(node);
