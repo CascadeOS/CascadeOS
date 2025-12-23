@@ -66,7 +66,7 @@ pub fn flushRequestHandler(
     _: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    cascade.entry.onFlushRequest(current_task);
+    cascade.mem.FlushRequest.processFlushRequests(current_task);
     // eoi after all current flush requests have been handled
     x64.apic.eoi();
 }

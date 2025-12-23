@@ -38,8 +38,3 @@ pub fn onPageFault(
         },
     }
 }
-
-/// Executed upon cross-executor flush request.
-pub fn onFlushRequest(current_task: Task.Current) void {
-    cascade.mem.FlushRequest.processFlushRequests(current_task);
-}
