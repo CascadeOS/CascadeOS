@@ -66,7 +66,7 @@ fn tryGetSerialOutputFromGenericSources(current_task: Task.Current) ?cascade.ini
             break :blk;
         }
 
-        if (cascade.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
+        if (cascade.acpi.tables.DBG2.init.tryGetSerialOutput(current_task)) |output_uart| {
             log.debug(current_task, "got serial output from DBG2", .{});
 
             static.init_output_uart = output_uart;
