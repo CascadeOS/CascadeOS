@@ -539,6 +539,10 @@ pub const user = struct {
         )(current_task, thread);
     }
 
+    pub const SyscallFrame = struct {
+        arch_specific: *current_decls.user.SyscallFrame,
+    };
+
     pub const EnterUserspaceOptions = struct {
         entry_point: core.VirtualAddress, // TODO: type for userspace addresses
         stack_pointer: core.VirtualAddress,
@@ -1160,6 +1164,8 @@ pub const Decls = struct {
     user: struct {
         /// Architecture specific per-thread data.
         PerThread: type,
+
+        SyscallFrame: type,
     },
 
     io: struct {

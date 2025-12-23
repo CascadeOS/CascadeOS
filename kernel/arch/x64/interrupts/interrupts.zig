@@ -17,22 +17,25 @@ const interrupt_handlers = @import("handlers.zig");
 const log = cascade.debug.log.scoped(.interrupt);
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
-    const current_task, const state_before_interrupt = Task.Current.onInterruptEntry();
-    defer state_before_interrupt.onInterruptExit(current_task);
-
     switch (interrupt_frame.cs.selector) {
         .kernel_code => {},
         .user_code, .user_code_32bit => x64.instructions.disableSSEUsage(),
         else => unreachable,
     }
-    defer switch (interrupt_frame.cs.selector) {
-        .user_code, .user_code_32bit => {
-            const thread: *Thread = .fromTask(current_task.task);
-            x64.instructions.enableSSEUsage();
-            thread.arch_specific.xsave.load();
-        },
-        else => {},
-    };
+
+    const current_task, const state_before_interrupt = Task.Current.onInterruptEntry();
+    defer {
+        state_before_interrupt.onInterruptExit(current_task);
+
+        switch (interrupt_frame.cs.selector) {
+            .user_code, .user_code_32bit => {
+                const thread: *Thread = .fromTask(current_task.task);
+                x64.instructions.enableSSEUsage();
+                thread.arch_specific.xsave.load();
+            },
+            else => {},
+        }
+    }
 
     var handler = globals.handlers[interrupt_frame.vector_number.full];
     handler.setTemplatedArgs(.{ current_task, .{ .arch_specific = interrupt_frame }, state_before_interrupt });

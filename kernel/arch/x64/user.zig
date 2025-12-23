@@ -192,8 +192,6 @@ const EnterUserspaceFrame = extern struct {
 };
 
 export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
-    _ = syscall_frame;
-
     x64.instructions.disableSSEUsage();
 
     const current_task: Task.Current = .onSyscallEntry();
@@ -204,12 +202,7 @@ export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
         thread.arch_specific.xsave.load();
     }
 
-    // TODO: actually do something with syscalls
-    {
-        const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-        scheduler_handle.drop(current_task);
-        unreachable;
-    }
+    cascade.user.onSyscall(current_task, .{ .arch_specific = syscall_frame });
 
     x64.instructions.disableInterrupts();
 }
@@ -218,7 +211,7 @@ pub fn getSyscallEntryPoint(executor: *cascade.Executor) *const anyopaque {
     return globals.syscall_entry_points[@intFromEnum(executor.id)];
 }
 
-const SyscallFrame = extern struct {
+pub const SyscallFrame = extern struct {
     fs: u64,
     gs: u64,
     r15: u64,

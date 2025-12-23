@@ -92,6 +92,7 @@ pub const decls: arch.Decls = .{
 
     .user = .{
         .PerThread = struct {},
+        .SyscallFrame = struct {},
     },
 
     .io = .{

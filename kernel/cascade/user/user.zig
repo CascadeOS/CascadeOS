@@ -13,6 +13,17 @@ pub const Thread = @import("Thread.zig");
 
 const log = cascade.debug.log.scoped(.user);
 
+/// Called on syscall.
+///
+/// Interrupts are enabled.
+pub fn onSyscall(current_task: Task.Current, syscall_frame: arch.user.SyscallFrame) void {
+    _ = syscall_frame;
+
+    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+    scheduler_handle.drop(current_task);
+    unreachable;
+}
+
 pub const init = struct {
     const init_log = cascade.debug.log.scoped(.user_init);
 

@@ -175,6 +175,7 @@ pub const decls: arch.Decls = .{
 
     .user = .{
         .PerThread = x64.user.PerThread,
+        .SyscallFrame = x64.user.SyscallFrame,
     },
 
     .io = .{
