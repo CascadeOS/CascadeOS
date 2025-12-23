@@ -108,9 +108,7 @@ pub const init = struct {
             "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
             .{
                 wallclock.elapsed(
-                    switch (globals.kernel_start_time) {
-                        inline else => |tick| tick,
-                    },
+                    globals.kernel_start_time.getTick(),
                     wallclock.read(),
                 ),
                 wallclock.elapsed(
@@ -371,6 +369,13 @@ pub const init = struct {
 
         /// The wallclock tick upon initialization of the time system.
         time_system_start: wallclock.Tick,
+
+        inline fn getTick(start_time: StartTime) wallclock.Tick {
+            return switch (start_time) {
+                .kernel_start => |tick| tick,
+                .time_system_start => |tick| tick,
+            };
+        }
     };
 
     const globals = struct {
