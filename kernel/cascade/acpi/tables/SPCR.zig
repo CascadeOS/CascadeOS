@@ -390,12 +390,12 @@ pub const SPCR = extern struct {
     pub const init = struct {
         const SPCRAcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.SPCR);
         const uart = cascade.init.Output.uart;
-        const log = cascade.debug.log.scoped(.output_init);
+        const init_log = cascade.debug.log.scoped(.output_init);
 
         pub fn tryGetSerialOutput(current_task: Task.Current) ?uart.Uart {
             const output_uart = tryGetSerialOutputInner(current_task) catch |err| switch (err) {
                 error.DivisorTooLarge => {
-                    log.warn(current_task, "baud divisor from SPCR too large", .{});
+                    init_log.warn(current_task, "baud divisor from SPCR too large", .{});
                     return null;
                 },
             } orelse return null;
@@ -492,7 +492,11 @@ pub const SPCR = extern struct {
                                 baud,
                             ) orelse return null,
                         },
-                        else => return null,
+                        else => |address_space| init_log.info(
+                            current_task,
+                            "16550 UART with unhandled address space: {t}",
+                            .{address_space},
+                        ),
                     }
                 },
                 .@"16450" => {
@@ -516,7 +520,11 @@ pub const SPCR = extern struct {
                                 baud,
                             ) orelse return null,
                         },
-                        else => return null,
+                        else => |address_space| init_log.info(
+                            current_task,
+                            "16450 UART with unhandled address space: {t}",
+                            .{address_space},
+                        ),
                     }
                 },
                 .ArmPL011 => {
@@ -539,12 +547,14 @@ pub const SPCR = extern struct {
                         ) orelse return null,
                     };
                 },
-                else => |tag| {
-                    // TODO: implement other UARTs
-                    log.warn(current_task, "unsupported UART: {t}", .{tag});
-                    return null;
-                },
+                else => |sub_type| init_log.info(
+                    current_task,
+                    "unhandled subtype: {t}",
+                    .{sub_type},
+                ), // TODO: implement other subtypes
             }
+
+            return null;
         }
     };
 };
