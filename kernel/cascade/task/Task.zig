@@ -192,7 +192,7 @@ pub const Transition = struct {
     }
 };
 
-pub const Name = core.containers.BoundedArray(u8, cascade.config.task_name_length);
+pub const Name = core.containers.BoundedArray(u8, cascade.config.task.task_name_length);
 
 const TaskCleanup = struct {
     task: *Task,

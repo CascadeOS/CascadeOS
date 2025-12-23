@@ -13,7 +13,7 @@ const core = @import("core");
 const log = cascade.debug.log.scoped(.cache);
 
 pub const ConstructorError = error{ItemConstructionFailed};
-pub const Name = core.containers.BoundedArray(u8, cascade.config.cache_name_length);
+pub const Name = core.containers.BoundedArray(u8, cascade.config.mem.cache_name_length);
 
 /// A slab based cache of T.
 ///

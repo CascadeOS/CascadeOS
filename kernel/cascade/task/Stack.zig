@@ -91,7 +91,7 @@ pub fn createStack(current_task: Task.Current) !Stack {
     const range = stack_range.toVirtualRange();
     const usable_range: core.VirtualRange = .{
         .address = range.address,
-        .size = cascade.config.kernel_stack_size,
+        .size = cascade.config.task.kernel_stack_size,
     };
 
     {
@@ -134,7 +134,7 @@ pub fn destroyStack(stack: Stack, current_task: Task.Current) void {
     globals.stack_arena.deallocate(current_task, .fromVirtualRange(stack.range));
 }
 
-const stack_size_including_guard_page = cascade.config.kernel_stack_size.add(arch.paging.standard_page_size);
+const stack_size_including_guard_page = cascade.config.task.kernel_stack_size.add(arch.paging.standard_page_size);
 
 const globals = struct {
     var stack_arena: cascade.mem.resource_arena.Arena(.none) = undefined;

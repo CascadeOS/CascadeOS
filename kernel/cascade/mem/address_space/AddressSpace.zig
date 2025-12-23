@@ -1201,7 +1201,7 @@ const PreallocatedEntries = struct {
     }
 };
 
-pub const Name = core.containers.BoundedArray(u8, cascade.config.address_space_name_length);
+pub const Name = core.containers.BoundedArray(u8, cascade.config.user.address_space_name_length);
 
 /// Returns the index of the entry that contains the given address.
 ///

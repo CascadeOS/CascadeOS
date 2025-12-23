@@ -1045,7 +1045,7 @@ pub const EnsureBoundaryTagsError = error{
     OutOfBoundaryTags,
 };
 
-pub const Name = core.containers.BoundedArray(u8, cascade.config.resource_arena_name_length);
+pub const Name = core.containers.BoundedArray(u8, cascade.config.mem.resource_arena_name_length);
 
 const BoundaryTag = struct {
     base: usize,

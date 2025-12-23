@@ -59,8 +59,8 @@ pub fn prepareBootstrapExecutor(
     architecture_processor_id: u64,
 ) void {
     const static = struct {
-        var bootstrap_double_fault_stack: [cascade.config.kernel_stack_size.value]u8 align(16) = undefined;
-        var bootstrap_non_maskable_interrupt_stack: [cascade.config.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_double_fault_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_non_maskable_interrupt_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
     prepareExecutorShared(

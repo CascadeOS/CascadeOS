@@ -285,8 +285,8 @@ const globals = struct {
     /// Initialized during `init.initialize`.
     var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
 
-    export var syscall_temp_rsp_storage: [cascade.config.maximum_number_of_executors]u64 = undefined;
-    const syscall_entry_points: [cascade.config.maximum_number_of_executors]*const fn () callconv(.naked) noreturn = createSyscallEntryPoints();
+    export var syscall_temp_rsp_storage: [cascade.config.executor.maximum_number_of_executors]u64 = undefined;
+    const syscall_entry_points: SyscallEntries = createSyscallEntryPoints();
 };
 
 pub const init = struct {
@@ -303,8 +303,10 @@ pub const init = struct {
     }
 };
 
-fn createSyscallEntryPoints() [cascade.config.maximum_number_of_executors](*const fn () callconv(.naked) noreturn) {
-    var temp_entry_points: [cascade.config.maximum_number_of_executors]*const fn () callconv(.naked) noreturn = undefined;
+const SyscallEntries = [cascade.config.executor.maximum_number_of_executors]*const fn () callconv(.naked) noreturn;
+
+fn createSyscallEntryPoints() SyscallEntries {
+    var temp_entry_points: SyscallEntries = undefined;
 
     @setEvalBranchQuota(temp_entry_points.len * 1024);
 

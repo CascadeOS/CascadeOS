@@ -122,7 +122,7 @@ fn initStage2(current_task: Task.Current) !noreturn {
     arch.init.initLocalInterruptController(current_task);
 
     log.debug(current_task, "enabling per-executor interrupt on {f}", .{executor.id});
-    cascade.time.per_executor_periodic.enableInterrupt(cascade.config.per_executor_interrupt_period);
+    cascade.time.per_executor_periodic.enableInterrupt(cascade.config.scheduler.per_executor_interrupt_period);
 
     try arch.scheduling.callNoSave(
         &current_task.task.stack,
@@ -218,10 +218,10 @@ fn constructBootstrapTask() !Task.Current {
 fn createExecutors(current_task: Task.Current) !struct { []cascade.Executor, *cascade.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
-    if (descriptors.count() > cascade.config.maximum_number_of_executors) {
+    if (descriptors.count() > cascade.config.executor.maximum_number_of_executors) {
         std.debug.panic(
             "number of executors '{d}' exceeds maximum '{d}'",
-            .{ descriptors.count(), cascade.config.maximum_number_of_executors },
+            .{ descriptors.count(), cascade.config.executor.maximum_number_of_executors },
         );
     }
 

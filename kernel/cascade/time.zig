@@ -124,7 +124,7 @@ pub const init = struct {
     pub const CandidateTimeSources = struct {
         candidate_time_sources: core.containers.BoundedArray(
             CandidateTimeSource,
-            cascade.config.maximum_number_of_time_sources,
+            cascade.config.time.maximum_number_of_time_sources,
         ) = .{},
 
         pub fn addTimeSource(

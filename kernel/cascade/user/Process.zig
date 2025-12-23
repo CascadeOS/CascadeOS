@@ -133,7 +133,7 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
     try writer.print("Process('{s}')", .{process.name.constSlice()});
 }
 
-pub const Name = core.containers.BoundedArray(u8, cascade.config.process_name_length);
+pub const Name = core.containers.BoundedArray(u8, cascade.config.user.process_name_length);
 
 const ProcessCleanup = struct {
     task: *Task,
@@ -254,7 +254,7 @@ const globals = struct {
                     .name = cascade.mem.AddressSpace.Name.fromSlice(
                         temp_name.constSlice(),
                     ) catch unreachable, // ensured in `cascade.config`
-                    .range = cascade.config.user_address_space_range,
+                    .range = cascade.config.user.user_address_space_range,
                     .page_table = page_table,
                     .context = .{ .user = process },
                 }) catch |err| {

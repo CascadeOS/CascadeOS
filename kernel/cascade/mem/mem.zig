@@ -534,7 +534,7 @@ pub fn kernelVirtualOffset() core.Size {
 pub const VirtualRangeBatch = struct {
     ranges: core.containers.BoundedArray(
         core.VirtualRange,
-        cascade.config.virtual_ranges_to_batch,
+        cascade.config.mem.virtual_ranges_to_batch,
     ) = .{},
 
     /// Appends a virtual range to the batch.
@@ -556,9 +556,9 @@ pub const VirtualRangeBatch = struct {
                 @branchHint(.unlikely);
                 batch.ranges.appendAssumeCapacity(range);
             },
-            cascade.config.virtual_ranges_to_batch => {
+            cascade.config.mem.virtual_ranges_to_batch => {
                 // we have hit the limit of virtual ranges to batch together so we always merge with the last range
-                const last: *core.VirtualRange = &batch.ranges.slice()[cascade.config.virtual_ranges_to_batch - 1];
+                const last: *core.VirtualRange = &batch.ranges.slice()[cascade.config.mem.virtual_ranges_to_batch - 1];
 
                 if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
 
@@ -574,7 +574,7 @@ pub const VirtualRangeBatch = struct {
 
                 const seperation = range.address.difference(last.endBound());
 
-                if (seperation.lessThanOrEqual(cascade.config.virtual_range_batching_seperation_to_merge_over)) {
+                if (seperation.lessThanOrEqual(cascade.config.mem.virtual_range_batching_seperation_to_merge_over)) {
                     last.size.addInPlace(seperation);
                     last.size.addInPlace(range.size);
                 } else {
@@ -612,7 +612,7 @@ pub const VirtualRangeBatch = struct {
 
         const seperation = range.address.difference(last.endBound());
 
-        if (seperation.lessThanOrEqual(cascade.config.virtual_range_batching_seperation_to_merge_over)) {
+        if (seperation.lessThanOrEqual(cascade.config.mem.virtual_range_batching_seperation_to_merge_over)) {
             last.size.addInPlace(seperation);
             last.size.addInPlace(range.size);
             return true;
@@ -628,7 +628,7 @@ pub const VirtualRangeBatch = struct {
     }
 
     pub fn full(batch: *VirtualRangeBatch) bool {
-        return batch.ranges.len == cascade.config.virtual_ranges_to_batch;
+        return batch.ranges.len == cascade.config.mem.virtual_ranges_to_batch;
     }
 
     pub fn clear(batch: *VirtualRangeBatch) void {
@@ -643,7 +643,7 @@ pub const VirtualRangeBatch = struct {
 pub const ChangeProtectionBatch = struct {
     ranges: core.containers.BoundedArray(
         VirtualRangeWithMapType,
-        cascade.config.virtual_ranges_to_batch,
+        cascade.config.mem.virtual_ranges_to_batch,
     ) = .{},
 
     pub const VirtualRangeWithMapType = struct {
@@ -677,7 +677,7 @@ pub const ChangeProtectionBatch = struct {
 
         const seperation = range.virtual_range.address.difference(last.virtual_range.endBound());
 
-        if (seperation.lessThanOrEqual(cascade.config.virtual_range_batching_seperation_to_merge_over) and
+        if (seperation.lessThanOrEqual(cascade.config.mem.virtual_range_batching_seperation_to_merge_over) and
             last.previous_map_type.equal(range.previous_map_type))
         {
             last.virtual_range.size.addInPlace(seperation);
@@ -695,7 +695,7 @@ pub const ChangeProtectionBatch = struct {
     }
 
     pub fn full(batch: *ChangeProtectionBatch) bool {
-        return batch.ranges.len == cascade.config.virtual_ranges_to_batch;
+        return batch.ranges.len == cascade.config.mem.virtual_ranges_to_batch;
     }
 
     pub fn clear(batch: *ChangeProtectionBatch) void {
@@ -756,7 +756,7 @@ pub const init = struct {
         globals.virtual_base_address = base_address.virtual;
 
         const kernel_virtual_offset = core.Size.from(
-            base_address.virtual.value - cascade.config.kernel_base_address.value,
+            base_address.virtual.value - cascade.config.mem.kernel_base_address.value,
             .byte,
         );
         globals.kernel_virtual_offset = kernel_virtual_offset;
@@ -1146,7 +1146,7 @@ pub const init = struct {
 
     const MemoryMap = core.containers.BoundedArray(
         boot.MemoryMap.Entry,
-        cascade.config.maximum_number_of_memory_map_entries,
+        cascade.config.mem.maximum_number_of_memory_map_entries,
     );
 
     const init_globals = struct {
