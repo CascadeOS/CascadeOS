@@ -11,6 +11,57 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
+/// Prepares the given task for being scheduled.
+///
+/// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
+///
+/// This function *must* be called before the task is scheduled and can only be called once.
+pub fn prepareTaskForScheduling(
+    task: *Task,
+    type_erased_call: core.TypeErasedCall,
+) void {
+    const impl = struct {
+        fn taskEntryTrampoline() callconv(.naked) void {
+            asm volatile (
+                \\pop %rdi       // current_task
+                \\pop %rsi       // type_erased_call.typeErased
+                \\pop %rdx       // type_erased_call.args[0]
+                \\pop %rcx       // type_erased_call.args[1]
+                \\pop %r8        // type_erased_call.args[2]
+                \\pop %r9        // type_erased_call.args[3]
+                \\xor %ebp, %ebp
+                \\ret            // the address of `Task.internal.taskEntry` is on the stack
+            );
+        }
+    };
+
+    if (core.is_debug) std.debug.assert(
+        task.stack.spaceFor(1 + // args[4]
+            1 + // task entry return address
+            1 + // taskEntry
+            4 + // args[..4]
+            1 + // type_erased_call.typeErased
+            1 + // task
+            1 // taskEntryTrampoline
+        ),
+    );
+
+    task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `taskEntryTrampoline` as per SysV ABI for 7th arg
+
+    task.stack.push(0) catch unreachable; // task entry return address
+
+    task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
+
+    task.stack.push(type_erased_call.args[3]) catch unreachable;
+    task.stack.push(type_erased_call.args[2]) catch unreachable;
+    task.stack.push(type_erased_call.args[1]) catch unreachable;
+    task.stack.push(type_erased_call.args[0]) catch unreachable;
+    task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
+    task.stack.push(@intFromPtr(task)) catch unreachable;
+
+    task.stack.push(@intFromPtr(&impl.taskEntryTrampoline)) catch unreachable;
+}
+
 /// Called before `transition.old_task` is switched to `transition.new_task`.
 ///
 /// Page table switching and managing ability to access user memory has already been performed before this function is called.
@@ -97,57 +148,6 @@ pub inline fn switchTaskNoSave(
         : [new_stack_pointer] "r" (new_task.stack.stack_pointer),
     );
     unreachable;
-}
-
-/// Prepares the given task for being scheduled.
-///
-/// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
-///
-/// This function *must* be called before the task is scheduled and can only be called once.
-pub fn prepareTaskForScheduling(
-    task: *Task,
-    type_erased_call: core.TypeErasedCall,
-) void {
-    const impl = struct {
-        fn taskEntryTrampoline() callconv(.naked) void {
-            asm volatile (
-                \\pop %rdi       // current_task
-                \\pop %rsi       // type_erased_call.typeErased
-                \\pop %rdx       // type_erased_call.args[0]
-                \\pop %rcx       // type_erased_call.args[1]
-                \\pop %r8        // type_erased_call.args[2]
-                \\pop %r9        // type_erased_call.args[3]
-                \\xor %ebp, %ebp
-                \\ret            // the address of `Task.internal.taskEntry` is on the stack
-            );
-        }
-    };
-
-    if (core.is_debug) std.debug.assert(
-        task.stack.spaceFor(1 + // args[4]
-            1 + // task entry return address
-            1 + // taskEntry
-            4 + // args[..4]
-            1 + // type_erased_call.typeErased
-            1 + // task
-            1 // taskEntryTrampoline
-        ),
-    );
-
-    task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `taskEntryTrampoline` as per SysV ABI for 7th arg
-
-    task.stack.push(0) catch unreachable; // task entry return address
-
-    task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
-
-    task.stack.push(type_erased_call.args[3]) catch unreachable;
-    task.stack.push(type_erased_call.args[2]) catch unreachable;
-    task.stack.push(type_erased_call.args[1]) catch unreachable;
-    task.stack.push(type_erased_call.args[0]) catch unreachable;
-    task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
-    task.stack.push(@intFromPtr(task)) catch unreachable;
-
-    task.stack.push(@intFromPtr(&impl.taskEntryTrampoline)) catch unreachable;
 }
 
 /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.

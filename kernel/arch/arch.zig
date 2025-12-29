@@ -426,6 +426,21 @@ pub const paging = struct {
 };
 
 pub const scheduling = struct {
+    /// Prepares the given task for being scheduled.
+    ///
+    /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
+    ///
+    /// This function *must* be called before the task is scheduled and can only be called once.
+    pub fn prepareTaskForScheduling(
+        task: *Task,
+        type_erased_call: core.TypeErasedCall,
+    ) callconv(core.inline_in_non_debug) void {
+        return getFunction(
+            current_functions.scheduling,
+            "prepareTaskForScheduling",
+        )(task, type_erased_call);
+    }
+
     /// Called before `transition.old_task` is switched to `transition.new_task`.
     ///
     /// Page table switching and managing ability to access user memory has already been performed before this function is called.
@@ -466,29 +481,16 @@ pub const scheduling = struct {
         )(new_task);
     }
 
-    /// Prepares the given task for being scheduled.
-    ///
-    /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
-    ///
-    /// This function *must* be called before the task is scheduled and can only be called once.
-    pub fn prepareTaskForScheduling(
-        task: *Task,
-        type_erased_call: core.TypeErasedCall,
-    ) callconv(core.inline_in_non_debug) void {
-        return getFunction(
-            current_functions.scheduling,
-            "prepareTaskForScheduling",
-        )(task, type_erased_call);
-    }
-
-    pub const CallError = error{StackOverflow};
-
     /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
+    ///
+    /// Asserts that the provided `type_erased_call` is noreturn.
     pub fn call(
         old_task: *Task,
         new_stack: *Task.Stack,
         type_erased_call: core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) void {
+        if (core.is_debug) std.debug.assert(type_erased_call.return_type.isNoReturn());
+
         getFunction(current_functions.scheduling, "call")(
             old_task,
             new_stack,
@@ -497,10 +499,14 @@ pub const scheduling = struct {
     }
 
     /// Calls `type_erased_call` on `new_stack`.
+    ///
+    /// Asserts that the provided `type_erased_call` is noreturn.
     pub fn callNoSave(
         new_stack: *Task.Stack,
         type_erased_call: core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) noreturn {
+        if (core.is_debug) std.debug.assert(type_erased_call.return_type.isNoReturn());
+
         getFunction(current_functions.scheduling, "callNoSave")(
             new_stack,
             type_erased_call,
@@ -1023,6 +1029,16 @@ pub const Functions = struct {
     },
 
     scheduling: struct {
+        /// Prepares the given task for being scheduled.
+        ///
+        /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
+        ///
+        /// This function *must* be called before the task is scheduled and can only be called once.
+        prepareTaskForScheduling: ?fn (
+            task: *Task,
+            type_erased_call: core.TypeErasedCall,
+        ) void = null,
+
         /// Called before `transition.old_task` is switched to `transition.new_task`.
         ///
         /// Page table switching and managing ability to access user memory has already been performed before this function is called.
@@ -1045,16 +1061,6 @@ pub const Functions = struct {
         ///
         /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
         switchTaskNoSave: ?fn (new_task: *Task) callconv(.@"inline") noreturn = null,
-
-        /// Prepares the given task for being scheduled.
-        ///
-        /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
-        ///
-        /// This function *must* be called before the task is scheduled and can only be called once.
-        prepareTaskForScheduling: ?fn (
-            task: *Task,
-            type_erased_call: core.TypeErasedCall,
-        ) void = null,
 
         /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
         call: ?fn (
