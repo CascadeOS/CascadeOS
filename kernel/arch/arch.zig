@@ -441,17 +441,29 @@ pub const scheduling = struct {
 
     /// Switches to `new_task`.
     ///
-    /// If `old_task` is not null its state is saved to allow it to be resumed later.
+    /// The state of `old_task` is saved to allow it to be resumed later.
     ///
     /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
     pub fn switchTask(
-        old_task: ?*Task,
+        old_task: *Task,
         new_task: *Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
             "switchTask",
         )(old_task, new_task);
+    }
+
+    /// Switches to `new_task`.
+    ///
+    /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
+    pub fn switchTaskNoSave(
+        new_task: *Task,
+    ) callconv(core.inline_in_non_debug) noreturn {
+        getFunction(
+            current_functions.scheduling,
+            "switchTaskNoSave",
+        )(new_task);
     }
 
     /// Prepares the given task for being scheduled.
@@ -1024,10 +1036,15 @@ pub const Functions = struct {
 
         /// Switches to `new_task`.
         ///
-        /// If `old_task` is not null its state is saved to allow it to be resumed later.
+        /// The state of `old_task` is saved to allow it to be resumed later.
         ///
         /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-        switchTask: ?fn (old_task: ?*Task, new_task: *Task) void = null,
+        switchTask: ?fn (old_task: *Task, new_task: *Task) void = null,
+
+        /// Switches to `new_task`.
+        ///
+        /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
+        switchTaskNoSave: ?fn (new_task: *Task) noreturn = null,
 
         /// Prepares the given task for being scheduled.
         ///

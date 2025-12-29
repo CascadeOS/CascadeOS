@@ -47,41 +47,11 @@ pub fn beforeSwitchTask(
 ///
 /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
 pub fn switchTask(
-    old_task: ?*Task,
+    old_task: *Task,
     new_task: *Task,
 ) void {
     const impls = struct {
-        const switchToTaskWithoutOld: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\mov %rdi, %rsp
-                        \\pop %r15
-                        \\pop %r14
-                        \\pop %r13
-                        \\pop %r12
-                        \\pop %rbp
-                        \\pop %rbx
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rbp = true,
-                            .r15 = true,
-                            .r14 = true,
-                            .r13 = true,
-                            .r12 = true,
-                            .rbx = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
-
-        const switchToTaskWithOld: *const fn (
+        const switchTaskImpl: *const fn (
             new_kernel_stack_pointer: core.VirtualAddress, // rdi
             previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
         ) callconv(.c) void = blk: {
@@ -121,21 +91,38 @@ pub fn switchTask(
         };
     };
 
-    const old = old_task orelse {
-        impls.switchToTaskWithoutOld(new_task.stack.stack_pointer);
-        @panic("task returned");
-    };
-
     if (core.is_debug) {
         std.debug.assert(new_task.stack.spaceFor(
             6, // general purpose registers
         ));
     }
 
-    impls.switchToTaskWithOld(
+    impls.switchTaskImpl(
         new_task.stack.stack_pointer,
-        &old.stack.stack_pointer,
+        &old_task.stack.stack_pointer,
     );
+}
+
+/// Switches to `new_task`.
+///
+/// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
+pub fn switchTaskNoSave(
+    new_task: *Task,
+) noreturn {
+    // no clobbers are listed as the calling context is abandoned
+    asm volatile (
+        \\mov %[stack_pointer], %rsp
+        \\pop %r15
+        \\pop %r14
+        \\pop %r13
+        \\pop %r12
+        \\pop %rbp
+        \\pop %rbx
+        \\ret
+        :
+        : [stack_pointer] "r" (new_task.stack.stack_pointer),
+    );
+    unreachable;
 }
 
 /// Prepares the given task for being scheduled.

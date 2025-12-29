@@ -104,6 +104,7 @@ pub const functions: arch.Functions = .{
     .scheduling = .{
         .beforeSwitchTask = x64.scheduling.beforeSwitchTask,
         .switchTask = x64.scheduling.switchTask,
+        .switchTaskNoSave = x64.scheduling.switchTaskNoSave,
         .prepareTaskForScheduling = x64.scheduling.prepareTaskForScheduling,
         .call = x64.scheduling.call,
         .callNoSave = x64.scheduling.callNoSave,

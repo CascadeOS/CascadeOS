@@ -252,7 +252,7 @@ fn switchToTaskFromIdleYield(current_task: Task.Current, new_task: *Task) void {
     // which is the value is is expected to have upon entry to idle
     scheduler_task.interrupt_disable_count = 1;
 
-    arch.scheduling.switchTask(null, new_task);
+    arch.scheduling.switchTaskNoSave(new_task);
     @panic("task returned");
 }
 
@@ -311,7 +311,7 @@ fn switchToTaskFromTaskDeferredAction(
 
             inner_current_task.task.state = .ready;
 
-            arch.scheduling.switchTask(null, inner_new_task);
+            arch.scheduling.switchTaskNoSave(inner_new_task);
             @panic("task returned");
         }
     };
