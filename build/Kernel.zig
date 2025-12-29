@@ -208,7 +208,7 @@ fn constructKernelModule(
     );
 
     const kernel_module = b.createModule(.{
-        .root_source_file = b.path("kernel/kernel.zig"),
+        .root_source_file = b.path("kernel/root.zig"),
 
         .target = architecture.kernelTarget(b),
         .optimize = options.optimize,
