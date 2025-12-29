@@ -6,8 +6,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 
 const x64 = @import("../x64.zig");

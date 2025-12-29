@@ -4,8 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -53,7 +53,7 @@ const SourceOverride = struct {
     polarity: IOAPIC.Polarity,
     trigger_mode: IOAPIC.TriggerMode,
 
-    fn fromMADT(source_override: cascade.acpi.tables.MADT.InterruptControllerEntry.InterruptSourceOverride) SourceOverride {
+    fn fromMADT(source_override: kernel.acpi.tables.MADT.InterruptControllerEntry.InterruptSourceOverride) SourceOverride {
         const polarity: IOAPIC.Polarity = switch (source_override.flags.polarity) {
             .conforms => .active_high,
             .active_high => .active_high,
@@ -99,9 +99,9 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.ioapic_init);
+    const init_log = kernel.debug.log.scoped(.ioapic_init);
 
-    pub fn captureMADTInformation(current_task: Task.Current, madt: *const cascade.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(current_task: Task.Current, madt: *const kernel.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {
@@ -109,7 +109,7 @@ pub const init = struct {
                 .io_apic => {
                     const io_apic_data = entry.specific.io_apic;
 
-                    const address = cascade.mem.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
+                    const address = kernel.mem.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
                     const ioapic = IOAPIC.init(address, io_apic_data.global_system_interrupt_base);
 
                     init_log.debug(current_task, "found ioapic for gsi {}-{}", .{

@@ -5,14 +5,14 @@ const std = @import("std");
 
 const arch = @import("arch");
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const AcpiTable = cascade.acpi.init.AcpiTable;
+const kernel = @import("kernel");
+const Task = kernel.Task;
+const AcpiTable = kernel.acpi.init.AcpiTable;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
 
-const log = cascade.debug.log.scoped(.init_x64);
+const log = kernel.debug.log.scoped(.init_x64);
 
 /// Attempt to get some form of init output.
 pub fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
@@ -59,8 +59,8 @@ pub fn prepareBootstrapExecutor(
     architecture_processor_id: u64,
 ) void {
     const static = struct {
-        var bootstrap_double_fault_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
-        var bootstrap_non_maskable_interrupt_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_double_fault_stack: [kernel.config.task.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_non_maskable_interrupt_stack: [kernel.config.task.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
     prepareExecutorShared(
@@ -80,7 +80,7 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(current_task: Task.Current, executor: *cascade.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(current_task: Task.Current, executor: *kernel.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
@@ -90,7 +90,7 @@ pub fn prepareExecutor(current_task: Task.Current, executor: *cascade.Executor, 
 }
 
 fn prepareExecutorShared(
-    executor: *cascade.Executor,
+    executor: *kernel.Executor,
     apic_id: u32,
     double_fault_stack: Task.Stack,
     non_maskable_interrupt_stack: Task.Stack,
@@ -145,13 +145,13 @@ pub fn captureEarlySystemInformation(current_task: Task.Current) void {
     }
 
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
-        const lapic_base_tick_duration_fs = cascade.time.fs_per_s / crystal_frequency;
+        const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
         log.debug(current_task, "lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
     }
 
     if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
-        const tsc_tick_duration_fs = cascade.time.fs_per_s / tsc_frequency;
+        const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
         log.debug(current_task, "tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
@@ -202,11 +202,11 @@ pub fn captureSystemInformation(
     current_task: Task.Current,
     options: CaptureSystemInformationOptions,
 ) !void {
-    const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
+    const madt_acpi_table = AcpiTable(kernel.acpi.tables.MADT).get(0) orelse return error.NoMADT;
     defer madt_acpi_table.deinit();
     const madt = madt_acpi_table.table;
 
-    const fadt_acpi_table = AcpiTable(cascade.acpi.tables.FADT).get(0) orelse return error.NoFADT;
+    const fadt_acpi_table = AcpiTable(kernel.acpi.tables.FADT).get(0) orelse return error.NoFADT;
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
 
@@ -416,7 +416,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
 pub fn registerArchitecturalTimeSources(
     current_task: Task.Current,
-    candidate_time_sources: *cascade.time.init.CandidateTimeSources,
+    candidate_time_sources: *kernel.time.init.CandidateTimeSources,
 ) void {
     x64.tsc.init.registerTimeSource(current_task, candidate_time_sources);
     x64.hpet.init.registerTimeSource(current_task, candidate_time_sources);

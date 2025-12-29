@@ -4,15 +4,15 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *cascade.Executor {
+        inline fn getCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(x64.registers.KERNEL_GS_BASE.read());
         }
     }.getCurrentExecutor,
@@ -58,7 +58,7 @@ pub const functions: arch.Functions = .{
         .createPageTable = x64.paging.PageTable.create,
 
         .loadPageTable = struct {
-            fn loadPageTable(current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) void {
+            fn loadPageTable(current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) void {
                 _ = current_task;
                 x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
             }

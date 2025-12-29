@@ -5,16 +5,16 @@ const std = @import("std");
 
 const arch = @import("arch");
 const Handler = arch.interrupts.Interrupt.Handler;
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const Thread = cascade.user.Thread;
+const kernel = @import("kernel");
+const Task = kernel.Task;
+const Thread = kernel.user.Thread;
 const core = @import("core");
 
 const x64 = @import("../x64.zig");
 const Idt = @import("Idt.zig");
 const interrupt_handlers = @import("handlers.zig");
 
-const log = cascade.debug.log.scoped(.interrupt);
+const log = kernel.debug.log.scoped(.interrupt);
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
     switch (interrupt_frame.cs.selector) {
@@ -218,7 +218,7 @@ pub const InterruptFrame = extern struct {
     pub fn context(
         interrupt_frame: *const InterruptFrame,
         current_task: Task.Current,
-    ) cascade.Context {
+    ) kernel.Context {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
             .user_code, .user_code_32bit => return .{ .user = .fromTask(current_task.task) },
@@ -311,11 +311,11 @@ const globals = struct {
 
         break :handlers temp_handlers;
     };
-    var interrupt_arena: cascade.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
+    var interrupt_arena: kernel.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.interrupt_init);
+    const init_log = kernel.debug.log.scoped(.interrupt_init);
 
     /// Ensure that any exceptions/faults that occur during early initialization are handled.
     ///
@@ -343,7 +343,7 @@ pub const init = struct {
         globals.interrupt_arena.init(
             current_task,
             .{
-                .name = cascade.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
+                .name = kernel.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
                 .quantum = 1,
             },
         ) catch |err| {

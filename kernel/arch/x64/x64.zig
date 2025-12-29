@@ -4,8 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 
 pub const apic = @import("apic.zig");

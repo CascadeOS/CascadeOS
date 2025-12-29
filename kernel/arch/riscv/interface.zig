@@ -4,15 +4,15 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 
 const riscv = @import("riscv.zig");
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *cascade.Executor {
+        inline fn getCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(riscv.registers.SupervisorScratch.read());
         }
     }.getCurrentExecutor,
@@ -44,7 +44,7 @@ pub const functions: arch.Functions = .{
 
     .init = .{
         .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
+            fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
                 return @enumFromInt(riscv.instructions.readTime());
             }
         }.getStandardWallclockStartTime,
@@ -62,7 +62,7 @@ pub const functions: arch.Functions = .{
                 return null;
             }
 
-            const log = cascade.debug.log.scoped(.riscv_init);
+            const log = kernel.debug.log.scoped(.riscv_init);
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {

@@ -9,9 +9,9 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const Thread = cascade.user.Thread;
+const kernel = @import("kernel");
+const Task = kernel.Task;
+const Thread = kernel.user.Thread;
 const core = @import("core");
 pub const current_arch = @import("cascade_architecture").arch;
 
@@ -21,7 +21,7 @@ pub const PerExecutor = current_decls.PerExecutor;
 /// Get the current `Executor`.
 ///
 /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *cascade.Executor {
+pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
     return getFunction(
         current_functions,
         "getCurrentExecutor",
@@ -91,7 +91,7 @@ pub const interrupts = struct {
     }
 
     /// Send a flush IPI to the given executor.
-    pub fn sendFlushIPI(current_task: Task.Current, executor: *cascade.Executor) callconv(core.inline_in_non_debug) void {
+    pub fn sendFlushIPI(current_task: Task.Current, executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.interrupts,
             "sendFlushIPI",
@@ -221,11 +221,11 @@ pub const paging = struct {
     pub const higher_half_start: core.VirtualAddress = current_decls.paging.higher_half_start;
 
     pub const PageTable = struct {
-        physical_frame: cascade.mem.phys.Frame,
+        physical_frame: kernel.mem.phys.Frame,
         arch_specific: *current_decls.paging.PageTable,
 
         /// Create a page table in the given physical frame.
-        pub fn create(current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
+        pub fn create(current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
             return .{
                 .physical_frame = physical_frame,
                 .arch_specific = getFunction(
@@ -267,10 +267,10 @@ pub const paging = struct {
             page_table: PageTable,
             current_task: Task.Current,
             virtual_address: core.VirtualAddress,
-            physical_frame: cascade.mem.phys.Frame,
-            map_type: cascade.mem.MapType,
-            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
-        ) callconv(core.inline_in_non_debug) cascade.mem.MapError!void {
+            physical_frame: kernel.mem.phys.Frame,
+            map_type: kernel.mem.MapType,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
             return getFunction(
                 current_functions.paging,
                 "mapSinglePage",
@@ -297,8 +297,8 @@ pub const paging = struct {
             virtual_range: core.VirtualRange,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
-            flush_batch: *cascade.mem.VirtualRangeBatch,
-            deallocate_frame_list: *cascade.mem.phys.FrameList,
+            flush_batch: *kernel.mem.VirtualRangeBatch,
+            deallocate_frame_list: *kernel.mem.phys.FrameList,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
@@ -325,9 +325,9 @@ pub const paging = struct {
             page_table: PageTable,
             current_task: Task.Current,
             virtual_range: core.VirtualRange,
-            previous_map_type: cascade.mem.MapType,
-            new_map_type: cascade.mem.MapType,
-            flush_batch: *cascade.mem.VirtualRangeBatch,
+            previous_map_type: kernel.mem.MapType,
+            new_map_type: kernel.mem.MapType,
+            flush_batch: *kernel.mem.VirtualRangeBatch,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
@@ -389,7 +389,7 @@ pub const paging = struct {
             current_task: Task.Current,
             page_table: PageTable,
             range: core.VirtualRange,
-            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
                 current_functions.paging.init,
@@ -414,8 +414,8 @@ pub const paging = struct {
             page_table: PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
-            map_type: cascade.mem.MapType,
-            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+            map_type: kernel.mem.MapType,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
                 current_functions.paging.init,
@@ -526,7 +526,7 @@ pub const user = struct {
     pub fn createThread(
         current_task: Task.Current,
         thread: *Thread,
-    ) callconv(core.inline_in_non_debug) cascade.mem.cache.ConstructorError!void {
+    ) callconv(core.inline_in_non_debug) kernel.mem.cache.ConstructorError!void {
         return getFunction(
             current_functions.user,
             "createThread",
@@ -649,7 +649,7 @@ pub const init = struct {
     /// Read current wallclock time from the standard wallclock source of the current architecture.
     ///
     /// For example on x86_64 this is the TSC.
-    pub fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
+    pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
         return getFunction(
             current_functions.init,
             "getStandardWallclockStartTime",
@@ -660,7 +660,7 @@ pub const init = struct {
         output: Output,
         preference: Preference,
 
-        pub const Output = cascade.init.Output;
+        pub const Output = kernel.init.Output;
 
         pub const Preference = enum {
             /// Use this output.
@@ -695,7 +695,7 @@ pub const init = struct {
     /// **WARNING**: This function will panic if the cpu cannot be prepared.
     pub fn prepareExecutor(
         current_task: Task.Current,
-        executor: *cascade.Executor,
+        executor: *kernel.Executor,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
@@ -763,7 +763,7 @@ pub const init = struct {
     /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
     pub fn registerArchitecturalTimeSources(
         current_task: Task.Current,
-        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
+        candidate_time_sources: *kernel.time.init.CandidateTimeSources,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
@@ -789,7 +789,7 @@ pub const Functions = struct {
     /// Get the current `Executor`.
     ///
     /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-    getCurrentExecutor: ?fn () callconv(.@"inline") *cascade.Executor = null,
+    getCurrentExecutor: ?fn () callconv(.@"inline") *kernel.Executor = null,
 
     /// Issues an architecture specific hint to the executor that we are spinning in a loop.
     spinLoopHint: ?fn () callconv(.@"inline") void = null,
@@ -821,7 +821,7 @@ pub const Functions = struct {
         sendPanicIPI: ?fn (current_task: Task.Current) void = null,
 
         /// Send a flush IPI to the given executor.
-        sendFlushIPI: ?fn (current_task: Task.Current, executor: *cascade.Executor) void = null,
+        sendFlushIPI: ?fn (current_task: Task.Current, executor: *kernel.Executor) void = null,
 
         allocateInterrupt: ?fn (
             current_task: Task.Current,
@@ -864,9 +864,9 @@ pub const Functions = struct {
 
     paging: struct {
         /// Create a page table in the given physical frame.
-        createPageTable: ?fn (current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) *current_decls.paging.PageTable = null,
+        createPageTable: ?fn (current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) *current_decls.paging.PageTable = null,
 
-        loadPageTable: ?fn (current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) void = null,
+        loadPageTable: ?fn (current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) void = null,
 
         /// Copies the top level of `page_table` into `target_page_table`.
         copyTopLevelIntoPageTable: ?fn (
@@ -888,10 +888,10 @@ pub const Functions = struct {
             page_table: *current_decls.paging.PageTable,
             current_task: Task.Current,
             virtual_address: core.VirtualAddress,
-            physical_frame: cascade.mem.phys.Frame,
-            map_type: cascade.mem.MapType,
-            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
-        ) cascade.mem.MapError!void = null,
+            physical_frame: kernel.mem.phys.Frame,
+            map_type: kernel.mem.MapType,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        ) kernel.mem.MapError!void = null,
 
         /// Unmaps the given virtual range.
         ///
@@ -906,8 +906,8 @@ pub const Functions = struct {
             virtual_range: core.VirtualRange,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
-            flush_batch: *cascade.mem.VirtualRangeBatch,
-            deallocate_frame_list: *cascade.mem.phys.FrameList,
+            flush_batch: *kernel.mem.VirtualRangeBatch,
+            deallocate_frame_list: *kernel.mem.phys.FrameList,
         ) void = null,
 
         /// Changes the protection of the given virtual range.
@@ -921,9 +921,9 @@ pub const Functions = struct {
             page_table: *current_decls.paging.PageTable,
             current_task: Task.Current,
             virtual_range: core.VirtualRange,
-            previous_map_type: cascade.mem.MapType,
-            new_map_type: cascade.mem.MapType,
-            flush_batch: *cascade.mem.VirtualRangeBatch,
+            previous_map_type: kernel.mem.MapType,
+            new_map_type: kernel.mem.MapType,
+            flush_batch: *kernel.mem.VirtualRangeBatch,
         ) void = null,
 
         /// Flushes the cache for the given virtual range on the current executor.
@@ -959,7 +959,7 @@ pub const Functions = struct {
                 current_task: Task.Current,
                 page_table: *current_decls.paging.PageTable,
                 range: core.VirtualRange,
-                physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
             ) anyerror!void = null,
 
             /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -979,8 +979,8 @@ pub const Functions = struct {
                 page_table: *current_decls.paging.PageTable,
                 virtual_range: core.VirtualRange,
                 physical_range: core.PhysicalRange,
-                map_type: cascade.mem.MapType,
-                physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+                map_type: kernel.mem.MapType,
+                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
             ) anyerror!void = null,
         },
     },
@@ -994,7 +994,7 @@ pub const Functions = struct {
         createThread: ?fn (
             current_task: Task.Current,
             thread: *Thread,
-        ) cascade.mem.cache.ConstructorError!void = null,
+        ) kernel.mem.cache.ConstructorError!void = null,
 
         /// Destroy the `PerThread` data of a thread.
         ///
@@ -1092,7 +1092,7 @@ pub const Functions = struct {
         /// For example on x86_64 this is the TSC.
         ///
         /// Non-optional because it is used during early initialization.
-        getStandardWallclockStartTime: fn () cascade.time.wallclock.Tick,
+        getStandardWallclockStartTime: fn () kernel.time.wallclock.Tick,
 
         /// Attempt to get some form of architecture specific init output if it is available.
         ///
@@ -1107,7 +1107,7 @@ pub const Functions = struct {
         /// **WARNING**: This function will panic if the cpu cannot be prepared.
         prepareExecutor: ?fn (
             current_task: Task.Current,
-            executor: *cascade.Executor,
+            executor: *kernel.Executor,
             architecture_processor_id: u64,
         ) void = null,
 
@@ -1142,7 +1142,7 @@ pub const Functions = struct {
         /// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
         registerArchitecturalTimeSources: ?fn (
             current_task: Task.Current,
-            candidate_time_sources: *cascade.time.init.CandidateTimeSources,
+            candidate_time_sources: *kernel.time.init.CandidateTimeSources,
         ) void = null,
 
         /// Initialize the local interrupt controller for the current executor.

@@ -4,15 +4,15 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 
 const arm = @import("arm.zig");
 
 pub const functions: arch.Functions = .{
     .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *cascade.Executor {
+        inline fn getCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(arm.registers.TPIDR_EL1.read());
         }
     }.getCurrentExecutor,
@@ -43,7 +43,7 @@ pub const functions: arch.Functions = .{
 
     .init = .{
         .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
+            fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
                 return @enumFromInt(arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
             }
         }.getStandardWallclockStartTime,

@@ -5,8 +5,8 @@ const std = @import("std");
 
 const arch = @import("arch");
 const boot = @import("boot");
-const cascade = @import("cascade");
-const Task = cascade.Task;
+const kernel = @import("kernel");
+const Task = kernel.Task;
 const core = @import("core");
 const limine = @import("limine");
 
@@ -259,7 +259,7 @@ fn limineEntryPoint() callconv(.c) noreturn {
         @panic("bootloader does not supported requested limine revision");
     };
 
-    @call(.never_inline, cascade.init.initStage1, .{}) catch |err| {
+    @call(.never_inline, kernel.init.initStage1, .{}) catch |err| {
         std.debug.panic("unhandled error: {t}", .{err});
     };
     @panic("`initStage1` returned");

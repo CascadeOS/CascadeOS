@@ -4,13 +4,13 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const Process = cascade.user.Process;
-const Thread = cascade.user.Thread;
+const kernel = @import("kernel");
+const Task = kernel.Task;
+const Process = kernel.user.Process;
+const Thread = kernel.user.Thread;
 const core = @import("core");
 
-const log = cascade.debug.log.scoped(.user_x64);
+const log = kernel.debug.log.scoped(.user_x64);
 
 const x64 = @import("x64.zig");
 
@@ -81,7 +81,7 @@ pub const PerThread = struct {
 /// Non-architecture specific creation has already been performed but no initialization.
 ///
 /// This function is called in the `Thread` cache constructor.
-pub fn createThread(current_task: Task.Current, thread: *Thread) cascade.mem.cache.ConstructorError!void {
+pub fn createThread(current_task: Task.Current, thread: *Thread) kernel.mem.cache.ConstructorError!void {
     thread.arch_specific = .{
         .xsave = .{
             .area = @alignCast(
@@ -202,12 +202,12 @@ export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
         thread.arch_specific.xsave.load();
     }
 
-    cascade.user.onSyscall(current_task, .{ .arch_specific = syscall_frame });
+    kernel.user.onSyscall(current_task, .{ .arch_specific = syscall_frame });
 
     x64.instructions.disableInterrupts();
 }
 
-pub fn getSyscallEntryPoint(executor: *cascade.Executor) *const anyopaque {
+pub fn getSyscallEntryPoint(executor: *kernel.Executor) *const anyopaque {
     return globals.syscall_entry_points[@intFromEnum(executor.id)];
 }
 
@@ -283,14 +283,14 @@ pub const SyscallFrame = extern struct {
 
 const globals = struct {
     /// Initialized during `init.initialize`.
-    var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
+    var xsave_area_cache: kernel.mem.cache.RawCache = undefined;
 
-    export var syscall_temp_rsp_storage: [cascade.config.executor.maximum_number_of_executors]u64 = undefined;
+    export var syscall_temp_rsp_storage: [kernel.config.executor.maximum_number_of_executors]u64 = undefined;
     const syscall_entry_points: SyscallEntries = createSyscallEntryPoints();
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.thread_init);
+    const init_log = kernel.debug.log.scoped(.thread_init);
 
     /// Perform any per-achitecture initialization needed for userspace processes/threads.
     pub fn initialize(current_task: Task.Current) !void {
@@ -303,7 +303,7 @@ pub const init = struct {
     }
 };
 
-const SyscallEntries = [cascade.config.executor.maximum_number_of_executors]*const fn () callconv(.naked) noreturn;
+const SyscallEntries = [kernel.config.executor.maximum_number_of_executors]*const fn () callconv(.naked) noreturn;
 
 fn createSyscallEntryPoints() SyscallEntries {
     var temp_entry_points: SyscallEntries = undefined;
@@ -314,7 +314,7 @@ fn createSyscallEntryPoints() SyscallEntries {
 
     const current_task_offset = std.fmt.comptimePrint(
         "{d}",
-        .{@offsetOf(cascade.Executor, "current_task")},
+        .{@offsetOf(kernel.Executor, "current_task")},
     );
     const stack_top_offset = std.fmt.comptimePrint(
         "{d}",

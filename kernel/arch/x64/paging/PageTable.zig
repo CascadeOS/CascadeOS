@@ -5,9 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const bitjuggle = @import("bitjuggle");
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const MapType = cascade.mem.MapType;
+const kernel = @import("kernel");
+const Task = kernel.Task;
+const MapType = kernel.mem.MapType;
 const core = @import("core");
 
 const x64 = @import("../x64.zig");
@@ -43,10 +43,10 @@ pub const PageTable = extern struct {
     }
 
     /// Create a page table in the given physical frame.
-    pub fn create(current_task: Task.Current, physical_frame: cascade.mem.phys.Frame) *PageTable {
+    pub fn create(current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) *PageTable {
         _ = current_task;
 
-        const page_table = cascade.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
+        const page_table = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
         page_table.zero();
         return page_table;
     }
@@ -56,13 +56,13 @@ pub const PageTable = extern struct {
         level4_table: *PageTable,
         current_task: Task.Current,
         virtual_address: core.VirtualAddress,
-        physical_frame: cascade.mem.phys.Frame,
+        physical_frame: kernel.mem.phys.Frame,
         map_type: MapType,
-        physical_frame_allocator: cascade.mem.phys.FrameAllocator,
-    ) cascade.mem.MapError!void {
+        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    ) kernel.mem.MapError!void {
         if (core.is_debug) std.debug.assert(virtual_address.isAligned(small_page_size));
 
-        var deallocate_frame_list: cascade.mem.phys.FrameList = .{};
+        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
         errdefer physical_frame_allocator.deallocate(current_task, deallocate_frame_list);
 
         const level4_index = p4Index(virtual_address);
@@ -135,8 +135,8 @@ pub const PageTable = extern struct {
         virtual_range: core.VirtualRange,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
-        flush_batch: *cascade.mem.VirtualRangeBatch,
-        deallocate_frame_list: *cascade.mem.phys.FrameList,
+        flush_batch: *kernel.mem.VirtualRangeBatch,
+        deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) void {
         _ = current_task;
 
@@ -161,7 +161,7 @@ pub const PageTable = extern struct {
             const level4_entry = level4_table.entries[level4_index].load();
 
             const level3_table = level4_entry.getNextLevel(
-                cascade.mem.directMapFromPhysical,
+                kernel.mem.directMapFromPhysical,
             ) catch |err| switch (err) {
                 error.NotPresent => {
                     if (opt_in_progress_range) |in_progress_range| {
@@ -191,7 +191,7 @@ pub const PageTable = extern struct {
                 const level3_entry = level3_table.entries[level3_index].load();
 
                 const level2_table = level3_entry.getNextLevel(
-                    cascade.mem.directMapFromPhysical,
+                    kernel.mem.directMapFromPhysical,
                 ) catch |err| switch (err) {
                     error.NotPresent => {
                         if (opt_in_progress_range) |in_progress_range| {
@@ -221,7 +221,7 @@ pub const PageTable = extern struct {
                     const level2_entry = level2_table.entries[level2_index].load();
 
                     const level1_table = level2_entry.getNextLevel(
-                        cascade.mem.directMapFromPhysical,
+                        kernel.mem.directMapFromPhysical,
                     ) catch |err| switch (err) {
                         error.NotPresent => {
                             if (opt_in_progress_range) |in_progress_range| {
@@ -291,7 +291,7 @@ pub const PageTable = extern struct {
         virtual_range: core.VirtualRange,
         previous_map_type: MapType,
         new_map_type: MapType,
-        flush_batch: *cascade.mem.VirtualRangeBatch,
+        flush_batch: *kernel.mem.VirtualRangeBatch,
     ) void {
         _ = current_task;
 
@@ -319,7 +319,7 @@ pub const PageTable = extern struct {
             const level4_entry = level4_table.entries[level4_index].load();
 
             const level3_table = level4_entry.getNextLevel(
-                cascade.mem.directMapFromPhysical,
+                kernel.mem.directMapFromPhysical,
             ) catch |err| switch (err) {
                 error.NotPresent => {
                     if (opt_in_progress_range) |in_progress_range| {
@@ -344,7 +344,7 @@ pub const PageTable = extern struct {
                 const level3_entry = level3_table.entries[level3_index].load();
 
                 const level2_table = level3_entry.getNextLevel(
-                    cascade.mem.directMapFromPhysical,
+                    kernel.mem.directMapFromPhysical,
                 ) catch |err| switch (err) {
                     error.NotPresent => {
                         if (opt_in_progress_range) |in_progress_range| {
@@ -369,7 +369,7 @@ pub const PageTable = extern struct {
                     const level2_entry = level2_table.entries[level2_index].load();
 
                     const level1_table = level2_entry.getNextLevel(
-                        cascade.mem.directMapFromPhysical,
+                        kernel.mem.directMapFromPhysical,
                     ) catch |err| switch (err) {
                         error.NotPresent => {
                             if (opt_in_progress_range) |in_progress_range| {
@@ -999,7 +999,7 @@ pub const PageTable = extern struct {
             current_task: Task.Current,
             page_table: *PageTable,
             range: core.VirtualRange,
-            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
         ) !void {
             const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
             if (core.is_debug) {
@@ -1033,7 +1033,7 @@ pub const PageTable = extern struct {
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: MapType,
-            physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
         ) !void {
             if (core.is_debug) {
                 std.debug.assert(virtual_range.address.isAligned(small_page_size));
@@ -1171,7 +1171,7 @@ pub const PageTable = extern struct {
             );
         }
 
-        const init_log = cascade.debug.log.scoped(.paging_init);
+        const init_log = kernel.debug.log.scoped(.paging_init);
     };
 
     comptime {
@@ -1185,7 +1185,7 @@ pub const PageTable = extern struct {
 fn ensureNextTable(
     current_task: Task.Current,
     raw_entry: *PageTable.Entry.Raw,
-    physical_frame_allocator: cascade.mem.phys.FrameAllocator,
+    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 
@@ -1204,7 +1204,7 @@ fn ensureNextTable(
         errdefer comptime unreachable;
 
         const physical_address = physical_frame.baseAddress();
-        cascade.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
+        kernel.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
 
         entry.setAddress4kib(physical_address);
         entry.present.write(true);
@@ -1220,7 +1220,7 @@ fn ensureNextTable(
     };
 
     return .{
-        cascade.mem
+        kernel.mem
             .directMapFromPhysical(next_level_physical_address)
             .toPtr(*PageTable),
         created_table,

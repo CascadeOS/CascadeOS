@@ -59,7 +59,7 @@ fn constructKernel(
     architecture: CascadeTarget.Architecture,
 ) !Kernel {
     { // check exe
-        const check_module = try constructKernelModule(
+        const check_module = try constructKernelRootModule(
             b,
             all_libraries,
             options,
@@ -73,7 +73,7 @@ fn constructKernel(
         step_collection.registerCheck(check_exe);
     }
 
-    const kernel_module = try constructKernelModule(
+    const kernel_root_module = try constructKernelRootModule(
         b,
         all_libraries,
         options,
@@ -83,7 +83,7 @@ fn constructKernel(
 
     const kernel_exe = b.addExecutable(.{
         .name = "kernel",
-        .root_module = kernel_module,
+        .root_module = kernel_root_module,
     });
 
     if (architecture == .x64) {
@@ -188,7 +188,7 @@ fn constructKernel(
     };
 }
 
-fn constructKernelModule(
+fn constructKernelRootModule(
     b: *std.Build,
     all_libraries: Library.Collection,
     options: Options,
@@ -207,7 +207,7 @@ fn constructKernelModule(
         is_check,
     );
 
-    const kernel_module = b.createModule(.{
+    const kernel_root_module = b.createModule(.{
         .root_source_file = b.path("kernel/root.zig"),
 
         .target = architecture.kernelTarget(b),
@@ -224,21 +224,21 @@ fn constructKernelModule(
 
         .omit_frame_pointer = false,
     });
-    kernel_module.addImport("arch", required_components.get("arch").?.module);
-    kernel_module.addImport("boot", required_components.get("boot").?.module);
-    kernel_module.addImport("cascade", required_components.get("cascade").?.module);
+    kernel_root_module.addImport("arch", required_components.get("arch").?.module);
+    kernel_root_module.addImport("boot", required_components.get("boot").?.module);
+    kernel_root_module.addImport("kernel", required_components.get("kernel").?.module);
 
     // apply architecture-specific configuration to the kernel
     switch (architecture) {
         .arm => {},
         .riscv => {},
         .x64 => {
-            kernel_module.code_model = .kernel;
-            kernel_module.red_zone = false;
+            kernel_root_module.code_model = .kernel;
+            kernel_root_module.red_zone = false;
         },
     }
 
-    return kernel_module;
+    return kernel_root_module;
 }
 
 /// Returns the kernel components required to build the kernel.
@@ -248,7 +248,7 @@ fn getAllRequiredComponents(
     b: *std.Build,
 ) !WipComponent.Collection {
     var todo_components: std.StringArrayHashMapUnmanaged(void) = .empty;
-    try todo_components.putNoClobber(b.allocator, "cascade", {});
+    try todo_components.putNoClobber(b.allocator, "kernel", {});
 
     var required_components: WipComponent.Collection = .{};
 
