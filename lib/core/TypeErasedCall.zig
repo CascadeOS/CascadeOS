@@ -25,6 +25,21 @@ const std = @import("std");
 pub const TypeErasedCall = extern struct {
     typeErased: *const TypeErasedFn,
     args: [supported_number_of_args]usize,
+    return_type: ReturnType,
+
+    pub const ReturnType = enum(u8) {
+        void,
+        noreturn,
+        void_error_union,
+        noreturn_error_union,
+
+        pub fn isNoReturn(return_type: ReturnType) bool {
+            return switch (return_type) {
+                .void, .void_error_union => false,
+                .noreturn, .noreturn_error_union => true,
+            };
+        }
+    };
 
     pub const supported_number_of_args = 5;
 
@@ -41,9 +56,12 @@ pub const TypeErasedCall = extern struct {
     }
 
     pub fn prepare(comptime function: anytype, args: std.meta.ArgsTuple(@TypeOf(function))) TypeErasedCall {
+        const typeErased, const return_type = typeErasedFn(function);
+
         var type_erased: TypeErasedCall = .{
-            .typeErased = typeErasedFn(function),
+            .typeErased = typeErased,
             .args = undefined,
+            .return_type = return_type,
         };
 
         inline for (args, 0..) |arg, i| {
@@ -121,10 +139,13 @@ pub const TypeErasedCall = extern struct {
                     }
                 }
 
+                const typeErased, const return_type = typeErasedFn(function);
+
                 var templated_type_erased: @This() = .{
                     .type_erased_call = .{
-                        .typeErased = typeErasedFn(function),
+                        .typeErased = typeErased,
                         .args = undefined,
+                        .return_type = return_type,
                     },
                 };
 
@@ -300,17 +321,19 @@ inline fn argFromUsize(comptime ArgT: type, value: usize) ArgT {
     }
 }
 
-fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
+fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn, TypeErasedCall.ReturnType } {
     const fn_info = @typeInfo(@TypeOf(function)).@"fn";
 
-    const returns_error = comptime blk: {
+    const return_type: TypeErasedCall.ReturnType = comptime blk: {
         const ReturnType = fn_info.return_type.?;
 
-        if (ReturnType == void or ReturnType == noreturn) break :blk false;
+        if (ReturnType == void) break :blk .void;
+        if (ReturnType == noreturn) break :blk .noreturn;
 
         switch (@typeInfo(ReturnType)) {
             .error_union => |error_union| {
-                if (error_union.payload == void or error_union.payload == noreturn) break :blk true;
+                if (error_union.payload == void) break :blk .void_error_union;
+                if (error_union.payload == noreturn) break :blk .noreturn_error_union;
             },
             else => {},
         }
@@ -320,93 +343,111 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
 
     const function_parameters = @typeInfo(@TypeOf(function)).@"fn".params;
 
-    return switch (function_parameters.len) {
+    return .{ switch (function_parameters.len) {
         0 => struct {
             fn typeErased0Args(_: usize, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
-                return if (returns_error)
-                    function() catch |err| std.debug.panic("unhandled error: {t}", .{err})
-                else
-                    function();
+                return switch (comptime return_type) {
+                    .void, .noreturn => function(),
+                    .void_error_union, .noreturn_error_union => function() catch |err| std.debug.panic(
+                        "unhandled error: {t}",
+                        .{err},
+                    ),
+                };
             }
         }.typeErased0Args,
         1 => struct {
             fn typeErased1Args(arg0: usize, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
-                return if (returns_error)
-                    function(
+                return switch (comptime return_type) {
+                    .void, .noreturn => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
-                    ) catch |err| std.debug.panic("unhandled error: {t}", .{err})
-                else
-                    function(
+                    ),
+                    .void_error_union, .noreturn_error_union => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
-                    );
+                    ) catch |err| std.debug.panic(
+                        "unhandled error: {t}",
+                        .{err},
+                    ),
+                };
             }
         }.typeErased1Args,
         2 => struct {
             fn typeErased2Args(arg0: usize, arg1: usize, _: usize, _: usize, _: usize) callconv(.c) void {
-                return if (returns_error)
-                    function(
+                return switch (comptime return_type) {
+                    .void, .noreturn => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
-                    ) catch |err| std.debug.panic("unhandled error: {t}", .{err})
-                else
-                    function(
+                    ),
+                    .void_error_union, .noreturn_error_union => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
-                    );
+                    ) catch |err| std.debug.panic(
+                        "unhandled error: {t}",
+                        .{err},
+                    ),
+                };
             }
         }.typeErased2Args,
         3 => struct {
             fn typeErased3Ags(arg0: usize, arg1: usize, arg2: usize, _: usize, _: usize) callconv(.c) void {
-                return if (returns_error)
-                    function(
+                return switch (comptime return_type) {
+                    .void, .noreturn => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
                         argFromUsize(function_parameters[2].type.?, arg2),
-                    ) catch |err| std.debug.panic("unhandled error: {t}", .{err})
-                else
-                    function(
+                    ),
+                    .void_error_union, .noreturn_error_union => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
                         argFromUsize(function_parameters[2].type.?, arg2),
-                    );
+                    ) catch |err| std.debug.panic(
+                        "unhandled error: {t}",
+                        .{err},
+                    ),
+                };
             }
         }.typeErased3Ags,
         4 => struct {
             fn typeErased4Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize, _: usize) callconv(.c) void {
-                return if (returns_error)
-                    function(
+                return switch (comptime return_type) {
+                    .void, .noreturn => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
                         argFromUsize(function_parameters[2].type.?, arg2),
                         argFromUsize(function_parameters[3].type.?, arg3),
-                    ) catch |err| std.debug.panic("unhandled error: {t}", .{err})
-                else
-                    function(
+                    ),
+                    .void_error_union, .noreturn_error_union => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
                         argFromUsize(function_parameters[2].type.?, arg2),
                         argFromUsize(function_parameters[3].type.?, arg3),
-                    );
+                    ) catch |err| std.debug.panic(
+                        "unhandled error: {t}",
+                        .{err},
+                    ),
+                };
             }
         }.typeErased4Args,
         5 => struct {
             fn typeErased5Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) callconv(.c) void {
-                return if (returns_error)
-                    function(
+                return switch (comptime return_type) {
+                    .void, .noreturn => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
                         argFromUsize(function_parameters[2].type.?, arg2),
                         argFromUsize(function_parameters[3].type.?, arg3),
                         argFromUsize(function_parameters[4].type.?, arg4),
-                    ) catch |err| std.debug.panic("unhandled error: {t}", .{err})
-                else
-                    function(
+                    ),
+                    .void_error_union, .noreturn_error_union => function(
                         argFromUsize(function_parameters[0].type.?, arg0),
                         argFromUsize(function_parameters[1].type.?, arg1),
                         argFromUsize(function_parameters[2].type.?, arg2),
                         argFromUsize(function_parameters[3].type.?, arg3),
                         argFromUsize(function_parameters[4].type.?, arg4),
-                    );
+                    ) catch |err| std.debug.panic(
+                        "unhandled error: {t}",
+                        .{err},
+                    ),
+                };
             }
         }.typeErased5Args,
         else => @compileError(
@@ -415,5 +456,5 @@ fn typeErasedFn(comptime function: anytype) TypeErasedCall.TypeErasedFn {
                 .{ TypeErasedCall.supported_number_of_args, function_parameters.len },
             ),
         ),
-    };
+    }, return_type };
 }
