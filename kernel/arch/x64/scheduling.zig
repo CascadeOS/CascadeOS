@@ -50,57 +50,36 @@ pub fn switchTask(
     old_task: *Task,
     new_task: *Task,
 ) void {
-    const impls = struct {
-        const switchTaskImpl: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\push %rbx
-                        \\push %rbp
-                        \\push %r12
-                        \\push %r13
-                        \\push %r14
-                        \\push %r15
-                        \\mov %rsp, %rax
-                        \\mov %rax, (%rsi)
-                        \\mov %rdi, %rsp
-                        \\pop %r15
-                        \\pop %r14
-                        \\pop %r13
-                        \\pop %r12
-                        \\pop %rbp
-                        \\pop %rbx
-                        \\ret
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rbp = true,
-                            .r15 = true,
-                            .r14 = true,
-                            .r13 = true,
-                            .r12 = true,
-                            .rbx = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
-    };
-
-    if (core.is_debug) {
-        std.debug.assert(new_task.stack.spaceFor(
-            6, // general purpose registers
-        ));
-    }
-
-    impls.switchTaskImpl(
-        new_task.stack.stack_pointer,
-        &old_task.stack.stack_pointer,
-    );
+    asm volatile (
+        \\lea 1f(%rip), %rax
+        \\push %rax
+        \\mov %rsp, (%[old_stack_pointer])
+        \\mov %[new_stack_pointer], %rsp
+        \\pop %rax
+        \\jmp *%rax
+        \\1:
+        :
+        : [old_stack_pointer] "{r10}" (@intFromPtr(&old_task.stack.stack_pointer)),
+          [new_stack_pointer] "{r11}" (new_task.stack.stack_pointer),
+        : .{
+          .memory = true,
+          .rax = true,
+          .rbx = true,
+          .rcx = true,
+          .rdx = true,
+          .rsi = true,
+          .rdi = true,
+          .rsp = true,
+          .rbp = true,
+          .r8 = true,
+          .r9 = true,
+          .r10 = true,
+          .r11 = true,
+          .r12 = true,
+          .r13 = true,
+          .r14 = true,
+          .r15 = true,
+        });
 }
 
 /// Switches to `new_task`.
@@ -111,16 +90,11 @@ pub fn switchTaskNoSave(
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
-        \\mov %[stack_pointer], %rsp
-        \\pop %r15
-        \\pop %r14
-        \\pop %r13
-        \\pop %r12
-        \\pop %rbp
-        \\pop %rbx
-        \\ret
+        \\mov %[new_stack_pointer], %rsp
+        \\pop %rax
+        \\jmp *%rax
         :
-        : [stack_pointer] "r" (new_task.stack.stack_pointer),
+        : [new_stack_pointer] "r" (new_task.stack.stack_pointer),
     );
     unreachable;
 }
@@ -134,39 +108,33 @@ pub fn prepareTaskForScheduling(
     task: *Task,
     type_erased_call: core.TypeErasedCall,
 ) void {
-    const impls = struct {
-        const taskEntryTrampoline: *const fn () callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\pop %rdi // current_task
-                        \\pop %rsi // type_erased_call.typeErased
-                        \\pop %rdx // type_erased_call.args[0]
-                        \\pop %rcx // type_erased_call.args[1]
-                        \\pop %r8  // type_erased_call.args[2]
-                        \\pop %r9  // type_erased_call.args[3]
-                        \\ret      // the address of `Task.internal.taskEntry` is on the stack
-                    );
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
+    const impl = struct {
+        fn taskEntryTrampoline() callconv(.naked) void {
+            asm volatile (
+                \\pop %rdi       // current_task
+                \\pop %rsi       // type_erased_call.typeErased
+                \\pop %rdx       // type_erased_call.args[0]
+                \\pop %rcx       // type_erased_call.args[1]
+                \\pop %r8        // type_erased_call.args[2]
+                \\pop %r9        // type_erased_call.args[3]
+                \\xor %ebp, %ebp
+                \\ret            // the address of `Task.internal.taskEntry` is on the stack
+            );
+        }
     };
 
-    std.debug.assert(
+    if (core.is_debug) std.debug.assert(
         task.stack.spaceFor(1 + // args[4]
             1 + // task entry return address
             1 + // taskEntry
             4 + // args[..4]
             1 + // type_erased_call.typeErased
             1 + // task
-            1 + // taskEntryTrampoline
-            6 // general purpose registers
+            1 // taskEntryTrampoline
         ),
     );
 
-    task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `impls.taskEntryTrampoline` as per System V ABI
+    task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `taskEntryTrampoline` as per SysV ABI for 7th arg
 
     task.stack.push(0) catch unreachable; // task entry return address
 
@@ -179,10 +147,7 @@ pub fn prepareTaskForScheduling(
     task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
     task.stack.push(@intFromPtr(task)) catch unreachable;
 
-    task.stack.push(@intFromPtr(impls.taskEntryTrampoline)) catch unreachable;
-
-    // general purpose registers
-    for (0..6) |_| task.stack.push(0) catch unreachable;
+    task.stack.push(@intFromPtr(&impl.taskEntryTrampoline)) catch unreachable;
 }
 
 /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
@@ -191,63 +156,42 @@ pub fn call(
     new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) arch.scheduling.CallError!void {
-    const impls = struct {
-        const callImpl: *const fn (
-            new_kernel_stack_pointer: core.VirtualAddress, // rdi
-            previous_kernel_stack_pointer: *core.VirtualAddress, // rsi
-        ) callconv(.c) void = blk: {
-            const impl = struct {
-                fn impl() callconv(.naked) void {
-                    asm volatile (
-                        \\push %rbx
-                        \\push %rbp
-                        \\push %r12
-                        \\push %r13
-                        \\push %r14
-                        \\push %r15
-                        \\mov %rsp, %rax
-                        \\mov %rax, (%rsi)
-                        \\mov %rdi, %rsp
-                        \\pop %rdi         // arg0
-                        \\pop %rsi         // arg1
-                        \\pop %rdx         // arg2
-                        \\pop %rcx         // arg3
-                        \\pop %r8          // arg4
-                        \\ret              // the address of `type_erased_call.typeErased` is on the stack
-                        ::: .{
-                            .memory = true,
-                            .rsp = true,
-                            .rdi = true,
-                            .rsi = true,
-                            .rdx = true,
-                            .rcx = true,
-                            .r8 = true,
-                        });
-                }
-            }.impl;
-
-            break :blk @ptrCast(&impl);
-        };
-    };
-
-    if (core.is_debug) {
-        std.debug.assert(new_stack.spaceFor(
-            1 + // type_erased_call.typeErased
-                5, // args[0..5]
-        ));
-    }
-
-    try new_stack.push(@intFromPtr(type_erased_call.typeErased));
-    try new_stack.push(type_erased_call.args[4]);
-    try new_stack.push(type_erased_call.args[3]);
-    try new_stack.push(type_erased_call.args[2]);
-    try new_stack.push(type_erased_call.args[1]);
-    try new_stack.push(type_erased_call.args[0]);
-
-    impls.callImpl(
-        new_stack.stack_pointer,
-        &old_task.stack.stack_pointer,
-    );
+    asm volatile (
+        \\lea 1f(%rip), %rax
+        \\push %rax
+        \\mov %rsp, (%[old_stack_pointer])
+        \\mov %[new_stack_pointer], %rsp
+        \\xor %ebp, %ebp
+        \\jmp *%[typeErased]
+        \\1:
+        :
+        : [arg0] "{rdi}" (type_erased_call.args[0]),
+          [arg1] "{rsi}" (type_erased_call.args[1]),
+          [arg2] "{rdx}" (type_erased_call.args[2]),
+          [arg3] "{rcx}" (type_erased_call.args[3]),
+          [arg4] "{r8}" (type_erased_call.args[4]),
+          [old_stack_pointer] "{r10}" (@intFromPtr(&old_task.stack.stack_pointer)),
+          [new_stack_pointer] "{r11}" (new_stack.stack_pointer),
+          [typeErased] "{r9}" (@intFromPtr(type_erased_call.typeErased)),
+        : .{
+          .memory = true,
+          .rax = true,
+          .rbx = true,
+          .rcx = true,
+          .rdx = true,
+          .rsi = true,
+          .rdi = true,
+          .rsp = true,
+          .rbp = true,
+          .r8 = true,
+          .r9 = true,
+          .r10 = true,
+          .r11 = true,
+          .r12 = true,
+          .r13 = true,
+          .r14 = true,
+          .r15 = true,
+        });
 }
 
 /// Calls `type_erased_call` on `new_stack`.
@@ -257,18 +201,17 @@ pub fn callNoSave(
 ) arch.scheduling.CallError!noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
-        \\mov %[stack_pointer], %rsp
+        \\mov %[new_stack_pointer], %rsp
         \\xor %ebp, %ebp
         \\jmp *%[typeErased]
-        \\ud2
         :
         : [arg0] "{rdi}" (type_erased_call.args[0]),
           [arg1] "{rsi}" (type_erased_call.args[1]),
           [arg2] "{rdx}" (type_erased_call.args[2]),
           [arg3] "{rcx}" (type_erased_call.args[3]),
           [arg4] "{r8}" (type_erased_call.args[4]),
-          [stack_pointer] "r" (new_stack.stack_pointer),
-          [typeErased] "r" (@intFromPtr(type_erased_call.typeErased)),
+          [new_stack_pointer] "{r11}" (new_stack.stack_pointer),
+          [typeErased] "{r10}" (@intFromPtr(type_erased_call.typeErased)),
     );
     unreachable;
 }
