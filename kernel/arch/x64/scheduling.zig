@@ -46,7 +46,7 @@ pub fn beforeSwitchTask(
 /// If `old_task` is not null its state is saved to allow it to be resumed later.
 ///
 /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-pub fn switchTask(
+pub inline fn switchTask(
     old_task: *Task,
     new_task: *Task,
 ) void {
@@ -85,7 +85,7 @@ pub fn switchTask(
 /// Switches to `new_task`.
 ///
 /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-pub fn switchTaskNoSave(
+pub inline fn switchTaskNoSave(
     new_task: *Task,
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned
@@ -151,7 +151,7 @@ pub fn prepareTaskForScheduling(
 }
 
 /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
-pub fn call(
+pub inline fn call(
     old_task: *Task,
     new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
@@ -195,7 +195,7 @@ pub fn call(
 }
 
 /// Calls `type_erased_call` on `new_stack`.
-pub fn callNoSave(
+pub inline fn callNoSave(
     new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) noreturn {

@@ -1039,12 +1039,12 @@ pub const Functions = struct {
         /// The state of `old_task` is saved to allow it to be resumed later.
         ///
         /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-        switchTask: ?fn (old_task: *Task, new_task: *Task) void = null,
+        switchTask: ?fn (old_task: *Task, new_task: *Task) callconv(.@"inline") void = null,
 
         /// Switches to `new_task`.
         ///
         /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-        switchTaskNoSave: ?fn (new_task: *Task) noreturn = null,
+        switchTaskNoSave: ?fn (new_task: *Task) callconv(.@"inline") noreturn = null,
 
         /// Prepares the given task for being scheduled.
         ///
@@ -1061,13 +1061,13 @@ pub const Functions = struct {
             old_task: *Task,
             new_stack: *Task.Stack,
             type_erased_call: core.TypeErasedCall,
-        ) void = null,
+        ) callconv(.@"inline") void = null,
 
         /// Calls `type_erased_call` on `new_stack`.
         callNoSave: ?fn (
             new_stack: *Task.Stack,
             type_erased_call: core.TypeErasedCall,
-        ) noreturn = null,
+        ) callconv(.@"inline") noreturn = null,
     },
 
     io: struct {
