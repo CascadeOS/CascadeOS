@@ -217,11 +217,7 @@ fn switchToIdleDeferredAction(
                 deferred_action.arg,
             },
         ),
-    ) catch |err| {
-        switch (err) {
-            error.StackOverflow => @panic("insufficent space on the scheduler task stack"),
-        }
-    };
+    );
 
     // returning to the old task
     if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
@@ -339,11 +335,7 @@ fn switchToTaskFromTaskDeferredAction(
                 deferred_action.arg,
             },
         ),
-    ) catch |err| {
-        switch (err) {
-            error.StackOverflow => @panic("insufficent space on the scheduler task stack"),
-        }
-    };
+    );
 
     // returning to the old task
     if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);

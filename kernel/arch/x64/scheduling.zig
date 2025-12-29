@@ -155,7 +155,7 @@ pub fn call(
     old_task: *Task,
     new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
-) arch.scheduling.CallError!void {
+) void {
     asm volatile (
         \\lea 1f(%rip), %rax
         \\push %rax
@@ -198,7 +198,7 @@ pub fn call(
 pub fn callNoSave(
     new_stack: *Task.Stack,
     type_erased_call: core.TypeErasedCall,
-) arch.scheduling.CallError!noreturn {
+) noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
         \\mov %[new_stack_pointer], %rsp

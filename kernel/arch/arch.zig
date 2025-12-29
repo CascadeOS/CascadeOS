@@ -488,8 +488,8 @@ pub const scheduling = struct {
         old_task: *Task,
         new_stack: *Task.Stack,
         type_erased_call: core.TypeErasedCall,
-    ) callconv(core.inline_in_non_debug) CallError!void {
-        return getFunction(current_functions.scheduling, "call")(
+    ) callconv(core.inline_in_non_debug) void {
+        getFunction(current_functions.scheduling, "call")(
             old_task,
             new_stack,
             type_erased_call,
@@ -500,8 +500,8 @@ pub const scheduling = struct {
     pub fn callNoSave(
         new_stack: *Task.Stack,
         type_erased_call: core.TypeErasedCall,
-    ) callconv(core.inline_in_non_debug) CallError!noreturn {
-        return getFunction(current_functions.scheduling, "callNoSave")(
+    ) callconv(core.inline_in_non_debug) noreturn {
+        getFunction(current_functions.scheduling, "callNoSave")(
             new_stack,
             type_erased_call,
         );
@@ -1061,13 +1061,13 @@ pub const Functions = struct {
             old_task: *Task,
             new_stack: *Task.Stack,
             type_erased_call: core.TypeErasedCall,
-        ) scheduling.CallError!void = null,
+        ) void = null,
 
         /// Calls `type_erased_call` on `new_stack`.
         callNoSave: ?fn (
             new_stack: *Task.Stack,
             type_erased_call: core.TypeErasedCall,
-        ) scheduling.CallError!noreturn = null,
+        ) noreturn = null,
     },
 
     io: struct {
