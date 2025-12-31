@@ -110,7 +110,7 @@ pub inline fn switchTask(
         \\jmp *%rax
         \\1:
         :
-        : [old_stack_pointer] "{r10}" (@intFromPtr(&old_task.stack.stack_pointer)),
+        : [old_stack_pointer] "{r10}" (&old_task.stack.stack_pointer),
           [new_stack_pointer] "{r11}" (new_task.stack.stack_pointer),
         : .{
           .memory = true,
@@ -170,9 +170,9 @@ pub inline fn call(
           [arg2] "{rdx}" (type_erased_call.args[2]),
           [arg3] "{rcx}" (type_erased_call.args[3]),
           [arg4] "{r8}" (type_erased_call.args[4]),
-          [old_stack_pointer] "{r10}" (@intFromPtr(&old_task.stack.stack_pointer)),
+          [old_stack_pointer] "{r10}" (&old_task.stack.stack_pointer),
           [new_stack_pointer] "{r11}" (new_stack.stack_pointer),
-          [typeErased] "{r9}" (@intFromPtr(type_erased_call.typeErased)),
+          [typeErased] "{r9}" (type_erased_call.typeErased),
         : .{
           .memory = true,
           .rax = true,
@@ -211,7 +211,7 @@ pub inline fn callNoSave(
           [arg3] "{rcx}" (type_erased_call.args[3]),
           [arg4] "{r8}" (type_erased_call.args[4]),
           [new_stack_pointer] "{r11}" (new_stack.stack_pointer),
-          [typeErased] "{r10}" (@intFromPtr(type_erased_call.typeErased)),
+          [typeErased] "{r10}" (type_erased_call.typeErased),
     );
     unreachable;
 }
