@@ -77,7 +77,7 @@ pub const init = struct {
         } else {
             globals.lapic = .{
                 .xapic = kernel.mem.nonCachedDirectMapFromPhysical(
-                    core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address),
+                    core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address), // TODO: get the address from the msr
                 ).toPtr([*]volatile u8),
             };
         }
