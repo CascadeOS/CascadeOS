@@ -43,7 +43,12 @@ fn tryGetSerialOutputInner(current_task: Task.Current) GetSerialOutputError!?uar
 
     if (try getSerialOutputFromChosenNode(current_task, dt)) |output_uart| return output_uart;
 
-    var iter = dt.compatibleMatchIterator({}, matchFunction);
+    var iter = try dt.nodeCompatibleMatchIteratorAdvanced(
+        .root,
+        .all_children,
+        {},
+        matchFunction,
+    );
 
     while (try iter.next(dt)) |compatible_match| {
         const func = compatible_lookup.get(compatible_match.compatible).?;
@@ -63,16 +68,22 @@ fn getDeviceTree(current_task: Task.Current) ?DeviceTree {
 }
 
 fn getSerialOutputFromChosenNode(current_task: Task.Current, dt: DeviceTree) GetSerialOutputError!?uart.Uart {
-    const chosen_node = (try DeviceTree.Node.root.firstMatchingSubnode(
-        dt,
-        .direct_children,
-        .{ .name = "chosen" },
-    )) orelse return null;
+    const chosen_node = blk: {
+        var node_iter = try dt.nodeIterator(
+            .root,
+            .direct_children,
+            .{ .name = "chosen" },
+        );
+        break :blk (try node_iter.next(dt)) orelse return null;
+    };
 
-    const stdout_path_property = (try chosen_node.node.firstMatchingProperty(
-        dt,
-        .{ .name = "stdout-path" },
-    )) orelse return null;
+    const stdout_path_property = blk: {
+        var property_iter = try chosen_node.node.propertyIterator(
+            dt,
+            .{ .name = "stdout-path" },
+        );
+        break :blk (try property_iter.next()) orelse return null;
+    };
 
     const stdout_path = stdout_path_property.value.toString();
 
@@ -97,20 +108,25 @@ fn getSerialOutputFromChosenNode(current_task: Task.Current, dt: DeviceTree) Get
 
 fn getSerialOutputFromNS16550a(current_task: Task.Current, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = blk: {
-        const clock_frequency_property = (try node.firstMatchingProperty(
+        var property_iter = try node.propertyIterator(
             dt,
             .{ .name = "clock-frequency" },
-        )) orelse {
+        );
+
+        const clock_frequency_property = if (try property_iter.next()) |prop| prop else {
             log.warn(current_task, "no clock-frequency property found for ns16550a", .{});
             return null;
         };
+
         break :blk clock_frequency_property.value.toU32();
     };
     const address = blk: {
-        const reg_property = (try node.firstMatchingProperty(
+        var property_iter = try node.propertyIterator(
             dt,
             .{ .name = "reg" },
-        )) orelse {
+        );
+
+        const reg_property = if (try property_iter.next()) |prop| prop else {
             log.warn(current_task, "no reg property found for ns16550a", .{});
             return null;
         };
@@ -140,10 +156,12 @@ fn getSerialOutputFromNS16550a(current_task: Task.Current, dt: DeviceTree, node:
 
 fn getSerialOutputFromPL011(current_task: Task.Current, dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
     const clock_frequency = clock_frequency: {
-        const clocks_property = (try node.firstMatchingProperty(
+        var property_iter = try node.propertyIterator(
             dt,
             .{ .name = "clocks" },
-        )) orelse {
+        );
+
+        const clocks_property = if (try property_iter.next()) |prop| prop else {
             log.warn(current_task, "no clocks property found for pl011", .{});
             return null;
         };
@@ -160,10 +178,12 @@ fn getSerialOutputFromPL011(current_task: Task.Current, dt: DeviceTree, node: De
             return null;
         };
 
-        const clock_frequency_property = (try clock_node.node.firstMatchingProperty(
+        property_iter = try clock_node.node.propertyIterator(
             dt,
             .{ .name = "clock-frequency" },
-        )) orelse {
+        );
+
+        const clock_frequency_property = if (try property_iter.next()) |prop| prop else {
             log.warn(current_task, "no clock-frequency property found for pl011", .{});
             return null;
         };
@@ -171,10 +191,12 @@ fn getSerialOutputFromPL011(current_task: Task.Current, dt: DeviceTree, node: De
         break :clock_frequency clock_frequency_property.value.toU32();
     };
     const address = blk: {
-        const reg_property = (try node.firstMatchingProperty(
+        var property_iter = try node.propertyIterator(
             dt,
             .{ .name = "reg" },
-        )) orelse {
+        );
+
+        const reg_property = if (try property_iter.next()) |prop| prop else {
             log.warn(current_task, "no reg property found for pl011", .{});
             return null;
         };

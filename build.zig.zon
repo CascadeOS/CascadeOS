@@ -11,8 +11,8 @@
 
     .dependencies = .{
         .devicetree = .{
-            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#54571ee6e4196f6248658dcbc71eb5f0aff4ce94",
-            .hash = "devicetree-3.0.1-cZRcrDugAQCBlQ4DAyQy0LBVEJKn_IEPr6MTn0S-aDF3",
+            .url = "git+https://github.com/CascadeOS/zig-devicetree.git?ref=main#35c0203e384eb12dddeeda49f31cd7d5c1ba7481",
+            .hash = "devicetree-4.0.0-cZRcrL-QAQD0bHWWBIdMjhFqJy1bI7AKtjxAt-NYpK8c",
         },
 
         .edk2 = .{
