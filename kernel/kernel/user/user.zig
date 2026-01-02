@@ -4,10 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
 
+pub const elf = @import("elf.zig");
 pub const Process = @import("Process.zig");
 pub const Thread = @import("Thread.zig");
 
