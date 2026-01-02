@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const cascade = @import("cascade");
 const arch = @import("arch");
 const kernel = @import("kernel");
 const Task = kernel.Task;
@@ -230,6 +231,10 @@ pub const SyscallFrame = extern struct {
     rflags: x64.registers.RFlags,
     rip: u64,
     rsp: u64,
+
+    pub fn syscall(syscall_frame: *const SyscallFrame) ?cascade.Syscall {
+        return std.enums.fromInt(cascade.Syscall, syscall_frame.rdi);
+    }
 
     pub fn print(
         value: *const SyscallFrame,

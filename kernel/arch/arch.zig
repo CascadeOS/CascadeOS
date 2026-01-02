@@ -8,6 +8,7 @@
 
 const std = @import("std");
 
+const cascade = @import("cascade");
 const arch = @import("arch");
 const kernel = @import("kernel");
 const Task = kernel.Task;
@@ -559,6 +560,14 @@ pub const user = struct {
 
     pub const SyscallFrame = struct {
         arch_specific: *current_decls.user.SyscallFrame,
+
+        /// Get the syscall this frame represents.
+        pub fn syscall(syscall_frame: SyscallFrame) callconv(core.inline_in_non_debug) ?cascade.Syscall {
+            return getFunction(
+                current_functions.user,
+                "syscallFromSyscallFrame",
+            )(syscall_frame.arch_specific);
+        }
     };
 
     pub const EnterUserspaceOptions = struct {
@@ -1021,6 +1030,9 @@ pub const Functions = struct {
             current_task: Task.Current,
             options: user.EnterUserspaceOptions,
         ) noreturn = null,
+
+        /// Get the syscall this frame represents.
+        syscallFromSyscallFrame: ?fn (syscall_frame: *const current_decls.user.SyscallFrame) ?cascade.Syscall = null,
 
         init: struct {
             /// Perform any per-achitecture initialization needed for userspace processes/threads.

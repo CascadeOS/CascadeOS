@@ -7,7 +7,7 @@ pub const components: []const KernelComponent = &.{
     .{
         .name = "arch",
         .component_dependencies = &.{"kernel"},
-        .library_dependencies = &.{ "core", "bitjuggle" },
+        .library_dependencies = &.{ "cascade", "core", "bitjuggle" },
         .configuration = @import("arch/custom_configuration.zig").customConfiguration,
     },
     .{
@@ -18,7 +18,7 @@ pub const components: []const KernelComponent = &.{
     .{
         .name = "kernel",
         .component_dependencies = &.{ "arch", "boot" },
-        .library_dependencies = &.{ "core", "sdf" },
+        .library_dependencies = &.{ "cascade", "core", "sdf" },
         .configuration = @import("kernel/custom_configuration.zig").customConfiguration,
         .provide_source_file_modules = true,
     },

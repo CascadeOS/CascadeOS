@@ -18,11 +18,20 @@ const log = kernel.debug.log.scoped(.user);
 ///
 /// Interrupts are enabled.
 pub fn onSyscall(current_task: Task.Current, syscall_frame: arch.user.SyscallFrame) void {
-    _ = syscall_frame;
+    const syscall = syscall_frame.syscall() orelse {
+        // TODO: return an error to userspace
+        std.debug.panic("invalid syscall\n{f}", .{syscall_frame.arch_specific});
+    };
 
-    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-    scheduler_handle.drop(current_task);
-    unreachable;
+    log.verbose(current_task, "received syscall: {t}", .{syscall});
+
+    switch (syscall) {
+        .exit_thread => {
+            const scheduler_handle: Task.SchedulerHandle = .get(current_task);
+            scheduler_handle.drop(current_task);
+            unreachable;
+        },
+    }
 }
 
 pub const init = struct {

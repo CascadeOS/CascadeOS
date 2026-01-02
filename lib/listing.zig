@@ -5,6 +5,7 @@ const LibraryDescription = @import("../build/LibraryDescription.zig");
 
 pub const libraries: []const LibraryDescription = &.{
     .{ .name = "bitjuggle", .dependencies = &.{"core"} },
+    .{ .name = "cascade" },
     .{ .name = "core" },
     .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
     .{ .name = "sdf" },
