@@ -8,7 +8,6 @@ pub const libraries: []const LibraryDescription = &.{
     .{ .name = "core" },
     .{ .name = "elf" },
     .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
-    .{ .name = "limine", .dependencies = &.{ "core", "uuid" } },
     .{ .name = "sdf" },
     .{ .name = "uuid", .dependencies = &.{"core"} },
 };

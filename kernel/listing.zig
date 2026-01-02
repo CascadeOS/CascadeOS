@@ -13,7 +13,7 @@ pub const components: []const KernelComponent = &.{
     .{
         .name = "boot",
         .component_dependencies = &.{ "arch", "kernel" },
-        .library_dependencies = &.{ "core", "limine" },
+        .library_dependencies = &.{ "core", "uuid" },
     },
     .{
         .name = "kernel",

@@ -8,7 +8,7 @@ const boot = @import("boot");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const core = @import("core");
-const limine = @import("limine");
+const limine = @import("limine.zig");
 
 pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     const resp = requests.kernel_address.response orelse

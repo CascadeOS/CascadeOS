@@ -8,12 +8,12 @@ const kernel = @import("kernel");
 const Task = kernel.Task;
 const core = @import("core");
 
-const limine = @import("limine.zig");
+const limine_interface = @import("limine/interface.zig");
 
 /// Returns the kernel virtual and physical base addresses provided by the bootloader, if any.
 pub fn kernelBaseAddress() ?KernelBaseAddress {
     return switch (bootloader_api) {
-        .limine => limine.kernelBaseAddress(),
+        .limine => limine_interface.kernelBaseAddress(),
         .unknown => null,
     };
 }
@@ -26,7 +26,7 @@ pub const KernelBaseAddress = struct {
 /// Returns an iterator over the memory map entries, iterating in the given direction.
 pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!MemoryMap {
     return switch (bootloader_api) {
-        .limine => limine.memoryMap(direction),
+        .limine => limine_interface.memoryMap(direction),
         .unknown => error.NoMemoryMap,
     };
 }
@@ -37,7 +37,7 @@ pub const MemoryMap = struct {
     pub fn next(memory_map: *MemoryMap) ?Entry {
         while (true) {
             const entry = switch (bootloader_api) {
-                .limine => limine.MemoryMapIterator.next(memory_map),
+                .limine => limine_interface.MemoryMapIterator.next(memory_map),
                 .unknown => null,
             } orelse
                 return null;
@@ -88,12 +88,12 @@ pub const MemoryMap = struct {
     };
 
     const backing_size: usize = @max(
-        @sizeOf(limine.MemoryMapIterator),
+        @sizeOf(limine_interface.MemoryMapIterator),
         0,
     );
 
     const backing_align: usize = @max(
-        @alignOf(limine.MemoryMapIterator),
+        @alignOf(limine_interface.MemoryMapIterator),
         0,
     );
 };
@@ -101,7 +101,7 @@ pub const MemoryMap = struct {
 /// Returns the direct map address provided by the bootloader, if any.
 pub fn directMapAddress() ?core.VirtualAddress {
     return switch (bootloader_api) {
-        .limine => limine.directMapAddress(),
+        .limine => limine_interface.directMapAddress(),
         .unknown => null,
     };
 }
@@ -109,7 +109,7 @@ pub fn directMapAddress() ?core.VirtualAddress {
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
 pub fn rsdp() ?core.Address {
     return switch (bootloader_api) {
-        .limine => limine.rsdp(),
+        .limine => limine_interface.rsdp(),
         .unknown => null,
     };
 }
@@ -120,21 +120,21 @@ pub fn x2apicEnabled() bool {
     }
 
     return switch (bootloader_api) {
-        .limine => limine.x2apicEnabled(),
+        .limine => limine_interface.x2apicEnabled(),
         .unknown => return false,
     };
 }
 
 pub fn bootstrapArchitectureProcessorId() u64 {
     return switch (bootloader_api) {
-        .limine => limine.bootstrapArchitectureProcessorId(),
+        .limine => limine_interface.bootstrapArchitectureProcessorId(),
         .unknown => unreachable,
     };
 }
 
 pub fn cpuDescriptors() ?CpuDescriptors {
     return switch (bootloader_api) {
-        .limine => limine.cpuDescriptors(),
+        .limine => limine_interface.cpuDescriptors(),
         .unknown => null,
     };
 }
@@ -144,7 +144,7 @@ pub const CpuDescriptors = struct {
 
     pub fn count(cpu_descriptors: *const CpuDescriptors) usize {
         return switch (bootloader_api) {
-            .limine => limine.CpuDescriptorIterator.count(cpu_descriptors),
+            .limine => limine_interface.CpuDescriptorIterator.count(cpu_descriptors),
             .unknown => 0,
         };
     }
@@ -152,7 +152,7 @@ pub const CpuDescriptors = struct {
     /// Returns the next cpu descriptor from the iterator, if any remain.
     pub fn next(cpu_descriptors: *CpuDescriptors) ?Descriptor {
         return switch (bootloader_api) {
-            .limine => limine.CpuDescriptorIterator.next(cpu_descriptors),
+            .limine => limine_interface.CpuDescriptorIterator.next(cpu_descriptors),
             .unknown => null,
         };
     }
@@ -166,43 +166,43 @@ pub const CpuDescriptors = struct {
             target_fn: fn (user_data: *anyopaque) anyerror!noreturn,
         ) void {
             switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.bootFn(descriptor, user_data, target_fn),
+                .limine => limine_interface.CpuDescriptorIterator.bootFn(descriptor, user_data, target_fn),
                 .unknown => unreachable,
             }
         }
 
         pub fn acpiProcessorId(descriptor: *const Descriptor) u32 {
             return switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.acpiProcessorId(descriptor),
+                .limine => limine_interface.CpuDescriptorIterator.acpiProcessorId(descriptor),
                 .unknown => unreachable,
             };
         }
 
         pub fn architectureProcessorId(descriptor: *const Descriptor) u64 {
             return switch (bootloader_api) {
-                .limine => limine.CpuDescriptorIterator.architectureProcessorId(descriptor),
+                .limine => limine_interface.CpuDescriptorIterator.architectureProcessorId(descriptor),
                 .unknown => unreachable,
             };
         }
 
         const descriptor_backing_size: usize = @max(
-            @sizeOf(limine.CpuDescriptorIterator.Descriptor),
+            @sizeOf(limine_interface.CpuDescriptorIterator.Descriptor),
             0,
         );
 
         const descriptor_backing_align: usize = @max(
-            @alignOf(limine.CpuDescriptorIterator.Descriptor),
+            @alignOf(limine_interface.CpuDescriptorIterator.Descriptor),
             0,
         );
     };
 
     const descriptors_backing_size: usize = @max(
-        @sizeOf(limine.CpuDescriptorIterator),
+        @sizeOf(limine_interface.CpuDescriptorIterator),
         0,
     );
 
     const descriptors_backing_align: usize = @max(
-        @alignOf(limine.CpuDescriptorIterator),
+        @alignOf(limine_interface.CpuDescriptorIterator),
         0,
     );
 };
@@ -221,7 +221,7 @@ pub const Framebuffer = struct {
 /// Returns the framebuffer provided by the bootloader, if any.
 pub fn framebuffer() ?Framebuffer {
     return switch (bootloader_api) {
-        .limine => limine.framebuffer(),
+        .limine => limine_interface.framebuffer(),
         .unknown => null,
     };
 }
@@ -229,7 +229,7 @@ pub fn framebuffer() ?Framebuffer {
 /// Returns the device tree blob provided by the bootloader, if any.
 pub fn deviceTreeBlob() ?core.VirtualAddress {
     return switch (bootloader_api) {
-        .limine => limine.deviceTreeBlob(),
+        .limine => limine_interface.deviceTreeBlob(),
         .unknown => null,
     };
 }
@@ -249,7 +249,7 @@ pub fn exportEntryPoints() void {
 
     comptime {
         @export(&unknownBootloaderEntryPoint, .{ .name = "_start" });
-        limine.exportRequests();
+        limine_interface.exportRequests();
     }
 }
 
