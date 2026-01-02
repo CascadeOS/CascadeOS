@@ -208,7 +208,7 @@ export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
 }
 
 pub fn getSyscallEntryPoint(executor: *kernel.Executor) *const anyopaque {
-    return globals.syscall_entry_points[@intFromEnum(executor.id)];
+    return raw_syscall_entry_points[@intFromEnum(executor.id)];
 }
 
 pub const SyscallFrame = extern struct {
@@ -284,9 +284,6 @@ pub const SyscallFrame = extern struct {
 const globals = struct {
     /// Initialized during `init.initialize`.
     var xsave_area_cache: kernel.mem.cache.RawCache = undefined;
-
-    export var syscall_temp_rsp_storage: [kernel.config.executor.maximum_number_of_executors]u64 = undefined;
-    const syscall_entry_points: SyscallEntries = createSyscallEntryPoints();
 };
 
 pub const init = struct {
@@ -303,96 +300,78 @@ pub const init = struct {
     }
 };
 
-const SyscallEntries = [kernel.config.executor.maximum_number_of_executors]*const fn () callconv(.naked) noreturn;
-
-fn createSyscallEntryPoints() SyscallEntries {
-    var temp_entry_points: SyscallEntries = undefined;
-
-    @setEvalBranchQuota(temp_entry_points.len * 1024);
-
-    // TODO: we should really switch to using KERNEL_GS_BASE correctly...
-
-    const current_task_offset = std.fmt.comptimePrint(
-        "{d}",
-        .{@offsetOf(kernel.Executor, "current_task")},
-    );
-    const stack_top_offset = std.fmt.comptimePrint(
-        "{d}",
-        .{@offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer")},
-    );
-
-    for (0..temp_entry_points.len) |i| {
-        const user_rsp_offset = std.fmt.comptimePrint(
-            "{d}",
-            .{i * @sizeOf(u64)},
-        );
-
-        const syscallEntryPoint = struct {
-            fn syscallEntryPoint() callconv(.naked) noreturn {
-                // zig fmt: off
-                    asm volatile (
-                        "mov %rsp, syscall_temp_rsp_storage+" ++ user_rsp_offset ++ "(%rip)\n" ++
-                        \\swapgs
-                        ++ "\nmov %gs:" ++ current_task_offset ++ ", %rsp\n" ++
-                        \\swapgs
-                        ++ "\nmov " ++ stack_top_offset ++ "(%rsp), %rsp\n" ++
-                        \\
-                        \\sub $8, %rsp // reserve space for the user rsp
-                        \\push %rcx // user rip
-                        \\push %r11 // user rflags
-                        \\
-                        ++ "\nmov syscall_temp_rsp_storage+" ++ user_rsp_offset ++ "(%rip), %r11\n" ++
-                        \\mov %r11, 16(%rsp) // store user rsp in reserved space
-                        \\
-                        \\push %rax
-                        \\push %rbx
-                        \\push %rdx
-                        \\push %rbp
-                        \\push %rsi
-                        \\push %rdi
-                        \\push %r8
-                        \\push %r9
-                        \\push %r10
-                        \\push %r12
-                        \\push %r13
-                        \\push %r14
-                        \\push %r15
-                        \\push %gs
-                        \\push %fs
-                        \\
-                        \\xor %ebp, %ebp
-                        \\mov %rsp, %rdi
-                        \\call syscallDispatch
-                        \\
-                        \\pop %fs
-                        \\pop %gs
-                        \\pop %r15
-                        \\pop %r14
-                        \\pop %r13
-                        \\pop %r12
-                        \\pop %r10
-                        \\pop %r9
-                        \\pop %r8
-                        \\pop %rdi
-                        \\pop %rsi
-                        \\pop %rbp
-                        \\pop %rdx
-                        \\pop %rbx
-                        \\pop %rax
-                        \\
-                        \\pop %r11 // user rflags
-                        \\pop %rcx // user rip
-                        \\
-                        \\pop %rsp // user rsp
-                        \\sysretq
-                        \\ud2
-                    );
-                    // zig fmt: on
-            }
-        }.syscallEntryPoint;
-
-        temp_entry_points[i] = syscallEntryPoint;
-    }
-
-    return temp_entry_points;
+comptime {
+    // below asserts ensure the constants in `kernel/x64/asm/syscallEntry.S` are in sync
+    std.debug.assert(kernel.config.executor.maximum_number_of_executors == 64);
+    std.debug.assert(@offsetOf(kernel.Executor, "current_task") == 0);
+    std.debug.assert(@offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer") == 136);
 }
+
+const RawSyscallEntry = *const fn () callconv(.naked) noreturn;
+
+const raw_syscall_entry_points: [kernel.config.executor.maximum_number_of_executors]RawSyscallEntry = .{
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_0" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_1" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_2" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_3" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_4" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_5" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_6" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_7" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_8" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_9" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_10" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_11" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_12" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_13" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_14" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_15" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_16" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_17" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_18" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_19" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_20" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_21" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_22" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_23" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_24" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_25" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_26" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_27" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_28" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_29" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_30" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_31" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_32" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_33" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_34" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_35" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_36" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_37" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_38" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_39" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_40" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_41" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_42" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_43" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_44" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_45" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_46" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_47" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_48" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_49" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_50" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_51" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_52" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_53" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_54" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_55" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_56" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_57" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_58" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_59" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_60" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_61" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_62" }),
+    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_63" }),
+};
