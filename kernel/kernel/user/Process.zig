@@ -214,6 +214,8 @@ const ProcessCleanup = struct {
             if (!globals.processes.swapRemove(process)) @panic("process not found in processes");
         }
 
+        log.debug(current_task, "destroying {f}", .{process});
+
         process.threads.clearAndFree(kernel.mem.heap.allocator);
         process.address_space.reinitializeAndUnmapAll(current_task);
 
