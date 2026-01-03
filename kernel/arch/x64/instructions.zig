@@ -99,28 +99,28 @@ pub inline fn halt() void {
 }
 
 pub inline fn portReadU8(port: u16) u8 {
-    return asm ("inb %[port],%[ret]"
+    return asm ("inb %[port], %[ret]"
         : [ret] "={al}" (-> u8),
         : [port] "N{dx}" (port),
     );
 }
 
 pub inline fn portReadU16(port: u16) u16 {
-    return asm ("inw %[port],%[ret]"
-        : [ret] "={al}" (-> u16),
+    return asm ("inw %[port], %[ret]"
+        : [ret] "={ax}" (-> u16),
         : [port] "N{dx}" (port),
     );
 }
 
 pub inline fn portReadU32(port: u16) u32 {
-    return asm ("inl %[port],%[ret]"
+    return asm ("inl %[port], %[ret]"
         : [ret] "={eax}" (-> u32),
         : [port] "N{dx}" (port),
     );
 }
 
 pub inline fn portWriteU8(port: u16, value: u8) void {
-    asm volatile ("outb %[value],%[port]"
+    asm volatile ("outb %[value], %[port]"
         :
         : [value] "{al}" (value),
           [port] "N{dx}" (port),
@@ -128,15 +128,15 @@ pub inline fn portWriteU8(port: u16, value: u8) void {
 }
 
 pub inline fn portWriteU16(port: u16, value: u16) void {
-    asm volatile ("outw %[value],%[port]"
+    asm volatile ("outw %[value], %[port]"
         :
-        : [value] "{al}" (value),
+        : [value] "{ax}" (value),
           [port] "N{dx}" (port),
     );
 }
 
 pub inline fn portWriteU32(port: u16, value: u32) void {
-    asm volatile ("outl %[value],%[port]"
+    asm volatile ("outl %[value], %[port]"
         :
         : [value] "{eax}" (value),
           [port] "N{dx}" (port),
