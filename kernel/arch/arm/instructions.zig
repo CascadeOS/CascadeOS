@@ -30,8 +30,10 @@ pub inline fn isb() void {
 /// Disable interrupts and put the CPU to sleep.
 pub inline fn disableInterruptsAndHalt() noreturn {
     while (true) {
-        asm volatile ("msr DAIFSet, #0b1111");
-        asm volatile ("wfe");
+        asm volatile (
+            \\msr DAIFSet, #0b1111
+            \\wfe
+        );
     }
 }
 
@@ -47,7 +49,7 @@ pub inline fn enableInterrupts() void {
 
 /// Are interrupts enabled?
 pub inline fn interruptsEnabled() bool {
-    const daif = asm ("MRS %[daif], DAIF"
+    const daif = asm ("mrs %[daif], DAIF"
         : [daif] "=r" (-> u64),
     );
     const mask: u64 = 0b1111000000;
