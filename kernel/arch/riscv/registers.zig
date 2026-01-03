@@ -78,13 +78,17 @@ pub fn CSR(comptime name: []const u8) type {
         }
 
         pub inline fn clearBitsImmediate(comptime immediate: u4) void {
-            const immediate_str = comptime std.fmt.comptimePrint("{d}", .{immediate});
-            asm volatile ("csrci " ++ name ++ ", " ++ immediate_str);
+            asm volatile ("csrci " ++ name ++ ", %[in]"
+                :
+                : [in] "i" (immediate),
+            );
         }
 
         pub inline fn setBitsImmediate(comptime immediate: u4) void {
-            const immediate_str = comptime std.fmt.comptimePrint("{d}", .{immediate});
-            asm volatile ("csrsi " ++ name ++ ", " ++ immediate_str);
+            asm volatile ("csrsi " ++ name ++ ", %[in]"
+                :
+                : [in] "i" (immediate),
+            );
         }
     };
 }
