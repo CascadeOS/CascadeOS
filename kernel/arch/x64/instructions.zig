@@ -76,7 +76,7 @@ pub inline fn disableInterruptsAndHalt() noreturn {
 pub inline fn invlpg(address: core.VirtualAddress) void {
     asm volatile ("invlpg (%[address])"
         :
-        : [address] "{rax}" (address.value),
+        : [address] "r" (address.value),
     );
 }
 
