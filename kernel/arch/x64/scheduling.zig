@@ -120,8 +120,8 @@ pub inline fn switchTask(
           .rdx = true,
           .rsi = true,
           .rdi = true,
-          .rsp = true,
-          .rbp = true,
+          //.rsp = true, from the perspective of a task the stack pointer is the restored
+          //.rbp = true, ensured by `omit_frame_pointer == false`; checked below
           .r8 = true,
           .r9 = true,
           .r10 = true,
@@ -131,6 +131,11 @@ pub inline fn switchTask(
           .r14 = true,
           .r15 = true,
         });
+
+    comptime {
+        const builtin = @import("builtin");
+        std.debug.assert(builtin.omit_frame_pointer == false);
+    }
 }
 
 /// Switches to `new_task`.
@@ -181,8 +186,8 @@ pub inline fn call(
           .rdx = true,
           .rsi = true,
           .rdi = true,
-          .rsp = true,
-          .rbp = true,
+          //.rsp = true, from the perspective of a task the stack pointer is the restored
+          //.rbp = true, ensured by `omit_frame_pointer == false`; checked below
           .r8 = true,
           .r9 = true,
           .r10 = true,
@@ -192,6 +197,11 @@ pub inline fn call(
           .r14 = true,
           .r15 = true,
         });
+
+    comptime {
+        const builtin = @import("builtin");
+        std.debug.assert(builtin.omit_frame_pointer == false);
+    }
 }
 
 /// Calls `type_erased_call` on `new_stack`.
