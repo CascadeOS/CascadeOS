@@ -145,7 +145,6 @@ pub fn enterUserspace(current_task: Task.Current, options: arch.user.EnterUsersp
         \\mov %ax, %fs
         \\mov %ax, %gs
         \\iretq
-        \\ud2
         :
         : [frame] "r" (&frame),
     );
