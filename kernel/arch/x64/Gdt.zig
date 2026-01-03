@@ -56,46 +56,38 @@ pub const Gdt = extern struct {
         gdt.descriptors[tss_index] = low_base | mid_base | limit | present | available_64_bit_tss;
         gdt.descriptors[tss_index + 1] = high_base;
 
-        asm volatile (
-            \\  ltr %[ts_sel]
+        asm volatile ("ltr %[ts_sel]"
             :
-            : [ts_sel] "rm" (@intFromEnum(Selector.tss)),
+            : [ts_sel] "r" (@intFromEnum(Selector.tss)),
         );
     }
 
     pub fn load(gdt: *Gdt) void {
-        const gdt_ptr = Gdtr{
+        const gdt_ptr: Gdtr = .{
             .limit = @sizeOf(Gdt) - 1,
             .base = @intFromPtr(gdt),
         };
 
-        // Load the GDT
         asm volatile (
-            \\  lgdt %[p]
+            \\lgdt %[gdt_ptr]
+            \\
+            \\mov %[dsel], %%ds
+            \\mov %[dsel], %%es
+            \\mov %[dsel], %%ss
+            \\
+            \\xor %%eax, %%eax
+            \\mov %%eax, %%fs
+            \\mov %%eax, %%gs
+            \\
+            \\push %[csel]
+            \\lea 1f(%%rip), %%rax
+            \\push %%rax
+            \\.byte 0x48, 0xCB // Far return
+            \\1:
             :
-            : [p] "*p" (&gdt_ptr),
-        );
-
-        // Use the data selectors
-        asm volatile (
-            \\  mov %[dsel], %%ds
-            \\  mov %[dsel], %%fs
-            \\  mov %[dsel], %%gs
-            \\  mov %[dsel], %%es
-            \\  mov %[dsel], %%ss
-            :
-            : [dsel] "rm" (@intFromEnum(Selector.kernel_data)),
-        );
-
-        // Use the code selector
-        asm volatile (
-            \\ push %[csel]
-            \\ lea 1f(%%rip), %%rax
-            \\ push %%rax
-            \\ .byte 0x48, 0xCB // Far return
-            \\ 1:
-            :
-            : [csel] "i" (@intFromEnum(Selector.kernel_code)),
+            : [gdt_ptr] "*p" (&gdt_ptr),
+              [dsel] "r" (@intFromEnum(Selector.kernel_data)),
+              [csel] "i" (@intFromEnum(Selector.kernel_code)),
             : .{ .rax = true });
     }
 
