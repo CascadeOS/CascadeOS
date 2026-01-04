@@ -231,7 +231,7 @@ pub const SyscallFrame = extern struct {
     rip: u64,
     rsp: u64,
 
-    pub fn syscall(syscall_frame: *const SyscallFrame) ?cascade.Syscall {
+    pub inline fn syscall(syscall_frame: *const SyscallFrame) ?cascade.Syscall {
         return std.enums.fromInt(cascade.Syscall, syscall_frame.rdi);
     }
 

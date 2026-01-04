@@ -1032,7 +1032,9 @@ pub const Functions = struct {
         ) noreturn = null,
 
         /// Get the syscall this frame represents.
-        syscallFromSyscallFrame: ?fn (syscall_frame: *const current_decls.user.SyscallFrame) ?cascade.Syscall = null,
+        syscallFromSyscallFrame: ?fn (
+            syscall_frame: *const current_decls.user.SyscallFrame,
+        ) callconv(.@"inline") ?cascade.Syscall = null,
 
         init: struct {
             /// Perform any per-achitecture initialization needed for userspace processes/threads.
