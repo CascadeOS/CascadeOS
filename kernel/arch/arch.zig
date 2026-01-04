@@ -568,6 +568,13 @@ pub const user = struct {
                 "syscallFromSyscallFrame",
             )(syscall_frame.arch_specific);
         }
+
+        pub inline fn format(
+            syscall_frame: SyscallFrame,
+            writer: *std.Io.Writer,
+        ) !void {
+            return syscall_frame.arch_specific.format(writer);
+        }
     };
 
     pub const EnterUserspaceOptions = struct {
