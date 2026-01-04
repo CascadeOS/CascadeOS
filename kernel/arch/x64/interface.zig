@@ -96,6 +96,7 @@ pub const functions: arch.Functions = .{
         .initializeThread = x64.user.initializeThread,
         .enterUserspace = x64.user.enterUserspace,
         .syscallFromSyscallFrame = x64.user.SyscallFrame.syscall,
+        .argFromSyscallFrame = x64.user.SyscallFrame.arg,
 
         .init = .{
             .initialize = x64.user.init.initialize,

@@ -569,6 +569,28 @@ pub const user = struct {
             )(syscall_frame.arch_specific);
         }
 
+        pub const Arg = enum {
+            one,
+            two,
+            three,
+            four,
+            five,
+            six,
+            seven,
+            eight,
+            nine,
+            ten,
+            eleven,
+            twelve,
+        };
+
+        pub fn arg(syscall_frame: SyscallFrame, comptime argument: Arg) callconv(core.inline_in_non_debug) usize {
+            return getFunction(
+                current_functions.user,
+                "argFromSyscallFrame",
+            )(syscall_frame.arch_specific, argument);
+        }
+
         pub inline fn format(
             syscall_frame: SyscallFrame,
             writer: *std.Io.Writer,
@@ -1042,6 +1064,12 @@ pub const Functions = struct {
         syscallFromSyscallFrame: ?fn (
             syscall_frame: *const current_decls.user.SyscallFrame,
         ) callconv(.@"inline") ?cascade.Syscall = null,
+
+        /// Get an argument from this frame.
+        argFromSyscallFrame: ?fn (
+            syscall_frame: *const current_decls.user.SyscallFrame,
+            comptime argument: user.SyscallFrame.Arg,
+        ) callconv(.@"inline") usize = null,
 
         init: struct {
             /// Perform any per-achitecture initialization needed for userspace processes/threads.

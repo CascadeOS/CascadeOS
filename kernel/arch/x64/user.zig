@@ -214,25 +214,59 @@ pub fn getSyscallEntryPoint(executor: *kernel.Executor) *const anyopaque {
 pub const SyscallFrame = extern struct {
     fs: u64,
     gs: u64,
+
+    /// arg11
     r15: u64,
+    /// arg10
     r14: u64,
+    /// arg9
     r13: u64,
+    /// arg8
     r12: u64,
+    /// arg7
     r10: u64,
+    /// arg5
     r9: u64,
+    /// arg4
     r8: u64,
+    /// syscall number
     rdi: u64,
+    /// arg1
     rsi: u64,
+    /// arg12
     rbp: u64,
+    /// arg2
     rdx: u64,
+    /// arg6
     rbx: u64,
+    /// arg3
     rax: u64,
+
+    /// r11
     rflags: x64.registers.RFlags,
+    /// rcx
     rip: u64,
     rsp: u64,
 
     pub inline fn syscall(syscall_frame: *const SyscallFrame) ?cascade.Syscall {
         return std.enums.fromInt(cascade.Syscall, syscall_frame.rdi);
+    }
+
+    pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) usize {
+        return switch (argument) {
+            .one => syscall_frame.rsi,
+            .two => syscall_frame.rdx,
+            .three => syscall_frame.rax,
+            .four => syscall_frame.r8,
+            .five => syscall_frame.r9,
+            .six => syscall_frame.rbx,
+            .seven => syscall_frame.r10,
+            .eight => syscall_frame.r12,
+            .nine => syscall_frame.r13,
+            .ten => syscall_frame.r14,
+            .eleven => syscall_frame.r15,
+            .twelve => syscall_frame.rbp,
+        };
     }
 
     pub fn print(
