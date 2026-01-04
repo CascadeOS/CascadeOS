@@ -9,6 +9,6 @@ const entry = @import("entry.zig");
 pub const getEntryPoint = entry.getEntryPoint;
 
 pub fn exitThread() noreturn {
-    _ = Syscall.zeroArg(.exit_thread);
+    _ = Syscall.call0(.exit_thread);
     unreachable;
 }
