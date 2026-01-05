@@ -29,7 +29,7 @@ pub const mem = struct {
     /// The number of virtual ranges to batch together when unmapping/changing protection.
     pub const virtual_ranges_to_batch = 16;
 
-    /// When batching virtual ranges are merged together if the seperation between them is less than or equal to this value.
+    /// When batching, virtual ranges are merged together if the seperation between them is less than or equal to this value.
     pub const virtual_range_batching_seperation_to_merge_over = arch.paging.standard_page_size.multiplyScalar(4);
 };
 
