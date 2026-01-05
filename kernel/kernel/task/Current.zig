@@ -184,9 +184,10 @@ pub const Current = extern struct {
 
         const executor = arch.getCurrentExecutor();
         const current_task = executor.current_task;
+        if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
         current_task.interrupt_disable_count += 1;
-        current_task.known_executor = executor;
+        current_task.known_executor = current_task.state.running;
 
         return .{ .task = current_task };
     }
