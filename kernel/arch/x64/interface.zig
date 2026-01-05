@@ -16,6 +16,7 @@ pub const functions: arch.Functions = .{
             return @ptrFromInt(x64.registers.KERNEL_GS_BASE.read());
         }
     }.unsafeGetCurrentExecutor,
+    .getCurrentTask = x64.getCurrentTask,
 
     .spinLoopHint = x64.instructions.pause,
     .halt = x64.instructions.halt,
