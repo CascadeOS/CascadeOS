@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-NON-AI-CC0-1.0
+// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+{
+    "files.associations": {
+        "**/kernel/arch/arm/asm/*": "arm64",
+        "**/kernel/arch/riscv/asm/*": "riscv",
+        "**/kernel/arch/x64/asm/*": "gas",
+    }
+}

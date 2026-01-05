@@ -3,6 +3,9 @@
 {
     "recommendations": [
         "ziglang.vscode-zig",
-        "zixuanwang.linkerscript"
+        "zixuanwang.linkerscript",
+        "mkornelsen.vscode-arm64",
+        "sunshaoce.risc-v",
+        "basdp.language-gas-x86"
     ]
 }
