@@ -31,6 +31,18 @@ pub fn unsafeGetCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Exe
     )();
 }
 
+/// Get the current `Task`.
+///
+/// Supports being called with interrupts and preemption enabled.
+///
+/// Assumes that `init.loadExecutor` has been called on the currently running executor.
+pub fn getCurrentTask() callconv(core.inline_in_non_debug) *kernel.Task {
+    return getFunction(
+        current_functions,
+        "getCurrentTask",
+    )();
+}
+
 /// Issues an architecture specific hint to the executor that we are spinning in a loop.
 pub fn spinLoopHint() callconv(core.inline_in_non_debug) void {
     getFunction(
@@ -832,6 +844,13 @@ pub const Functions = struct {
     ///
     /// Assumes that `init.loadExecutor` has been called on the currently running executor.
     unsafeGetCurrentExecutor: ?fn () callconv(.@"inline") *kernel.Executor = null,
+
+    /// Get the current `Task`.
+    ///
+    /// Supports being called with interrupts and preemption enabled.
+    ///
+    /// Assumes that `init.loadExecutor` has been called on the currently running executor.
+    getCurrentTask: ?fn () callconv(.@"inline") *kernel.Task = null,
 
     /// Issues an architecture specific hint to the executor that we are spinning in a loop.
     spinLoopHint: ?fn () callconv(.@"inline") void = null,

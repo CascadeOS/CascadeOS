@@ -22,17 +22,7 @@ pub const Current = extern struct {
     }
 
     pub fn current() Task.Current {
-        // TODO: some architectures can do this without disabling interrupts
-
-        arch.interrupts.disable();
-
-        const executor = arch.unsafeGetCurrentExecutor();
-        const current_task = executor.current_task;
-        if (core.is_debug) std.debug.assert(current_task.state.running == executor);
-
-        if (current_task.interrupt_disable_count == 0) arch.interrupts.enable();
-
-        return .{ .task = current_task };
+        return .{ .task = arch.getCurrentTask() };
     }
 
     pub fn incrementInterruptDisable(current_task: Task.Current) void {
