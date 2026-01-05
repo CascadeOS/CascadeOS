@@ -574,7 +574,7 @@ pub const VirtualRangeBatch = struct {
 
                 const seperation = range.address.difference(last.endBound());
 
-                if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_seperation_to_merge_over)) {
+                if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance)) {
                     last.size.addInPlace(seperation);
                     last.size.addInPlace(range.size);
                 } else {
@@ -612,7 +612,7 @@ pub const VirtualRangeBatch = struct {
 
         const seperation = range.address.difference(last.endBound());
 
-        if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_seperation_to_merge_over)) {
+        if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance)) {
             last.size.addInPlace(seperation);
             last.size.addInPlace(range.size);
             return true;
@@ -677,7 +677,7 @@ pub const ChangeProtectionBatch = struct {
 
         const seperation = range.virtual_range.address.difference(last.virtual_range.endBound());
 
-        if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_seperation_to_merge_over) and
+        if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance) and
             last.previous_map_type.equal(range.previous_map_type))
         {
             last.virtual_range.size.addInPlace(seperation);

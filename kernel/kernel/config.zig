@@ -30,7 +30,7 @@ pub const mem = struct {
     pub const virtual_ranges_to_batch = 16;
 
     /// When batching, virtual ranges are merged together if the seperation between them is less than or equal to this value.
-    pub const virtual_range_batching_seperation_to_merge_over = arch.paging.standard_page_size.multiplyScalar(4);
+    pub const virtual_range_batching_merge_distance = arch.paging.standard_page_size.multiplyScalar(4);
 };
 
 pub const scheduler = struct {
