@@ -21,11 +21,13 @@ pub const PerExecutor = current_decls.PerExecutor;
 
 /// Get the current `Executor`.
 ///
+/// It is the callers responsibility to ensure the executor does not change from under them.
+///
 /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-pub fn getCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
+pub fn unsafeGetCurrentExecutor() callconv(core.inline_in_non_debug) *kernel.Executor {
     return getFunction(
         current_functions,
-        "getCurrentExecutor",
+        "unsafeGetCurrentExecutor",
     )();
 }
 
@@ -826,8 +828,10 @@ pub const init = struct {
 pub const Functions = struct {
     /// Get the current `Executor`.
     ///
+    /// It is the callers responsibility to ensure the executor does not change from under them.
+    ///
     /// Assumes that `init.loadExecutor` has been called on the currently running executor.
-    getCurrentExecutor: ?fn () callconv(.@"inline") *kernel.Executor = null,
+    unsafeGetCurrentExecutor: ?fn () callconv(.@"inline") *kernel.Executor = null,
 
     /// Issues an architecture specific hint to the executor that we are spinning in a loop.
     spinLoopHint: ?fn () callconv(.@"inline") void = null,

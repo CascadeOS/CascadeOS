@@ -26,7 +26,7 @@ pub const Current = extern struct {
 
         arch.interrupts.disable();
 
-        const executor = arch.getCurrentExecutor();
+        const executor = arch.unsafeGetCurrentExecutor();
         const current_task = executor.current_task;
         if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
@@ -106,7 +106,7 @@ pub const Current = extern struct {
     pub fn onSyscallEntry() Task.Current {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
-        const executor = arch.getCurrentExecutor();
+        const executor = arch.unsafeGetCurrentExecutor();
         const current_task = executor.current_task;
         if (core.is_debug) {
             std.debug.assert(current_task.state.running == executor);
@@ -122,7 +122,7 @@ pub const Current = extern struct {
     pub fn onInterruptEntry() struct { Task.Current, StateBeforeInterrupt } {
         if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
-        const executor = arch.getCurrentExecutor();
+        const executor = arch.unsafeGetCurrentExecutor();
         const current_task = executor.current_task;
         if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 
@@ -182,7 +182,7 @@ pub const Current = extern struct {
     pub fn panicked() Task.Current {
         std.debug.assert(!arch.interrupts.areEnabled());
 
-        const executor = arch.getCurrentExecutor();
+        const executor = arch.unsafeGetCurrentExecutor();
         const current_task = executor.current_task;
         if (core.is_debug) std.debug.assert(current_task.state.running == executor);
 

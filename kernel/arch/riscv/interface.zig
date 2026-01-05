@@ -11,11 +11,11 @@ const core = @import("core");
 const riscv = @import("riscv.zig");
 
 pub const functions: arch.Functions = .{
-    .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *kernel.Executor {
+    .unsafeGetCurrentExecutor = struct {
+        inline fn unsafeGetCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(riscv.registers.SupervisorScratch.read());
         }
-    }.getCurrentExecutor,
+    }.unsafeGetCurrentExecutor,
 
     .spinLoopHint = riscv.instructions.pause,
 

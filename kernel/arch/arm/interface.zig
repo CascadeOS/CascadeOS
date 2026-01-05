@@ -11,11 +11,11 @@ const core = @import("core");
 const arm = @import("arm.zig");
 
 pub const functions: arch.Functions = .{
-    .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *kernel.Executor {
+    .unsafeGetCurrentExecutor = struct {
+        inline fn unsafeGetCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(arm.registers.TPIDR_EL1.read());
         }
-    }.getCurrentExecutor,
+    }.unsafeGetCurrentExecutor,
 
     .spinLoopHint = arm.instructions.isb,
     .halt = arm.instructions.halt,

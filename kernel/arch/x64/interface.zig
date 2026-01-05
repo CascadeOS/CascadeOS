@@ -11,11 +11,11 @@ const core = @import("core");
 const x64 = @import("x64.zig");
 
 pub const functions: arch.Functions = .{
-    .getCurrentExecutor = struct {
-        inline fn getCurrentExecutor() *kernel.Executor {
+    .unsafeGetCurrentExecutor = struct {
+        inline fn unsafeGetCurrentExecutor() *kernel.Executor {
             return @ptrFromInt(x64.registers.KERNEL_GS_BASE.read());
         }
-    }.getCurrentExecutor,
+    }.unsafeGetCurrentExecutor,
 
     .spinLoopHint = x64.instructions.pause,
     .halt = x64.instructions.halt,
