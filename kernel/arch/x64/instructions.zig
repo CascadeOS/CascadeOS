@@ -90,6 +90,32 @@ pub inline fn readTsc() u64 {
     return (@as(u64, high) << 32) | @as(u64, low);
 }
 
+pub inline fn rdfsbase() u64 {
+    return asm ("rdfsbase %[fs]"
+        : [fs] "=r" (-> u64),
+    );
+}
+
+pub inline fn wrfsbase(fs: u64) void {
+    asm volatile ("wrfsbase %[fs]"
+        :
+        : [fs] "r" (fs),
+    );
+}
+
+pub inline fn rdgsbase() u64 {
+    return asm ("rdgsbase %[gs]"
+        : [gs] "=r" (-> u64),
+    );
+}
+
+pub inline fn wrgsbase(gs: u64) void {
+    asm volatile ("wrgsbase %[gs]"
+        :
+        : [gs] "r" (gs),
+    );
+}
+
 pub inline fn pause() void {
     asm volatile ("pause" ::: .{ .memory = true });
 }
