@@ -374,9 +374,9 @@ pub const init = struct {
     /// Initializes the PCI ECAM.
     ///
     /// No-op if no MCFG table is found.
-    pub fn initializeECAM(current_task: Task.Current) !void {
+    pub fn initializeECAM() !void {
         const mcfg_acpi_table = MCFGAcpiTable.get(0) orelse {
-            init_log.warn(current_task, "no MCFG table found - skipping PCI ECAM initialization", .{});
+            init_log.warn("no MCFG table found - skipping PCI ECAM initialization", .{});
             return;
         };
         defer mcfg_acpi_table.deinit();
@@ -396,7 +396,7 @@ pub const init = struct {
                 .config_space_address = kernel.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
             };
 
-            init_log.debug(current_task, "found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
+            init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
                 ecam.segment_group,
                 ecam.start_bus,
                 ecam.end_bus,

@@ -17,9 +17,7 @@ const log = kernel.debug.log.scoped(.paging);
 /// Flushes the cache for the given virtual range on the current executor.
 ///
 /// The `virtual_range` address and size must be aligned to the standard page size.
-pub fn flushCache(current_task: Task.Current, virtual_range: core.VirtualRange) void {
-    _ = current_task;
-
+pub fn flushCache(virtual_range: core.VirtualRange) void {
     if (core.is_debug) {
         std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
         std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));

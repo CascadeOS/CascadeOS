@@ -22,9 +22,9 @@ scheduler: *Scheduler,
 /// the handle is no longer needed.
 ///
 /// When dropping the task the scheduler handle does not need to be released.
-pub fn get(current_task: Task.Current) SchedulerHandle {
+pub fn get() SchedulerHandle {
     const scheduler = &globals.scheduler;
-    scheduler.lock(current_task);
+    scheduler.lock();
     return .{ .scheduler = &globals.scheduler };
 }
 
@@ -37,14 +37,14 @@ pub const MaybeLocked = struct {
     /// Supports the scheduler already being locked. The scheduler will be locked when this function returns.
     ///
     /// It is the caller's responsibility to call `MaybeLocked.unlock` when
-    pub fn get(current_task: Task.Current) MaybeLocked {
+    pub fn get() MaybeLocked {
         const scheduler = &globals.scheduler;
 
-        const scheduler_already_locked = current_task.task.scheduler_locked;
+        const scheduler_already_locked = Task.Current.get().task.scheduler_locked;
 
         switch (scheduler_already_locked) {
-            true => if (core.is_debug) scheduler.assertLocked(current_task),
-            false => scheduler.lock(current_task),
+            true => if (core.is_debug) scheduler.assertLocked(),
+            false => scheduler.lock(),
         }
 
         return .{
@@ -53,68 +53,70 @@ pub const MaybeLocked = struct {
         };
     }
 
-    pub fn unlock(maybe_locked: MaybeLocked, current_task: Task.Current) void {
-        if (!maybe_locked.was_locked) maybe_locked.scheduler_handle.unlock(current_task);
+    pub fn unlock(maybe_locked: MaybeLocked) void {
+        if (!maybe_locked.was_locked) maybe_locked.scheduler_handle.unlock();
     }
 };
 
-pub fn unlock(scheduler_handle: SchedulerHandle, current_task: Task.Current) void {
-    scheduler_handle.scheduler.unlock(current_task);
+pub fn unlock(scheduler_handle: SchedulerHandle) void {
+    scheduler_handle.scheduler.unlock();
 }
 
-pub fn queueTask(scheduler_handle: SchedulerHandle, current_task: Task.Current, task: *Task) void {
+pub fn queueTask(scheduler_handle: SchedulerHandle, task: *Task) void {
     if (core.is_debug) {
         std.debug.assert(!task.is_scheduler_task); // cannot queue a scheduler task
-        scheduler_handle.scheduler.assertLocked(current_task);
+        scheduler_handle.scheduler.assertLocked();
         std.debug.assert(task.state == .ready);
     }
 
     scheduler_handle.scheduler.queueTask(task);
 }
 
-pub fn isEmpty(scheduler_handle: SchedulerHandle, current_task: Task.Current) bool {
-    if (core.is_debug) scheduler_handle.scheduler.assertLocked(current_task);
+pub fn isEmpty(scheduler_handle: SchedulerHandle) bool {
+    if (core.is_debug) scheduler_handle.scheduler.assertLocked();
     return scheduler_handle.scheduler.isEmpty();
 }
 
 /// Yields the current task.
-pub fn yield(scheduler_handle: SchedulerHandle, current_task: Task.Current) void {
+pub fn yield(scheduler_handle: SchedulerHandle) void {
+    const old_task = Task.Current.get().task;
+
     if (core.is_debug) {
-        scheduler_handle.scheduler.assertLocked(current_task);
-        std.debug.assert(current_task.task.spinlocks_held == 1); // only the scheduler lock is held
+        scheduler_handle.scheduler.assertLocked();
+        std.debug.assert(old_task.spinlocks_held == 1); // only the scheduler lock is held
     }
 
     const new_task = scheduler_handle.scheduler.getNextTask() orelse return; // no tasks to run
 
-    if (core.is_debug) std.debug.assert(current_task.task.state == .running);
+    if (core.is_debug) std.debug.assert(old_task.state == .running);
 
-    if (current_task.task.is_scheduler_task) {
-        log.verbose(current_task, "switching from idle to {f}", .{new_task});
-        switchToTaskFromIdleYield(current_task, new_task);
+    if (old_task.is_scheduler_task) {
+        log.verbose("switching from idle to {f}", .{new_task});
+        switchToTaskFromIdleYield(old_task, new_task);
         unreachable;
     }
 
-    if (core.is_debug) std.debug.assert(current_task.task != new_task);
+    if (core.is_debug) std.debug.assert(old_task != new_task);
 
-    log.verbose(current_task, "switching from {f} to {f}", .{ current_task, new_task });
+    log.verbose("switching from {f} to {f}", .{ old_task, new_task });
 
-    scheduler_handle.switchToTaskFromTaskYield(current_task, new_task);
+    scheduler_handle.switchToTaskFromTaskYield(old_task, new_task);
 }
 
 /// Drops the current task out of the scheduler.
 ///
 /// Decrements the reference count of the task to remove the implicit self reference.
-pub fn drop(scheduler_handle: SchedulerHandle, current_task: Task.Current) noreturn {
+pub fn drop(scheduler_handle: SchedulerHandle) noreturn {
     if (core.is_debug) {
-        scheduler_handle.scheduler.assertLocked(current_task);
-        std.debug.assert(current_task.task.spinlocks_held == 1); // only the scheduler lock is held
+        scheduler_handle.scheduler.assertLocked();
+        std.debug.assert(Task.Current.get().task.spinlocks_held == 1); // only the scheduler lock is held
     }
 
-    scheduler_handle.dropWithDeferredAction(current_task, .{
+    scheduler_handle.dropWithDeferredAction(.{
         .action = struct {
-            fn action(inner_current_task: Task.Current, old_task: *Task, _: usize) void {
+            fn action(old_task: *Task, _: usize) void {
                 old_task.state = .{ .dropped = .{} };
-                old_task.decrementReferenceCount(inner_current_task);
+                old_task.decrementReferenceCount();
             }
         }.action,
         .arg = undefined,
@@ -134,7 +136,6 @@ pub const DeferredAction = struct {
     arg: usize,
 
     pub const Action = *const fn (
-        current_task: Task.Current,
         old_task: *Task,
         arg: usize,
     ) void;
@@ -145,65 +146,64 @@ pub const DeferredAction = struct {
 /// Intended to be used when blocking or dropping a task.
 ///
 /// The provided `DeferredAction` will be executed after the task has been switched away from.
-pub fn dropWithDeferredAction(scheduler_handle: SchedulerHandle, current_task: Task.Current, deferred_action: DeferredAction) void {
+pub fn dropWithDeferredAction(scheduler_handle: SchedulerHandle, deferred_action: DeferredAction) void {
+    const old_task = Task.Current.get().task;
+
     if (core.is_debug) {
-        std.debug.assert(!current_task.task.is_scheduler_task); // scheduler task cannot be dropped
-        scheduler_handle.scheduler.assertLocked(current_task);
-        std.debug.assert(current_task.task.state == .running);
+        std.debug.assert(!old_task.is_scheduler_task); // scheduler task cannot be dropped
+        scheduler_handle.scheduler.assertLocked();
+        std.debug.assert(old_task.state == .running);
     }
 
     const new_task = scheduler_handle.scheduler.getNextTask() orelse {
-        log.verbose(current_task, "switching from {f} to idle with a deferred action", .{current_task});
-        switchToIdleDeferredAction(current_task, deferred_action);
+        log.verbose("switching from {f} to idle with a deferred action", .{old_task});
+        switchToIdleDeferredAction(old_task, deferred_action);
         return;
     };
     if (core.is_debug) {
         std.debug.assert(!new_task.is_scheduler_task);
-        std.debug.assert(current_task.task != new_task);
+        std.debug.assert(old_task != new_task);
         std.debug.assert(new_task.scheduler_locked);
         std.debug.assert(new_task.spinlocks_held == 1); // only the scheduler lock is held
         std.debug.assert(new_task.state == .ready);
     }
 
-    log.verbose(current_task, "switching from {f} to {f} with a deferred action", .{ current_task, new_task });
+    log.verbose("switching from {f} to {f} with a deferred action", .{ old_task, new_task });
 
-    switchToTaskFromTaskDeferredAction(current_task, new_task, deferred_action);
+    switchToTaskFromTaskDeferredAction(old_task, new_task, deferred_action);
 }
 
 fn switchToIdleDeferredAction(
-    current_task: Task.Current,
+    old_task: *Task,
     deferred_action: DeferredAction,
 ) void {
     const static = struct {
         fn idleEntryDeferredAction(
-            scheduler_task: *Task,
-            old_task: *Task,
+            inner_old_task: *Task,
             action: DeferredAction.Action,
             action_arg: usize,
         ) noreturn {
-            const inner_current_task: Task.Current = .{ .task = scheduler_task };
-            action(inner_current_task, old_task, action_arg);
+            action(inner_old_task, action_arg);
             if (core.is_debug) {
-                std.debug.assert(inner_current_task.task.interrupt_disable_count == 1);
-                std.debug.assert(inner_current_task.task.spinlocks_held == 1);
+                const scheduler_task = Task.Current.get().task;
+                std.debug.assert(scheduler_task.is_scheduler_task);
+                std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+                std.debug.assert(scheduler_task.spinlocks_held == 1);
             }
-
-            idle(inner_current_task);
+            idle();
             @panic("idle returned");
         }
     };
 
-    const executor = current_task.knownExecutor();
+    const executor = old_task.known_executor.?;
     const scheduler_task = &executor.scheduler_task;
     if (core.is_debug) std.debug.assert(scheduler_task.state == .ready);
 
-    beforeSwitchTask(current_task, scheduler_task);
+    beforeSwitchTask(old_task, scheduler_task);
 
     scheduler_task.state = .{ .running = executor };
     scheduler_task.known_executor = executor;
-    executor.current_task = scheduler_task;
-
-    const old_task = current_task.task;
+    executor.setCurrentTask(scheduler_task);
 
     arch.scheduling.call(
         old_task,
@@ -211,7 +211,6 @@ fn switchToIdleDeferredAction(
         .prepare(
             static.idleEntryDeferredAction,
             .{
-                scheduler_task,
                 old_task,
                 deferred_action.action,
                 deferred_action.arg,
@@ -223,16 +222,15 @@ fn switchToIdleDeferredAction(
     if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
 }
 
-fn switchToTaskFromIdleYield(current_task: Task.Current, new_task: *Task) void {
-    const executor = current_task.knownExecutor();
-    const scheduler_task = current_task.task;
+fn switchToTaskFromIdleYield(scheduler_task: *Task, new_task: *Task) void {
+    const executor = scheduler_task.known_executor.?;
     if (core.is_debug) std.debug.assert(&executor.scheduler_task == scheduler_task);
 
-    beforeSwitchTask(current_task, new_task);
+    beforeSwitchTask(scheduler_task, new_task);
 
     new_task.state = .{ .running = executor };
     new_task.known_executor = executor;
-    executor.current_task = new_task;
+    executor.setCurrentTask(new_task);
 
     scheduler_task.state = .ready;
 
@@ -254,20 +252,19 @@ fn switchToTaskFromIdleYield(current_task: Task.Current, new_task: *Task) void {
 
 fn switchToTaskFromTaskYield(
     scheduler_handle: SchedulerHandle,
-    current_task: Task.Current,
+    old_task: *Task,
     new_task: *Task,
 ) void {
-    const executor = current_task.knownExecutor();
-    const old_task = current_task.task;
+    const executor = old_task.known_executor.?;
 
-    beforeSwitchTask(current_task, new_task);
+    beforeSwitchTask(old_task, new_task);
 
     new_task.state = .{ .running = executor };
     new_task.known_executor = executor;
-    executor.current_task = new_task;
+    executor.setCurrentTask(new_task);
 
     old_task.state = .ready;
-    scheduler_handle.scheduler.queueTask(current_task.task);
+    scheduler_handle.scheduler.queueTask(old_task);
 
     arch.scheduling.switchTask(old_task, new_task);
 
@@ -276,7 +273,7 @@ fn switchToTaskFromTaskYield(
 }
 
 fn switchToTaskFromTaskDeferredAction(
-    current_task: Task.Current,
+    old_task: *Task,
     new_task: *Task,
     deferred_action: DeferredAction,
 ) void {
@@ -287,41 +284,37 @@ fn switchToTaskFromTaskDeferredAction(
             action: DeferredAction.Action,
             action_arg: usize,
         ) noreturn {
-            const executor = inner_old_task.known_executor.?;
+            const scheduler_task = Task.Current.get().task;
+            if (core.is_debug) std.debug.assert(scheduler_task.is_scheduler_task);
+            const executor = scheduler_task.known_executor.?;
 
-            const inner_current_task: Task.Current = .{ .task = &executor.scheduler_task };
-
-            action(
-                inner_current_task,
-                inner_old_task,
-                action_arg,
-            );
+            action(inner_old_task, action_arg);
             if (core.is_debug) {
-                std.debug.assert(inner_current_task.task.interrupt_disable_count == 1);
-                std.debug.assert(inner_current_task.task.spinlocks_held == 1);
+                std.debug.assert(Task.Current.get().task == scheduler_task);
+                std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+                std.debug.assert(scheduler_task.spinlocks_held == 1);
             }
 
             inner_new_task.state = .{ .running = executor };
             inner_new_task.known_executor = executor;
-            executor.current_task = inner_new_task;
+            executor.setCurrentTask(inner_new_task);
 
-            inner_current_task.task.state = .ready;
+            scheduler_task.state = .ready;
 
             arch.scheduling.switchTaskNoSave(inner_new_task);
             @panic("task returned");
         }
     };
 
-    const executor = current_task.knownExecutor();
-    const old_task = current_task.task;
+    const executor = old_task.known_executor.?;
 
-    beforeSwitchTask(current_task, new_task);
+    beforeSwitchTask(old_task, new_task);
 
     const scheduler_task = &executor.scheduler_task;
 
     scheduler_task.state = .{ .running = executor };
     scheduler_task.known_executor = executor;
-    executor.current_task = scheduler_task;
+    executor.setCurrentTask(scheduler_task);
 
     arch.scheduling.call(
         old_task,
@@ -342,10 +335,10 @@ fn switchToTaskFromTaskDeferredAction(
 }
 
 fn beforeSwitchTask(
-    current_task: Task.Current,
-    new_task_: *Task,
+    old_task: *Task,
+    new_task: *Task,
 ) void {
-    const transition: Task.Transition = .from(current_task.task, new_task_);
+    const transition: Task.Transition = .from(old_task, new_task);
 
     switch (transition.type) {
         .kernel_to_kernel => {
@@ -359,8 +352,8 @@ fn beforeSwitchTask(
                 std.debug.assert(transition.old_task.enable_access_to_user_memory_count == 0);
             }
 
-            const new_process: *Process = .fromTask(transition.new_task);
-            new_process.address_space.page_table.load(current_task);
+            const new_process: *Process = .from(transition.new_task);
+            new_process.address_space.page_table.load();
 
             if (transition.new_task.enable_access_to_user_memory_count != 0) {
                 @branchHint(.unlikely); // we expect this to be 0 most of the time
@@ -372,7 +365,7 @@ fn beforeSwitchTask(
                 std.debug.assert(transition.new_task.enable_access_to_user_memory_count == 0);
             }
 
-            kernel.mem.kernelPageTable().load(current_task);
+            kernel.mem.kernelPageTable().load();
 
             if (transition.old_task.enable_access_to_user_memory_count != 0) {
                 @branchHint(.unlikely); // we expect this to be 0 most of the time
@@ -380,9 +373,9 @@ fn beforeSwitchTask(
             }
         },
         .user_to_user => {
-            const old_process: *const Process = .fromTask(transition.old_task);
-            const new_process: *Process = .fromTask(transition.new_task);
-            if (old_process != new_process) new_process.address_space.page_table.load(current_task);
+            const old_process: *const Process = .from(transition.old_task);
+            const new_process: *Process = .from(transition.new_task);
+            if (old_process != new_process) new_process.address_space.page_table.load();
 
             if (transition.old_task.enable_access_to_user_memory_count != transition.new_task.enable_access_to_user_memory_count) {
                 @branchHint(.unlikely); // we expect both to be 0 most of the time
@@ -396,26 +389,27 @@ fn beforeSwitchTask(
         },
     }
 
-    arch.scheduling.beforeSwitchTask(current_task, transition);
+    arch.scheduling.beforeSwitchTask(transition);
 }
 
-fn idle(current_task: Task.Current) callconv(.c) noreturn {
+fn idle() callconv(.c) noreturn {
     if (core.is_debug) {
-        std.debug.assert(current_task.task.is_scheduler_task);
-        std.debug.assert(current_task.task.scheduler_locked);
-        std.debug.assert(current_task.task.interrupt_disable_count == 1);
-        std.debug.assert(current_task.task.spinlocks_held == 1);
+        const scheduler_task = Task.Current.get().task;
+        std.debug.assert(scheduler_task.is_scheduler_task);
+        std.debug.assert(scheduler_task.scheduler_locked);
+        std.debug.assert(scheduler_task.interrupt_disable_count == 1);
+        std.debug.assert(scheduler_task.spinlocks_held == 1);
         std.debug.assert(!arch.interrupts.areEnabled());
     }
 
-    globals.scheduler.unlock(current_task);
+    globals.scheduler.unlock();
 
     while (true) {
         {
-            const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-            defer scheduler_handle.unlock(current_task);
+            const scheduler_handle: Task.SchedulerHandle = .get();
+            defer scheduler_handle.unlock();
 
-            scheduler_handle.yield(current_task);
+            scheduler_handle.yield();
         }
 
         arch.halt();
@@ -423,8 +417,8 @@ fn idle(current_task: Task.Current) callconv(.c) noreturn {
 }
 
 pub const internal = struct {
-    pub fn unsafeUnlock(current_task: Task.Current) void {
-        globals.scheduler.unlock(current_task);
+    pub fn unsafeUnlock() void {
+        globals.scheduler.unlock();
     }
 };
 

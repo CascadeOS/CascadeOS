@@ -21,7 +21,9 @@ pub const Node = struct {
     node: std.SinglyLinkedList.Node,
 };
 
-pub fn submitAndWait(flush_request: *FlushRequest, current_task: Task.Current) void {
+pub fn submitAndWait(flush_request: *FlushRequest) void {
+    const current_task: Task.Current = .get();
+
     {
         current_task.incrementInterruptDisable();
         defer current_task.decrementInterruptDisable();
@@ -32,29 +34,39 @@ pub fn submitAndWait(flush_request: *FlushRequest, current_task: Task.Current) v
         // TODO: is there a better way to determine which executors to target?
         for (kernel.Executor.executors()) |*executor| {
             if (executor == current_executor) continue; // skip ourselves
-            flush_request.requestExecutor(current_task, executor);
+            flush_request.requestExecutor(executor);
         }
 
-        flush_request.flush(current_task);
+        flush_request.flush();
     }
 
-    while (flush_request.count.load(.monotonic) != 0) {
-        arch.spinLoopHint();
+    if (current_task.task.interrupt_disable_count == 0) {
+        // interrupts are enabled so flush requests from other cores will be serviced
+        while (flush_request.count.load(.monotonic) != 0) {
+            arch.spinLoopHint();
+        }
+    } else {
+        // interrupts are disabled so service flush requests here
+        while (flush_request.count.load(.monotonic) != 0) {
+            processFlushRequests();
+        }
     }
 }
 
-pub fn processFlushRequests(current_task: Task.Current) void {
+pub fn processFlushRequests() void {
+    const current_task: Task.Current = .get();
     if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
 
     const executor = current_task.knownExecutor();
 
     while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const kernel.mem.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.flush(current_task);
+        request_node.request.flush();
     }
 }
 
-fn flush(flush_request: *FlushRequest, current_task: Task.Current) void {
+fn flush(flush_request: *FlushRequest) void {
+    const current_task: Task.Current = .get();
     if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
@@ -64,18 +76,18 @@ fn flush(flush_request: *FlushRequest, current_task: Task.Current) void {
         .user => |target_process| switch (current_task.task.type) {
             .kernel => return,
             .user => {
-                const current_process: *Process = .fromTask(current_task.task);
+                const current_process: *Process = .from(current_task.task);
                 if (current_process != target_process) return;
             },
         },
     }
 
     for (flush_request.batch.ranges.constSlice()) |range| {
-        arch.paging.flushCache(current_task, range);
+        arch.paging.flushCache(range);
     }
 }
 
-fn requestExecutor(flush_request: *FlushRequest, current_task: Task.Current, executor: *kernel.Executor) void {
+fn requestExecutor(flush_request: *FlushRequest, executor: *kernel.Executor) void {
     _ = flush_request.count.fetchAdd(1, .monotonic);
 
     const node = flush_request.nodes.addOne() catch @panic("exceeded maximum number of executors");
@@ -85,5 +97,5 @@ fn requestExecutor(flush_request: *FlushRequest, current_task: Task.Current, exe
     };
     executor.flush_requests.prepend(&node.node);
 
-    arch.interrupts.sendFlushIPI(current_task, executor);
+    arch.interrupts.sendFlushIPI(executor);
 }

@@ -36,24 +36,28 @@ pub fn getNextTask(scheduler: *Scheduler) ?*Task {
     return task;
 }
 
-pub fn lock(scheduler: *Scheduler, current_task: Task.Current) void {
-    scheduler.ticket_spin_lock.lock(current_task);
-    current_task.task.scheduler_locked = true;
+pub fn lock(scheduler: *Scheduler) void {
+    scheduler.ticket_spin_lock.lock();
+    Task.Current.get().task.scheduler_locked = true;
 }
 
-pub fn unlock(scheduler: *Scheduler, current_task: Task.Current) void {
-    current_task.task.scheduler_locked = false;
-    scheduler.ticket_spin_lock.unlock(current_task);
+pub fn unlock(scheduler: *Scheduler) void {
+    Task.Current.get().task.scheduler_locked = false;
+    scheduler.ticket_spin_lock.unlock();
 }
 
 /// Asserts that the scheduler lock is held by the current task.
-pub inline fn assertLocked(scheduler: *const Scheduler, current_task: Task.Current) void {
-    std.debug.assert(current_task.task.scheduler_locked);
-    std.debug.assert(scheduler.ticket_spin_lock.isLockedByCurrent(current_task));
+pub inline fn assertLocked(scheduler: *const Scheduler) void {
+    if (core.is_debug) {
+        std.debug.assert(Task.Current.get().task.scheduler_locked);
+        std.debug.assert(scheduler.ticket_spin_lock.isLockedByCurrent());
+    }
 }
 
 /// Asserts that the scheduler lock is not held by the current task.
-pub inline fn assertNotLocked(scheduler: *const Scheduler, current_task: Task.Current) void {
-    std.debug.assert(!current_task.task.scheduler_locked);
-    std.debug.assert(!scheduler.ticket_spin_lock.isLockedByCurrent(current_task));
+pub inline fn assertNotLocked(scheduler: *const Scheduler) void {
+    if (core.is_debug) {
+        std.debug.assert(!Task.Current.get().task.scheduler_locked);
+        std.debug.assert(!scheduler.ticket_spin_lock.isLockedByCurrent());
+    }
 }

@@ -19,6 +19,7 @@ pub const interrupts = @import("interrupts/interrupts.zig");
 pub const ioapic = @import("ioapic.zig");
 pub const paging = @import("paging/paging.zig");
 pub const PerExecutor = @import("PerExecutor.zig");
+pub const PerTask = @import("PerTask.zig");
 pub const registers = @import("registers.zig");
 pub const scheduling = @import("scheduling.zig");
 pub const tsc = @import("tsc.zig");
@@ -31,16 +32,3 @@ pub const PrivilegeLevel = enum(u2) {
     ring2 = 2,
     ring3 = 3,
 };
-
-/// Get the current `Task`.
-///
-/// Supports being called with interrupts and preemption enabled.
-///
-/// Assumes that `init.loadExecutor` has been called on the currently running executor.
-pub inline fn getCurrentTask() *kernel.Task {
-    arch.interrupts.disable();
-    const executor = arch.unsafeGetCurrentExecutor();
-    const current_task = executor.current_task;
-    if (current_task.interrupt_disable_count == 0) arch.interrupts.enable();
-    return current_task;
-}

@@ -392,10 +392,10 @@ pub const SPCR = extern struct {
         const uart = kernel.init.Output.uart;
         const init_log = kernel.debug.log.scoped(.output_init);
 
-        pub fn tryGetSerialOutput(current_task: Task.Current) ?uart.Uart {
-            const output_uart = tryGetSerialOutputInner(current_task) catch |err| switch (err) {
+        pub fn tryGetSerialOutput() ?uart.Uart {
+            const output_uart = tryGetSerialOutputInner() catch |err| switch (err) {
                 error.DivisorTooLarge => {
-                    init_log.warn(current_task, "baud divisor from SPCR too large", .{});
+                    init_log.warn("baud divisor from SPCR too large", .{});
                     return null;
                 },
             } orelse return null;
@@ -403,7 +403,7 @@ pub const SPCR = extern struct {
             return output_uart;
         }
 
-        fn tryGetSerialOutputInner(current_task: Task.Current) uart.Baud.DivisorError!?uart.Uart {
+        fn tryGetSerialOutputInner() uart.Baud.DivisorError!?uart.Uart {
             const spcr_table = SPCRAcpiTable.get(0) orelse return null;
             defer spcr_table.deinit();
 
@@ -493,7 +493,6 @@ pub const SPCR = extern struct {
                             ) orelse return null,
                         },
                         else => |address_space| init_log.info(
-                            current_task,
                             "16550 UART with unhandled address space: {t}",
                             .{address_space},
                         ),
@@ -521,7 +520,6 @@ pub const SPCR = extern struct {
                             ) orelse return null,
                         },
                         else => |address_space| init_log.info(
-                            current_task,
                             "16450 UART with unhandled address space: {t}",
                             .{address_space},
                         ),
@@ -548,7 +546,6 @@ pub const SPCR = extern struct {
                     };
                 },
                 else => |sub_type| init_log.info(
-                    current_task,
                     "unhandled subtype: {t}",
                     .{sub_type},
                 ), // TODO: implement other subtypes

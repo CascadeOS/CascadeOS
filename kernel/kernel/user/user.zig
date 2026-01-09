@@ -16,19 +16,28 @@ const log = kernel.debug.log.scoped(.user);
 
 /// Called on syscall.
 ///
-/// Interrupts are enabled.
-pub fn onSyscall(current_task: Task.Current, syscall_frame: arch.user.SyscallFrame) void {
+/// Interrupts are disabled on entry.
+pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) void {
+    if (core.is_debug) {
+        const current_task: Task.Current = .get();
+        std.debug.assert(current_task.task.interrupt_disable_count == 0);
+        std.debug.assert(current_task.task.enable_access_to_user_memory_count == 0);
+        std.debug.assert(!arch.interrupts.areEnabled());
+    }
+
+    arch.interrupts.enable();
+
     const syscall = syscall_frame.syscall() orelse {
         // TODO: return an error to userspace
-        std.debug.panic("invalid syscall\n{f}", .{syscall_frame.arch_specific});
+        std.debug.panic("invalid syscall\n{f}", .{syscall_frame});
     };
 
-    log.verbose(current_task, "received syscall: {t}", .{syscall});
+    log.verbose("received syscall: {t}", .{syscall});
 
     switch (syscall) {
         .exit_thread => {
-            const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-            scheduler_handle.drop(current_task);
+            const scheduler_handle: Task.SchedulerHandle = .get();
+            scheduler_handle.drop();
             unreachable;
         },
     }
@@ -37,13 +46,13 @@ pub fn onSyscall(current_task: Task.Current, syscall_frame: arch.user.SyscallFra
 pub const init = struct {
     const init_log = kernel.debug.log.scoped(.user_init);
 
-    pub fn initialize(current_task: Task.Current) !void {
-        init_log.debug(current_task, "initializing processes", .{});
-        try Process.init.initializeProcesses(current_task);
+    pub fn initialize() !void {
+        init_log.debug("initializing processes", .{});
+        try Process.init.initializeProcesses();
 
-        init_log.debug(current_task, "initializing threads", .{});
-        try Thread.init.initializeThreads(current_task);
+        init_log.debug("initializing threads", .{});
+        try Thread.init.initializeThreads();
 
-        try arch.user.init.initialize(current_task);
+        try arch.user.init.initialize();
     }
 };

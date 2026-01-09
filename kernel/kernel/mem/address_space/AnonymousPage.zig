@@ -33,8 +33,8 @@ reference_count: u32 = 1,
 
 page: *Page,
 
-pub fn create(current_task: Task.Current, page: *Page) !*AnonymousPage {
-    const anonymous_page = try globals.anonymous_page_cache.allocate(current_task);
+pub fn create(page: *Page) !*AnonymousPage {
+    const anonymous_page = try globals.anonymous_page_cache.allocate();
     anonymous_page.* = .{
         .page = page,
     };
@@ -44,10 +44,10 @@ pub fn create(current_task: Task.Current, page: *Page) !*AnonymousPage {
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Task.Current) void {
+pub fn incrementReferenceCount(anonymous_page: *AnonymousPage) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
-        std.debug.assert(anonymous_page.lock.isLockedByCurrent(current_task));
+        std.debug.assert(anonymous_page.lock.isLockedByCurrent());
     }
 
     anonymous_page.reference_count += 1;
@@ -58,7 +58,6 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage, current_task: Tas
 /// When called the a write lock must be held, upon return the lock is unlocked.
 pub fn decrementReferenceCount(
     anonymous_page: *AnonymousPage,
-    current_task: Task.Current,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
     if (core.is_debug) {
@@ -71,11 +70,11 @@ pub fn decrementReferenceCount(
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous page
-        anonymous_page.destroy(current_task, deallocate_frame_list);
+        anonymous_page.destroy(deallocate_frame_list);
         return;
     }
 
-    anonymous_page.lock.writeUnlock(current_task);
+    anonymous_page.lock.writeUnlock();
 }
 
 /// Destroy the anonymous page.
@@ -85,7 +84,6 @@ pub fn decrementReferenceCount(
 /// Called `uvm_anfree` in OpenBSD uvm.
 fn destroy(
     anonymous_page: *AnonymousPage,
-    current_task: Task.Current,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
     if (core.is_debug) {
@@ -95,8 +93,8 @@ fn destroy(
 
     deallocate_frame_list.push(anonymous_page.page.physical_frame);
 
-    anonymous_page.lock.writeUnlock(current_task);
-    globals.anonymous_page_cache.deallocate(current_task, anonymous_page);
+    anonymous_page.lock.writeUnlock();
+    globals.anonymous_page_cache.deallocate(anonymous_page);
 }
 
 const globals = struct {
@@ -107,10 +105,10 @@ const globals = struct {
 pub const init = struct {
     const init_log = kernel.debug.log.scoped(.anonymous_page_init);
 
-    pub fn initializeCaches(current_task: Task.Current) !void {
-        log.debug(current_task, "initializing anonymous page cache", .{});
+    pub fn initializeCaches() !void {
+        log.debug("initializing anonymous page cache", .{});
 
-        globals.anonymous_page_cache.init(current_task, .{
+        globals.anonymous_page_cache.init(.{
             .name = try .fromSlice("anonymous page"),
         });
     }

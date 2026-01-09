@@ -51,22 +51,22 @@ needs_copy: bool,
 
 wired_count: u32,
 
-pub fn create(current_task: Task.Current) !*Entry {
+pub fn create() !*Entry {
     var entry: [1]*Entry = undefined;
-    try createMany(current_task, &entry);
+    try createMany(&entry);
     return entry[0];
 }
 
-pub fn createMany(current_task: Task.Current, items: []*Entry) !void {
-    return globals.entry_cache.allocateMany(current_task, items) catch |err| switch (err) {
+pub fn createMany(items: []*Entry) !void {
+    return globals.entry_cache.allocateMany(items) catch |err| switch (err) {
         error.SlabAllocationFailed => return error.OutOfMemory,
         error.ItemConstructionFailed => unreachable, // no constructor is provided
         error.LargeItemAllocationFailed => unreachable, // `Entry` is not a large entry - checked in `global_init.initializeCaches`
     };
 }
 
-pub fn destroy(entry: *Entry, current_task: Task.Current) void {
-    globals.entry_cache.deallocate(current_task, entry);
+pub fn destroy(entry: *Entry) void {
+    globals.entry_cache.deallocate(entry);
 }
 
 pub fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
@@ -167,7 +167,7 @@ pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
 ///  - the entries are mergable, see `canMerge`
 ///  - the `second_entry` immediately follows` `first_entry` in the address space
 ///  - after this function `second_entry` is no longer treated as valid
-pub fn merge(first_entry: *Entry, current_task: Task.Current, second_entry: *const Entry) void {
+pub fn merge(first_entry: *Entry, second_entry: *const Entry) void {
     object: {
         const object = first_entry.object_reference.object orelse {
             if (core.is_debug) std.debug.assert(second_entry.object_reference.object == null);
@@ -177,8 +177,8 @@ pub fn merge(first_entry: *Entry, current_task: Task.Current, second_entry: *con
         const second_entry_object = second_entry.object_reference.object.?;
         if (core.is_debug) std.debug.assert(object == second_entry_object);
 
-        object.lock.writeLock(current_task);
-        defer object.lock.writeUnlock(current_task);
+        object.lock.writeLock();
+        defer object.lock.writeUnlock();
         if (core.is_debug) std.debug.assert(object.reference_count >= 2);
 
         object.reference_count -= 1;
@@ -190,8 +190,8 @@ pub fn merge(first_entry: *Entry, current_task: Task.Current, second_entry: *con
             break :anonymous_map;
         };
 
-        anonymous_map.lock.writeLock(current_task);
-        defer anonymous_map.lock.writeUnlock(current_task);
+        anonymous_map.lock.writeLock();
+        defer anonymous_map.lock.writeUnlock();
 
         if (second_entry.anonymous_map_reference.anonymous_map) |second_entry_anonymous_map| {
             if (core.is_debug) {
@@ -218,7 +218,7 @@ pub fn merge(first_entry: *Entry, current_task: Task.Current, second_entry: *con
 ///  - `split_offset` is not `.zero`
 ///  - `split_offset` is less than or equal to `first_entry.range.size`
 ///  - `split_offset` is a multiple of the standard page size
-pub fn split(first_entry: *Entry, current_task: Task.Current, new_second_entry: *Entry, split_offset: core.Size) void {
+pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_offset: core.Size) void {
     if (core.is_debug) {
         std.debug.assert(first_entry != new_second_entry);
         std.debug.assert(first_entry.range.size.notEqual(.zero));
@@ -245,8 +245,8 @@ pub fn split(first_entry: *Entry, current_task: Task.Current, new_second_entry: 
     if (first_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
         new_second_entry.anonymous_map_reference.start_offset.addInPlace(split_offset);
 
-        anonymous_map.lock.writeLock(current_task);
-        defer anonymous_map.lock.writeUnlock(current_task);
+        anonymous_map.lock.writeLock();
+        defer anonymous_map.lock.writeUnlock();
 
         anonymous_map.reference_count += 1;
     }
@@ -254,8 +254,8 @@ pub fn split(first_entry: *Entry, current_task: Task.Current, new_second_entry: 
     if (first_entry.object_reference.object) |object| {
         new_second_entry.object_reference.start_offset.addInPlace(split_offset);
 
-        object.lock.writeLock(current_task);
-        defer object.lock.writeUnlock(current_task);
+        object.lock.writeLock();
+        defer object.lock.writeUnlock();
 
         object.reference_count += 1;
     }
@@ -309,7 +309,7 @@ pub fn shrink(
 }
 
 /// Prints the entry.
-pub fn print(entry: *const Entry, current_task: Task.Current, writer: *std.Io.Writer, indent: usize) !void {
+pub fn print(entry: *const Entry, writer: *std.Io.Writer, indent: usize) !void {
     const new_indent = indent + 2;
 
     try writer.writeAll("Entry{\n");
@@ -336,7 +336,6 @@ pub fn print(entry: *const Entry, current_task: Task.Current, writer: *std.Io.Wr
     if (entry.anonymous_map_reference.anonymous_map != null) {
         try writer.writeAll("anonymous_map: ");
         try entry.anonymous_map_reference.print(
-            current_task,
             writer,
             new_indent,
         );
@@ -349,7 +348,6 @@ pub fn print(entry: *const Entry, current_task: Task.Current, writer: *std.Io.Wr
     if (entry.object_reference.object != null) {
         try writer.writeAll("object: ");
         try entry.object_reference.print(
-            current_task,
             writer,
             new_indent,
         );
@@ -374,10 +372,10 @@ const globals = struct {
 pub const init = struct {
     const init_log = kernel.debug.log.scoped(.address_space_entry_init);
 
-    pub fn initializeCaches(current_task: Task.Current) !void {
-        init_log.debug(current_task, "initializing address space entry cache", .{});
+    pub fn initializeCaches() !void {
+        init_log.debug("initializing address space entry cache", .{});
 
-        globals.entry_cache.init(current_task, .{
+        globals.entry_cache.init(.{
             .name = try .fromSlice("address space entry"),
         });
     }

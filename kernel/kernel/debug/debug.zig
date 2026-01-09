@@ -15,20 +15,20 @@ pub fn hasAnExecutorPanicked() bool {
 }
 
 pub fn interruptSourcePanic(
-    current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
     comptime format: []const u8,
     args: anytype,
 ) noreturn {
     @branchHint(.cold);
 
+    const current_task: Task.Current = .get();
+
     current_task.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
     const executor = current_task.knownExecutor();
 
     panicDispatch(
-        executor.renderInterruptSourcePanicMessage(current_task, format, args),
+        executor.renderInterruptSourcePanicMessage(format, args),
         .{ .interrupt = interrupt_frame },
-        current_task,
     );
 }
 
@@ -44,7 +44,6 @@ fn zigPanic(
             .return_address = return_address_opt orelse @returnAddress(),
             .error_return_trace = @errorReturnTrace(),
         } },
-        null,
     );
 }
 
@@ -59,7 +58,6 @@ const PanicType = union(enum) {
 fn panicDispatch(
     msg: []const u8,
     panic_type: PanicType,
-    opt_current_task: ?Task.Current,
 ) noreturn {
     @branchHint(.cold);
 
@@ -69,7 +67,7 @@ fn panicDispatch(
         .no_op => {},
         .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
         .init_panic => initPanic(
-            if (opt_current_task) |c| c else .panicked(),
+            .panicked(),
             msg,
             panic_type,
         ),
@@ -128,7 +126,7 @@ fn initPanic(
     }
 
     kernel.init.Output.lock.poison();
-    arch.interrupts.sendPanicIPI(current_task);
+    arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;

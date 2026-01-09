@@ -15,11 +15,7 @@ const log = kernel.debug.log.scoped(.uacpi_kernel_api);
 
 /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_get_rsdp called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_get_rsdp called", .{});
 
     out_rsdp_address.* = kernel.mem.physicalFromDirectMap(.fromPtr(acpi.rsdpTable())) catch return .internal_error;
 
@@ -35,22 +31,14 @@ export fn uacpi_kernel_pci_device_open(
     address: kernel.pci.Address,
     out_handle: **volatile kernel.pci.Function,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_device_open called with address {f}",
-        .{address},
-    );
+    log.verbose("uacpi_kernel_pci_device_open called with address {f}", .{address});
 
     out_handle.* = kernel.pci.getFunction(address) orelse return uacpi.Status.not_found;
     return .ok;
 }
 
 export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_device_close called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_device_close called", .{});
 
     _ = handle;
 }
@@ -61,11 +49,7 @@ export fn uacpi_kernel_pci_read8(
     offset: usize,
     value: *u8,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_read8 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_read8 called", .{});
 
     value.* = function.read(u8, offset);
 
@@ -78,11 +62,7 @@ export fn uacpi_kernel_pci_read16(
     offset: usize,
     value: *u16,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_read16 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_read16 called", .{});
 
     value.* = function.read(u16, offset);
 
@@ -95,11 +75,7 @@ export fn uacpi_kernel_pci_read32(
     offset: usize,
     value: *u32,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_read32 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_read32 called", .{});
 
     value.* = function.read(u32, offset);
 
@@ -112,11 +88,7 @@ export fn uacpi_kernel_pci_write8(
     offset: usize,
     value: u8,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_write8 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_write8 called", .{});
 
     function.write(u8, offset, value);
 
@@ -129,11 +101,7 @@ export fn uacpi_kernel_pci_write16(
     offset: usize,
     value: u16,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_write16 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_write16 called", .{});
 
     function.write(u16, offset, value);
 
@@ -146,11 +114,7 @@ export fn uacpi_kernel_pci_write32(
     offset: usize,
     value: u32,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_pci_write32 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_pci_write32 called", .{});
 
     function.write(u32, offset, value);
 
@@ -162,11 +126,7 @@ export fn uacpi_kernel_pci_write32(
 ///
 /// NOTE: The x86 architecture uses the in/out family of instructions to access the SystemIO address space.
 export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_map called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_map called", .{});
 
     _ = len;
 
@@ -175,11 +135,7 @@ export fn uacpi_kernel_io_map(base: u64, len: usize, out_handle: **anyopaque) ua
 }
 
 export fn uacpi_kernel_io_unmap(handle: *anyopaque) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_unmap called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_unmap called", .{});
 
     _ = handle;
 }
@@ -192,11 +148,7 @@ export fn uacpi_kernel_io_read8(
     offset: usize,
     value: *u8,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_read8 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_read8 called", .{});
 
     const port = arch.io.Port.from(
         @intFromPtr(handle) + offset,
@@ -214,11 +166,7 @@ export fn uacpi_kernel_io_read16(
     offset: usize,
     value: *u16,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_read16 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_read16 called", .{});
 
     const port = arch.io.Port.from(
         @intFromPtr(handle) + offset,
@@ -236,11 +184,7 @@ export fn uacpi_kernel_io_read32(
     offset: usize,
     value: *u32,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_read32 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_read32 called", .{});
 
     const port = arch.io.Port.from(
         @intFromPtr(handle) + offset,
@@ -258,11 +202,7 @@ export fn uacpi_kernel_io_write8(
     offset: usize,
     value: u8,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_write8 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_write8 called", .{});
 
     const port = arch.io.Port.from(
         @intFromPtr(handle) + offset,
@@ -280,11 +220,7 @@ export fn uacpi_kernel_io_write16(
     offset: usize,
     value: u16,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_write16 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_write16 called", .{});
 
     const port = arch.io.Port.from(
         @intFromPtr(handle) + offset,
@@ -302,11 +238,7 @@ export fn uacpi_kernel_io_write32(
     offset: usize,
     value: u32,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_io_write32 called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_io_write32 called", .{});
 
     const port = arch.io.Port.from(
         @intFromPtr(handle) + offset,
@@ -337,11 +269,7 @@ export fn uacpi_kernel_io_write32(
 ///           5. Add the original offset within page 0xABC (from step 1) to the resulting virtual address
 ///              0xF000 + 0xABC => 0xFABC. Return it to uACPI.
 export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_map called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_map called", .{});
 
     _ = len;
 
@@ -354,11 +282,7 @@ export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
 ///       Similar steps to uacpi_kernel_map can be taken to retrieve the virtual address originally returned by the VMM
 ///       for this mapping as well as its true length.
 export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_unmap called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_unmap called", .{});
 
     _ = addr;
     _ = len;
@@ -367,11 +291,7 @@ export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
 /// Allocate a block of memory of 'size' bytes.
 /// The contents of the allocated memory are unspecified.
 export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_alloc called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_alloc called", .{});
 
     const buf = kernel.mem.heap.allocator.alloc(u8, size) catch return null;
     return buf.ptr;
@@ -381,11 +301,7 @@ export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
 ///
 /// 'mem' might be a NULL pointer. In this case, the call is assumed to be a no-op.
 export fn uacpi_kernel_free(opt_mem: ?[*]u8) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_free called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_free called", .{});
 
     kernel.mem.heap.freeWithNoSize(opt_mem orelse return);
 }
@@ -405,8 +321,6 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 
             if (!uacpi_log.levelEnabled(kernel_log_level)) return;
 
-            const current_task: Task.Current = .current();
-
             const full_msg = std.mem.sliceTo(c_msg, 0);
 
             const msg = if (full_msg.len > 0 and full_msg[full_msg.len - 1] == '\n')
@@ -415,11 +329,11 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
                 full_msg;
 
             switch (comptime kernel_log_level) {
-                .verbose => uacpi_log.verbose(current_task, "{s}", .{msg}),
-                .debug => uacpi_log.debug(current_task, "{s}", .{msg}),
+                .verbose => uacpi_log.verbose("{s}", .{msg}),
+                .debug => uacpi_log.debug("{s}", .{msg}),
                 .info => @compileError("NO INFO LOGS"),
-                .warn => uacpi_log.warn(current_task, "{s}", .{msg}),
-                .err => uacpi_log.err(current_task, "{s}", .{msg}),
+                .warn => uacpi_log.warn("{s}", .{msg}),
+                .err => uacpi_log.err("{s}", .{msg}),
             }
         },
     }
@@ -427,22 +341,14 @@ export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8
 
 /// Returns the number of nanosecond ticks elapsed since boot, strictly monotonic.
 export fn uacpi_kernel_get_nanoseconds_since_boot() u64 {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_get_nanoseconds_since_boot called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_get_nanoseconds_since_boot called", .{});
 
     return kernel.time.wallclock.elapsed(.zero, kernel.time.wallclock.read()).value;
 }
 
 /// Spin for N microseconds.
 export fn uacpi_kernel_stall(usec: u8) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_stall called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_stall called", .{});
 
     const start = kernel.time.wallclock.read();
 
@@ -455,22 +361,14 @@ export fn uacpi_kernel_stall(usec: u8) void {
 
 /// Sleep for N milliseconds.
 export fn uacpi_kernel_sleep(msec: u64) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_sleep called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_sleep called", .{});
 
     std.debug.panic("uacpi_kernel_sleep(msec={})", .{msec});
 }
 
 /// Create an opaque non-recursive kernel mutex object.
 export fn uacpi_kernel_create_mutex() *kernel.sync.Mutex {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_create_mutex called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_create_mutex called", .{});
 
     const mutex = kernel.mem.heap.allocator.create(kernel.sync.Mutex) catch unreachable;
     mutex.* = .{};
@@ -479,26 +377,16 @@ export fn uacpi_kernel_create_mutex() *kernel.sync.Mutex {
 
 /// Free a opaque non-recursive kernel mutex object.
 export fn uacpi_kernel_free_mutex(mutex: *kernel.sync.Mutex) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_free_mutex called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_free_mutex called", .{});
 
     kernel.mem.heap.allocator.destroy(mutex);
 }
 
 /// Create/free an opaque kernel (semaphore-like) event object.
 export fn uacpi_kernel_create_event() *anyopaque {
-    const current_task: Task.Current = .current(); // TODO: once this is implemented move this in to the if
+    log.verbose("uacpi_kernel_create_event called", .{});
 
-    if (log.levelEnabled(.verbose)) log.verbose(
-        current_task,
-        "uacpi_kernel_create_event called",
-        .{},
-    );
-
-    log.warn(current_task, "uacpi_kernel_create_event called with dummy implementation", .{});
+    log.warn("uacpi_kernel_create_event called with dummy implementation", .{});
 
     const static = struct {
         var value: std.atomic.Value(usize) = .init(1);
@@ -509,11 +397,7 @@ export fn uacpi_kernel_create_event() *anyopaque {
 
 /// Free a previously allocated kernel (semaphore-like) event object.
 export fn uacpi_kernel_free_event(handle: *anyopaque) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_free_event called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_free_event called", .{});
 
     std.debug.panic("uacpi_kernel_free_event(handle={})", .{handle});
 }
@@ -522,11 +406,8 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 ///
 /// The returned thread id cannot be UACPI_THREAD_ID_NONE.
 export fn uacpi_kernel_get_thread_id() usize {
-    const current_task: Task.Current = .current();
-
-    log.verbose(current_task, "uacpi_kernel_get_thread_id called", .{});
-
-    return @intFromPtr(current_task.task);
+    log.verbose("uacpi_kernel_get_thread_id called", .{});
+    return @intFromPtr(Task.Current.get().task);
 }
 
 /// Try to acquire the mutex with a millisecond timeout.
@@ -542,13 +423,11 @@ export fn uacpi_kernel_get_thread_id() usize {
 ///                           successful for calls with timeout=.none)
 /// 3. Any other value - signifies a host internal error and is treated as such
 export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: uacpi.Timeout) uacpi.Status {
-    const current_task: Task.Current = .current();
-
-    log.verbose(current_task, "uacpi_kernel_acquire_mutex called", .{});
+    log.verbose("uacpi_kernel_acquire_mutex called", .{});
 
     switch (timeout) {
-        .none => if (!mutex.tryLock(current_task)) return .timeout,
-        .infinite => mutex.lock(current_task),
+        .none => if (!mutex.tryLock()) return .timeout,
+        .infinite => mutex.lock(),
         else => @panic("mutex timeout lock not implemented"),
     }
 
@@ -556,11 +435,8 @@ export fn uacpi_kernel_acquire_mutex(mutex: *kernel.sync.Mutex, timeout: uacpi.T
 }
 
 export fn uacpi_kernel_release_mutex(mutex: *kernel.sync.Mutex) void {
-    const current_task: Task.Current = .current();
-
-    log.verbose(current_task, "uacpi_kernel_release_mutex called", .{});
-
-    mutex.unlock(current_task);
+    log.verbose("uacpi_kernel_release_mutex called", .{});
+    mutex.unlock();
 }
 
 /// Try to wait for an event (counter > 0) with a millisecond timeout.
@@ -569,11 +445,7 @@ export fn uacpi_kernel_release_mutex(mutex: *kernel.sync.Mutex) void {
 ///
 /// A successful wait is indicated by returning UACPI_TRUE.
 export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: uacpi.Timeout) bool {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_wait_for_event called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_wait_for_event called", .{});
 
     std.debug.panic(
         "uacpi_kernel_wait_for_event(handle={}, timeout={})",
@@ -585,22 +457,14 @@ export fn uacpi_kernel_wait_for_event(handle: *anyopaque, timeout: uacpi.Timeout
 ///
 /// This function may be used in interrupt contexts.
 export fn uacpi_kernel_signal_event(handle: *anyopaque) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_signal_event called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_signal_event called", .{});
 
     std.debug.panic("uacpi_kernel_signal_event(handle={})", .{handle});
 }
 
 /// Reset the event counter to 0.
 export fn uacpi_kernel_reset_event(handle: *anyopaque) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_reset_event called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_reset_event called", .{});
 
     std.debug.panic("uacpi_kernel_reset_event(handle={})", .{handle});
 }
@@ -609,11 +473,7 @@ export fn uacpi_kernel_reset_event(handle: *anyopaque) void {
 ///
 /// Currently either a Breakpoint or Fatal operators.
 export fn uacpi_kernel_handle_firmware_request(request: *const uacpi.FirmwareRequest) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_handle_firmware_request called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_handle_firmware_request called", .{});
 
     std.debug.panic(
         "uacpi_kernel_handle_firmware_request(request={})",
@@ -632,7 +492,6 @@ export fn uacpi_kernel_install_interrupt_handler(
 ) uacpi.Status {
     const HandlerWrapper = struct {
         fn HandlerWrapper(
-            _: Task.Current,
             _: arch.interrupts.InterruptFrame,
             _: Task.Current.StateBeforeInterrupt,
             inner_handler: uacpi.RawInterruptHandler,
@@ -642,24 +501,21 @@ export fn uacpi_kernel_install_interrupt_handler(
         }
     }.HandlerWrapper;
 
-    const current_task: Task.Current = .current();
-
-    log.verbose(current_task, "uacpi_kernel_install_interrupt_handler called", .{});
+    log.verbose("uacpi_kernel_install_interrupt_handler called", .{});
 
     const interrupt_handler: arch.interrupts.Interrupt.Handler = .prepare(HandlerWrapper, .{ handler, ctx });
 
     const interrupt = arch.interrupts.Interrupt.allocate(
-        current_task,
         interrupt_handler,
     ) catch |err| {
-        log.err(current_task, "failed to allocate interrupt: {}", .{err});
+        log.err("failed to allocate interrupt: {}", .{err});
         return .internal_error;
     };
 
-    interrupt.route(current_task, irq) catch |err| {
-        interrupt.deallocate(current_task);
+    interrupt.route(irq) catch |err| {
+        interrupt.deallocate();
 
-        log.err(current_task, "failed to route interrupt: {}", .{err});
+        log.err("failed to route interrupt: {}", .{err});
         return .internal_error;
     };
 
@@ -675,12 +531,10 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
     _: uacpi.RawInterruptHandler,
     irq_handle: *anyopaque,
 ) uacpi.Status {
-    const current_task: Task.Current = .current();
-
-    log.verbose(current_task, "uacpi_kernel_uninstall_interrupt_handler called", .{});
+    log.verbose("uacpi_kernel_uninstall_interrupt_handler called", .{});
 
     const interrupt: arch.interrupts.Interrupt = .fromUsize(@intFromPtr(irq_handle));
-    interrupt.deallocate(current_task);
+    interrupt.deallocate();
 
     return .ok;
 }
@@ -689,11 +543,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
 ///
 /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
 export fn uacpi_kernel_create_spinlock() *kernel.sync.TicketSpinLock {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_create_spinlock called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_create_spinlock called", .{});
 
     const lock = kernel.mem.heap.allocator.create(kernel.sync.TicketSpinLock) catch unreachable;
     lock.* = .{};
@@ -704,11 +554,7 @@ export fn uacpi_kernel_create_spinlock() *kernel.sync.TicketSpinLock {
 ///
 /// Unlike other types of locks, spinlocks may be used in interrupt contexts.
 export fn uacpi_kernel_free_spinlock(spinlock: *kernel.sync.TicketSpinLock) void {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_free_spinlock called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_free_spinlock called", .{});
 
     kernel.mem.heap.allocator.destroy(spinlock);
 }
@@ -720,21 +566,17 @@ export fn uacpi_kernel_free_spinlock(spinlock: *kernel.sync.TicketSpinLock) void
 ///
 /// Note that lock is infalliable.
 export fn uacpi_kernel_lock_spinlock(spinlock: *kernel.sync.TicketSpinLock) uacpi.CpuFlags {
-    const current_task: Task.Current = .current();
+    log.verbose("uacpi_kernel_lock_spinlock called", .{});
 
-    log.verbose(current_task, "uacpi_kernel_lock_spinlock called", .{});
-
-    spinlock.lock(current_task);
+    spinlock.lock();
     return 0;
 }
 
 export fn uacpi_kernel_unlock_spinlock(spinlock: *kernel.sync.TicketSpinLock, cpu_flags: uacpi.CpuFlags) void {
-    const current_task: Task.Current = .current();
-
-    log.verbose(current_task, "uacpi_kernel_unlock_spinlock called", .{});
+    log.verbose("uacpi_kernel_unlock_spinlock called", .{});
 
     _ = cpu_flags;
-    spinlock.unlock(current_task);
+    spinlock.unlock();
 }
 
 /// Schedules deferred work for execution.
@@ -745,11 +587,7 @@ export fn uacpi_kernel_schedule_work(
     handler: uacpi.WorkHandler,
     ctx: *anyopaque,
 ) uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_schedule_work called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_schedule_work called", .{});
 
     std.debug.panic(
         "uacpi_kernel_schedule_work(work_type={}, handler={}, ctx={})",
@@ -763,11 +601,7 @@ export fn uacpi_kernel_schedule_work(
 ///
 /// Note that the waits must be done in this order specifically.
 export fn uacpi_kernel_wait_for_work_completion() uacpi.Status {
-    if (log.levelEnabled(.verbose)) log.verbose(
-        .current(),
-        "uacpi_kernel_wait_for_work_completion called",
-        .{},
-    );
+    log.verbose("uacpi_kernel_wait_for_work_completion called", .{});
 
     @panic("uacpi_kernel_wait_for_work_completion()");
 }

@@ -41,17 +41,17 @@ pub const CreateOptions = struct {
 };
 
 /// Create a process.
-pub fn create(current_task: Task.Current, options: CreateOptions) !*Process {
-    const process = try globals.cache.allocate(current_task);
-    errdefer globals.cache.deallocate(current_task, process);
+pub fn create(options: CreateOptions) !*Process {
+    const process = try globals.cache.allocate();
+    errdefer globals.cache.deallocate(process);
 
     if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 0);
 
     process.name = options.name;
     process.address_space.retarget(process);
 
-    globals.processes_lock.writeLock(current_task);
-    defer globals.processes_lock.writeUnlock(current_task);
+    globals.processes_lock.writeLock();
+    defer globals.processes_lock.writeUnlock();
 
     const gop = try globals.processes.getOrPut(kernel.mem.heap.allocator, process);
     if (gop.found_existing) @panic("process already in processes list");
@@ -63,7 +63,7 @@ pub fn create(current_task: Task.Current, options: CreateOptions) !*Process {
 
 pub const CreateThreadOptions = struct {
     name: ?Task.Name = null,
-    entry: Task.EntryFunction,
+    entry: core.TypeErasedCall,
 };
 
 /// Creates a thread in the given process.
@@ -73,11 +73,9 @@ pub const CreateThreadOptions = struct {
 /// `Thread.setThreadEntry` *must* be called before the thread is scheduled.
 pub fn createThread(
     process: *Process,
-    current_task: Task.Current,
     options: CreateThreadOptions,
 ) !*Thread {
     const thread = try Thread.internal.create(
-        current_task,
         process,
         .{
             .name = if (options.name) |provided_name|
@@ -94,11 +92,11 @@ pub fn createThread(
     errdefer {
         thread.task.state = .{ .dropped = .{} }; // `destroy` will assert this
         thread.task.reference_count.store(0, .monotonic); // `destroy` will assert this
-        Thread.internal.destroy(current_task, thread);
+        Thread.internal.destroy(thread);
     }
 
-    process.threads_lock.writeLock(current_task);
-    defer process.threads_lock.writeUnlock(current_task);
+    process.threads_lock.writeLock();
+    defer process.threads_lock.writeUnlock();
 
     const gop = try process.threads.getOrPut(kernel.mem.heap.allocator, thread);
     if (gop.found_existing) @panic("thread already in process threads list");
@@ -112,20 +110,20 @@ pub fn incrementReferenceCount(process: *Process) void {
     _ = process.reference_count.fetchAdd(1, .acq_rel);
 }
 
-pub fn decrementReferenceCount(process: *Process, current_task: Task.Current) void {
+pub fn decrementReferenceCount(process: *Process) void {
     if (process.reference_count.fetchSub(1, .acq_rel) != 1) {
         @branchHint(.likely);
         return;
     }
-    globals.process_cleanup.queueProcessForCleanup(current_task, process);
+    globals.process_cleanup.queueProcessForCleanup(process);
 }
 
 /// Returns the process that the given task belongs to.
 ///
 /// Asserts that the task is a user task.
-pub inline fn fromTask(task: *Task) *Process {
+pub inline fn from(task: *Task) *Process {
     if (core.is_debug) std.debug.assert(task.type == .user);
-    const thread: *Thread = .fromTask(task);
+    const thread: *Thread = .from(task);
     return thread.process;
 }
 
@@ -140,9 +138,9 @@ const ProcessCleanup = struct {
     parker: kernel.sync.Parker,
     incoming: core.containers.AtomicSinglyLinkedList,
 
-    pub fn init(process_cleanup: *ProcessCleanup, current_task: Task.Current) !void {
+    pub fn init(process_cleanup: *ProcessCleanup) !void {
         process_cleanup.* = .{
-            .task = try Task.createKernelTask(current_task, .{
+            .task = try Task.createKernelTask(.{
                 .name = try .fromSlice("process cleanup"),
                 .entry = .prepare(ProcessCleanup.execute, .{process_cleanup}),
             }),
@@ -155,7 +153,6 @@ const ProcessCleanup = struct {
 
     pub fn queueProcessForCleanup(
         process_cleanup: *ProcessCleanup,
-        current_task: Task.Current,
         process: *Process,
     ) void {
         if (process.queued_for_cleanup.cmpxchgStrong(
@@ -167,59 +164,54 @@ const ProcessCleanup = struct {
             @panic("already queued for cleanup");
         }
 
-        log.verbose(current_task, "queueing {f} for cleanup", .{process});
+        log.verbose("queueing {f} for cleanup", .{process});
 
         process_cleanup.incoming.prepend(&process.cleanup_node);
-        process_cleanup.parker.unpark(current_task);
+        process_cleanup.parker.unpark();
     }
 
-    fn execute(current_task: Task.Current, process_cleanup: *ProcessCleanup) noreturn {
-        if (core.is_debug) std.debug.assert(process_cleanup.task == current_task.task);
-
+    fn execute(process_cleanup: *ProcessCleanup) noreturn {
         while (true) {
             while (process_cleanup.incoming.popFirst()) |node| {
-                cleanupProcess(
-                    current_task,
-                    @fieldParentPtr("cleanup_node", node),
-                );
+                cleanupProcess(@fieldParentPtr("cleanup_node", node));
             }
 
-            process_cleanup.parker.park(current_task);
+            process_cleanup.parker.park();
         }
     }
 
-    fn cleanupProcess(current_task: Task.Current, process: *Process) void {
+    fn cleanupProcess(process: *Process) void {
         if (core.is_debug) std.debug.assert(process.queued_for_cleanup.load(.monotonic));
 
         process.queued_for_cleanup.store(false, .release);
 
         {
-            globals.processes_lock.writeLock(current_task);
-            defer globals.processes_lock.writeUnlock(current_task);
+            globals.processes_lock.writeLock();
+            defer globals.processes_lock.writeUnlock();
 
             if (process.reference_count.load(.acquire) != 0) {
                 @branchHint(.unlikely);
                 // someone has acquired a reference to the process after it was queued for cleanup
-                log.verbose(current_task, "{f} still has references", .{process});
+                log.verbose("{f} still has references", .{process});
                 return;
             }
 
             if (process.queued_for_cleanup.load(.acquire)) {
                 @branchHint(.unlikely);
                 // someone has requeued this process for cleanup
-                log.verbose(current_task, "{f} has been requeued for cleanup", .{process});
+                log.verbose("{f} has been requeued for cleanup", .{process});
                 return;
             }
 
             if (!globals.processes.swapRemove(process)) @panic("process not found in processes");
         }
 
-        log.debug(current_task, "destroying {f}", .{process});
+        log.debug("destroying {f}", .{process});
 
         process.threads.clearAndFree(kernel.mem.heap.allocator);
-        process.address_space.reinitializeAndUnmapAll(current_task);
+        process.address_space.reinitializeAndUnmapAll();
 
-        globals.cache.deallocate(current_task, process);
+        globals.cache.deallocate(process);
     }
 };
 
@@ -230,7 +222,7 @@ const globals = struct {
     var cache: kernel.mem.cache.Cache(
         Process,
         struct {
-            fn constructor(process: *Process, current_task: Task.Current) kernel.mem.cache.ConstructorError!void {
+            fn constructor(process: *Process) kernel.mem.cache.ConstructorError!void {
                 const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
                 process.* = .{
@@ -239,20 +231,20 @@ const globals = struct {
                     .address_space = undefined, // initialized below
                 };
 
-                const frame = kernel.mem.phys.allocator.allocate(current_task) catch |err| {
-                    log.warn(current_task, "process constructor failed during frame allocation: {t}", .{err});
+                const frame = kernel.mem.phys.allocator.allocate() catch |err| {
+                    log.warn("process constructor failed during frame allocation: {t}", .{err});
                     return error.ItemConstructionFailed;
                 };
                 errdefer {
                     var frame_list: kernel.mem.phys.FrameList = .{};
                     frame_list.push(frame);
-                    kernel.mem.phys.allocator.deallocate(current_task, frame_list);
+                    kernel.mem.phys.allocator.deallocate(frame_list);
                 }
 
-                const page_table: arch.paging.PageTable = .create(current_task, frame);
-                kernel.mem.kernelPageTable().copyTopLevelInto(current_task, page_table);
+                const page_table: arch.paging.PageTable = .create(frame);
+                kernel.mem.kernelPageTable().copyTopLevelInto(page_table);
 
-                process.address_space.init(current_task, .{
+                process.address_space.init(.{
                     .name = kernel.mem.AddressSpace.Name.fromSlice(
                         temp_name.constSlice(),
                     ) catch unreachable, // ensured in `kernel.config`
@@ -261,7 +253,6 @@ const globals = struct {
                     .context = .{ .user = process },
                 }) catch |err| {
                     log.warn(
-                        current_task,
                         "process constructor failed during address space initialization: {t}",
                         .{err},
                     );
@@ -270,14 +261,14 @@ const globals = struct {
             }
         }.constructor,
         struct {
-            fn destructor(process: *Process, current_task: Task.Current) void {
+            fn destructor(process: *Process) void {
                 const page_table = process.address_space.page_table;
 
-                process.address_space.deinit(current_task);
+                process.address_space.deinit();
 
                 var frame_list: kernel.mem.phys.FrameList = .{};
                 frame_list.push(page_table.physical_frame);
-                kernel.mem.phys.allocator.deallocate(current_task, frame_list);
+                kernel.mem.phys.allocator.deallocate(frame_list);
             }
         }.destructor,
     ) = undefined;
@@ -292,13 +283,13 @@ const globals = struct {
 pub const init = struct {
     const init_log = kernel.debug.log.scoped(.process_init);
 
-    pub fn initializeProcesses(current_task: Task.Current) !void {
-        init_log.debug(current_task, "initializing process cache", .{});
-        globals.cache.init(current_task, .{
+    pub fn initializeProcesses() !void {
+        init_log.debug("initializing process cache", .{});
+        globals.cache.init(.{
             .name = try .fromSlice("process"),
         });
 
-        init_log.debug(current_task, "initializing process cleanup service", .{});
-        try globals.process_cleanup.init(current_task);
+        init_log.debug("initializing process cleanup service", .{});
+        try globals.process_cleanup.init();
     }
 };

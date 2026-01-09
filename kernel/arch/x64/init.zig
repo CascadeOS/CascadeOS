@@ -15,9 +15,9 @@ const x64 = @import("x64.zig");
 const log = kernel.debug.log.scoped(.init_x64);
 
 /// Attempt to get some form of init output.
-pub fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
+pub fn tryGetSerialOutput() ?arch.init.InitOutput {
     if (DebugCon.detect()) {
-        log.debug(current_task, "using debug console for serial output", .{});
+        log.debug("using debug console for serial output", .{});
         return .{
             .output = DebugCon.output,
             .preference = .use,
@@ -40,7 +40,7 @@ pub fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
         ) catch continue) |serial| {
-            log.debug(current_task, "using {t} for serial output", .{com_port});
+            log.debug("using {t} for serial output", .{com_port});
 
             static.init_output_serial_port = serial;
             return .{
@@ -53,9 +53,9 @@ pub fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
     return null;
 }
 
-/// Prepares the current executor as the bootstrap executor.
+/// Prepares the executor as the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    current_task: Task.Current,
+    executor: *kernel.Executor,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
@@ -64,7 +64,7 @@ pub fn prepareBootstrapExecutor(
     };
 
     prepareExecutorShared(
-        current_task.knownExecutor(),
+        executor,
         @intCast(architecture_processor_id),
         .fromRange(
             .fromSlice(u8, &static.bootstrap_double_fault_stack),
@@ -80,12 +80,12 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(current_task: Task.Current, executor: *kernel.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate double fault stack"),
-        Task.init.earlyCreateStack(current_task) catch @panic("failed to allocate NMI stack"),
+        Task.init.earlyCreateStack() catch @panic("failed to allocate double fault stack"),
+        Task.init.earlyCreateStack() catch @panic("failed to allocate NMI stack"),
     );
 }
 
@@ -95,39 +95,38 @@ fn prepareExecutorShared(
     double_fault_stack: Task.Stack,
     non_maskable_interrupt_stack: Task.Stack,
 ) void {
-    executor.arch_specific = .{
+    const per_executor: *x64.PerExecutor = .from(executor);
+
+    per_executor.* = .{
         .apic_id = apic_id,
         .double_fault_stack = double_fault_stack,
         .non_maskable_interrupt_stack = non_maskable_interrupt_stack,
     };
 
-    executor.arch_specific.tss.setInterruptStack(
-        @intFromEnum(x64.interrupts.InterruptStackSelector.double_fault),
-        executor.arch_specific.double_fault_stack.stack_pointer,
+    per_executor.tss.setInterruptStack(
+        .double_fault,
+        per_executor.double_fault_stack.stack_pointer,
     );
-    executor.arch_specific.tss.setInterruptStack(
-        @intFromEnum(x64.interrupts.InterruptStackSelector.non_maskable_interrupt),
-        executor.arch_specific.non_maskable_interrupt_stack.stack_pointer,
+    per_executor.tss.setInterruptStack(
+        .non_maskable_interrupt,
+        per_executor.non_maskable_interrupt_stack.stack_pointer,
     );
 }
 
-/// Load the executor that `current_task` is running on as the current executor.
-pub fn loadExecutor(current_task: Task.Current) void {
-    const executor = current_task.knownExecutor();
+pub fn initExecutor(executor: *kernel.Executor) void {
+    const per_executor: *x64.PerExecutor = .from(executor);
 
-    executor.arch_specific.gdt.load();
-    executor.arch_specific.gdt.setTss(&executor.arch_specific.tss);
+    per_executor.gdt.load();
+    per_executor.gdt.setTss(&per_executor.tss);
 
     x64.interrupts.init.loadIdt();
-
-    x64.registers.KERNEL_GS_BASE.write(@intFromPtr(executor));
 }
 
 /// Capture any system information that can be without using mmio.
 ///
 /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation(current_task: Task.Current) void {
-    log.debug(current_task, "capturing cpuid information", .{});
+pub fn captureEarlySystemInformation() void {
+    log.debug("capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
     if (!x64.info.cpu_id.mtrr) {
@@ -137,8 +136,8 @@ pub fn captureEarlySystemInformation(current_task: Task.Current) void {
     const mtrr_cap = x64.registers.IA32_MTRRCAP.read();
     x64.info.mtrr_number_of_variable_registers = mtrr_cap.number_of_variable_range_registers;
     x64.info.mtrr_write_combining_supported = mtrr_cap.write_combining_supported;
-    log.debug(current_task, "mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
-    log.debug(current_task, "mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
+    log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
+    log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
 
     if (!x64.info.cpu_id.pat) {
         @panic("PAT not supported");
@@ -147,23 +146,23 @@ pub fn captureEarlySystemInformation(current_task: Task.Current) void {
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
         const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
-        log.debug(current_task, "lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
+        log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
     }
 
     if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
         const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
-        log.debug(current_task, "tsc tick duration: {} fs", .{tsc_tick_duration_fs});
+        log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
 
-    captureXsaveInformation(current_task);
+    captureXsaveInformation();
 }
 
-fn captureXsaveInformation(current_task: Task.Current) void {
+fn captureXsaveInformation() void {
     if (!x64.info.cpu_id.xsave.supported) @panic("XSAVE is not supported");
 
     x64.info.xsave.method = if (x64.info.cpu_id.xsave.supported_features.xsaveopt) .xsaveopt else .xsave;
-    log.debug(current_task, "xsave method: {t}", .{x64.info.xsave.method});
+    log.debug("xsave method: {t}", .{x64.info.xsave.method});
 
     var cr4 = x64.registers.Cr4.read();
     cr4.osxsave = true; // enable `xgetbv`/`xsetbv`
@@ -182,13 +181,13 @@ fn captureXsaveInformation(current_task: Task.Current) void {
         xcr0.avx512 = .true;
     }
     x64.info.xsave.xcr0_value = xcr0;
-    log.debug(current_task, "state managed by XSAVE: {f}", .{xcr0});
+    log.debug("state managed by XSAVE: {f}", .{xcr0});
 
     // set xcr0 on the bootstrap executor to allow capturing the required size of the XSAVE area
     xcr0.write();
 
     x64.info.xsave.xsave_area_size = x64.info.cpu_id.xsave.enabledStateSize().?;
-    log.debug(current_task, "size of XSAVE area: {f}", .{x64.info.xsave.xsave_area_size});
+    log.debug("size of XSAVE area: {f}", .{x64.info.xsave.xsave_area_size});
 }
 
 pub const CaptureSystemInformationOptions = struct {
@@ -198,10 +197,7 @@ pub const CaptureSystemInformationOptions = struct {
 /// Capture any system information that needs mmio.
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
-pub fn captureSystemInformation(
-    current_task: Task.Current,
-    options: CaptureSystemInformationOptions,
-) !void {
+pub fn captureSystemInformation(options: CaptureSystemInformationOptions) !void {
     const madt_acpi_table = AcpiTable(kernel.acpi.tables.MADT).get(0) orelse return error.NoMADT;
     defer madt_acpi_table.deinit();
     const madt = madt_acpi_table.table;
@@ -210,37 +206,37 @@ pub fn captureSystemInformation(
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
 
-    log.debug(current_task, "capturing FADT information", .{});
+    log.debug("capturing FADT information", .{});
     {
         const flags = fadt.IA_PC_BOOT_ARCH;
 
         x64.info.have_ps2_controller = flags.@"8042";
-        log.debug(current_task, "have ps2 controller: {}", .{x64.info.have_ps2_controller});
+        log.debug("have ps2 controller: {}", .{x64.info.have_ps2_controller});
 
         x64.info.msi_supported = !flags.msi_not_supported;
-        log.debug(current_task, "message signaled interrupts supported: {}", .{x64.info.msi_supported});
+        log.debug("message signaled interrupts supported: {}", .{x64.info.msi_supported});
 
         x64.info.have_cmos_rtc = !flags.cmos_rtc_not_present;
-        log.debug(current_task, "have cmos rtc: {}", .{x64.info.have_cmos_rtc});
+        log.debug("have cmos rtc: {}", .{x64.info.have_cmos_rtc});
     }
 
-    log.debug(current_task, "capturing MADT information", .{});
+    log.debug("capturing MADT information", .{});
     {
         x64.info.have_pic = madt.flags.PCAT_COMPAT;
-        log.debug(current_task, "have pic: {}", .{x64.info.have_pic});
+        log.debug("have pic: {}", .{x64.info.have_pic});
     }
 
-    log.debug(current_task, "capturing APIC information", .{});
-    x64.apic.init.captureApicInformation(current_task, fadt, madt, options.x2apic_enabled);
+    log.debug("capturing APIC information", .{});
+    x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
 
-    log.debug(current_task, "capturing IOAPIC information", .{});
-    try x64.ioapic.init.captureMADTInformation(current_task, madt);
+    log.debug("capturing IOAPIC information", .{});
+    try x64.ioapic.init.captureMADTInformation(madt);
 }
 
 /// Configure any global system features.
-pub fn configureGlobalSystemFeatures(current_task: Task.Current) void {
+pub fn configureGlobalSystemFeatures() void {
     if (x64.info.have_pic) {
-        log.debug(current_task, "disabling pic", .{});
+        log.debug("disabling pic", .{});
         disablePic();
     }
 }
@@ -296,9 +292,9 @@ fn disablePic() void {
 ///  - By the bootstrap executor after calling `captureEarlySystemInformation`
 ///  - By the bootstrap executor after calling `captureSystemInformation`
 ///  - By every executor after `captureSystemInformation` has been called
-pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
+pub fn configurePerExecutorSystemFeatures() void {
     if (x64.info.cpu_id.rdtscp) {
-        x64.registers.IA32_TSC_AUX.write(@intFromEnum(current_task.knownExecutor().id));
+        x64.registers.IA32_TSC_AUX.write(@intFromEnum(Task.Current.get().knownExecutor().id));
     }
 
     // TODO: be more thorough with setting up these registers
@@ -372,9 +368,7 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
             .sysret_cs_ss = .user_code_32bit,
         });
 
-        x64.registers.IA32_LSTAR.write(
-            @intFromPtr(x64.user.getSyscallEntryPoint(current_task.knownExecutor())),
-        );
+        x64.registers.IA32_LSTAR.write(@intFromPtr(&x64.user.syscallEntry));
     }
 
     // PAT
@@ -414,13 +408,10 @@ pub fn configurePerExecutorSystemFeatures(current_task: Task.Current) void {
 /// Register any architectural time sources.
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
-pub fn registerArchitecturalTimeSources(
-    current_task: Task.Current,
-    candidate_time_sources: *kernel.time.init.CandidateTimeSources,
-) void {
-    x64.tsc.init.registerTimeSource(current_task, candidate_time_sources);
-    x64.hpet.init.registerTimeSource(current_task, candidate_time_sources);
-    x64.apic.init.registerTimeSource(current_task, candidate_time_sources);
+pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    x64.tsc.init.registerTimeSource(candidate_time_sources);
+    x64.hpet.init.registerTimeSource(candidate_time_sources);
+    x64.apic.init.registerTimeSource(candidate_time_sources);
 
     // TODO: PIT, KVMCLOCK
 }
@@ -428,8 +419,7 @@ pub fn registerArchitecturalTimeSources(
 /// Initialize the local interrupt controller for the current executor.
 ///
 /// For example, on x86_64 this should initialize the APIC.
-pub fn initLocalInterruptController(current_task: Task.Current) void {
-    _ = current_task;
+pub fn initLocalInterruptController() void {
     x64.apic.init.initApicOnCurrentExecutor();
 }
 
@@ -471,7 +461,7 @@ const DebugCon = struct {
             }
         }.splatFn,
         .remapFn = struct {
-            fn remapFn(_: *anyopaque, _: Task.Current) !void {
+            fn remapFn(_: *anyopaque) !void {
                 return;
             }
         }.remapFn,

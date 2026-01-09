@@ -11,7 +11,6 @@ const core = @import("core");
 const x64 = @import("../x64.zig");
 
 pub fn nonMaskableInterruptHandler(
-    _: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
@@ -24,16 +23,15 @@ pub fn nonMaskableInterruptHandler(
 }
 
 pub fn pageFaultHandler(
-    current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
     state_before_interrupt: Task.Current.StateBeforeInterrupt,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
-    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
+    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
     const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
-    kernel.mem.onPageFault(current_task, .{
+    kernel.mem.onPageFault(.{
         .faulting_address = faulting_address,
 
         .access_type = if (error_code.write)
@@ -49,9 +47,7 @@ pub fn pageFaultHandler(
             .invalid,
 
         .faulting_context = if (error_code.user)
-            .{
-                .user = .fromTask(current_task.task),
-            }
+            .user
         else
             .{
                 .kernel = .{
@@ -62,34 +58,30 @@ pub fn pageFaultHandler(
 }
 
 pub fn flushRequestHandler(
-    current_task: Task.Current,
     _: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    kernel.mem.FlushRequest.processFlushRequests(current_task);
+    kernel.mem.FlushRequest.processFlushRequests();
     // eoi after all current flush requests have been handled
     x64.apic.eoi();
 }
 
 pub fn perExecutorPeriodicHandler(
-    current_task: Task.Current,
     _: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     // eoi before calling `maybePreempt` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
-    current_task.maybePreempt();
+    Task.Current.get().maybePreempt();
 }
 
 pub fn unhandledException(
-    current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = @ptrCast(@alignCast(interrupt_frame.arch_specific));
-    switch (arch_interrupt_frame.context(current_task)) {
+    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
+    switch (arch_interrupt_frame.contextSS()) {
         .kernel => kernel.debug.interruptSourcePanic(
-            current_task,
             interrupt_frame,
             "unhandled kernel exception: {t}",
             .{arch_interrupt_frame.vector_number.interrupt},
@@ -102,10 +94,11 @@ pub fn unhandledException(
 ///
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(
-    current_task: Task.Current,
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    const executor = current_task.knownExecutor();
-    std.debug.panic("unhandled interrupt on {f}\n{f}", .{ executor, interrupt_frame });
+    std.debug.panic(
+        "unhandled interrupt on {f}\n{f}",
+        .{ Task.Current.get().knownExecutor(), interrupt_frame },
+    );
 }

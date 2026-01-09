@@ -11,13 +11,6 @@ const core = @import("core");
 const x64 = @import("x64.zig");
 
 pub const functions: arch.Functions = .{
-    .unsafeGetCurrentExecutor = struct {
-        inline fn unsafeGetCurrentExecutor() *kernel.Executor {
-            return @ptrFromInt(x64.registers.KERNEL_GS_BASE.read());
-        }
-    }.unsafeGetCurrentExecutor,
-    .getCurrentTask = x64.getCurrentTask,
-
     .spinLoopHint = x64.instructions.pause,
     .halt = x64.instructions.halt,
 
@@ -59,8 +52,7 @@ pub const functions: arch.Functions = .{
         .createPageTable = x64.paging.PageTable.create,
 
         .loadPageTable = struct {
-            fn loadPageTable(current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) void {
-                _ = current_task;
+            fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
                 x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
             }
         }.loadPageTable,
@@ -68,10 +60,8 @@ pub const functions: arch.Functions = .{
         .copyTopLevelIntoPageTable = struct {
             fn copyTopLevelIntoPageTable(
                 page_table: *x64.paging.PageTable,
-                current_task: Task.Current,
                 target_page_table: *x64.paging.PageTable,
             ) void {
-                _ = current_task;
                 if (core.is_debug) std.debug.assert(page_table != target_page_table);
                 @memcpy(&target_page_table.entries, &page_table.entries);
             }
@@ -92,9 +82,9 @@ pub const functions: arch.Functions = .{
     },
 
     .user = .{
-        .createThread = x64.user.createThread,
-        .destroyThread = x64.user.destroyThread,
-        .initializeThread = x64.user.initializeThread,
+        .createThread = x64.user.PerThread.createThread,
+        .destroyThread = x64.user.PerThread.destroyThread,
+        .initializeThread = x64.user.PerThread.initializeThread,
         .enterUserspace = x64.user.enterUserspace,
         .syscallFromSyscallFrame = x64.user.SyscallFrame.syscall,
         .argFromSyscallFrame = x64.user.SyscallFrame.arg,
@@ -105,6 +95,9 @@ pub const functions: arch.Functions = .{
     },
 
     .scheduling = .{
+        .initializeTaskArchSpecific = x64.PerTask.initializeTaskArchSpecific,
+        .getCurrentTask = x64.PerTask.getCurrentTask,
+        .setCurrentTask = x64.PerTask.setCurrentTask,
         .beforeSwitchTask = x64.scheduling.beforeSwitchTask,
         .switchTask = x64.scheduling.switchTask,
         .switchTaskNoSave = x64.scheduling.switchTaskNoSave,
@@ -151,7 +144,7 @@ pub const functions: arch.Functions = .{
         .tryGetSerialOutput = x64.init.tryGetSerialOutput,
         .prepareBootstrapExecutor = x64.init.prepareBootstrapExecutor,
         .prepareExecutor = x64.init.prepareExecutor,
-        .loadExecutor = x64.init.loadExecutor,
+        .initExecutor = x64.init.initExecutor,
         .captureEarlySystemInformation = x64.init.captureEarlySystemInformation,
         .captureSystemInformation = x64.init.captureSystemInformation,
         .configureGlobalSystemFeatures = x64.init.configureGlobalSystemFeatures,
@@ -175,6 +168,10 @@ pub const decls: arch.Decls = .{
         .lower_half_size = .from(128, .tib),
         .higher_half_start = .fromInt(0xffff800000000000),
         .PageTable = x64.paging.PageTable,
+    },
+
+    .scheduling = .{
+        .PerTask = x64.PerTask,
     },
 
     .user = .{

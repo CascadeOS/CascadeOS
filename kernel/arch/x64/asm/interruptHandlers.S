@@ -5,23 +5,14 @@
 
 .extern interruptDispatch
 
-.altmacro
-.macro INTERRUPT_HANDLER interrupt_number
-    .global _interrupt_handler_\interrupt_number
-    .type _interrupt_handler_\interrupt_number, @function
-    _interrupt_handler_\interrupt_number:
-.if !(                                                      \
-    \interrupt_number == 8 ||                               \
-    (\interrupt_number >= 10 && \interrupt_number <= 14) || \
-    \interrupt_number == 17 ||                              \
-    \interrupt_number == 21 ||                              \
-    \interrupt_number == 29 ||                              \
-    \interrupt_number == 30                                 \
-)
-    push $0
-.endif
-    push $\interrupt_number
-
+.global _interrupt_handler_common
+.type _interrupt_handler_common, @function
+_interrupt_handler_common:
+    // if we interrupted userspace then swapgs
+    testl $3, 0x18(%rsp)
+    jz 1f
+    swapgs
+1:
     push %rax
     push %rbx
     push %rcx
@@ -37,15 +28,12 @@
     push %r13
     push %r14
     push %r15
-    push %gs
-    push %fs
 
+    cld
     xor %ebp, %ebp
     mov %rsp, %rdi
     call interruptDispatch
 
-    pop %fs
-    pop %gs
     pop %r15
     pop %r14
     pop %r13
@@ -62,8 +50,31 @@
     pop %rbx
     pop %rax
 
+	// if returning to userspace swapgs
+	testl $3, 0x18(%rsp)
+	jz 1f
+	swapgs
+1:
     add $16, %rsp // pop the error code and interrupt number
     iretq
+
+.altmacro
+.macro INTERRUPT_HANDLER interrupt_number
+    .global _interrupt_handler_\interrupt_number
+    .type _interrupt_handler_\interrupt_number, @function
+_interrupt_handler_\interrupt_number:
+.if !(                                                      \
+    \interrupt_number == 8 ||                               \
+    (\interrupt_number >= 10 && \interrupt_number <= 14) || \
+    \interrupt_number == 17 ||                              \
+    \interrupt_number == 21 ||                              \
+    \interrupt_number == 29 ||                              \
+    \interrupt_number == 30                                 \
+)
+    push $0
+.endif
+    push $\interrupt_number
+    jmp _interrupt_handler_common
 .endm
 
 .set i, 0

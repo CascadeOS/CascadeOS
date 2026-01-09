@@ -43,9 +43,7 @@ pub const PageTable = extern struct {
     }
 
     /// Create a page table in the given physical frame.
-    pub fn create(current_task: Task.Current, physical_frame: kernel.mem.phys.Frame) *PageTable {
-        _ = current_task;
-
+    pub fn create(physical_frame: kernel.mem.phys.Frame) *PageTable {
         const page_table = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
         page_table.zero();
         return page_table;
@@ -54,7 +52,6 @@ pub const PageTable = extern struct {
     /// Maps a 4 KiB page.
     pub fn map4KiB(
         level4_table: *PageTable,
-        current_task: Task.Current,
         virtual_address: core.VirtualAddress,
         physical_frame: kernel.mem.phys.Frame,
         map_type: MapType,
@@ -63,12 +60,11 @@ pub const PageTable = extern struct {
         if (core.is_debug) std.debug.assert(virtual_address.isAligned(small_page_size));
 
         var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-        errdefer physical_frame_allocator.deallocate(current_task, deallocate_frame_list);
+        errdefer physical_frame_allocator.deallocate(deallocate_frame_list);
 
         const level4_index = p4Index(virtual_address);
 
         const level3_table, const created_level3_table = try ensureNextTable(
-            current_task,
             &level4_table.entries[level4_index],
             physical_frame_allocator,
         );
@@ -84,7 +80,6 @@ pub const PageTable = extern struct {
         const level3_index = p3Index(virtual_address);
 
         const level2_table, const created_level2_table = try ensureNextTable(
-            current_task,
             &level3_table.entries[level3_index],
             physical_frame_allocator,
         );
@@ -100,7 +95,6 @@ pub const PageTable = extern struct {
         const level2_index = p2Index(virtual_address);
 
         const level1_table, const created_level1_table = try ensureNextTable(
-            current_task,
             &level2_table.entries[level2_index],
             physical_frame_allocator,
         );
@@ -131,15 +125,12 @@ pub const PageTable = extern struct {
     ///  - does not flush the TLB
     pub fn unmap(
         level4_table: *PageTable,
-        current_task: Task.Current,
         virtual_range: core.VirtualRange,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
         flush_batch: *kernel.mem.VirtualRangeBatch,
         deallocate_frame_list: *kernel.mem.phys.FrameList,
     ) void {
-        _ = current_task;
-
         if (core.is_debug) {
             std.debug.assert(virtual_range.address.isAligned(small_page_size));
             std.debug.assert(virtual_range.size.isAligned(small_page_size));
@@ -287,14 +278,11 @@ pub const PageTable = extern struct {
 
     pub fn changeProtection(
         level4_table: *PageTable,
-        current_task: Task.Current,
         virtual_range: core.VirtualRange,
         previous_map_type: MapType,
         new_map_type: MapType,
         flush_batch: *kernel.mem.VirtualRangeBatch,
     ) void {
-        _ = current_task;
-
         if (core.is_debug) {
             std.debug.assert(virtual_range.address.isAligned(small_page_size));
             std.debug.assert(virtual_range.size.isAligned(small_page_size));
@@ -996,7 +984,6 @@ pub const PageTable = extern struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn fillTopLevel(
-            current_task: Task.Current,
             page_table: *PageTable,
             range: core.VirtualRange,
             physical_frame_allocator: kernel.mem.phys.FrameAllocator,
@@ -1012,7 +999,7 @@ pub const PageTable = extern struct {
             const entry = raw_entry.load();
             if (entry.present.read()) return error.AlreadyMapped;
 
-            _ = try ensureNextTable(current_task, raw_entry, physical_frame_allocator);
+            _ = try ensureNextTable(raw_entry, physical_frame_allocator);
         }
 
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -1028,7 +1015,6 @@ pub const PageTable = extern struct {
         ///  - does not flush the TLB
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
-            current_task: Task.Current,
             level4_table: *PageTable,
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
@@ -1044,7 +1030,6 @@ pub const PageTable = extern struct {
             }
 
             init_log.verbose(
-                current_task,
                 "mapToPhysicalRangeAllPageSizes - virtual_range: {f} - physical_range: {f} - map_type: {f}",
                 .{ virtual_range, physical_range, map_type },
             );
@@ -1068,7 +1053,6 @@ pub const PageTable = extern struct {
 
             while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
                 const level3_table, _ = try ensureNextTable(
-                    current_task,
                     &level4_table.entries[level4_index],
                     physical_frame_allocator,
                 );
@@ -1102,7 +1086,6 @@ pub const PageTable = extern struct {
                     }
 
                     const level2_table, _ = try ensureNextTable(
-                        current_task,
                         &level3_table.entries[level3_index],
                         physical_frame_allocator,
                     );
@@ -1135,7 +1118,6 @@ pub const PageTable = extern struct {
                         }
 
                         const level1_table, _ = try ensureNextTable(
-                            current_task,
                             &level2_table.entries[level2_index],
                             physical_frame_allocator,
                         );
@@ -1165,7 +1147,6 @@ pub const PageTable = extern struct {
             }
 
             init_log.verbose(
-                current_task,
                 "satified using {} large pages, {} medium pages, {} small pages",
                 .{ large_pages_mapped, medium_pages_mapped, small_pages_mapped },
             );
@@ -1183,7 +1164,6 @@ pub const PageTable = extern struct {
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
-    current_task: Task.Current,
     raw_entry: *PageTable.Entry.Raw,
     physical_frame_allocator: kernel.mem.phys.FrameAllocator,
 ) !struct { *PageTable, bool } {
@@ -1200,7 +1180,7 @@ fn ensureNextTable(
         if (core.is_debug) std.debug.assert(entry.isZero());
         created_table = true;
 
-        const physical_frame = try physical_frame_allocator.allocate(current_task);
+        const physical_frame = try physical_frame_allocator.allocate();
         errdefer comptime unreachable;
 
         const physical_address = physical_frame.baseAddress();

@@ -295,7 +295,7 @@ pub const DBG2 = extern struct {
         const uart = kernel.init.Output.uart;
         const init_log = kernel.debug.log.scoped(.output_init);
 
-        pub fn tryGetSerialOutput(current_task: Task.Current) ?uart.Uart {
+        pub fn tryGetSerialOutput() ?uart.Uart {
             const dbg2_table = DBG2AcpiTable.get(0) orelse return null;
             defer dbg2_table.deinit();
 
@@ -329,7 +329,6 @@ pub const DBG2 = extern struct {
                                     ) catch unreachable) orelse continue,
                                 },
                                 else => |address_space| init_log.info(
-                                    current_task,
                                     "16550 UART with unhandled address space: {t}",
                                     .{address_space},
                                 ),
@@ -352,7 +351,6 @@ pub const DBG2 = extern struct {
                                     ) catch unreachable) orelse continue,
                                 },
                                 else => |address_space| init_log.info(
-                                    current_task,
                                     "16450 UART with unhandled address space: {t}",
                                     .{address_space},
                                 ),
@@ -374,13 +372,11 @@ pub const DBG2 = extern struct {
                             };
                         },
                         else => init_log.info(
-                            current_task,
                             "unhandled serial subtype: {t}",
                             .{subtype},
                         ), // TODO: implement other serial subtypes
                     },
                     else => |port_type| init_log.info(
-                        current_task,
                         "unhandled port type: {t}",
                         .{port_type},
                     ), // TODO: implement other port types

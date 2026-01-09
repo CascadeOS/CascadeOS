@@ -72,11 +72,8 @@ pub const InitOptions = struct {
 
 pub fn init(
     address_space: *AddressSpace,
-    current_task: Task.Current,
     options: InitOptions,
 ) !void {
-    _ = current_task;
-
     address_space.* = .{
         .range = options.range,
         ._name = options.name,
@@ -112,15 +109,15 @@ pub fn retarget(address_space: *AddressSpace, new_process: *Process) void {
 ///
 /// Caller must ensure:
 ///  - the address space is not in use by any tasks
-pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, current_task: Task.Current) void {
-    log.debug(current_task, "{s}: reinitializeAndUnmapAll", .{address_space.name()});
+pub fn reinitializeAndUnmapAll(address_space: *AddressSpace) void {
+    log.debug("{s}: reinitializeAndUnmapAll", .{address_space.name()});
 
     if (core.is_debug) {
         std.debug.assert(!address_space.page_table_lock.isLocked());
         std.debug.assert(!address_space.entries_lock.isReadLocked() and !address_space.entries_lock.isWriteLocked());
     }
 
-    address_space.unmap(current_task, address_space.range) catch |err| switch (err) {
+    address_space.unmap(address_space.range) catch |err| switch (err) {
         error.OutOfMemory => unreachable, // as we are freeing the entire address space we do not need to split any entries
     };
 
@@ -132,9 +129,9 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace, current_task: Task.
 /// Caller must ensure:
 ///  - the address space is not in use by any tasks
 ///  - the address space is empty
-pub fn deinit(address_space: *AddressSpace, current_task: Task.Current) void {
+pub fn deinit(address_space: *AddressSpace) void {
     // cannot use the name as it will reference a defunct process that this address space is now unrelated to
-    log.debug(current_task, "deinit", .{});
+    log.debug("deinit", .{});
 
     if (core.is_debug) {
         std.debug.assert(!address_space.page_table_lock.isLocked());
@@ -206,19 +203,18 @@ pub const MapError = error{
 /// Map a range into the address space.
 pub fn map(
     address_space: *AddressSpace,
-    current_task: Task.Current,
     options: MapOptions,
 ) MapError!core.VirtualRange {
-    errdefer |err| log.debug(current_task, "{s}: map failed {t}", .{ address_space.name(), err });
+    errdefer |err| log.debug("{s}: map failed {t}", .{ address_space.name(), err });
 
     if (log.levelEnabled(.verbose)) {
-        if (options.base) |base| log.verbose(current_task, "{s}: map {f} @ {f} - {t} - {t}", .{
+        if (options.base) |base| log.verbose("{s}: map {f} @ {f} - {t} - {t}", .{
             address_space.name(),
             options.size,
             base,
             options.protection,
             options.type,
-        }) else log.verbose(current_task, "{s}: map {f} - {t} - {t}", .{
+        }) else log.verbose("{s}: map {f} - {t} - {t}", .{
             address_space.name(),
             options.size,
             options.protection,
@@ -273,8 +269,8 @@ pub fn map(
     var merges: usize = 0;
 
     {
-        address_space.entries_lock.writeLock(current_task);
-        defer address_space.entries_lock.writeUnlock(current_task);
+        address_space.entries_lock.writeLock();
+        defer address_space.entries_lock.writeUnlock();
 
         // zig fmt: off
         const free_range: FreeRange = (
@@ -297,7 +293,7 @@ pub fn map(
             if (core.is_debug) std.debug.assert(!local_entry.anyOverlap(following_entry)); // entry overlaps with the following entry
 
             if (local_entry.canMerge(following_entry)) {
-                local_entry.merge(current_task, following_entry);
+                local_entry.merge(following_entry);
                 following_entry.* = local_entry;
                 merges += 1;
             }
@@ -309,12 +305,12 @@ pub fn map(
             if (core.is_debug) std.debug.assert(!local_entry.anyOverlap(preceding_entry)); // entry overlaps with the preceding entry
 
             if (preceding_entry.canMerge(&local_entry)) {
-                preceding_entry.merge(current_task, &local_entry);
+                preceding_entry.merge(&local_entry);
 
                 if (merges != 0) {
                     // the local entry was merged into the following entry above, so we need to remove it
                     const following_entry = address_space.entries.orderedRemove(insertion_index);
-                    following_entry.destroy(current_task);
+                    following_entry.destroy();
                 }
 
                 merges += 1;
@@ -322,8 +318,8 @@ pub fn map(
         }
 
         if (merges == 0) {
-            const new_entry: *Entry = try .create(current_task);
-            errdefer new_entry.destroy(current_task);
+            const new_entry: *Entry = try .create();
+            errdefer new_entry.destroy();
 
             new_entry.* = local_entry;
 
@@ -348,13 +344,13 @@ pub fn map(
     errdefer comptime unreachable;
 
     switch (merges) {
-        0 => log.verbose(current_task, "{s}: inserted new entry", .{address_space.name()}),
-        1 => log.verbose(current_task, "{s}: merged with pre-existing entry", .{address_space.name()}),
-        2 => log.verbose(current_task, "{s}: merged with 2 pre-existing entries", .{address_space.name()}),
+        0 => log.verbose("{s}: inserted new entry", .{address_space.name()}),
+        1 => log.verbose("{s}: merged with pre-existing entry", .{address_space.name()}),
+        2 => log.verbose("{s}: merged with 2 pre-existing entries", .{address_space.name()}),
         else => unreachable,
     }
 
-    log.verbose(current_task, "{s}: mapped {f}", .{ address_space.name(), local_entry.range });
+    log.verbose("{s}: mapped {f}", .{ address_space.name(), local_entry.range });
 
     return local_entry.range;
 }
@@ -524,15 +520,14 @@ pub const ChangeProtectionError = error{
 ///  - the `max_protection` if provided is not `.none`
 pub fn changeProtection(
     address_space: *AddressSpace,
-    current_task: Task.Current,
     range: core.VirtualRange,
     change: ChangeProtection,
 ) ChangeProtectionError!void {
-    errdefer |err| log.debug(current_task, "{s}: change protection failed {t}", .{ address_space.name(), err });
+    errdefer |err| log.debug("{s}: change protection failed {t}", .{ address_space.name(), err });
 
     const request = change.toRequest();
 
-    log.verbose(current_task, "{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
+    log.verbose("{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
 
     if (core.is_debug) {
         std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
@@ -547,8 +542,8 @@ pub fn changeProtection(
             break :blk .none;
         }
 
-        address_space.entries_lock.writeLock(current_task);
-        defer address_space.entries_lock.writeUnlock(current_task);
+        address_space.entries_lock.writeLock();
+        defer address_space.entries_lock.writeUnlock();
         if (core.is_debug) std.debug.assert(!address_space.page_table_lock.isLocked());
 
         const entry_range = address_space.entryRange(range) orelse {
@@ -566,8 +561,8 @@ pub fn changeProtection(
         }
 
         var preallocated_entries: PreallocatedEntries = .empty;
-        defer preallocated_entries.deinit(current_task);
-        try preallocated_entries.preallocateChangeProtection(current_task, address_space, entry_range);
+        defer preallocated_entries.deinit();
+        try preallocated_entries.preallocateChangeProtection(address_space, entry_range);
         errdefer comptime unreachable;
 
         if (validate_change_protection.update_page_table) {
@@ -596,7 +591,6 @@ pub fn changeProtection(
                     @branchHint(.unlikely);
 
                     kernel.mem.changeProtection(
-                        current_task,
                         address_space.page_table,
                         &change_protection_batch,
                         address_space.context,
@@ -611,7 +605,6 @@ pub fn changeProtection(
 
             if (change_protection_batch.ranges.len != 0) {
                 kernel.mem.changeProtection(
-                    current_task,
                     address_space.page_table,
                     &change_protection_batch,
                     address_space.context,
@@ -623,7 +616,6 @@ pub fn changeProtection(
         address_space.entries_version +%= 1;
 
         break :blk address_space.performChangeProtection(
-            current_task,
             entry_range,
             range,
             request,
@@ -632,7 +624,6 @@ pub fn changeProtection(
     };
 
     log.verbose(
-        current_task,
         "{s}: change protection of {f} resulted in {} split, {} modified and {} merged entries",
         .{
             address_space.name(),
@@ -715,7 +706,6 @@ const ChangeProtectionResult = struct {
 
 fn performChangeProtection(
     address_space: *AddressSpace,
-    current_task: Task.Current,
     entry_range: EntryRange,
     range: core.VirtualRange,
     request: ChangeProtection.Request,
@@ -742,7 +732,7 @@ fn performChangeProtection(
         }
 
         const split_offset = range.address.difference(first_entry.range.address);
-        log.verbose(current_task, "{s}: split first entry {f} at offset {f}", .{
+        log.verbose("{s}: split first entry {f} at offset {f}", .{
             address_space.name(),
             first_entry.range,
             split_offset,
@@ -752,7 +742,7 @@ fn performChangeProtection(
         //
         // | first entry | -> | first entry | new entry |
         const new_entry = preallocated_entries.entries.pop() orelse unreachable;
-        first_entry.split(current_task, new_entry, split_offset);
+        first_entry.split(new_entry, split_offset);
 
         // move first entry index forward to as the new entry is now the first entry of the entry range
         first_entry_index += 1;
@@ -779,7 +769,7 @@ fn performChangeProtection(
         }
 
         const split_offset = range.endBound().difference(last_entry.range.address);
-        log.verbose(current_task, "{s}: split last entry {f} at offset {f}", .{
+        log.verbose("{s}: split last entry {f} at offset {f}", .{
             address_space.name(),
             last_entry.range,
             split_offset,
@@ -789,7 +779,7 @@ fn performChangeProtection(
         //
         // | last entry | -> | last entry | new entry |
         const new_entry = preallocated_entries.entries.pop() orelse unreachable;
-        last_entry.split(current_task, new_entry, split_offset);
+        last_entry.split(new_entry, split_offset);
 
         // `last_entry_index + 1` as the new entry is after the last entry of the entry range
         address_space.entries.insertAssumeCapacity(last_entry_index + 1, new_entry);
@@ -830,10 +820,10 @@ fn performChangeProtection(
             const following_entry = address_space.entries.items[following_index];
 
             if (entry.canMerge(following_entry)) {
-                entry.merge(current_task, following_entry);
+                entry.merge(following_entry);
 
                 _ = address_space.entries.orderedRemove(following_index);
-                following_entry.destroy(current_task);
+                following_entry.destroy();
 
                 merged = true;
             }
@@ -852,10 +842,10 @@ fn performChangeProtection(
         const preceeding_entry = address_space.entries.items[index - 1];
 
         if (preceeding_entry.canMerge(first_entry)) {
-            preceeding_entry.merge(current_task, first_entry);
+            preceeding_entry.merge(first_entry);
 
             _ = address_space.entries.orderedRemove(index);
-            first_entry.destroy(current_task);
+            first_entry.destroy();
 
             // the first entry must have be modified in the above loop, as otherwise it would already be merged with the
             // preceeding entry
@@ -880,10 +870,10 @@ pub const UnmapError = error{
 ///
 /// Caller must ensure:
 ///  - the size and address of the range are aligned to the standard page size
-pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: core.VirtualRange) UnmapError!void {
-    errdefer |err| log.debug(current_task, "{s}: unmap failed {t}", .{ address_space.name(), err });
+pub fn unmap(address_space: *AddressSpace, range: core.VirtualRange) UnmapError!void {
+    errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
 
-    log.verbose(current_task, "{s}: unmap {f}", .{ address_space.name(), range });
+    log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
 
     if (core.is_debug) {
         std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
@@ -896,8 +886,8 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
             break :blk .none;
         }
 
-        address_space.entries_lock.writeLock(current_task);
-        defer address_space.entries_lock.writeUnlock(current_task);
+        address_space.entries_lock.writeLock();
+        defer address_space.entries_lock.writeUnlock();
         if (core.is_debug) std.debug.assert(!address_space.page_table_lock.isLocked());
 
         const entry_range = address_space.entryRange(range) orelse {
@@ -908,8 +898,8 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
         if (core.is_debug) std.debug.assert(entry_range.length != 0);
 
         var preallocated_entries: PreallocatedEntries = .empty;
-        defer preallocated_entries.deinit(current_task);
-        try preallocated_entries.preallocateUnmap(current_task, address_space, entry_range);
+        defer preallocated_entries.deinit();
+        try preallocated_entries.preallocateUnmap(address_space, entry_range);
         errdefer comptime unreachable;
 
         var unmap_batch: kernel.mem.VirtualRangeBatch = .{};
@@ -920,7 +910,6 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
                 @branchHint(.unlikely);
 
                 kernel.mem.unmap(
-                    current_task,
                     address_space.page_table,
                     &unmap_batch,
                     address_space.context,
@@ -940,7 +929,6 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
 
         if (unmap_batch.ranges.len != 0) {
             kernel.mem.unmap(
-                current_task,
                 address_space.page_table,
                 &unmap_batch,
                 address_space.context,
@@ -956,7 +944,6 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
         address_space.entries_version +%= 1;
 
         break :blk address_space.performUnmap(
-            current_task,
             entry_range,
             range,
             &preallocated_entries,
@@ -964,7 +951,6 @@ pub fn unmap(address_space: *AddressSpace, current_task: Task.Current, range: co
     };
 
     log.verbose(
-        current_task,
         "{s}: unmap of {f} resulted in {} split, {} shrunk and {} removed entries",
         .{
             address_space.name(),
@@ -990,7 +976,6 @@ const UnmapResult = struct {
 
 fn performUnmap(
     address_space: *AddressSpace,
-    current_task: Task.Current,
     entry_range: EntryRange,
     range: core.VirtualRange,
     preallocated_entries: *PreallocatedEntries,
@@ -1006,7 +991,7 @@ fn performUnmap(
         // split the first entry, the two entries together still cover the entire range of the first entry
         // | first entry | -> | first entry | second entry |
         const second_entry = preallocated_entries.entries.pop() orelse unreachable;
-        first.split(current_task, second_entry, split_offset);
+        first.split(second_entry, split_offset);
 
         // now shrink the second entry to leave a hole in between the first and second entry
         // | entry | -> | first entry | UNMAPPED | second entry |
@@ -1060,20 +1045,20 @@ fn performUnmap(
         const entry = address_space.entries.orderedRemove(index);
 
         if (entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-            anonymous_map.lock.writeLock(current_task);
-            anonymous_map.decrementReferenceCount(current_task, &deallocate_frame_list);
+            anonymous_map.lock.writeLock();
+            anonymous_map.decrementReferenceCount(&deallocate_frame_list);
         }
 
         if (entry.object_reference.object) |object| {
-            object.lock.writeLock(current_task);
-            object.decrementReferenceCount(current_task);
+            object.lock.writeLock();
+            object.decrementReferenceCount();
         }
 
-        entry.destroy(current_task);
+        entry.destroy();
         result.entries_removed += 1;
     }
 
-    kernel.mem.phys.allocator.deallocate(current_task, deallocate_frame_list);
+    kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
 
     return result;
 }
@@ -1094,12 +1079,11 @@ pub const HandlePageFaultError = error{
 /// Called `uvm_fault` in OpenBSD uvm.
 pub fn handlePageFault(
     address_space: *AddressSpace,
-    current_task: Task.Current,
     page_fault_details: kernel.mem.PageFaultDetails,
 ) HandlePageFaultError!void {
-    errdefer |err| log.debug(current_task, "{s}: page fault failed {t}", .{ address_space.name(), err });
+    errdefer |err| log.debug("{s}: page fault failed {t}", .{ address_space.name(), err });
 
-    log.verbose(current_task, "{s}: page fault {f}", .{
+    log.verbose("{s}: page fault {f}", .{
         address_space.name(),
         page_fault_details,
     });
@@ -1116,12 +1100,11 @@ pub fn handlePageFault(
         var opt_anonymous_page: ?*AnonymousPage = null;
 
         fault_info.faultCheck(
-            current_task,
             &opt_anonymous_page,
             page_fault_details.fault_type,
         ) catch |err| switch (err) {
             error.Restart => {
-                log.verbose(current_task, "restarting fault", .{});
+                log.verbose("restarting fault", .{});
                 continue;
             },
             else => |narrow_err| return @errorCast(narrow_err), // TODO: why is this `@errorCast` needed?
@@ -1131,9 +1114,9 @@ pub fn handlePageFault(
             _ = anonymous_page;
             @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L685
         } else {
-            fault_info.faultObjectOrZeroFill(current_task) catch |err| switch (err) {
+            fault_info.faultObjectOrZeroFill() catch |err| switch (err) {
                 error.Restart => {
-                    log.verbose(current_task, "restarting fault", .{});
+                    log.verbose("restarting fault", .{});
                     continue;
                 },
                 else => |narrow_err| return @errorCast(narrow_err), // TODO: why is this `@errorCast` needed?
@@ -1158,7 +1141,6 @@ const PreallocatedEntries = struct {
     /// Only entries that straddle the start or end of the range might require a new entry, so we will need at most 2.
     pub fn preallocateChangeProtection(
         preallocated_entries: *PreallocatedEntries,
-        current_task: Task.Current,
         address_space: *AddressSpace,
         entry_range: EntryRange,
     ) !void {
@@ -1168,7 +1150,7 @@ const PreallocatedEntries = struct {
         if (entry_range.end_overlap) worse_case_new_entries += 1;
         if (worse_case_new_entries == 0) return;
 
-        try Entry.createMany(current_task, preallocated_entries.entries.unusedCapacitySlice()[0..worse_case_new_entries]);
+        try Entry.createMany(preallocated_entries.entries.unusedCapacitySlice()[0..worse_case_new_entries]);
         preallocated_entries.entries.resize(worse_case_new_entries) catch unreachable;
 
         try address_space.entries.ensureUnusedCapacity(
@@ -1184,19 +1166,18 @@ const PreallocatedEntries = struct {
     /// Only an entry that completely contains the range requires a new entry after spliting, so we will need at most 1.
     pub fn preallocateUnmap(
         preallocated_entries: *PreallocatedEntries,
-        current_task: Task.Current,
         address_space: *AddressSpace,
         entry_range: EntryRange,
     ) !void {
         if (!entry_range.isWithinSingleEntry()) return;
 
-        preallocated_entries.entries.append(try Entry.create(current_task)) catch unreachable;
+        preallocated_entries.entries.append(try Entry.create()) catch unreachable;
         try address_space.entries.ensureUnusedCapacity(kernel.mem.heap.allocator, 1);
     }
 
-    fn deinit(preallocated_entries: *PreallocatedEntries, current_task: Task.Current) void {
+    fn deinit(preallocated_entries: *PreallocatedEntries) void {
         for (preallocated_entries.entries.constSlice()) |entry| {
-            entry.destroy(current_task); // free any preallocated entries that we didn't use
+            entry.destroy(); // free any preallocated entries that we didn't use
         }
     }
 };
@@ -1429,9 +1410,9 @@ fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?Ent
 /// Prints the address space.
 ///
 /// Locks the entries lock.
-pub fn print(address_space: *AddressSpace, current_task: Task.Current, writer: *std.Io.Writer, indent: usize) !void {
-    address_space.entries_lock.readLock(current_task);
-    defer address_space.entries_lock.readUnlock(current_task);
+pub fn print(address_space: *AddressSpace, writer: *std.Io.Writer, indent: usize) !void {
+    address_space.entries_lock.readLock();
+    defer address_space.entries_lock.readUnlock();
 
     const new_indent = indent + 2;
 
@@ -1452,7 +1433,7 @@ pub fn print(address_space: *AddressSpace, current_task: Task.Current, writer: *
 
         for (address_space.entries.items) |entry| {
             try writer.splatByteAll(' ', new_indent + 2);
-            try entry.print(current_task, writer, new_indent + 2);
+            try entry.print(writer, new_indent + 2);
             try writer.writeAll(",\n");
         }
 
@@ -1468,5 +1449,5 @@ pub fn print(address_space: *AddressSpace, current_task: Task.Current, writer: *
 }
 
 pub inline fn format(address_space: *AddressSpace, writer: *std.Io.Writer) !void {
-    return address_space.print(.current(), writer, 0);
+    return address_space.print(writer, 0);
 }

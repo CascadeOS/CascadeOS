@@ -29,26 +29,22 @@ pub const init = struct {
         return @enumFromInt(readTsc());
     }
 
-    pub fn registerTimeSource(
-        current_task: Task.Current,
-        candidate_time_sources: *kernel.time.init.CandidateTimeSources,
-    ) void {
+    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
         if (!shouldUseTsc()) return;
 
-        candidate_time_sources.addTimeSource(current_task, .{
+        candidate_time_sources.addTimeSource(.{
             .name = "tsc",
             .priority = 200,
 
             .initialization = if (x64.info.tsc_tick_duration_fs != null)
                 .{
                     .simple = struct {
-                        fn simple(inner_current_task: Task.Current) void {
+                        fn simple() void {
                             std.debug.assert(shouldUseTsc());
                             std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
                             globals.tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
                             init_log.debug(
-                                inner_current_task,
                                 "tick duration (fs): {}",
                                 .{globals.tick_duration_fs},
                             );
@@ -96,10 +92,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeTscCalibrate(
-        current_task: Task.Current,
-        reference_counter: kernel.time.init.ReferenceCounter,
-    ) void {
+    fn initializeTscCalibrate(reference_counter: kernel.time.init.ReferenceCounter) void {
         std.debug.assert(shouldUseTsc());
 
         const sample_duration = core.Duration.from(5, .millisecond);
@@ -119,7 +112,7 @@ pub const init = struct {
         const average_ticks = total_ticks / number_of_samples;
 
         globals.tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
-        init_log.debug(current_task, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
+        init_log.debug("tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
     fn shouldUseTsc() bool {

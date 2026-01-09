@@ -32,10 +32,10 @@ pub const Tss = extern struct {
     /// Sets the stack for the given stack selector.
     pub fn setInterruptStack(
         tss: *Tss,
-        stack_selector: u3,
+        stack_selector: x64.interrupts.InterruptStackSelector,
         stack_pointer: core.VirtualAddress,
     ) void {
-        tss.interrupt_stack_table[stack_selector] = stack_pointer;
+        tss.interrupt_stack_table[@intFromEnum(stack_selector)] = stack_pointer;
     }
 
     /// Sets the stack for the given privilege level.

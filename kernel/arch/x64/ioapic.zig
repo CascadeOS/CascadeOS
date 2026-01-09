@@ -101,7 +101,7 @@ const globals = struct {
 pub const init = struct {
     const init_log = kernel.debug.log.scoped(.ioapic_init);
 
-    pub fn captureMADTInformation(current_task: Task.Current, madt: *const kernel.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(madt: *const kernel.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {
@@ -112,7 +112,7 @@ pub const init = struct {
                     const address = kernel.mem.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
                     const ioapic = IOAPIC.init(address, io_apic_data.global_system_interrupt_base);
 
-                    init_log.debug(current_task, "found ioapic for gsi {}-{}", .{
+                    init_log.debug("found ioapic for gsi {}-{}", .{
                         ioapic.gsi_base,
                         ioapic.gsi_base + ioapic.number_of_redirection_entries,
                     });
@@ -123,7 +123,7 @@ pub const init = struct {
                     const madt_iso = entry.specific.interrupt_source_override;
                     const source_override: SourceOverride = .fromMADT(madt_iso);
                     globals.source_overrides[madt_iso.source] = source_override;
-                    init_log.debug(current_task, "found irq {} has {f}", .{ madt_iso.source, source_override });
+                    init_log.debug("found irq {} has {f}", .{ madt_iso.source, source_override });
                 },
                 else => continue,
             }

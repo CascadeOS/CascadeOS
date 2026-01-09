@@ -970,6 +970,8 @@ pub const IA32_SFMASK = packed struct(u64) {
 
 pub const IA32_LSTAR = MSR(u64, 0xC0000082);
 
+pub const FS_BASE = MSR(u64, 0xC0000100);
+pub const GS_BASE = MSR(u64, 0xC0000101);
 pub const KERNEL_GS_BASE = MSR(u64, 0xC0000102);
 
 pub inline fn readMSR(comptime T: type, register: u32) T {

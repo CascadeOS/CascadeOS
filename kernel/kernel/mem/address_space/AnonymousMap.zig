@@ -44,10 +44,10 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: properly support shared anonymous maps
 
-pub fn create(current_task: Task.Current, size: core.Size) error{OutOfMemory}!*AnonymousMap {
+pub fn create(size: core.Size) error{OutOfMemory}!*AnonymousMap {
     if (core.is_debug) std.debug.assert(size.isAligned(arch.paging.standard_page_size));
 
-    const anonymous_map = globals.anonymous_map_cache.allocate(current_task) catch return error.OutOfMemory;
+    const anonymous_map = globals.anonymous_map_cache.allocate() catch return error.OutOfMemory;
 
     anonymous_map.* = .{ .number_of_pages = .fromSize(size) };
 
@@ -69,7 +69,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: Task.Current, deallocate_frame_list: *kernel.mem.phys.FrameList) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_frame_list: *kernel.mem.phys.FrameList) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -80,14 +80,14 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: Task.
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous map
-        anonymous_map.destroy(current_task, deallocate_frame_list);
+        anonymous_map.destroy(deallocate_frame_list);
         return;
     }
 
     // TODO: once `shared` is supported:
     // https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_amap.c#L1342-L1347
 
-    anonymous_map.lock.writeUnlock(current_task);
+    anonymous_map.lock.writeUnlock();
 }
 
 /// Destroy the anonymous map.
@@ -97,7 +97,6 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, current_task: Task.
 /// Called `amap_wipeout` in OpenBSD uvm.
 fn destroy(
     anonymous_map: *AnonymousMap,
-    current_task: Task.Current,
     deallocate_frame_list: *kernel.mem.phys.FrameList,
 ) void {
     if (core.is_debug) {
@@ -110,15 +109,15 @@ fn destroy(
     while (iter.next()) |chunk| {
         for (chunk) |opt_page| {
             const page = opt_page orelse continue;
-            page.lock.writeLock(current_task);
-            page.decrementReferenceCount(current_task, deallocate_frame_list);
+            page.lock.writeLock();
+            page.decrementReferenceCount(deallocate_frame_list);
         }
     }
     anonymous_map.anonymous_page_chunks.deinit();
     anonymous_map.anonymous_page_chunks.chunks = .{};
 
-    anonymous_map.lock.writeUnlock(current_task);
-    globals.anonymous_map_cache.deallocate(current_task, anonymous_map);
+    anonymous_map.lock.writeUnlock();
+    globals.anonymous_map_cache.deallocate(anonymous_map);
 }
 
 /// Ensure an entries `needs_copy` flag is false, by copying the anonymous map if needed.
@@ -130,7 +129,6 @@ fn destroy(
 ///
 /// Called `amap_copy` in OpenBSD uvm.
 pub fn copy(
-    current_task: Task.Current,
     address_space: *AddressSpace,
     entry: *Entry,
     faulting_address: core.VirtualAddress,
@@ -143,7 +141,7 @@ pub fn copy(
         // no anonymous map, create one
 
         // FIXME: rather than `try` - wait for memory to be available and trigger memory reclaimation
-        entry.anonymous_map_reference.anonymous_map = try create(current_task, entry.range.size);
+        entry.anonymous_map_reference.anonymous_map = try create(entry.range.size);
         entry.anonymous_map_reference.start_offset = .zero;
 
         entry.needs_copy = false;
@@ -196,7 +194,6 @@ pub const Reference = struct {
     /// Called `amap_add` in OpenBSD uvm.
     pub fn add(
         reference: Reference,
-        current_task: Task.Current,
         entry: *const Entry,
         faulting_address: core.VirtualAddress,
         anonymous_page: *AnonymousPage,
@@ -210,7 +207,7 @@ pub const Reference = struct {
             std.debug.assert(entry.range.containsAddress(faulting_address));
         }
 
-        log.verbose(current_task, "adding anonymous page for {f} to anonymous map", .{faulting_address});
+        log.verbose("adding anonymous page for {f} to anonymous map", .{faulting_address});
 
         const anonymous_map = reference.anonymous_map.?;
 
@@ -247,7 +244,6 @@ pub const Reference = struct {
     /// Prints the anonymous map reference.
     pub fn print(
         anonymous_map_reference: Reference,
-        current_task: Task.Current,
         writer: *std.Io.Writer,
         indent: usize,
     ) !void {
@@ -261,7 +257,6 @@ pub const Reference = struct {
 
             try writer.splatByteAll(' ', new_indent);
             try anonymous_map.print(
-                current_task,
                 writer,
                 new_indent,
             );
@@ -312,14 +307,13 @@ pub const PageCount = extern struct {
 /// Locks the spinlock.
 pub fn print(
     anonymous_map: *AnonymousMap,
-    current_task: Task.Current,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
     const new_indent = indent + 2;
 
-    anonymous_map.lock.readLock(current_task);
-    defer anonymous_map.lock.readUnlock(current_task);
+    anonymous_map.lock.readLock();
+    defer anonymous_map.lock.readUnlock();
 
     try writer.writeAll("AnonymousMap{\n");
 
@@ -348,10 +342,10 @@ const globals = struct {
 pub const init = struct {
     const init_log = kernel.debug.log.scoped(.anonymous_map_init);
 
-    pub fn initializeCaches(current_task: Task.Current) !void {
-        init_log.debug(current_task, "initializing anonymous map cache", .{});
+    pub fn initializeCaches() !void {
+        init_log.debug("initializing anonymous map cache", .{});
 
-        globals.anonymous_map_cache.init(current_task, .{
+        globals.anonymous_map_cache.init(.{
             .name = try .fromSlice("anonymous map"),
         });
     }

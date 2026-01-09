@@ -15,7 +15,7 @@ const Executor = @This();
 /// As no executor hotswapping is supported this is guaranteed to be the index of this executor in `globals.executors`.
 id: Id,
 
-current_task: *Task,
+_current_task: *Task,
 
 /// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
 scheduler_task: Task,
@@ -29,17 +29,20 @@ flush_requests: core.containers.AtomicSinglyLinkedList = .{},
 interrupt_source_panic_buffer: [kernel.config.executor.interrupt_source_panic_buffer_size.value + interrupt_source_panic_truncated.len]u8 = undefined,
 const interrupt_source_panic_truncated = " (msg truncated)";
 
+pub fn setCurrentTask(executor: *Executor, task: *Task) void {
+    executor._current_task = task;
+    arch.scheduling.setCurrentTask(task);
+}
+
 /// Renders the given message using this executor's interrupt source panic buffer.
 ///
 /// If the message is too large to fit in the buffer, the message is truncated.
 pub fn renderInterruptSourcePanicMessage(
     current_executor: *Executor,
-    current_task: Task.Current,
     comptime fmt: []const u8,
     args: anytype,
 ) []const u8 {
     // TODO: this treatment should be given to all panics
-    std.debug.assert(current_executor == current_task.knownExecutor());
 
     const full_buffer = current_executor.interrupt_source_panic_buffer[0..];
 

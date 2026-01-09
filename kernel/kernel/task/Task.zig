@@ -13,11 +13,9 @@ const Process = kernel.user.Process;
 const Thread = kernel.user.Thread;
 const core = @import("core");
 
-pub const Current = @import("Current.zig").Current;
+pub const Current = @import("Current.zig");
 pub const SchedulerHandle = @import("SchedulerHandle.zig");
 pub const Stack = @import("Stack.zig");
-
-pub const EntryFunction = core.TypeErasedCall.Templated(&.{Current});
 
 const log = kernel.debug.log.scoped(.task);
 
@@ -67,6 +65,8 @@ enable_access_to_user_memory_count: u32 = 0,
 spinlocks_held: u32,
 scheduler_locked: bool,
 
+arch_specific: arch.scheduling.PerTask,
+
 pub const State = union(enum) {
     ready,
     /// Do not access the executor directly, use `known_executor` instead.
@@ -87,27 +87,28 @@ pub fn incrementReferenceCount(task: *Task) void {
 ///
 /// If it reaches zero the task is submitted to the task cleanup service.
 ///
-/// This must not be called when the task is the current task, see `Task.drop` instead.
-pub fn decrementReferenceCount(task: *Task, current_task: Task.Current) void {
-    if (core.is_debug) std.debug.assert(task != current_task.task);
+/// This must **not** be called when the task is the current task, see `Task.drop` instead.
+pub fn decrementReferenceCount(task: *Task) void {
+    if (core.is_debug) std.debug.assert(task != Task.Current.get().task);
+
     if (task.reference_count.fetchSub(1, .acq_rel) != 1) {
         @branchHint(.likely);
         return;
     }
-    globals.task_cleanup.queueTaskForCleanup(current_task, task);
+    globals.task_cleanup.queueTaskForCleanup(task);
 }
 
 pub const CreateKernelTaskOptions = struct {
     name: Name,
-    entry: EntryFunction,
+    entry: core.TypeErasedCall,
 };
 
 /// Create a kernel task.
 ///
 /// The task is in the `ready` state and is not scheduled.
-pub fn createKernelTask(current_task: Task.Current, options: CreateKernelTaskOptions) !*Task {
-    const task = try globals.cache.allocate(current_task);
-    errdefer globals.cache.deallocate(current_task, task);
+pub fn createKernelTask(options: CreateKernelTaskOptions) !*Task {
+    const task = try globals.cache.allocate();
+    errdefer globals.cache.deallocate(task);
 
     try Task.internal.init(task, .{
         .name = options.name,
@@ -115,8 +116,8 @@ pub fn createKernelTask(current_task: Task.Current, options: CreateKernelTaskOpt
         .entry = options.entry,
     });
 
-    globals.kernel_tasks_lock.writeLock(current_task);
-    defer globals.kernel_tasks_lock.writeUnlock(current_task);
+    globals.kernel_tasks_lock.writeLock();
+    defer globals.kernel_tasks_lock.writeUnlock();
 
     const gop = try globals.kernel_tasks.getOrPut(kernel.mem.heap.allocator, task);
     if (gop.found_existing) std.debug.panic("task already in kernel tasks list", .{});
@@ -134,7 +135,7 @@ pub fn format(
             .{task.name.constSlice()},
         ),
         .user => {
-            const process: *const Process = .fromTask(task);
+            const process: *const Process = .from(task);
             try writer.print(
                 "User<{s} - {s}>",
                 .{ process.name.constSlice(), task.name.constSlice() },
@@ -199,9 +200,9 @@ const TaskCleanup = struct {
     parker: kernel.sync.Parker,
     incoming: core.containers.AtomicSinglyLinkedList,
 
-    pub fn init(task_cleanup: *TaskCleanup, current_task: Task.Current) !void {
+    pub fn init(task_cleanup: *TaskCleanup) !void {
         task_cleanup.* = .{
-            .task = try Task.createKernelTask(current_task, .{
+            .task = try Task.createKernelTask(.{
                 .name = try .fromSlice("task cleanup"),
                 .entry = .prepare(TaskCleanup.execute, .{task_cleanup}),
             }),
@@ -213,13 +214,14 @@ const TaskCleanup = struct {
     }
 
     /// Queues a task to be cleaned up by the task cleanup service.
+    ///
+    /// This must **not** be called when the task is the current task.
     pub fn queueTaskForCleanup(
         task_cleanup: *TaskCleanup,
-        current_task: Task.Current,
         task: *Task,
     ) void {
         if (core.is_debug) {
-            std.debug.assert(current_task.task != task);
+            std.debug.assert(task != Task.Current.get().task);
             std.debug.assert(task.state == .dropped);
         }
 
@@ -232,28 +234,23 @@ const TaskCleanup = struct {
             @panic("already queued for cleanup");
         }
 
-        log.verbose(current_task, "queueing {f} for cleanup", .{task});
+        log.verbose("queueing {f} for cleanup", .{task});
 
         task_cleanup.incoming.prepend(&task.next_task_node);
-        task_cleanup.parker.unpark(current_task);
+        task_cleanup.parker.unpark();
     }
 
-    fn execute(current_task: Task.Current, task_cleanup: *TaskCleanup) noreturn {
-        if (core.is_debug) std.debug.assert(task_cleanup.task == current_task.task);
-
+    fn execute(task_cleanup: *TaskCleanup) noreturn {
         while (true) {
             while (task_cleanup.incoming.popFirst()) |node| {
-                cleanupTask(
-                    current_task,
-                    .fromNode(node),
-                );
+                cleanupTask(.fromNode(node));
             }
 
-            task_cleanup.parker.park(current_task);
+            task_cleanup.parker.park();
         }
     }
 
-    fn cleanupTask(current_task: Task.Current, task: *Task) void {
+    fn cleanupTask(task: *Task) void {
         if (core.is_debug) {
             std.debug.assert(task.state == .dropped);
             std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
@@ -263,24 +260,24 @@ const TaskCleanup = struct {
 
         const lock: *kernel.sync.RwLock = switch (task.type) {
             .kernel => &globals.kernel_tasks_lock,
-            .user => &Process.fromTask(task).threads_lock,
+            .user => &Process.from(task).threads_lock,
         };
 
         {
-            lock.writeLock(current_task);
-            defer lock.writeUnlock(current_task);
+            lock.writeLock();
+            defer lock.writeUnlock();
 
             if (task.reference_count.load(.acquire) != 0) {
                 @branchHint(.unlikely);
                 // someone has acquired a reference to the task after it was queued for cleanup
-                log.verbose(current_task, "{f} still has references", .{task});
+                log.verbose("{f} still has references", .{task});
                 return;
             }
 
             if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
                 @branchHint(.unlikely);
                 // someone has requeued this task for cleanup
-                log.verbose(current_task, "{f} has been requeued for cleanup", .{task});
+                log.verbose("{f} has been requeued for cleanup", .{task});
                 return;
             }
 
@@ -288,21 +285,21 @@ const TaskCleanup = struct {
             switch (task.type) {
                 .kernel => if (!globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks"),
                 .user => {
-                    const thread: *Thread = .fromTask(task);
+                    const thread: *Thread = .from(task);
                     if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
                 },
             }
         }
 
         // this log must happen before the process reference count is decremented
-        log.debug(current_task, "destroying {f}", .{task});
+        log.debug("destroying {f}", .{task});
 
         switch (task.type) {
-            .kernel => globals.cache.deallocate(current_task, task),
+            .kernel => globals.cache.deallocate(task),
             .user => {
-                const thread: *Thread = .fromTask(task);
-                thread.process.decrementReferenceCount(current_task);
-                Thread.internal.destroy(current_task, thread);
+                const thread: *Thread = .from(task);
+                thread.process.decrementReferenceCount();
+                Thread.internal.destroy(thread);
             },
         }
     }
@@ -312,7 +309,7 @@ pub const internal = struct {
     pub const InitOptions = struct {
         name: Name,
         type: kernel.Context.Type,
-        entry: EntryFunction,
+        entry: core.TypeErasedCall,
     };
 
     pub fn init(task: *Task, options: InitOptions) !void {
@@ -326,22 +323,18 @@ pub const internal = struct {
             .known_executor = null,
             .spinlocks_held = 1, // fresh tasks start with the scheduler locked
             .scheduler_locked = true, // fresh tasks start with the scheduler locked
+
+            .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below
         };
+        arch.scheduling.initializeTaskArchSpecific(task);
 
         task.stack.reset();
 
-        var entry = options.entry;
-        entry.setTemplatedArgs(.{.{ .task = task }});
-
-        arch.scheduling.prepareTaskForScheduling(
-            task,
-            entry.type_erased_call,
-        );
+        arch.scheduling.prepareTaskForScheduling(task, options.entry);
     }
 
     // Called directly by assembly code in `arch.scheduling.prepareTaskForScheduling`, so the signature must match.
     pub fn taskEntry(
-        current_task: Task.Current,
         target_function: *const core.TypeErasedCall.TypeErasedFn,
         arg0: usize,
         arg1: usize,
@@ -349,11 +342,11 @@ pub const internal = struct {
         arg3: usize,
         arg4: usize,
     ) callconv(.c) noreturn {
-        SchedulerHandle.internal.unsafeUnlock(current_task);
+        SchedulerHandle.internal.unsafeUnlock();
         target_function(arg0, arg1, arg2, arg3, arg4);
 
-        const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-        scheduler_handle.drop(current_task);
+        const scheduler_handle: Task.SchedulerHandle = .get();
+        scheduler_handle.drop();
         unreachable;
     }
 };
@@ -365,14 +358,14 @@ const globals = struct {
     var cache: kernel.mem.cache.Cache(
         Task,
         struct {
-            fn constructor(task: *Task, current_task: Task.Current) kernel.mem.cache.ConstructorError!void {
+            fn constructor(task: *Task) kernel.mem.cache.ConstructorError!void {
                 if (core.is_debug) task.* = undefined;
-                task.stack = try .createStack(current_task);
+                task.stack = try .createStack();
             }
         }.constructor,
         struct {
-            fn destructor(task: *Task, current_task: Task.Current) void {
-                task.stack.destroyStack(current_task);
+            fn destructor(task: *Task) void {
+                task.stack.destroyStack();
             }
         }.destructor,
     ) = undefined;
@@ -392,17 +385,14 @@ pub const init = struct {
 
     pub const earlyCreateStack = Stack.createStack;
 
-    pub fn initializeTasks(current_task: Task.Current) !void {
-        try Stack.init.initializeStacks(current_task);
+    pub fn initializeTasks() !void {
+        try Stack.init.initializeStacks();
 
-        init_log.debug(current_task, "initializing task cache", .{});
-        globals.cache.init(
-            current_task,
-            .{ .name = try .fromSlice("task") },
-        );
+        init_log.debug("initializing task cache", .{});
+        globals.cache.init(.{ .name = try .fromSlice("task") });
 
-        init_log.debug(current_task, "initializing task cleanup service", .{});
-        try globals.task_cleanup.init(current_task);
+        init_log.debug("initializing task cleanup service", .{});
+        try globals.task_cleanup.init();
     }
 
     pub fn initializeBootstrapInitTask(
@@ -420,21 +410,20 @@ pub const init = struct {
             .known_executor = bootstrap_executor,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
             .scheduler_locked = false, // init tasks don't start with the scheduler locked
+
+            .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below
         };
+        arch.scheduling.initializeTaskArchSpecific(bootstrap_init_task);
     }
 
-    pub fn createAndAssignInitTask(
-        current_task: Task.Current,
-        executor: *kernel.Executor,
-    ) !void {
+    pub fn createAndAssignInitTask(executor: *kernel.Executor) !void {
         const dummyInitEntry = struct {
-            fn dummyInitEntry(_: Task.Current) noreturn {
+            fn dummyInitEntry() noreturn {
                 @panic("init task should not be scheduled");
             }
         }.dummyInitEntry;
 
         const task = try createKernelTask(
-            current_task,
             .{
                 .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
                 .entry = .prepare(dummyInitEntry, .{}),
@@ -449,11 +438,10 @@ pub const init = struct {
 
         task.stack.reset(); // we don't care about the entry function or its arguments
 
-        executor.current_task = task;
+        executor._current_task = task; // can't use `executor.setCurrentTask` as this function is used by the bootstrap executor to prepare other executors
     }
 
     pub fn initializeSchedulerTask(
-        current_task: Task.Current,
         scheduler_task: *Task,
         executor: *kernel.Executor,
     ) !void {
@@ -461,12 +449,15 @@ pub const init = struct {
             .name = try .initPrint("scheduler {}", .{@intFromEnum(executor.id)}),
 
             .state = .ready,
-            .stack = try .createStack(current_task),
+            .stack = try .createStack(),
             .type = .kernel,
             .known_executor = null,
             .spinlocks_held = 1, // fresh tasks start with the scheduler locked
             .scheduler_locked = true, // fresh tasks start with the scheduler locked
             .is_scheduler_task = true,
+
+            .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below
         };
+        arch.scheduling.initializeTaskArchSpecific(scheduler_task);
     }
 };

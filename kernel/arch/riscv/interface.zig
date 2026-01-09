@@ -11,12 +11,6 @@ const core = @import("core");
 const riscv = @import("riscv.zig");
 
 pub const functions: arch.Functions = .{
-    .unsafeGetCurrentExecutor = struct {
-        inline fn unsafeGetCurrentExecutor() *kernel.Executor {
-            return @ptrFromInt(riscv.registers.SupervisorScratch.read());
-        }
-    }.unsafeGetCurrentExecutor,
-
     .spinLoopHint = riscv.instructions.pause,
 
     .halt = riscv.instructions.halt,
@@ -38,7 +32,22 @@ pub const functions: arch.Functions = .{
         .init = .{},
     },
 
-    .scheduling = .{},
+    .scheduling = .{
+        .initializeTaskArchSpecific = struct {
+            fn initializeTaskArchSpecific(_: *kernel.Task) void {}
+        }.initializeTaskArchSpecific,
+
+        .getCurrentTask = struct {
+            inline fn getCurrentTask() *kernel.Task {
+                return @ptrFromInt(riscv.registers.SupervisorScratch.read());
+            }
+        }.getCurrentTask,
+        .setCurrentTask = struct {
+            inline fn setCurrentTask(task: *kernel.Task) void {
+                riscv.registers.SupervisorScratch.write(@intFromPtr(task));
+            }
+        }.setCurrentTask,
+    },
 
     .io = .{},
 
@@ -50,9 +59,9 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(current_task: Task.Current) ?arch.init.InitOutput {
+            fn tryGetSerialOutput() ?arch.init.InitOutput {
                 if (riscv.sbi_debug_console.detect()) {
-                    log.debug(current_task, "using sbi debug console for serial output", .{});
+                    log.debug("using sbi debug console for serial output", .{});
                     return .{
                         .output = riscv.sbi_debug_console.output,
                         .preference = .use,
@@ -67,20 +76,14 @@ pub const functions: arch.Functions = .{
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                current_task: Task.Current,
+                executor: *kernel.Executor,
                 architecture_processor_id: u64,
             ) void {
-                current_task.knownExecutor().arch_specific = .{
+                executor.arch_specific = .{
                     .hartid = @intCast(architecture_processor_id),
                 };
             }
         }.prepareBootstrapExecutor,
-
-        .loadExecutor = struct {
-            fn loadExecutor(current_task: Task.Current) void {
-                riscv.registers.SupervisorScratch.write(@intFromPtr(current_task.knownExecutor()));
-            }
-        }.loadExecutor,
     },
 };
 
@@ -99,6 +102,10 @@ pub const decls: arch.Decls = .{
         .lower_half_size = .from(128, .tib),
         .higher_half_start = .fromInt(0xffff800000000000),
         .PageTable = extern struct {},
+    },
+
+    .scheduling = .{
+        .PerTask = struct {},
     },
 
     .user = .{

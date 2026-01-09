@@ -22,12 +22,12 @@ pub fn initStage1() !noreturn {
     // we need basic memory layout information to be able to panic
     kernel.mem.init.determineEarlyMemoryLayout();
 
-    var current_task = try constructBootstrapTask();
+    try constructAndLoadBootstrapExecutorAndTask();
 
-    // now that we have a current_task we can panic in a meaningful way
+    // now that we have a executor and task we can panic in a meaningful way
     kernel.debug.setPanicMode(.single_executor_init_panic);
 
-    kernel.mem.phys.init.initializeBootstrapFrameAllocator(current_task);
+    kernel.mem.phys.init.initializeBootstrapFrameAllocator();
 
     // TODO: ensure all physical memory regions are mapped in the bootloader provided page table here, this would allow
     // us to switch to latter limine revisions and also allow us to support unusual systems with MMIO above 4GiB
@@ -35,71 +35,72 @@ pub fn initStage1() !noreturn {
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     try kernel.acpi.init.earlyInitialize();
 
-    Output.registerOutputs(current_task);
+    Output.registerOutputs();
 
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    kernel.mem.init.logEarlyMemoryLayout(current_task);
+    kernel.mem.init.logEarlyMemoryLayout();
 
-    try kernel.acpi.init.logAcpiTables(current_task);
+    try kernel.acpi.init.logAcpiTables();
 
-    log.debug(current_task, "initializing early interrupts", .{});
-    arch.interrupts.init.initializeEarlyInterrupts(current_task);
+    log.debug("initializing early interrupts", .{});
+    arch.interrupts.init.initializeEarlyInterrupts();
 
-    log.debug(current_task, "capturing early system information", .{});
-    arch.init.captureEarlySystemInformation(current_task);
+    log.debug("capturing early system information", .{});
+    arch.init.captureEarlySystemInformation();
 
-    log.debug(current_task, "configuring per-executor system features with early system information", .{});
-    arch.init.configurePerExecutorSystemFeatures(current_task);
+    log.debug("configuring per-executor system features with early system information", .{});
+    arch.init.configurePerExecutorSystemFeatures();
 
-    log.debug(current_task, "initializing memory system", .{});
-    try kernel.mem.init.initializeMemorySystem(current_task);
+    log.debug("initializing memory system", .{});
+    try kernel.mem.init.initializeMemorySystem();
 
-    log.debug(current_task, "remapping init outputs", .{});
-    try Output.remapOutputs(current_task);
+    log.debug("remapping init outputs", .{});
+    try Output.remapOutputs();
 
-    log.debug(current_task, "capturing system information", .{});
-    try arch.init.captureSystemInformation(current_task, switch (arch.current_arch) {
+    log.debug("capturing system information", .{});
+    try arch.init.captureSystemInformation(switch (arch.current_arch) {
         .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
         .arm, .riscv => .{},
     });
 
-    log.debug(current_task, "configuring per-executor system features with full system information", .{});
-    arch.init.configurePerExecutorSystemFeatures(current_task);
+    log.debug("configuring per-executor system features with full system information", .{});
+    arch.init.configurePerExecutorSystemFeatures();
 
-    log.debug(current_task, "configuring global system features", .{});
-    arch.init.configureGlobalSystemFeatures(current_task);
+    log.debug("configuring global system features", .{});
+    arch.init.configureGlobalSystemFeatures();
 
-    log.debug(current_task, "initializing time", .{});
-    try kernel.time.init.initializeTime(current_task);
+    log.debug("initializing time", .{});
+    try kernel.time.init.initializeTime();
 
-    log.debug(current_task, "initializing interrupt routing", .{});
-    try arch.interrupts.init.initializeInterruptRouting(current_task);
+    log.debug("initializing interrupt routing", .{});
+    try arch.interrupts.init.initializeInterruptRouting();
 
-    log.debug(current_task, "initializing tasks", .{});
-    try Task.init.initializeTasks(current_task);
+    log.debug("initializing tasks", .{});
+    try Task.init.initializeTasks();
 
-    log.debug(current_task, "initializing user processes and threads", .{});
-    try kernel.user.init.initialize(current_task);
+    log.debug("initializing user processes and threads", .{});
+    try kernel.user.init.initialize();
 
-    log.debug(current_task, "initializing kernel executors", .{});
-    const executors, const new_bootstrap_executor = try createExecutors(current_task);
+    log.debug("initializing kernel executors", .{});
+    const executors, const new_executor = try createExecutors();
     kernel.Executor.init.setExecutors(executors);
-    current_task.task = new_bootstrap_executor.current_task;
 
-    // ensure the bootstrap executor is re-loaded before we change panic and log modes
-    arch.init.loadExecutor(current_task);
+    // ensure the executor is re-loaded before we change panic and log modes
+    arch.init.initExecutor(new_executor);
+    new_executor.setCurrentTask(new_executor._current_task);
 
+    // TODO: non-bootstrap executors have not yet had a chance to set their current tasks, so this is too early to switch panic mode
     kernel.debug.setPanicMode(.init_panic);
     kernel.debug.log.setLogMode(.init_log);
 
     if (executors.len > 1) {
-        log.debug(current_task, "booting non-bootstrap executors", .{});
+        log.debug("booting non-bootstrap executors", .{});
         try bootNonBootstrapExecutors();
     }
 
-    try initStage2(current_task);
+    try initStage2(new_executor);
     unreachable;
 }
 
@@ -108,27 +109,27 @@ pub fn initStage1() !noreturn {
 /// This function is executed by all executors, including the bootstrap executor.
 ///
 /// All executors are using the bootloader provided stack.
-fn initStage2(current_task: Task.Current) !noreturn {
+fn initStage2(executor: *kernel.Executor) !noreturn {
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
-    kernel.mem.kernelPageTable().load(current_task);
-    const executor = current_task.knownExecutor();
-    arch.init.loadExecutor(current_task);
+    kernel.mem.kernelPageTable().load();
+    arch.init.initExecutor(executor);
+    executor.setCurrentTask(executor._current_task);
 
-    log.debug(current_task, "configuring per-executor system features on {f}", .{executor.id});
-    arch.init.configurePerExecutorSystemFeatures(current_task);
+    log.debug("configuring per-executor system features on {f}", .{executor.id});
+    arch.init.configurePerExecutorSystemFeatures();
 
-    log.debug(current_task, "configuring local interrupt controller on {f}", .{executor.id});
-    arch.init.initLocalInterruptController(current_task);
+    log.debug("configuring local interrupt controller on {f}", .{executor.id});
+    arch.init.initLocalInterruptController();
 
-    log.debug(current_task, "enabling per-executor interrupt on {f}", .{executor.id});
+    log.debug("enabling per-executor interrupt on {f}", .{executor.id});
     kernel.time.per_executor_periodic.enableInterrupt(kernel.config.scheduler.per_executor_interrupt_period);
 
     try arch.scheduling.callNoSave(
-        &current_task.task.stack,
+        &executor._current_task.stack,
         .prepare(
             initStage3,
-            .{current_task},
+            .{},
         ),
     );
     unreachable;
@@ -139,57 +140,56 @@ fn initStage2(current_task: Task.Current) !noreturn {
 /// This function is executed by all executors.
 ///
 /// All executors are using their init task's stack.
-fn initStage3(current_task: Task.Current) !noreturn {
+fn initStage3() !noreturn {
     if (Stage3Barrier.start()) {
-        log.debug(current_task, "loading standard interrupt handlers", .{});
-        arch.interrupts.init.loadStandardInterruptHandlers(current_task);
+        log.debug("loading standard interrupt handlers", .{});
+        arch.interrupts.init.loadStandardInterruptHandlers();
 
-        log.debug(current_task, "creating and scheduling init stage 4 task", .{});
+        log.debug("creating and scheduling init stage 4 task", .{});
         {
             const init_stage4_task: *Task = try .createKernelTask(
-                current_task,
                 .{
                     .name = try .fromSlice("init stage 4"),
                     .entry = .prepare(initStage4, .{}),
                 },
             );
 
-            const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-            defer scheduler_handle.unlock(current_task);
+            const scheduler_handle: Task.SchedulerHandle = .get();
+            defer scheduler_handle.unlock();
 
-            scheduler_handle.queueTask(current_task, init_stage4_task);
+            scheduler_handle.queueTask(init_stage4_task);
         }
 
         Stage3Barrier.complete();
     }
 
-    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-    scheduler_handle.drop(current_task);
+    const scheduler_handle: Task.SchedulerHandle = .get();
+    scheduler_handle.drop();
     unreachable;
 }
 
 /// Stage 4 of kernel initialization.
 ///
 /// This function is executed in a fully scheduled kernel task with interrupts enabled.
-fn initStage4(current_task: Task.Current) !void {
-    log.debug(current_task, "initializing PCI ECAM", .{});
-    try kernel.pci.init.initializeECAM(current_task);
+fn initStage4() !void {
+    log.debug("initializing PCI ECAM", .{});
+    try kernel.pci.init.initializeECAM();
 
-    log.debug(current_task, "initializing ACPI", .{});
-    try kernel.acpi.init.initialize(current_task);
+    log.debug("initializing ACPI", .{});
+    try kernel.acpi.init.initialize();
 
-    Output.lock.lock(current_task);
-    defer Output.lock.unlock(current_task);
+    Output.lock.lock();
+    defer Output.lock.unlock();
     try kernel.time.init.printInitializationTime(Output.writer);
     try Output.writer.flush();
 }
 
-fn constructBootstrapTask() !Task.Current {
+fn constructAndLoadBootstrapExecutorAndTask() !void {
     const static = struct {
         var bootstrap_init_task: Task = undefined;
         var bootstrap_executor: kernel.Executor = .{
             .id = @enumFromInt(0),
-            .current_task = &bootstrap_init_task,
+            ._current_task = undefined, // set by `setCurrentTask`
             .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
             .scheduler_task = undefined, // not used
         };
@@ -199,23 +199,21 @@ fn constructBootstrapTask() !Task.Current {
         &static.bootstrap_init_task,
         &static.bootstrap_executor,
     );
-    const current_task: Task.Current = .{ .task = &static.bootstrap_init_task };
 
     arch.init.prepareBootstrapExecutor(
-        current_task,
+        &static.bootstrap_executor,
         boot.bootstrapArchitectureProcessorId(),
     );
-    arch.init.loadExecutor(current_task);
+    arch.init.initExecutor(&static.bootstrap_executor);
+    static.bootstrap_executor.setCurrentTask(&static.bootstrap_init_task);
 
     kernel.Executor.init.setExecutors(@ptrCast(&static.bootstrap_executor));
-
-    return current_task;
 }
 
 /// Creates an executor for each CPU.
 ///
 /// Returns the slice of executors and the bootstrap executor.
-fn createExecutors(current_task: Task.Current) !struct { []kernel.Executor, *kernel.Executor } {
+fn createExecutors() !struct { []kernel.Executor, *kernel.Executor } {
     var descriptors = boot.cpuDescriptors() orelse return error.NoSMPFromBootloader;
 
     if (descriptors.count() > kernel.config.executor.maximum_number_of_executors) {
@@ -225,7 +223,7 @@ fn createExecutors(current_task: Task.Current) !struct { []kernel.Executor, *ker
         );
     }
 
-    log.debug(current_task, "initializing {} executors", .{descriptors.count()});
+    log.debug("initializing {} executors", .{descriptors.count()});
 
     const executors = try kernel.mem.heap.allocator.alloc(kernel.Executor, descriptors.count());
 
@@ -240,15 +238,14 @@ fn createExecutors(current_task: Task.Current) !struct { []kernel.Executor, *ker
         executor.* = .{
             .id = @enumFromInt(i),
             .arch_specific = undefined, // set by `arch.init.prepareExecutor`
-            .current_task = undefined, // set below by `Task.init.createAndAssignInitTask`
+            ._current_task = undefined, // set below by `Task.init.createAndAssignInitTask`
             .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
         };
 
-        try Task.init.createAndAssignInitTask(current_task, executor);
-        try Task.init.initializeSchedulerTask(current_task, &executor.scheduler_task, executor);
+        try Task.init.createAndAssignInitTask(executor);
+        try Task.init.initializeSchedulerTask(&executor.scheduler_task, executor);
 
         arch.init.prepareExecutor(
-            current_task,
             executor,
             desc.architectureProcessorId(),
         );
@@ -271,10 +268,10 @@ fn bootNonBootstrapExecutors() !void {
         if (desc.architectureProcessorId() == bootstrap_architecture_processor_id) continue;
 
         desc.boot(
-            kernel.Executor.executors()[i].current_task,
+            &kernel.Executor.executors()[i],
             struct {
-                fn bootFn(inner_current_task: *anyopaque) !noreturn {
-                    try initStage2(.{ .task = @ptrCast(@alignCast(inner_current_task)) });
+                fn bootFn(inner_executor: *anyopaque) !noreturn {
+                    try initStage2(@ptrCast(@alignCast(inner_executor)));
                 }
             }.bootFn,
         );

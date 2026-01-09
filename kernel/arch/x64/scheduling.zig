@@ -23,12 +23,12 @@ pub fn prepareTaskForScheduling(
     const impl = struct {
         fn taskEntryTrampoline() callconv(.naked) void {
             asm volatile (
-                \\pop %rdi       // current_task
-                \\pop %rsi       // type_erased_call.typeErased
-                \\pop %rdx       // type_erased_call.args[0]
-                \\pop %rcx       // type_erased_call.args[1]
-                \\pop %r8        // type_erased_call.args[2]
-                \\pop %r9        // type_erased_call.args[3]
+                \\pop %rdi       // type_erased_call.typeErased
+                \\pop %rsi       // type_erased_call.args[0]
+                \\pop %rdx       // type_erased_call.args[1]
+                \\pop %rcx       // type_erased_call.args[2]
+                \\pop %r8        // type_erased_call.args[3]
+                \\pop %r9        // type_erased_call.args[4]
                 \\xor %ebp, %ebp
                 \\ret            // the address of `Task.internal.taskEntry` is on the stack
             );
@@ -36,28 +36,24 @@ pub fn prepareTaskForScheduling(
     };
 
     if (core.is_debug) std.debug.assert(
-        task.stack.spaceFor(1 + // args[4]
-            1 + // task entry return address
+        task.stack.spaceFor(1 + // task entry return address
             1 + // taskEntry
-            4 + // args[..4]
+            5 + // args
             1 + // type_erased_call.typeErased
-            1 + // task
             1 // taskEntryTrampoline
         ),
     );
-
-    task.stack.push(type_erased_call.args[4]) catch unreachable; // left on the stack by `taskEntryTrampoline` as per SysV ABI for 7th arg
 
     task.stack.push(0) catch unreachable; // task entry return address
 
     task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
+    task.stack.push(type_erased_call.args[4]) catch unreachable;
     task.stack.push(type_erased_call.args[3]) catch unreachable;
     task.stack.push(type_erased_call.args[2]) catch unreachable;
     task.stack.push(type_erased_call.args[1]) catch unreachable;
     task.stack.push(type_erased_call.args[0]) catch unreachable;
     task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
-    task.stack.push(@intFromPtr(task)) catch unreachable;
 
     task.stack.push(@intFromPtr(&impl.taskEntryTrampoline)) catch unreachable;
 }
@@ -66,26 +62,23 @@ pub fn prepareTaskForScheduling(
 ///
 /// Page table switching and managing ability to access user memory has already been performed before this function is called.
 ///
-/// Interrupts are disabled when this function is called meaning the `known_executor` field of `current_task` is not null.
-pub fn beforeSwitchTask(
-    current_task: Task.Current,
-    transition: Task.Transition,
-) void {
-    const executor = current_task.knownExecutor();
+/// Interrupts are disabled when this function is called.
+pub fn beforeSwitchTask(transition: Task.Transition) void {
+    const executor = transition.old_task.state.running;
 
-    const arch_specific: *x64.PerExecutor = &executor.arch_specific;
+    const per_executor: *x64.PerExecutor = .from(executor);
 
-    arch_specific.tss.setPrivilegeStack(
+    per_executor.tss.setPrivilegeStack(
         .ring0,
         transition.new_task.stack.top_stack_pointer,
     );
 
     switch (transition.type) {
         .user_to_kernel, .user_to_user => {
-            const old_thread: *Thread = .fromTask(transition.old_task);
+            const per_thread: *x64.user.PerThread = .from(.from(transition.old_task));
 
             x64.instructions.enableSSEUsage();
-            old_thread.arch_specific.xsave.save();
+            per_thread.extended_state.save();
             x64.instructions.disableSSEUsage();
         },
         .kernel_to_kernel, .kernel_to_user => {},

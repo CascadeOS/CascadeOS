@@ -16,9 +16,7 @@ pub fn eoi() void {
 }
 
 /// Send a panic IPI to all other executors.
-pub fn sendPanicIPI(current_task: Task.Current) void {
-    _ = current_task;
-
+pub fn sendPanicIPI() void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .non_maskable_interrupt;
@@ -33,9 +31,7 @@ pub fn sendPanicIPI(current_task: Task.Current) void {
 }
 
 /// Send a flush IPI to the given executor.
-pub fn sendFlushIPI(current_task: Task.Current, executor: *kernel.Executor) void {
-    _ = current_task;
-
+pub fn sendFlushIPI(executor: *kernel.Executor) void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .flush_request;
@@ -45,9 +41,11 @@ pub fn sendFlushIPI(current_task: Task.Current, executor: *kernel.Executor) void
     icr.trigger_mode = .edge;
     icr.destination_shorthand = .no_shorthand;
 
+    const per_executor: *x64.PerExecutor = .from(executor);
+
     switch (globals.lapic) {
-        .xapic => icr.destination_field.xapic.destination = @intCast(executor.arch_specific.apic_id),
-        .x2apic => icr.destination_field.x2apic = executor.arch_specific.apic_id,
+        .xapic => icr.destination_field.xapic.destination = @intCast(per_executor.apic_id),
+        .x2apic => icr.destination_field.x2apic = per_executor.apic_id,
     }
 
     globals.lapic.writeInterruptCommandRegister(icr);
@@ -67,7 +65,6 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.apic_init);
 
     pub fn captureApicInformation(
-        current_task: Task.Current,
         fadt: *const kernel.acpi.tables.FADT,
         madt: *const kernel.acpi.tables.MADT,
         x2apic_enabled: bool,
@@ -82,7 +79,7 @@ pub const init = struct {
             };
         }
 
-        init_log.debug(current_task, "lapic in mode: {t}", .{globals.lapic});
+        init_log.debug("lapic in mode: {t}", .{globals.lapic});
 
         if (fadt.fixed_feature_flags.FORCE_APIC_PHYSICAL_DESTINATION_MODE) {
             @panic("physical destination mode is forced");
@@ -102,10 +99,9 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        current_task: Task.Current,
         candidate_time_sources: *kernel.time.init.CandidateTimeSources,
     ) void {
-        candidate_time_sources.addTimeSource(current_task, .{
+        candidate_time_sources.addTimeSource(.{
             .name = "lapic",
             .priority = 150,
             .initialization = if (x64.info.lapic_base_tick_duration_fs != null)
@@ -120,15 +116,14 @@ pub const init = struct {
 
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
-    fn initializeLapicTimer(current_task: Task.Current) void {
+    fn initializeLapicTimer() void {
         std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
 
         globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
-        init_log.debug(current_task, "tick duration (fs) from cpuid: {}", .{globals.tick_duration_fs});
+        init_log.debug("tick duration (fs) from cpuid: {}", .{globals.tick_duration_fs});
     }
 
     fn initializeLapicTimerCalibrate(
-        current_task: Task.Current,
         reference_counter: kernel.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
@@ -182,7 +177,7 @@ pub const init = struct {
         const average_ticks = total_ticks / number_of_samples;
 
         globals.tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
-        init_log.debug(current_task, "tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
+        init_log.debug("tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
     fn perExecutorPeriodicEnableInterrupt(period: core.Duration) void {

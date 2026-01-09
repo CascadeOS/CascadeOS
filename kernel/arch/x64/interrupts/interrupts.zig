@@ -22,23 +22,23 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
         .user_code, .user_code_32bit => x64.instructions.disableSSEUsage(),
         else => unreachable,
     }
-
-    const current_task, const state_before_interrupt = Task.Current.onInterruptEntry();
     defer {
-        state_before_interrupt.onInterruptExit(current_task);
-
         switch (interrupt_frame.cs.selector) {
             .user_code, .user_code_32bit => {
-                const thread: *Thread = .fromTask(current_task.task);
+                const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
                 x64.instructions.enableSSEUsage();
-                thread.arch_specific.xsave.load();
+                per_thread.extended_state.load();
             },
-            else => {},
+            .kernel_code => {},
+            else => unreachable,
         }
     }
 
+    const state_before_interrupt = Task.Current.onInterruptEntry();
+    defer state_before_interrupt.onInterruptExit();
+
     var handler = globals.handlers[interrupt_frame.vector_number.full];
-    handler.setTemplatedArgs(.{ current_task, .{ .arch_specific = interrupt_frame }, state_before_interrupt });
+    handler.setTemplatedArgs(.{ .{ .arch_specific = interrupt_frame }, state_before_interrupt });
     handler.call();
 
     x64.instructions.disableInterrupts();
@@ -134,10 +134,9 @@ pub const Interrupt = enum(u8) {
     }
 
     pub fn allocate(
-        current_task: Task.Current,
         interrupt_handler: Handler,
     ) arch.interrupts.Interrupt.AllocateError!Interrupt {
-        const allocation = globals.interrupt_arena.allocate(current_task, 1, .instant_fit) catch {
+        const allocation = globals.interrupt_arena.allocate(1, .instant_fit) catch {
             return error.InterruptAllocationFailed;
         };
 
@@ -150,13 +149,13 @@ pub const Interrupt = enum(u8) {
         _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
 
         const interrupt: Interrupt = @enumFromInt(interrupt_number);
-        log.debug(current_task, "allocated interrupt {}", .{interrupt});
+        log.debug("allocated interrupt {}", .{interrupt});
 
         return interrupt;
     }
 
-    pub fn deallocate(interrupt: Interrupt, current_task: Task.Current) void {
-        log.debug(current_task, "deallocating interrupt {}", .{interrupt});
+    pub fn deallocate(interrupt: Interrupt) void {
+        log.debug("deallocating interrupt {}", .{interrupt});
 
         const interrupt_number = @intFromEnum(interrupt);
 
@@ -166,22 +165,17 @@ pub const Interrupt = enum(u8) {
         const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
         _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
 
-        globals.interrupt_arena.deallocate(current_task, .{
-            .base = interrupt_number,
-            .len = 1,
-        });
+        globals.interrupt_arena.deallocate(.{ .base = interrupt_number, .len = 1 });
     }
 
-    pub fn route(interrupt: Interrupt, current_task: Task.Current, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
-        log.debug(current_task, "routing interrupt {} to {}", .{ interrupt, external_interrupt });
+    pub fn route(interrupt: Interrupt, external_interrupt: u32) arch.interrupts.Interrupt.RouteError!void {
+        log.debug("routing interrupt {} to {}", .{ interrupt, external_interrupt });
 
         try x64.ioapic.routeInterrupt(@intCast(external_interrupt), interrupt);
     }
 };
 
 pub const InterruptFrame = extern struct {
-    fs: u64,
-    gs: u64,
     r15: u64,
     r14: u64,
     r13: u64,
@@ -214,14 +208,15 @@ pub const InterruptFrame = extern struct {
         selector: x64.Gdt.Selector,
     },
 
+    pub inline fn from(interrupt_frame: arch.interrupts.InterruptFrame) *InterruptFrame {
+        return interrupt_frame.arch_specific;
+    }
+
     /// Returns the context that the interrupt was triggered from.
-    pub fn context(
-        interrupt_frame: *const InterruptFrame,
-        current_task: Task.Current,
-    ) kernel.Context {
+    pub fn contextSS(interrupt_frame: *const InterruptFrame) kernel.Context.Type {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
-            .user_code, .user_code_32bit => return .{ .user = .fromTask(current_task.task) },
+            .user_code, .user_code_32bit => .user,
             else => unreachable,
         };
     }
@@ -320,9 +315,7 @@ pub const init = struct {
     /// Ensure that any exceptions/faults that occur during early initialization are handled.
     ///
     /// The handler is not expected to do anything other than panic.
-    pub fn initializeEarlyInterrupts(current_task: Task.Current) void {
-        _ = current_task;
-
+    pub fn initializeEarlyInterrupts() void {
         for (raw_interrupt_handlers, 0..) |raw_handler, i| {
             globals.idt.handlers[i].init(
                 .kernel_code,
@@ -339,9 +332,8 @@ pub const init = struct {
     }
 
     /// Prepare interrupt allocation and routing.
-    pub fn initializeInterruptRouting(current_task: Task.Current) void {
+    pub fn initializeInterruptRouting() void {
         globals.interrupt_arena.init(
-            current_task,
             .{
                 .name = kernel.mem.resource_arena.Name.fromSlice("interrupts") catch unreachable,
                 .quantum = 1,
@@ -351,7 +343,6 @@ pub const init = struct {
         };
 
         globals.interrupt_arena.addSpan(
-            current_task,
             Interrupt.first_available_interrupt,
             Interrupt.last_available_interrupt - Interrupt.first_available_interrupt,
         ) catch |err| {
@@ -361,9 +352,7 @@ pub const init = struct {
 
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
-    pub fn loadStandardInterruptHandlers(current_task: Task.Current) void {
-        _ = current_task;
-
+    pub fn loadStandardInterruptHandlers() void {
         globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .prepare(interrupt_handlers.nonMaskableInterruptHandler, .{});
         globals.handlers[@intFromEnum(Interrupt.page_fault)] = .prepare(interrupt_handlers.pageFaultHandler, .{});
         globals.handlers[@intFromEnum(Interrupt.flush_request)] = .prepare(interrupt_handlers.flushRequestHandler, .{});

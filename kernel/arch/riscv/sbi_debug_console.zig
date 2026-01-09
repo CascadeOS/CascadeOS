@@ -31,7 +31,7 @@ pub const output: arch.init.InitOutput.Output = .{
         }
     }.splatFn,
     .remapFn = struct {
-        fn remapFn(_: *anyopaque, _: Task.Current) !void {
+        fn remapFn(_: *anyopaque) !void {
             return;
         }
     }.remapFn,

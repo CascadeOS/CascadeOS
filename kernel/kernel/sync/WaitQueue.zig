@@ -35,12 +35,11 @@ pub fn popFirst(wait_queue: *WaitQueue) ?*Task {
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wakeOne(
     wait_queue: *WaitQueue,
-    current_task: Task.Current,
     spinlock: *const kernel.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(current_task.task.interrupt_disable_count != 0);
-        std.debug.assert(spinlock.isLockedByCurrent(current_task));
+        std.debug.assert(Task.Current.get().task.interrupt_disable_count != 0);
+        std.debug.assert(spinlock.isLockedByCurrent());
     }
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
@@ -49,10 +48,10 @@ pub fn wakeOne(
     if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
-    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get(current_task);
-    defer maybe_locked.unlock(current_task);
+    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get();
+    defer maybe_locked.unlock();
 
-    maybe_locked.scheduler_handle.queueTask(current_task, task_to_wake);
+    maybe_locked.scheduler_handle.queueTask(task_to_wake);
 }
 
 /// Add the current task to the wait queue.
@@ -62,22 +61,23 @@ pub fn wakeOne(
 /// Asserts that the spinlock is locked by the current executor and interrupts are disabled.
 pub fn wait(
     wait_queue: *WaitQueue,
-    current_task: Task.Current,
     spinlock: *kernel.sync.TicketSpinLock,
 ) void {
+    const current_task: Task.Current = .get();
+
     if (core.is_debug) {
         std.debug.assert(current_task.task.interrupt_disable_count != 0);
-        std.debug.assert(spinlock.isLockedByCurrent(current_task));
+        std.debug.assert(spinlock.isLockedByCurrent());
     }
 
     wait_queue.waiting_tasks.append(&current_task.task.next_task_node);
 
-    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-    defer scheduler_handle.unlock(current_task);
+    const scheduler_handle: Task.SchedulerHandle = .get();
+    defer scheduler_handle.unlock();
 
-    scheduler_handle.dropWithDeferredAction(current_task, .{
+    scheduler_handle.dropWithDeferredAction(.{
         .action = struct {
-            fn action(_: Task.Current, old_task: *Task, arg: usize) void {
+            fn action(old_task: *Task, arg: usize) void {
                 const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(arg);
 
                 old_task.state = .blocked;

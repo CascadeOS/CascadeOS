@@ -21,7 +21,7 @@ splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
 /// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
 /// initialized.
-remapFn: *const fn (state: *anyopaque, current_task: Task.Current) anyerror!void,
+remapFn: *const fn (state: *anyopaque) anyerror!void,
 
 state: *anyopaque,
 
@@ -29,52 +29,52 @@ pub const writer = &globals.writer;
 pub const lock = &globals.lock;
 
 /// Allow outputs to remap themselves into the non-cached direct map or special heap.
-pub fn remapOutputs(current_task: Task.Current) !void {
-    if (globals.framebuffer_output) |output| try output.remapFn(output.state, current_task);
-    if (globals.serial_output) |output| try output.remapFn(output.state, current_task);
+pub fn remapOutputs() !void {
+    if (globals.framebuffer_output) |output| try output.remapFn(output.state);
+    if (globals.serial_output) |output| try output.remapFn(output.state);
 }
 
-pub fn registerOutputs(current_task: Task.Current) void {
+pub fn registerOutputs() void {
     if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
         globals.framebuffer_output = output;
     }
 
-    if (arch.init.tryGetSerialOutput(current_task)) |output| {
+    if (arch.init.tryGetSerialOutput()) |output| {
         switch (output.preference) {
             .use => globals.serial_output = output.output,
             .prefer_generic => {
-                if (tryGetSerialOutputFromGenericSources(current_task)) |generic_output|
+                if (tryGetSerialOutputFromGenericSources()) |generic_output|
                     globals.serial_output = generic_output
                 else
                     globals.serial_output = output.output;
             },
         }
-    } else globals.serial_output = tryGetSerialOutputFromGenericSources(current_task);
+    } else globals.serial_output = tryGetSerialOutputFromGenericSources();
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources(current_task: Task.Current) ?kernel.init.Output {
+fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
 
     blk: {
-        if (kernel.acpi.tables.SPCR.init.tryGetSerialOutput(current_task)) |output_uart| {
-            log.debug(current_task, "got serial output from SPCR", .{});
+        if (kernel.acpi.tables.SPCR.init.tryGetSerialOutput()) |output_uart| {
+            log.debug("got serial output from SPCR", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (kernel.acpi.tables.DBG2.init.tryGetSerialOutput(current_task)) |output_uart| {
-            log.debug(current_task, "got serial output from DBG2", .{});
+        if (kernel.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
+            log.debug("got serial output from DBG2", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (devicetree.tryGetSerialOutput(current_task)) |output_uart| {
-            log.debug(current_task, "got serial output from device tree", .{});
+        if (devicetree.tryGetSerialOutput()) |output_uart| {
+            log.debug("got serial output from device tree", .{});
 
             static.init_output_uart = output_uart;
             break :blk;

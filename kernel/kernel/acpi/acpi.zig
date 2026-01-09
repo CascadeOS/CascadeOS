@@ -19,10 +19,12 @@ pub fn rsdpTable() *const tables.RSDP {
     return globals.rsdp;
 }
 
-pub fn tryShutdown(current_task: Task.Current) !void {
+pub fn tryShutdown() !void {
     if (!globals.acpi_initialized) return;
 
     try uacpi.prepareForSleep(.S5);
+
+    const current_task: Task.Current = .get();
 
     current_task.incrementInterruptDisable();
     defer current_task.decrementInterruptDisable();
@@ -64,7 +66,7 @@ pub const init = struct {
         init_globals.acpi_present = true;
     }
 
-    pub fn logAcpiTables(current_task: Task.Current) !void {
+    pub fn logAcpiTables() !void {
         if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
         // `directMapFromPhysical` is used as the non-cached direct map is not yet initialized
@@ -75,13 +77,13 @@ pub const init = struct {
 
         var iter = tableIterator(sdt_header);
 
-        init_log.debug(current_task, "ACPI tables:", .{});
+        init_log.debug("ACPI tables:", .{});
 
         while (iter.next()) |table| {
             if (table.isValid()) {
-                init_log.debug(current_task, "  {s}", .{table.signatureAsString()});
+                init_log.debug("  {s}", .{table.signatureAsString()});
             } else {
-                init_log.debug(current_task, "  {s} - INVALID", .{table.signatureAsString()});
+                init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
             }
         }
     }
@@ -89,13 +91,13 @@ pub const init = struct {
     /// Initialize the ACPI subsystem.
     ///
     /// NOP if ACPI is not present.
-    pub fn initialize(current_task: Task.Current) !void {
+    pub fn initialize() !void {
         if (!init_globals.acpi_present) {
-            init_log.debug(current_task, "ACPI not present", .{});
+            init_log.debug("ACPI not present", .{});
             return;
         }
 
-        init_log.debug(current_task, "entering ACPI mode", .{});
+        init_log.debug("entering ACPI mode", .{});
         try uacpi.initialize(.{});
 
         try uacpi.FixedEvent.power_button.installHandler(
@@ -104,26 +106,25 @@ pub const init = struct {
             null,
         );
 
-        init_log.debug(current_task, "loading namespace", .{});
+        init_log.debug("loading namespace", .{});
         try uacpi.namespaceLoad();
 
         if (arch.current_arch == .x64) {
             try uacpi.setInterruptModel(.ioapic);
         }
 
-        init_log.debug(current_task, "initializing namespace", .{});
+        init_log.debug("initializing namespace", .{});
         try uacpi.namespaceInitialize();
 
-        init_log.debug(current_task, "finializing GPEs", .{});
+        init_log.debug("finializing GPEs", .{});
         try uacpi.finializeGpeInitialization();
 
         globals.acpi_initialized = true;
     }
 
     fn earlyPowerButtonHandler(_: ?*void) uacpi.InterruptReturn {
-        const current_task: Task.Current = .current();
-        log.warn(current_task, "power button pressed", .{});
-        tryShutdown(current_task) catch |err| {
+        log.warn("power button pressed", .{});
+        tryShutdown() catch |err| {
             std.debug.panic("failed to shutdown: {t}", .{err});
         };
         @panic("shutdown failed");

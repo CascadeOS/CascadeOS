@@ -13,48 +13,43 @@ const kernel_log_scopes = kernel_options.kernel_log_scopes;
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
         pub fn err(
-            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.err)) return;
-            logFn(current_task, prefix_err, userFmt(format), args);
+            logFn(prefix_err, userFmt(format), args);
         }
 
         pub fn warn(
-            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.warn)) return;
-            logFn(current_task, prefix_warn, userFmt(format), args);
+            logFn(prefix_warn, userFmt(format), args);
         }
 
         pub fn info(
-            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.info)) return;
-            logFn(current_task, prefix_info, userFmt(format), args);
+            logFn(prefix_info, userFmt(format), args);
         }
 
         pub fn debug(
-            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.debug)) return;
-            logFn(current_task, prefix_debug, userFmt(format), args);
+            logFn(prefix_debug, userFmt(format), args);
         }
 
         pub fn verbose(
-            current_task: Task.Current,
             comptime format: []const u8,
             args: anytype,
         ) callconv(core.inline_in_non_debug) void {
             if (comptime !levelEnabled(.verbose)) return;
-            logFn(current_task, prefix_verbose, userFmt(format), args);
+            logFn(prefix_verbose, userFmt(format), args);
         }
 
         pub inline fn levelEnabled(comptime message_level: Level) bool {
@@ -108,7 +103,6 @@ pub const Level = enum {
 };
 
 fn logFn(
-    current_task: Task.Current,
     prefix: []const u8,
     comptime format: []const u8,
     args: anytype,
@@ -127,7 +121,7 @@ fn logFn(
                 return;
             };
 
-            writer.print("{f} | ", .{current_task}) catch {
+            writer.print("{f} | ", .{Task.Current.get().task}) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;
@@ -148,8 +142,8 @@ fn logFn(
         .init_log => {
             @branchHint(.unlikely);
 
-            kernel.init.Output.lock.lock(current_task);
-            defer kernel.init.Output.lock.unlock(current_task);
+            kernel.init.Output.lock.lock();
+            defer kernel.init.Output.lock.unlock();
 
             const writer = kernel.init.Output.writer;
 
@@ -159,7 +153,7 @@ fn logFn(
                 return;
             };
 
-            writer.print("{f} | ", .{current_task}) catch {
+            writer.print("{f} | ", .{Task.Current.get().task}) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;

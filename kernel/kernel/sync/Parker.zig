@@ -33,15 +33,15 @@ pub fn withParkedTask(parked_task: *Task) Parker {
 /// Park (block) the current task.
 ///
 /// Spurious wakeups are possible.
-pub fn park(parker: *Parker, current_task: Task.Current) void {
-    if (core.is_debug) std.debug.assert(current_task.task.state == .running);
+pub fn park(parker: *Parker) void {
+    if (core.is_debug) std.debug.assert(Task.Current.get().task.state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         return; // there were some wakeups, they might be spurious
     }
 
-    const scheduler_handle: Task.SchedulerHandle = .get(current_task);
-    defer scheduler_handle.unlock(current_task);
+    const scheduler_handle: Task.SchedulerHandle = .get();
+    defer scheduler_handle.unlock();
 
     // recheck for unpark attempts that happened while we were locking the scheduler
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
@@ -49,19 +49,19 @@ pub fn park(parker: *Parker, current_task: Task.Current) void {
         return;
     }
 
-    parker.lock.lock(current_task);
+    parker.lock.lock();
     if (core.is_debug) std.debug.assert(parker.parked_task == null);
 
     // recheck for unpark attempts that happened while we were locking the parker lock
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         @branchHint(.unlikely);
-        parker.lock.unlock(current_task);
+        parker.lock.unlock();
         return;
     }
 
-    scheduler_handle.dropWithDeferredAction(current_task, .{
+    scheduler_handle.dropWithDeferredAction(.{
         .action = struct {
-            fn action(_: Task.Current, old_task: *Task, arg: usize) void {
+            fn action(old_task: *Task, arg: usize) void {
                 const inner_parker: *Parker = @ptrFromInt(arg);
 
                 old_task.state = .blocked;
@@ -79,18 +79,15 @@ pub fn park(parker: *Parker, current_task: Task.Current) void {
 }
 
 /// Unpark (wake) the parked task if it is currently parked.
-pub fn unpark(
-    parker: *Parker,
-    current_task: Task.Current,
-) void {
+pub fn unpark(parker: *Parker) void {
     if (parker.unpark_attempts.fetchAdd(1, .acq_rel) != 0) {
         // someone else was the first to attempt to unpark the task, so we can leave waking the task to them
         return;
     }
 
     const parked_task = blk: {
-        parker.lock.lock(current_task);
-        defer parker.lock.unlock(current_task);
+        parker.lock.lock();
+        defer parker.lock.unlock();
 
         const parked_task = parker.parked_task orelse return;
         parker.parked_task = null;
@@ -100,8 +97,8 @@ pub fn unpark(
 
     parked_task.state = .ready;
 
-    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get(current_task);
-    defer maybe_locked.unlock(current_task);
+    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get();
+    defer maybe_locked.unlock();
 
-    maybe_locked.scheduler_handle.queueTask(current_task, parked_task);
+    maybe_locked.scheduler_handle.queueTask(parked_task);
 }

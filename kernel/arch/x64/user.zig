@@ -16,60 +16,110 @@ const log = kernel.debug.log.scoped(.user_x64);
 const x64 = @import("x64.zig");
 
 pub const PerThread = struct {
-    xsave: XSave,
+    extended_state: ExtendedState,
 
-    pub const XSave = struct {
-        area: []align(64) u8,
+    /// Create the `PerThread` data of a thread.
+    ///
+    /// Non-architecture specific creation has already been performed but no initialization.
+    ///
+    /// This function is called in the `Thread` cache constructor.
+    pub fn createThread(thread: *Thread) kernel.mem.cache.ConstructorError!void {
+        const per_thread: *x64.user.PerThread = .from(thread);
 
-        /// Where is the xsave data currently stored.
-        state: State = .area,
+        per_thread.* = .{
+            .extended_state = .{
+                .xsave_area = @alignCast(
+                    globals.xsave_area_cache.allocate() catch return error.ItemConstructionFailed,
+                ),
+            },
+        };
+    }
+
+    /// Destroy the `PerThread` data of a thread.
+    ///
+    /// Non-architecture specific destruction has not already been performed.
+    ///
+    /// This function is called in the `Thread` cache destructor.
+    pub fn destroyThread(thread: *Thread) void {
+        const per_thread: *x64.user.PerThread = .from(thread);
+
+        globals.xsave_area_cache.deallocate(per_thread.extended_state.xsave_area);
+    }
+
+    /// Initialize the `PerThread` data of a thread.
+    ///
+    /// All non-architecture specific initialization has already been performed.
+    ///
+    /// This function is called in `Thread.internal.create`.
+    pub fn initializeThread(thread: *Thread) void {
+        const per_thread: *x64.user.PerThread = .from(thread);
+        per_thread.extended_state.zero();
+    }
+
+    pub fn from(thread: *Thread) *PerThread {
+        return &thread.arch_specific;
+    }
+
+    pub const ExtendedState = struct {
+        fs_base: usize = undefined,
+        gs_base: usize = undefined,
+        xsave_area: []align(64) u8,
+
+        /// Where is the extended state currently stored
+        state: State = .memory,
 
         pub const State = enum {
             registers,
-            area,
+            memory,
         };
 
-        pub fn zero(xsave: *XSave) void {
-            @memset(xsave.area, 0);
-            xsave.state = .area;
+        fn zero(extended_state: *ExtendedState) void {
+            extended_state.fs_base = 0;
+            extended_state.gs_base = 0;
+            @memset(extended_state.xsave_area, 0);
+            extended_state.state = .memory;
         }
 
-        /// Save the xsave state into the xsave area if it is currently stored in the registers.
+        /// Save the extended state into memory if it is currently stored in the registers.
         ///
         /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
-        pub fn save(xsave: *XSave) void {
-            switch (xsave.state) {
-                .area => {},
+        pub fn save(extended_state: *ExtendedState) void {
+            switch (extended_state.state) {
+                .memory => {},
                 .registers => {
+                    extended_state.fs_base = x64.registers.FS_BASE.read();
+                    extended_state.gs_base = x64.registers.KERNEL_GS_BASE.read();
                     switch (x64.info.xsave.method) {
                         .xsaveopt => {
                             @branchHint(.likely); // modern machines support xsaveopt
                             x64.instructions.xsaveopt(
-                                xsave.area,
+                                extended_state.xsave_area,
                                 x64.info.xsave.xcr0_value,
                             );
                         },
                         .xsave => x64.instructions.xsave(
-                            xsave.area,
+                            extended_state.xsave_area,
                             x64.info.xsave.xcr0_value,
                         ),
                     }
-                    xsave.state = .area;
+                    extended_state.state = .memory;
                 },
             }
         }
 
-        /// Load the xsave state into registers if it is currently stored in the xsave area.
+        /// Load the extended state into registers if it is currently stored in memory.
         ///
         /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
-        pub fn load(xsave: *XSave) void {
-            switch (xsave.state) {
-                .area => {
+        pub fn load(extended_state: *ExtendedState) void {
+            switch (extended_state.state) {
+                .memory => {
+                    x64.registers.FS_BASE.write(extended_state.fs_base);
+                    x64.registers.KERNEL_GS_BASE.write(extended_state.gs_base);
                     x64.instructions.xrstor(
-                        xsave.area,
+                        extended_state.xsave_area,
                         x64.info.xsave.xcr0_value,
                     );
-                    xsave.state = .registers;
+                    extended_state.state = .registers;
                 },
                 .registers => {},
             }
@@ -77,53 +127,20 @@ pub const PerThread = struct {
     };
 };
 
-/// Create the `PerThread` data of a thread.
-///
-/// Non-architecture specific creation has already been performed but no initialization.
-///
-/// This function is called in the `Thread` cache constructor.
-pub fn createThread(current_task: Task.Current, thread: *Thread) kernel.mem.cache.ConstructorError!void {
-    thread.arch_specific = .{
-        .xsave = .{
-            .area = @alignCast(
-                globals.xsave_area_cache.allocate(current_task) catch return error.ItemConstructionFailed,
-            ),
-        },
-    };
-}
-
-/// Destroy the `PerThread` data of a thread.
-///
-/// Non-architecture specific destruction has not already been performed.
-///
-/// This function is called in the `Thread` cache destructor.
-pub fn destroyThread(current_task: Task.Current, thread: *Thread) void {
-    globals.xsave_area_cache.deallocate(current_task, thread.arch_specific.xsave.area);
-}
-
-/// Initialize the `PerThread` data of a thread.
-///
-/// All non-architecture specific initialization has already been performed.
-///
-/// This function is called in `Thread.internal.create`.
-pub fn initializeThread(current_task: Task.Current, thread: *Thread) void {
-    _ = current_task;
-    thread.arch_specific.xsave.zero();
-}
-
 /// Enter userspace for the first time in the current task.
-pub fn enterUserspace(current_task: Task.Current, options: arch.user.EnterUserspaceOptions) noreturn {
-    const thread: *Thread = .fromTask(current_task.task);
-
-    x64.instructions.disableInterrupts();
-
-    x64.instructions.enableSSEUsage();
-    thread.arch_specific.xsave.load();
+pub fn enterUserspace(options: arch.user.EnterUserspaceOptions) noreturn {
+    const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
+    if (core.is_debug) std.debug.assert(per_thread.extended_state.state == .memory);
 
     const frame: EnterUserspaceFrame = .{
         .rip = options.entry_point,
         .rsp = options.stack_pointer,
     };
+
+    x64.instructions.disableInterrupts();
+
+    x64.instructions.enableSSEUsage();
+    per_thread.extended_state.load();
 
     asm volatile (
         \\mov %[frame], %rsp
@@ -142,8 +159,7 @@ pub fn enterUserspace(current_task: Task.Current, options: arch.user.EnterUsersp
         \\xor %r13, %r13
         \\xor %r14, %r14
         \\xor %r15, %r15
-        \\mov %ax, %fs
-        \\mov %ax, %gs
+        \\swapgs
         \\iretq
         :
         : [frame] "r" (&frame),
@@ -191,30 +207,7 @@ const EnterUserspaceFrame = extern struct {
     };
 };
 
-export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
-    x64.instructions.disableSSEUsage();
-
-    const current_task: Task.Current = .onSyscallEntry();
-
-    defer {
-        const thread: *Thread = .fromTask(current_task.task);
-        x64.instructions.enableSSEUsage();
-        thread.arch_specific.xsave.load();
-    }
-
-    kernel.user.onSyscall(current_task, .{ .arch_specific = syscall_frame });
-
-    x64.instructions.disableInterrupts();
-}
-
-pub fn getSyscallEntryPoint(executor: *kernel.Executor) *const anyopaque {
-    return raw_syscall_entry_points[@intFromEnum(executor.id)];
-}
-
 pub const SyscallFrame = extern struct {
-    fs: u64,
-    gs: u64,
-
     /// arg11
     r15: u64,
     /// arg10
@@ -247,6 +240,10 @@ pub const SyscallFrame = extern struct {
     /// rcx
     rip: u64,
     rsp: u64,
+
+    pub inline fn from(syscall_frame: arch.user.SyscallFrame) *SyscallFrame {
+        return &syscall_frame.arch_specific;
+    }
 
     pub inline fn syscall(syscall_frame: *const SyscallFrame) ?cascade.Syscall {
         return std.enums.fromInt(cascade.Syscall, syscall_frame.rdi);
@@ -322,6 +319,78 @@ pub const SyscallFrame = extern struct {
     }
 };
 
+export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
+    x64.instructions.disableSSEUsage();
+    defer {
+        const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
+        x64.instructions.enableSSEUsage();
+        per_thread.extended_state.load();
+    }
+
+    kernel.user.onSyscall(.{ .arch_specific = syscall_frame });
+
+    x64.instructions.disableInterrupts();
+}
+
+pub fn syscallEntry() callconv(.naked) noreturn {
+    asm volatile (std.fmt.comptimePrint(
+            \\swapgs
+            \\
+            \\mov %rsp, %gs:{[user_rsp_scratch_offset]}      // save the user rsp
+            \\mov %gs:{[kernel_stack_pointer_offset]}, %rsp  // load the kernel rsp
+            \\
+            \\sub $8, %rsp                                   // reserve space for the user rsp
+            \\push %rcx                                      // user rip
+            \\push %r11                                      // user rflags
+            \\
+            \\mov %gs:{[user_rsp_scratch_offset]}, %r11
+            \\mov %r11, 16(%rsp)                             // store the user rsp in reserved space
+            \\
+            \\push %rax
+            \\push %rbx
+            \\push %rdx
+            \\push %rbp
+            \\push %rsi
+            \\push %rdi
+            \\push %r8
+            \\push %r9
+            \\push %r10
+            \\push %r12
+            \\push %r13
+            \\push %r14
+            \\push %r15
+            \\
+            \\cld
+            \\xor %ebp, %ebp
+            \\mov %rsp, %rdi
+            \\call syscallDispatch
+            \\
+            \\pop %r15
+            \\pop %r14
+            \\pop %r13
+            \\pop %r12
+            \\pop %r10
+            \\pop %r9
+            \\pop %r8
+            \\pop %rdi
+            \\pop %rsi
+            \\pop %rbp
+            \\pop %rdx
+            \\pop %rbx
+            \\pop %rax
+            \\
+            \\pop %r11 // user rflags
+            \\pop %rcx // user rip
+            \\pop %rsp // user rsp
+            \\
+            \\swapgs
+            \\sysretq
+        , .{
+            .user_rsp_scratch_offset = @offsetOf(kernel.Task, "arch_specific") + @offsetOf(x64.PerTask, "user_rsp_scratch"),
+            .kernel_stack_pointer_offset = @offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer"),
+        }));
+}
+
 const globals = struct {
     /// Initialized during `init.initialize`.
     var xsave_area_cache: kernel.mem.cache.RawCache = undefined;
@@ -331,88 +400,12 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.thread_init);
 
     /// Perform any per-achitecture initialization needed for userspace processes/threads.
-    pub fn initialize(current_task: Task.Current) !void {
-        init_log.debug(current_task, "initializing xsave area cache", .{});
-        globals.xsave_area_cache.init(current_task, .{
+    pub fn initialize() !void {
+        init_log.debug("initializing xsave area cache", .{});
+        globals.xsave_area_cache.init(.{
             .name = try .fromSlice("xsave"),
             .size = x64.info.xsave.xsave_area_size.value,
             .alignment = .fromByteUnits(64),
         });
     }
-};
-
-comptime {
-    // below asserts ensure the constants in `kernel/x64/asm/syscallEntry.S` are in sync
-    std.debug.assert(kernel.config.executor.maximum_number_of_executors == 64);
-    std.debug.assert(@offsetOf(kernel.Executor, "current_task") == 0);
-    std.debug.assert(@offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer") == 136);
-}
-
-const RawSyscallEntry = *const fn () callconv(.naked) noreturn;
-
-const raw_syscall_entry_points: [kernel.config.executor.maximum_number_of_executors]RawSyscallEntry = .{
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_0" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_1" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_2" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_3" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_4" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_5" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_6" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_7" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_8" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_9" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_10" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_11" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_12" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_13" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_14" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_15" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_16" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_17" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_18" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_19" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_20" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_21" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_22" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_23" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_24" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_25" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_26" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_27" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_28" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_29" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_30" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_31" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_32" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_33" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_34" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_35" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_36" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_37" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_38" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_39" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_40" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_41" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_42" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_43" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_44" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_45" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_46" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_47" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_48" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_49" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_50" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_51" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_52" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_53" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_54" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_55" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_56" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_57" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_58" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_59" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_60" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_61" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_62" }),
-    @extern(RawSyscallEntry, .{ .name = "_syscall_entry_63" }),
 };
