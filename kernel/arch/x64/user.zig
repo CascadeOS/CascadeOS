@@ -87,8 +87,14 @@ pub const PerThread = struct {
             switch (extended_state.state) {
                 .memory => {},
                 .registers => {
-                    extended_state.fs_base = x64.registers.FS_BASE.read();
+                    if (x64.info.cpu_id.fsgsbase) {
+                        @branchHint(.likely); // modern machines support fsgsbase
+                        extended_state.fs_base = x64.instructions.rdfsbase();
+                    } else {
+                        extended_state.fs_base = x64.registers.FS_BASE.read();
+                    }
                     extended_state.gs_base = x64.registers.KERNEL_GS_BASE.read();
+
                     switch (x64.info.xsave.method) {
                         .xsaveopt => {
                             @branchHint(.likely); // modern machines support xsaveopt
@@ -102,6 +108,7 @@ pub const PerThread = struct {
                             x64.info.xsave.xcr0_value,
                         ),
                     }
+
                     extended_state.state = .memory;
                 },
             }
@@ -113,12 +120,20 @@ pub const PerThread = struct {
         pub fn load(extended_state: *ExtendedState) void {
             switch (extended_state.state) {
                 .memory => {
-                    x64.registers.FS_BASE.write(extended_state.fs_base);
+                    if (x64.info.cpu_id.fsgsbase) {
+                        @branchHint(.likely); // modern machines support fsgsbase
+                        x64.instructions.wrfsbase(extended_state.fs_base);
+                    } else {
+                        x64.registers.FS_BASE.write(extended_state.fs_base);
+                    }
+
                     x64.registers.KERNEL_GS_BASE.write(extended_state.gs_base);
+
                     x64.instructions.xrstor(
                         extended_state.xsave_area,
                         x64.info.xsave.xcr0_value,
                     );
+
                     extended_state.state = .registers;
                 },
                 .registers => {},
